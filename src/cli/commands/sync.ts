@@ -42,6 +42,7 @@ import { ensureHerdr } from '../../lib/herdr-setup/ensure.js';
 import { renderHerdrReport } from '../herdr-report.js';
 import { checkSyncSourceFreshness } from '../../lib/sync-source-freshness.js';
 import { pruneDanglingGitHookLinks } from '../../lib/git-hooks.js';
+import { runOperatorMemorySyncStep } from './memory-sync.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -116,6 +117,10 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     console.log(chalk.yellow(devrootWarning));
     console.log('');
   }
+
+  // PAN-4578: operator memory changes on other machines are not a sync input, so pull
+  // before the --if-changed shortcut. Silent when the store is not synced; never throws.
+  if (!options.dryRun && !options.backupOnly) await runOperatorMemorySyncStep();
 
   // Startup-only shortcut: skip the expensive full sync when inputs are unchanged.
   if (options.ifChanged && !options.force) {

@@ -68,6 +68,14 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   slot `keywrap/v1` for the PAN-4328 passphrase-wrapped key), with `store/dir.ts` and
   `store/git.ts` backends and a shared contract suite under `tests/unit/lib/vault/store/`.
   `identity.ts` owns the key and the 24-word phrase. CLI verbs: `src/cli/commands/vault/`.
+- `memory/facts/` (PAN-3957) — curated memory facts: `store.ts` (one `<id>.md` per fact; project store
+  `<planHome>/.overdeck/memory/`, operator store `~/.overdeck/context/memory/`, machine store
+  `~/.overdeck/context/machine-memory/`) and `render.ts` (the launch-time index, rendered from
+  frontmatter, never stored, never network). PAN-4578: `operator-sync.ts` + `operator-sync-conflicts.ts`
+  make the operator store a git clone of an operator-owned remote (setup, sync, status; conflict copies);
+  triggers are `pan memory sync` (`memory-sync.ts`), `pan sync`, `--user` writes and the dashboard's
+  `operator-memory-sync-service.ts` — never a launch. CLI verbs in `src/cli/commands/memory-facts.ts`.
+  Distinct from observation memory (`memory/*.ts`, `~/.overdeck/memory/`).
 - `cloister/` — the Deacon (lifecycle watchdog), model routing (`router.ts`),
   legacy `model_selection.specialist_harnesses` (PAN-636).
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).
@@ -208,4 +216,4 @@ from `DerivedIssueState.pr`, not from links; the conversation list's badge
 
 No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.
 
-<!-- last-verified: 2026-10-20 -->
+<!-- last-verified: 2026-10-21 -->

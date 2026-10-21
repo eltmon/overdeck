@@ -12,6 +12,7 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
 import {
   defaultFactTitle,
   isActiveFact,
+  machineMemoryDir,
   matchMemoryFacts,
   MemoryFactExistsError,
   MemoryFactSensitiveError,
@@ -142,15 +143,39 @@ describe('memory facts store', () => {
       expect('reason' in result && result.reason).toBe('invalid id "Not Valid!"');
     });
 
-    it('reports a machine-specific path in a project-store fact, and accepts it with scope user', () => {
+    it('reports a machine-specific path in a project-store fact', () => {
       const file = join(tmpRoot, 'valid-id.md');
       const raw = '---\ntype: feedback\ndescription: x\n---\nSee /home/alice/notes for details.\n';
       const projectResult = parseMemoryFact(file, raw, 'project');
       expect('reason' in projectResult && projectResult.reason).toBe(
-        'machine-specific path "/home/alice/"; use ~ or a project-relative path, or keep the fact on this machine with --user',
+        'machine-specific path "/home/alice/"; use ~ or a relative path, or keep the fact on this machine with --machine',
       );
+    });
+
+    it('user scope refuses a home-directory path with the --machine hint', () => {
+      const file = join(tmpRoot, 'valid-id.md');
+      const raw = '---\ntype: feedback\ndescription: x\n---\nSee /home/alice/x for details.\n';
       const userResult = parseMemoryFact(file, raw, 'user');
-      expect('reason' in userResult).toBe(false);
+      expect('reason' in userResult && userResult.reason).toBe(
+        'machine-specific path "/home/alice/"; use ~ or a relative path, or keep the fact on this machine with --machine',
+      );
+    });
+
+    it('machine scope accepts a home-directory path and type user', () => {
+      const file = join(tmpRoot, 'valid-id.md');
+      const raw = '---\ntype: user\ndescription: x\n---\nSee /home/alice/x for details.\n';
+      const machineResult = parseMemoryFact(file, raw, 'machine');
+      expect('reason' in machineResult).toBe(false);
+      expect('reason' in machineResult ? null : machineResult.scope).toBe('machine');
+    });
+
+    it('project scope still refuses type user', () => {
+      const file = join(tmpRoot, 'valid-id.md');
+      const raw = '---\ntype: user\ndescription: x\n---\nbody\n';
+      const result = parseMemoryFact(file, raw, 'project');
+      expect('reason' in result && result.reason).toBe(
+        'user facts belong in the operator store (~/.overdeck/context/memory)',
+      );
     });
 
     it('accepts ~ paths and localhost ports in a project store', () => {
@@ -297,16 +322,20 @@ describe('memory facts store', () => {
       );
     });
 
-    it('refuses a /home/<user>/ path in a project store and accepts it in the operator store', async () => {
+    it('refuses a /home/<user>/ path in the project and operator stores and accepts it in the machine store', async () => {
       const projectDir = join(tmpRoot, 'memory-project');
       const userDir = join(tmpRoot, 'memory-user');
+      const machineDir = join(tmpRoot, 'memory-machine');
       await expect(
         writeMemoryFact(projectDir, 'project', { ...baseFact('path-fact'), body: 'See /home/alice/notes.' }),
       ).rejects.toThrow(/machine-specific path/);
-
       await expect(
         writeMemoryFact(userDir, 'user', { ...baseFact('path-fact'), body: 'See /home/alice/notes.' }),
-      ).resolves.toBe(join(userDir, 'path-fact.md'));
+      ).rejects.toThrow(/machine-specific path/);
+
+      await expect(
+        writeMemoryFact(machineDir, 'machine', { ...baseFact('path-fact'), body: 'See /home/alice/notes.' }),
+      ).resolves.toBe(join(machineDir, 'path-fact.md'));
     });
 
     it('accepts ~/.overdeck and localhost:3011 in a project store', async () => {
@@ -393,7 +422,7 @@ describe('memory facts store', () => {
     });
   });
 
-  describe('projectMemoryDir / userMemoryDir', () => {
+  describe('projectMemoryDir / userMemoryDir / machineMemoryDir', () => {
     it('resolves a workspace path to the workspace checkout, not the project root', () => {
       const projectRoot = projectPathRef.current;
       const workspace = join(projectRoot, 'workspaces', 'feature-pan-3957');
@@ -403,6 +432,10 @@ describe('memory facts store', () => {
 
     it('userMemoryDir follows OVERDECK_HOME', () => {
       expect(userMemoryDir()).toBe(join(process.env.OVERDECK_HOME as string, 'context', 'memory'));
+    });
+
+    it('machineMemoryDir resolves under OVERDECK_HOME/context/machine-memory', () => {
+      expect(machineMemoryDir()).toBe(join(tmpRoot, 'overdeck-home', 'context', 'machine-memory'));
     });
   });
 });

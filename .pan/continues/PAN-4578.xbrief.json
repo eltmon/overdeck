@@ -1,0 +1,273 @@
+{
+  "version": "1",
+  "issueId": "PAN-4578",
+  "created": "2026-10-21T04:41:10.643Z",
+  "updated": "2026-10-21T05:25:55.961Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-machine-scope": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T04:41:10.643Z",
+      "doneAt": "2026-10-21T04:42:18.586Z"
+    },
+    "w2-render-machine-section": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T04:42:23.250Z",
+      "doneAt": "2026-10-21T04:43:26.480Z"
+    },
+    "w3-context-preview-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T04:43:30.083Z",
+      "doneAt": "2026-10-21T04:44:01.067Z"
+    },
+    "w4-cli-machine-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T04:44:04.892Z",
+      "doneAt": "2026-10-21T04:45:33.668Z"
+    },
+    "w5-operator-sync-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T04:45:37.709Z",
+      "doneAt": "2026-10-21T04:49:37.216Z"
+    },
+    "w6-sync-conflicts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T04:52:55.652Z",
+      "doneAt": "2026-10-21T04:55:25.876Z"
+    },
+    "w7-cli-memory-sync": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T04:55:30.759Z",
+      "doneAt": "2026-10-21T04:58:20.633Z"
+    },
+    "w8-post-write-sync": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T04:58:24.614Z",
+      "doneAt": "2026-10-21T04:59:48.380Z"
+    },
+    "w9-pan-sync-step": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T04:59:52.661Z",
+      "doneAt": "2026-10-21T05:00:47.158Z"
+    },
+    "w10-dashboard-sync-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T05:00:51.426Z",
+      "doneAt": "2026-10-21T05:03:34.827Z"
+    },
+    "w11-pan-4577-routing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T05:03:39.677Z",
+      "doneAt": "2026-10-21T05:04:49.015Z"
+    },
+    "w12-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T05:04:53.903Z",
+      "doneAt": "2026-10-21T05:07:08.754Z"
+    },
+    "w1-machine-scope.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:16:54.869Z"
+    },
+    "w1-machine-scope.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:17:05.735Z"
+    },
+    "w1-machine-scope.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:17:16.465Z"
+    },
+    "w1-machine-scope.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:17:27.482Z"
+    },
+    "w2-render-machine-section.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:17:38.415Z"
+    },
+    "w2-render-machine-section.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:17:49.476Z"
+    },
+    "w2-render-machine-section.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:18:01.434Z"
+    },
+    "w2-render-machine-section.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:18:12.705Z"
+    },
+    "w3-context-preview-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:18:26.173Z"
+    },
+    "w3-context-preview-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:18:39.914Z"
+    },
+    "w4-cli-machine-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:18:52.170Z"
+    },
+    "w4-cli-machine-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:19:03.966Z"
+    },
+    "w4-cli-machine-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:19:16.702Z"
+    },
+    "w4-cli-machine-flag.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:19:27.624Z"
+    },
+    "w4-cli-machine-flag.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:19:38.567Z"
+    },
+    "w5-operator-sync-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:19:49.514Z"
+    },
+    "w5-operator-sync-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:20:00.551Z"
+    },
+    "w5-operator-sync-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:20:12.440Z"
+    },
+    "w5-operator-sync-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:20:24.812Z"
+    },
+    "w5-operator-sync-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:20:37.212Z"
+    },
+    "w6-sync-conflicts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:20:48.561Z"
+    },
+    "w6-sync-conflicts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:20:59.528Z"
+    },
+    "w6-sync-conflicts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:21:10.133Z"
+    },
+    "w6-sync-conflicts.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:21:20.750Z"
+    },
+    "w6-sync-conflicts.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:21:31.424Z"
+    },
+    "w7-cli-memory-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:21:42.301Z"
+    },
+    "w7-cli-memory-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:21:55.500Z"
+    },
+    "w7-cli-memory-sync.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:22:09.973Z"
+    },
+    "w7-cli-memory-sync.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:22:23.238Z"
+    },
+    "w7-cli-memory-sync.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:22:35.742Z"
+    },
+    "w8-post-write-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:22:48.259Z"
+    },
+    "w8-post-write-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:23:00.630Z"
+    },
+    "w8-post-write-sync.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:23:11.401Z"
+    },
+    "w8-post-write-sync.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:23:22.201Z"
+    },
+    "w9-pan-sync-step.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:23:33.141Z"
+    },
+    "w9-pan-sync-step.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:23:43.978Z"
+    },
+    "w10-dashboard-sync-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:23:55.062Z"
+    },
+    "w10-dashboard-sync-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:24:07.674Z"
+    },
+    "w10-dashboard-sync-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:24:19.229Z"
+    },
+    "w10-dashboard-sync-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:24:30.374Z"
+    },
+    "w10-dashboard-sync-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:24:42.293Z"
+    },
+    "w11-pan-4577-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:24:54.221Z"
+    },
+    "w11-pan-4577-routing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:25:06.361Z"
+    },
+    "w11-pan-4577-routing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:25:18.882Z"
+    },
+    "w12-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:25:31.081Z"
+    },
+    "w12-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:25:43.549Z"
+    },
+    "w12-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:25:55.961Z"
+    }
+  }
+}

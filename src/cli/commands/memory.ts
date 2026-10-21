@@ -16,6 +16,7 @@ import {
 } from '../../lib/memory/cli.js';
 import { backfillMemoryFromTranscripts } from '../../lib/memory/backfill.js';
 import { printMatchingFacts, registerMemoryFactCommands } from './memory-facts.js';
+import { registerMemorySyncCommand } from './memory-sync.js';
 import { resolveContainedPinPath, verifyPinPathContainment } from '../../lib/memory/pin-path.js';
 import { getProjectByKey, getWorkspaceById, listPinnedDocs, listWorkspacesForPath } from '../../lib/workspaces/resolver.js';
 import { pinDoc, unpinDoc } from '../../lib/workspaces/writer.js';
@@ -414,6 +415,7 @@ export function createMemoryCommand(): Command {
     });
 
   registerMemoryFactCommands(memory);
+  registerMemorySyncCommand(memory);
 
   return memory;
 }

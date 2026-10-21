@@ -1,0 +1,1003 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-21T05:00:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4578: Sync operator-level memory across machines (follow-up to PAN-3957)",
+    "updated": "2026-10-21T04:40:58.706Z"
+  },
+  "plan": {
+    "id": "pan-4578",
+    "title": "Sync operator-level memory across machines (follow-up to PAN-3957)",
+    "status": "running",
+    "uid": "acb2e804-870e-4ba3-b90a-ec641b9df85b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-21T05:00:00Z",
+    "updated": "2026-10-21T04:40:58.706Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4578",
+        "label": "PAN-4578",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4578.md",
+        "label": "PRD draft (.pan/drafts/pan-4578.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3957",
+        "label": "PAN-3957 (parent)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4577",
+        "label": "PAN-4577 (sibling, plan amended by W11)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "memory",
+      "operator-memory",
+      "sync",
+      "git",
+      "cli",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "PAN-3957 keeps operator facts (working agreements about the operator) in ~/.overdeck/context/memory/ on each machine and lists syncing as a non-goal. The operator works across several machines, so an operator fact written on one machine never reaches the others. The operator store also doubles as the home for machine-specific facts (home-directory paths), which must not travel.",
+      "Proposal": "Make the operator store a plain git clone of a private repository the operator owns (`pan memory sync --setup <git-url>`; no config key, the clone's origin is the setting). syncOperatorMemory commits local changes (holding back secret-like or home-path files), fetches, merges origin/main and pushes, never throwing; conflicts keep the remote version under the id and commit a review-marked `<id>-conflict-<machine>` copy of the local version. Add a never-synced machine store (~/.overdeck/context/machine-memory/, --machine, ## Machine memory) and apply the home-path guard to the operator store. Sync runs from `pan memory sync`, `pan sync` (before --if-changed), a 15-minute dashboard timer, and after `--user` writes; never at launch.",
+      "NonGoals": "- Encrypting operator facts or storing them in the Session Vault\n- Creating the sync repository, checking it is private, or managing git credentials\n- Syncing the machine store, the project store, the global layer, or anything else under ~/.overdeck\n- Any network access, fetch or git process at launch time (render.ts, materialize.ts, muse-context.ts)\n- A dashboard UI for sync setup, status or conflicts\n- Automatically merging fact content in a conflict (the operator resolves conflict copies)\n- More than one remote, or a branch other than main\n- A --no-sync flag on add/edit/retire --user\n- Changing the project store, observation memory, PAN-3957 D17 pipeline carve-outs, or OKF\n- Implementing PAN-4577 (W11 only amends its plan unless the checkpoint finds it landed)\n- git stash, reset --hard or execSync anywhere\n- Running pan sync on the host as part of the work"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Q1: the operator store becomes a plain git clone of an operator-owned private repo, set up with `pan memory sync --setup <git-url>`; no config key (origin is the setting).",
+        "rationale": "It is the issue's own example ('a private git repository that pan sync pulls and pushes'); facts stay readable OKF-compatible markdown; D10 already refuses secret-like text, so the Session Vault's encryption buys little and would make facts opaque; storing the URL in config would duplicate what git already records."
+      },
+      {
+        "summary": "Q2: machine-specific facts move to a new never-synced machine store ~/.overdeck/context/machine-memory/ (--machine), and the home-path guard now applies to the operator store; setup migrates existing home-path operator facts.",
+        "rationale": "git cannot ignore files by content and the reader already skips subdirectories, so a sibling directory needs no exclude list and no second reader; the operator store now travels, so PAN-3957 D16's reasoning applies to it; 0 operator facts exist on this host, so nothing is stranded here."
+      },
+      {
+        "summary": "Q3: on a conflict the remote version keeps the id and the local version is committed as a review-marked <id>-conflict-<machine-label> fact; an edit beats a deletion.",
+        "rationale": "Nothing is lost, an unattended sync never blocks on conflict markers, and PAN-3957's review marker already keeps such a fact out of the index, so no new state is invented. Last-writer-wins by the day-granularity updated date would silently lose same-day edits."
+      },
+      {
+        "summary": "Sync triggers: pan memory sync, pan sync (placed before the --if-changed early return), a 15-minute dashboard timer, and once after each --user write; never at launch.",
+        "rationale": "pan sync --if-changed returns before any step when only the remote changed, so a step after it would never pull; the timer covers long-running machines; post-write sync makes an agent-recorded fact reach other machines without waiting; the launch path is synchronous and must never touch the network (PAN-3957 D9)."
+      },
+      {
+        "summary": "The dashboard service calls syncOperatorMemory in-process (async execFile) instead of spawning the pan CLI.",
+        "rationale": "Every git call is async execFile, so no-execsync-server holds; the library is self-contained and a CLI spawn would add a process per tick for no isolation benefit; a dynamic import avoids circular ESM edges like sync-auto-service.ts."
+      },
+      {
+        "summary": "PAN-4577's plan is amended in .pan/drafts/pan-3957.md W9 (home-path imports go to the machine store) and PAN-4577 gets a comment, with an implementation checkpoint if its code has already landed.",
+        "rationale": "After this issue the operator store refuses home-path facts, so PAN-4577's planned routing would fail at writeMemoryFact; fixing the plan text now prevents a broken import."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One vertical feature that crosses its natural seams once each: the fact store (new scope), the launch renderer, the Context preview the docs promise matches it, the pan memory CLI door (which must regenerate the composer manifest and skill in lockstep), the new sync library and its conflict module, the pan sync step, the dashboard timer, the PAN-4577 plan amendment, and docs. About 27 files, half of them tests and docs each slice carries; the subsystem count is inflated by tests/, sync-sources/, configuration/, packages/ and root docs files. Splitting the machine store from the sync would ship a synced operator store that pushes machine-specific facts to other machines, or a guard that strands facts with nowhere to go; splitting the dashboard timer out would ship a sync that never pulls on a long-running machine.",
+      "canonicalFilename": "2026-10-21-PAN-4578-sync-operator-level-memory-across-machines-follow-up-to-pan-3957.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w1-machine-scope",
+        "title": "Add the machine store scope and guard the operator store against home-directory paths (store.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-21T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4578",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/facts/store.ts",
+            "tests/unit/lib/memory/facts/store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "store.test.ts passes including the four new W1 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "w2-render-machine-section",
+            "w4-cli-machine-flag",
+            "w5-operator-sync-core"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W1 (D1-D3): widen MemoryFactScope to 'project' | 'user' | 'machine'; add machineMemoryDir() = join(getOverdeckHome(), 'context', 'machine-memory') after userMemoryDir(); change the MACHINE_PATH_PATTERN check in parseMemoryFact from `if (scope === 'project')` to `if (scope === 'project' || scope === 'user')` with the exact D3 reason `machine-specific path \"<m>\"; use ~ or a relative path, or keep the fact on this machine with --machine`; type user stays a problem only in scope project. Update the module header to name three stores. Update the existing D16 test to the new message and add the four W1 test cases. Tests use mkdtempSync + OVERDECK_HOME, never the real home."
+        },
+        "items": [
+          {
+            "id": "w1-machine-scope.ac1",
+            "title": "Given a fact whose body contains '/home/alice/x', when parseMemoryFact runs with scope 'user' or 'project', then it returns the problem reason 'machine-specific path \"/home/alice/\"; use ~ or a relative path, or keep the fact on this machine with --machine'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-machine-scope.ac2",
+            "title": "Given the same file and a type: user fact, when parseMemoryFact runs with scope 'machine', then it returns a MemoryFact (no problem)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-machine-scope.ac3",
+            "title": "Given OVERDECK_HOME=<tmp>, when machineMemoryDir() is called, then it returns <tmp>/context/machine-memory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-machine-scope.ac4",
+            "title": "Given a type: user fact, when parseMemoryFact runs with scope 'project', then it still returns the existing 'user facts belong in the operator store' problem",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-render-machine-section",
+        "title": "Render the Machine memory section and the synced/unsynced operator source line (render.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-21T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4578",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/facts/render.ts",
+            "tests/unit/lib/memory/facts/render.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/render.test.ts tests/lib/context-layers/materialize.test.ts tests/unit/lib/runtimes/muse-context.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "render.test.ts, materialize.test.ts and muse-context.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W2 (D4): add MACHINE_MEMORY_CHAR_BUDGET = 2_000; replace the three scope ternaries in renderMemoryIndexSection with a per-scope lookup implementing the D4 table (heading, sourceSuffix, show/list hints); for scope user choose the suffix with existsSync(join(input.dir, '.git')) inline (do not import operator-sync.ts). renderManagedMemorySections gains opts.machineDir (default machineMemoryDir()) and pushes the machine section after the operator section inside the existing try/catch. Never add any git/network call to the render path. Update render.test.ts:120 and add the four W2 cases."
+        },
+        "items": [
+          {
+            "id": "w2-render-machine-section.ac1",
+            "title": "Given an operator store with one active fact and no .git, when renderManagedMemorySections runs, then the Operator memory source line contains 'not synced; pan memory sync --setup <git-url> shares it across machines'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-render-machine-section.ac2",
+            "title": "Given the same store with a <dir>/.git directory, when it renders, then the source line contains 'synced across your machines by pan memory sync'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-render-machine-section.ac3",
+            "title": "Given one active fact in the machine dir, when it renders, then '## Machine memory' appears after '## Operator memory' with the hint 'pan memory show --machine <id>' and the suffix 'this machine only, never synced'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-render-machine-section.ac4",
+            "title": "Given 300 machine facts, when it renders, then the machine section is at most 2000 characters and ends with the overflow line naming 'pan memory list --machine'; an empty machine store renders no Machine memory heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-context-preview-machine",
+        "title": "Show machine memory in the dashboard Context preview (context.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-21T05:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4578",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/context.ts",
+            "tests/dashboard/context-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/dashboard/context-routes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "context-routes.test.ts passes including the Machine memory case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W3: in the preview handler (context.ts around line 509, anchor `renderManagedMemorySections(previewProjectRoot(projects, layers), {`) add `machineDir: join(overdeckHome, 'context', 'machine-memory')` next to userDir. Add a context-routes.test.ts case copied from the existing Operator memory case that writes one fact into <overdeckHome>/context/machine-memory/."
+        },
+        "items": [
+          {
+            "id": "w3-context-preview-machine.ac1",
+            "title": "Given one active fact in <overdeckHome>/context/machine-memory/, when the global-scoped Context preview is requested, then the returned preview contains '## Machine memory' and the fact's index line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-context-preview-machine.ac2",
+            "title": "Given an empty machine-memory directory, when the preview is requested, then the preview contains no '## Machine memory' heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-cli-machine-flag",
+        "title": "Add --machine to pan memory show/list/add/edit/retire and Machine memory to search (memory-facts.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-21T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4578",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory-facts.ts",
+            "tests/unit/cli/memory-facts.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "sync-sources/skills/pan-memory/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-facts.test.ts",
+            "npm run typecheck",
+            "npm run build:cli && npm run generate:slash-commands",
+            "bash scripts/lint-slash-commands.sh",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "memory-facts.test.ts passes including the five W4 cases",
+            "lint-slash-commands prints '✓ composer-command manifest matches the CLI registry'",
+            "lint-skills passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W4 (D12): FactTargetFlags gains machine; resolveFactTarget counts it in the mutual-exclusion check (error '--project, --user, --machine and --here are mutually exclusive') and returns { scope: 'machine', dir: machineMemoryDir(), root: null }; add --type user is allowed with --user or --machine, else refused with 'user facts go in the operator store: add --user (or --machine for this machine only)'; printMatchingFacts prints a 'Machine memory:' block (max 5) after 'Operator memory:'; register --machine on show/list/add/edit/retire with the D12 descriptions and change the five --user descriptions from '(per-machine)' to '(travels with you; synced when set up)'. Regenerate and commit the composer manifest; update SKILL.md synopsis lines and add one sentence on operator vs machine store."
+        },
+        "items": [
+          {
+            "id": "w4-cli-machine-flag.ac1",
+            "title": "Given OVERDECK_HOME=<tmp>, when `pan memory add x --machine --type feedback --description d` runs, then <tmp>/context/machine-memory/x.md exists and the command exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-cli-machine-flag.ac2",
+            "title": "Given a body containing '/home/alice/x', when `pan memory add x --user ...` runs, then it exits 1 and prints the D3 message ending 'with --machine', and no file is written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-cli-machine-flag.ac3",
+            "title": "Given both --user and --machine, when any fact verb runs, then it exits 1 with '--project, --user, --machine and --here are mutually exclusive'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-cli-machine-flag.ac4",
+            "title": "Given a fact matching the query in the machine store, when `pan memory search <q>` runs (human output), then 'Machine memory:' is printed after 'Operator memory:' and --json output remains the observation array only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-cli-machine-flag.ac5",
+            "title": "Given the regenerated manifest, when bash scripts/lint-slash-commands.sh runs, then it prints '✓ composer-command manifest matches the CLI registry' and the memory add entry lists --machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-operator-sync-core",
+        "title": "Add the operator memory sync library: setup, sync, status (operator-sync.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-21T05:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4578",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/memory/facts/operator-sync.ts",
+            "tests/unit/lib/memory/facts/operator-sync.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/operator-sync.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "operator-sync.test.ts passes every W5 case using only local bare repositories",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "w6-sync-conflicts",
+            "w7-cli-memory-sync",
+            "w8-post-write-sync",
+            "w10-dashboard-sync-service"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W5 exactly: D5 (redactRemoteUrl), D6 (async execFile git with GIT_TERMINAL_PROMPT=0 and OVERDECK_PAN_GIT_OP=1, 30 s timeout on ls-remote/fetch/push, -c user.name='pan memory sync (<label>)' -c user.email=memory-sync@overdeck.local; never execSync, git stash or reset --hard), D7 outcome type (never throws), D8 algorithm steps 1-11 under withFileLock(`${dir}.lock`, ..., { staleMs: 300_000 }) imported from ../../vault/file-lock.js, with the pre-W6 conflict branch that runs git merge --abort and returns failed 'merge conflict in <paths>; nothing was changed', D9 setup (same-url idempotent, different-url refusal, .git-without-origin adds origin after the reachability check, ls-remote reachability check BEFORE any disk change, home-path migration to machineMemoryDir, mkdir -p dir, git init -q + git symbolic-ref HEAD refs/heads/main (not git init -b), remote add, sync in the same lock via an unexported syncLocked), and D13 status (no network). Hold back staged (--diff-filter=AMR) top-level .md files that trip redactSensitiveText or MACHINE_PATH_PATTERN with git reset -q -- <path>. Tests use git init --bare remotes and two clone dirs in mkdtempSync with explicit dir/machineDir/label; no network."
+        },
+        "items": [
+          {
+            "id": "w5-operator-sync-core.ac1",
+            "title": "Given an empty bare remote and an operator store with one fact, when setupOperatorMemorySync(url) runs, then the remote's main branch contains <id>.md and the outcome is { status: 'synced', pushed: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-operator-sync-core.ac2",
+            "title": "Given machine A synced with one fact, when machine B runs setupOperatorMemorySync with the same url, then B's store contains A's fact file; and after A adds a second fact and both sync, B contains it too",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-operator-sync-core.ac3",
+            "title": "Given a store file containing an sk-ant- style key or a /home/<user>/ path, when syncOperatorMemory runs, then the outcome lists it in heldBack with reason 'secret-like content' or 'machine-specific path' and `git -C <bare> show main:<file>` fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-operator-sync-core.ac4",
+            "title": "Given url file:///nonexistent/x.git, when setupOperatorMemorySync runs, then it throws OperatorMemorySetupError starting 'cannot reach' and the store has no .git and no file moved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-operator-sync-core.ac5",
+            "title": "Given origin pointing at a deleted bare repo after one local fact was added, when syncOperatorMemory runs, then it returns status 'offline' with committed: true and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-sync-conflicts",
+        "title": "Resolve sync conflicts with review-marked conflict copies (operator-sync-conflicts.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-21T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4578",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/facts/operator-sync-conflicts.ts",
+            "tests/unit/lib/memory/facts/operator-sync-conflicts.test.ts",
+            "src/lib/memory/facts/operator-sync.ts",
+            "tests/unit/lib/memory/facts/operator-sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/operator-sync-conflicts.test.ts tests/unit/lib/memory/facts/operator-sync.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W6 (D10): export resolveSyncConflicts({ dir, labelSlug, git }) and conflictCopyId(id, labelSlug). For each unmerged path read stages via git ls-files -u -z: both stages -> checkout --theirs and, for a top-level <id>.md other than README.md, write the conflict copy from `git show :2:<path>`; only ours -> checkout --ours; only theirs -> checkout --theirs; then git add. Conflict copy id = id.slice(0, 80 - suffix.length) + suffix with suffix '-conflict-' + labelSlug; content = serializeMemoryFact of the parsed local fact with review de-duplicated [...review, 'sync-conflict'] and source 'sync-conflict:<id>', or the raw local bytes when it does not parse. In operator-sync.ts replace exactly the pre-W6 abort branch with the resolver call plus `git commit --no-edit` (identity flags) and fill outcome.conflicts. Replace W5's abort test with the both-versions-kept test."
+        },
+        "items": [
+          {
+            "id": "w6-sync-conflicts.ac1",
+            "title": "Given machines A and B both editing be-decisive.md and A syncing first, when B syncs, then B's be-decisive.md equals A's version and be-decisive-conflict-beta.md holds B's version with review containing 'sync-conflict', and the outcome lists 'be-decisive-conflict-beta' in conflicts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-sync-conflicts.ac2",
+            "title": "Given that state, when A syncs again, then A's store also contains be-decisive-conflict-beta.md (the copy was pushed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-sync-conflicts.ac3",
+            "title": "Given A deleted a fact and B edited it, when either side syncs after the other, then the edited file survives on both machines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-sync-conflicts.ac4",
+            "title": "Given a 79-character id, when conflictCopyId runs, then the result matches /^[a-z0-9][a-z0-9-]{0,79}$/ and ends with '-conflict-<slug>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-sync-conflicts.ac5",
+            "title": "Given a conflict copy in the operator store, when renderManagedMemorySections renders that store, then the copy's id does not appear in the injected index",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-cli-memory-sync",
+        "title": "Add the pan memory sync verb with --setup, --status and --json (memory-sync.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-21T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4578",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory-sync.ts",
+            "tests/unit/cli/memory-sync.test.ts",
+            "src/cli/commands/memory.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "sync-sources/skills/pan-memory/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-sync.test.ts",
+            "npm run typecheck",
+            "npm run build:cli && npm run generate:slash-commands",
+            "node dist/cli/index.js memory sync --help",
+            "bash scripts/lint-slash-commands.sh",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "memory-sync.test.ts passes",
+            "`memory sync --help` lists --setup, --status and --json",
+            "both lint scripts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W7: new src/cli/commands/memory-sync.ts exporting formatSyncOutcome(outcome) with the exact W7 lines, runOperatorMemorySyncStep(io?) (silent when !isOperatorMemorySynced(); ora spinner; never throws; never changes exit code), memorySyncCommand({ setup, status, json }) with injectable deps and the D12 exit codes, and registerMemorySyncCommand(memory). Register it in memory.ts next to registerMemoryFactCommands(memory) (line 416). --setup prints moved/kept facts; --status prints the redacted remote, last commit, ahead/behind, uncommitted and conflict ids. Regenerate the composer manifest; add the synopsis line and two sentences (conflict rule, held-back rule) to SKILL.md."
+        },
+        "items": [
+          {
+            "id": "w7-cli-memory-sync.ac1",
+            "title": "Given a not-configured store, when `pan memory sync` runs, then it exits 1 and prints 'Operator memory is not synced. Run pan memory sync --setup <git-url> with a private repository.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-cli-memory-sync.ac2",
+            "title": "Given a mocked synced outcome with one conflict, when `pan memory sync` runs, then it exits 0 and prints the conflict line naming both `pan memory edit --user <id>` and `pan memory retire --user <copy>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-cli-memory-sync.ac3",
+            "title": "Given a mocked offline outcome, when `pan memory sync` runs, then it exits 1 with 'Operator memory sync is offline:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-cli-memory-sync.ac4",
+            "title": "Given --setup and --status together, when the command runs, then it exits 1; and given --json, the printed output parses as JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-cli-memory-sync.ac5",
+            "title": "Given the built CLI, when `node dist/cli/index.js memory sync --help` runs, then it lists --setup <git-url>, --status and --json, and bash scripts/lint-slash-commands.sh prints '✓ composer-command manifest matches the CLI registry'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8-post-write-sync",
+        "title": "Sync once after pan memory add/edit/retire --user on a synced store (memory-facts.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-21T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4578",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory-facts.ts",
+            "tests/unit/cli/memory-facts.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-facts.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-facts.test.ts passes including the four W8 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W8 (D11.4): add an injectable syncOperator?: () => Promise<OperatorMemorySyncOutcome> option (default syncOperatorMemory) to the add, edit and retire options, following the checkIgnored pattern. After a successful write with target.scope === 'user' and isOperatorMemorySynced(target.dir), await it and print formatSyncOutcome(outcome).lines (imported from ./memory-sync.js); under --json add `sync: <outcome>` to the printed object. A non-synced outcome never changes the exit code. --project and --machine writes never sync."
+        },
+        "items": [
+          {
+            "id": "w8-post-write-sync.ac1",
+            "title": "Given <OVERDECK_HOME>/context/memory/.git exists, when `pan memory add x --user ...` runs, then the injected sync mock is called exactly once and the command exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-post-write-sync.ac2",
+            "title": "Given no .git in the operator store, when `pan memory add x --user ...` runs, then the sync mock is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-post-write-sync.ac3",
+            "title": "Given `pan memory add x --machine ...`, when it runs, then the sync mock is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-post-write-sync.ac4",
+            "title": "Given a synced store and a mock returning { status: 'offline' }, when `pan memory edit x --user --description d` runs, then the fact file is rewritten and the command exits 0 with the offline line printed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w9-pan-sync-step",
+        "title": "Run the operator memory sync in pan sync before the --if-changed shortcut (sync.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-21T05:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4578",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/sync.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "grep -n \"runOperatorMemorySyncStep\\|Startup-only shortcut\" src/cli/commands/sync.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep shows the runOperatorMemorySyncStep call on a lower line number than 'Startup-only shortcut'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W9: import runOperatorMemorySyncStep from ./memory-sync.js and insert, immediately above the comment `// Startup-only shortcut: skip the expensive full sync when inputs are unchanged.`, the two-line PAN-4578 comment and `if (!options.dryRun && !options.backupOnly) await runOperatorMemorySyncStep();`. Do not write a test that reads source (the gate rejects source-grep tests); verification is typecheck plus the grep."
+        },
+        "items": [
+          {
+            "id": "w9-pan-sync-step.ac1",
+            "title": "Given src/cli/commands/sync.ts, when `grep -n runOperatorMemorySyncStep` runs, then it returns an import line and one call line whose line number is below the 'Startup-only shortcut' comment line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-pan-sync-step.ac2",
+            "title": "Given the call line, when it is read, then the line contains `!options.dryRun && !options.backupOnly` and `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w10-dashboard-sync-service",
+        "title": "Add the dashboard operator memory sync service (60 s after boot, every 15 min)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-21T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4578",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/operator-memory-sync-service.ts",
+            "src/dashboard/server/services/__tests__/operator-memory-sync-service.test.ts",
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/operator-memory-sync-service.test.ts",
+            "npm run typecheck",
+            "grep -n \"OperatorMemorySyncService\" src/dashboard/server/main.ts"
+          ],
+          "expected_outputs": [
+            "operator-memory-sync-service.test.ts passes under fake timers",
+            "typecheck completes without errors",
+            "main.ts shows the start and stop calls"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W10 modeled on sync-auto-service.ts: export OPERATOR_MEMORY_SYNC_BOOT_DELAY_MS = 60_000, OPERATOR_MEMORY_SYNC_INTERVAL_MS = 900_000, OperatorMemorySyncDeps { isSynced, sync }, startOperatorMemorySyncService(opts?), stopOperatorMemorySyncService(), runOperatorMemorySyncTick() (single-flight; null when not synced or in flight). Default deps dynamically import ../../../lib/memory/facts/operator-sync.js. Timers are unref()'d. console.warn('[operator-memory-sync] ...') only for offline, failed, conflicts and held-back files. In main.ts add `if (!isPeerDashboard) startOperatorMemorySyncService();` after startSyncAutoService(...) and `stopOperatorMemorySyncService();` after stopSyncAutoService(). Tests use vi.useFakeTimers() and vi.advanceTimersByTimeAsync only."
+        },
+        "items": [
+          {
+            "id": "w10-dashboard-sync-service.ac1",
+            "title": "Given the service started with isSynced true and fake timers, when 59 s elapse, then sync has not been called; and when 60 s elapse, then sync is called exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-dashboard-sync-service.ac2",
+            "title": "Given the service running, when a further 15 minutes elapse, then sync has been called a second time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-dashboard-sync-service.ac3",
+            "title": "Given isSynced returns false, when 60 s elapse, then sync is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-dashboard-sync-service.ac4",
+            "title": "Given a sync that has not resolved, when runOperatorMemorySyncTick is called again, then it returns null and sync was called only once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-dashboard-sync-service.ac5",
+            "title": "Given a started service, when stopOperatorMemorySyncService runs and 20 minutes elapse, then sync is not called again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w11-pan-4577-routing",
+        "title": "Amend PAN-4577's plan to route home-path imports to the machine store",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-21T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4578",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/pan-3957.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n \"machineMemoryDir()\\|machine store (machine-specific)\" .pan/drafts/pan-3957.md",
+            "gh issue view 4577 --comments"
+          ],
+          "expected_outputs": [
+            "grep finds both strings in the W9 section",
+            "PAN-4577 shows the PAN-4578 routing comment"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W11. Implementation checkpoint: if src/lib/memory/facts/import-claude.ts exists on origin/main when this item starts, change its home-path routing from userMemoryDir()/scope 'user' to machineMemoryDir()/scope 'machine' in that file and its test and include them in this commit; otherwise (the planning-time state) change only the plan text. In .pan/drafts/pan-3957.md W9 step 3, replace the 'home-directory paths (D16)' bullet's operator-store routing with the exact machine-store text from PRD W11 step 2, and change the applyClaudeImport dirs type to { project: string; user: string; machine: string }. Then post one comment on PAN-4577 with `gh issue comment 4577` stating the routing change and that the plan text was amended."
+        },
+        "items": [
+          {
+            "id": "w11-pan-4577-routing.ac1",
+            "title": "Given .pan/drafts/pan-3957.md after the edit, when grep runs, then the W9 home-directory bullet contains 'machineMemoryDir()' and '→ machine store (machine-specific)' and no longer says 'into the operator store (this machine only)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-pan-4577-routing.ac2",
+            "title": "Given the applyClaudeImport signature line in that file, when it is read, then the line contains `dirs: { project: string; user: string; machine: string }`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-pan-4577-routing.ac3",
+            "title": "Given PAN-4577 on GitHub, when its comments are listed, then one comment from this item names machineMemoryDir() and PAN-4578",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w12-docs",
+        "title": "Document the machine store, pan memory sync, conflicts and held-back files",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-21T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4578",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/memory.mdx",
+            "docs/CONTEXT-LAYERS.md",
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "sync-sources/rules/context-nomenclature.md",
+            "sync-sources/rules/project-memory.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c \"machine-memory\\|pan memory sync --setup\\|sync-conflict\\|held back\" configuration/memory.mdx",
+            "grep -n \"Machine memory\" docs/CONTEXT-LAYERS.md",
+            "grep -n \"\\-\\-machine\" sync-sources/rules/context-nomenclature.md sync-sources/rules/project-memory.md"
+          ],
+          "expected_outputs": [
+            "memory.mdx contains all four strings",
+            "CONTEXT-LAYERS.md has a Machine memory row",
+            "both rules mention --machine"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W12 exactly. configuration/memory.mdx: three-store 'Where facts live', the Machine memory section and the two operator source-line variants in 'How agents see them', rewrite 'Several machines' (fix line 121's --user to --machine), a new 'Syncing operator memory' section (setup on every machine with the same command, private repo, credentials from git, the four triggers, the conflict rule with exact resolution commands, held-back rule, --status, moving an old home-path operator fact by hand), and the 'Where' table row listing three stores. docs/CONTEXT-LAYERS.md: update the Operator memory row (line 344) and add a Machine memory row. docs/WORKSPACES-AND-PROJECTS.md 'Memory homes': name the machine store and the synced operator clone. context-nomenclature.md row 18 and project-memory.md per PRD W12 steps 4-5; keep the universal rule to one added clause. Do not run pan sync."
+        },
+        "items": [
+          {
+            "id": "w12-docs.ac1",
+            "title": "Given configuration/memory.mdx, when it is read, then it names ~/.overdeck/context/machine-memory/, the command `pan memory sync --setup <git-url>`, the review marker `sync-conflict` with the commands `pan memory edit --user <id>` and `pan memory retire --user <id>-conflict-<machine>`, and says a held back file stays on this machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-docs.ac2",
+            "title": "Given docs/CONTEXT-LAYERS.md, when the context-source table is read, then it has a 'Machine memory' row with path ~/.overdeck/context/machine-memory/*.md and the Operator memory row says it syncs across machines when set up",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-docs.ac3",
+            "title": "Given sync-sources/rules/project-memory.md, when it is read, then it says operator-level facts use --user (synced to your other machines) and one-machine facts use --machine, and context-nomenclature.md's memory row names both destinations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-machine-scope",
+        "to": "w2-render-machine-section",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-machine-scope",
+        "to": "w4-cli-machine-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-machine-scope",
+        "to": "w5-operator-sync-core",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-render-machine-section",
+        "to": "w3-context-preview-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-operator-sync-core",
+        "to": "w6-sync-conflicts",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-operator-sync-core",
+        "to": "w7-cli-memory-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-operator-sync-core",
+        "to": "w8-post-write-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-operator-sync-core",
+        "to": "w10-dashboard-sync-service",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-cli-machine-flag",
+        "to": "w7-cli-memory-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-cli-machine-flag",
+        "to": "w8-post-write-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "w7-cli-memory-sync",
+        "to": "w8-post-write-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "w7-cli-memory-sync",
+        "to": "w9-pan-sync-step",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

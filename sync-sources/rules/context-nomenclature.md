@@ -15,7 +15,7 @@ scope word alone determines the destination:
 | **dev rule** | Overdeck development only | bundled rule: `sync-sources/rules/<name>.md`, `scope: dev` |
 | **project rule** | one project | `<projectRoot>/.overdeck/context/project.md` (project layer) |
 | **machine rule** | this machine only | `~/.overdeck/context/global.md` (global layer) |
-| **memory** ("remember that …") | one project (`--user`: this operator, every project) | `pan memory add` → `<planHome>/.overdeck/memory/<id>.md` (operator: `~/.overdeck/context/memory/`) |
+| **memory** ("remember that …") | one project (`--user`: this operator, every project and machine; `--machine`: this machine only) | `pan memory add` → `<planHome>/.overdeck/memory/<id>.md` (operator: `~/.overdeck/context/memory/`, machine: `~/.overdeck/context/machine-memory/`) |
 
 After writing any of them, run `pan sync`. Changes reach **new** sessions only.
 

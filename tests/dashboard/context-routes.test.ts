@@ -173,6 +173,24 @@ describe('dashboard context route helpers', () => {
       expect(response.previews['claude-code']).not.toContain('## Project memory');
     });
 
+    it('global-only preview contains ## Machine memory for a fact in context/machine-memory (PAN-4578)', async () => {
+      await mkdir(join(panHome, 'context', 'machine-memory'), { recursive: true });
+      await writeFile(
+        join(panHome, 'context', 'machine-memory', 'gpu.md'),
+        '---\ntype: reference\ndescription: The GPU is an RTX 3090.\n---\nBody.\n',
+        'utf-8',
+      );
+
+      const response = await previewContextLayers(projects, {
+        operation: 'preview',
+        selectedLayer: { kind: 'global' },
+        drafts: [],
+      }, panHome);
+
+      expect(response.previews['claude-code']).toContain('## Machine memory');
+      expect(response.previews['claude-code']).toContain('reference/gpu: The GPU is an RTX 3090.');
+    });
+
     it('no memory heading when the injected project has no store and panHome has no context/memory', async () => {
       const response = await previewContextLayers(projects, {
         operation: 'preview',
@@ -182,6 +200,7 @@ describe('dashboard context route helpers', () => {
 
       expect(response.previews['claude-code']).not.toContain('## Project memory');
       expect(response.previews['claude-code']).not.toContain('## Operator memory');
+      expect(response.previews['claude-code']).not.toContain('## Machine memory');
     });
   });
 });
