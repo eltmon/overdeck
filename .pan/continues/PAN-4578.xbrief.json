@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4578",
   "created": "2026-10-21T04:41:10.643Z",
-  "updated": "2026-10-21T05:03:39.677Z",
+  "updated": "2026-10-21T05:04:49.016Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,9 +70,10 @@
       "doneAt": "2026-10-21T05:03:34.827Z"
     },
     "w11-pan-4577-routing": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4578",
-      "claimedAt": "2026-10-21T05:03:39.677Z"
+      "claimedAt": "2026-10-21T05:03:39.677Z",
+      "doneAt": "2026-10-21T05:04:49.015Z"
     }
   }
 }
