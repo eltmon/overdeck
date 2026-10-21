@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-21T00:45:49Z · model: claude-opus-5-5 · open: 832_
+_Last sequenced: 2026-10-21T00:50:03Z · model: claude-opus-5-5 · open: 831_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -636,9 +636,8 @@ _Last sequenced: 2026-10-21T00:45:49Z · model: claude-opus-5-5 · open: 832_
 | 664 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 665 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 666 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 667 | PAN-3957 | L | low | ok |  |  | In pipeline: repo-owned project memory replacing per-harness auto-memory; phase 2 is PAN-4577. Pinned at prior rank. |
-| 668 | PAN-4577 | M | medium | ok |  | PAN-3957 | PAN-3957 phase 2: import Claude auto-memory into repo facts and gate native memory; blocked until #3957 merges. |
-| 669 | PAN-4578 | M | low | needs-refinement |  | PAN-3957 | Sync operator memory across machines; deferred by operator. Open: store location, machine-local facts, conflicts. |
+| 668 | PAN-4577 | M | medium | ok |  |  | PAN-3957 phase 2: import Claude auto-memory into repo facts and gate native memory; prerequisite #3957 merged. |
+| 669 | PAN-4578 | M | low | needs-refinement |  |  | Sync operator memory across machines; deferred by operator. Open: store location, machine-local facts, conflicts. |
 | 670 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 671 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 672 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
@@ -1167,10 +1166,10 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-21T00:45:49Z",
+  "generatedAt": "2026-10-21T00:50:03Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 832,
+  "openCount": 831,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -9062,30 +9061,15 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
       "planning": "auto"
     },
     {
-      "issue": "PAN-3957",
-      "rank": 667,
-      "size": "L",
-      "importance": "low",
-      "score": 25,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: repo-owned project memory replacing per-harness auto-memory; phase 2 is PAN-4577. Pinned at prior rank.",
-      "rationale": "Restored after it dropped from the prior run; it is in pipeline, so it is pinned at its earlier rank 667 directly ahead of its phase-2 follow-up PAN-4577.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4577",
       "rank": 668,
       "size": "M",
       "importance": "medium",
       "score": 28,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-3957"
-      ],
-      "why": "PAN-3957 phase 2: import Claude auto-memory into repo facts and gate native memory; blocked until #3957 merges.",
-      "rationale": "New issue with a PRD (PAN-3957 W9-W11) and an explicit block on PAN-3957, which is in pipeline; it ranks directly after its parent so it is next once phase 1 merges.",
+      "dependsOn": [],
+      "why": "PAN-3957 phase 2: import Claude auto-memory into repo facts and gate native memory; prerequisite #3957 merged.",
+      "rationale": "Prerequisite PAN-3957 merged (#4579), so this phase-2 follow-up is no longer blocked; rank kept, dependency dropped.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9096,11 +9080,9 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
       "importance": "low",
       "score": 20,
       "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-3957"
-      ],
+      "dependsOn": [],
       "why": "Sync operator memory across machines; deferred by operator. Open: store location, machine-local facts, conflicts.",
-      "rationale": "New follow-up to PAN-3957 that the operator explicitly deferred; it has three open design decisions, so it is needs-refinement and sits after the PAN-3957 family.",
+      "rationale": "Prerequisite PAN-3957 merged (#4579), so this follow-up is no longer blocked; rank kept, dependency dropped.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12022,13 +12004,6 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
       "confidence": 0.6
     },
     {
-      "from": "PAN-3957",
-      "to": "PAN-3940",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3563",
       "to": "PAN-3560",
       "type": "informs",
@@ -12888,20 +12863,6 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-3957",
-      "to": "PAN-4577",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3957",
-      "to": "PAN-4578",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
     }
   ]
 }
