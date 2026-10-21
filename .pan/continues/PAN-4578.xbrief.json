@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4578",
   "created": "2026-10-21T04:41:10.643Z",
-  "updated": "2026-10-21T05:23:22.202Z",
+  "updated": "2026-10-21T05:23:33.142Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -216,6 +216,10 @@
     "w8-post-write-sync.ac4": {
       "status": "completed",
       "doneAt": "2026-10-21T05:23:22.201Z"
+    },
+    "w9-pan-sync-step.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:23:33.141Z"
     }
   }
 }
