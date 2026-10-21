@@ -1,11 +1,17 @@
 /**
  * Launch-time index for curated memory facts (PAN-3957). Nothing here is
  * stored: the index is rendered from frontmatter at every launch (store.ts
- * holds the files). Memory never breaks a launch (D9): every reader error is
- * caught and reported with console.warn, and rendering returns ''.
+ * holds the files). Three stores render in order: project, operator (synced
+ * across machines when it is a git checkout, PAN-4578) and machine (never
+ * synced). The launch path never touches the network. Memory never breaks a
+ * launch (D9): every reader error is caught and reported with console.warn,
+ * and rendering returns ''.
  */
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   isActiveFact,
+  machineMemoryDir,
   type MemoryFact,
   type MemoryFactScope,
   type MemoryFactType,
@@ -16,6 +22,44 @@ import {
 
 export const PROJECT_MEMORY_CHAR_BUDGET = 12_000;
 export const OPERATOR_MEMORY_CHAR_BUDGET = 4_000;
+export const MACHINE_MEMORY_CHAR_BUDGET = 2_000;
+
+interface SectionText {
+  readonly heading: string;
+  readonly sourceSuffix: string;
+  readonly showHint: string;
+  readonly listHint: string;
+}
+
+// PAN-4578 D4: per-scope section text. The operator store says whether it is
+// synced; that check is a local existsSync, never a git or network call.
+function sectionText(scope: MemoryFactScope, dir: string): SectionText {
+  switch (scope) {
+    case 'project':
+      return {
+        heading: '## Project memory',
+        sourceSuffix: 'curated and committed with this repository',
+        showHint: 'pan memory show <id>',
+        listHint: 'pan memory list',
+      };
+    case 'user':
+      return {
+        heading: '## Operator memory',
+        sourceSuffix: existsSync(join(dir, '.git'))
+          ? 'synced across your machines by pan memory sync'
+          : 'not synced; pan memory sync --setup <git-url> shares it across machines',
+        showHint: 'pan memory show --user <id>',
+        listHint: 'pan memory list --user',
+      };
+    case 'machine':
+      return {
+        heading: '## Machine memory',
+        sourceSuffix: 'this machine only, never synced',
+        showHint: 'pan memory show --machine <id>',
+        listHint: 'pan memory list --machine',
+      };
+  }
+}
 
 const TYPE_RANK: Record<MemoryFactType, number> = { feedback: 0, project: 1, reference: 2, user: 3 };
 
@@ -39,10 +83,7 @@ export function renderMemoryIndexSection(input: {
   if (active.length === 0) return '';
 
   const sorted = [...active].sort(compareFacts);
-  const listHint = input.scope === 'user' ? 'pan memory list --user' : 'pan memory list';
-  const showHint = input.scope === 'user' ? 'pan memory show --user <id>' : 'pan memory show <id>';
-  const heading = input.scope === 'user' ? '## Operator memory' : '## Project memory';
-  const sourceSuffix = input.scope === 'user' ? 'this machine only' : 'curated and committed with this repository';
+  const { heading, sourceSuffix, showHint, listHint } = sectionText(input.scope, input.dir);
 
   const header = [
     heading,
@@ -74,7 +115,7 @@ export function renderMemoryIndexSection(input: {
 
 export function renderManagedMemorySections(
   projectRoot: string | null,
-  opts?: { userDir?: string },
+  opts?: { userDir?: string; machineDir?: string },
 ): string {
   try {
     const sections: string[] = [];
@@ -95,6 +136,16 @@ export function renderManagedMemorySections(
       budget: OPERATOR_MEMORY_CHAR_BUDGET,
     });
     if (userSection) sections.push(userSection);
+
+    const machineDir = opts?.machineDir ?? machineMemoryDir();
+    const { facts: machineFacts } = readMemoryFactsSync(machineDir, 'machine');
+    const machineSection = renderMemoryIndexSection({
+      scope: 'machine',
+      dir: machineDir,
+      facts: machineFacts,
+      budget: MACHINE_MEMORY_CHAR_BUDGET,
+    });
+    if (machineSection) sections.push(machineSection);
 
     return sections.join('\n\n---\n\n');
   } catch (error) {

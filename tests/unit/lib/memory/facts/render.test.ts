@@ -15,7 +15,7 @@ vi.mock('../../../../../src/lib/memory/facts/store.js', async (importOriginal) =
   const actual = await importOriginal<typeof import('../../../../../src/lib/memory/facts/store.js')>();
   return {
     ...actual,
-    readMemoryFactsSync: (dir: string, scope: 'project' | 'user') => {
+    readMemoryFactsSync: (dir: string, scope: 'project' | 'user' | 'machine') => {
       if (throwOnRead.current) throw new Error('boom');
       return actual.readMemoryFactsSync(dir, scope);
     },
@@ -24,6 +24,7 @@ vi.mock('../../../../../src/lib/memory/facts/store.js', async (importOriginal) =
 
 import type { MemoryFact } from '../../../../../src/lib/memory/facts/store.js';
 import {
+  MACHINE_MEMORY_CHAR_BUDGET,
   OPERATOR_MEMORY_CHAR_BUDGET,
   PROJECT_MEMORY_CHAR_BUDGET,
   renderManagedMemorySections,
@@ -117,12 +118,22 @@ describe('renderMemoryIndexSection', () => {
     const facts = [fact({ id: 'op-fact' })];
     const section = renderMemoryIndexSection({ scope: 'user', dir: '/home/op/.overdeck/context/memory', facts, budget: OPERATOR_MEMORY_CHAR_BUDGET });
     expect(section).toContain('## Operator memory');
-    expect(section).toContain('this machine only');
+    expect(section).toContain('not synced; pan memory sync --setup <git-url> shares it across machines');
     expect(section).toContain('pan memory show --user <id>');
 
     const many = Array.from({ length: 200 }, (_, i) => fact({ id: `op-${String(i).padStart(4, '0')}`, description: 'x'.repeat(150) }));
     const overflowed = renderMemoryIndexSection({ scope: 'user', dir: '/home/op/.overdeck/context/memory', facts: many, budget: OPERATOR_MEMORY_CHAR_BUDGET });
     expect(overflowed).toContain('more facts: run `pan memory list --user`');
+  });
+
+  it('machine section is bounded at 2000 chars', () => {
+    const facts = Array.from({ length: 300 }, (_, i) =>
+      fact({ id: `m-${String(i).padStart(4, '0')}`, scope: 'machine', description: 'x'.repeat(150) }),
+    );
+    const section = renderMemoryIndexSection({ scope: 'machine', dir: '/m', facts, budget: MACHINE_MEMORY_CHAR_BUDGET });
+    expect(MACHINE_MEMORY_CHAR_BUDGET).toBe(2_000);
+    expect(section.length).toBeLessThanOrEqual(MACHINE_MEMORY_CHAR_BUDGET);
+    expect(section).toContain('more facts: run `pan memory list --machine`');
   });
 });
 
@@ -163,6 +174,35 @@ describe('renderManagedMemorySections', () => {
     expect(text.indexOf('## Project memory')).toBeGreaterThanOrEqual(0);
     expect(text.indexOf('## Operator memory')).toBeGreaterThan(text.indexOf('## Project memory'));
     expect(text).toContain('\n\n---\n\n');
+  });
+
+  it('operator section says synced when the store has .git', () => {
+    const userDir = join(tmpRoot, 'operator-memory');
+    writeFact(userDir, 'terse-answers', '---\ntype: user\ndescription: Keep answers terse.\n---\nBody.\n');
+    mkdirSync(join(userDir, '.git'));
+    const text = renderManagedMemorySections(null, { userDir });
+    expect(text).toContain('synced across your machines by pan memory sync');
+    expect(text).not.toContain('not synced');
+  });
+
+  it('machine section renders after operator memory with --machine hints', () => {
+    const userDir = join(tmpRoot, 'operator-memory');
+    const machineDir = join(tmpRoot, 'machine-memory');
+    writeFact(userDir, 'terse-answers', '---\ntype: user\ndescription: Keep answers terse.\n---\nBody.\n');
+    writeFact(machineDir, 'gpu', '---\ntype: reference\ndescription: The GPU is an RTX 3090.\n---\nSee /home/op/gpu.\n');
+    const text = renderManagedMemorySections(null, { userDir, machineDir });
+    expect(text.indexOf('## Machine memory')).toBeGreaterThan(text.indexOf('## Operator memory'));
+    expect(text).toContain(`Source: ${machineDir} (1 active facts, this machine only, never synced)`);
+    expect(text).toContain('pan memory show --machine <id>');
+    expect(text).toContain('- reference/gpu: The GPU is an RTX 3090.');
+  });
+
+  it('empty machine store renders no section', () => {
+    const userDir = join(tmpRoot, 'operator-memory');
+    writeFact(userDir, 'terse-answers', '---\ntype: user\ndescription: Keep answers terse.\n---\nBody.\n');
+    const text = renderManagedMemorySections(null, { userDir, machineDir: join(tmpRoot, 'empty-machine') });
+    expect(text).toContain('## Operator memory');
+    expect(text).not.toContain('## Machine memory');
   });
 
   it('renders no section when both stores are empty', () => {
