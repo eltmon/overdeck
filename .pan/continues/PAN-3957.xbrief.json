@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-21T00:18:40.183Z",
+  "updated": "2026-10-21T00:18:51.258Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -212,6 +212,10 @@
     "w12-dirty-gate-carveout.ac2": {
       "status": "completed",
       "doneAt": "2026-10-21T00:18:40.183Z"
+    },
+    "w13-autocommit-carveout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:18:51.258Z"
     }
   }
 }
