@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4578",
   "created": "2026-10-21T04:41:10.643Z",
-  "updated": "2026-10-21T05:22:35.742Z",
+  "updated": "2026-10-21T05:22:48.259Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,10 @@
     "w7-cli-memory-sync.ac5": {
       "status": "completed",
       "doneAt": "2026-10-21T05:22:35.742Z"
+    },
+    "w8-post-write-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:22:48.259Z"
     }
   }
 }
