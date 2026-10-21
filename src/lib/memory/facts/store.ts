@@ -1,8 +1,9 @@
 /**
  * Curated memory facts (PAN-3957): one markdown file per fact with OKF-compatible
  * frontmatter. Project facts live in `<planHome>/.overdeck/memory/`, operator facts
- * in `~/.overdeck/context/memory/`. Nothing here stores an index: the index is
- * rendered from frontmatter at launch (render.ts).
+ * in `~/.overdeck/context/memory/` (synced across machines, PAN-4578), and
+ * machine facts in `~/.overdeck/context/machine-memory/` (never synced). Nothing
+ * here stores an index: the index is rendered from frontmatter at launch (render.ts).
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdir, rename, unlink, writeFile } from 'node:fs/promises';
@@ -15,11 +16,11 @@ import { redactSensitiveText } from '../../secret-redaction.js';
 
 export const MEMORY_FACT_TYPES = ['feedback', 'project', 'reference', 'user'] as const;
 export type MemoryFactType = (typeof MEMORY_FACT_TYPES)[number];
-export type MemoryFactScope = 'project' | 'user';
+export type MemoryFactScope = 'project' | 'user' | 'machine';
 export const MEMORY_FACT_ID = /^[a-z0-9][a-z0-9-]{0,79}$/;
 export const MEMORY_FACT_DESCRIPTION_MAX = 200;
-// PAN-3957 D16: a home-directory path cannot be true on another machine, so it
-// never belongs in the project store.
+// PAN-3957 D16 / PAN-4578 D3: a home-directory path cannot be true on another
+// machine, so it never belongs in the project or operator store.
 export const MACHINE_PATH_PATTERN = /\/home\/[^/\s]+\/|\/Users\/[^/\s]+\/|\b[A-Za-z]:\\Users\\/;
 
 export interface MemoryFact {
@@ -67,6 +68,11 @@ export function projectMemoryDir(checkoutPath: string): string {
 
 export function userMemoryDir(): string {
   return join(getOverdeckHome(), 'context', 'memory');
+}
+
+/** PAN-4578: per-machine facts (local paths, hardware); never synced. */
+export function machineMemoryDir(): string {
+  return join(getOverdeckHome(), 'context', 'machine-memory');
 }
 
 export function defaultFactTitle(id: string): string {
@@ -128,13 +134,13 @@ export function parseMemoryFact(file: string, raw: string, scope: MemoryFactScop
   const title = typeof frontmatter.title === 'string' ? frontmatter.title : defaultFactTitle(id);
   const body = raw.slice(frontmatterMatch[0].length).trim();
 
-  if (scope === 'project') {
+  if (scope === 'project' || scope === 'user') {
     const haystack = [title, description, ...tags, body].join('\n');
     const machineMatch = haystack.match(MACHINE_PATH_PATTERN);
     if (machineMatch) {
       return {
         file,
-        reason: `machine-specific path "${machineMatch[0]}"; use ~ or a project-relative path, or keep the fact on this machine with --user`,
+        reason: `machine-specific path "${machineMatch[0]}"; use ~ or a relative path, or keep the fact on this machine with --machine`,
       };
     }
   }
