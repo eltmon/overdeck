@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4557",
   "created": "2026-10-21T04:34:51.196Z",
-  "updated": "2026-10-21T04:46:00.813Z",
+  "updated": "2026-10-21T04:46:42.321Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "context-menu-paste-via-xterm.ac4": {
       "status": "completed",
       "doneAt": "2026-10-21T04:46:00.813Z"
+    },
+    "docs-herdr-snapshot-modes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:46:42.321Z"
     }
   }
 }
