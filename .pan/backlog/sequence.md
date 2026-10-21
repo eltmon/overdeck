@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-21T00:37:08Z · model: claude-opus-5-5 · open: 832_
+_Last sequenced: 2026-10-21T00:43:07Z · model: claude-opus-5-5 · open: 832_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1167,7 +1167,7 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-21T00:37:08Z",
+  "generatedAt": "2026-10-21T00:43:07Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 832,
