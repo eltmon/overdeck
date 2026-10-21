@@ -29,19 +29,25 @@ review: [unindexed]       # optional; non-empty means excluded from the index
 <body: the fact, then **Why:** and **How to apply:** lines, free markdown>
 ```
 
-`type: user` is valid only in the operator store (below). The `id` must match `/^[a-z0-9][a-z0-9-]{0,79}$/`.
-A project-store fact whose title, description, tags, or body contains a machine-specific path (an
-absolute path into a home directory) is refused — see **Several machines** below.
+`type: user` is valid only in the operator and machine stores (below). The `id` must match
+`/^[a-z0-9][a-z0-9-]{0,79}$/`. A project-store or operator-store fact whose title, description, tags,
+or body contains a machine-specific path (an absolute path into a home directory) is refused — see
+**Several machines** below.
 
 ## Where facts live
 
 - **Project store**: `<planHome>/.overdeck/memory/`, one file per fact, committed on your code branch.
   For a single repository, `planHome` is the project root. For a polyrepo, it is the repository your
   project nominates as its plan home (`pan_records.repo`).
-- **Operator store**: `~/.overdeck/context/memory/`, per machine, never committed. This is where
-  "who the operator is" facts live, and the only store that accepts machine-specific paths.
+- **Operator store** (`--user`): `~/.overdeck/context/memory/`. This is where "who the operator is"
+  facts live. It travels with you: once you run `pan memory sync --setup <git-url>`, it is synced across
+  your machines (see **Syncing operator memory** below). It refuses home-directory paths whether or not
+  it is synced.
+- **Machine store** (`--machine`): `~/.overdeck/context/machine-memory/`, this machine only, never
+  synced. It is the only store that accepts home-directory paths, so facts about local paths and
+  hardware go here.
 
-Both stores are flat directories. A `README.md`, a dotfile, a subdirectory, or a non-`.md` file is
+All three stores are flat directories. A `README.md`, a dotfile, a subdirectory, or a non-`.md` file is
 ignored, so a human README can sit alongside the facts.
 
 ## How agents see them
@@ -60,10 +66,14 @@ Record a new durable fact with `pan memory add`; never write harness-native memo
 ```
 
 The operator section follows immediately with the heading `## Operator memory`, and the same shape.
-Nothing is stored: the index is rendered from frontmatter fresh at every launch. It is ordered by
-type (`feedback`, `project`, `reference`, `user`), then by `updated` descending, then by id. The
-project section is bounded at 12,000 characters and the operator section at 4,000; once the budget
-is reached, the index stops and prints how many more facts to find with `pan memory list`. A fact
+Its source line says whether the store is synced: `synced across your machines by pan memory sync`, or
+`not synced; pan memory sync --setup <git-url> shares it across machines`. The machine section comes
+last, with the heading `## Machine memory` and the source line `this machine only, never synced`.
+Nothing is stored: the index is rendered from frontmatter fresh at every launch, and a launch never
+touches git or the network. It is ordered by type (`feedback`, `project`, `reference`, `user`), then by
+`updated` descending, then by id. The project section is bounded at 12,000 characters, the operator
+section at 4,000, and the machine section at 2,000; once the budget is reached, the index stops and
+prints how many more facts to find with `pan memory list` (`--user`, `--machine`). A fact
 carrying a non-empty `review` marker is never injected — only `pan memory list --review` shows it.
 Only the index line is injected; open the fact file (`pan memory show <id>`) for its body. A fact
 added inside a workspace reaches every session's index once its branch merges and the primary
@@ -80,17 +90,19 @@ pan memory retire be-decisive
 ```
 
 Writes land in your checkout; the PR is the review. `add`, `edit`, and `retire` write into the
-checkout that owns your current directory (or `--project <key>`'s primary checkout, or `--user` for
-the operator store) and print the `git add`/`git rm` plus commit command to run — Overdeck never
-commits a fact for you. `add --type user` without `--user` is refused: user facts belong in the
+checkout that owns your current directory (or `--project <key>`'s primary checkout, `--user` for
+the operator store, or `--machine` for the machine store) and print the `git add`/`git rm` plus commit
+command to run for a project fact — Overdeck never commits a project fact for you. A `--user` write to a
+synced operator store runs one sync and prints its outcome; the fact is written even when that sync is
+offline. `add --type user` without `--user` or `--machine` is refused: user facts belong in the
 operator store. A fact whose text trips the secret scanner (an API key, a `token: value` pair) is
 refused with no file written; rephrase it. If `.overdeck/` is gitignored in your project, `add`
 refuses with the exact line to add to `.gitignore`.
 
 ## Search
 
-`pan memory search <query>` prints matching curated facts first, under `Project memory:` and
-`Operator memory:` headings, before the usual observation hits below them. `--json` output is
+`pan memory search <query>` prints matching curated facts first, under `Project memory:`,
+`Operator memory:` and `Machine memory:` headings, before the usual observation hits below them. `--json` output is
 unchanged — it is still the observation array only.
 
 ## Facts vs. observation memory vs. OKF knowledge
@@ -99,7 +111,7 @@ unchanged — it is still the observation array only.
 | --- | --- | --- | --- |
 | What | Short, durable, human-reviewable truths | Automatically extracted session logs | Long-form concepts and architecture |
 | Who writes | You, or an agent via `pan memory add` | The memory pipeline, automatically | A human (or agent) through `/okf author`, PR-gated |
-| Where | `<planHome>/.overdeck/memory/` (repo), `~/.overdeck/context/memory/` (operator) | `~/.overdeck/memory/{projectId}/{workspaceId}/` | A separate knowledge-bundle repository |
+| Where | `<planHome>/.overdeck/memory/` (repo), `~/.overdeck/context/memory/` (operator, synced when set up), `~/.overdeck/context/machine-memory/` (this machine) | `~/.overdeck/memory/{projectId}/{workspaceId}/` | A separate knowledge-bundle repository |
 | How injected | A rendered index, every managed harness, every launch | Prompt-time retrieval and rollups | Prompt-time concept index, when configured |
 
 Facts use the same frontmatter keys (`type`, `title`, `description`, `tags`) OKF's indexer reads, so
@@ -107,17 +119,69 @@ Facts use the same frontmatter keys (`type`, `title`, `description`, `tags`) OKF
 
 ## Previewing
 
-The dashboard's **Context** page preview shows the same Project memory / Operator memory sections the
+The dashboard's **Context** page preview shows the same Project / Operator / Machine memory sections the
 launch composition injects, for the project the previewed layer belongs to. The preview places memory
 after the layers rather than before the workspace section — it is a source-labelled audit view, not a
 byte-identical copy of what a launch sends.
 
 ## Several machines
 
-Facts travel only through git: commit a project fact, push it, and a normal `git pull` of the primary
-checkout on another machine brings it into that machine's next sessions. Nothing else syncs facts.
-Because of this, a project-store fact can never hold a path into a home directory — it would be true
-on only the machine that wrote it. `pan memory add`/`edit` refuse such text with the exact match and a
-fix: rewrite it with `~` or a project-relative path, or keep it on this machine only with `--user`.
-`pan done` refuses to finish an issue with an uncommitted fact still sitting in the working tree — commit
-it like any other change before signaling completion.
+Each store travels a different way:
+
+- **Project facts** travel through the project repository. Commit a project fact, push it, and a normal
+  `git pull` of the primary checkout on another machine brings it into that machine's next sessions.
+- **Operator facts** travel through your sync remote, once you set it up (next section).
+- **Machine facts** never travel.
+
+Because the project and operator stores reach other machines, a fact in either can never hold a path
+into a home directory: it would be true only on the machine that wrote it. `pan memory add`/`edit`
+refuse such text with the exact match and a fix: rewrite it with `~` or a relative path, or keep it on
+this machine only with `--machine`. `pan done` refuses to finish an issue with an uncommitted fact still
+sitting in the working tree — commit it like any other change before signaling completion.
+
+## Syncing operator memory
+
+The operator store becomes a plain git clone of a private repository you own. Create an empty private
+repository (Overdeck never creates it and never checks that it is private), then run the same command on
+each machine:
+
+```bash
+pan memory sync --setup git@github.com:you/overdeck-memory.git
+```
+
+On the first machine, setup pushes your existing operator facts. On every later machine, it pulls them
+and merges in that machine's own facts. Before the first commit, setup moves any operator fact that
+contains a home-directory path into the machine store and prints `moved <id> to the machine store`.
+If the remote cannot be reached, setup changes nothing on disk. Credentials come from your own git
+setup (an SSH key or a credential helper); a token inside an HTTPS URL is never printed.
+
+After setup, four things sync the store, and a launch never does:
+
+1. `pan memory sync`, run by hand.
+2. `pan sync`, before its `--if-changed` shortcut (skipped under `--dry-run` and `--backup-only`).
+3. The dashboard, 60 seconds after it starts and then every 15 minutes.
+4. `pan memory add|edit|retire --user`, once after each write.
+
+Each sync commits local changes, fetches, merges `origin/main`, and pushes. When two machines changed
+the same fact, the remote version keeps the id and your version is kept as a new fact
+`<id>-conflict-<machine>` with `review: [sync-conflict]`, so it is never injected. Both machines see
+both versions. Resolve it with:
+
+```bash
+pan memory list --user --review
+pan memory edit --user <id> --body "<the merged text>"
+pan memory retire --user <id>-conflict-<machine>
+```
+
+An edit always beats a deletion. A changed fact whose text trips the secret scanner or contains a
+home-directory path is held back: it stays on this machine, uncommitted, and every sync reports it.
+`pan memory sync --status` shows the remote, the last commit, ahead/behind counts as of the last fetch,
+uncommitted changes, and conflict copies, without touching the network.
+
+To move an older home-path operator fact by hand:
+
+```bash
+pan memory show --user <id>
+pan memory add <id> --machine --type <type> --description "<description>" --body "<body>"
+pan memory retire --user <id>
+```

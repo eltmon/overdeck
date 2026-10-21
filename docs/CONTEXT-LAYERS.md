@@ -341,7 +341,8 @@ Changing the transport does not disable a user's native instructions.
 | Project context | `<project>/.overdeck/context/project.md` | Resolved from the registered project at launch |
 | Workspace context | `<workspace>/.overdeck/context/workspace.md` | Issue metadata, memory, and status |
 | Project memory | `<planHome>/.overdeck/memory/*.md` | Rendered index (one line per active fact) after the project layer, every harness |
-| Operator memory | `~/.overdeck/context/memory/*.md` | Rendered index after project memory, every harness on this machine |
+| Operator memory | `~/.overdeck/context/memory/*.md` | Rendered index after project memory, every harness; synced across machines when set up |
+| Machine memory | `~/.overdeck/context/machine-memory/*.md` | Rendered index after operator memory, every harness on this machine |
 | Legacy context paths | `.pan/context/project.md`, `.pan/context/workspace.md` | Read fallback only when the canonical file is absent |
 | Role instructions | Role definition selected by the launcher | Frontmatter removed; source path retained in the role prompt |
 | Session briefing | The briefing resolver's Overdeck-owned file | Added to the launch context |
