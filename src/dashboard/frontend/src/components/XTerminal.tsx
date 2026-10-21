@@ -302,11 +302,8 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     }
 
     try {
-      const text = await navigator.clipboard.readText();
-      // Send pasted text to WebSocket if open
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(text);
-      }
+      // term.paste applies bracketed paste and \n→\r; its onData sends to the socket.
+      term.paste(await navigator.clipboard.readText());
     } catch (err) {
       console.error('Failed to read from clipboard:', err);
       toast.error('Could not read the clipboard — use Ctrl+V / Cmd+V to paste into the terminal.');

@@ -169,6 +169,15 @@ async function captureViewportSnapshot(sessionName: string): Promise<string> {
 }
 
 /**
+ * A Herdr full frame repaints the grid but never replays the DEC modes the app
+ * set earlier, and the client resets xterm before writing the snapshot, so
+ * bracketed paste would start off (PAN-4557). Turning it on is safe for every
+ * pane: Herdr's attach input re-wraps a complete bracketed paste to the pane's
+ * live mode, so an app that never enabled it receives plain text.
+ */
+const HERDR_SNAPSHOT_MODES = '\x1b[?2004h';
+
+/**
  * Serve one WebSocket client from a Herdr terminal (PAN-3917 FR-4).
  *
  * Herdr already multiplexes a terminal — many observers, one controller — so
@@ -193,7 +202,7 @@ function serveHerdrTerminal(
     if (ws.readyState !== WebSocket.OPEN) return;
     if (!sentSnapshot) {
       sentSnapshot = true;
-      sendControl(ws, { type: 'snapshot', cols: attach.cols, rows: attach.rows, data });
+      sendControl(ws, { type: 'snapshot', cols: attach.cols, rows: attach.rows, data: HERDR_SNAPSHOT_MODES + data });
       return;
     }
     ws.send(data);

@@ -59,6 +59,7 @@ vi.mock('@xterm/xterm', () => ({
     getSelection(): string { return this.selection; }
     hasSelection(): boolean { return this.selection.length > 0; }
     focus = vi.fn();
+    paste = vi.fn();
   },
 }));
 
@@ -505,6 +506,31 @@ describe('XTerminal', () => {
       expect(readTextMock).toHaveBeenCalled();
       expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Ctrl+V'));
     });
+  });
+
+  it('routes context-menu paste through xterm.paste instead of the raw WebSocket (PAN-4557)', async () => {
+    const readTextMock = vi.fn().mockResolvedValue('line1\nline2');
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { readText: readTextMock, writeText: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+
+    const { container } = render(<XTerminal sessionName="test-session" />);
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+    const ws = MockWebSocket.instances[0];
+
+    const terminalSurface = container.querySelector('.xterm-host') as HTMLDivElement | null;
+    fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
+    fireEvent.click(await screen.findByText('Paste'));
+
+    const term = (Terminal as unknown as { instances: Array<{ paste: ReturnType<typeof vi.fn> }> }).instances[0];
+    await waitFor(() => {
+      expect(term.paste).toHaveBeenCalledWith('line1\nline2');
+    });
+    expect(ws.send.mock.calls.some(([data]) => data === 'line1\nline2')).toBe(false);
   });
 
   it('contains wheel events inside the terminal surface', async () => {

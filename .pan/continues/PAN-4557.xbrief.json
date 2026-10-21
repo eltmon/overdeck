@@ -1,0 +1,71 @@
+{
+  "version": "1",
+  "issueId": "PAN-4557",
+  "created": "2026-10-21T04:34:51.196Z",
+  "updated": "2026-10-21T04:46:53.123Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "herdr-snapshot-bracketed-paste": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4557",
+      "claimedAt": "2026-10-21T04:34:51.196Z",
+      "doneAt": "2026-10-21T04:39:02.862Z"
+    },
+    "context-menu-paste-via-xterm": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4557",
+      "claimedAt": "2026-10-21T04:39:08.635Z",
+      "doneAt": "2026-10-21T04:40:52.275Z"
+    },
+    "docs-herdr-snapshot-modes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4557",
+      "claimedAt": "2026-10-21T04:40:58.724Z",
+      "doneAt": "2026-10-21T04:42:18.479Z"
+    },
+    "herdr-snapshot-bracketed-paste.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:44:04.868Z"
+    },
+    "herdr-snapshot-bracketed-paste.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:44:20.867Z"
+    },
+    "herdr-snapshot-bracketed-paste.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:44:31.456Z"
+    },
+    "herdr-snapshot-bracketed-paste.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:44:42.358Z"
+    },
+    "context-menu-paste-via-xterm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:45:26.456Z"
+    },
+    "context-menu-paste-via-xterm.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:45:38.962Z"
+    },
+    "context-menu-paste-via-xterm.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:45:50.091Z"
+    },
+    "context-menu-paste-via-xterm.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:46:00.813Z"
+    },
+    "docs-herdr-snapshot-modes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:46:42.321Z"
+    },
+    "docs-herdr-snapshot-modes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:46:53.123Z"
+    }
+  }
+}

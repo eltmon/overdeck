@@ -419,6 +419,16 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   escape`, silently killing a review kickoff. Use `truncateWellFormed` /
   `toWellFormedText` from `src/lib/well-formed-text.ts` for any text (a
   truncated preview, a paste payload) that is heading to a Herdr request.
+- **Herdr full frames carry no terminal modes** (PAN-4557) — the first
+  `terminal.frame` (`full: true`) from `terminal session observe` repaints the
+  grid only; it never replays DEC private modes the app set earlier (`?2004h`
+  bracketed paste, mouse, focus), and Herdr v0.9.1–0.9.5 exposes no mode state
+  via `pane get`, `session.snapshot` or the stream. The browser's xterm is
+  `reset()` before the snapshot, so it starts with every mode off. The fix
+  forces `?2004h` into the Herdr snapshot: Herdr's attach input path
+  (`apply_terminal_attach_input`) re-wraps a complete bracketed paste to the
+  pane's live mode, so this is safe for panes that never enabled it. Mouse
+  modes stay off on purpose (drag-select fix `5d2dafcf16d`).
 - **Two runtime maps, neither replayed at boot before PAN-4522** — the read
   model's `agentRuntimeById` (`read-model.ts`, served in snapshots) booted `{}`,
   and `syncSnapshot` replaced the client's map wholesale, so a restart showed
@@ -440,4 +450,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   pairs from/import with a quoted word (PAN-4508's `from "custom"`) blocks every
   deploy. Even after the lexer fix, the first reload of a change runs the
   *installed* CLI, so never write that syntax in source comments.
-<!-- last-verified: 2026-10-04 -->
+<!-- last-verified: 2026-10-21 -->
