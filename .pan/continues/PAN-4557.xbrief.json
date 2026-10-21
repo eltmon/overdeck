@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4557",
+  "created": "2026-10-21T04:34:51.196Z",
+  "updated": "2026-10-21T04:34:51.196Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "herdr-snapshot-bracketed-paste": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4557",
+      "claimedAt": "2026-10-21T04:34:51.196Z"
+    }
+  }
+}
