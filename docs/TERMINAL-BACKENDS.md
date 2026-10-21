@@ -609,7 +609,11 @@ A THROW from the Herdr prompt stays a Herdr failure (`ok: false, path: 'herdr'`)
 The dashboard terminal follows the same rule: `/ws/terminal` resolves the session name to a Herdr
 terminal id first (`resolveHerdrTerminalId`) and serves that client from `observe` plus a lazily
 opened `control`; a null answer means the PTY hub path, exactly as before. The RPC
-`TerminalService` uses the same bridge, wearing the PTY interface (`HerdrTerminalProcess`).
+`TerminalService` uses the same bridge, wearing the PTY interface (`HerdrTerminalProcess`). A Herdr
+full frame repaints the grid but carries no DEC private modes, and Herdr exposes none. So
+`serveHerdrTerminal` prefixes the snapshot with `\x1b[?2004h` (PAN-4557). This is safe because
+Herdr's attach input re-wraps a complete bracketed paste to the pane's live mode. Mouse and focus
+modes are not forced (drag-select, `5d2dafcf16d`).
 
 A prompt whose `wait` stalls or times out is reported **delivered**, not failed: Herdr writes the
 text and Enter before it starts watching for activity, so a stalled wait is no proof the prompt never
@@ -989,6 +993,9 @@ $ herdr --session overdeck terminal session observe term_65bc93acb59ea2
 {"type":"terminal.frame","encoding":"ansi","full":true,"width":100,"height":30,"seq":1,"bytes":"G1s/MjAyNmgb…"}
 … 27 further frames with "full":false during one prompt …
 ```
+
+The full frame's bytes hold no `?2004h`/mouse modes (see the paragraph above); the dashboard
+client prefixes the snapshot it builds from that frame with `\x1b[?2004h` itself.
 
 **Inventory and events** (`list`, `events`)
 

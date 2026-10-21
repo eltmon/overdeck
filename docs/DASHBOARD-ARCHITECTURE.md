@@ -48,7 +48,8 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
 - PTY waits for the tmux session to exist (`sessionExists` + respawn-pending waits) before spawning
 - Attach uses a deterministic snapshot protocol: the server sends a `snapshot` control frame,
   the client acks `ready`, and only then does live data flow (`readyForLiveData` in XTerminal.tsx);
-  unready clients are closed with `terminal-ready-timeout`
+  unready clients are closed with `terminal-ready-timeout`. On a Herdr terminal the snapshot `data`
+  starts with `\x1b[?2004h` (PAN-4557), because the client resets xterm before writing it.
 - App-level heartbeat (PAN-4434): a client that opts in with `?heartbeat=1` on the upgrade URL
   receives a `\u0000{"type":"ping"}` control frame every 20s from connection onward (across the
   attach/respawn wait) and must answer `{"type":"pong"}`; any inbound message resets the missed-interval
