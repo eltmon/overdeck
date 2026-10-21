@@ -30,6 +30,11 @@ pan memory pin <doc-path> [--project <id> | --workspace <id>] [--json]
 pan memory unpin <doc-path> [--project <id> | --workspace <id>] [--json]
 pan memory pins [--project <id> | --workspace <id>] [--json]
 pan memory config [--json]
+pan memory show <id> [--project <key> | --user | --here]
+pan memory list [--type <t>] [--query <q>] [--review] [--project <key> | --user | --here] [--json]
+pan memory add <id> --type <feedback|project|reference|user> --description <text> [--title <text>] [--body <text> | --body-file <path>] [--tags <a,b>] [--project <key> | --user] [--json]
+pan memory edit <id> [--type <t>] [--title <text>] [--description <text>] [--body <text> | --body-file <path>] [--tags <a,b>] [--clear-review] [--project <key> | --user] [--json]
+pan memory retire <id> [--project <key> | --user] [--json]
 ```
 
 ## Notes
@@ -38,6 +43,7 @@ pan memory config [--json]
 - `search --global` merges results across every registered project instead of just the selected/default one.
 - `search --workspace` accepts either a workspace id or a workspace name; a name matching more than one workspace across projects errors instead of guessing.
 - `search --target [path]` (Subspace `target-search` parity) finds every non-archived workspace whose `path` targets a directory — bare `--target` defaults to the current working directory. Mutually exclusive with `--workspace`/`--issue`/`--global`. Fans out per matched workspace (which may span several projects) and merges by rank score, same as `--global`'s per-project merge. When no workspace targets the directory, prints a friendly "No workspaces target `<dir>`." note and exits 0.
+- `search` (human output only) prints matching curated facts first, under `Project memory:`/`Operator memory:` (PAN-3957, at most 5 each), before the observation hits below them. `--json` is unchanged — still the observation array only.
 - `status` and `summary` address a workspace three ways, in precedence order: `--workspace <id|name>`, an issue positional, then the workspace that owns the current directory. With none of the three resolvable the command exits non-zero and names all three modes. A workspace with no issue (main/scratch) is titled by its workspace name in `summary` output.
 - `status --history <n>` prints the current status first, then up to N archived statuses newest-first with their archive timestamp, phase, and headline. N is capped at 50; the rollup writer prunes the on-disk archive to its three most recent entries, so N above 3 returns whatever is still retained. `--history` with `--json` emits `{current, history}` where each history entry is `{archivedAt, path, status}`.
 - `timeline` prints one row per observation — timestamp, the action status or summary, and the files touched — oldest first, for the workspace named by `--workspace` or the one owning the current directory. `--days` counts today as day 1 and defaults to 7; `--limit` caps the row count at the 50 most recent by default; `--json` emits the observation rows.
@@ -46,3 +52,5 @@ pan memory config [--json]
 - `doctor` exits non-zero when an active agent has no successful extraction in the last hour.
 - `backfill` reads historical Claude Code JSONL transcripts under `~/.claude/projects/` and extracts observations for sessions whose first-message cwd maps to a registered workspace; unmatched sessions are skipped. Read-only on the JSONL files — `--dry-run` reports matches without extracting or writing anything.
 - `pin`/`unpin`/`pins` manage docs injected under the knowledge budget at prompt time. `--workspace` overrides `--project`; paths are stored project-relative regardless of scope.
+- `show`/`list` read curated memory facts (PAN-3957) — short, human-reviewable markdown files with frontmatter, committed in the repo and distinct from the observation substrate above. `--project <key>` always reads that project's primary checkout; with neither `--project` nor `--user`, `show`/`list` default to the primary checkout too (the store the launch-time index was rendered from) — pass `--here` to read the cwd checkout's own store instead (useful inside a workspace before its branch merges). `list` defaults to active facts only; `--review` shows only facts carrying a review marker, and `list` exits non-zero when any fact file fails to parse, printing a `Problems:` block.
+- `add`/`edit`/`retire` write curated facts into the checkout that owns the cwd (or `--project <key>`'s primary checkout, or `--user` for the per-machine operator store); they never accept `--here` and never commit — each prints the `git add`/`git rm` + commit hint to run yourself. `add --type user` without `--user` is refused (user facts belong in the operator store). A fact whose text contains an absolute home-directory path, or something that looks like a secret, is refused in the project store (the operator store accepts machine-specific paths). `edit` requires at least one field flag and always bumps `updated`; `--clear-review` removes a review marker, reactivating the fact in the launch index.

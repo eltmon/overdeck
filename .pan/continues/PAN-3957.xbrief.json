@@ -1,0 +1,273 @@
+{
+  "version": "1",
+  "issueId": "PAN-3957",
+  "created": "2026-10-20T21:53:35.214Z",
+  "updated": "2026-10-21T00:21:21.732Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-fact-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T21:53:35.214Z",
+      "doneAt": "2026-10-20T22:08:53.970Z"
+    },
+    "w2-index-renderer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T22:09:03.666Z",
+      "doneAt": "2026-10-20T22:19:28.044Z"
+    },
+    "w3a-inject-launch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T22:19:34.678Z",
+      "doneAt": "2026-10-20T22:31:22.183Z"
+    },
+    "w3b-inject-muse": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T22:31:28.387Z",
+      "doneAt": "2026-10-20T22:38:50.784Z"
+    },
+    "w4-context-preview": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T22:38:54.958Z",
+      "doneAt": "2026-10-20T22:49:14.410Z"
+    },
+    "w5a-cli-read-verbs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T22:49:20.628Z",
+      "doneAt": "2026-10-20T23:01:46.874Z"
+    },
+    "w5b-cli-write-verbs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T23:01:50.591Z",
+      "doneAt": "2026-10-20T23:13:36.757Z"
+    },
+    "w6-search-facts-first": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T23:13:40.784Z",
+      "doneAt": "2026-10-20T23:22:56.484Z"
+    },
+    "w12-dirty-gate-carveout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T23:23:00.573Z",
+      "doneAt": "2026-10-20T23:30:36.731Z"
+    },
+    "w13-autocommit-carveout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T23:30:40.997Z",
+      "doneAt": "2026-10-20T23:38:27.507Z"
+    },
+    "w14-closeout-carveout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T23:38:31.629Z",
+      "doneAt": "2026-10-20T23:46:41.478Z"
+    },
+    "w7-bundled-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T23:46:45.682Z",
+      "doneAt": "2026-10-20T23:53:43.305Z"
+    },
+    "w8a-user-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T23:53:47.461Z",
+      "doneAt": "2026-10-21T00:01:36.413Z"
+    },
+    "w8b-dev-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-21T00:01:41.855Z",
+      "doneAt": "2026-10-21T00:09:48.295Z"
+    },
+    "w1-fact-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:13:13.437Z"
+    },
+    "w1-fact-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:13:24.475Z"
+    },
+    "w1-fact-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:13:35.380Z"
+    },
+    "w1-fact-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:13:46.408Z"
+    },
+    "w2-index-renderer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:13:57.346Z"
+    },
+    "w2-index-renderer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:14:08.518Z"
+    },
+    "w2-index-renderer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:14:19.256Z"
+    },
+    "w2-index-renderer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:14:30.221Z"
+    },
+    "w3a-inject-launch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:14:41.240Z"
+    },
+    "w3a-inject-launch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:14:52.306Z"
+    },
+    "w3a-inject-launch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:15:03.749Z"
+    },
+    "w3a-inject-launch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:15:16.472Z"
+    },
+    "w3b-inject-muse.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:15:29.731Z"
+    },
+    "w3b-inject-muse.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:15:42.484Z"
+    },
+    "w4-context-preview.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:15:53.733Z"
+    },
+    "w4-context-preview.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:16:05.330Z"
+    },
+    "w4-context-preview.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:16:16.380Z"
+    },
+    "w5a-cli-read-verbs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:16:27.629Z"
+    },
+    "w5a-cli-read-verbs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:16:38.418Z"
+    },
+    "w5a-cli-read-verbs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:16:49.505Z"
+    },
+    "w5a-cli-read-verbs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:17:00.531Z"
+    },
+    "w5b-cli-write-verbs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:17:11.801Z"
+    },
+    "w5b-cli-write-verbs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:17:22.938Z"
+    },
+    "w5b-cli-write-verbs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:17:33.806Z"
+    },
+    "w5b-cli-write-verbs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:17:44.846Z"
+    },
+    "w6-search-facts-first.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:17:55.715Z"
+    },
+    "w6-search-facts-first.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:18:06.979Z"
+    },
+    "w6-search-facts-first.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:18:18.016Z"
+    },
+    "w12-dirty-gate-carveout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:18:28.832Z"
+    },
+    "w12-dirty-gate-carveout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:18:40.183Z"
+    },
+    "w13-autocommit-carveout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:18:51.258Z"
+    },
+    "w13-autocommit-carveout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:19:02.694Z"
+    },
+    "w13-autocommit-carveout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:19:13.409Z"
+    },
+    "w14-closeout-carveout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:19:24.593Z"
+    },
+    "w14-closeout-carveout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:19:35.773Z"
+    },
+    "w14-closeout-carveout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:19:46.726Z"
+    },
+    "w7-bundled-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:19:57.599Z"
+    },
+    "w7-bundled-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:20:10.072Z"
+    },
+    "w8a-user-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:20:23.076Z"
+    },
+    "w8a-user-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:20:36.377Z"
+    },
+    "w8a-user-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:20:48.283Z"
+    },
+    "w8b-dev-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:20:59.457Z"
+    },
+    "w8b-dev-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:21:10.584Z"
+    },
+    "w8b-dev-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:21:21.732Z"
+    }
+  }
+}

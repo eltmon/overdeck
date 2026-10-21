@@ -98,6 +98,14 @@ with global rules and workspace-only content. User-authored native files remain
 entirely user-owned and are still available through each harness's normal
 discovery behavior.
 
+## Project memory
+
+Curated memory facts — short, human-reviewable, repo-committed truths distinct from the layers
+above — are injected right after the project layer and before the workspace section, as a `## Project
+memory` section and (on this machine) a following `## Operator memory` section. See
+[Project Memory](/configuration/memory) for the fact format, the two store paths, and the `pan memory`
+commands.
+
 ## Native files are a no-touch boundary
 
 Normal install, sync, startup, workspace, and agent lifecycle paths do not

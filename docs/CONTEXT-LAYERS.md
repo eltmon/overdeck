@@ -340,6 +340,8 @@ Changing the transport does not disable a user's native instructions.
 | Bundled rules | `sync-sources/rules/*.md` | Applicable scope and enabled rules, each labeled with its source path |
 | Project context | `<project>/.overdeck/context/project.md` | Resolved from the registered project at launch |
 | Workspace context | `<workspace>/.overdeck/context/workspace.md` | Issue metadata, memory, and status |
+| Project memory | `<planHome>/.overdeck/memory/*.md` | Rendered index (one line per active fact) after the project layer, every harness |
+| Operator memory | `~/.overdeck/context/memory/*.md` | Rendered index after project memory, every harness on this machine |
 | Legacy context paths | `.pan/context/project.md`, `.pan/context/workspace.md` | Read fallback only when the canonical file is absent |
 | Role instructions | Role definition selected by the launcher | Frontmatter removed; source path retained in the role prompt |
 | Session briefing | The briefing resolver's Overdeck-owned file | Added to the launch context |
@@ -358,8 +360,9 @@ project `.claude/rules/`, applicable ancestor and descendant files, and `@`
 imports. Organization policy lives at `/etc/claude-code/CLAUDE.md` on Linux,
 `/Library/Application Support/ClaudeCode/CLAUDE.md` on macOS, and
 `C:\Program Files\ClaudeCode\CLAUDE.md` on Windows. Additional-directory settings
-can extend discovery. Claude auto memory is another input, normally under
-`~/.claude/projects/<project>/memory/`; it is not a context-layer source.
+can extend discovery. Claude auto memory (`~/.claude/projects/<project>/memory/`) is a
+harness-native input that Overdeck does not read at launch. Curated project memory replaces it
+for managed sessions (see `configuration/memory.mdx`).
 
 Codex's native global input is `$CODEX_HOME/AGENTS.override.md`, otherwise
 `$CODEX_HOME/AGENTS.md`. Overdeck explicitly preserves the user's ordinary

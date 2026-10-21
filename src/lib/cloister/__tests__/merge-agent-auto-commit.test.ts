@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -56,5 +56,21 @@ describe('sync-main pre-commit safety', () => {
     expect(git(root, 'rev-parse', 'HEAD')).toBe(headBefore);
     expect(git(root, 'diff', '--cached', '--name-only')).toBe('');
     expect(readFileSync(join(root, 'tracked.txt'), 'utf8')).toContain('<<<<<<< HEAD');
+  });
+
+  it('commits .overdeck/memory/x.md and leaves .overdeck/config.yaml uncommitted (PAN-3957 D17)', async () => {
+    mkdirSync(join(root, '.overdeck', 'memory'), { recursive: true });
+    writeFileSync(join(root, '.overdeck', 'memory', 'x.md'), '---\ntype: feedback\ndescription: x\n---\nBody.\n');
+    writeFileSync(join(root, '.overdeck', 'config.yaml'), 'machine: local\n');
+    writeFileSync(join(root, 'code.ts'), 'export const x = 1;\n');
+
+    const result = await autoCommitWorkspaceChangesBeforeSync(root);
+
+    expect(result).toMatchObject({ success: true, committed: true });
+    const committed = git(root, 'show', '--name-only', '--pretty=format:', 'HEAD').split('\n').filter(Boolean);
+    expect(committed).toContain('.overdeck/memory/x.md');
+    expect(committed).toContain('code.ts');
+    expect(committed).not.toContain('.overdeck/config.yaml');
+    expect(git(root, 'status', '--porcelain')).toContain('.overdeck/config.yaml');
   });
 });

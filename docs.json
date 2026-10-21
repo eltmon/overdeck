@@ -119,6 +119,7 @@
               "configuration/memory-governor",
               "configuration/jev",
               "configuration/context-layers",
+              "configuration/memory",
               "configuration/appearance",
               "configuration/state-branch",
               "configuration/issue-trackers",

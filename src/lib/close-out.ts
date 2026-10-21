@@ -8,6 +8,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { runGh } from './github-quota/run-gh.js';
+import { isProjectMemoryPath, PROJECT_MEMORY_PATH } from './state-plane.js';
 
 const execAsync = promisify(exec);
 
@@ -33,6 +34,24 @@ const ARTIFACT_PATH_PREFIXES = ['.pan/', '.planning/', 'docs/prds/', '.overdeck/
 const ARTIFACT_EXCLUSIONS = ARTIFACT_PATH_PREFIXES
   .map((prefix) => `':!${prefix.slice(0, -1)}'`)
   .join(' ');
+
+/** PAN-3957 D17: `.overdeck/memory/` is committed work product, not a pipeline artifact. */
+function isPipelineArtifactPath(file: string): boolean {
+  return !isProjectMemoryPath(file) && ARTIFACT_PATH_PREFIXES.some((prefix) => file.startsWith(prefix));
+}
+
+/** True when `ref` adds or changes a curated fact that `main` does not have (PAN-3957). */
+async function branchAddsMemoryFacts(ref: string, projectPath: string): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(
+      `git diff --name-only --diff-filter=AM main ${ref} -- ${PROJECT_MEMORY_PATH}`,
+      { cwd: projectPath, encoding: 'utf-8' },
+    );
+    return stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Squash-merge detection via the forge. A squash-merged branch is never an
@@ -103,7 +122,7 @@ async function isSquashMergedViaPr(
       { cwd: projectPath, encoding: 'utf-8' },
     );
     const files = filesOut.split('\n').map((line) => line.trim()).filter(Boolean);
-    const merged = files.every((file) => ARTIFACT_PATH_PREFIXES.some((prefix) => file.startsWith(prefix)));
+    const merged = files.every(isPipelineArtifactPath);
     if (!merged) negativeAnswerCache.set(key, Date.now());
     return merged;
   } catch {
@@ -147,7 +166,7 @@ export async function isBranchMerged(
           `git diff main...${branchName} -- ${ARTIFACT_EXCLUSIONS} 2>/dev/null || true`,
           { cwd: projectPath, encoding: 'utf-8' },
         );
-        if (!codeDiff.trim()) {
+        if (!codeDiff.trim() && !(await branchAddsMemoryFacts(branchName, projectPath))) {
           return { status: 'merged', message: 'Code changes squash-merged to main (only planning artifacts remain on branch)' };
         }
       } catch {
@@ -195,7 +214,7 @@ export async function isBranchMerged(
           `git diff main...origin/${branchName} -- ${ARTIFACT_EXCLUSIONS} 2>/dev/null || true`,
           { cwd: projectPath, encoding: 'utf-8' },
         );
-        if (!codeDiff.trim()) {
+        if (!codeDiff.trim() && !(await branchAddsMemoryFacts(`origin/${branchName}`, projectPath))) {
           return { status: 'merged', message: 'Remote code changes squash-merged to main (only planning artifacts remain on branch)' };
         }
       } catch {

@@ -41,4 +41,11 @@ describe('isAutoCommitExcludedPath', () => {
     expect(isAutoCommitExcludedPath('src/lib/template.ts')).toBe(false);
     expect(isAutoCommitExcludedPath('.pan/specs/2026-06-14-PAN-1862.vbrief.json')).toBe(false);
   });
+
+  it('does not exclude .overdeck/memory/<id>.md or the bare .overdeck/memory entry (PAN-3957 D17)', () => {
+    expect(isAutoCommitExcludedPath('.overdeck/memory')).toBe(false);
+    expect(isAutoCommitExcludedPath('.overdeck/memory/be-decisive.md')).toBe(false);
+    // Everything else under .overdeck/ is still excluded.
+    expect(isAutoCommitExcludedPath('.overdeck/config.yaml')).toBe(true);
+  });
 });

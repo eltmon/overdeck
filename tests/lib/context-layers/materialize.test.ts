@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const { projectRootRef } = vi.hoisted(() => ({ projectRootRef: { current: '' } }));
 vi.mock('../../../src/lib/projects.js', () => ({
   findProjectByPath: () => ({ name: 'Project', path: projectRootRef.current }),
+  resolveInfraRepo: (_project: unknown, root: string) => ({ repoPath: root, recordsPath: '.pan' }),
 }));
 
 import {
@@ -83,5 +84,56 @@ describe('managed launch context composition', () => {
     const path = materializeSharedManagedLaunchContext(workspace, 'kimi-code');
     expect(path).toMatch(new RegExp(`^${overdeckHome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/context/launch/kimi-code-`));
     expect(readFileSync(path, 'utf8')).toContain('Always global.');
+  });
+
+  describe('curated memory sections (PAN-3957)', () => {
+    function writeProjectFact(id: string, body: string) {
+      const dir = join(projectRoot, '.overdeck', 'memory');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${id}.md`), body, 'utf8');
+    }
+
+    function writeOperatorFact(id: string, body: string) {
+      const dir = join(overdeckHome, 'context', 'memory');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${id}.md`), body, 'utf8');
+    }
+
+    it('includes Project memory between the project layer and the workspace section', () => {
+      writeProjectFact('be-decisive', '---\ntype: feedback\ndescription: Make routine reversible calls yourself.\n---\nBody.\n');
+      const rendered = renderManagedLaunchContext(workspace, 'codex');
+      expect(rendered.indexOf('## Project context')).toBeLessThan(rendered.indexOf('## Project memory'));
+      expect(rendered.indexOf('## Project memory')).toBeLessThan(rendered.indexOf('## Workspace context'));
+      expect(rendered).toContain('feedback/be-decisive: Make routine reversible calls yourself.');
+    });
+
+    it('includes Operator memory from OVERDECK_HOME/context/memory', () => {
+      writeOperatorFact('terse-answers', '---\ntype: user\ndescription: Keep answers terse.\n---\nBody.\n');
+      const rendered = renderManagedLaunchContext(workspace, 'codex');
+      expect(rendered).toContain('## Operator memory');
+      expect(rendered).toContain('user/terse-answers: Keep answers terse.');
+    });
+
+    it('the codex and claude renders carry the identical memory section', () => {
+      writeProjectFact('be-decisive', '---\ntype: feedback\ndescription: Make routine reversible calls yourself.\n---\nBody.\n');
+      writeOperatorFact('terse-answers', '---\ntype: user\ndescription: Keep answers terse.\n---\nBody.\n');
+      const codexRendered = renderManagedLaunchContext(workspace, 'codex');
+      const claudeRendered = renderManagedLaunchContext(workspace, 'claude-code');
+      const extractMemory = (text: string) => text.slice(text.indexOf('## Project memory'), text.indexOf('## Workspace context'));
+      expect(extractMemory(codexRendered)).toBe(extractMemory(claudeRendered));
+    });
+
+    it('a review-marked fact is absent', () => {
+      writeProjectFact('marked-fact', '---\ntype: feedback\ndescription: Should not appear.\nreview: [unindexed]\n---\nBody.\n');
+      const rendered = renderManagedLaunchContext(workspace, 'codex');
+      expect(rendered).not.toContain('## Project memory');
+      expect(rendered).not.toContain('Should not appear.');
+    });
+
+    it('renders neither heading when both stores are empty', () => {
+      const rendered = renderManagedLaunchContext(workspace, 'codex');
+      expect(rendered).not.toContain('## Project memory');
+      expect(rendered).not.toContain('## Operator memory');
+    });
   });
 });

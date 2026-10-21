@@ -346,6 +346,14 @@ workspaces from it.
 
 ## Memory homes
 
+This section is **observation memory**: the automatically extracted session log substrate below.
+It is distinct from **curated facts** (PAN-3957, `configuration/memory.mdx`) — short,
+human-reviewable, repo-committed truths under `<planHome>/.overdeck/memory/` (project) and
+`~/.overdeck/context/memory/` (operator). `.overdeck/memory/` is the one `.overdeck/` subdirectory
+the pipeline treats as committed work product rather than runtime state (D17):
+`isOverdeckWorkspaceRuntimePath`, the pre-sync auto-commit, and close-out's merge detection all
+carve it out of their usual blanket `.overdeck/` exclusion.
+
 Memory storage is keyed by **workspace UUID**, not issue id:
 `~/.overdeck/memory/{projectId}/{workspaceId}/{observations,pending,status.json,summaries,archive}`.
 A conversation with no spawned agent (a main/scratch workspace turn) still
