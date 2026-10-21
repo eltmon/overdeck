@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-21T00:01:41.856Z",
+  "updated": "2026-10-21T00:09:48.296Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,9 +88,10 @@
       "doneAt": "2026-10-21T00:01:36.413Z"
     },
     "w8b-dev-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3957",
-      "claimedAt": "2026-10-21T00:01:41.855Z"
+      "claimedAt": "2026-10-21T00:01:41.855Z",
+      "doneAt": "2026-10-21T00:09:48.295Z"
     }
   }
 }
