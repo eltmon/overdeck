@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4557",
   "created": "2026-10-21T04:34:51.196Z",
-  "updated": "2026-10-21T04:42:18.479Z",
+  "updated": "2026-10-21T04:44:04.868Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,10 @@
       "claimedBy": "agent-pan-4557",
       "claimedAt": "2026-10-21T04:40:58.724Z",
       "doneAt": "2026-10-21T04:42:18.479Z"
+    },
+    "herdr-snapshot-bracketed-paste.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:44:04.868Z"
     }
   }
 }
