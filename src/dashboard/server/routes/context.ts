@@ -508,6 +508,7 @@ export async function previewContextLayers(
   const layers = applicableLayers(state, request.selectedLayer);
   const memory = renderManagedMemorySections(previewProjectRoot(projects, layers), {
     userDir: join(overdeckHome, 'context', 'memory'),
+    machineDir: join(overdeckHome, 'context', 'machine-memory'),
   });
   const previews = {} as Record<Harness, string>;
   for (const harness of PREVIEW_HARNESSES) {
