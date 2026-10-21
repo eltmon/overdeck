@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4578",
   "created": "2026-10-21T04:41:10.643Z",
-  "updated": "2026-10-21T05:07:08.754Z",
+  "updated": "2026-10-21T05:16:54.870Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
       "claimedBy": "agent-pan-4578",
       "claimedAt": "2026-10-21T05:04:53.903Z",
       "doneAt": "2026-10-21T05:07:08.754Z"
+    },
+    "w1-machine-scope.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:16:54.869Z"
     }
   }
 }
