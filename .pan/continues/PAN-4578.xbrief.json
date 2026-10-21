@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4578",
   "created": "2026-10-21T04:41:10.643Z",
-  "updated": "2026-10-21T05:19:38.567Z",
+  "updated": "2026-10-21T05:19:49.514Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "w4-cli-machine-flag.ac5": {
       "status": "completed",
       "doneAt": "2026-10-21T05:19:38.567Z"
+    },
+    "w5-operator-sync-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:19:49.514Z"
     }
   }
 }
