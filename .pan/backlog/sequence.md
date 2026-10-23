@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-23T19:03:18Z · model: claude-opus-5-5 · open: 829_
+_Last sequenced: 2026-10-23T20:58:11Z · model: claude-opus-5-5 · open: 830_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -21,6 +21,7 @@ _Last sequenced: 2026-10-23T19:03:18Z · model: claude-opus-5-5 · open: 829_
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
+| 26 | PAN-4582 | M | high | ok |  |  | Herdr splits every conversation pane out of one shared tab, so new PTYs get 0-1 rows and the Terminal tab is blank |
 | 27 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 28 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
 | 29 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
@@ -901,6 +902,10 @@ New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criter
 
 New bug filed from PAN-4222: after all eleven top-level items were closed through pan task done, pan done refused on 39 pending acceptance-criterion children that pan task next never surfaced, and the agent had to make 39 empty trailer commits to get through. It blocks completion of every issue planned with nested ACs, the default planner shape, so it ranks critical beside PAN-4217 and PAN-4219. It is marked needs-refinement because it describes the same missing AC-status writer as PAN-4217 and PAN-4219; the three should be fixed by one change and the extras closed as duplicates.
 
+### PAN-4582 (rank 26)
+
+New issue. Verified 2026-10-23: HerdrBackend.startAgent splits each agent pane out of its workspace's single tab, so the shared conversations workspace halved space until the newest pane had height 0 and a 1-row PTY; restored idle shells after reboot are never reaped. Every conversation past about the fifth renders a blank Terminal tab, and issue workspaces share the split path. Ranked beside PAN-3952 (same Herdr pane-sizing family) because both blind pane consumers; manual relief was applied but recurs on the next conversation spawn.
+
 ### PAN-3566 (rank 27)
 
 New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.
@@ -1153,10 +1158,6 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 
 Triage: verify whether a provider-capacity zombie can still read as running under the current liveness definition. Rank held.
 
-### PAN-2817 (rank 95)
-
-Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; verify the composer-freeze detection gap against it. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1164,10 +1165,10 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-23T19:03:18Z",
+  "generatedAt": "2026-10-23T20:58:11Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 829,
+  "openCount": 830,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11489,6 +11490,19 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
       "rationale": "New since the prior run. Clear file-by-file spec, but the change is only correct on or after 2026-12-01, so it ranks at the tail to keep the Flywheel from picking it early.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-4582",
+      "rank": 26,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Herdr splits every conversation pane out of one shared tab, so new PTYs get 0-1 rows and the Terminal tab is blank",
+      "rationale": "New issue. Verified 2026-10-23: HerdrBackend.startAgent splits each agent pane out of its workspace's single tab, so the shared conversations workspace halved space until the newest pane had height 0 and a 1-row PTY; restored idle shells after reboot are never reaped. Every conversation past about the fifth renders a blank Terminal tab, and issue workspaces share the split path. Ranked beside PAN-3952 (same Herdr pane-sizing family) because both blind pane consumers; manual relief was applied but recurs on the next conversation spawn.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12821,6 +12835,13 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4582",
+      "to": "PAN-3952",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
     }
   ]
 }
