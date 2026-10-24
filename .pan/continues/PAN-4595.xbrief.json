@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4595",
   "created": "2026-10-24T08:32:14.826Z",
-  "updated": "2026-10-24T09:27:31.500Z",
+  "updated": "2026-10-24T10:49:54.522Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-10-24T10:49:54.522Z"
+    }
+  ],
   "items": {
     "register-heartbeat-in-health": {
       "status": "completed",
@@ -72,5 +78,6 @@
       "doneAt": "2026-10-24T08:56:10.116Z"
     }
   },
-  "feedback": []
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
 }
