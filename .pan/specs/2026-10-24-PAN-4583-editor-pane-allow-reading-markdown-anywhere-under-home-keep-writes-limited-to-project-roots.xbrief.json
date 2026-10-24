@@ -1,0 +1,308 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T07:15:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4583: Editor pane: allow reading markdown anywhere under $HOME; keep writes limited to project roots",
+    "updated": "2026-10-24T07:17:10.774Z"
+  },
+  "plan": {
+    "id": "pan-4583",
+    "title": "Editor pane: allow reading markdown anywhere under $HOME; keep writes limited to project roots",
+    "status": "proposed",
+    "uid": "f8482bf5-3cba-4953-9c7b-bdd96e250960",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-24T07:15:37Z",
+    "updated": "2026-10-24T07:17:10.774Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4583",
+        "label": "PAN-4583",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4583.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "editor-pane",
+      "security",
+      "rpc",
+      "file-at-path"
+    ],
+    "narratives": {
+      "Problem": "The internal markdown editor pane refuses to open markdown files outside a registered project (e.g. ~/Projects/OpenMontage/.../script.md) with 'Path is outside the allowed project roots'. readFileAtPath and writeFileAtPath share one validateAndResolve() in src/dashboard/server/services/file-at-path.ts whose containment check accepts only registered project roots + OVERDECK_HOME, so reads were narrowed as a side effect of the write allowlist.",
+      "Proposal": "Give validateAndResolve a door argument ('read' | 'write'). Reads accept a realpath inside the operator's home directory (realpath(os.homedir())) or a write root; writes accept write roots only, unchanged. ReadFileAtPathResult gains a required writable: boolean (true when inside a write root). EditorPane opens writable:false files read-only (readonly textarea, Save and Ctrl/Cmd+S disabled, a read-only note). docs/MARKDOWN-EDITOR-PANE.md documents the split and a 'Who can call this door' analysis: every /ws/rpc caller holds the admin scope, which already grants a shell via /ws/terminal, and no Shared Sessions host transport exists in this repo. After pan done opens the PR, the work agent pastes the PRD's 'Security analysis — who can call /ws/rpc' section into the PR description (issue AC-8) and addresses CodeRabbit comments before merge.",
+      "NonGoals": "- No change to which files writeFileAtPath accepts; it still accepts registered project roots + OVERDECK_HOME only\n- No file creation by either door\n- No widening for non-markdown files; .md/.mdx/.markdown on both given and resolved path stays required\n- No change to the 1 MiB read cap, the 4096-char path limit, or the absolute-path rule\n- No new RPC method, no new error code, no new npm dependency\n- No change to MarkdownFileLink routing or the markdown open-target preference\n- No Shared Sessions transport work\n- No 'make writable' / 'register project' action in the read-only note\n- No change to isInsidePath semantics"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Inject the home root in tests by mocking node:os homedir with a spread of the real module",
+        "rationale": "src/lib/paths.ts exports no home constant; importing homedir from node:os in file-at-path.ts and mocking it keeps tests off the real home directory (issue AC-6) while tmpdir() keeps working."
+      },
+      {
+        "summary": "Keep one validateAndResolve with a door: 'read' | 'write' argument returning { realPath, writable }",
+        "rationale": "Preserves the existing check order and write error precedence exactly, and hands readFileAtPath the writable bit without a second containment pass."
+      },
+      {
+        "summary": "Read rejection message is 'Path is outside your home directory and the registered project roots'; write rejection keeps 'Path is outside the allowed project roots'",
+        "rationale": "The issue fixes the code (PATH_NOT_ALLOWED) but not the read message; a distinct message tells the operator the actual read boundary."
+      },
+      {
+        "summary": "EditorPane fails closed: only writable === true is editable; existing test mocks gain writable: true",
+        "rationale": "The issue requires that the operator never type edits that can only fail on save; failing closed guarantees that even for a malformed result."
+      },
+      {
+        "summary": "Contract change and server change ship as one work item",
+        "rationale": "Adding a required field to ReadFileAtPathResult breaks npm run typecheck until readFileAtPath returns it, so the two cannot land independently."
+      },
+      {
+        "summary": "The PR-description security analysis (issue AC-8) is also committed as a 'Who can call this door' section in docs/MARKDOWN-EDITOR-PANE.md",
+        "rationale": "The PR is opened by pan done after items complete, so a PR-body AC cannot gate an item; committing the analysis to docs makes it durable and reviewable from the diff, and the PR body copies it."
+      },
+      {
+        "summary": "The /ws/rpc caller analysis concludes the widening is acceptable; planning does not stop",
+        "rationale": "authorizeDashboardUpgrade requires the admin scope for /ws/rpc (ws-auth.ts lines 33-48, DASHBOARD-AUTH.md line 72); admin satisfies operate, which opens /ws/terminal as the same user; no Shared Sessions host transport exists in src/apps/packages."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Three small items across contracts, one server service, one frontend pane, and one doc page.",
+      "canonicalFilename": "2026-10-24-PAN-4583-editor-pane-allow-reading-markdown-anywhere-under-home-keep-writes-limited-to-project-roots.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "server-split-read-write-containment",
+        "title": "Split file-at-path containment by door and return writable from readFileAtPath",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T07:15:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4583",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "editor-pane-read-only-mode"
+          ],
+          "files_scope": [
+            "packages/contracts/src/rpc.ts",
+            "src/dashboard/server/services/file-at-path.ts",
+            "src/dashboard/server/services/__tests__/file-at-path.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/file-at-path.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "file-at-path.test.ts passes, including the new $HOME, sibling-prefix, symlink-escape, non-markdown, and write-rejection tests",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. (1) packages/contracts/src/rpc.ts: add required `writable: Schema.Boolean` (with the PRD's doc comment) to ReadFileAtPathResult; replace the ReadFileAtPathRpc comment's last sentence with the PRD text describing home root + write roots and writable; add the PATH_NOT_ALLOWED sentence to WriteFileAtPathRpc's comment. (2) src/dashboard/server/services/file-at-path.ts: import homedir from node:os; rename resolveAllowedRoots -> resolveWriteRoots with the new comment; add resolveHomeRoot() returning realpath(homedir()) or null; give validateAndResolve(path, door: 'read' | 'write') and return { realPath, writable }; replace the containment block (old lines 98-101) with the PRD's after-snippet (write outside write roots -> PATH_NOT_ALLOWED 'Path is outside the allowed project roots'; read outside write roots and outside home root -> PATH_NOT_ALLOWED 'Path is outside your home directory and the registered project roots'); readFileAtPath passes 'read' and returns writable; writeFileAtPath passes 'write'; add a module header comment. Do not change isInsidePath. (3) file-at-path.test.ts: add state.home, create tempRoot/home in beforeEach, add the PRD's vi.mock('node:os', ...) with the importOriginal spread, add writable: true to the existing project-root toEqual, and add the named tests listed in PRD WI-1 Step 3."
+        },
+        "items": [
+          {
+            "id": "server-split-read-write-containment.ac1",
+            "title": "Given a .md file under the mocked home root and outside every write root, when readFileAtPath is called, then it returns the file text with writable: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-split-read-write-containment.ac2",
+            "title": "Given a .md file inside the registered project root or OVERDECK_HOME (both outside the mocked home), when readFileAtPath is called, then it returns writable: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-split-read-write-containment.ac3",
+            "title": "Given a .md file under the mocked home root and outside the write roots, when writeFileAtPath is called, then it rejects with PATH_NOT_ALLOWED and the file content on disk is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-split-read-write-containment.ac4",
+            "title": "readFileAtPath rejects with PATH_NOT_ALLOWED a path outside home and write roots, a symlink under home resolving outside it, and <home>2/x.md; and rejects with UNSUPPORTED_FILE_TYPE a non-markdown file under home and a .md symlink under home resolving to a non-markdown file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-split-read-write-containment.ac5",
+            "title": "Given the test file mocks node:os homedir to a temp directory, when file-at-path.test.ts runs, then no test reads the real home directory; and ReadFileAtPathResult in rpc.ts contains writable: Schema.Boolean with a doc comment describing the read roots",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "editor-pane-read-only-mode",
+        "title": "Render writable:false files read-only in EditorPane",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T07:15:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4583",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
+            "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/panes/EditorPane.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "EditorPane.test.tsx passes, including the new read-only tests and the existing save/conflict tests with writable: true mocks",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. In EditorPane.tsx: add writable: boolean to the ready LoadState; loadFile sets writable: r.writable === true; derive const writable = load.status === 'ready' && load.writable; save() returns early unless load.writable; handlePaneKeyDown keeps preventDefault but only calls save() when writable && dirty && !saving (add writable to deps); Save button disabled={!writable || !dirty || saving}; textarea gets readOnly={!writable} and onChange only when writable; render a note with data-testid=\"editor-pane-readonly-note\" and the exact text 'Read-only — this file is outside the registered project roots.' above the conflict banner when !writable; update the component doc comment. In EditorPane.test.tsx: add writable: true to every existing readFileAtPath resolved value, then add the three named tests from PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "editor-pane-read-only-mode.ac1",
+            "title": "Given readFileAtPath resolves with writable: false, when EditorPane renders, then the textarea has the readonly attribute, a fireEvent.change leaves its value at the loaded text, and the Save button is disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-pane-read-only-mode.ac2",
+            "title": "Given a writable: false file with focus in the textarea, when Ctrl+S or Cmd+S is pressed, then writeFileAtPath is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-pane-read-only-mode.ac3",
+            "title": "EditorPane renders editor-pane-readonly-note with the text 'Read-only — this file is outside the registered project roots.' for writable: false and does not render it for writable: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-pane-read-only-mode.ac4",
+            "title": "The existing save, Ctrl/Cmd+S, split-pane, conflict, and reload tests pass with writable: true mocks, so a writable file still saves through writeFileAtPath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-editor-pane-split-door",
+        "title": "Document the split read/write door and the /ws/rpc caller analysis in MARKDOWN-EDITOR-PANE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T07:15:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4583",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MARKDOWN-EDITOR-PANE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Who can call this door' docs/MARKDOWN-EDITOR-PANE.md",
+            "grep -n 'writable' docs/MARKDOWN-EDITOR-PANE.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep finds the '## Who can call this door' heading",
+            "grep finds the writable field in the readFileAtPath result and the read-only pane paragraph",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly in docs/MARKDOWN-EDITOR-PANE.md: retitle to '(PAN-3260, PAN-4583)'; change the readFileAtPath result to { text, lang, mtimeMs, totalLines, writable }; replace the shared-validation paragraph and containment bullet (lines 50-63) with the door-split description (read roots = home + write roots, write roots = project roots + OVERDECK_HOME, the two exact PATH_NOT_ALLOWED messages, writable meaning) while keeping the absolute-path, extension, regular-file, no-create, and 1 MiB bullets; add the read-only EditorPane paragraph; add a '## Who can call this door' section condensing the PRD's four-point Security analysis with its file references (ws-auth.ts authorizeDashboardUpgrade admin scope, access-tokens.ts scopeSatisfies, DASHBOARD-AUTH.md scope table, Shared Sessions has no host transport in this repo). No other doc page describes this allowlist (configuration/, reference/, and the OKF bundle were searched)."
+        },
+        "items": [
+          {
+            "id": "docs-editor-pane-split-door.ac1",
+            "title": "docs/MARKDOWN-EDITOR-PANE.md states that reads accept the home directory or a write root, writes accept only registered project roots + OVERDECK_HOME, and readFileAtPath returns writable that is true exactly inside a write root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-editor-pane-split-door.ac2",
+            "title": "docs/MARKDOWN-EDITOR-PANE.md contains a '## Who can call this door' section that names the admin scope requirement for /ws/rpc, explains that admin grants /ws/terminal shell access, and states that Shared Sessions viewers have no route to the RPC",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-editor-pane-split-door.ac3",
+            "title": "docs/MARKDOWN-EDITOR-PANE.md describes that EditorPane renders a writable: false file with a readonly textarea, disabled Save and Ctrl/Cmd+S, and a read-only note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "server-split-read-write-containment",
+        "to": "editor-pane-read-only-mode",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
