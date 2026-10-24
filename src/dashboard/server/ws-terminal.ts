@@ -181,11 +181,12 @@ const HERDR_SNAPSHOT_MODES = '\x1b[?2004h';
  * Serve one WebSocket client from a Herdr terminal (PAN-3917 FR-4).
  *
  * Herdr already multiplexes a terminal — many observers, one controller — so
- * there is no PTY hub here: every client gets its own `observe` stream, and
- * the `control` stream is opened lazily on the client's first keystroke or
- * resize. The wire protocol the browser sees is unchanged: a `snapshot`
- * control frame first, then raw output, with `size` frames on a geometry
- * change.
+ * there is no PTY hub here: every client gets its own `HerdrTerminalProcess`
+ * bridge. The `control` stream is opened at attach with the client's size, so
+ * the PTY resizes to it immediately and later resizes stay in sync; a second
+ * viewer of the same terminal is served read-only over `observe` instead. The
+ * wire protocol the browser sees is unchanged: a `snapshot` control frame
+ * first, then raw output, with `size` frames on a geometry change.
  */
 function serveHerdrTerminal(
   ws: WebSocket,

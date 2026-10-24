@@ -225,7 +225,9 @@ describe('HerdrBackend.startAgent when Herdr never detects the agent', () => {
     vi.useFakeTimers();
     try {
       const { api, log } = fakeApi(({ method }) => {
-        if (method === 'pane.split') return { pane: { pane_id: 'w1:p3', terminal_id: 't3', workspace_id: 'w1' } };
+        if (method === 'tab.create') {
+          return { type: 'tab_created', tab: { tab_id: 'w1:t3' }, root_pane: { pane_id: 'w1:p3', terminal_id: 't3', workspace_id: 'w1' } };
+        }
         if (method === 'pane.get') return { pane: { pane_id: 'w1:p3', terminal_id: 't3', workspace_id: 'w1' } };
         return {};
       });
