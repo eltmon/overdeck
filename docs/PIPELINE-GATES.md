@@ -173,6 +173,20 @@ Work agents run only the tests they touched (the work prompt names
 CI" only in a CI-mode project); reviewers never run the suite — they read the
 CI result on the head (`gh pr checks <pr>`) where tests run on CI.
 
+### CPU admission (PAN-4311, PAN-4546)
+
+Before each local gate starts, it waits in a machine-wide FIFO queue under
+`~/.overdeck/verification-workers/admission/`. Direct local Vitest runs join
+the same queue. Up to `resources.quality_gate_slots` gates hold admission at
+once (default 2; set it in the global `~/.overdeck/config.yaml`, because a
+project `.pan.yaml` value is ignored). A gate is admitted only when its CPU
+sample is unpressured both before and 1.5 s after it takes its slot:
+utilization below 75 %, and CPU PSI `some avg10` below 25, or load per core
+below 1 where PSI is unavailable. Under pressure, new gates wait while running
+gates keep their slots; nothing is preempted. The file layout and stale-owner
+reclaim are described in the CPU-pressure bullet of
+[Agent Auto-Resume Gates](#agent-auto-resume-gates).
+
 ## Verification artifacts (FR-8)
 
 Each verification run writes an immutable artifact named by run time and
@@ -943,7 +957,17 @@ Auto-resume is intentionally suppressible:
   `cpu-pressure sample` calibration line (PSI some avg10/avg60, load per core)
   to `~/.overdeck/logs/deacon.log` every 5 minutes. Quality-gate admission
   (`quality-gate-admission.ts`) treats the host as contended at PSI `some
-  avg10 >= 25`, with load per core `>= 1` as the fallback.
+  avg10 >= 25`, with load per core `>= 1` as the fallback. Admission has
+  `resources.quality_gate_slots` slots (default 2, read from the global
+  config only): slot 0 is `owner.json` and slot *i* is `slot-<i>.json`.
+  Waiters stay FIFO, and the head takes the lowest free slot only while fewer
+  than that many slot files are held. Every slot needs an unpressured sample
+  and a settle re-check, so under pressure new gates wait while running gates
+  keep their slots (nothing is preempted). A stale owner (dead pid or older
+  than 25 minutes) is reclaimed per slot through that slot's breaker file.
+  Ticket and owner files are published atomically (written to a temp file,
+  then hard-linked into place), and a waiter whose ticket disappears
+  recreates it in place with its original queue position (PAN-4610).
 - **Runaway processes (PAN-4311):** the runaway patrol
   (`cloister/runaway-process-patrol.ts`, classifier `runaway-classify.ts`)
   runs every 30 s in the dashboard main process and is observe-only: it
@@ -957,8 +981,8 @@ Auto-resume is intentionally suppressible:
   its agent idle or its harness gone), or `long-burn` (age >= 30 min).
   Never flagged: harness processes and their pane shells, Herdr, tmux, the
   dashboard, Docker/containerd cgroups, gate-shaped groups (leader at nice
-  19, younger than the 20.5-minute gate watchdog), and the quality-gate
-  admission owner with its descendants. Ownership resolves from the
+  19, younger than the 20.5-minute gate watchdog), and every quality-gate
+  admission slot owner with its descendants. Ownership resolves from the
   process's environ (`OVERDECK_CONVERSATION`, `OVERDECK_AGENT_ID`), then an
   ancestor's environ, then the cgroup unit, then a `workspaces/feature-*`
   cwd. The feed gets one `warn` per group (naming `kill -TERM -<pgid>`),
