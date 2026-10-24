@@ -14,56 +14,104 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 export interface HeldKickoff {
   held: boolean;
   text?: string;
+  /** PAN-4596: the trimmed handoff focus, when the fork request carried one. */
+  focus?: string;
+}
+
+/**
+ * PAN-4596: whether the lookup has answered. `loading` until the first answer
+ * for this conversation, `ready` once one succeeded, `error` when every
+ * attempt so far failed — so a caller never reads "not held" from a lookup
+ * that has not answered yet.
+ */
+export type HeldKickoffStatus = 'loading' | 'ready' | 'error';
+
+export interface HeldKickoffOptions {
+  /** When false the hook makes no request and reports `{ held: false }`, `ready`. Default true. */
+  enabled?: boolean;
+  /** Keep polling every 5s even while not held, so a hold restored after a failed start is seen. Default false. */
+  pollAlways?: boolean;
 }
 
 export class HeldKickoffConflictError extends Error {}
 
-async function fetchHeldKickoff(name: string, signal?: AbortSignal): Promise<HeldKickoff> {
-  const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(name)}/kickoff`, { signal });
-  if (!res.ok) return { held: false };
+/** null when the lookup failed: a non-OK response, a non-JSON body or a rejected fetch. */
+async function fetchHeldKickoff(name: string, signal?: AbortSignal): Promise<HeldKickoff | null> {
   try {
+    const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(name)}/kickoff`, { signal });
+    if (!res.ok) return null;
     // .clone() so reading this body never consumes a Response another fetch
     // consumer (e.g. a test's blanket fetch mock shared across endpoints) still
     // needs to read.
     return (await res.clone().json()) as HeldKickoff;
   } catch {
-    return { held: false };
+    return null;
   }
 }
 
-/** Polls the kickoff door every 5s while held; stops once the conversation starts. */
-export function useHeldKickoff(conversationName: string): HeldKickoff & { refresh: () => void } {
-  const [state, setState] = useState<HeldKickoff>({ held: false });
+interface HeldKickoffSnapshot extends HeldKickoff {
+  /** The conversation + enabled pair this answer belongs to; a stale key reads as `loading`. */
+  key: string;
+  status: HeldKickoffStatus;
+}
+
+/** Polls the kickoff door every 5s while held (or always, with `pollAlways`); stops once the conversation starts. */
+export function useHeldKickoff(
+  conversationName: string,
+  options: HeldKickoffOptions = {},
+): HeldKickoff & { status: HeldKickoffStatus; refresh: () => void } {
+  const enabled = options.enabled ?? true;
+  const pollAlways = options.pollAlways ?? false;
+  const key = `${conversationName}::${enabled}`;
+  const [snapshot, setSnapshot] = useState<HeldKickoffSnapshot | null>(null);
   const heldRef = useRef(false);
+  const succeededKeyRef = useRef<string | null>(null);
   const loadRef = useRef<() => void>(() => {});
 
   useEffect(() => {
+    heldRef.current = false;
+    if (!enabled) {
+      loadRef.current = () => {};
+      return;
+    }
     let cancelled = false;
     const controller = new AbortController();
     const load = () => {
-      void fetchHeldKickoff(conversationName, controller.signal)
-        .then((next) => {
-          if (cancelled) return;
+      void fetchHeldKickoff(conversationName, controller.signal).then((next) => {
+        if (cancelled) return;
+        if (next) {
+          succeededKeyRef.current = key;
           heldRef.current = next.held;
-          setState(next);
-        })
-        .catch(() => { /* keep the last known state on a transient fetch failure */ });
+          setSnapshot({ ...next, key, status: 'ready' });
+        } else if (succeededKeyRef.current !== key) {
+          setSnapshot({ held: false, key, status: 'error' });
+        }
+        // A failure after a success keeps the last known state.
+      });
     };
-    loadRef.current = load;
+    loadRef.current = () => {
+      setSnapshot((prev) => (prev?.key === key && prev.status === 'error' ? { ...prev, status: 'loading' } : prev));
+      load();
+    };
     load();
-    const interval = setInterval(() => { if (heldRef.current) load(); }, 5000);
+    const interval = setInterval(() => { if (heldRef.current || pollAlways) load(); }, 5000);
     return () => {
       cancelled = true;
       controller.abort();
       clearInterval(interval);
     };
-  }, [conversationName]);
+  }, [conversationName, enabled, key, pollAlways]);
 
   // Stable identity: `heldKickoff` sits in ComposerFooter's handleSubmit
   // useCallback deps, and a fresh object/function every render there would
   // recreate handleSubmit (and everything downstream of it) on every render.
   const refresh = useCallback(() => loadRef.current(), []);
-  return useMemo(() => ({ ...state, refresh }), [state, refresh]);
+  return useMemo(() => {
+    if (!enabled) return { held: false, status: 'ready' as const, refresh };
+    // An answer for another conversation never shows through a switch.
+    if (!snapshot || snapshot.key !== key) return { held: false, status: 'loading' as const, refresh };
+    return { held: snapshot.held, text: snapshot.text, focus: snapshot.focus, status: snapshot.status, refresh };
+  }, [enabled, key, snapshot, refresh]);
 }
 
 /** POSTs the kickoff door. Throws HeldKickoffConflictError on 409, Error(body.error) otherwise. */
