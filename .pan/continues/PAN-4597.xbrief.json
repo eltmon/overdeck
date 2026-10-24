@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4597",
   "created": "2026-10-24T10:43:53.166Z",
-  "updated": "2026-10-24T10:48:06.176Z",
+  "updated": "2026-10-24T10:48:22.142Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -31,6 +31,10 @@
     "approval-refresh-accessor.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T10:48:06.176Z"
+    },
+    "open-pr-listing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:48:22.141Z"
     }
   }
 }
