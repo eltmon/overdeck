@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4582",
   "created": "2026-10-24T07:40:29.074Z",
-  "updated": "2026-10-24T08:50:59.617Z",
+  "updated": "2026-10-24T08:51:15.218Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "launch-pty-sizing.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T08:50:59.617Z"
+    },
+    "launch-pty-sizing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:51:15.217Z"
     }
   }
 }
