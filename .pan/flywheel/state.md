@@ -271,3 +271,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   (paths-ignore `.pan/**` on push), started. Mistake: I started PAN-4616 by
   guessing the new issue's number; stopped it with `pan kill` and commented.
   Always read the number from `gh issue create` output before `pan start`.
+- 2026-10-24 11:50: CI has no `concurrency` group, so superseded runs keep
+  their runners (48 unfinished runs, 12 on one PR branch). Cancelled 34
+  superseded runs by hand (kept each PR's head run and main's newest run);
+  permanent fix added to PAN-4618. When reading main's CI state after a
+  cancel, skip `cancelled` conclusions.
