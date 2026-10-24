@@ -467,9 +467,13 @@ whether it acts:
   that the inventory lists or that has a `running` row protects its stack. `pan workspace update`
   (`findLiveAgentInWorkspace`, via `isAlive`) refuses to run under a probe that did not answer.
   `pan show --health ping|check` (`lib/health.ts`) reports an unanswered probe as a `warning` that
-  neither increments nor resets the force-kill counter. Cloister `emergencyStop` stops every agent
-  the inventory lists plus every `running` row, through `stopAgent` (which closes Herdr panes), and
-  reports a stop whose pane is not confirmed gone as `unconfirmedAgents`, apart from `killedAgents`.
+  neither increments nor resets the force-kill counter. Its last-activity age comes from the
+  transcript heartbeat: `lib/health.ts` loads the runtime registry, which registers the heartbeat
+  lookup with `liveness.ts`. A CLI process has no runtime mirror and a Herdr pane has no tmux
+  `window_activity`, so without the heartbeat every Herdr agent older than 30 minutes would read
+  `stuck` (PAN-4595). Cloister `emergencyStop` stops every agent the inventory lists plus every
+  `running` row, through `stopAgent` (which closes Herdr panes), and reports a stop whose pane is
+  not confirmed gone as `unconfirmedAgents`, apart from `killedAgents`.
 
 The tmux adapter's inventory reports a failed ps/pgrep probe (`runtime-indeterminate`) as
 `unknown`, never `exited`, so a live agent does not drop out of a readable inventory.

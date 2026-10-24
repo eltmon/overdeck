@@ -2,7 +2,7 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
-import { readHeldKickoff } from '../../../lib/overdeck/conversation-kickoff-store.js';
+import { heldKickoffFocus, readHeldKickoff } from '../../../lib/overdeck/conversation-kickoff-store.js';
 import { startHeldKickoff } from '../../../lib/overdeck/conversation-kickoff.js';
 import { getConversationByName } from '../../../lib/overdeck/conversations.js';
 import { validateOrigin } from './origin-validation.js';
@@ -29,7 +29,9 @@ const getConversationKickoffRoute = HttpRouter.add(
     const conv = getConversationByName(name);
     if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
     const text = readHeldKickoff(name);
-    return text === null ? jsonResponse({ held: false }) : jsonResponse({ held: true, text });
+    if (text === null) return jsonResponse({ held: false });
+    const focus = heldKickoffFocus(conv.forkRequest);
+    return jsonResponse({ held: true, text, ...(focus ? { focus } : {}) });
   }),
 );
 

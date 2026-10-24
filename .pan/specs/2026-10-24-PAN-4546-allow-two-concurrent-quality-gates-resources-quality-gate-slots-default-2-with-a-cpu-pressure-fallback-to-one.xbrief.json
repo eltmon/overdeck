@@ -1,0 +1,575 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T10:27:31Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4546: Allow two concurrent quality gates (resources.quality_gate_slots, default 2) with a CPU-pressure fallback to one",
+    "updated": "2026-10-24T10:43:41.388Z"
+  },
+  "plan": {
+    "id": "pan-4546",
+    "title": "Allow two concurrent quality gates (resources.quality_gate_slots, default 2) with a CPU-pressure fallback to one",
+    "status": "running",
+    "uid": "5318ad9e-35e4-4593-a3de-e6d029afb293",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-24T10:27:31Z",
+    "updated": "2026-10-24T10:43:41.388Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4546",
+        "label": "PAN-4546",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4610",
+        "label": "PAN-4610",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "quality-gates",
+      "cpu-admission",
+      "config",
+      "verification",
+      "pan-4610"
+    ],
+    "narratives": {
+      "Problem": "Quality-gate CPU admission (src/lib/cloister/quality-gate-admission.ts) is one machine-wide slot held as owner.json. On 2026-10-04 on the 24-core host, 5-7 PRs waited 1-2 hours in the queue while load sat near 7 and CPU PSI some avg10 stayed near 0, so the serialized queue bounded throughput. The operator decided to allow two concurrent heavy gates and fall back to one under CPU pressure. Folded in PAN-4610: writeExclusive creates a ticket file before writing its JSON, every poller's listLiveTickets deletes unparseable tickets, and a waiter never checks its own ticket still exists, so a poll landing mid-write strands the waiter forever (PAN-4532's build gate waited 40+ minutes on 2026-10-24).",
+      "Proposal": "First (PAN-4610): publish ticket, owner and breaker files atomically (temp file + link(), which keeps open('wx')'s EEXIST exclusivity), skip unparseable tickets younger than a 10 s torn grace instead of deleting them, sweep temp files of dead pids, and have a waiter republish its own missing ticket with its original createdAt. Then: Generalize the single owner lock to N slot locks in the same admission directory: slot 0 keeps owner.json/owner.break (so unrebased checkouts that only know owner.json still coordinate), slot i>=1 uses slot-<i>.json/slot-<i>.break. The FIFO head waiter takes the lowest free slot in [0, N) only when the live owner count across all slot files is below N and today's pressure check plus settle re-check are both unpressured; stale owners are reclaimed per slot through that slot's breaker. N comes from a new resources.quality_gate_slots config key (integer 1-16, default 2), resolved from the global config only by a never-throwing lazy loader with deps.slots as the test override. The runaway patrol switches from one admission-owner pid to all slot-owner pids. Docs describe the key and the pressure fallback. Full detail: .pan/drafts/PAN-4546.md.",
+      "NonGoals": "- No preemption: an admitted gate is never paused, killed, or demoted when pressure rises.\n- No change to the pressure thresholds or to sampleQualityGatePressure().\n- No per-gate-type slots and no per-project slot counts; admission reads resources.quality_gate_slots from the global config only.\n- No dashboard settings UI for resources.quality_gate_slots.\n- No change to OVERDECK_GATE_ADMITTED reentrancy or the OVERDECK_GATE_ADMISSION=0 / CI bypass in tests/vitest-cpu-admission.ts.\n- No change to the waiter ticket JSON shape or waiter filenames.\n- No migration or cleanup of existing owner.json files (owner.json is slot 0 by design).\n- No edit to src/lib/config-yaml/schema.ts (god file) and no file-size allowlist raise.\n- No edit to the opening overview of the 'Verification Gate (PAN-174)' section of docs/PIPELINE-GATES.md (PAN-4609 owns it); only CPU-admission paragraphs change.\n- No maxWaitMs timeout added to validation.ts gate admission.\n- No use of rename() to publish owner.json, slot files, or breaker files (it would overwrite a held lock)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Slot 0 keeps the legacy owner.json/owner.break filenames; extra slots are slot-<i>.json/slot-<i>.break (the issue text said slot-0.json).",
+        "rationale": "Unrebased workspaces run tests/vitest-cpu-admission.ts from old checkouts that only know owner.json. Sharing owner.json as slot 0 caps mixed-version concurrency at N; slot-0.json would allow N+1. No acceptance criterion checks filenames."
+      },
+      {
+        "summary": "Every slot, including slot 0, uses today's exact admission path (pressure check, exclusive write, settle, re-check, give back on pressure). 'Fall back to one' means no new gate starts while the sample is pressured.",
+        "rationale": "The issue's AC requires quality_gate_slots: 1 to behave identically to today, and the existing test at quality-gate-admission.test.ts:101 proves today's slot 0 checks pressure; an unconditional slot 0 would break it."
+      },
+      {
+        "summary": "Capacity counts live owners across all slot files present (any index), so lowering quality_gate_slots while a higher slot is held still caps concurrency at the new N.",
+        "rationale": "Config changes take effect per request; counting only indices < N would let N-lowering exceed the cap until the high slot frees."
+      },
+      {
+        "summary": "resources.quality_gate_slots accepts integers 1-16; out-of-range or non-integer values are ignored and the default 2 stays.",
+        "rationale": "Matches merge-cpu.ts's ignore-not-clamp convention; the upper bound stops a typo from effectively disabling admission."
+      },
+      {
+        "summary": "The slot-count resolver lazy-imports a new global-only loadGlobalConfigNoMigration (never a project .pan.yaml) and never throws, falling back to 2.",
+        "rationale": "tests/vitest-cpu-admission.ts swallows acquire errors and runs without admission, so a throwing resolver would silently disable the Vitest queue; the lazy import avoids new import cycles (precedent model-presets/plan.ts:111). The admission directory is machine-wide, so per-workspace project values must not change its limit (critique round 1)."
+      },
+      {
+        "summary": "The runaway patrol reads all slot-owner pids through a new exported readQualityGateAdmissionOwnerPids().",
+        "rationale": "runaway-process-patrol.ts:222 reads only owner.json, so a gate in slot 1 would be flagged as a runaway after 10 minutes; the issue body did not mention this reader."
+      },
+      {
+        "summary": "Flywheel docs note: WI-5 adds a CPU-admission subsection at the end of the Verification Gate section (or rewrites the one PAN-4609 added) and updates the existing admission paragraphs in 'Agent Auto-Resume Gates'; the user-facing page is configuration/memory-governor.mdx.",
+        "rationale": "At 56359953274 the only admission paragraphs in docs/PIPELINE-GATES.md are lines 903-905 and 919-920; memory-governor.mdx is the only configuration/ or reference/ page listing resources.* keys; PAN-4609 owns the Verification Gate overview."
+      },
+      {
+        "summary": "Only canonical slot names count: owner.json and slot-<i>.json with i a positive safe integer without leading zeros; aliases are ignored.",
+        "rationale": "A loose matcher would map slot-0.json or slot-01.json onto a slot whose reclaim targets a different file, holding capacity forever (critique round 1)."
+      },
+      {
+        "summary": "PAN-4610 is folded in as its own item (admission-ticket-durability) that blocks admission-n-slots, and its files are published with link() instead of the rename() the issue suggested.",
+        "rationale": "Flywheel scope addition. rename() silently replaces an existing target, which would break owner.json and breaker exclusivity; link() is atomic and fails with EEXIST, preserving today's contract."
+      },
+      {
+        "summary": "Unparseable tickets and slot owner files younger than 10 s (file mtime vs Date.now()) are skipped, never deleted; older ones are deleted.",
+        "rationale": "New code never writes torn files, but old-version processes still do during rollout; instant deletion is the PAN-4610 failure."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Single subsystem (CPU admission) plus its config key, its one other reader (runaway patrol), docs, and the folded-in PAN-4610 ticket fix in the same module; 19 files total.",
+      "canonicalFilename": "2026-10-24-PAN-4546-allow-two-concurrent-quality-gates-resources-quality-gate-slots-default-2-with-a-cpu-pressure-fallback-to-one.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "admission-ticket-durability",
+        "title": "Publish admission files atomically and let a waiter recreate its own deleted ticket (PAN-4610)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T10:27:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4546",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "admission-n-slots"
+          ],
+          "files_scope": [
+            "src/lib/cloister/quality-gate-admission.ts",
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "quality-gate-admission.test.ts reports the five pre-existing tests plus the young-torn, old-torn, own-ticket-recreated and temp-file tests passing",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "FR-13",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-0 and decisions D13-D17. (1) Replace writeExclusive (line 149) with publishExclusive(path, value): write the JSON to `.tmp-${process.pid}-${tempSequence++}-${basename(path)}` in the same directory with open('wx', 0o600), then `link(temp, path)` (throws EEXIST when path exists), and unlink the temp file in a finally. Never use rename(). Switch all three call sites (breaker line 198, ticket line 280, owner line 310) to it with their EEXIST handling unchanged. (2) Add QUALITY_GATE_ADMISSION_TORN_GRACE_MS = 10_000 and deps.tornGraceMs. (3) listLiveTickets: delete `.tmp-<pid>-...` entries only when that pid is dead; for an unparseable waiter-*.json, stat it and delete only when Date.now() - mtimeMs > tornGraceMs (skip on ENOENT); compare with Date.now(), not deps.now. (4) In the acquire loop right after listLiveTickets, if no listed ticket has our ticketId, republish the same ticket object (ignore EEXIST), sleep pollMs, continue. (5) Add the four tests in PRD WI-0 step 5 using fake timers, a temp root, and utimesSync to backdate mtimes. (6) Closing PAN-4610: `pan done` creates the PR with a generated body (issue number plus item checklist, src/cli/commands/done.ts buildPrBody) and has no free-text field, so right after `pan done` returns, run `gh pr view --json body -q .body > /tmp/pr-body.md`, append a line `Closes #4610`, and run `gh pr edit --body-file /tmp/pr-body.md` (the gh shim allows this; it only blocks grant labels). This is a post-done step, not a checklist AC. (7) Add `tornGraceMs` to the test deps() helper so torn tests do not depend on the module constant. Verify the no-rename( clause of ac3 with grep at review time; do not write a test that reads module source (lint:source-introspection rejects it)."
+        },
+        "items": [
+          {
+            "id": "admission-ticket-durability.ac1",
+            "title": "Given a fresh empty waiter-*.json in the admission root, when another request polls and is admitted, then the empty file still exists; given the same file backdated 60 s, it is deleted after one admission",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-ticket-durability.ac2",
+            "title": "Given request A holding admission and request B waiting, when the test deletes B's ticket file, then B republishes it with createdAt 2 and, after A releases, B resolves before a later request C",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-ticket-durability.ac3",
+            "title": "After an admission and release the admission root contains no .tmp- file, a pre-created .tmp- file of a dead pid is removed after one poll, and quality-gate-admission.ts contains no rename( call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-ticket-durability.ac4",
+            "title": "Given the deps() helper also passes tornGraceMs, each of the five pre-existing admission tests passes with no other change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-quality-gate-slots",
+        "title": "Add resources.quality_gate_slots config key (default 2, integer 1-16) and a global-only config loader",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T10:27:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4546",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema-cpu.ts",
+            "src/lib/config-yaml/merge-cpu.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "tests/lib/config-yaml.test.ts",
+            "src/lib/config-yaml/load.ts",
+            "src/lib/__tests__/config-yaml-async.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/config-yaml.test.ts src/lib/__tests__/config-yaml-async.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/config-yaml.test.ts and src/lib/__tests__/config-yaml-async.test.ts pass, including the qualityGateSlots cases and the global-vs-project case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. Add `quality_gate_slots?: number` (doc comment: concurrent quality-gate admission slots, 1-16; extra slots open only while CPU is unpressured) to CpuResourcesYamlConfig and `qualityGateSlots: number` to CpuResourcesConfig in src/lib/config-yaml/schema-cpu.ts. In merge-cpu.ts after the governor_cpu_hold_dispatch line add `if (isIntegerInRange(yaml.quality_gate_slots, 1, 16)) resolved.qualityGateSlots = yaml.quality_gate_slots;`. In defaults.ts after `governorCpuHoldDispatch: false,` (line 250) add `qualityGateSlots: 2,`. In merge.ts after line 261 add `qualityGateSlots: DEFAULT_CONFIG.resources.qualityGateSlots,`. Do not edit schema.ts. Extend the three PAN-4311 tests in tests/lib/config-yaml.test.ts (lines 302-357): defaults expect qualityGateSlots 2; override quality_gate_slots 3 expects 3; out-of-range 0 expects 2; add a case with 1.5 and one with 17 that expect 2. Then follow PRD WI-1 steps 6-7: in src/lib/config-yaml/load.ts after loadConfigNoMigration add `export async function loadGlobalConfigNoMigration(): Promise<ConfigLoadResult>` that returns `{ config: mergeConfigs(await loadGlobalConfigFromDisk()).config }`, never reads a project .pan.yaml, and does not touch configCache. In src/lib/__tests__/config-yaml-async.test.ts (reuse its OVERDECK_HOME + process.chdir fixture) write <testHome>/config.yaml with resources.quality_gate_slots: 1 and <projectRoot>/.pan.yaml with resources.quality_gate_slots: 3; loadGlobalConfigNoMigration() returns qualityGateSlots 1 while loadConfigNoMigration() returns 3; with no global file it returns 2."
+        },
+        "items": [
+          {
+            "id": "config-quality-gate-slots.ac1",
+            "title": "Given no resources override, mergeConfigs().config.resources.qualityGateSlots defaults to 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-quality-gate-slots.ac2",
+            "title": "Given resources.quality_gate_slots: 3, mergeConfigs returns qualityGateSlots 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-quality-gate-slots.ac3",
+            "title": "Given quality_gate_slots of 0, 1.5, or 17, mergeConfigs falls back to qualityGateSlots 2 without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-quality-gate-slots.ac4",
+            "title": "Given a global config.yaml with quality_gate_slots: 1 and a project .pan.yaml with 3, loadGlobalConfigNoMigration() returns qualityGateSlots 1 while loadConfigNoMigration() returns 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "admission-n-slots",
+        "title": "Generalize quality-gate admission from one owner lock to N slot locks",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T10:27:31Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4546",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "admission-config-resolver",
+            "runaway-patrol-all-slot-owners"
+          ],
+          "parallelSafeReason": "Touches only the admission module, its unit test, and one log line in validation.ts; no other ready item shares these files.",
+          "files_scope": [
+            "src/lib/cloister/quality-gate-admission.ts",
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts",
+            "src/lib/cloister/validation.ts",
+            "tests/cloister/verification-gate.test.ts",
+            "tests/unit/lib/cloister/validation.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts tests/cloister/verification-gate.test.ts tests/unit/lib/cloister/validation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "quality-gate-admission.test.ts reports the five pre-existing tests plus the new two-slot, pressure-fallback, per-slot stale-reclaim, lowered-cap and owner-pid-reader tests passing",
+            "verification-gate.test.ts and validation.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "acJustification": "Six criteria: the five issue-derived behaviors plus the critique's canonical-slot-name guard, each a separate unit test in one file."
+        },
+        "narrative": {
+          "Action": "Starts after admission-ticket-durability lands (same file; builds on publishExclusive and the torn grace). Follow PRD WI-2 and decisions D1-D4, D7-D9 exactly. (1) Add `slots?: number` to QualityGateAdmissionDeps and export `DEFAULT_QUALITY_GATE_SLOTS = 2`; in this item an omitted slots, or a deps.slots that is not an integer >= 1, uses that constant. (2) Replace ownerPath/breakerPath with slotOwnerPath(root, slot) -> owner.json for 0 else slot-<slot>.json, and slotBreakerPath(root, slot) -> owner.break for 0 else slot-<slot>.break; thread slot through acquireBreaker and clearStaleOwner. (3) Add listSlotOwnerFiles(root) that readdirs owner.json (slot 0) and names matching /^slot-([1-9]\\d*)\\.json$/ whose index passes Number.isSafeInteger; aliases such as slot-0.json or slot-01.json are never counted, read, reclaimed, written, or reported (PRD D6a). (4) In the acquire loop, after the FIFO head check: reclaim any stale owner per slot (then sleep pollMs and continue, as today); a listed slot file whose readJson returns null (torn or unparseable) AND whose mtime is older than the torn grace (deps.tornGraceMs, from admission-ticket-durability) is cleared right there with clearStaleOwner(root, slot, null, ...) and counts as a reclaim this pass, so a torn file never holds a slot forever; a younger unparseable file counts as occupied; write slot files with publishExclusive; count live owner files as occupied; if occupied >= slots sleep and continue; pick the lowest free index in [0, slots); then today's pressure sample, exclusive write, settle and re-check on that slot path; return { admittedAt, slot, slots, release } where release unlinks only its own slot file when sameOwner matches. (5) Export readQualityGateAdmissionOwnerPids(rootDir?: string): Promise<number[]> that returns the numeric pids from owner.json and every slot-<i>.json, skips malformed files and waiter/breaker files, returns [] when the root is missing, and never throws. (6) Rewrite the module header comment (lines 8-11) to describe N slots. (7) validation.ts:420 logs `[quality-gate] Admitted (slot ${admission.slot + 1}/${admission.slots}): ${identity}`; add `slot: 0, slots: 1` to mock handles in tests/cloister/verification-gate.test.ts and tests/unit/lib/cloister/validation.test.ts only if typecheck or those tests require it. (8) Tests with fake timers and the existing driveUntilResolved helper: set the deps() helper to `slots: 1`; add the seven new tests listed in PRD WI-2 step 8. The helper's staleMs is 1_000, so every live-owner fixture must pin `now` (e.g. now: () => 10_000 with acquiredAt 10_000) or it reads as stale. Keep the waiter ticket JSON fields unchanged. No real setTimeout waits."
+        },
+        "items": [
+          {
+            "id": "admission-n-slots.ac1",
+            "title": "Given slots: 2 and unpressured samples, when two requests run concurrently, then both resolve before either releases and the root contains owner.json and slot-1.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-n-slots.ac2",
+            "title": "Given slots: 2 and a pressured sample for the second request, when the first holds slot 0, then the second stays unresolved and slot-1.json is never created; after the first releases and samples turn unpressured, the second resolves with slot 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-n-slots.ac3",
+            "title": "Given the deps() helper passes slots: 1, the five pre-existing admission tests (FIFO, pressure recovery, settle re-check, stale owner reclaim, maxWaitMs expiry) pass with no other change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-n-slots.ac4",
+            "title": "Given slots: 2, a live owner in owner.json and a dead-pid owner in slot-1.json, a new request reclaims slot-1.json and resolves with slot 1 while owner.json is preserved; given a slot-1.json containing '{' backdated 60 s, a request with slots: 2 removes that file and resolves, while a fresh-mtime torn slot-1.json is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-n-slots.ac5",
+            "title": "readQualityGateAdmissionOwnerPids returns the pids from owner.json and slot-2.json and skips a malformed slot-1.json and waiter files; given slots: 1 and a live slot-1.json only, a request stays unresolved until that file is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-n-slots.ac6",
+            "title": "Given slots: 1 and live owners in slot-0.json and slot-01.json, a new request resolves with slot 0, both alias files are preserved unchanged, and readQualityGateAdmissionOwnerPids does not return their pids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "admission-config-resolver",
+        "title": "Resolve the admission slot count from the global config only, with a never-throwing fallback to 2",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T10:27:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4546",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/quality-gate-admission.ts",
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "quality-gate-admission.test.ts passes including the new config-resolver describe block",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 and decision D5. Add `async function resolveQualityGateSlots(): Promise<number>` to quality-gate-admission.ts: inside try, `const { loadGlobalConfigNoMigration } = await import('../config-yaml/load.js')`, read `(await loadGlobalConfigNoMigration()).config.resources.qualityGateSlots`, return it when it is an integer >= 1, else DEFAULT_QUALITY_GATE_SLOTS; catch returns DEFAULT_QUALITY_GATE_SLOTS. In acquireQualityGateAdmission use deps.slots when it is an integer >= 1, otherwise `await resolveQualityGateSlots()`, once per call. Add a describe block in the admission test file that vi.mock's '../../../../src/lib/config-yaml/load.js' with hoisted loadGlobalConfigNoMigration and loadConfigNoMigration mocks (the latter must record zero calls) and covers: config 3 with deps.slots omitted admits three concurrent requests (slots 0, 1, 2); a rejecting loader admits two and leaves a third waiting without acquire rejecting; deps.slots: 1 with config 3 leaves the second request waiting. Use fake timers. Run npm run lint:circular."
+        },
+        "items": [
+          {
+            "id": "admission-config-resolver.ac1",
+            "title": "Given the mocked global-only loader returns qualityGateSlots 3 and deps.slots is omitted, three concurrent requests all resolve with slots 0, 1 and 2, and the project-merged loadConfigNoMigration records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-config-resolver.ac2",
+            "title": "Given loadGlobalConfigNoMigration rejects, acquireQualityGateAdmission falls back to 2 slots: two requests resolve, a third stays waiting, and no call rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-config-resolver.ac3",
+            "title": "Given deps.slots: 1 and a mocked config of 3, the explicit deps value wins and the second concurrent request stays waiting until the first releases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runaway-patrol-all-slot-owners",
+        "title": "Runaway patrol excludes every admission slot owner, not only owner.json",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T10:27:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4546",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/runaway-classify.ts",
+            "src/lib/cloister/runaway-process-patrol.ts",
+            "tests/unit/lib/cloister/runaway-classify.test.ts",
+            "tests/unit/lib/cloister/runaway-process-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/runaway-classify.test.ts tests/unit/lib/cloister/runaway-process-patrol.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "runaway-classify.test.ts and runaway-process-patrol.test.ts pass, including the new second-owner exclusion case",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In runaway-classify.ts change RunawayContext.admissionOwnerPid: number | null (line 62) to admissionOwnerPids: readonly number[], and rewrite the exclusion at lines 226-231 to build `const owners = new Set(context.admissionOwnerPids)` and exclude a fact whose pid or any ancestor pid is in owners. In runaway-process-patrol.ts rename the dep readAdmissionOwnerPid to readAdmissionOwnerPids(): Promise<number[]> (line 83), delete the private readAdmissionOwner() (lines 222-232), wire `readAdmissionOwnerPids: () => readQualityGateAdmissionOwnerPids()` imported from './quality-gate-admission.js' (line 259), and pass `admissionOwnerPids: await deps.readAdmissionOwnerPids()` (line 404). Remove imports only if this change made them unused. Update tests: runaway-classify.test.ts:51 -> admissionOwnerPids: [], line 208 -> admissionOwnerPids: [950], plus a new case where a group descended from the second pid in [950, 960] is excluded; runaway-process-patrol.test.ts:91 -> readAdmissionOwnerPids: async () => []. Verify the no-'owner.json' clause of ac2 with grep at review time; do not write a test that reads module source (lint:source-introspection rejects it)."
+        },
+        "items": [
+          {
+            "id": "runaway-patrol-all-slot-owners.ac1",
+            "title": "Given admissionOwnerPids [950, 960], classifyRunaways returns no runaway for a process group descended from pid 960",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runaway-patrol-all-slot-owners.ac2",
+            "title": "The patrol's default deps resolve owner pids through readQualityGateAdmissionOwnerPids, and runaway-process-patrol.ts contains no literal 'owner.json' path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runaway-patrol-all-slot-owners.ac3",
+            "title": "Given admissionOwnerPids [], the existing runaway-classify cases still return the same runaways they returned with admissionOwnerPid null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-quality-gate-slots",
+        "title": "Document resources.quality_gate_slots and the CPU-pressure fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T10:27:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4546",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "configuration/memory-governor.mdx",
+            "CLAUDE.md",
+            "tests/vitest-cpu-admission.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n quality_gate_slots docs/PIPELINE-GATES.md configuration/memory-governor.mdx CLAUDE.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "grep prints at least one matching line from each of the three files",
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5, including its operator constraint and implementation checkpoint. Touch only CPU-admission paragraphs in docs/PIPELINE-GATES.md; never edit the opening overview of the 'Verification Gate (PAN-174)' section (PAN-4609 owns it). (1) docs/PIPELINE-GATES.md lines 903-905 ('Quality-gate admission (`quality-gate-admission.ts`) treats the host as contended...'): state that admission has resources.quality_gate_slots slots (default 2; slot 0 = owner.json, slot i = slot-<i>.json), waiters stay FIFO, every slot needs an unpressured sample and a settle re-check so under pressure new gates wait while running gates keep their slots, that the count comes from the global config only, stale owners are reclaimed per slot, and ticket and owner files are published atomically so a waiter whose ticket disappears recreates it in place (PAN-4610). (2) Lines 919-920: 'the quality-gate admission owner with its descendants' -> 'every quality-gate admission slot owner with its descendants'. (3) Verification Gate paragraph (required): run `grep -n -i admission docs/PIPELINE-GATES.md`; if the Verification Gate section (before '## Verification artifacts (FR-8)') already has a CPU-admission paragraph (PAN-4609 landed), rewrite only that paragraph; otherwise add a `### CPU admission (PAN-4311, PAN-4546)` subsection as the last block of the Verification Gate section, immediately before '## Verification artifacts (FR-8)'. Content per PRD WI-5: machine-wide FIFO queue shared with local Vitest runs, up to resources.quality_gate_slots gates (default 2, global ~/.overdeck/config.yaml only), admission needs an unpressured sample (utilization below 75 %, PSI some avg10 below 25, or load per core below 1 without PSI) before and 1.5 s after taking a slot, under pressure new gates wait while running gates keep their slots, plus a link to the CPU-pressure bullet in 'Agent Auto-Resume Gates'. Never edit the section's opening overview. Say which case applied in the commit message. (4) configuration/memory-governor.mdx 'CPU pressure' section: add a table row after resources.governor_cpu_hold_dispatch (line 138) for resources.quality_gate_slots, default 2, range 1-16, explaining that it is read from ~/.overdeck/config.yaml only (a project .pan.yaml value is ignored), that a gate starts only while CPU is unpressured (utilization below 75 %, and PSI some avg10 below 25, or load per core below 1 without PSI), and that under pressure new gates wait while running gates keep their slots; add one prose sentence above the table saying the same. (5) CLAUDE.md line 37: append '(`resources.quality_gate_slots`, default 2, global config only; under CPU pressure new gates wait and running gates keep their slots)' after 'every local Vitest run enters the shared CPU admission queue'. (6) tests/vitest-cpu-admission.ts header (lines 1-7): 'the shared lease' -> 'a shared admission slot'."
+        },
+        "items": [
+          {
+            "id": "docs-quality-gate-slots.ac1",
+            "title": "configuration/memory-governor.mdx contains a table row for resources.quality_gate_slots showing default 2, saying a project .pan.yaml value is ignored, naming the 75 % utilization threshold, and stating that under pressure new gates wait while running gates keep their slots",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-quality-gate-slots.ac2",
+            "title": "The Verification Gate section of docs/PIPELINE-GATES.md (before '## Verification artifacts (FR-8)') contains a CPU-admission paragraph naming quality_gate_slots and the pressure fallback, and git diff shows no change to that section's opening overview paragraph starting '`pan done` runs quality gates'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-quality-gate-slots.ac3",
+            "title": "The CPU-pressure bullet in 'Agent Auto-Resume Gates' of docs/PIPELINE-GATES.md contains quality_gate_slots and the slot filenames owner.json and slot-<i>.json, and the runaway paragraph says every slot owner is excluded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-quality-gate-slots.ac4",
+            "title": "CLAUDE.md line about the shared CPU admission queue contains resources.quality_gate_slots and default 2, and none of the CPU-admission paragraphs this item writes contains the phrase 'one at a time'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "admission-ticket-durability",
+        "to": "admission-n-slots",
+        "type": "blocks"
+      },
+      {
+        "from": "admission-ticket-durability",
+        "to": "admission-config-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "config-quality-gate-slots",
+        "to": "admission-config-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "admission-n-slots",
+        "to": "admission-config-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "admission-n-slots",
+        "to": "runaway-patrol-all-slot-owners",
+        "type": "blocks"
+      },
+      {
+        "from": "admission-n-slots",
+        "to": "docs-quality-gate-slots",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "active"
+}

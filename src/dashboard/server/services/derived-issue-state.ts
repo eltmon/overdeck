@@ -41,6 +41,7 @@ export {
   deriveIssueState,
   forgeForProject,
   issueIdFromBranch,
+  listOpenPullRequestsForProject,
   listReadyIssuesForProject,
   listRepoPullRequests,
   listRepoPullRequestsStaleOk,

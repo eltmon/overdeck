@@ -23,7 +23,6 @@ import { cpus, loadavg } from 'node:os';
 import { join } from 'node:path';
 
 import { emitActivityEntry, type EmitActivityOptions } from '../activity-logger.js';
-import { getOverdeckHome } from '../paths.js';
 import {
   classifyRunaways,
   type AttributedProcessFact,
@@ -32,6 +31,7 @@ import {
   type RunawayProcessFact,
   type RunawayReason,
 } from './runaway-classify.js';
+import { readQualityGateAdmissionOwnerPids } from './quality-gate-admission.js';
 import type {
   AgentSessionProcess,
   HostProcessRecord,
@@ -80,7 +80,7 @@ export interface RunawayPatrolDeps {
   readCmdline(pid: number): Promise<string | null>;
   readCwd(pid: number): Promise<string | null>;
   readUptimeSeconds(): Promise<number>;
-  readAdmissionOwnerPid(): Promise<number | null>;
+  readAdmissionOwnerPids(): Promise<number[]>;
   isAgentIdle(agentId: string): boolean | Promise<boolean>;
   readHostCpu(): { cpuPercent: number; load1: number; cores: number };
   emit(entry: RunawayFeedEntry): void;
@@ -219,18 +219,6 @@ async function readUptime(): Promise<number> {
   return Number((await readFile('/proc/uptime', 'utf-8')).split(/\s+/)[0]);
 }
 
-async function readAdmissionOwner(): Promise<number | null> {
-  try {
-    const owner = JSON.parse(await readFile(
-      join(getOverdeckHome(), 'verification-workers', 'admission', 'owner.json'),
-      'utf-8',
-    )) as { pid?: unknown };
-    return typeof owner.pid === 'number' ? owner.pid : null;
-  } catch {
-    return null;
-  }
-}
-
 let previousCpuTotals: { idle: number; total: number } | null = null;
 
 function readHostCpu(): { cpuPercent: number; load1: number; cores: number } {
@@ -256,7 +244,7 @@ function defaultDeps(): RunawayPatrolDeps {
     readCmdline: readCmdlineFile,
     readCwd: (pid) => readlink(`/proc/${pid}/cwd`).catch(() => null),
     readUptimeSeconds: readUptime,
-    readAdmissionOwnerPid: readAdmissionOwner,
+    readAdmissionOwnerPids: () => readQualityGateAdmissionOwnerPids(),
     // Lazy: keep the liveness graph out of this module's static imports.
     isAgentIdle: async (agentId) => (await import('../agents/liveness.js')).isIdle(agentId),
     readHostCpu,
@@ -401,7 +389,7 @@ export function createRunawayPatrol(overrides: Partial<RunawayPatrolDeps> = {}):
   async function classify(facts: RunawayProcessFact[]) {
     const base: RunawayContext = {
       idleAgentIds: new Set(),
-      admissionOwnerPid: await deps.readAdmissionOwnerPid(),
+      admissionOwnerPids: await deps.readAdmissionOwnerPids(),
       dashboardPid: deps.dashboardPid,
       windowMs: RUNAWAY_WINDOW_MS,
     };

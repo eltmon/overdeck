@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T11:24:13Z · model: claude-opus-5-5 · open: 848_
+_Last sequenced: 2026-10-24T12:05:49Z · model: claude-opus-5-5 · open: 846_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -12,14 +12,12 @@ _Last sequenced: 2026-10-24T11:24:13Z · model: claude-opus-5-5 · open: 848_
 | 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
-| 8 | PAN-4583 | S | medium | ok |  |  | In pipeline: editor pane reads markdown anywhere under $HOME read-only; writes stay limited to project roots + OVERDECK_HOME. |
 | 9 | PAN-4605 | M | critical | ok |  |  | In pipeline: feature/ PRs opened from handoff worktrees get no workspace, so review never starts and only a console.log records it |
 | 10 | PAN-4546 | S | high | ok |  |  | Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
-| 15 | PAN-4589 | M | high | ok |  |  | In pipeline: CI test gate ignores commit-status CI (Dagger Cloud); read status context as check name, baseline + feedback. |
 | 16 | PAN-4595 | S | critical | ok |  |  | CLI health never registers the transcript heartbeat, so Herdr agents read STUCK after 30 min and invite recovery on healthy agents. |
 | 17 | PAN-4597 | S | high | ok |  |  | Awaiting Merge hides approved green PRs: ready needs a 5-min gate answer only auto-merge refreshes. Merge machinery: supervised handoff |
 | 18 | PAN-4598 | M | critical | ok |  |  | No UAT batch has assembled since the cut (newest 2026-09-20, failed); Flywheel card offers only an escape-hatch merge link |
@@ -30,7 +28,6 @@ _Last sequenced: 2026-10-24T11:24:13Z · model: claude-opus-5-5 · open: 848_
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 24 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 25 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
-| 26 | PAN-4582 | M | high | ok |  |  | Herdr splits every conversation pane out of one shared tab, so new PTYs get 0-1 rows and the Terminal tab is blank |
 | 27 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
 | 28 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 29 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
@@ -69,6 +66,7 @@ _Last sequenced: 2026-10-24T11:24:13Z · model: claude-opus-5-5 · open: 848_
 | 62 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
 | 63 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
 | 64 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
+| 65 | PAN-4618 | S | critical | ok |  |  | In pipeline: CI runs full suite on .pan/ bookkeeping pushes to main (95 of 99 runs), starving PR checks of runners |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
@@ -884,10 +882,6 @@ New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup fa
 
 New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.
 
-### PAN-4583 (rank 8)
-
-New since the prior run and already in the pipeline (live workspace), so it is pinned near the top rather than ranked against the queue. Well-specified ACs including symlink, prefix and extension containment tests; the PR must state who can reach /ws/rpc before the read widening ships.
-
 ### PAN-4605 (rank 9)
 
 New since the prior run and already in the pipeline. Supervised handoffs (the TENET-10 path for pipeline-machinery fixes) open PRs from plain worktrees, and handlePullRequest silently drops them when startReview finds no workspace; PRs #4599/#4602/#4603 sat unreviewed on 2026-10-24. Placed in the open rank 9 slot of the critical top tier because it gates review for every handoff-produced PR, including PAN-4527 and PAN-4532.
@@ -911,10 +905,6 @@ Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls th
 ### PAN-4551 (rank 14)
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.
-
-### PAN-4589 (rank 15)
-
-New since the prior run and already in the pipeline, so it is pinned in a free top-tier slot. Without it a Dagger, Buildkite or Jenkins project never shows a passed test job, so merge gate and auto-merge stall; ACs are precise and unit-testable.
 
 ### PAN-4595 (rank 16)
 
@@ -955,10 +945,6 @@ New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done
 ### PAN-4219 (rank 25)
 
 New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.
-
-### PAN-4582 (rank 26)
-
-New issue. Verified 2026-10-23: HerdrBackend.startAgent splits each agent pane out of its workspace's single tab, so the shared conversations workspace halved space until the newest pane had height 0 and a 1-row PTY; restored idle shells after reboot are never reaped. Every conversation past about the fifth renders a blank Terminal tab, and issue workspaces share the split path. Ranked beside PAN-3952 (same Herdr pane-sizing family) because both blind pane consumers; manual relief was applied but recurs on the next conversation spawn.
 
 ### PAN-4229 (rank 27)
 
@@ -1112,6 +1098,10 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 
 Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
 
+### PAN-4618 (rank 65)
+
+New in-pipeline substrate bug: path-filtering bookkeeping commits off the main push trigger frees runners for every PR check, so it is critical; placed in the free top-tier slot 65 so no existing rank moves.
+
 ### PAN-2940 (rank 67)
 
 Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
@@ -1176,6 +1166,14 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 
 Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
 
+### PAN-3043 (rank 85)
+
+Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
+
+### PAN-1824 (rank 86)
+
+Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass — PAN-3243, PAN-3492, PAN-3520 and PAN-2421 — all trace red or flaky main to real-timer tests under load. This is the shared fix for that family and it is now marked ready, so it should sit with the other CI-integrity work rather than behind it.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1183,10 +1181,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T11:24:13Z",
+  "generatedAt": "2026-10-24T12:05:49Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 848,
+  "openCount": 846,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1282,19 +1280,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "planning": "auto"
     },
     {
-      "issue": "PAN-4583",
-      "rank": 8,
-      "size": "S",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: editor pane reads markdown anywhere under $HOME read-only; writes stay limited to project roots + OVERDECK_HOME.",
-      "rationale": "New since the prior run and already in the pipeline (live workspace), so it is pinned near the top rather than ranked against the queue. Well-specified ACs including symlink, prefix and extension containment tests; the PR must state who can reach /ws/rpc before the read widening ships.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4546",
       "rank": 10,
       "size": "S",
@@ -1362,19 +1347,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       ],
       "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
       "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4589",
-      "rank": 15,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: CI test gate ignores commit-status CI (Dagger Cloud); read status context as check name, baseline + feedback.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned in a free top-tier slot. Without it a Dagger, Buildkite or Jenkins project never shows a passed test job, so merge gate and auto-merge stall; ACs are precise and unit-testable.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1481,19 +1453,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       ],
       "why": "pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix.",
       "rationale": "New bug filed from PAN-4222: after all eleven top-level items were closed through pan task done, pan done refused on 39 pending acceptance-criterion children that pan task next never surfaced, and the agent had to make 39 empty trailer commits to get through. It blocks completion of every issue planned with nested ACs, the default planner shape, so it ranks critical beside PAN-4217 and PAN-4219. It is marked needs-refinement because it describes the same missing AC-status writer as PAN-4217 and PAN-4219; the three should be fixed by one change and the extras closed as duplicates.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4582",
-      "rank": 26,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Herdr splits every conversation pane out of one shared tab, so new PTYs get 0-1 rows and the Terminal tab is blank",
-      "rationale": "New issue. Verified 2026-10-23: HerdrBackend.startAgent splits each agent pane out of its workspace's single tab, so the shared conversations workspace halved space until the newest pane had height 0 and a 1-row PTY; restored idle shells after reboot are never reaped. Every conversation past about the fifth renders a blank Terminal tab, and issue workspaces share the split path. Ranked beside PAN-3952 (same Herdr pane-sizing family) because both blind pane consumers; manual relief was applied but recurs on the next conversation spawn.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11771,6 +11730,19 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "rationale": "New issue: an observation follow-up to in-pipeline PAN-4614; ranked mid-tier because it only matters if GitHub ignores union, and any fallback touches the merge gate's trust boundary and needs its own plan.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4618",
+      "rank": 65,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: CI runs full suite on .pan/ bookkeeping pushes to main (95 of 99 runs), starving PR checks of runners",
+      "rationale": "New in-pipeline substrate bug: path-filtering bookkeeping commits off the main push trigger frees runners for every PR check, so it is critical; placed in the free top-tier slot 65 so no existing rank moves.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13105,22 +13077,8 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 0.6
     },
     {
-      "from": "PAN-4582",
-      "to": "PAN-3952",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-4586",
       "to": "PAN-3952",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4586",
-      "to": "PAN-4582",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1

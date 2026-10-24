@@ -1087,6 +1087,16 @@ Sources, merged in `useMergedFeed.ts`:
   at 50 (`useActivityEntryFeed.ts`).
 - Memory observations (`useObservationFeed.ts`).
 
+**Needs you lists held handoffs (PAN-4596).** The pending-input feed
+(`getConversationsPendingInputFeed`, `src/lib/overdeck/conversation-reads.ts`)
+also returns every unarchived, non-superseded conversation whose kickoff is
+held (`conversations.held_kickoff IS NOT NULL`), whether or not its session is
+alive, with `heldKickoff: { since, focus? }`. `useDecisions.ts` maps it to the
+non-blocking `heldKickoff` kind, labeled "Held handoff — kickoff not sent", so
+it sorts into Waiting. A held-only row has one **Open** button that navigates to
+`/conv/<name>`, where the held handoff view offers Start; it has no Answer
+button, because there is no dialog to reopen.
+
 **All shows transitions.** A conversation card is dated by a lifecycle fact:
 `endedAt` when the conversation ended, otherwise `createdAt`, labelled `ended` or
 `started`. It is never dated by transcript activity (`lastActivityAt`), which

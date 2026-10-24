@@ -266,3 +266,21 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   merge door rebases onto main, so a PR GitHub calls CLEAN can still be
   refused for a conflict. A first "not approved at PR HEAD" refusal right
   after a review lands can be stale PR facts; retry once after ~1 min.
+- 2026-10-24 11:30: 95 of 99 CI runs on main that day came from
+  `chore(workspace)` bookkeeping commits, starving PR checks → PAN-4618
+  (paths-ignore `.pan/**` on push), started. Mistake: I started PAN-4616 by
+  guessing the new issue's number; stopped it with `pan kill` and commented.
+  Always read the number from `gh issue create` output before `pan start`.
+- 2026-10-24 11:50: CI has no `concurrency` group, so superseded runs keep
+  their runners (48 unfinished runs, 12 on one PR branch). Cancelled 34
+  superseded runs by hand (kept each PR's head run and main's newest run);
+  permanent fix added to PAN-4618. When reading main's CI state after a
+  cancel, skip `cancelled` conclusions.
+- Handoff-built issues hit a third gate: `pan plan finalize` refuses without a
+  PRD draft (`.pan/drafts/pan-<n>.md`, PRD-first gate). Recipe for adopting an
+  outside PR into the pipeline: pipeline workspace → short PRD → finalize →
+  Item: commits + `pan task done` per item and AC (push after each) →
+  `pan review request`. Conversation 3304 told to do this for PAN-4527, 4532,
+  4531, 4540, 4534 at 12:00; all of it belongs in PAN-4605's fix.
+- Cancel queued `chore(workspace)` runs on main while PAN-4618 is pending;
+  the sequencer commits every few minutes.

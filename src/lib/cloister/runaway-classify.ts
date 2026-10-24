@@ -59,7 +59,7 @@ export interface RunawayProcessFact {
 
 export interface RunawayContext {
   idleAgentIds: ReadonlySet<string>;
-  admissionOwnerPid: number | null;
+  admissionOwnerPids: readonly number[];
   dashboardPid: number;
   windowMs: number;
 }
@@ -221,11 +221,12 @@ function excludedPids(
   for (const fact of facts) {
     if (fact.pid === fact.pgid && fact.nice >= GATE_NICE && fact.ageMs < GATE_MAX_AGE_MS) gateGroups.add(fact.pgid);
   }
+  const owners = new Set(context.admissionOwnerPids);
   for (const fact of facts) {
     if (DOCKER_CGROUP.test(fact.cgroup) || gateGroups.has(fact.pgid)) excluded.add(fact.pid);
-    if (context.admissionOwnerPid != null && (
-      fact.pid === context.admissionOwnerPid
-      || ancestors(fact.pid, byPid).some((ancestor) => ancestor.pid === context.admissionOwnerPid)
+    if (owners.size > 0 && (
+      owners.has(fact.pid)
+      || ancestors(fact.pid, byPid).some((ancestor) => owners.has(ancestor.pid))
     )) {
       excluded.add(fact.pid);
     }
