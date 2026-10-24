@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4583",
   "created": "2026-10-24T07:18:16.083Z",
-  "updated": "2026-10-24T07:44:46.831Z",
+  "updated": "2026-10-24T07:44:51.362Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4583",
       "claimedAt": "2026-10-24T07:35:15.787Z",
       "doneAt": "2026-10-24T07:44:46.830Z"
+    },
+    "docs-editor-pane-split-door": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4583",
+      "claimedAt": "2026-10-24T07:44:51.362Z"
     }
   }
 }
