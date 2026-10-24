@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4618",
   "created": "2026-10-24T12:05:55.935Z",
-  "updated": "2026-10-24T13:22:11.308Z",
+  "updated": "2026-10-24T13:22:26.491Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -171,6 +171,10 @@
     "ci-webhook-uses-ci-head.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T13:22:11.307Z"
+    },
+    "ci-webhook-uses-ci-head.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:22:26.491Z"
     }
   },
   "feedback": [
