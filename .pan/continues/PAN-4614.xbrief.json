@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4614",
   "created": "2026-10-24T11:11:53.918Z",
-  "updated": "2026-10-24T11:24:34.028Z",
+  "updated": "2026-10-24T11:25:26.728Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-10-24T11:24:30.002Z"
     },
     "footer-dedupe-guidance": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4614",
-      "claimedAt": "2026-10-24T11:24:34.028Z"
+      "claimedAt": "2026-10-24T11:24:34.028Z",
+      "doneAt": "2026-10-24T11:25:26.727Z"
     }
   }
 }
