@@ -108,9 +108,9 @@ target-branch sync, skipped when CI is already green on the exact tip commit
   (see [What a verification run does](#what-a-verification-run-does), step 4)
   are not admission-gated but still take wall-clock time; and the gates can
   run a second time at merge, adding another pass through the queue.
-- **Two upcoming changes to admission.** PAN-4546 allows two concurrent
-  admission slots; PAN-4531 stops a run whose outcome is already decided
-  before its next gate. Each change documents itself where it lands.
+- **Changes to admission.** PAN-4546 allows two concurrent admission slots;
+  PAN-4531 stops a run whose outcome is already decided before its next gate.
+  Each change documents itself where it lands.
 
 **Reading the logs.** Each worker writes
 `~/.overdeck/verification-workers/<issue>/worker-<runId>.log` (issue id

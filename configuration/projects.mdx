@@ -277,7 +277,7 @@ is skipped on the host when `verification.tests` resolves to `ci` (above).
 | `wait` | No | `120` | Seconds to wait before the first `http_health` check. |
 | `expect_status` | No | `200` | HTTP status the `http_health` check must return. |
 | `container` | No | `false` | Run the command with `docker exec` instead of on the host. |
-| `container_name` | No | — | Container name; supports placeholders (below). Required when `container: true`. |
+| `container_name` | No | — | Container name; supports placeholders (below). Used only when `container: true`; without it the gate runs on the host even if `container: true` is set. |
 | `retry` | No | `0` | Extra attempts on failure before the gate counts as failed (PAN-2461: CI-parity for suites with known order-dependent flakes). |
 
 `command` and `container_name` accept the placeholders `{{CHANGED_BASE}}`,

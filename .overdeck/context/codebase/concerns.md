@@ -460,12 +460,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   pairs from/import with a quoted word (PAN-4508's `from "custom"`) blocks every
   deploy. Even after the lexer fix, the first reload of a change runs the
   *installed* CLI, so never write that syntax in source comments.
-- **Verification is serialized machine-wide** (PAN-4609) — every local or
-  container quality gate, and every direct `npx vitest run` from an agent shell
-  (`tests/vitest-cpu-admission.ts` globalSetup), waits for the one CPU
-  admission slot in `cloister/quality-gate-admission.ts` (FIFO; host must show
-  CPU < 0.75 and PSI `some avg10` < 25). Each gate and each retry re-queues.
-  The `passed (Nms)` log time and artifact `durationMs` include queue wait, so
-  a "slow gate" is often a long queue: compare the `Queued for CPU admission:`
-  and `Admitted:` lines in `~/.overdeck/verification-workers/<issue>/worker-*.log`.
 <!-- last-verified: 2026-10-24 -->
