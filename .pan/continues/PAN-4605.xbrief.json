@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T11:47:42.755Z",
+  "updated": "2026-10-24T11:47:58.376Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,10 @@
     "pan-show-prints-fix.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T11:47:42.755Z"
+    },
+    "docs-outside-pr-pipeline.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:47:58.375Z"
     }
   }
 }
