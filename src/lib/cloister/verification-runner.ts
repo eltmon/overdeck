@@ -576,9 +576,12 @@ export async function runVerificationForIssueInProcess(
       ? [{ name: 'test-skip', passed: true, required: true, output: testSkip.evidence, durationMs: Date.now() - testSkipStart }, ...rawGateResults]
       : rawGateResults;
     // PAN-4531: a commit that landed during the last gate is caught here, before
-    // the verdict, rather than producing a verdict for a tree that moved.
-    if (!localGateResults.some((r) => !r.passed && r.required !== false)) await decided.isDecided();
-    const decidedStop = decided.stop;
+    // the verdict, rather than producing a verdict for a tree that moved. A
+    // failed gate is checked too: a commit during it supersedes the failure.
+    // Red CI only replaces a clean local run; a local failure keeps its verdict.
+    const localFailed = localGateResults.some((r) => !r.passed && r.required !== false);
+    await decided.isDecided();
+    const decidedStop = decided.stop?.kind === 'ci-red' && localFailed ? undefined : decided.stop;
     if (decidedStop?.kind === 'merged') return decidedStop.outcome;
     if (decidedStop?.kind === 'superseded') {
       const reason = `HEAD moved from ${headShort ?? 'the launch head'} to ${decidedStop.head ?? 'a new commit'} during verification`;
@@ -587,7 +590,9 @@ export async function runVerificationForIssueInProcess(
       return { outcome: 'deferred', reason, superseded: { from: headShort, to: decidedStop.head } };
     }
     const notRun = decidedStop?.kind === 'ci-red'
-      ? Object.keys(gates).filter((name) => !localGateResults.some((r) => r.name === name))
+      ? Object.entries(gates)
+        .filter(([name, gate]) => (gate.phase || 'pre_push') === 'pre_push' && !localGateResults.some((r) => r.name === name))
+        .map(([name]) => name)
       : [];
     if (notRun.length > 0) {
       console.log(`[${logPrefix}] CI test job already red for ${issueId} — local gates not run: ${notRun.join(', ')}`);

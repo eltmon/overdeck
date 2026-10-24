@@ -32,16 +32,18 @@ vi.mock('../../../../src/lib/cloister/validation.js', () => ({
     lint: { command: 'npm run lint' },
     test: { command: 'npx vitest run --changed {{CHANGED_BASE}}' },
   },
-  // Stand-in for the real gate runner: every gate it is handed "passes", and
-  // the result list is exactly the gates that would have run on the host. Like
-  // the real one, it asks `shouldStop` before each gate (PAN-4531).
+  // Stand-in for the real gate runner: every gate it is handed "passes" unless
+  // its body returns false, and the result list is exactly the gates that would
+  // have run on the host. Like the real one, it asks `shouldStop` before each
+  // gate and stops after a failed required gate (PAN-4531).
   runQualityGates: async (gates: Record<string, unknown>, path: unknown, phase: unknown, opts?: { shouldStop?: () => Promise<boolean> }) => {
     mockRunQualityGates(gates, path, phase, opts);
     const results = [];
     for (const name of Object.keys(gates)) {
       if (await opts?.shouldStop?.()) break;
-      mockGateBody(name);
-      results.push({ name, passed: true, required: true, output: '', durationMs: 1 });
+      const passed = mockGateBody(name) !== false;
+      results.push({ name, passed, required: true, output: '', durationMs: 1 });
+      if (!passed) break;
     }
     return results;
   },
@@ -330,6 +332,8 @@ describe('a run whose outcome is decided mid-run (PAN-4531)', () => {
   });
 
   it('CI turning red during a gate stops the run before the next gate; it fails at test', async () => {
+    // A post_push gate never runs in pre-push verification, so it is not "not run" either.
+    mockFindProject.mockReturnValue({ ...project({ tests: 'ci' }), quality_gates: { ...PROJECT_GATES, smoke: { command: 'true', phase: 'post_push' } } });
     mockGateBody.mockImplementationOnce(() => {
       writeVerificationArtifact(workspacePath, 'PAN-3965', [{ name: 'test', passed: false, required: true, output: 'CI red', durationMs: 0 }], {
         ranAt: '2026-09-23T00:00:00.000Z', head8, via: 'ci',
@@ -407,6 +411,22 @@ describe('a red head whose verification merges the target branch in (PAN-4527)',
     mockFindProject.mockReturnValue(project({ tests: 'local' }));
     mockGateBody.mockImplementationOnce(() => {
       execFileSync('git', ['commit', '-q', '--allow-empty', '-m', 'agent fix'], { cwd: workspacePath });
+    });
+
+    const outcome = await runVerificationForIssueInProcess(
+      'PAN-3965', workspacePath, { isRemote: false }, 'test', { skipPlanChecklist: true },
+    );
+
+    expect(outcome).toMatchObject({ outcome: 'deferred', superseded: { to: execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { cwd: workspacePath, encoding: 'utf-8' }).trim() } });
+    expect(mockGateBody.mock.calls.map(([name]) => name)).toEqual(['typecheck']);
+    expect(readPipelineJournal(workspacePath).map((entry) => entry.type)).toEqual(['verification.started']);
+  });
+
+  it('PAN-4531: an agent commit during a gate that fails supersedes the failure', async () => {
+    mockFindProject.mockReturnValue(project({ tests: 'local' }));
+    mockGateBody.mockImplementationOnce(() => {
+      execFileSync('git', ['commit', '-q', '--allow-empty', '-m', 'agent fix'], { cwd: workspacePath });
+      return false;
     });
 
     const outcome = await runVerificationForIssueInProcess(

@@ -397,7 +397,9 @@ time (`cloister/quality-gate-admission.ts`), so a run whose outcome is
 already known must not keep queueing for it. The runner checks three decided
 conditions, in this order, before the first local gate (dependency install,
 test-skip and plan-integrity included), before each quality gate requests
-admission (`runQualityGates`' `shouldStop`), and once after the last gate:
+admission (`runQualityGates`' `shouldStop`), again once the gate is admitted
+(the slot is released without running the command), before each `retry`
+attempt, and once after the last gate, including a gate that failed:
 
 1. **The PR merged.** The run ends with the existing merged skip
    (`skipMergedVerification`).
@@ -412,7 +414,8 @@ admission (`runQualityGates`' `shouldStop`), and once after the last gate:
    known-red CI head short-circuits the local gates. The run fails at `test`
    with the usual message ("The CI test job already failed on this head …"),
    counts against the attempt budget as before, and the artifact lists the
-   gates it did not start in `notRun`.
+   `pre_push` gates it did not start in `notRun`. Red CI does not replace a
+   local gate failure: that failure stays the verdict.
 
 With CI passed or unknown, every gate runs as before.
 

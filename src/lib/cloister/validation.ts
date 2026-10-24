@@ -412,7 +412,14 @@ export async function runQualityGates(
     let lastError: any = null;
     let passedGate = false;
     let passOutput = '';
+    // PAN-4531: a run decided while this gate waited for admission, or between
+    // its retries, does not start the command; the slot is released at once.
+    let stopped = false;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (attempt > 1 && await opts.shouldStop?.()) {
+        stopped = true;
+        break;
+      }
       let gatePgid: number | undefined;
       let admission: QualityGateAdmissionHandle | null = null;
       try {
@@ -428,6 +435,10 @@ export async function runQualityGates(
             attempt,
           });
           console.log(`[quality-gate] Admitted (slot ${admission.slot + 1}/${admission.slots}): ${identity}`);
+          if (await opts.shouldStop?.()) {
+            stopped = true;
+            break;
+          }
           opts.onAdmissionPhase?.({
             phase: 'running',
             gateName: name,
@@ -478,6 +489,11 @@ export async function runQualityGates(
         }
       }
       if (passedGate) break;
+    }
+
+    if (stopped) {
+      console.log(`[quality-gate] Run already decided — not running "${name}" or any later gate`);
+      break;
     }
 
     if (passedGate) {

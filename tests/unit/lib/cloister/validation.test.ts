@@ -110,6 +110,36 @@ echo "pass stderr diagnostic" >&2
       expect(admissionMocks.acquire).toHaveBeenCalledTimes(1);
       expect(admissionMocks.release).toHaveBeenCalled();
     });
+
+    it('a run decided while the gate waited for admission releases the slot without running the command', async () => {
+      admissionMocks.acquire.mockClear();
+      admissionMocks.release.mockClear();
+      let checks = 0;
+      const results = await runQualityGates({
+        lint: { command: 'false' },
+      }, testDir, 'pre_push', {
+        // false at the top of the gate, true once admitted
+        shouldStop: async () => ++checks > 1,
+      });
+
+      expect(results).toEqual([]);
+      expect(admissionMocks.acquire).toHaveBeenCalledTimes(1);
+      expect(admissionMocks.release).toHaveBeenCalledTimes(1);
+    });
+
+    it('a run decided between retries does not queue the next attempt', async () => {
+      admissionMocks.acquire.mockClear();
+      let checks = 0;
+      const results = await runQualityGates({
+        test: { command: 'false', retry: 2 },
+      }, testDir, 'pre_push', {
+        // top of the gate, after admission, then before the first retry
+        shouldStop: async () => ++checks > 2,
+      });
+
+      expect(results).toEqual([]);
+      expect(admissionMocks.acquire).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('autoRevertMerge', () => {
