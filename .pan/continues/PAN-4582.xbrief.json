@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4582",
   "created": "2026-10-24T07:40:29.074Z",
-  "updated": "2026-10-24T08:18:39.342Z",
+  "updated": "2026-10-24T08:18:46.647Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4582",
       "claimedAt": "2026-10-24T08:13:49.380Z",
       "doneAt": "2026-10-24T08:18:39.342Z"
+    },
+    "residue-reaper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4582",
+      "claimedAt": "2026-10-24T08:18:46.647Z"
     }
   }
 }
