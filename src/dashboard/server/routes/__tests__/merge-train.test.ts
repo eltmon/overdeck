@@ -563,6 +563,26 @@ describe('PAN-1696 merge-train-routes', () => {
       expect(result.body).toMatchObject({ projectKey: 'myn' });
     });
 
+    it('PAN-4598: an issueId merges that ready feature, not the head of the queue', async () => {
+      const result = await postMergeTrainMergeNextPayload(
+        { n: 1, project: 'myn', issueId: 'min-900' },
+        { getOrderedIssueIds: async () => ['MIN-831', 'MIN-900', 'MIN-901'] },
+      );
+      expect(result.status).toBe(200);
+      expect(mergeBatchMocks.shipMergeBatch).toHaveBeenCalledWith(['MIN-900'], expect.anything());
+    });
+
+    it('PAN-4598: an issueId outside the ready set is a 409, and a malformed one a 400', async () => {
+      const deps = { getOrderedIssueIds: async () => ['MIN-831'] };
+      const missing = await postMergeTrainMergeNextPayload({ n: 1, project: 'myn', issueId: 'MIN-999' }, deps);
+      expect(missing).toEqual({ status: 409, body: { error: expect.stringContaining('MIN-999 is not in myn') } });
+      for (const issueId of ['', '  ', 7, null]) {
+        const result = await postMergeTrainMergeNextPayload({ n: 1, project: 'myn', issueId }, deps);
+        expect(result.status, JSON.stringify(issueId)).toBe(400);
+      }
+      expect(mergeBatchMocks.shipMergeBatch).not.toHaveBeenCalled();
+    });
+
     it('rejects an unknown project key with a 4xx error body', async () => {
       const result = await postMergeTrainMergeNextPayload({ n: 1, project: 'nope' });
       expect(result.status).toBe(404);
