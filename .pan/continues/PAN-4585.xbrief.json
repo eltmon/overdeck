@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4585",
   "created": "2026-10-24T08:22:26.190Z",
-  "updated": "2026-10-24T10:38:43.948Z",
+  "updated": "2026-10-24T10:39:00.483Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "install-entrypoints.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T10:38:43.947Z"
+    },
+    "install-entrypoints.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:39:00.483Z"
     }
   }
 }
