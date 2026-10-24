@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T11:42:40.964Z",
+  "updated": "2026-10-24T11:42:58.555Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "adopt-and-review-orchestrator.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T11:42:40.964Z"
+    },
+    "adopt-and-review-orchestrator.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:42:58.555Z"
     }
   }
 }
