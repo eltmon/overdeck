@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4596",
   "created": "2026-10-24T08:38:08.714Z",
-  "updated": "2026-10-24T09:30:51.557Z",
+  "updated": "2026-10-24T09:31:04.630Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "held-handoff-view.ac4": {
       "status": "completed",
       "doneAt": "2026-10-24T09:30:51.556Z"
+    },
+    "held-handoff-view.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:31:04.630Z"
     }
   }
 }
