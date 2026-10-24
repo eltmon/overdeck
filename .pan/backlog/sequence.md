@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T16:28:46Z · model: claude-opus-5-5 · open: 838_
+_Last sequenced: 2026-10-24T16:48:06Z · model: claude-opus-5-5 · open: 838_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1173,7 +1173,7 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T16:28:46Z",
+  "generatedAt": "2026-10-24T16:48:06Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 838,
