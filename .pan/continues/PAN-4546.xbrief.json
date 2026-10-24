@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4546",
   "created": "2026-10-24T10:44:02.967Z",
-  "updated": "2026-10-24T10:57:56.707Z",
+  "updated": "2026-10-24T10:58:17.691Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4546",
       "claimedAt": "2026-10-24T10:54:39.181Z",
       "doneAt": "2026-10-24T10:57:56.706Z"
+    },
+    "admission-config-resolver": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4546",
+      "claimedAt": "2026-10-24T10:58:17.691Z"
     }
   }
 }
