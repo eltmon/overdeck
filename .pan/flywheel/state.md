@@ -194,3 +194,11 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   sent; its session ended 2026-10-15 with no transcript, and its worktree
   base is 352 commits behind main. The dashboard shows it as "no saved
   history" → PAN-4596 (needs-handoff, conversation live-control).
+- 2026-10-24 08:25 UTC, operator-approved: conversation 3230 archived; the
+  bundle restarted as conversation 3304 in `~/Projects/hoff-verify-merge-2`
+  (fresh from `origin/main` `e8b715cf814`, refreshed brief with re-verified
+  line numbers). PAN-4595 and PAN-4596 started with `pan start --plan auto`
+  on the operator's request despite the needs-handoff marking. Watch both
+  for PAN-4554 (planning finalizes but no work agent spawns).
+- `pan handoff self` fails from the Flywheel's Bash ("Could not determine the
+  current conversation"); name the source explicitly: `pan handoff conv-flywheel`.
