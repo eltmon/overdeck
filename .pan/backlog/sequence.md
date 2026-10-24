@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T08:05:09Z · model: claude-opus-5-5 · open: 834_
+_Last sequenced: 2026-10-24T08:12:30Z · model: claude-opus-5-5 · open: 840_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -19,6 +19,7 @@ _Last sequenced: 2026-10-24T08:05:09Z · model: claude-opus-5-5 · open: 834_
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
+| 15 | PAN-4589 | M | high | ok |  |  | In pipeline: CI test gate ignores commit-status CI (Dagger Cloud); read status context as check name, baseline + feedback. |
 | 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 22 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
@@ -839,6 +840,11 @@ _Last sequenced: 2026-10-24T08:05:09Z · model: claude-opus-5-5 · open: 834_
 | 872 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
 | 873 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
 | 874 | PAN-4585 | XL | medium | needs-refinement | ✓ |  | New opt-in Semgrep SAST epic; no children filed yet and 4 operator decisions open (gate default, Guardian, opengrep). |
+| 875 | PAN-4590 | L | medium | ok |  | PAN-4585 | Semgrep sast verification gate + review-context findings; first buildable child of PAN-4585, needs its config block. |
+| 876 | PAN-4591 | L | medium | ok |  | PAN-4585 | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; blocked by PAN-4585. |
+| 877 | PAN-4592 | M | low | ok |  | PAN-4585, PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs PAN-4585 and gate mode from PAN-4590. |
+| 878 | PAN-4594 | M | low | ok |  | PAN-4585, PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
+| 879 | PAN-4593 | L | low | needs-refinement |  | PAN-4585, PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 
 ## Rationale detail
 
@@ -897,6 +903,10 @@ Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls th
 ### PAN-4551 (rank 14)
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.
+
+### PAN-4589 (rank 15)
+
+New since the prior run and already in the pipeline, so it is pinned in a free top-tier slot. Without it a Dagger, Buildkite or Jenkins project never shows a passed test job, so merge gate and auto-merge stall; ACs are precise and unit-testable.
 
 ### PAN-4572 (rank 19)
 
@@ -1158,10 +1168,6 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
 
 Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
 
-### PAN-2699 (rank 91)
-
-npm run build regenerates the committed record-cost-event.js bundle, dirtying every workspace tree and blocking clean-workspace gates.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1169,10 +1175,10 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T08:05:09Z",
+  "generatedAt": "2026-10-24T08:12:30Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 834,
+  "openCount": 840,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1365,6 +1371,19 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "planning": "auto"
     },
     {
+      "issue": "PAN-4589",
+      "rank": 15,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: CI test gate ignores commit-status CI (Dagger Cloud); read status context as check name, baseline + feedback.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned in a free top-tier slot. Without it a Dagger, Buildkite or Jenkins project never shows a passed test job, so merge gate and auto-merge stall; ACs are precise and unit-testable.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4572",
       "rank": 19,
       "size": "M",
@@ -1374,6 +1393,19 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "dependsOn": [],
       "why": "Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs.",
       "rationale": "PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4586",
+      "rank": 22,
+      "size": "XS",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind",
+      "rationale": "New issue. Verified against herdr 0.9.1: HerdrApiClient.call returns response.result, whose pane_read text sits under read.text, but readHerdrPaneText, diagnoseDetectionFailure and the herdr-submit composer read a top-level text, so every pane-text consumer on the default backend sees an empty string. A three-site fix plus corrected test stubs; placed in a free rank slot just above the Herdr pane-sizing pair (PAN-4582, PAN-3952) because it is smaller and likely explains part of PAN-3952's 'pane read returns nothing' observation.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11549,15 +11581,80 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "isEpic": true
     },
     {
-      "issue": "PAN-4586",
-      "rank": 22,
-      "size": "XS",
-      "importance": "critical",
-      "score": 90,
+      "issue": "PAN-4590",
+      "rank": 875,
+      "size": "L",
+      "importance": "medium",
+      "score": 50,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind",
-      "rationale": "New issue. Verified against herdr 0.9.1: HerdrApiClient.call returns response.result, whose pane_read text sits under read.text, but readHerdrPaneText, diagnoseDetectionFailure and the herdr-submit composer read a top-level text, so every pane-text consumer on the default backend sees an empty string. A three-site fix plus corrected test stubs; placed in a free rank slot just above the Herdr pane-sizing pair (PAN-4582, PAN-3952) because it is smaller and likely explains part of PAN-3952's 'pane read returns nothing' observation.",
+      "dependsOn": [
+        "PAN-4585"
+      ],
+      "why": "Semgrep sast verification gate + review-context findings; first buildable child of PAN-4585, needs its config block.",
+      "rationale": "New since the prior run. Phase-2 child of the Semgrep epic with a detailed scope and probe results; blocked by PAN-4585 and unblocks PAN-4592/4593/4594, so it leads the appended Semgrep group.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4591",
+      "rank": 876,
+      "size": "L",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4585"
+      ],
+      "why": "Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; blocked by PAN-4585.",
+      "rationale": "New since the prior run. Independent of the gate child, blocked only by PAN-4585; appended after PAN-4590 to avoid shifting existing ranks.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4592",
+      "rank": 877,
+      "size": "M",
+      "importance": "low",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4585",
+        "PAN-4590"
+      ],
+      "why": "pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs PAN-4585 and gate mode from PAN-4590.",
+      "rationale": "New since the prior run. Opt-in CI workflow child; depends on the epic config block and PAN-4590 gate mode, so it follows the gate child.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4594",
+      "rank": 878,
+      "size": "M",
+      "importance": "low",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4585",
+        "PAN-4590"
+      ],
+      "why": "Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590.",
+      "rationale": "New since the prior run. UI child that needs findings and the verification.sast override from PAN-4590 to exist first.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4593",
+      "rank": 879,
+      "size": "L",
+      "importance": "low",
+      "score": 30,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4585",
+        "PAN-4590"
+      ],
+      "why": "Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work.",
+      "rationale": "New since the prior run. Two operator decisions from PAN-4585 are unresolved and Guardian provisioning touches liveness and pan done, so it is needs-refinement and last in the group.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -12911,6 +13008,97 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "from": "PAN-4586",
       "to": "PAN-4582",
       "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4585",
+      "to": "PAN-4590",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4585",
+      "to": "PAN-4590",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4585",
+      "to": "PAN-4591",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4585",
+      "to": "PAN-4591",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4585",
+      "to": "PAN-4592",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4585",
+      "to": "PAN-4592",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4585",
+      "to": "PAN-4593",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4585",
+      "to": "PAN-4593",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4585",
+      "to": "PAN-4594",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4585",
+      "to": "PAN-4594",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4590",
+      "to": "PAN-4592",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4590",
+      "to": "PAN-4593",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4590",
+      "to": "PAN-4594",
+      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     }
