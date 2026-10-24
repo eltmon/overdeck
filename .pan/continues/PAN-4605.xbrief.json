@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T11:51:50.204Z",
+  "updated": "2026-10-24T12:27:39.588Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-10-24T12:27:39.587Z"
+    }
+  ],
   "items": {
     "worktree-fetch-feature-branch": {
       "status": "completed",
@@ -232,5 +238,6 @@
       "doneAt": "2026-10-24T11:48:30.559Z"
     }
   },
-  "feedback": []
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
 }
