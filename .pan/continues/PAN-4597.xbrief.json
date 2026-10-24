@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4597",
   "created": "2026-10-24T10:43:53.166Z",
-  "updated": "2026-10-24T10:49:34.577Z",
+  "updated": "2026-10-24T10:50:00.963Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -51,6 +51,10 @@
     "docs-ready-definition.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T10:49:34.577Z"
+    },
+    "docs-ready-definition.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:50:00.962Z"
     }
   }
 }
