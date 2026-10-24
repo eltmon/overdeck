@@ -251,6 +251,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     governorCpuPsiHoldAvg60: 50,
     governorCpuPsiRecoveryAvg60: 25,
     governorCpuHoldDispatch: false,
+    qualityGateSlots: 2,
   },
   issues: {
     closedWindowDays: 14,
