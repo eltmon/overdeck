@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PanRpcError } from '@overdeck/contracts';
 
-const state = vi.hoisted(() => ({ projectPath: '', overdeckHome: '' }));
+const state = vi.hoisted(() => ({ projectPath: '', overdeckHome: '', home: '' }));
 
 vi.mock('../../../../lib/projects.js', () => ({
   listProjectsSync: () => [{ key: 'overdeck', config: { name: 'Overdeck', path: state.projectPath } }],
@@ -18,6 +18,11 @@ vi.mock('../../../../lib/paths.js', () => ({
   },
 }));
 
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return { ...actual, homedir: () => state.home };
+});
+
 async function expectPanRpcError(promise: Promise<unknown>, code: string) {
   await expect(promise).rejects.toMatchObject({ code });
   await expect(promise).rejects.toBeInstanceOf(PanRpcError);
@@ -27,15 +32,19 @@ describe('file-at-path', () => {
   let tempRoot: string;
   let projectDir: string;
   let homeDir: string;
+  let fakeHome: string;
 
   beforeEach(async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'pan-file-at-path-'));
     projectDir = join(tempRoot, 'project');
     homeDir = join(tempRoot, 'overdeck-home');
+    fakeHome = join(tempRoot, 'home');
     await mkdir(projectDir, { recursive: true });
     await mkdir(homeDir, { recursive: true });
+    await mkdir(fakeHome, { recursive: true });
     state.projectPath = projectDir;
     state.overdeckHome = homeDir;
+    state.home = fakeHome;
   });
 
   afterEach(async () => {
@@ -57,10 +66,22 @@ describe('file-at-path', () => {
         lang: 'markdown',
         mtimeMs: onDiskStat.mtimeMs,
         totalLines: 3,
+        writable: true,
       });
     });
 
-    it('reads a markdown file under OVERDECK_HOME', async () => {
+    it('reads a markdown file under a registered project root with writable: true', async () => {
+      const { readFileAtPath } = await import('../file-at-path.js');
+      const target = join(projectDir, 'docs', 'brief2.md');
+      await mkdir(join(projectDir, 'docs'), { recursive: true });
+      await writeFile(target, 'body');
+
+      const result = await readFileAtPath({ path: target });
+
+      expect(result.writable).toBe(true);
+    });
+
+    it('reads a markdown file under OVERDECK_HOME with writable: true', async () => {
       const { readFileAtPath } = await import('../file-at-path.js');
       const target = join(homeDir, 'drafts', 'PAN-3260.md');
       await mkdir(join(homeDir, 'drafts'), { recursive: true });
@@ -70,6 +91,60 @@ describe('file-at-path', () => {
 
       expect(result.text).toBe('draft body');
       expect(result.lang).toBe('markdown');
+      expect(result.writable).toBe(true);
+    });
+
+    it('reads a markdown file under $HOME outside every write root with writable: false', async () => {
+      const { readFileAtPath } = await import('../file-at-path.js');
+      const target = join(fakeHome, 'Projects', 'OpenMontage', 'script.md');
+      await mkdir(join(fakeHome, 'Projects', 'OpenMontage'), { recursive: true });
+      await writeFile(target, 'script body');
+
+      const result = await readFileAtPath({ path: target });
+
+      expect(result.text).toBe('script body');
+      expect(result.writable).toBe(false);
+    });
+
+    it('rejects a symlink under $HOME that resolves outside it', async () => {
+      const { readFileAtPath } = await import('../file-at-path.js');
+      const outside = resolve(tempRoot, 'outside.md');
+      await writeFile(outside, 'outside');
+      const link = join(fakeHome, 'escape.md');
+      await symlink(outside, link);
+
+      await expectPanRpcError(readFileAtPath({ path: link }), 'PATH_NOT_ALLOWED');
+    });
+
+    it('rejects a sibling-prefix path (<home>2/x.md)', async () => {
+      const { readFileAtPath } = await import('../file-at-path.js');
+      const siblingDir = `${fakeHome}2`;
+      const target = join(siblingDir, 'x.md');
+      await mkdir(siblingDir, { recursive: true });
+      await writeFile(target, 'sibling');
+
+      await expectPanRpcError(readFileAtPath({ path: target }), 'PATH_NOT_ALLOWED');
+    });
+
+    it('rejects a non-markdown file under $HOME with UNSUPPORTED_FILE_TYPE', async () => {
+      const { readFileAtPath } = await import('../file-at-path.js');
+      const target = join(fakeHome, '.aws', 'credentials');
+      await mkdir(join(fakeHome, '.aws'), { recursive: true });
+      await writeFile(target, 'secret');
+
+      await expectPanRpcError(readFileAtPath({ path: target }), 'UNSUPPORTED_FILE_TYPE');
+    });
+
+    it('rejects a .md symlink under $HOME that resolves to a non-markdown file with UNSUPPORTED_FILE_TYPE', async () => {
+      const { readFileAtPath } = await import('../file-at-path.js');
+      const sshDir = join(fakeHome, '.ssh');
+      await mkdir(sshDir, { recursive: true });
+      const keyFile = join(sshDir, 'id_rsa');
+      await writeFile(keyFile, 'private key');
+      const alias = join(fakeHome, 'notes.md');
+      await symlink(keyFile, alias);
+
+      await expectPanRpcError(readFileAtPath({ path: alias }), 'UNSUPPORTED_FILE_TYPE');
     });
 
     it('rejects a path outside every allowlisted root', async () => {
@@ -191,6 +266,17 @@ describe('file-at-path', () => {
       await writeFile(outside, 'outside');
 
       await expectPanRpcError(writeFileAtPath({ path: outside, content: 'hi' }), 'PATH_NOT_ALLOWED');
+    });
+
+    it('rejects a markdown file under $HOME outside the write roots with PATH_NOT_ALLOWED and leaves it unchanged', async () => {
+      const { writeFileAtPath } = await import('../file-at-path.js');
+      const target = join(fakeHome, 'Projects', 'OpenMontage', 'script.md');
+      await mkdir(join(fakeHome, 'Projects', 'OpenMontage'), { recursive: true });
+      await writeFile(target, 'original');
+
+      await expectPanRpcError(writeFileAtPath({ path: target, content: 'clobbered' }), 'PATH_NOT_ALLOWED');
+      const onDisk = await import('node:fs/promises').then((fs) => fs.readFile(target, 'utf8'));
+      expect(onDisk).toBe('original');
     });
 
     it('rejects a write through an in-root .md symlink to a non-markdown file, leaving it unchanged', async () => {

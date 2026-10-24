@@ -65,7 +65,7 @@ beforeEach(() => {
 
 describe('EditorPane', () => {
   it('renders the loaded text in Edit and renders the draft as markdown in Preview', async () => {
-    wsTransportMock.readFileAtPath.mockResolvedValue({ text: '# Hello', lang: 'markdown', mtimeMs: 100, totalLines: 1 })
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: '# Hello', lang: 'markdown', mtimeMs: 100, totalLines: 1, writable: true })
 
     render(<EditorPane pane={pane()} ctx={ctx} />)
 
@@ -79,7 +79,7 @@ describe('EditorPane', () => {
   })
 
   it('saves the draft with the last-read expectedMtimeMs and clears the dirty indicator', async () => {
-    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'original', lang: 'markdown', mtimeMs: 100, totalLines: 1 })
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'original', lang: 'markdown', mtimeMs: 100, totalLines: 1, writable: true })
     wsTransportMock.writeFileAtPath.mockResolvedValue({ mtimeMs: 200 })
 
     render(<EditorPane pane={pane()} ctx={ctx} />)
@@ -102,7 +102,7 @@ describe('EditorPane', () => {
   })
 
   it('saves on Ctrl/Cmd+S while the textarea is focused', async () => {
-    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'original', lang: 'markdown', mtimeMs: 100, totalLines: 1 })
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'original', lang: 'markdown', mtimeMs: 100, totalLines: 1, writable: true })
     wsTransportMock.writeFileAtPath.mockResolvedValue({ mtimeMs: 200 })
 
     render(<EditorPane pane={pane()} ctx={ctx} />)
@@ -131,6 +131,7 @@ describe('EditorPane', () => {
         lang: 'markdown',
         mtimeMs: 100,
         totalLines: 1,
+        writable: true,
       }),
     )
     wsTransportMock.writeFileAtPath.mockResolvedValue({ mtimeMs: 200 })
@@ -168,7 +169,7 @@ describe('EditorPane', () => {
   })
 
   it('shows Reload-from-disk and Overwrite on WRITE_CONFLICT; Overwrite resaves without expectedMtimeMs', async () => {
-    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'original', lang: 'markdown', mtimeMs: 100, totalLines: 1 })
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'original', lang: 'markdown', mtimeMs: 100, totalLines: 1, writable: true })
     wsTransportMock.writeFileAtPath.mockRejectedValueOnce(new PanRpcError({ message: 'conflict', code: 'WRITE_CONFLICT' }))
 
     render(<EditorPane pane={pane()} ctx={ctx} />)
@@ -190,7 +191,7 @@ describe('EditorPane', () => {
   })
 
   it('Reload from disk discards the draft and re-reads the file', async () => {
-    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'original', lang: 'markdown', mtimeMs: 100, totalLines: 1 })
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'original', lang: 'markdown', mtimeMs: 100, totalLines: 1, writable: true })
     wsTransportMock.writeFileAtPath.mockRejectedValueOnce(new PanRpcError({ message: 'conflict', code: 'WRITE_CONFLICT' }))
 
     render(<EditorPane pane={pane()} ctx={ctx} />)
@@ -199,7 +200,7 @@ describe('EditorPane', () => {
     fireEvent.click(screen.getByTestId('editor-pane-save'))
     await waitFor(() => expect(screen.getByTestId('editor-pane-conflict')).toBeInTheDocument())
 
-    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'fresh from disk', lang: 'markdown', mtimeMs: 400, totalLines: 1 })
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'fresh from disk', lang: 'markdown', mtimeMs: 400, totalLines: 1, writable: true })
     fireEvent.click(screen.getByTestId('editor-pane-reload'))
 
     await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('fresh from disk'))
@@ -242,6 +243,64 @@ describe('EditorPane', () => {
     expect(screen.getByTestId('editor-pane-missing-path')).toBeInTheDocument()
     expect(wsTransportMock.readFileAtPath).not.toHaveBeenCalled()
   })
+
+  it('renders a writable: false file read-only with the read-only note', async () => {
+    wsTransportMock.readFileAtPath.mockResolvedValue({
+      text: 'outside body',
+      lang: 'markdown',
+      mtimeMs: 100,
+      totalLines: 1,
+      writable: false,
+    })
+
+    render(<EditorPane pane={pane()} ctx={ctx} />)
+
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('outside body'))
+    const textarea = screen.getByTestId('editor-pane-textarea')
+    expect(textarea).toHaveAttribute('readonly')
+
+    fireEvent.change(textarea, { target: { value: 'attempted edit' } })
+    expect(textarea).toHaveValue('outside body')
+
+    expect(screen.getByTestId('editor-pane-save')).toBeDisabled()
+    expect(screen.getByTestId('editor-pane-readonly-note')).toHaveTextContent(
+      'Read-only — this file is outside the registered project roots.',
+    )
+  })
+
+  it('Ctrl/Cmd+S on a writable: false file sends no write', async () => {
+    wsTransportMock.readFileAtPath.mockResolvedValue({
+      text: 'outside body',
+      lang: 'markdown',
+      mtimeMs: 100,
+      totalLines: 1,
+      writable: false,
+    })
+
+    render(<EditorPane pane={pane()} ctx={ctx} />)
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('outside body'))
+    const textarea = screen.getByTestId('editor-pane-textarea')
+
+    fireEvent.keyDown(textarea, { key: 's', ctrlKey: true })
+    fireEvent.keyDown(textarea, { key: 's', metaKey: true })
+
+    expect(wsTransportMock.writeFileAtPath).not.toHaveBeenCalled()
+  })
+
+  it('does not show the read-only note for a writable: true file', async () => {
+    wsTransportMock.readFileAtPath.mockResolvedValue({
+      text: 'original',
+      lang: 'markdown',
+      mtimeMs: 100,
+      totalLines: 1,
+      writable: true,
+    })
+
+    render(<EditorPane pane={pane()} ctx={ctx} />)
+
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('original'))
+    expect(screen.queryByTestId('editor-pane-readonly-note')).not.toBeInTheDocument()
+  })
 })
 
 // PAN-3260 editor-pane.ac5 — the Stage self-heal effect (index.tsx's
@@ -250,7 +309,7 @@ describe('EditorPane', () => {
 // pane's identity is its editorFilePath, not an issue.
 describe('editor pane survives the Stage self-heal effect', () => {
   it('keeps a workspace-less editor pane open across a deck mount', async () => {
-    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'brief body', lang: 'markdown', mtimeMs: 1, totalLines: 1 })
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'brief body', lang: 'markdown', mtimeMs: 1, totalLines: 1, writable: true })
 
     const [{ Stage }, { usePanesStore }, { useTerminalStateStore }, reactQuery] = await Promise.all([
       import('../index'),

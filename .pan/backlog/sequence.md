@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T08:19:42Z · model: claude-opus-5-5 · open: 842_
+_Last sequenced: 2026-10-24T09:16:42Z · model: claude-opus-5-5 · open: 843_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -13,7 +13,6 @@ _Last sequenced: 2026-10-24T08:19:42Z · model: claude-opus-5-5 · open: 842_
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 8 | PAN-4583 | S | medium | ok |  |  | In pipeline: editor pane reads markdown anywhere under $HOME read-only; writes stay limited to project roots + OVERDECK_HOME. |
-| 9 | PAN-4584 | S | medium | ok |  |  | In pipeline: archiving a conversation shows no pending state and swallows failures; unify three entry points on one mutation. |
 | 10 | PAN-4546 | S | high | ok |  |  | Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
@@ -21,6 +20,8 @@ _Last sequenced: 2026-10-24T08:19:42Z · model: claude-opus-5-5 · open: 842_
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 15 | PAN-4589 | M | high | ok |  |  | In pipeline: CI test gate ignores commit-status CI (Dagger Cloud); read status context as check name, baseline + feedback. |
 | 16 | PAN-4595 | S | critical | ok |  |  | CLI health never registers the transcript heartbeat, so Herdr agents read STUCK after 30 min and invite recovery on healthy agents. |
+| 17 | PAN-4597 | S | high | ok |  |  | Awaiting Merge hides approved green PRs: ready needs a 5-min gate answer only auto-merge refreshes. Merge machinery: supervised handoff |
+| 18 | PAN-4598 | M | critical | ok |  |  | No UAT batch has assembled since the cut (newest 2026-09-20, failed); Flywheel card offers only an escape-hatch merge link |
 | 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 22 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
@@ -882,10 +883,6 @@ New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan
 
 New since the prior run and already in the pipeline (live workspace), so it is pinned near the top rather than ranked against the queue. Well-specified ACs including symlink, prefix and extension containment tests; the PR must state who can reach /ws/rpc before the read widening ships.
 
-### PAN-4584 (rank 9)
-
-New since the prior run and already in planning (live workspace), so it is pinned near the top. Self-contained frontend UX fix with clear ACs; retitleMutation in the same file is the pattern to copy.
-
 ### PAN-4546 (rank 10)
 
 Operator decision 2026-10-04: the single admission slot, not agent count, bounded overnight throughput (5-7 PRs waiting 1-2 h at near-zero PSI). Doubling slots under low pressure is the largest throughput lever on the board. Ranks after the bundle because PAN-4531/4532 remove wasted slot time first.
@@ -913,6 +910,14 @@ New since the prior run and already in the pipeline, so it is pinned in a free t
 ### PAN-4595 (rank 16)
 
 New since the prior run. pan show --health is what the Flywheel reads to decide whether to resume or nudge an agent, and on Herdr the CLI path has only the spawn timestamp as an activity signal, so every working agent older than 30 minutes is classified stuck. A false stuck verdict drives recovery actions against healthy agents, which is a pipeline-integrity problem. The root cause and fix are precise (register the heartbeat lookup on the CLI path, guard against an import cycle, add one test), so it is small and ranks into the top tier beside the other Herdr substrate fixes.
+
+### PAN-4597 (rank 17)
+
+New issue filed 2026-10-24 after PR #4587 was approved, green and clean yet absent from Awaiting Merge. deriveState needs a cached approved-at-head gate answer that only the auto-merge scheduler, merge doors and sibling walks write, and it expires after 5 minutes, so non-opted-in ready PRs vanish from the operator's merge view. Root cause and fix options are already in the body with file and line references, so it is well-scoped. Ranked just behind the in-pipeline pins and next to the auto-merge re-arm fix (PAN-4540) because it touches the same approval-at-head and merge-gate code.
+
+### PAN-4598 (rank 18)
+
+New since the prior run and labeled substrate-improvement: the merge train reconciler has built no UAT batch for any project since the PAN-3917 cut, so approved green PRs reach main only through a hidden escape-hatch link. It ranks into the open slot beside PAN-4597 (Awaiting Merge hides ready PRs) because both block the operator's last step from approved PR to main; the ACs are concrete (reconciler decision tests, per-row Merge button, honest copy, MERGE-WORKFLOW.md).
 
 ### PAN-4572 (rank 19)
 
@@ -1166,10 +1171,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
 
 Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.
 
-### PAN-2337 (rank 89)
-
-Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1177,10 +1178,10 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T08:19:42Z",
+  "generatedAt": "2026-10-24T09:16:42Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 842,
+  "openCount": 843,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1289,19 +1290,6 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "planning": "auto"
     },
     {
-      "issue": "PAN-4584",
-      "rank": 9,
-      "size": "S",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: archiving a conversation shows no pending state and swallows failures; unify three entry points on one mutation.",
-      "rationale": "New since the prior run and already in planning (live workspace), so it is pinned near the top. Self-contained frontend UX fix with clear ACs; retitleMutation in the same file is the pattern to copy.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4546",
       "rank": 10,
       "size": "S",
@@ -1382,6 +1370,45 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "dependsOn": [],
       "why": "In pipeline: CI test gate ignores commit-status CI (Dagger Cloud); read status context as check name, baseline + feedback.",
       "rationale": "New since the prior run and already in the pipeline, so it is pinned in a free top-tier slot. Without it a Dagger, Buildkite or Jenkins project never shows a passed test job, so merge gate and auto-merge stall; ACs are precise and unit-testable.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4595",
+      "rank": 16,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CLI health never registers the transcript heartbeat, so Herdr agents read STUCK after 30 min and invite recovery on healthy agents.",
+      "rationale": "New since the prior run. pan show --health is what the Flywheel reads to decide whether to resume or nudge an agent, and on Herdr the CLI path has only the spawn timestamp as an activity signal, so every working agent older than 30 minutes is classified stuck. A false stuck verdict drives recovery actions against healthy agents, which is a pipeline-integrity problem. The root cause and fix are precise (register the heartbeat lookup on the CLI path, guard against an import cycle, add one test), so it is small and ranks into the top tier beside the other Herdr substrate fixes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4597",
+      "rank": 17,
+      "size": "S",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Awaiting Merge hides approved green PRs: ready needs a 5-min gate answer only auto-merge refreshes. Merge machinery: supervised handoff",
+      "rationale": "New issue filed 2026-10-24 after PR #4587 was approved, green and clean yet absent from Awaiting Merge. deriveState needs a cached approved-at-head gate answer that only the auto-merge scheduler, merge doors and sibling walks write, and it expires after 5 minutes, so non-opted-in ready PRs vanish from the operator's merge view. Root cause and fix options are already in the body with file and line references, so it is well-scoped. Ranked just behind the in-pipeline pins and next to the auto-merge re-arm fix (PAN-4540) because it touches the same approval-at-head and merge-gate code.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4598",
+      "rank": 18,
+      "size": "M",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "No UAT batch has assembled since the cut (newest 2026-09-20, failed); Flywheel card offers only an escape-hatch merge link",
+      "rationale": "New since the prior run and labeled substrate-improvement: the merge train reconciler has built no UAT batch for any project since the PAN-3917 cut, so approved green PRs reach main only through a hidden escape-hatch link. It ranks into the open slot beside PAN-4597 (Awaiting Merge hides ready PRs) because both block the operator's last step from approved PR to main; the ACs are concrete (reconciler decision tests, per-row Merge button, honest copy, MERGE-WORKFLOW.md).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3835,6 +3862,19 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "dependsOn": [],
       "why": "Kimi ACP cancel is sent with id:\"\" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked.",
       "rationale": "Source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. Its prerequisite PAN-4563 (replay fixture and pinned host-replay test) merged in #4576, so the dependency is cleared; the rank stays at 224 because it already sat in the high tier with peers of equal score and nothing else about the issue changed.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4596",
+      "rank": 225,
+      "size": "S",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Ended held handoff shows generic \"no saved history\"; hides kickoff focus/brief and offers no Start. Sat 20 days as \"waiting on operator\".",
+      "rationale": "New since the prior run. ConversationPanel treats every ended conversation without a timeline as orphaned and never reads forkRequest.hold, so a held handoff loses its kickoff text, brief path and Start action. The substrate-improvement label sets a high floor; impact is operator visibility rather than pipeline correctness, so it ranks with other Needs-you visibility gaps such as PAN-3276.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11659,32 +11699,6 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "rationale": "New since the prior run. Two operator decisions from PAN-4585 are unresolved and Guardian provisioning touches liveness and pan done, so it is needs-refinement and last in the group.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4595",
-      "rank": 16,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CLI health never registers the transcript heartbeat, so Herdr agents read STUCK after 30 min and invite recovery on healthy agents.",
-      "rationale": "New since the prior run. pan show --health is what the Flywheel reads to decide whether to resume or nudge an agent, and on Herdr the CLI path has only the spawn timestamp as an activity signal, so every working agent older than 30 minutes is classified stuck. A false stuck verdict drives recovery actions against healthy agents, which is a pipeline-integrity problem. The root cause and fix are precise (register the heartbeat lookup on the CLI path, guard against an import cycle, add one test), so it is small and ranks into the top tier beside the other Herdr substrate fixes.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4596",
-      "rank": 225,
-      "size": "S",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Ended held handoff shows generic \"no saved history\"; hides kickoff focus/brief and offers no Start. Sat 20 days as \"waiting on operator\".",
-      "rationale": "New since the prior run. ConversationPanel treats every ended conversation without a timeline as orphaned and never reads forkRequest.hold, so a held handoff loses its kickoff text, brief path and Start action. The substrate-improvement label sets a high floor; impact is operator visibility rather than pipeline correctness, so it ranks with other Needs-you visibility gaps such as PAN-3276.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13143,6 +13157,20 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4540",
+      "to": "PAN-4597",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4597",
+      "to": "PAN-4598",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
