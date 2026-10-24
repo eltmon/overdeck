@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4582",
   "created": "2026-10-24T07:40:29.074Z",
-  "updated": "2026-10-24T08:38:38.036Z",
+  "updated": "2026-10-24T08:38:46.644Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4582",
       "claimedAt": "2026-10-24T08:18:46.647Z",
       "doneAt": "2026-10-24T08:38:38.035Z"
+    },
+    "docs-herdr-tabs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4582",
+      "claimedAt": "2026-10-24T08:38:46.644Z"
     }
   }
 }
