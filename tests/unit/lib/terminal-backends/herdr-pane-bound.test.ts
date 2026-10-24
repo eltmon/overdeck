@@ -102,8 +102,12 @@ describe('HerdrBackend.startAgent, pane-bound', () => {
     vi.useFakeTimers();
     try {
       const { api, log } = fakeApi(({ method }) =>
-        method === 'pane.split'
-          ? { pane: { pane_id: 'wE:p2', terminal_id: 'term_9', workspace_id: 'wE' } }
+        method === 'tab.create'
+          ? {
+            type: 'tab_created',
+            tab: { tab_id: 'wE:t2' },
+            root_pane: { pane_id: 'wE:p2', terminal_id: 'term_9', workspace_id: 'wE' },
+          }
           : {});
 
       // No timer advance at all: the launch must settle on its own.
@@ -117,7 +121,7 @@ describe('HerdrBackend.startAgent, pane-bound', () => {
         agentName: 'agent-pan-3705-review',
       });
       const methods = log.map((call) => call.method);
-      expect(methods).toEqual(['pane.split', 'pane.report_metadata', 'pane.send_input']);
+      expect(methods).toEqual(['tab.create', 'pane.layout', 'pane.report_metadata', 'pane.send_input']);
       expect(methods).not.toContain('agent.rename');
       expect(methods).not.toContain('pane.get');
       expect(methods).not.toContain('pane.close');
@@ -128,7 +132,13 @@ describe('HerdrBackend.startAgent, pane-bound', () => {
 
   it('stamps identity BEFORE the launcher runs, so a pane that dies early still says what it was', async () => {
     const { api, log } = fakeApi(({ method }) =>
-      method === 'pane.split' ? { pane: { pane_id: 'wE:p2', terminal_id: 'term_9', workspace_id: 'wE' } } : {});
+      method === 'tab.create'
+        ? {
+          type: 'tab_created',
+          tab: { tab_id: 'wE:t2' },
+          root_pane: { pane_id: 'wE:p2', terminal_id: 'term_9', workspace_id: 'wE' },
+        }
+        : {});
 
     await Effect.runPromise(new HerdrBackend(api as never).startAgent(workspace, codexSpec));
 
@@ -151,7 +161,9 @@ describe('HerdrBackend.startAgent, pane-bound', () => {
 
   it('closes the pane when the launcher cannot be sent', async () => {
     const { api, log } = fakeApi(({ method }) => {
-      if (method === 'pane.split') return { pane: { pane_id: 'wE:p2', terminal_id: 't', workspace_id: 'wE' } };
+      if (method === 'tab.create') {
+        return { type: 'tab_created', tab: { tab_id: 'wE:t2' }, root_pane: { pane_id: 'wE:p2', terminal_id: 't', workspace_id: 'wE' } };
+      }
       if (method === 'pane.send_input') return new HerdrApiError({ method, code: 'pane_busy', message: 'pane busy' });
       return {};
     });
@@ -166,7 +178,9 @@ describe('HerdrBackend.startAgent, pane-bound', () => {
 
   it('keeps stamping the agent id on the detected path, so the inventory keys both alike', async () => {
     const { api, log } = fakeApi(({ method }) => {
-      if (method === 'pane.split') return { pane: { pane_id: 'wE:p3', terminal_id: 't', workspace_id: 'wE' } };
+      if (method === 'tab.create') {
+        return { type: 'tab_created', tab: { tab_id: 'wE:t3' }, root_pane: { pane_id: 'wE:p3', terminal_id: 't', workspace_id: 'wE' } };
+      }
       if (method === 'pane.get') return { pane: { pane_id: 'wE:p3', terminal_id: 't', workspace_id: 'wE', agent: 'claude' } };
       return {};
     });

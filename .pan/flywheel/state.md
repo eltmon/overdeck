@@ -230,3 +230,57 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   exist". Every handoff brief must say: when a PR is ready, remove the hoff
   worktree, `pan workspace create PAN-<n>`, confirm HEAD = PR head, then
   `pan review request PAN-<n>` (sent to conversations 3304 and 3305 at 09:20).
+- 2026-10-24 09:30 UTC disk cleanup (operator-approved): removed 19 MYN
+  worktrees whose HEAD was on origin/main with no local changes (re-verified
+  per repo, then `git worktree remove`), plus `docker image prune -a`
+  (12.6 GB). `/` went from 29 GB to 48 GB free. Kept: cohesion,
+  feature-min-1072, feature-min-1078, intro-video-api, restic-retry,
+  hoff-restic (tracked brief edit, MIN-1053 open), site-style, and the
+  papers-please and tindra workspaces. Restic home backups failed 8 times in
+  7 days, all from a full disk on 2026-10-22.
+- Merged #4600 (PAN-4582) at 09:32 through the merge door.
+- 2026-10-24 10:20 UTC, operator-approved speedups: (1) local verification
+  gates for panopticon-cli trimmed to install + typecheck + CI-deferred test
+  in ~/.overdeck/projects.yaml (backup `projects.yaml.bak-2026-10-24-gates`;
+  machine memory `overdeck-local-gates-trimmed`); CI owns lint, build and the
+  server smoke test. (2) PAN-4546 (two concurrent gate slots) started with
+  `pan start --plan auto` despite needs-handoff, on the operator's word.
+  (3) PAN-4531 (skip gates when CI already failed) is in conversation 3304.
+- Handoff-built issues have no xBRIEF, so verification fails
+  `incomplete-plan-items`; handoff agents must write an xBRIEF and record items
+  (told 3304/3305; added to PAN-4605).
+- 2026-10-24 10:25 UTC operator instruction for THIS run: start no new
+  work. When every in-flight Overdeck issue has merged (PAN-4583, 4585,
+  4589, 4595, 4596, 4597, 4598, 4527, 4532, 4531, 4605, 4546, plus 3304's
+  remaining PAN-4540 and PAN-4534, and the docs issue PAN-4609), cut an npm release with
+  `pan release stable --version X.Y.Z`, push main + tag, write the report,
+  then pause the Flywheel.
+- PAN-4610 (2026-10-24): a verification worker can wait forever in CPU
+  admission when another poller deletes its half-written ticket. Symptom:
+  `phase: queued`, `admittedAt: null` for 30+ min and no
+  `~/.overdeck/verification-workers/admission/waiter-*.json` for that issue.
+  Recovery: stop the worker pid and `pan review request <id>`. Fix folded into
+  PAN-4546. Used on PAN-4532 at 10:40.
+- concerns.md conflicts recur on concurrent PRs (PAN-4595 hit it twice on
+  2026-10-24) → PAN-4614 (`merge=union` in .gitattributes), started. The
+  merge door rebases onto main, so a PR GitHub calls CLEAN can still be
+  refused for a conflict. A first "not approved at PR HEAD" refusal right
+  after a review lands can be stale PR facts; retry once after ~1 min.
+- 2026-10-24 11:30: 95 of 99 CI runs on main that day came from
+  `chore(workspace)` bookkeeping commits, starving PR checks → PAN-4618
+  (paths-ignore `.pan/**` on push), started. Mistake: I started PAN-4616 by
+  guessing the new issue's number; stopped it with `pan kill` and commented.
+  Always read the number from `gh issue create` output before `pan start`.
+- 2026-10-24 11:50: CI has no `concurrency` group, so superseded runs keep
+  their runners (48 unfinished runs, 12 on one PR branch). Cancelled 34
+  superseded runs by hand (kept each PR's head run and main's newest run);
+  permanent fix added to PAN-4618. When reading main's CI state after a
+  cancel, skip `cancelled` conclusions.
+- Handoff-built issues hit a third gate: `pan plan finalize` refuses without a
+  PRD draft (`.pan/drafts/pan-<n>.md`, PRD-first gate). Recipe for adopting an
+  outside PR into the pipeline: pipeline workspace → short PRD → finalize →
+  Item: commits + `pan task done` per item and AC (push after each) →
+  `pan review request`. Conversation 3304 told to do this for PAN-4527, 4532,
+  4531, 4540, 4534 at 12:00; all of it belongs in PAN-4605's fix.
+- Cancel queued `chore(workspace)` runs on main while PAN-4618 is pending;
+  the sequencer commits every few minutes.

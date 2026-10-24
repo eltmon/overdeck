@@ -201,8 +201,12 @@ export interface TerminalObservation {
   close(): void;
 }
 
-/** Write attachment to a terminal. One controller at a time. */
+/**
+ * Write attachment to a terminal. One controller at a time. Its frames
+ * follow its own resizes; an observer's frames stay at the size it opened with.
+ */
 export interface TerminalControl {
+  readonly frames: AsyncIterable<TerminalFrame>;
   write(data: string): void;
   resize(cols: number, rows: number): void;
   close(): void;

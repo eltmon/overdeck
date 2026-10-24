@@ -1,0 +1,158 @@
+{
+  "version": "1",
+  "issueId": "PAN-4582",
+  "created": "2026-10-24T07:40:29.074Z",
+  "updated": "2026-10-24T08:55:22.659Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "control-frames": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4582",
+      "claimedAt": "2026-10-24T07:40:29.074Z",
+      "doneAt": "2026-10-24T07:47:18.882Z"
+    },
+    "size-terminal-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4582",
+      "claimedAt": "2026-10-24T07:47:25.745Z",
+      "doneAt": "2026-10-24T07:54:40.756Z"
+    },
+    "agent-own-tab": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4582",
+      "claimedAt": "2026-10-24T07:54:51.078Z",
+      "doneAt": "2026-10-24T08:02:39.784Z"
+    },
+    "launch-pty-sizing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4582",
+      "claimedAt": "2026-10-24T08:02:48.138Z",
+      "doneAt": "2026-10-24T08:13:24.002Z"
+    },
+    "bridge-controller-output": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4582",
+      "claimedAt": "2026-10-24T08:13:49.380Z",
+      "doneAt": "2026-10-24T08:18:39.342Z"
+    },
+    "residue-reaper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4582",
+      "claimedAt": "2026-10-24T08:18:46.647Z",
+      "doneAt": "2026-10-24T08:38:38.035Z"
+    },
+    "docs-herdr-tabs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4582",
+      "claimedAt": "2026-10-24T08:38:46.644Z",
+      "doneAt": "2026-10-24T08:41:29.901Z"
+    },
+    "control-frames.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:48:16.018Z"
+    },
+    "control-frames.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:48:30.025Z"
+    },
+    "size-terminal-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:48:46.388Z"
+    },
+    "size-terminal-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:49:00.377Z"
+    },
+    "size-terminal-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:49:18.468Z"
+    },
+    "size-terminal-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:49:35.363Z"
+    },
+    "agent-own-tab.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:49:53.741Z"
+    },
+    "agent-own-tab.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:50:08.843Z"
+    },
+    "agent-own-tab.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:50:23.566Z"
+    },
+    "agent-own-tab.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:50:39.106Z"
+    },
+    "launch-pty-sizing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:50:59.617Z"
+    },
+    "launch-pty-sizing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:51:15.217Z"
+    },
+    "launch-pty-sizing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:51:28.914Z"
+    },
+    "launch-pty-sizing.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:51:43.239Z"
+    },
+    "bridge-controller-output.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:52:00.207Z"
+    },
+    "bridge-controller-output.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:52:13.937Z"
+    },
+    "bridge-controller-output.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:52:28.378Z"
+    },
+    "residue-reaper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:52:47.104Z"
+    },
+    "residue-reaper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:53:02.361Z"
+    },
+    "residue-reaper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:53:17.706Z"
+    },
+    "residue-reaper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:53:32.466Z"
+    },
+    "residue-reaper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:53:47.508Z"
+    },
+    "bridge-controller-output.ac4": {
+      "status": "cancelled"
+    },
+    "docs-herdr-tabs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:54:54.537Z"
+    },
+    "docs-herdr-tabs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:55:08.210Z"
+    },
+    "docs-herdr-tabs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:55:22.659Z"
+    }
+  }
+}

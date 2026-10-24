@@ -13,9 +13,9 @@
  * command line itself from Herdr's agent manifest, so it cannot run Overdeck's
  * generated launcher script — the script that carries the provider exports,
  * the system-prompt files, the session id, and every harness-specific launch
- * field. Instead the adapter splits a pane with the launch env and runs the
- * launcher in it with `pane.send_input` (text plus Enter in one ordered
- * submission).
+ * field. Instead the adapter opens a tab for the agent (PAN-4582) with the
+ * launch env and runs the launcher in it with `pane.send_input` (text plus
+ * Enter in one ordered submission).
  *
  * What happens next depends on the launch's DETECTION POLICY
  * (`detectionPolicyFor`, `./launch.ts`):
@@ -38,12 +38,13 @@
 
 import { Effect } from 'effect';
 
+import { openAgentTab, type SizeTerminal } from './herdr-agent-tab.js';
 import {
   getHerdrApiClient,
   HerdrApiClient,
   HerdrApiError,
 } from './herdr-api.js';
-import { controlTerminal, observeTerminal } from './herdr-stream.js';
+import { controlTerminal, observeTerminal, sizeHerdrTerminal } from './herdr-stream.js';
 import { pasteAndSubmitHerdrPane } from './herdr-submit.js';
 import { adoptIssueWorkspace, listIssueWorkspaces, type HerdrWorkspaceInfo } from './herdr-workspaces.js';
 import { checkPrompt } from './prompt-guard.js';
@@ -238,7 +239,7 @@ async function findAgentIdPane(
  * command reports that command with a different pid and process group. So the
  * question is whether any foreground process is NOT the shell.
  */
-async function paneProcessLiveness(
+export async function paneProcessLiveness(
   paneId: string,
   api: HerdrApiClient,
 ): Promise<'running' | 'exited' | 'indeterminate'> {
@@ -533,6 +534,7 @@ export async function readHerdrPaneText(
 export interface HerdrBackendOptions {
   readonly detectTimeoutMs?: number;
   readonly detectPollMs?: number;
+  readonly sizeTerminal?: SizeTerminal;
 }
 
 export class HerdrBackend implements TerminalBackend {
@@ -540,6 +542,7 @@ export class HerdrBackend implements TerminalBackend {
 
   private readonly detectTimeoutMs: number;
   private readonly detectPollMs: number;
+  private readonly sizeTerminal: SizeTerminal;
 
   constructor(
     private readonly api: HerdrApiClient = getHerdrApiClient(),
@@ -547,6 +550,7 @@ export class HerdrBackend implements TerminalBackend {
   ) {
     this.detectTimeoutMs = options.detectTimeoutMs ?? AGENT_DETECT_TIMEOUT_MS;
     this.detectPollMs = options.detectPollMs ?? AGENT_DETECT_POLL_MS;
+    this.sizeTerminal = options.sizeTerminal ?? sizeHerdrTerminal;
   }
 
   /**
@@ -584,15 +588,9 @@ export class HerdrBackend implements TerminalBackend {
     spec: StartAgentSpec,
   ): Effect.Effect<BackendResult<AgentPaneRef>, TerminalBackendError> {
     return attempt('startAgent', async () => {
-      const split = await this.api.call<{ pane?: HerdrPaneInfo }>('pane.split', {
-        workspace_id: workspace.workspaceId,
-        direction: 'down',
-        cwd: spec.cwd ?? workspace.cwd,
-        env: spec.env,
-        focus: false,
-      });
-      const pane = split.pane;
-      if (!pane) throw new Error('pane.split returned no pane');
+      const pane: HerdrPaneInfo = await openAgentTab(this.api, {
+        workspaceId: workspace.workspaceId, cwd: spec.cwd ?? workspace.cwd, env: spec.env, label: spec.name ?? spec.tokens.role,
+      }, this.sizeTerminal);
       const agentName = spec.name ?? `${spec.tokens.role}-${pane.pane_id.replace(':', '-')}`;
 
       if ((spec.detection ?? 'required') === 'not-required') {

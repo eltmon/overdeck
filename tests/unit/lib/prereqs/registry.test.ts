@@ -27,12 +27,33 @@ vi.mock("node:child_process", () => ({
   execFile: execFileMock,
 }));
 
+const loadConfigSyncMock = vi.hoisted(() => vi.fn());
+vi.mock("../../../../src/lib/config-yaml.js", () => ({
+  loadConfigSync: loadConfigSyncMock,
+}));
+
+const ensureSemgrepInstalledMock = vi.hoisted(() => vi.fn());
+const readSemgrepVersionMock = vi.hoisted(() => vi.fn());
+vi.mock("../../../../src/lib/semgrep/install.js", () => ({
+  ensureSemgrepInstalled: ensureSemgrepInstalledMock,
+  readSemgrepVersion: readSemgrepVersionMock,
+  managedSemgrepPath: () => "/home/test/.overdeck/bin/semgrep",
+  SEMGREP_VERSION: "1.180.0",
+}));
+
 import {
   detectLinuxPackageManager,
   getLinuxInstallCommand,
   getLinuxManualInstallHint,
   isToolInstalled,
+  installTool,
+  INSTALLABLE_TOOLS,
+  PREREQ_REGISTRY,
 } from "../../../../src/lib/prereqs/registry.js";
+
+function mockSemgrepEnabled(enabled: boolean): void {
+  loadConfigSyncMock.mockReturnValue({ config: { security: { semgrep: { enabled } } } });
+}
 
 describe("isToolInstalled", () => {
   it("detects tmux via -V (tmux does not support --version)", async () => {
@@ -83,5 +104,47 @@ describe("Linux package install commands", () => {
     expect(getLinuxManualInstallHint("jq", null)).toBe(
       "jq — download from https://jqlang.github.io/jq/download/",
     );
+  });
+});
+
+describe("semgrep prerequisite (PAN-4585)", () => {
+  it("registers semgrep as an installable tool with its own feature key", () => {
+    expect(INSTALLABLE_TOOLS).toContain("semgrep");
+    expect(PREREQ_REGISTRY.useSemgrep).toEqual(["semgrep"]);
+  });
+
+  it("refuses to install while the feature is disabled, without calling the installer", async () => {
+    mockSemgrepEnabled(false);
+    const result = await installTool("semgrep");
+    expect(result.success).toBe(false);
+    expect(result.message).toContain("security.semgrep.enabled");
+    expect(ensureSemgrepInstalledMock).not.toHaveBeenCalled();
+  });
+
+  it("succeeds when enabled and the installer reports installed", async () => {
+    mockSemgrepEnabled(true);
+    ensureSemgrepInstalledMock.mockResolvedValue({
+      status: "installed",
+      version: "1.180.0",
+      message: "Installed Semgrep 1.180.0",
+    });
+    const result = await installTool("semgrep");
+    expect(result.success).toBe(true);
+  });
+
+  it("reports installed only when enabled and the managed version matches the pin", async () => {
+    mockSemgrepEnabled(true);
+    readSemgrepVersionMock.mockResolvedValue("1.180.0");
+    await expect(isToolInstalled("semgrep")).resolves.toBe(true);
+
+    readSemgrepVersionMock.mockResolvedValue("1.179.0");
+    await expect(isToolInstalled("semgrep")).resolves.toBe(false);
+  });
+
+  it("reports not installed while disabled, without probing the version", async () => {
+    mockSemgrepEnabled(false);
+    readSemgrepVersionMock.mockClear();
+    await expect(isToolInstalled("semgrep")).resolves.toBe(false);
+    expect(readSemgrepVersionMock).not.toHaveBeenCalled();
   });
 });

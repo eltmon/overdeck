@@ -19,6 +19,8 @@ export interface CpuResourcesYamlConfig {
   governor_cpu_psi_recovery_avg60?: number;
   /** hold Flywheel-started agent spawns while CPU pressure is saturated (default off) */
   governor_cpu_hold_dispatch?: boolean;
+  /** concurrent quality-gate admission slots (1-16); extra slots open only while CPU is unpressured */
+  quality_gate_slots?: number;
 }
 
 /** Resolved CPU resource settings (always defined). */
@@ -30,4 +32,5 @@ export interface CpuResourcesConfig {
   governorCpuPsiHoldAvg60: number;
   governorCpuPsiRecoveryAvg60: number;
   governorCpuHoldDispatch: boolean;
+  qualityGateSlots: number;
 }

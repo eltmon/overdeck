@@ -251,8 +251,68 @@ projects:
 | `workspace` | No | Polyrepo/progressive workspace configuration |
 | `release` | No | Coordinated post-merge release configuration |
 | `verification.tests` | No | `ci` or `local`: where the verification gate's `test` gate runs. `ci` skips the local `quality_gates.test` run and treats the CI test job on the PR head as the test gate; `local` runs it on the host. Default: `ci` when the project has `github_repo` and a GitHub Actions workflow that runs a job named `test`/`tests`/`test-*`/`test (…)` on pull requests, else `local`. |
+| `quality_gates` | No | Map of verification gates; see [Quality gates](#quality-gates). |
 
 *Not required if `issue_prefixes` or `issue_pattern` is specified.
+
+### Quality gates
+
+`quality_gates` is a map from a gate name to its configuration. The
+verification gate runs the gates it lists, in declaration order, as the
+project's quality gates (see
+[What a verification run does](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#what-a-verification-run-does)).
+When a project declares no `quality_gates` at all, the verification gate runs
+`DEFAULT_GATES` instead: `typecheck`, `lint`, and `test`. A gate named `test`
+is skipped on the host when `verification.tests` resolves to `ci` (above).
+
+| Key | Required | Default | Description |
+|-----|----------|---------|-------------|
+| `command` | Yes for `type: command` gates | — | Shell command to run. |
+| `path` | No | workspace root | Path relative to the workspace. For a container gate, the container's working directory is `/workspaces/feature/<path>`. |
+| `required` | No | `true` | When `true`, the first failed required gate stops the run; the gate's name becomes the run's `failedCheck`. |
+| `env` | No | — | Extra environment variables for the gate's process. |
+| `phase` | No | `pre_push` | `pre_push` or `post_push`: when the gate runs relative to the push. |
+| `type` | No | `command` | `command` or `http_health`. |
+| `url` | No | — | URL to check; only used when `type: http_health`. |
+| `wait` | No | `120` | Seconds to wait before the first `http_health` check. |
+| `expect_status` | No | `200` | HTTP status the `http_health` check must return. |
+| `container` | No | `false` | Run the command with `docker exec` instead of on the host. |
+| `container_name` | No | — | Container name; supports placeholders (below). Used only when `container: true`; without it the gate runs on the host even if `container: true` is set. |
+| `retry` | No | `0` | Extra attempts on failure before the gate counts as failed (PAN-2461: CI-parity for suites with known order-dependent flakes). |
+
+`command` and `container_name` accept the placeholders `{{CHANGED_BASE}}`,
+`{{FEATURE_FOLDER}}`, and `{{WORKSPACE_PATH}}`. A gate's process does not
+inherit the agent's full environment: every `OVERDECK_*` variable except
+`OVERDECK_HOME` is dropped, as are `API_PORT`, `PORT`, and `DASHBOARD_URL`
+unless the gate sets them itself, and `SKIP_DOCS_INDEX=1` is always set. See
+[Change-Scoped Verification Gates](https://github.com/eltmon/overdeck/blob/main/docs/CONFIGURATION.md#change-scoped-verification-gates)
+for the placeholder values in context.
+
+```yaml
+projects:
+  example:
+    name: "Example"
+    path: /home/user/projects/example
+    issue_prefix: EX
+    quality_gates:
+      typecheck:
+        command: npm run typecheck
+      frontend-lint:
+        command: pnpm lint
+        path: frontend
+      frontend-build:
+        command: pnpm build
+        path: frontend
+        container: true
+        container_name: "example-{{FEATURE_FOLDER}}-fe-1"
+      test:
+        command: npm test
+        retry: 1
+```
+
+See also [What a verification run does](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#what-a-verification-run-does),
+[Why verification is slow](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#why-verification-is-slow),
+and [Choosing a project's local gates](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#choosing-a-projects-local-gates).
 
 ### Separate the issue tracker from the code host
 

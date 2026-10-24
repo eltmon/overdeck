@@ -91,8 +91,8 @@ describe('launchAgentPane CPU class (PAN-4311)', () => {
     const api = {
       call: async (method: string, params: Record<string, unknown>) => {
         log.push({ method, params });
-        return method === 'pane.split'
-          ? { pane: { pane_id: 'w1:p2', terminal_id: 't2', workspace_id: 'w1' } }
+        return method === 'tab.create'
+          ? { type: 'tab_created', tab: { tab_id: 'w1:t2' }, root_pane: { pane_id: 'w1:p2', terminal_id: 't2', workspace_id: 'w1' } }
           : {};
       },
     };

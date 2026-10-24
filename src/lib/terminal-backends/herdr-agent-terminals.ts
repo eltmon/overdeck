@@ -12,7 +12,7 @@
  *   only when nothing in it names another owner: no other agent's `agentId`
  *   token, and no detected harness under another name;
  * - workspaces that belong to this agent alone. `launchAgentPane` places every
- *   agent in the workspace of its `issueId`, splitting a new pane into it, so an
+ *   agent in the workspace of its `issueId`, in a tab of its own, so an
  *   issue workspace is shared by the issue's work, review and test agents and a
  *   stop never closes it. A role run launched with its own id as the issue (the
  *   backlog sequencer) owns its workspace, root shell included, and a stop

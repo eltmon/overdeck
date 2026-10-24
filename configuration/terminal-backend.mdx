@@ -127,6 +127,20 @@ or export `OVERDECK_TERMINAL_BACKEND=tmux`. With `terminal.backend: tmux`,
 Overdeck skips all Herdr setup and runs agents on the `tmux -L overdeck`
 socket.
 
+## Tabs, sizing, and idle shells
+
+Each agent and each operator conversation opens in its own tab (PAN-4582) —
+never split into a shared one, which would halve the remaining rows on
+every launch. A new tab's PTY is sized to the tab's own layout rect right
+after it opens, since a brand-new PTY otherwise copies the size of whichever
+pane in the session happens to be focused.
+
+After a Herdr restart, the agent panes it restores lose their tokens and come
+back as plain idle shells. Overdeck's hygiene scheduler closes them in its
+own workspaces — never the operator's own panes — within about 20 minutes
+(a pane has to be seen idle on two separate 10-minute sweeps before it is
+closed), and never while the Deacon is paused or frozen.
+
 ## Reaching an agent from a shell
 
 `pan start` (including when the agent is already running), `pan strike` and
@@ -155,6 +169,14 @@ the terminal id was recorded get
 The hint follows the backend recorded in the agent's state at launch, so an
 agent started on tmux before a switch to Herdr still gets the tmux form. An
 agent with no recorded backend gets the host's current selection.
+
+The dashboard's own terminal viewer takes control of a Herdr terminal at
+attach — only a control attach resizes the PTY, and only control frames
+follow a later resize, so the viewer and the PTY stay in sync. Herdr allows
+one controller per terminal: if the dashboard is already showing a terminal,
+`herdr --session <session> terminal attach <terminal-id>` from a shell needs
+`--takeover`, or it is refused with `already has an attached client`. A
+second dashboard viewer of the same terminal is served read-only instead.
 
 ## Claude Code hooks
 

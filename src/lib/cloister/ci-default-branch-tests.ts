@@ -7,10 +7,14 @@
  * only that commit would see no failures while main is red, so the newest
  * commit whose test checks have all finished decisively is the verdict. A
  * cancelled or stale run says nothing about the code, so it is skipped too.
+ *
+ * Commit statuses (Dagger Cloud checks) count alongside check runs: each is
+ * read through `commitStatusAsCheckRun` and judged by the same verdict
+ * (PAN-4589).
  */
 import { execFile } from 'node:child_process';
 
-import { isCiTestCheckName } from './verification-tests-mode.js';
+import { isCiTestCheckName, isDaggerCloudTestCheck } from './verification-tests-mode.js';
 
 /** How many default-branch commits to walk back for a finished test run. */
 const DEFAULT_BRANCH_LOOKBACK = 10;
@@ -25,6 +29,24 @@ interface CheckRun {
   name?: string;
   status?: string;
   conclusion?: string | null;
+  targetUrl?: string;
+}
+
+interface CommitStatus {
+  name?: string;
+  state?: string;
+  targetUrl?: string | null;
+}
+
+/** PAN-4589: a commit status as a check run, so one verdict reads both. `error` is a failure (D4). */
+export function commitStatusAsCheckRun(status: CommitStatus): CheckRun {
+  const state = (status.state ?? '').toLowerCase();
+  return {
+    name: status.name,
+    status: state === 'pending' ? 'in_progress' : 'completed',
+    conclusion: state === 'pending' ? null : state === 'error' ? 'failure' : state,
+    ...(status.targetUrl ? { targetUrl: status.targetUrl } : {}),
+  };
 }
 
 function ghJson<T>(args: string[]): Promise<T> {
@@ -43,13 +65,31 @@ function ghJson<T>(args: string[]): Promise<T> {
   });
 }
 
+/** Like `ghJson`, but each stdout line is one page's array; pages are flattened. */
+function ghJsonPages<T>(args: string[]): Promise<T[]> {
+  return new Promise((resolve, reject) => {
+    execFile('gh', args, { encoding: 'utf-8', timeout: 30000, maxBuffer: 4 * 1024 * 1024 }, (error, stdout) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      try {
+        const pages = (stdout as string).split('\n').filter((line) => line.trim().length > 0).map((line) => JSON.parse(line) as T[]);
+        resolve(pages.flat());
+      } catch (parseError) {
+        reject(parseError);
+      }
+    });
+  });
+}
+
 /**
  * The test verdict of one commit's check runs: the failing test checks'
  * names, `'pending'` when a test check has not finished decisively, or
  * `'no-tests'` when the commit has no test checks at all.
  */
 export function defaultBranchCommitTestVerdict(runs: readonly CheckRun[]): ReadonlySet<string> | 'pending' | 'no-tests' {
-  const tests = runs.filter((run) => isCiTestCheckName(run.name));
+  const tests = runs.filter((run) => isCiTestCheckName(run.name) || isDaggerCloudTestCheck(run.name, run.targetUrl));
   if (tests.length === 0) return 'no-tests';
   const undecided = tests.some((run) => run.status !== 'completed'
     || INDECISIVE_CONCLUSIONS.has((run.conclusion ?? '').toLowerCase()));
@@ -73,11 +113,17 @@ export async function readDefaultBranchFailingTestChecks(repo: string): Promise<
     ]);
     let sawTestChecks = false;
     for (const sha of shas) {
-      const runs = await ghJson<CheckRun[]>([
-        'api', `repos/${repo}/commits/${sha}/check-runs?per_page=100`,
-        '--jq', '[.check_runs[] | {name, status, conclusion}]',
+      const [runs, statuses] = await Promise.all([
+        ghJson<CheckRun[]>([
+          'api', `repos/${repo}/commits/${sha}/check-runs?per_page=100`,
+          '--jq', '[.check_runs[] | {name, status, conclusion}]',
+        ]),
+        ghJsonPages<CommitStatus>([
+          'api', '--paginate', `repos/${repo}/commits/${sha}/status?per_page=100`,
+          '--jq', '[.statuses[] | {name: .context, state, targetUrl: .target_url}]',
+        ]),
       ]);
-      const verdict = defaultBranchCommitTestVerdict(runs);
+      const verdict = defaultBranchCommitTestVerdict([...runs, ...statuses.map(commitStatusAsCheckRun)]);
       if (verdict === 'no-tests') continue;
       sawTestChecks = true;
       if (verdict === 'pending') continue;
