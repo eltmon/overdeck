@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4596",
   "created": "2026-10-24T08:38:08.714Z",
-  "updated": "2026-10-24T09:29:53.851Z",
+  "updated": "2026-10-24T09:30:07.051Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
     "kickoff-get-focus.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T09:29:53.850Z"
+    },
+    "held-handoff-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:30:07.051Z"
     }
   }
 }
