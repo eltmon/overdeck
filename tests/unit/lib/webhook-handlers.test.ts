@@ -250,6 +250,39 @@ describe('handleCheckRun', () => {
     }));
   });
 
+  it('hands the relay the failed check it fired on (PAN-4534)', async () => {
+    await handleCheckRun(makePayload({
+      check_run: {
+        id: 456,
+        name: 'test-shard (4/4)',
+        conclusion: 'failure',
+        details_url: 'https://github.com/o/r/actions/runs/900/job/456',
+        app: { slug: 'github-actions' },
+        pull_requests: [{ number: 5, head: { ref: 'feature/pan-123', sha: 'cafe' } }],
+      },
+    }));
+
+    expect(mockRelayCiFailureFeedback).toHaveBeenCalledWith(expect.objectContaining({
+      trigger: { name: 'test-shard (4/4)', conclusion: 'failure', url: 'https://github.com/o/r/actions/runs/900/job/456', jobId: 456 },
+    }));
+  });
+
+  it('gives the relay no trigger for a check run of a superseded commit (PAN-4534)', async () => {
+    await handleCheckRun(makePayload({
+      check_run: {
+        id: 457,
+        name: 'test-shard (1/4)',
+        conclusion: 'cancelled',
+        head_sha: 'old0',
+        app: { slug: 'github-actions' },
+        pull_requests: [{ number: 5, head: { ref: 'feature/pan-123', sha: 'cafe' } }],
+      },
+    }));
+
+    expect(mockRelayCiFailureFeedback).toHaveBeenCalledTimes(1);
+    expect(mockRelayCiFailureFeedback.mock.calls[0]![0]).not.toHaveProperty('trigger');
+  });
+
   it('bumps the cache but never relays for an advisory check run', async () => {
     await handleCheckRun(makePayload({
       check_run: {

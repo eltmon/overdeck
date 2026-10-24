@@ -46,6 +46,7 @@ import {
 } from './verification-cycles.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import { readDefaultBranchFailingTestChecks } from './ci-default-branch-tests.js';
+import { collectCheckRunFailures, FAILED_CHECK_RUN_CONCLUSIONS, listFailingCheckRunNames } from './ci-check-run-failures.js';
 import { isDaggerCloudUrl, resolveVerificationTestsMode, TEST_GATE_NAME } from './verification-tests-mode.js';
 
 function execFilePromise(
@@ -72,12 +73,25 @@ export interface CiFailureFeedbackOptions {
   headRef: string;
   prUrl?: string;
   source: string;
+  /**
+   * PAN-4534: the failed check that fired this relay, from the webhook. When
+   * neither lookup finds a failure (the check-run read failed, the workflow run
+   * is still in progress), the feedback still names and links it. Only a
+   * failed or timed-out check is reported this way: a cancelled one (a
+   * superseded run) is not a failure of this head.
+   */
+  trigger?: { name: string; conclusion: string; url?: string; jobId?: number };
 }
 
 export interface CiFailure {
   name: string;
   workflowName?: string;
-  runId: number;
+  /** A failed workflow run (the fallback lookup). */
+  runId?: number;
+  /** PAN-4534: a failing check run's Actions job. */
+  jobId?: number;
+  /** PAN-4534: the failing check's details page. */
+  url?: string;
   excerpt: string;
   inheritedFromMain: boolean;
 }
@@ -494,6 +508,13 @@ async function collectFailures(
   headSha: string,
   mainFailingNames: Set<string>,
 ): Promise<CiFailure[]> {
+  // PAN-4534: the head's check runs conclude per job, so a failing shard is
+  // visible while its workflow run is still in progress. The workflow-run
+  // lookup below stays as the fallback when no check run reports a failure.
+  const checkRunFailures = await collectCheckRunFailures(owner, repo, headSha);
+  if (checkRunFailures && checkRunFailures.length > 0) {
+    return checkRunFailures.map((failure) => ({ ...failure, inheritedFromMain: mainFailingNames.has(failure.name) }));
+  }
   const runs = await listFailingRuns(owner, repo, branch, headSha);
   const failures: CiFailure[] = [];
   for (const run of runs) {
@@ -556,7 +577,9 @@ function buildFeedbackBody(opts: {
       if (f.workflowName && f.workflowName !== f.name) {
         body += `Workflow: ${f.workflowName}  \n`;
       }
-      body += `Run: \`gh run view ${f.runId} --repo ${opts.repo}\`  \n`;
+      if (f.runId !== undefined) body += `Run: \`gh run view ${f.runId} --repo ${opts.repo}\`  \n`;
+      if (f.jobId !== undefined) body += `Job log: \`gh api repos/${opts.repo}/actions/jobs/${f.jobId}/logs\`  \n`;
+      if (f.url) body += `Check: ${f.url}  \n`;
       if (f.excerpt) {
         body += '```\n' + f.excerpt + '\n```\n\n';
       } else {
@@ -671,10 +694,19 @@ async function relayCiFailureFeedbackInQueue(
 
   // Diff against main's current failing checks so agents do not chase inherited failures.
   const mainRuns = await listFailingRuns(owner, repo, 'main');
-  const mainFailingNames = new Set(mainRuns.map((r) => r.name || r.workflowName || `run-${r.databaseId}`));
+  // PAN-4534: check-run failures carry job names, workflow runs carry workflow
+  // names, so main's failing jobs are listed too.
+  const mainFailingNames = new Set([
+    ...mainRuns.map((r) => r.name || r.workflowName || `run-${r.databaseId}`),
+    ...await listFailingCheckRunNames(owner, repo, 'main'),
+  ]);
 
   // Collect the concrete failures for this PR head.
   const failures = await collectFailures(owner, repo, opts.headRef, opts.headSha, mainFailingNames);
+  if (failures.length === 0 && opts.trigger && FAILED_CHECK_RUN_CONCLUSIONS.has(opts.trigger.conclusion.toLowerCase())) {
+    const { name, url, jobId } = opts.trigger;
+    failures.push({ name, ...(url ? { url } : {}), ...(jobId !== undefined ? { jobId } : {}), excerpt: '', inheritedFromMain: mainFailingNames.has(name) });
+  }
 
   // If we cannot find any failing workflow run for this SHA, still write a short
   // feedback file for explicit status events and authoritative polling so the
