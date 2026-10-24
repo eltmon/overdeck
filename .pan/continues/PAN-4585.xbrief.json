@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4585",
   "created": "2026-10-24T08:22:26.190Z",
-  "updated": "2026-10-24T10:41:38.809Z",
+  "updated": "2026-10-24T10:41:55.857Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "docs-semgrep.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T10:41:38.808Z"
+    },
+    "docs-semgrep.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:41:55.856Z"
     }
   }
 }
