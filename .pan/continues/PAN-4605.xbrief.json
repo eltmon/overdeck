@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T11:41:38.993Z",
+  "updated": "2026-10-24T11:41:55.127Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "adopt-pr-workspace.ac4": {
       "status": "completed",
       "doneAt": "2026-10-24T11:41:38.992Z"
+    },
+    "adopt-pr-workspace.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:41:55.126Z"
     }
   }
 }
