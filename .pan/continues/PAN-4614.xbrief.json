@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4614",
+  "created": "2026-10-24T11:11:53.918Z",
+  "updated": "2026-10-24T11:11:53.918Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "gitattributes-union": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4614",
+      "claimedAt": "2026-10-24T11:11:53.918Z"
+    }
+  }
+}
