@@ -4,17 +4,17 @@
     "created": "2026-10-24T10:27:31Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4546: Allow two concurrent quality gates (resources.quality_gate_slots, default 2) with a CPU-pressure fallback to one",
-    "updated": "2026-10-24T10:42:46.651Z"
+    "updated": "2026-10-24T10:43:41.388Z"
   },
   "plan": {
     "id": "pan-4546",
     "title": "Allow two concurrent quality gates (resources.quality_gate_slots, default 2) with a CPU-pressure fallback to one",
-    "status": "proposed",
+    "status": "running",
     "uid": "5318ad9e-35e4-4593-a3de-e6d029afb293",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T10:27:31Z",
-    "updated": "2026-10-24T10:42:46.651Z",
+    "updated": "2026-10-24T10:43:41.388Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4546",
@@ -571,5 +571,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
