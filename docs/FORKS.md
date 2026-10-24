@@ -223,9 +223,12 @@ with an **Open handoff doc** button, the kickoff text behind a disclosure,
 with a resume contract instead of its kickoff and leave the kickoff held.
 Start POSTs the door with no text, and the door relaunches the ended session
 through `ensureForkSessionReady(conv, sessionId, resume=false)` before it
-delivers. After a failed Start the door restores the hold and marks the fork
-failed; the panel re-reads the door, shows the held view again with "The last
-start failed: <error>", and Start retries. The panel shows "no saved history"
+delivers. When the session start or the delivery throws, the door restores the
+hold and marks the fork failed; the panel re-reads the door, shows the held
+view again with "The last start failed: <error>", and Start retries. (A
+stranded delivery, where the text reached the pane unsubmitted, marks the fork
+failed without restoring the hold; the session is alive then, so the panel
+takes the live path.) The panel shows "no saved history"
 only after the lookup answers `{ held: false }`: a pending lookup shows the
 loading skeleton, and a failed one shows a retryable warning. The
 pending-input feed also lists every unarchived held conversation (alive or

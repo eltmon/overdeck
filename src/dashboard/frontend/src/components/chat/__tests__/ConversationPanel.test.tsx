@@ -1458,6 +1458,40 @@ describe('ConversationPanel held handoff (PAN-4596)', () => {
     expect(kickoffGetCount()).toBe(before + 1);
   });
 
+  it('after a successful start, a later session end shows the transcript and Resume, not "Starting…"', async () => {
+    kickoffAnswers = [() => Response.json(HELD), () => Response.json({ held: false })];
+    const { client, rerender } = renderPanel(ended);
+    fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+    expect(await screen.findByText('Waiting for the session to start.')).toBeInTheDocument();
+
+    // The door delivers: the session comes up and forkStatus returns to null.
+    rerender(tree(client, { ...ended, status: 'active', sessionAlive: true, endedAt: null, forkStatus: null }));
+    expect(screen.getByTestId('composer-footer')).toBeInTheDocument();
+
+    // The agent works, then its session ends; forkStatus is still null, as at Start time.
+    await act(async () => {
+      client.setQueryData(['conversation-messages', 'test-conv'], {
+        messages: [],
+        workLog: [{ id: 'call_1', createdAt: '2024-01-01T00:30:00Z', label: 'Bash', tone: 'tool', toolTitle: 'Bash', detail: 'git status' }],
+        streaming: false,
+      });
+    });
+    rerender(tree(client, { ...ended, forkStatus: null }));
+    expect(await screen.findByRole('button', { name: 'Resume Session' })).toBeInTheDocument();
+    expect(screen.queryByText('Waiting for the session to start.')).toBeNull();
+  });
+
+  it('after a successful start, a later end with an empty transcript is not "Starting…"', async () => {
+    kickoffAnswers = [() => Response.json(HELD), () => Response.json({ held: false })];
+    const { client, rerender } = renderPanel(ended);
+    fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+    expect(await screen.findByText('Waiting for the session to start.')).toBeInTheDocument();
+    rerender(tree(client, { ...ended, status: 'active', sessionAlive: true, endedAt: null, forkStatus: null }));
+    rerender(tree(client, { ...ended, forkStatus: null }));
+    expect(await screen.findByText(/no saved history/)).toBeInTheDocument();
+    expect(screen.queryByText('Waiting for the session to start.')).toBeNull();
+  });
+
   it('a start that fails in the background brings the held view and Start back', async () => {
     vi.useFakeTimers();
     kickoffAnswers = [() => Response.json(HELD), () => Response.json({ held: false }), () => Response.json(HELD)];

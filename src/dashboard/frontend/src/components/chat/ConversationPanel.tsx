@@ -1274,17 +1274,21 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
     && isWithinSpawnWindow(conversation.createdAt) && !hasTimelineActivity;
   // PAN-4596: an ended empty conversation may be a --hold successor whose kickoff was
   // never sent. Until the kickoff lookup answers { held: false } it is not orphaned.
-  const heldKickoff = useHeldKickoff(conversation.name, { enabled: !conversation.sessionAlive, pollAlways: true });
+  const heldKickoff = useHeldKickoff(conversation.name, { enabled: !conversation.sessionAlive && !hasTimelineActivity, pollAlways: true });
   const heldLookupOpen = data != null && !data.error && !conversation.sessionAlive && !hasTimelineActivity
     && !isSpawning && !isSpawnFailed && !isForkInProgress;
   const heldLookupPending = heldLookupOpen && heldKickoff.status === 'loading';
   const heldLookupFailed = heldLookupOpen && heldKickoff.status === 'error';
   const isHeldUnsent = heldLookupOpen && heldKickoff.held && heldKickoff.text !== undefined;
   // After Start, show "Starting…" until the server moves forkStatus off its value at
-  // Start time, the session comes up, or a failed start restores the hold.
+  // Start time, the session comes up, or a failed start restores the hold. Once seen,
+  // the start is spent: a later null forkStatus or session end must not revive it.
   const [kickoffStartedFrom, setKickoffStartedFrom] = useState<{ name: string; forkStatus: string | null } | null>(null);
-  const kickoffStartPending = kickoffStartedFrom?.name === conversation.name && kickoffStartedFrom.forkStatus === (conversation.forkStatus ?? null)
-    && !conversation.sessionAlive && !(isForkFailed && heldKickoff.held);
+  const kickoffStartSeen = !kickoffStartedFrom || kickoffStartedFrom.name !== conversation.name
+    || kickoffStartedFrom.forkStatus !== (conversation.forkStatus ?? null) || conversation.sessionAlive;
+  const kickoffStartPending = !kickoffStartSeen && !(isForkFailed && heldKickoff.held) && !hasTimelineActivity;
+  useEffect(() => { if (kickoffStartedFrom && kickoffStartSeen) setKickoffStartedFrom(null); }, [kickoffStartedFrom, kickoffStartSeen]);
+  useEffect(() => { if (heldKickoff.held) setKickoffStartedFrom(null); }, [heldKickoff.held]);
   // The door restores the hold before it marks the fork failed: re-read it at once.
   useEffect(() => { if (isForkFailed) heldKickoff.refresh(); }, [isForkFailed, heldKickoff.refresh]);
   const isFirstMessage = !isLoading && !isDiscovering && !awaitingFirstPayload && !hasTimelineActivity && failedMessages.length === 0 && conversation.sessionAlive;
