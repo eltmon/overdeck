@@ -216,3 +216,11 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   `POST /api/issues/PAN-4583/merge`. The issue view's Merge action is hidden
   by the same 5-minute `ready` flag as Awaiting Merge
   (`issueActions.ts` line 553) → added to PAN-4597.
+- `pan flywheel status` `liveAgents: 0` on a working issue usually means the
+  agent ended a turn while a background task runs: Herdr reports the pane
+  `agent_status: done` (✳ title) and `paneIsLive`
+  (`src/lib/flywheel/derive-status.ts` line 162) drops `done` panes. Read the
+  transcript tail before treating it as a stall (PAN-4585, PAN-4589,
+  2026-10-24).
+- Hold `pan reload` while `pgrep -af dist/verification-worker.js` shows a
+  worker; the serialized gate queue means waiting for a gap between issues.
