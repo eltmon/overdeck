@@ -2,12 +2,187 @@
 
 ## Verification Gate (PAN-174)
 
-`pan done` runs quality gates (typecheck, lint, test) from `projects.yaml`
-before opening or updating the PR and requesting review. If a gate fails,
-feedback goes to the agent's session and the command refuses to proceed, so
-the agent can fix and retry. There is no separate stuck counter stored on a
-record — a run that keeps failing is visible directly in the PR's check
-history.
+A review request (`pan done`, `pan review request`, the PR webhook) starts a
+verification run before the review convoy. The run executes the quality gates
+the project declares under `quality_gates` in `projects.yaml`, in declaration
+order (or `DEFAULT_GATES` in `cloister/validation.ts` when the project declares
+none), plus the diff and plan checks listed below. If any check fails, feedback
+goes to the work agent and review does not start, so the agent can fix and
+retry. There is no separate stuck counter stored on a record — a run that keeps
+failing is visible directly in the PR's check history.
+
+- [What a verification run does](#what-a-verification-run-does)
+- [Why verification is slow](#why-verification-is-slow)
+- [Choosing a project's local gates](#choosing-a-projects-local-gates)
+
+### What a verification run does
+
+`runVerificationForIssueInProcess` (`src/lib/cloister/verification-runner.ts`)
+runs these steps in order. Each step that fails returns early with the named
+`failedCheck`; later steps do not run.
+
+0. Skip the run if the PR already merged, or if this head already used its
+   `VERIFICATION_MAX_CYCLES` (3) attempts (outcome `skipped`, no `failedCheck`).
+1. Snapshot the head for the test-skip waiver.
+2. Merge the target branch into each repo root (`syncSingleRepo`), unless the
+   project sets `syncTargetBranch: false` — `failedCheck: sync-target-branch`.
+3. Pick the gates to run: the project's declared `quality_gates`, or
+   `DEFAULT_GATES` when it declares none; drop the gate named `test` in `ci`
+   tests mode (`selectLocalVerificationGates`).
+4. Non-polyrepo only: run the package manager's install (60 s timeout) and
+   each `workspace_packages[].build_command` (30 s timeout). Warn-only — a
+   failure here is logged, not a `failedCheck`, and does not block the run.
+5. Run the test-skip diff check (`evaluateTestSkipGate`) — `failedCheck:
+   test-skip`. See [Test-skip gate](#test-skip-gate-pan-3847-pan-3906).
+6. If step 5 passed, run the plan-integrity check (`evaluatePlanIntegrityGate`)
+   — `failedCheck: plan-integrity`. See
+   [Plan-integrity gate](#plan-integrity-gate-pan-1728).
+7. Run each declared `pre_push` gate in declaration order (`runQualityGates`);
+   the first failing *required* gate stops the loop and its name becomes the
+   `failedCheck`.
+8. In `ci` tests mode, if the CI test job already failed on this head, record
+   a failed `test` result — `failedCheck: test`.
+9. A gate that could not run at all (a missing container, Docker down) defers
+   the run without counting an attempt against it, rather than failing it.
+10. Write the per-run verification artifact and `verification-latest.json`
+    (see [Verification artifacts](#verification-artifacts-fr-8)); on a gate
+    failure, post a failed check run and send feedback to the work agent.
+11. Run the acceptance-criteria check on the xBRIEF (`getXBriefACStatus`) —
+    `failedCheck: vbrief-conflicts` or `vbrief-ac`.
+12. Run the plan checklist check (`checkIncompletePlanItems`) —
+    `failedCheck: incomplete-plan-items`.
+13. Run the empty-changeset guard, which catches a changeset that touched only
+    `.pan/` task state — `failedCheck: empty-changeset`.
+14. On a full pass: post a success check run, lift any verification-stuck
+    pause, journal `verification.passed`, deliver the pass to the work agent
+    (`deliverVerificationPass`), and report `overdeck/test` as success.
+
+After a pass, `createRequestReviewPipeline`
+(`src/lib/cloister/request-review-pipeline.ts`) pushes the branch
+(`pushBranch`) and dispatches the review convoy (`dispatchReview`).
+
+Verification starts from two doors: `startRequestReviewPipeline`
+(`src/dashboard/server/routes/workspaces/review-pipeline.ts`), reached by
+`pan done`, `pan review request`, the PR webhook, and deacon-lite; and
+`triggerMerge` (`src/dashboard/server/routes/workspaces/merge-ops.ts`, log
+prefix `merge-verify`), which runs the same checks again at merge time with no
+target-branch sync, skipped when CI is already green on the exact tip commit
+(PAN-2487). So one issue's gates can run twice.
+
+### Why verification is slow
+
+- **One machine-wide slot.** `acquireQualityGateAdmission`
+  (`src/lib/cloister/quality-gate-admission.ts`) lets one gate attempt run at a
+  time across every issue and every agent shell on the host, served FIFO.
+  Each gate re-queues for admission separately, and `retry: N` means up to
+  N + 1 separate waits for that one gate — seven concurrent runs with three
+  gates each wait behind roughly 21 admissions.
+- **The pressure rule.** Before granting the slot, the admission queue samples
+  the host: it is pressured when CPU utilization is at or above `0.75`, or
+  when PSI `some avg10` is at or above `25`, or — only when PSI is
+  unavailable — when 1-minute load per core is at or above `1`. If not
+  pressured, it writes the holder record, waits 1.5 seconds, and samples
+  again; if the host is pressured on that second look, it gives the slot back
+  and keeps waiting.
+- **Agent shells share the queue.** Both `vitest.config.ts` and
+  `src/dashboard/frontend/vitest.config.ts` load
+  `tests/vitest-cpu-admission.ts` as `globalSetup`, which calls
+  `acquireQualityGateAdmission` for a gate named `vitest` unless the process
+  already has `OVERDECK_GATE_ADMITTED=1` or `OVERDECK_GATE_ADMISSION=0`, or
+  `CI` is set. An agent's own `npx vitest run <files>` therefore competes with
+  every verification run for the same single slot.
+- **Gates yield CPU.** Local host gates run as `nice -n 19`, and the whole
+  verification worker runs under a systemd user scope with `CPUWeight=20`
+  (default), so gates run slower when the dashboard or other agents are busy.
+- **Logged times include the queue wait.** `runQualityGates` records the
+  start time before calling `acquireQualityGateAdmission`, so both the
+  `✓ "<name>" passed (<N>ms)` log line and the artifact's `durationMs` cover
+  queue time plus every retry, not just the command's own run time.
+- **Limits.** Each gate attempt has a 20-minute timeout, with a process-group
+  watchdog 30 seconds after that. The whole verification worker has a
+  65-minute budget counted from its first admission, not from launch — time
+  spent queued before that first admission does not use the budget. A holder
+  record older than 25 minutes, or one whose process has died, is cleared
+  automatically.
+- **Other time in the run.** The install and `workspace_packages` build steps
+  (see [What a verification run does](#what-a-verification-run-does), step 4)
+  are not admission-gated but still take wall-clock time; and the gates can
+  run a second time at merge, adding another pass through the queue.
+- **Changes to admission.** PAN-4546 allows two concurrent admission slots;
+  PAN-4531 stops a run whose outcome is already decided before its next gate.
+  Each change documents itself where it lands.
+
+**Reading the logs.** Each worker writes
+`~/.overdeck/verification-workers/<issue>/worker-<runId>.log` (issue id
+lowercased):
+
+```text
+[quality-gate] Queued for CPU admission: PAN-1234 gate="typecheck" attempt=1/1 workspace=/…/workspaces/feature-pan-1234
+[quality-gate] Admitted: PAN-1234 gate="typecheck" attempt=1/1 workspace=/…
+[quality-gate] ✓ "typecheck" passed (912345ms)
+```
+
+The gap between `Queued` and `Admitted` is queue wait; the gap between
+`Admitted` and `passed` is close to the command's own run time. The sibling
+`state.json` carries `phase` (`queued` or `running`), `admittedAt`,
+`currentGate`, and `currentAttempt`. The admission directory itself,
+`~/.overdeck/verification-workers/admission/`, holds `owner.json` for the
+current holder and one `waiter-*.json` per queued attempt.
+
+### Choosing a project's local gates
+
+When CI already runs a check as a required PR check, a local gate for that
+same check only repeats it under the single machine-wide admission slot (see
+[Why verification is slow](#why-verification-is-slow)) — it adds queue time
+without catching anything CI would not catch anyway. Keep locally what CI
+does not run, or what must fail before review ever starts.
+
+The configuration the Overdeck maintainers run (per-machine
+`~/.overdeck/projects.yaml`, not tracked in this repo) is an example of
+applying that rule:
+
+```yaml
+panopticon-cli:
+  quality_gates:
+    install:
+      command: bun install --frozen-lockfile
+      required: true
+    typecheck:
+      command: npm run typecheck
+      required: true
+    test:
+      # Changed-file Vitest, root + frontend; deferred to CI in `ci` tests mode.
+      command: >
+        OVERDECK_VERIFICATION=1 npx vitest run --changed {{CHANGED_BASE}} &
+        r=$!; (cd src/dashboard/frontend && OVERDECK_VERIFICATION=1 npx vitest
+        run --changed {{CHANGED_BASE}}) & f=$!; rc=0; wait $r || rc=1; wait $f
+        || rc=1; exit $rc
+      retry: 1
+```
+
+`lint`, `build`, the frontend's strict typecheck, and the server bundle build
+were dropped from that list, not because they do not matter, but because CI
+already runs the equivalent of each one as a required check: `npm run build`
+already runs `build:dashboard:server:bundle` and the frontend's strict `tsc`,
+and `npm run typecheck` already runs `typecheck:frontend` — though
+`typecheck:frontend` is a baseline ratchet (the error count may not grow), not
+the strict zero-error check `build:dashboard:frontend`'s `tsc` runs, so the two
+are not the same check. CI's `build` and `lint` jobs run both.
+
+An `install` gate such as `bun install --frozen-lockfile` is worth keeping
+even though the runner always installs dependencies on its own: that built-in
+install is warn-only (see
+[What a verification run does](#what-a-verification-run-does), step 4), so an
+explicit `install` gate is what turns a stale or broken lockfile into a real
+failure instead of a log warning.
+
+The tradeoff: dropping a local `lint` or `build` gate means a lint or build
+failure no longer blocks review from starting. It instead shows up after
+review has already begun, as a red CI check — delivered to a live work agent
+as a plain "CI FAILED" message, not counted against the verification attempt
+budget. The merge gate still requires that check to go green before the PR
+can merge, so nothing merges broken; it only changes when in the pipeline the
+failure surfaces.
 
 ### One full-suite run per push, on CI (PAN-3965)
 
