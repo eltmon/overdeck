@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4618",
   "created": "2026-10-24T12:05:55.935Z",
-  "updated": "2026-10-24T12:32:03.250Z",
+  "updated": "2026-10-24T12:39:43.928Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-10-24T12:29:13.077Z"
     },
     "dod-later-green-skips-ci-less": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4618",
-      "claimedAt": "2026-10-24T12:32:03.249Z"
+      "claimedAt": "2026-10-24T12:32:03.249Z",
+      "doneAt": "2026-10-24T12:39:43.927Z"
     }
   }
 }
