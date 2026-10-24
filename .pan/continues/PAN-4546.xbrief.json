@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4546",
+  "created": "2026-10-24T10:44:02.967Z",
+  "updated": "2026-10-24T10:44:02.967Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "admission-ticket-durability": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4546",
+      "claimedAt": "2026-10-24T10:44:02.967Z"
+    }
+  }
+}
