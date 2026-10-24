@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4527",
   "created": "2026-10-24T10:10:19.162Z",
-  "updated": "2026-10-24T13:41:28.278Z",
+  "updated": "2026-10-24T13:41:59.470Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -31,6 +31,10 @@
     "supervisor-join": {
       "status": "completed",
       "doneAt": "2026-10-24T13:41:28.277Z"
+    },
+    "runner-ci-head": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:41:59.470Z"
     }
   }
 }
