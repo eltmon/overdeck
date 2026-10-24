@@ -285,6 +285,13 @@ describe('forge shape translation', () => {
     expect(toChecksState([{ status: 'COMPLETED', conclusion: 'FAILURE' }])).toBe('red');
     expect(toChecksState([{ status: 'IN_PROGRESS' }])).toBe('pending');
   });
+
+  it('honors a commit status row\'s state (PAN-4589)', () => {
+    expect(toChecksState([{ state: 'FAILURE' }])).toBe('red');
+    expect(toChecksState([{ state: 'ERROR' }])).toBe('red');
+    expect(toChecksState([{ state: 'PENDING' }])).toBe('pending');
+    expect(toChecksState([{ state: 'SUCCESS' }, { status: 'COMPLETED', conclusion: 'SUCCESS' }])).toBe('green');
+  });
 });
 
 describe('deriveIssueState — an open PR is always the pipeline\'s move', () => {

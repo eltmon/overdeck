@@ -105,6 +105,12 @@ panes (Herdr default; legacy tmux on `tmux -L overdeck`), with state in
 `src/lib/agents/liveness.ts`; the dashboard's live pane list is
 `services/backend-inventory.ts` (`backendPanesById` in the read model).
 
+CI test-job classification (`verification.tests: ci`, PAN-3965) lives in
+`cloister/verification-tests-mode.ts` (`isCiTestCheckName`); PR checks
+(`cloister/pr-facts.ts`), the default-branch baseline
+(`cloister/ci-default-branch-tests.ts`) and the `check_run`/`status` webhooks
+(`webhook-handlers.ts` → `cloister/ci-failure-feedback.ts`) all filter through it.
+
 ## Spawn sites (harness decision points)
 
 1. Plan kickoff — `planning/spawn-planning-session.ts` (~:558)
@@ -216,4 +222,4 @@ from `DerivedIssueState.pr`, not from links; the conversation list's badge
 
 No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.
 
-<!-- last-verified: 2026-10-21 -->
+<!-- last-verified: 2026-10-24 -->
