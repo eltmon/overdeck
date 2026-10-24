@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4597",
   "created": "2026-10-24T10:43:53.166Z",
-  "updated": "2026-10-24T10:49:13.158Z",
+  "updated": "2026-10-24T10:49:34.577Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -47,6 +47,10 @@
     "approval-refresh-tick.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T10:49:13.158Z"
+    },
+    "docs-ready-definition.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:49:34.577Z"
     }
   }
 }
