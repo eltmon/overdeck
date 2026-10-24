@@ -1,0 +1,65 @@
+{
+  "version": "1",
+  "issueId": "PAN-4540",
+  "created": "2026-10-24T15:41:16.095Z",
+  "updated": "2026-10-24T15:45:26.696Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "refused-blocks": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:41:16.095Z"
+    },
+    "readiness-order": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:41:46.148Z"
+    },
+    "mergeability-reread": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:42:17.694Z"
+    },
+    "docs": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:42:49.157Z"
+    },
+    "refused-blocks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:43:19.626Z"
+    },
+    "refused-blocks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:43:35.282Z"
+    },
+    "refused-blocks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:43:50.597Z"
+    },
+    "readiness-order.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:44:06.111Z"
+    },
+    "readiness-order.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:44:21.637Z"
+    },
+    "mergeability-reread.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:44:37.102Z"
+    },
+    "mergeability-reread.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:44:52.905Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:45:09.914Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:45:26.695Z"
+    }
+  }
+}

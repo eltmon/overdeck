@@ -97,6 +97,12 @@ export interface TriggerMergeResult {
   error?: string;
   retryable?: boolean;
   deferred?: boolean;
+  /**
+   * PAN-4540: the merge gate refused before any merge command ran. The
+   * auto-merge executor records it as `blocked` (re-armed once the gate
+   * passes), never as a `failed` merge.
+   */
+  refused?: boolean;
   message?: string;
   /** The issue's derived pipeline state at the moment the merge was refused. */
   state?: DerivedIssueState['state'];

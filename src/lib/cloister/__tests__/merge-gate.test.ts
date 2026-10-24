@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
-import { defaultUatRequired, evaluateIssueMergeGate } from '../merge-gate.js';
+import { MERGEABILITY_REREAD_MS, defaultUatRequired, evaluateIssueMergeGate } from '../merge-gate.js';
 import { getMergeReadyIssues } from '../merge-ready-set.js';
 import {
   cachedApprovalAtHead,
@@ -136,6 +136,48 @@ describe('evaluateIssueMergeGate', () => {
     });
     expect(result.ready).toBe(false);
     expect(result.facts.headBranch).toBe('strike/pan-5');
+  });
+});
+
+describe('evaluateIssueMergeGate — mergeability not yet computed (PAN-4540)', () => {
+  it('re-reads an unknown mergeability once after a delay, and passes when the re-read says mergeable', async () => {
+    vi.useFakeTimers();
+    try {
+      const getFacts = vi.fn()
+        .mockResolvedValueOnce(readyFacts('PAN-4540', { mergeable: null, mergeableState: 'unknown' }))
+        .mockResolvedValueOnce(readyFacts('PAN-4540'));
+
+      const verdict = evaluateIssueMergeGate('PAN-4540', { getFacts, ciTestsRequired: () => false });
+      await vi.advanceTimersByTimeAsync(MERGEABILITY_REREAD_MS);
+
+      expect(await verdict).toMatchObject({ ready: true });
+      expect(getFacts).toHaveBeenCalledTimes(2);
+      expect(getFacts.mock.calls[1]![1]).toMatchObject({ fresh: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports mergeability, not a missing approval, when the re-read is still unknown', async () => {
+    vi.useFakeTimers();
+    try {
+      // The approving review is not read for an unmergeable PR, so the head is unproven.
+      const unknown = readyFacts('PAN-4540', { mergeable: null, approvedAtHead: false });
+      const verdict = evaluateIssueMergeGate('PAN-4540', { getFacts: async () => unknown, ciTestsRequired: () => false });
+      await vi.advanceTimersByTimeAsync(MERGEABILITY_REREAD_MS);
+
+      const result = await verdict;
+      expect(result.ready).toBe(false);
+      expect(result.reason).toContain('has not computed mergeability yet');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads once when mergeability is already known', async () => {
+    const getFacts = vi.fn(async () => readyFacts('PAN-4540'));
+    expect((await evaluateIssueMergeGate('PAN-4540', { getFacts, ciTestsRequired: () => false })).ready).toBe(true);
+    expect(getFacts).toHaveBeenCalledTimes(1);
   });
 });
 

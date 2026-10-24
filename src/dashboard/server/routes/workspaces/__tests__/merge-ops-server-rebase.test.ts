@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   reportCommitStatus: vi.fn(async () => undefined),
   sessionExists: vi.fn(),
   setMergeRun: vi.fn(),
+  getMergeRun: vi.fn((): { phase: string } | null => null),
+  getPendingOperation: vi.fn((): { type: string; status: string } | null => null),
 }));
 
 // PAN-3917: config-yaml's defaults import lib/agents/tier-table, which still
@@ -122,7 +124,7 @@ vi.mock('../../../../../lib/forge.js', async (importOriginal) => ({
 }));
 vi.mock('../../workspaces.js', () => ({
   completePendingOperation: mocks.completePendingOperation,
-  getPendingOperation: vi.fn(() => null),
+  getPendingOperation: (issueId: string) => mocks.getPendingOperation(issueId),
   getProjectPath: vi.fn(() => '/project'),
   getWorkspaceInfoForIssue: vi.fn(() => ({ isRemote: false, localPath: '/workspace/feature-pan-3110' })),
   readJsonBody: vi.fn(),
@@ -131,7 +133,7 @@ vi.mock('../../workspaces.js', () => ({
 vi.mock('../../../services/merge-queue-service.js', () => ({
   setMergeQueueAdvanceHandler: vi.fn(),
   setMergeRun: (issueId: string, patch: Record<string, unknown>) => mocks.setMergeRun(issueId, patch),
-  getMergeRun: () => null,
+  getMergeRun: (issueId: string) => mocks.getMergeRun(issueId),
   clearMergeRun: vi.fn(),
 }));
 
@@ -193,6 +195,8 @@ describe('triggerMerge server rebase escalation', () => {
       statusCode: 400,
       error: `Cannot merge: no CI test job reported on PR HEAD ${HEAD_SHA} (verification.tests: ci)`,
       state: 'ready',
+      // PAN-4540: a gate refusal ran no merge, so auto-merge records it as blocked.
+      refused: true,
     });
     expect(mocks.setMergeRun).not.toHaveBeenCalled();
     expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
@@ -422,9 +426,29 @@ describe('triggerMerge server rebase escalation', () => {
 
     const result = await triggerMerge('PAN-3110');
 
-    expect(result).toEqual(expect.objectContaining({ success: false, statusCode: 409 }));
+    // PAN-4540: no merge ran, so auto-merge blocks the row and re-arms it once CI is green.
+    expect(result).toEqual(expect.objectContaining({ success: false, statusCode: 409, refused: true }));
     expect(result).not.toHaveProperty('retryable');
     expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
     expect(mocks.setMergeRun).toHaveBeenCalledWith('PAN-3110', expect.objectContaining({ phase: 'failed' }));
+  });
+
+  it('defers, never fails, a merge call while a merge of the same issue is already running (PAN-4540)', async () => {
+    mocks.getMergeRun.mockReturnValueOnce({ phase: 'merging' });
+    mocks.getPendingOperation.mockReturnValueOnce({ type: 'merge', status: 'running' });
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual(expect.objectContaining({ success: false, outcome: 'merging', deferred: true }));
+    expect(mocks.evaluateIssueMergeGate).not.toHaveBeenCalled();
+  });
+
+  it('refuses a CONFLICTING PR before any merge command, as a refusal (PAN-4540)', async () => {
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState({ mergeable: false, mergeableState: 'dirty' }));
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual(expect.objectContaining({ success: false, statusCode: 409, refused: true }));
+    expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
   });
 });

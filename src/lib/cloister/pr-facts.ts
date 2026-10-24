@@ -19,6 +19,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from '../gitlab-merge-requests.js';
+import { bumpIssuePrTabCacheGeneration } from '../../dashboard/server/services/pr-tab-cache.js';
 import { fetchIssuePullRequest, type IssuePullRequestData } from '../overdeck/pull-requests.js';
 import { resolveProjectReposForIssue, type ResolvedProjectRepo } from '../project-repos.js';
 import { approvalProvenAtHead, recordReadApprovalAtHead } from './approval-at-head.js';
@@ -35,10 +36,12 @@ import {
   type ReadAuthorKinds,
   type TrustedAuthors,
 } from './forge-identity.js';
+import type { GitLabMrApprovals, GitLabMrView } from './gitlab-mr-types.js';
 import { parseUatVerdict } from './uat-verdict-marker.js';
 import { isCiTestRollupCheck } from './verification-tests-mode.js';
 
 export type { ForgeAuthor, ReadAuthorKinds, TrustedAuthors } from './forge-identity.js';
+export type { GitLabMrApprovals, GitLabMrView } from './gitlab-mr-types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -162,35 +165,11 @@ export interface PrFactsOptions {
    * `strike/<issue>`), so an open feature PR cannot stand in for it.
    */
   preferBranch?: string;
-}
-
-export interface GitLabMrView {
-  iid?: number;
-  state?: string;
-  draft?: boolean;
-  web_url?: string;
-  sha?: string;
-  source_branch?: string;
-  detailed_merge_status?: string;
-  merge_status?: string;
-  has_conflicts?: boolean;
-  approvals_before_merge?: number | null;
-  head_pipeline?: { status?: string } | null;
-  pipeline?: { status?: string } | null;
-}
-
-/**
- * #4066 review: what GitLab's `/merge_requests/:iid/approvals` endpoint
- * reports. `glab mr view -F json` carries no approval at all, and the
- * endpoint's own `approved` is true whenever the project requires no approvals
- * (`approvals_required: 0`, as the MYN backend does), so only `approved_by`,
- * which `glab mr approve` fills, is evidence someone approved the MR.
- */
-export interface GitLabMrApprovals {
-  approved?: boolean;
-  approvals_required?: number;
-  approvals_left?: number;
-  approved_by?: ReadonlyArray<{ user?: { username?: string | null } | null }> | null;
+  /**
+   * PAN-4540: skip both caches (this module's and the PR tab's under
+   * `fetchIssuePullRequest`); the fresh answer still refreshes them.
+   */
+  fresh?: boolean;
 }
 
 /**
@@ -612,7 +591,7 @@ export async function getPrFacts(
 ): Promise<PrFacts> {
   const cacheable = Object.keys(deps).length === 0 && !options.preferBranch;
   const key = issueId.toUpperCase();
-  if (cacheable) {
+  if (cacheable && !options.fresh) {
     const hit = prFactsCache.get(key);
     if (hit && Date.now() - hit.at < PR_FACTS_TTL_MS) return hit.facts;
   }
@@ -678,6 +657,7 @@ async function trustedAuthorsFor(pr: IssuePullRequestData, deps: PrFactsDeps): P
 
 async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsOptions = {}): Promise<PrFacts> {
   const fetchGitHubPr = deps.fetchGitHubPr ?? fetchIssuePullRequest;
+  if (options.fresh) bumpIssuePrTabCacheGeneration(issueId);
   try {
     const gh = await fetchGitHubPr(issueId, options.preferBranch ? { preferBranch: options.preferBranch } : {});
     if (gh.pr) {
@@ -949,7 +929,11 @@ export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPol
   if (facts.draft) return { ready: false, reason: 'PR is a draft' };
   if (facts.changesRequested) return { ready: false, reason: 'latest review requested changes' };
   if (policy.requireApprovalAtHead && facts.forge === 'github') {
-    if (!approvalProvenAtHead(facts)) {
+    // PAN-4540: the reviews are read only for a green, mergeable PR
+    // (withForgeApprovalAtHead), so an unproven approval on any other PR is a
+    // missing read, not a missing review. Let the checks and mergeability
+    // below give the real reason; neither lets such a PR through.
+    if (!approvalProvenAtHead(facts) && facts.checks === 'green' && facts.mergeable === true) {
       return {
         ready: false,
         reason: `PR is not approved at PR HEAD ${head} (needs a review approving that commit)`,

@@ -4,6 +4,7 @@ import {
   markBlocked,
   markFailed,
   markMerged,
+  markMergeRefused,
   markMergeRetriesExhausted,
   requeueToPending,
   transitionToMerging,
@@ -55,6 +56,8 @@ interface MergeResult {
   outcome?: string;
   retryable?: boolean;
   deferred?: boolean;
+  /** PAN-4540: the merge gate inside `triggerMerge` refused; no merge ran. */
+  refused?: boolean;
 }
 
 export interface AutoMergeExecutorDeps {
@@ -68,6 +71,8 @@ export interface AutoMergeExecutorDeps {
   hasPendingDeploy?: () => Promise<boolean>;
   transition?: (id: number) => boolean;
   markBlocked?: (id: number, reason: string) => boolean;
+  /** PAN-4540: a `merging` row whose merge the gate inside triggerMerge refused. */
+  markRefused?: (id: number, reason: string) => boolean;
   markMergeRetriesExhausted?: (id: number, reason: string) => boolean;
   markMerged?: (id: number) => boolean;
   markFailed?: (id: number, reason: string) => boolean;
@@ -257,6 +262,16 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
       }
 
       const reason = failureReason(result);
+      // PAN-4540: `failed` means a merge command ran and failed, and a failed
+      // row is never re-armed at the same head. A gate refusal inside
+      // triggerMerge ran nothing, so it is `blocked`, which the scheduler
+      // re-arms once the gate passes again.
+      if (result.refused) {
+        if (!(deps.markRefused ?? markMergeRefused)(entry.id, `${entry.issueId} is not ready to merge: ${reason}`)) {
+          log(`[auto-merge] lost block race for refused merge of ${entry.issueId} (#${entry.id}), skipping`);
+        }
+        continue;
+      }
       if (result.deferred) {
         const retryAt = new Date(nowDate.getTime() + REQUEUE_BACKOFF_MS).toISOString();
         const requeued = (deps.requeueToPending ?? requeueToPending)(entry.id, retryAt);

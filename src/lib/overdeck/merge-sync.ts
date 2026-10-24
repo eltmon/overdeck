@@ -204,6 +204,20 @@ export function markBlocked(id: number, reason: string): boolean {
 }
 
 /**
+ * PAN-4540: block an in-progress auto-merge whose merge the gate inside
+ * `triggerMerge` refused before any merge command ran. `blocked`, not
+ * `failed`: nothing was attempted, so the scheduler re-arms the row once the
+ * gate passes again.
+ */
+export function markMergeRefused(id: number, reason: string): boolean {
+  const db = getOverdeckDatabase();
+  const result = db.prepare(
+    "UPDATE pending_auto_merges SET status = 'blocked', failure_reason = ? WHERE id = ? AND status = 'merging'",
+  ).run(truncateReason(reason), id);
+  return result.changes === 1;
+}
+
+/**
  * Atomically stop an in-progress auto-merge after its retry circuit breaker
  * opens. `failed`, not `blocked` (#3983): the merge was attempted and failed at
  * this head, so the scheduler must not re-arm it until the head changes;

@@ -1,0 +1,7 @@
+plan-digest: c5d5bd2751ac5586735563c4e0c33f848e5ced426975f0484e93952745045bfc
+
+## blocks-the-design: Later pre-merge refusals still strand the same head
+
+The plan handles only `forgeMergeGate`'s refusal at `merge-ops.ts:281`. After that gate passes, `triggerMerge` performs another PR-state check at `src/dashboard/server/routes/workspaces/merge-ops.ts:798-833`. If checks turn red between the reads, line 818 returns `success: false` before any merge command runs, without `refused`, `deferred`, or `retryable`. The executor then calls `markFailed` at `src/dashboard/server/services/auto-merge-executor.ts:264-305`; `latestAutoMergeAllowsSchedule` returns false for a failed row at the same head (`src/dashboard/server/services/auto-merge-scheduler.ts:146-156`). A check rerun can turn green at that same head, yet the PR remains stranded. The later `mergeTargetRefusal` at `merge-ops.ts:793-794` and `automaticMergeStartRefusal` at `merge-ops.ts:862-866` also return unflagged pre-merge failures. This contradicts the PRD's definition of `failed` and the proposed documentation's claim that it means a merge command ran.
+
+Classify recoverable refusals throughout `triggerMerge`'s pre-command path so the executor blocks and re-arms them, while keeping deliberately terminal conditions terminal. Add an executor-level test using one of these later return paths, and revise the `failed`/`blocked` wording to match the resulting behavior.
