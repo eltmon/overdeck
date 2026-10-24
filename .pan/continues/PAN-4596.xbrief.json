@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4596",
+  "created": "2026-10-24T08:38:08.714Z",
+  "updated": "2026-10-24T08:38:08.715Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "kickoff-get-focus": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4596",
+      "claimedAt": "2026-10-24T08:38:08.714Z"
+    }
+  }
+}
