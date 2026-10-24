@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4609",
   "created": "2026-10-24T10:37:57.966Z",
-  "updated": "2026-10-24T10:57:31.187Z",
+  "updated": "2026-10-24T10:57:49.781Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "w6-configuration-md.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T10:57:31.186Z"
+    },
+    "w7-merge-verify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:57:49.781Z"
     }
   }
 }
