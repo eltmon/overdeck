@@ -18,6 +18,7 @@ import { Effect } from 'effect';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { resolveVerificationTestsModeDecision, selectLocalVerificationGates } from './verification-tests-mode.js';
 import {
+  markRunningVerificationArtifactSkipped,
   readVerificationArtifact,
   verificationArtifactPath,
   writeVerificationArtifact,
@@ -57,6 +58,7 @@ import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 import { snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
 import { primaryShaFromAnchor } from './verified-head.js';
+import { createDecidedStopCheck, readVerifiedHead, readWorkspaceHeadShort } from './verification-decided-stop.js';
 
 const execAsync = promisify(exec);
 
@@ -253,16 +255,6 @@ export async function workspaceChangesetHasContent(
   return diffFailed ? undefined : false;
 }
 
-/** The workspace's current HEAD, eight chars, or undefined when git cannot say. */
-async function readWorkspaceHeadShort(workspacePath: string): Promise<string | undefined> {
-  try {
-    const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 10_000 });
-    return stdout.trim() || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * FR-8: report the run as an `overdeck/verification` check run where the GitHub
  * App is installed. Non-fatal — the workspace artifact is the primary record.
@@ -346,7 +338,8 @@ export async function runVerificationForIssueInProcess(
     // PAN-3906: the head a test-skip waiver is pinned to. Snapshotted BEFORE the
     // sync below, which merges `origin/<target>` in and moves HEAD — that would
     // expire a waiver the operator just recorded. The gate diff is three-dot.
-    const testSkipHead = await snapshotWorkspaceHeads(issueId, workspacePath);
+    // PAN-4527: it is also the launch head later heads are classified against.
+    const launchHead = await snapshotWorkspaceHeads(issueId, workspacePath);
 
     // === Sync target branch ===
     if (options.syncTargetBranch !== false) {
@@ -471,9 +464,18 @@ export async function runVerificationForIssueInProcess(
       );
     }
 
+    // PAN-4531: a decided run (merged, superseded, CI red) starts no further gate.
+    const decided = createDecidedStopCheck({
+      issueId, workspacePath, logPrefix, repoRoots, launchHead, launchHeadShort: headShort, testsMode,
+      checkSuperseded: options.syncTargetBranch !== false,
+    });
+    const decidedBeforeGates = await decided.isDecided();
+
     // Install dependencies for monorepo workspaces.
     // Polyrepo workspaces manage deps per-repo via quality gate commands or containers.
-    if (!isPolyrepo) {
+    if (decidedBeforeGates) {
+      console.log(`[${logPrefix}] Outcome for ${issueId} already decided (${decided.stop!.kind}) — running no local gate`);
+    } else if (!isPolyrepo) {
       const packageManager = projectConfig?.package_manager || 'npm';
       const installCmd = packageManager === 'bun' ? 'bun install' : `${packageManager} install`;
       try {
@@ -526,15 +528,16 @@ export async function runVerificationForIssueInProcess(
     // repository root and violations aggregate, so a skipped test in a secondary
     // repo cannot slip past it.
     const testSkipStart = Date.now();
-    const testSkip = await evaluateTestSkipGate(workspacePath, repoRoots, testSkipHead);
+    const testSkip = decidedBeforeGates ? null : await evaluateTestSkipGate(workspacePath, repoRoots, launchHead);
     // PAN-1728: the spec is immutable after planning; a work-agent edit to it fails
     // a required `plan-integrity` check before the quality gates run.
     const planIntegrityStart = Date.now();
-    const planIntegrity = testSkip.failed ? null : await evaluatePlanIntegrityGate(issueId, workspacePath, repoRoots);
+    const planIntegrity = !testSkip || testSkip.failed ? null : await evaluatePlanIntegrityGate(issueId, workspacePath, repoRoots);
 
-    const rawGateResults = !testSkip.failed && !planIntegrity?.failed
+    const rawGateResults = !testSkip ? [] : !testSkip.failed && !planIntegrity?.failed
       ? await runQualityGates(gates, workspacePath, 'pre_push', {
       issueId,
+      shouldStop: () => decided.isDecided(),
       isRemote: workspaceInfo.isRemote,
       vmName: workspaceInfo.vmName,
       placeholders,
@@ -569,23 +572,52 @@ export async function runVerificationForIssueInProcess(
 
     // PAN-3906: an operator override stays visible in the verification artifact
     // even though it let the gate pass.
-    const localGateResults = !testSkip.failed && testSkip.waiverApplied
+    const localGateResults = testSkip && !testSkip.failed && testSkip.waiverApplied
       ? [{ name: 'test-skip', passed: true, required: true, output: testSkip.evidence, durationMs: Date.now() - testSkipStart }, ...rawGateResults]
       : rawGateResults;
+    // PAN-4531: a commit that landed during the last gate is caught here, before
+    // the verdict, rather than producing a verdict for a tree that moved. A
+    // failed gate is checked too: a commit during it supersedes the failure.
+    // Red CI only replaces a clean local run; a local failure keeps its verdict.
+    const localFailed = localGateResults.some((r) => !r.passed && r.required !== false);
+    await decided.isDecided();
+    const decidedStop = decided.stop?.kind === 'ci-red' && localFailed ? undefined : decided.stop;
+    if (decidedStop?.kind === 'merged') return decidedStop.outcome;
+    if (decidedStop?.kind === 'superseded') {
+      const reason = `HEAD moved from ${headShort ?? 'the launch head'} to ${decidedStop.head ?? 'a new commit'} during verification`;
+      try { markRunningVerificationArtifactSkipped(workspacePath, reason); } catch { /* best-effort */ }
+      console.log(`[${logPrefix}] Verification of ${issueId} superseded: ${reason}`);
+      return { outcome: 'deferred', reason, superseded: { from: headShort, to: decidedStop.head } };
+    }
+    const notRun = decidedStop?.kind === 'ci-red'
+      ? Object.entries(gates)
+        .filter(([name, gate]) => (gate.phase || 'pre_push') === 'pre_push' && !localGateResults.some((r) => r.name === name))
+        .map(([name]) => name)
+      : [];
+    if (notRun.length > 0) {
+      console.log(`[${logPrefix}] CI test job already red for ${issueId} — local gates not run: ${notRun.join(', ')}`);
+    }
+
     // PAN-3965: in `ci` mode the test gate's verdict for this head is the CI
     // test job. When it is already known red, re-requesting review on the same
     // head fails `test` again instead of passing on typecheck+lint alone — so a
     // resubmit without a fix counts against the attempt budget as it always did.
-    const ciTestRed = testsMode === 'ci'
+    // PAN-4527: the verdict is for the head being verified now. The worker's own
+    // sync merge keeps the launch head (CI never sees that local merge commit);
+    // an agent commit since launch makes the new commit the verified head.
+    const verifiedHeadShort = testsMode === 'ci'
+      ? (await readVerifiedHead(repoRoots, launchHead, headShort, issueId, workspacePath)).short
+      : headShort;
+    const ciTestRed = decidedStop?.kind === 'ci-red' || (testsMode === 'ci'
       && !localGateResults.some((r) => !r.passed && r.required !== false)
-      && readLatestCiTestResult(workspacePath, headShort) === 'failed';
+      && readLatestCiTestResult(workspacePath, verifiedHeadShort) === 'failed');
     const gateResults = ciTestRed
       ? [...localGateResults, {
         name: 'test',
         passed: false,
         required: true,
         durationMs: 0,
-        output: `The CI test job already failed on this head (${headShort}). Fix it and push a new commit; see .pan/feedback/ for the CI failure details.`,
+        output: `The CI test job already failed on this head (${verifiedHeadShort}). Fix it and push a new commit; see .pan/feedback/ for the CI failure details.`,
       }]
       : localGateResults;
 
@@ -638,6 +670,7 @@ export async function runVerificationForIssueInProcess(
         ranAt: runStartedAt,
         ...(head8 ? { head8 } : {}),
         ...artifactExtras,
+        ...(notRun.length > 0 ? { notRun } : {}),
       });
       runArtifactPath = finalArtifact.path;
     } catch (artifactErr: any) {

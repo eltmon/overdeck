@@ -1,0 +1,145 @@
+{
+  "version": "1",
+  "issueId": "PAN-4546",
+  "created": "2026-10-24T10:44:02.967Z",
+  "updated": "2026-10-24T11:22:11.631Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "admission-ticket-durability": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4546",
+      "claimedAt": "2026-10-24T10:44:02.967Z",
+      "doneAt": "2026-10-24T10:50:28.682Z"
+    },
+    "config-quality-gate-slots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4546",
+      "claimedAt": "2026-10-24T10:50:48.916Z",
+      "doneAt": "2026-10-24T10:54:36.770Z"
+    },
+    "admission-n-slots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4546",
+      "claimedAt": "2026-10-24T10:54:39.181Z",
+      "doneAt": "2026-10-24T10:57:56.706Z"
+    },
+    "admission-config-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4546",
+      "claimedAt": "2026-10-24T10:58:17.691Z",
+      "doneAt": "2026-10-24T11:09:01.753Z"
+    },
+    "runaway-patrol-all-slot-owners": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4546",
+      "claimedAt": "2026-10-24T11:09:04.003Z",
+      "doneAt": "2026-10-24T11:10:31.451Z"
+    },
+    "docs-quality-gate-slots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4546",
+      "claimedAt": "2026-10-24T11:10:33.830Z",
+      "doneAt": "2026-10-24T11:11:10.911Z"
+    },
+    "admission-ticket-durability.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:15:07.675Z"
+    },
+    "admission-ticket-durability.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:15:25.855Z"
+    },
+    "admission-ticket-durability.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:15:45.565Z"
+    },
+    "admission-ticket-durability.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:16:07.513Z"
+    },
+    "config-quality-gate-slots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:16:29.472Z"
+    },
+    "config-quality-gate-slots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:16:49.031Z"
+    },
+    "config-quality-gate-slots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:17:07.989Z"
+    },
+    "config-quality-gate-slots.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:17:25.591Z"
+    },
+    "admission-n-slots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:17:43.290Z"
+    },
+    "admission-n-slots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:18:01.102Z"
+    },
+    "admission-n-slots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:18:18.116Z"
+    },
+    "admission-n-slots.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:18:35.230Z"
+    },
+    "admission-n-slots.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:18:53.495Z"
+    },
+    "admission-n-slots.ac6": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:19:10.107Z"
+    },
+    "admission-config-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:19:26.887Z"
+    },
+    "admission-config-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:19:44.490Z"
+    },
+    "admission-config-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:20:02.257Z"
+    },
+    "runaway-patrol-all-slot-owners.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:20:20.863Z"
+    },
+    "runaway-patrol-all-slot-owners.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:20:38.949Z"
+    },
+    "runaway-patrol-all-slot-owners.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:20:58.527Z"
+    },
+    "docs-quality-gate-slots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:21:16.283Z"
+    },
+    "docs-quality-gate-slots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:21:35.729Z"
+    },
+    "docs-quality-gate-slots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:21:53.998Z"
+    },
+    "docs-quality-gate-slots.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:22:11.631Z"
+    }
+  }
+}

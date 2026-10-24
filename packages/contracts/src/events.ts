@@ -59,7 +59,8 @@ export type BeadsFreshnessChangedEvent = typeof BeadsFreshnessChangedEvent.Type
  * (PAN-3537).
  *
  * Emitted by the `check_suite` webhook handler for live updates, only after an
- * independent branch-head lookup verifies the payload SHA is still current.
+ * independent lookup verifies the payload SHA is still the current CI head
+ * (the newest push run of the CI workflow, PAN-4618).
  * `suiteId` is the check suite id — for GitHub Actions that is one suite per
  * workflow run. The webhook payload does not carry `htmlUrl`.
  *
@@ -82,17 +83,18 @@ export const ProjectCiSuiteObservedEvent = Schema.Struct({
     conclusion: Schema.NullOr(Schema.String),
     htmlUrl: Schema.optional(Schema.String),
     observedAt: Schema.String,
-    /** True only after the emitter verified headSha against the branch head. */
+    /** True only after the emitter verified headSha against the current CI head. */
     authoritativeHead: Schema.optional(Schema.Boolean),
   }),
 })
 export type ProjectCiSuiteObservedEvent = typeof ProjectCiSuiteObservedEvent.Type
 
 /**
- * Complete GitHub Actions projection for the verified default-branch head.
- * The REST seed/repair emits one event after paginating every run and verifying
- * the branch head a second time. An empty suites record explicitly clears stale
- * CI when the current commit has no Actions runs.
+ * Complete GitHub Actions projection for the verified current CI head (the
+ * newest push run of the CI workflow, PAN-4618). The REST seed/repair emits
+ * one event after paginating every run and verifying the CI head a second
+ * time. An empty suites record explicitly clears stale CI when the current
+ * commit has no Actions runs.
  */
 export const ProjectCiHeadObservedEvent = Schema.Struct({
   type: Schema.Literal("project.ci_head_observed"),

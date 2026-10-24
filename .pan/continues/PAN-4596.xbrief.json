@@ -1,0 +1,168 @@
+{
+  "version": "1",
+  "issueId": "PAN-4596",
+  "created": "2026-10-24T08:38:08.714Z",
+  "updated": "2026-10-24T10:51:40.528Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-24T10:51Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-10-24T10:51:40.528Z"
+    }
+  ],
+  "items": {
+    "kickoff-get-focus": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4596",
+      "claimedAt": "2026-10-24T08:38:08.714Z",
+      "doneAt": "2026-10-24T08:39:38.527Z"
+    },
+    "held-handoff-view": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4596",
+      "claimedAt": "2026-10-24T08:39:45.420Z",
+      "doneAt": "2026-10-24T08:45:22.430Z"
+    },
+    "panel-held-branch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4596",
+      "claimedAt": "2026-10-24T08:45:29.831Z",
+      "doneAt": "2026-10-24T08:56:08.756Z"
+    },
+    "feed-held-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4596",
+      "claimedAt": "2026-10-24T08:56:17.293Z",
+      "doneAt": "2026-10-24T09:00:12.654Z"
+    },
+    "needs-you-held-kind": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4596",
+      "claimedAt": "2026-10-24T09:00:22.186Z",
+      "doneAt": "2026-10-24T09:11:01.403Z"
+    },
+    "docs-held-handoff": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4596",
+      "claimedAt": "2026-10-24T09:11:08.384Z",
+      "doneAt": "2026-10-24T09:11:56.714Z"
+    },
+    "kickoff-get-focus.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:29:27.289Z"
+    },
+    "kickoff-get-focus.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:29:40.791Z"
+    },
+    "kickoff-get-focus.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:29:53.850Z"
+    },
+    "held-handoff-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:30:07.051Z"
+    },
+    "held-handoff-view.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:30:21.530Z"
+    },
+    "held-handoff-view.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:30:35.811Z"
+    },
+    "held-handoff-view.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:30:51.556Z"
+    },
+    "held-handoff-view.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:31:04.630Z"
+    },
+    "panel-held-branch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:31:17.252Z"
+    },
+    "panel-held-branch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:31:31.478Z"
+    },
+    "panel-held-branch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:31:47.716Z"
+    },
+    "panel-held-branch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:32:00.851Z"
+    },
+    "panel-held-branch.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:32:15.523Z"
+    },
+    "panel-held-branch.ac6": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:32:30.054Z"
+    },
+    "feed-held-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:32:44.826Z"
+    },
+    "feed-held-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:33:00.784Z"
+    },
+    "feed-held-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:33:15.551Z"
+    },
+    "feed-held-rows.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:33:30.221Z"
+    },
+    "needs-you-held-kind.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:33:46.399Z"
+    },
+    "needs-you-held-kind.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:34:01.840Z"
+    },
+    "needs-you-held-kind.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:34:16.430Z"
+    },
+    "needs-you-held-kind.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:34:31.609Z"
+    },
+    "needs-you-held-kind.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:34:47.011Z"
+    },
+    "docs-held-handoff.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:35:02.841Z"
+    },
+    "docs-held-handoff.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:35:19.428Z"
+    },
+    "docs-held-handoff.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:35:35.345Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-10-24T10:51:40Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4596\n\n# Review — PAN-4596\n## Verdict: CHANGES REQUESTED — after a successful Start, the \"Starting…\" placeholder latches and replaces the transcript and Resume once the session ends again\n\n## Context\n- Run ID: agent-pan-4596-review-360b37f8\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4596/.pan/review/agent-pan-4596-review-360b37f8/context.json\n- Branch / workspace: feature/pan-4596 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4596\n- PR: https://github.com/eltmon/overdeck/pull/4606\n- HEAD reviewed: 360b37f83fe7ef1c8cbc328876917e246018ef1d\n- Base / prior cycle SHA: merge-base c4a434cf03920fb6b4e46c0d6cc0a09c9b13b848; no prior review cycle\n\n## Blocking Findings\n\n### [correctness] `kickoffStartPending` is never cleared, so a successfully started held conversation shows \"Starting…\" after its session ends, until the view remounts — `src/dashboard/frontend/src/components/chat/ConversationPanel.tsx:1285`\n- Severity: ! MUST\n- Classification / requirement scope: implementation defect; in_pr_scope. It diverges from the PRD: WI-3 step 1 calls for an effect that clears the pending flag \"once the server shows the start (forkStatus set, session alive) or the hold comes back after a failure\". The implementation replaced that with a derived value and no reset.\n- Trigger and changed-code connection:\n  - `kickoffStartedFrom` is set only in `HeldHandoffView`'s `onStarted` (line 1379), to `{ name, forkStatus: conversation.forkStatus ?? null }`. Nothing ever sets it back to `null`; `grep setKickoffStartedFrom` finds only that one call.\n  - `kickoffStartPending` (line 1286) is `kickoffStartedFrom.name === conversation.name && kickoffStartedFrom.forkStatus === (conversation.forkStatus ?? null) && !conversation.sessionAlive && !(isForkFailed && heldKickoff.held)`.\n  - A held row's `forkStatus` is `null` before the first Start. The door sets `'spawning'` (`src/lib/overdeck/conversation-kickoff.ts` `startHeldKickoff`). On a successful delivery `deliverForkSeed` calls `updateForkStatus(conv.name, null)` (`src/lib/overdeck/conversation-forks.ts`, the end of `deliverForkSeed`). So after success, `forkStatus` returns to `null` and again equals the recorded `null`.\n  - While the session is alive, `!conversation.sessionAlive` keeps the flag false. When the session later ends (operator Stop, crash, reboot, idle end), `sessionAlive` goes false and `kickoffStartPending` becomes **true** again.\n  - `ConversationView` is not keyed by conversation name in the main mounts (`SessionPanel.tsx`, `WorkspaceView.tsx`, `AgentPane.tsx`). The state survives conversation switches, and the name check matches again when the operator returns to the conversation.\n- Expected / observed / impact:\n  - Expected: an ended conversation that was started through the held view and then did work shows its transcript timeline and the Resume Session controls. This is the baseline behavior for every ended conversation with history, and the PRD's non-goal 2 says that behavior stays.\n  - Observed (static trace): the render chain's `isSpawning || kickoffStartPending` branch (line 1352) comes before the timeline branch and is not gated on `hasTimelineActivity`. So the panel shows the spinner \"Starting… / Waiting for the session to start.\" in place of the whole transcript. The tail condition `isOrphaned || isHeldUnsent || heldLookupPending || heldLookupFailed || kickoffStartPending ? null : …` (line 1477) also removes the Resume controls. `isOrphaned` is false as well.\n  - Impact: this hits the feature's own primary path (Start from the held view → the agent works → the session ends). The operator loses sight of the agent's transcript and cannot resume until a page reload or a component remount. The only signal is a misleading \"Starting…\" spinner.\n- Evidence: static trace of the current HEAD code, cited above. Mount check: `ConversationPanel` renders `<ConversationView>` under `(effectiveViewMode === 'conversation' || !showTerminal) && !selectedSubagent` (line ~1025), with `showTerminal = conversation.sessionAlive || resumedAwaitingConfirm` (line 665). In the default conversation (transcript) view mode, `ConversationView` therefore stays mounted from Start through alive to ended, and the latched state survives. If the operator watched in terminal mode while the session was alive, the session end remounts `ConversationView` and resets the state, so that narrower path does not latch. The latch lasts until a remount (page reload, a view toggle that unmounts it, or a parent remount); it is not literally permanent. I tried a runtime probe (a temporary copy of `ConversationPanel.test.tsx` that does Start → rerender `sessionAlive: true, forkStatus: null` → rerender ended with `forkStatus: null`, then asserts on \"Waiting for the session to start.\" and Resume). It could not run in this workspace: the frontend vitest config's `ensureFrontendNodeModules` fails with `EEXIST` on a dangling `src/dashboard/frontend/node_modules/@dnd-kit/core` link to a nonexistent `.bun/@dnd-kit+core@6.3.1+6dbf9a050bc9aadb` store path. That is an environment problem, not part of this PR. I deleted the probe file, and the worktree is clean apart from the pre-existing `.pan/continues` change. The existing test \"Start POSTs the kickoff door…\" and the failed-start test do not cover success followed by a later end.\n- Fix: clear `kickoffStartedFrom` once the start is observed, as the PRD specified. For example, add an effect that sets it to `null` when `(conversation.forkStatus ?? null) !== kickoffStartedFrom.forkStatus`, when `conversation.sessionAlive` is true, or when `isForkFailed && heldKickoff.held`. Also gate `kickoffStartPending` on `!hasTimelineActivity` as a guard. Add a panel test: Start → rerender alive with `forkStatus: null` → rerender ended with `forkStatus: null` and timeline content (or at least an empty transcript). Assert that \"Waiting for the session to start.\" is absent and that Resume Session (or the timeline) renders.\n\n## Non-blocking Findings\n- **Stub UI finding is a false positive.** In `HeldHandoffView.tsx:38`, `starting` is written by `setStarting(true)` / `setStarting(false)` in `handleStart`, so it is a live in-flight flag.\n- **~ Performance, advisory.** `getConversationsPendingInputFeed` now runs `listHeldKickoffNames()` on each call. That query (`SELECT name FROM conversations WHERE held_kickoff IS NOT NULL AND archived_at IS NULL`) is a synchronous better-sqlite3 scan with no index on `held_kickoff`, and each dashboard client polls the feed every 5 s. At today's table sizes (thousands of rows) the cost is bounded, it matches the sibling store queries, and there is no child process, so it is not blocking. A partial index would make the cost constant if the table grows.\n- **? Polling scope, advisory.** `useHeldKickoff(name, { enabled: !sessionAlive, pollAlways: true })` polls every 5 s for *every* open ended conversation, including ones with long history that can never render the held view (`heldLookupOpen` requires `!hasTimelineActivity`). NFR-1 explicitly accepts this cost. Passing `enabled: !sessionAlive && !hasTimelineActivity` (or something similar) would remove the polling for history-bearing conversations.\n- **Spec note: stranded delivery (critique-2 \"sharpens-framing\").** When `deliverForkSeed` returns `'stranded'`, it marks the fork `failed` without restoring the hold. The session is alive in that case, so the panel takes the normal live/fork-progress path and does not latch. This behavior is acceptable. The docs' sentence \"After a failed Start the door restores the hold\" is true only for thrown failures, which is a minor docs imprecision.\n- **Behavior change for `ComposerFooter` (positive).** A non-OK kickoff GET after a successful one now keeps the last known `held: true` instead of flipping to `held: false`, so a transient failure no longer lets the composer send outside the door.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| src/dashboard/server/routes/conversation-kickoff.ts | reviewed — GET adds `focus`; POST unchanged (non-goal 3 respected) |\n| src/lib/overdeck/conversation-kickoff-store.ts | reviewed — `listHeldKickoffNames`, `heldKickoffFocus` (pure, safe JSON parse) |\n| src/lib/overdeck/conversation-reads.ts | reviewed — held merge after the scan; superseded filter; no `pendingInputKinds`; 982 lines ≤ 1000 |\n| src/dashboard/frontend/src/components/chat/heldKickoff.tsx | reviewed — keyed snapshot fixes the conversation-switch leak (critique-2 #2); loading/ready/error status; `enabled`/`pollAlways` |\n| src/dashboard/frontend/src/components/chat/HeldHandoffView.tsx | reviewed — view, Start/Archive, no Resume, lookup-failed view |\n| src/dashboard/frontend/src/components/chat/ConversationPanel.tsx | reviewed — **blocking finding above**; `heldLookupOpen` gated on `!hasTimelineActivity` (critique-2 #1 resolved); 1516 lines ≤ 1531 cap |\n| src/dashboard/frontend/src/components/DecisionsPanel.tsx | reviewed — held-only Open, no Answer; mixed rows unchanged |\n| src/dashboard/frontend/src/lib/pendingInput.ts | reviewed — kind + label |\n| src/dashboard/frontend/src/lib/useDecisions.ts | reviewed — kind derivation, `since` fallback, focus; not in BLOCKING_KINDS |\n| package.json | reviewed — adds heldKickoff/HeldHandoffView/ConversationPanel tests to `test:frontend-subset` (run in CI) |\n| src/dashboard/server/routes/__tests__/conversation-kickoff-route.test.ts | reviewed |\n| src/lib/overdeck/__tests__/conversation-kickoff-store.test.ts | reviewed |\n| src/lib/overdeck/__tests__/conversation-pending-feed-held-kickoff.test.ts | reviewed |\n| src/lib/overdeck/__tests__/conversation-pending-feed-clear-chain.test.ts | reviewed — store mocked |\n| src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx | reviewed — missing the success-then-end case |\n| src/dashboard/frontend/src/components/chat/__tests__/HeldHandoffView.test.tsx | reviewed |\n| src/dashboard/frontend/src/components/chat/__tests__/heldKickoff.test.tsx | reviewed |\n| src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx | reviewed |\n| src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts | reviewed |\n| docs/FORKS.md, docs/DASHBOARD-ARCHITECTURE.md, features/conversations.mdx, .overdeck/context/codebase/architecture.md | reviewed — accurate apart from the stranded-delivery imprecision |\n| .pan/drafts/PAN-4596*.md, .pan/continues/*, xbrief json | not applicable — planning artifacts; read for requirements |\n\nNote: the PRD lists `conversation-permission-feed.test.ts` for a store mock. It is not in the diff, but CI test shards pass on HEAD, so either the file does not reach the store or it is unaffected.\n\n### Dimensions\n- **Correctness:** one blocker (above). The critique-2 blockers (lookup failure removing Resume from saved conversations; a switch showing the previous kickoff) are resolved by `heldLookupOpen`'s `!hasTimelineActivity` gate and by the keyed snapshot in `useHeldKickoff`. The failed-Start → restored-hold path is traced and tested.\n- **Security:** no new trust boundary. GET still sits behind the existing dashboard auth gates and adds only `focus`, a subset of the already-returned `fork_request` data. Focus and kickoff text render as React text (escaped). The handoff-doc URL uses `encodeURIComponent`, and `window.open` passes `noopener,noreferrer`.\n- **Performance:** advisory notes only (the feed's held query, polling of ended conversations with history).\n- **Requirements/UX:** see the matrix below. FR-2/FR-4 hold for the held state itself, but the post-Start lifecycle breaks the baseline Resume/timeline behavior (blocker).\n\n### AC matrix\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 (WI-1 route/store tests) | met | Tests present (focus, no focus, ended POST → `ensureForkSessionReady(…, false)`); CI test-shard 1–4 pass on 360b37f8 |\n| AC-2 (WI-2 view + hook tests) | met | HeldHandoffView/heldKickoff tests in `test:frontend-subset`; CI \"Frontend test subset\" step success on 360b37f8 |\n| AC-3 (WI-3 panel cases, file size) | met as written | Listed cases present; CI frontend subset green; 1516 ≤ 1531; CI lint green. The cases miss the success-then-end lifecycle (blocker) |\n| AC-4 (WI-4 feed tests, ≤1000 lines) | met | Feed tests present; 982 lines; CI shards green |\n| AC-5 (WI-5 Needs you) | met | useDecisions/DecisionsPanel tests in the subset; CI green |\n| AC-6 (WI-6 docs grep) | met | grep matches in all three docs + mdx |\n| typecheck + lint | met | `overdeck/test` verification gate (typecheck+lint) pass; CI lint, lint-group core/effect/skills/state pass on 360b37f8 |\n| FR-2 / FR-4 / FR-5 / FR-9 | met for the held/failed/lookup states | Static trace + panel tests |\n| Baseline (non-goal 2: ended + activity keeps timeline + Resume) | **unmet after a successful Start** | Blocking finding |\n\n## Verification\n- `gh pr checks 4606`: every check passes on run 40082616958 (`headSha` 360b37f83fe7…, event pull_request). That covers test-shard 1–4, test-e2e (includes the \"Frontend test subset\" step: success), build (22), lint, lint-group (core/effect/skills/state), Clean install + server smoke, and `overdeck/test` (verification gate: typecheck+lint).\n- `npm run lint:effect-diagnostics`: covered by the CI `lint-group (effect)` job passing on the exact HEAD; not re-run.\n- Runtime probe of the blocker: attempted and not runnable, because of the dangling bun link in this workspace's `src/dashboard/frontend/node_modules` (`EEXIST` from `vitest.config.ts` `ensureFrontendNodeModules`). The probe file was removed. The finding rests on a static trace.\n- I did not run the full suite (per role).\n\n## Scope Note\nThis workspace's `src/dashboard/frontend/node_modules/@dnd-kit/*` (and probably other) links point at nonexistent `.bun/*+<hash>` store directories, so local frontend vitest runs fail at startup with `EEXIST`. CI is unaffected. A `bun install` in the workspace (by the work agent, not the reviewer) should repair it.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4596/.pan/review/agent-pan-4596-review-360b37f8/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4596 -m \"Fixed review issues\"`"
+    }
+  ]
+}

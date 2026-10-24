@@ -193,7 +193,10 @@ only when **all** of these are true:
 - The forge reports CI checks on the PR head, and all of them passed. Pending
   checks, failing checks, and no reported checks each make the PR ineligible.
   When the project runs `verification.tests: ci`, the CI test job must also
-  have run and passed on that head.
+  have run and passed on that head. The test job may be a GitHub Actions
+  check run or a commit status such as a Dagger Cloud check; a Dagger Cloud
+  project must set `verification.tests: ci` in `projects.yaml` explicitly,
+  since commit-status CI cannot be auto-detected.
 - The forge reports the PR as `mergeable` (no merge conflicts, branch
   protection satisfied). A PR whose mergeability the forge has not computed
   yet is not eligible.

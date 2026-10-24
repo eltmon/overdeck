@@ -75,6 +75,17 @@ Every review request goes through one entry point, whether it comes from
 `pan done`, `pan review request`, the dashboard or the PR webhook. The parent
 and all four lanes start together against the PR's current head commit.
 
+### A PR opened outside a pipeline workspace
+
+Reviews run in the issue's pipeline workspace. If a `feature/<issue>` PR was
+pushed from somewhere else, such as a handoff worktree, Overdeck adopts the
+branch into a new pipeline workspace at the PR's head and then starts the
+review. Adoption never pushes, forces or deletes anything. If it cannot adopt
+the branch safely, for example because another worktree still has it checked
+out, the issue shows **Review never started** under Needs you, and
+`pan show <id>` prints the exact fix. After you apply the fix, run
+`pan review request <id>`.
+
 ### Phase 1: Specialized Reviews (Parallel)
 
 Four reviewers run at the same time, each focused on one concern:

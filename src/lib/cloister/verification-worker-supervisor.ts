@@ -1,11 +1,14 @@
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { loadConfigSync } from '../config-yaml/load.js';
 import { getOverdeckHome, packageRoot } from '../paths.js';
 import { snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
+import { classifyWorkspaceVerificationHead, isSameVerificationHead } from './verification-head.js';
 import type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 import { buildVerificationWorkerLaunch, launchVerificationWorker } from './verification-worker-launcher.js';
+
+type SupervisedOptions = Pick<VerificationRunnerOptions, 'syncTargetBranch' | 'skipPlanChecklist'>;
 
 export type WorkerState = {
   runId: string;
@@ -20,6 +23,12 @@ export type WorkerState = {
   systemdUnit?: string;
   currentGate?: string;
   currentAttempt?: number;
+  /** PAN-4532: the door that launched the worker (`request-review`, `review`, `merge-verify`). */
+  logPrefix?: string;
+  /** PAN-4532: the options the worker runs with; a result is adopted only for the same options. */
+  options?: SupervisedOptions;
+  /** PAN-4532: when a waiter took this run's result. A result is consumed at most once. */
+  resultConsumedAt?: string;
 };
 
 const POLL_MS = 250;
@@ -103,6 +112,41 @@ export function isVerificationWorkerActive(issueId: string): boolean {
   return !!state && isProcessAlive(state.pid) && !existsSync(state.resultPath);
 }
 
+/**
+ * PAN-4532: workers launched by `logPrefix` that a restarted dashboard should
+ * re-attach to — still running with no result, or finished with a result no
+ * waiter consumed. An `error` result is never adopted.
+ */
+export function listAdoptableVerificationWorkers(logPrefix: string): WorkerState[] {
+  const root = join(getOverdeckHome(), 'verification-workers');
+  let entries: string[];
+  try {
+    entries = readdirSync(root);
+  } catch {
+    return [];
+  }
+  const adoptable: WorkerState[] = [];
+  for (const entry of entries) {
+    let issueId: unknown;
+    try {
+      issueId = (JSON.parse(readFileSync(join(root, entry, 'state.json'), 'utf8')) as { issueId?: unknown }).issueId;
+    } catch {
+      continue;
+    }
+    if (typeof issueId !== 'string' || safeIssueId(issueId) !== entry) continue;
+    const state = readVerificationWorkerState(issueId);
+    if (!state || state.logPrefix !== logPrefix) continue;
+    const finished = existsSync(state.resultPath);
+    if (!finished && isProcessAlive(state.pid)) {
+      adoptable.push(state);
+    } else if (finished && !state.resultConsumedAt) {
+      const result = readResult(state.resultPath);
+      if (result && result.outcome !== 'error') adoptable.push(state);
+    }
+  }
+  return adoptable;
+}
+
 function writeJsonAtomic(path: string, value: unknown): void {
   const temp = `${path}.${process.pid}.tmp`;
   writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`);
@@ -135,10 +179,42 @@ export function markVerificationWorkerAdmissionPhase(
   });
 }
 
+/**
+ * Record that `runId`'s result has a consumer, unless a newer run replaced the
+ * state. Returns whether the consumption is on disk: adoption uses the result
+ * only then, so a failed write can never let one result dispatch twice.
+ */
+function markResultConsumed(issueId: string, runId: string): boolean {
+  const state = readVerificationWorkerState(issueId);
+  if (!state || state.runId !== runId) return false;
+  try {
+    writeJsonAtomic(statePath(issueId), { ...state, resultConsumedAt: new Date().toISOString() });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readResult(path: string): VerificationRunnerOutcome | null {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as VerificationRunnerOutcome;
+  } catch {
+    return null;
+  }
+}
+
 async function waitForResult(state: WorkerState): Promise<VerificationRunnerOutcome> {
   for (;;) {
     if (existsSync(state.resultPath)) {
-      return JSON.parse(readFileSync(state.resultPath, 'utf8')) as VerificationRunnerOutcome;
+      const result = JSON.parse(readFileSync(state.resultPath, 'utf8')) as VerificationRunnerOutcome;
+      // Fail closed: a result whose consumption is not on disk could be
+      // adopted again after a restart, so this waiter does not use it. The
+      // next request adopts it once the write succeeds. A newer run that
+      // replaced the state owns the issue now, and this result is not adoptable.
+      if (!markResultConsumed(state.issueId, state.runId) && readVerificationWorkerState(state.issueId)?.runId === state.runId) {
+        return { outcome: 'error', message: `Verification worker ${state.pid} finished, but its result could not be recorded as consumed; re-request review to use it` };
+      }
+      return result;
     }
     if (!isProcessAlive(state.pid)) {
       return { outcome: 'error', message: `Verification worker ${state.pid} exited before writing a result` };
@@ -159,24 +235,99 @@ async function waitForResult(state: WorkerState): Promise<VerificationRunnerOutc
 
 const activeSupervisorRuns = new Map<string, Promise<VerificationRunnerOutcome>>();
 
+/**
+ * PAN-4527: is `existing` still verifying `headAnchor`? Review verification
+ * moves HEAD with its own target-branch sync merge, and that still counts as
+ * the launch head; an agent commit since launch does not. Merge verification
+ * never syncs, so only its exact anchor counts.
+ */
+async function workerVerifiesHead(
+  existing: WorkerState,
+  issueId: string,
+  workspacePath: string,
+  headAnchor: HeadAnchor | undefined,
+  options: SupervisedOptions,
+): Promise<boolean> {
+  const relation = await classifyWorkspaceVerificationHead(issueId, workspacePath, existing.headAnchor, headAnchor);
+  return options.syncTargetBranch === false ? relation === 'same' : isSameVerificationHead(relation);
+}
+
+function sameOptions(a: SupervisedOptions | undefined, b: SupervisedOptions): boolean {
+  return (a?.syncTargetBranch !== false) === (b.syncTargetBranch !== false)
+    && !!a?.skipPlanChecklist === !!b.skipPlanChecklist;
+}
+
+/**
+ * PAN-4532: a finished result nobody consumed — its waiter died with the
+ * previous dashboard process — is the answer for the same head, so it is
+ * adopted instead of re-running every gate. An `error` result is not adopted.
+ */
+async function adoptUnconsumedResult(
+  existing: WorkerState,
+  issueId: string,
+  workspacePath: string,
+  headAnchor: HeadAnchor | undefined,
+  options: SupervisedOptions,
+): Promise<VerificationRunnerOutcome | null> {
+  if (existing.resultConsumedAt || existing.workspacePath !== workspacePath || !existsSync(existing.resultPath)) return null;
+  if (!existing.options || !sameOptions(existing.options, options)) return null;
+  const result = readResult(existing.resultPath);
+  if (!result || result.outcome === 'error') return null;
+  if (!await workerVerifiesHead(existing, issueId, workspacePath, headAnchor, options)) return null;
+  // An unrecorded consumption falls back to a fresh run, never a second use.
+  return markResultConsumed(issueId, existing.runId) ? result : null;
+}
+
+/** PAN-4531: fresh workers started for a head that moved under verification, before giving up. */
+const MAX_SUPERSEDED_RESTARTS = 3;
+
+/**
+ * PAN-4531: a run the agent's commit superseded restarts on the new head, so
+ * the waiting door gets the verdict for the head it will push. Past the bound
+ * the door gets a plain `deferred`.
+ */
 async function runSupervisedVerificationInternal(
   issueId: string,
   workspacePath: string,
   workspaceInfo: WorkspaceInfo,
   logPrefix: string,
-  options: Pick<VerificationRunnerOptions, 'syncTargetBranch' | 'skipPlanChecklist'> = {},
+  options: SupervisedOptions = {},
+): Promise<VerificationRunnerOutcome> {
+  let outcome = await runSupervisedVerificationOnce(issueId, workspacePath, workspaceInfo, logPrefix, options);
+  for (let restarts = 0; outcome.outcome === 'deferred' && outcome.superseded; restarts++) {
+    if (restarts >= MAX_SUPERSEDED_RESTARTS) {
+      return {
+        outcome: 'deferred',
+        reason: `${outcome.reason}; the head moved again after ${MAX_SUPERSEDED_RESTARTS} restarts, so verification waits for the next review request`,
+      };
+    }
+    console.log(`[${logPrefix}] ${issueId}: ${outcome.reason} — restarting verification on the new head`);
+    outcome = await runSupervisedVerificationOnce(issueId, workspacePath, workspaceInfo, logPrefix, options);
+  }
+  return outcome;
+}
+
+async function runSupervisedVerificationOnce(
+  issueId: string,
+  workspacePath: string,
+  workspaceInfo: WorkspaceInfo,
+  logPrefix: string,
+  options: SupervisedOptions,
 ): Promise<VerificationRunnerOutcome> {
   const headAnchor = await snapshotWorkspaceHeads(issueId, workspacePath);
   const existing = readVerificationWorkerState(issueId);
+  const adopted = existing ? await adoptUnconsumedResult(existing, issueId, workspacePath, headAnchor, options) : null;
+  if (adopted) {
+    console.log(`[${logPrefix}] Adopting the unconsumed ${adopted.outcome} result of verification worker ${existing!.pid} for ${issueId}`);
+    return adopted;
+  }
   // Never join a worker past its deadline: its result (if it ever lands) is
   // for a stale gate run, and waitForResult would re-fail on the same deadline
   // forever. Kill it and fall through to a fresh worker.
   if (existing && existing.workspacePath === workspacePath && isProcessAlive(existing.pid) && !existsSync(existing.resultPath)) {
     const existingDeadline = verificationWorkerDeadline(existing);
-    // Review verification may legitimately change HEAD while syncing the target
-    // branch. Merge verification disables that sync, so only that path can use
-    // an exact launch-time anchor to decide whether the worker is authoritative.
-    const sameHead = options.syncTargetBranch !== false || existing.headAnchor === headAnchor;
+    // PAN-4527: join only a worker that is still verifying the requested head.
+    const sameHead = await workerVerifiesHead(existing, issueId, workspacePath, headAnchor, options);
     if (sameHead && (existingDeadline === null || Date.now() < existingDeadline)) {
       console.log(`[${logPrefix}] Joining live verification worker ${existing.pid} for ${issueId}`);
       return waitForResult(existing);
@@ -230,6 +381,8 @@ async function runSupervisedVerificationInternal(
     resultPath,
     phase: 'queued',
     admittedAt: null,
+    logPrefix,
+    options,
     ...(headAnchor ? { headAnchor } : {}),
     ...(launch.systemdUnit ? { systemdUnit: launch.systemdUnit } : {}),
   };
@@ -244,7 +397,7 @@ export function runSupervisedVerification(
   workspacePath: string,
   workspaceInfo: WorkspaceInfo,
   logPrefix: string,
-  options: Pick<VerificationRunnerOptions, 'syncTargetBranch' | 'skipPlanChecklist'> = {},
+  options: SupervisedOptions = {},
 ): Promise<VerificationRunnerOutcome> {
   const key = issueId.toUpperCase();
   const active = activeSupervisorRuns.get(key);

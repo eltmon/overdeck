@@ -546,6 +546,50 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     expect(existsSync(verificationArtifactPath(workspacePath))).toBe(false);
   });
 
+  it('names a failing commit-status test check with its link and a Dagger rerun command (PAN-4589)', async () => {
+    (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(makeExecFileMock([
+      { cmd: 'gh', args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main', '--status', 'failure'], stdout: '[]' },
+      { cmd: 'gh', args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'feature/pan-1801', '--status', 'failure'], stdout: '[]' },
+    ]));
+    const readPrFacts = vi.fn(async () => facts({
+      checks: 'red',
+      testChecks: 'red',
+      testCheckFailures: [{
+        name: 'go-client/test',
+        conclusion: 'FAILURE',
+        targetUrl: 'https://dagger.cloud/o/checks/github.com/o/r@abc123def456?check=go-client/test',
+      }],
+    }));
+    const readDefaultBranchFailingTestChecks = vi.fn(async () => new Set<string>());
+
+    await relayCiFailureFeedback(relayOpts, { readPrFacts, readDefaultBranchFailingTestChecks });
+
+    const markdownBody = mockWriteFeedbackFile.mock.calls[0][0].markdownBody as string;
+    expect(markdownBody).toContain('### go-client/test');
+    expect(markdownBody).toContain('https://dagger.cloud/o/checks/github.com/o/r@abc123def456?check=go-client/test');
+    expect(markdownBody).toContain('`dagger check dag://go-client/test`');
+    expect(markdownBody).not.toContain('no failing workflow runs were found');
+  });
+
+  it('names a failing commit-status test check with its link but no Dagger rerun command when the link is not Dagger Cloud (PAN-4589)', async () => {
+    (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(makeExecFileMock([
+      { cmd: 'gh', args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main', '--status', 'failure'], stdout: '[]' },
+      { cmd: 'gh', args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'feature/pan-1801', '--status', 'failure'], stdout: '[]' },
+    ]));
+    const readPrFacts = vi.fn(async () => facts({
+      checks: 'red',
+      testChecks: 'red',
+      testCheckFailures: [{ name: 'go-client/test', conclusion: 'FAILURE', targetUrl: 'https://buildkite.com/o/p/builds/1' }],
+    }));
+    const readDefaultBranchFailingTestChecks = vi.fn(async () => new Set<string>());
+
+    await relayCiFailureFeedback(relayOpts, { readPrFacts, readDefaultBranchFailingTestChecks });
+
+    const markdownBody = mockWriteFeedbackFile.mock.calls[0][0].markdownBody as string;
+    expect(markdownBody).toContain('Details: https://buildkite.com/o/p/builds/1');
+    expect(markdownBody).not.toContain('dagger check');
+  });
+
   it('keeps verification-latest.json as the local gate wrote it through a red then green CI head (review of #3993)', async () => {
     tick();
     writeVerificationArtifact(workspacePath, 'PAN-1801', [

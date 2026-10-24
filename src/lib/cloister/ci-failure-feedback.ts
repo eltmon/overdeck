@@ -22,6 +22,9 @@
  *   failing on the default branch too; relays for one issue run one at a time,
  *   so concurrent webhooks for one red head count it once; and a replayed
  *   report for a head already recorded is never re-delivered.
+ * - PAN-4589: a failing test check reported as a commit status (Dagger Cloud)
+ *   is named with its own link, and a `dagger check dag://<name>` rerun
+ *   command when that link is a Dagger Cloud page.
  */
 
 import { execFile } from 'node:child_process';
@@ -44,7 +47,7 @@ import {
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import { readDefaultBranchFailingTestChecks } from './ci-default-branch-tests.js';
 import { collectCheckRunFailures } from './ci-check-run-failures.js';
-import { resolveVerificationTestsMode, TEST_GATE_NAME } from './verification-tests-mode.js';
+import { isDaggerCloudUrl, resolveVerificationTestsMode, TEST_GATE_NAME } from './verification-tests-mode.js';
 
 function execFilePromise(
   file: string,
@@ -102,6 +105,8 @@ interface CiTestGateFailure {
   escalate: boolean;
   /** The workspace the record goes to; absent when it no longer exists. */
   workspacePath?: string;
+  /** PAN-4589: the failing test checks the PR reported (name, conclusion, link). */
+  failures?: readonly FailedCheck[];
 }
 
 export interface CiFailureFeedbackDeps {
@@ -276,7 +281,7 @@ async function assessCiTestGateFailure(
   }
 
   // The journal and the attempt record die with the workspace; never recreate it.
-  if (!hasWorkspace) return { cycleCount: 1, escalate: false };
+  if (!hasWorkspace) return { cycleCount: 1, escalate: false, failures: facts.testCheckFailures ?? [] };
 
   const perHead = readVerificationCycleState(workspacePath!, head8);
   const streak = readCiTestFailureStreak(workspacePath!);
@@ -285,7 +290,7 @@ async function assessCiTestGateFailure(
   const cycleCount = Math.max(perHeadCount, streakCount);
   const escalate = isFinalVerificationAttempt(streakCount)
     || shouldEscalateVerificationFailure(perHead, TEST_GATE_NAME, perHeadCount);
-  return { cycleCount, escalate, workspacePath: workspacePath! };
+  return { cycleCount, escalate, workspacePath: workspacePath!, failures: facts.testCheckFailures ?? [] };
 }
 
 /**
@@ -527,6 +532,8 @@ function buildFeedbackBody(opts: {
   failures: CiFailure[];
   source: string;
   testGateFailed?: boolean;
+  /** PAN-4589: failing test checks reported as commit statuses (Dagger Cloud). */
+  statusFailures?: readonly FailedCheck[];
 }): string {
   const shortSha = opts.headSha.slice(0, 8);
   const prLine = opts.prUrl
@@ -541,10 +548,20 @@ function buildFeedbackBody(opts: {
       'do not run the full suite locally.\n\n';
   }
 
-  if (opts.failures.length === 0) {
+  const statusFailures = opts.statusFailures ?? [];
+  if (statusFailures.length > 0) {
+    body += `## Failing test checks reported as commit statuses (${statusFailures.length})\n\n`;
+    for (const f of statusFailures) {
+      body += `### ${f.name}\n\nConclusion: ${f.conclusion}  \nDetails: ${f.targetUrl}  \n`;
+      if (isDaggerCloudUrl(f.targetUrl)) body += `Rerun just this check: \`dagger check dag://${f.name}\`\n`;
+      body += '\n';
+    }
+  }
+
+  if (opts.failures.length === 0 && statusFailures.length === 0) {
     body +=
       'GitHub reported a failing CI status, but no failing workflow runs were found for this commit. Check the PR checks page directly.\n\n';
-  } else {
+  } else if (opts.failures.length > 0) {
     body += `## Failing checks (${opts.failures.length})\n\n`;
     for (const f of opts.failures) {
       const inheritedTag = f.inheritedFromMain ? ' [INHERITED FROM MAIN — also failing on main]' : '';
@@ -691,6 +708,9 @@ async function relayCiFailureFeedbackInQueue(
     return { agentMessageSent: false, ...testGateFlag };
   }
 
+  // PAN-4589: a commit-status test check (Dagger Cloud) carries its own link.
+  const statusFailures = (counted?.failures ?? []).filter((f) => f.targetUrl);
+
   const markdownBody = buildFeedbackBody({
     issueId,
     repo: opts.repo,
@@ -700,6 +720,7 @@ async function relayCiFailureFeedbackInQueue(
     failures,
     source: opts.source,
     testGateFailed,
+    statusFailures,
   });
 
   const fileResult = await writeFeedbackFile({
@@ -707,7 +728,7 @@ async function relayCiFailureFeedbackInQueue(
       workspacePath,
       specialist: 'ci-monitor',
       outcome: 'failed',
-      summary: `CI failure: ${failures.map((f) => f.name).join(', ') || opts.source}`.slice(0, 120),
+      summary: `CI failure: ${[...failures.map((f) => f.name), ...statusFailures.map((f) => f.name)].join(', ') || opts.source}`.slice(0, 120),
       markdownBody,
     });
 

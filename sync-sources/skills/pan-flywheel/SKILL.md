@@ -76,6 +76,12 @@ section is how they reach the loop. They bind every tick.
   state file and the report.
 - **Keep `main` green.** A red or unknown `main` is P0: every PR inherits the
   failing check.
+  > Main's CI verdict is the newest `CI` run on `main` that concluded `success` or
+  > `failure`: `gh run list --branch main --workflow CI --limit 20 --json headSha,status,conclusion --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][0]'`.
+  > Queued, in-progress and `cancelled` runs are no verdict (a newer push cancels a
+  > superseded run), and bookkeeping commits (only `.pan/**` or
+  > `.overdeck/memory/**`) run no CI (PAN-4618), so the verdict's `headSha` is
+  > usually older than `origin/main` HEAD. That is expected, not "unknown".
 - **Fix at the root.** Read the code to the exact `file:line` before you file a
   substrate bug. An issue that restates an error message is a symptom log, not
   a diagnosis.
@@ -123,7 +129,7 @@ Every tick, before picking anything new, walk every in-flight issue and ask
 | Review never reports | review requested, no verdict, no reviewer activity | `pan review restart <id>` |
 | Checks red | the PR's checks fail | if `main` is green, the PR broke it: tell the agent |
 | Merged, not closed out | PR merged, issue still open | `pan close <id>`; a close-out refused on the deploy row needs `pan reload` first |
-| Merged, not deployed (Overdeck) | the deployed build lacks the merge | `pan reload` once CI on `main` is green; it waits for the operator's restart approval, so say so in `needs-you` |
+| Merged, not deployed (Overdeck) | the deployed build lacks the merge | `pan reload` once the newest CI run on `main` succeeded (deploy rule); it waits for the operator's restart approval, so say so in `needs-you` |
 
 For every stall: form the root-cause hypothesis first (Doctrine), act once,
 and if the cause is in Overdeck itself, file it with the `substrate-improvement`
@@ -203,7 +209,14 @@ agent handles its own review feedback loop. Only intervene (`pan tell`) if
 the agent looks stuck (idle with unaddressed feedback) — deacon-lite already
 nudges this case; give it a chance before you do.
 
-Once a PR onto Overdeck's own `main` merges with green CI, run:
+Once a PR onto Overdeck's own `main` merges, apply the deploy rule, then run:
+
+> Deploy with `pan reload` only when the newest `CI` run on `main` succeeded:
+> `gh run list --branch main --workflow CI --limit 1 --json status,conclusion,headSha`
+> must show `status: completed` and `conclusion: success`. Queued or in progress:
+> wait for it. Cancelled: only an operator cancels the newest run, so ask; do not
+> deploy. Bookkeeping commits run no CI (PAN-4618), so this run's `headSha` may be
+> older than HEAD; the build is the same code.
 
 ```bash
 pan reload

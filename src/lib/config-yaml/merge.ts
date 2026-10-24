@@ -11,6 +11,7 @@ import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTi
 import { DEFAULT_CONFIG } from './defaults.js';
 import { normalizeOllamaConfig } from './ollama.js';
 import { normalizeJevConfig } from './jev.js';
+import { normalizeSecurityConfig } from './semgrep.js';
 import { normalizeGovernorReserves } from './governor-reserves.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
@@ -168,6 +169,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     },
     ollama: { ...DEFAULT_CONFIG.ollama },
     jev: { ...DEFAULT_CONFIG.jev },
+    security: { semgrep: { ...DEFAULT_CONFIG.security.semgrep } },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
     workhorses: { ...DEFAULT_WORKHORSES },
@@ -259,6 +261,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       governorCpuPsiHoldAvg60: DEFAULT_CONFIG.resources.governorCpuPsiHoldAvg60,
       governorCpuPsiRecoveryAvg60: DEFAULT_CONFIG.resources.governorCpuPsiRecoveryAvg60,
       governorCpuHoldDispatch: DEFAULT_CONFIG.resources.governorCpuHoldDispatch,
+      qualityGateSlots: DEFAULT_CONFIG.resources.qualityGateSlots,
     },
     issues: {
       closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays,
@@ -478,6 +481,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     result.ollama = normalizeOllamaConfig(config.ollama, result.ollama);
     // Optional Jev judgment client (PAN-4369): folds like ollama, throws on bad values.
     result.jev = normalizeJevConfig(config.jev, result.jev);
+    result.security = normalizeSecurityConfig(config.security, result.security); // PAN-4585
 
     // Merge conversation configuration
     if (config.conversations?.compaction_model) {

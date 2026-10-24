@@ -1,79 +1,73 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T09:57:22Z · model: claude-opus-5-5 · open: 844_
+_Last sequenced: 2026-10-24T15:45:08Z · model: claude-opus-5-5 · open: 837_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4540 | S | critical | ok |  |  | Gate refusal inside triggerMerge is marked failed, so approved green PRs never re-arm auto-merge. TENET-10: supervised handoff |
 | 2 | PAN-4527 | S | critical | ok |  |  | Re-review joins a worker started on the old head and fails the new head on stale CI; burns attempts. TENET-10: supervised handoff |
-| 3 | PAN-4532 | M | critical | ok |  | PAN-4527 | Dashboard restart during verification drops review dispatch; re-request re-runs 25-45 min of passed gates. TENET-10: supervised handoff |
 | 4 | PAN-4531 | S | critical | ok |  |  | Verification runs ~25 min of local gates on a head whose CI test already failed, holding the CPU slot. TENET-10: supervised handoff |
 | 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
-| 8 | PAN-4583 | S | medium | ok |  |  | In pipeline: editor pane reads markdown anywhere under $HOME read-only; writes stay limited to project roots + OVERDECK_HOME. |
-| 9 | PAN-4605 | M | critical | ok |  |  | In pipeline: feature/ PRs opened from handoff worktrees get no workspace, so review never starts and only a console.log records it |
-| 10 | PAN-4546 | S | high | ok |  |  | Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
-| 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
-| 15 | PAN-4589 | M | high | ok |  |  | In pipeline: CI test gate ignores commit-status CI (Dagger Cloud); read status context as check name, baseline + feedback. |
-| 16 | PAN-4595 | S | critical | ok |  |  | CLI health never registers the transcript heartbeat, so Herdr agents read STUCK after 30 min and invite recovery on healthy agents. |
-| 17 | PAN-4597 | S | high | ok |  |  | Awaiting Merge hides approved green PRs: ready needs a 5-min gate answer only auto-merge refreshes. Merge machinery: supervised handoff |
-| 18 | PAN-4598 | M | critical | ok |  |  | No UAT batch has assembled since the cut (newest 2026-09-20, failed); Flywheel card offers only an escape-hatch merge link |
-| 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
-| 22 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
-| 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
-| 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
-| 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
-| 26 | PAN-4582 | M | high | ok |  |  | Herdr splits every conversation pane out of one shared tab, so new PTYs get 0-1 rows and the Terminal tab is blank |
-| 27 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
-| 28 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
-| 29 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
-| 30 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
-| 31 | PAN-4166 | S | critical | ok |  |  | write-sequence replays every superseded sequence commit and dies on an old one, so the ranked order never reaches origin/main |
-| 32 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
-| 33 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
-| 34 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
-| 35 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
-| 36 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
-| 37 | PAN-4240 | S | critical | ok |  |  | Closed-issue reaper rm -rf's polyrepo workspaces with unmerged work: merge check runs in the non-git root and reads 'no-branch'. |
-| 38 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
-| 39 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
-| 40 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
-| 41 | PAN-4241 | XS | high | ok |  |  | computeWorkspaceRepoRoots joins an absolute repoPath, so polyrepo repos named unlike their path (fe/frontend) are skipped by pan task done. |
-| 42 | PAN-4396 | XS | critical | ok |  |  | test-skip gate fails closed on any branch diff over 1 MiB (execFile default maxBuffer); one-line fix unblocks big PRs |
-| 43 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
-| 44 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
-| 45 | PAN-3630 | M | critical | ok |  |  | pan tell reported three deliveries to a live agent, moved all three to read/, and the agent received none — the delivery door lies. |
-| 46 | PAN-3805 | S | critical | needs-refinement |  |  | Codex idle poke spawns codex exec instead of the app-server door; failed sends still tick the counter and pause healthy agents |
-| 47 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
-| 48 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
-| 49 | PAN-4439 | S | high | ok |  |  | CI relay has no backstop for webhooks missed during pan reload; red test jobs never reach the agent, PRs stall |
-| 50 | PAN-4407 | XS | high | ok |  |  | Every pan vault verb crashes (Commander passes Command as io); setup saves a key but never shows the recovery phrase |
-| 51 | PAN-4392 | XS | high | ok |  |  | pan task done accepts an Item: trailer from another issue's merged commit (history-wide grep); gate passes with no evidence |
-| 52 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
-| 53 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
-| 54 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
-| 55 | PAN-4391 | S | high | ok |  |  | pan worker run fails in polyrepo workspaces because the root is not a git repo; delegation is broken for MYN |
-| 56 | PAN-4390 | S | high | ok |  |  | Polyrepo workspace create runs npm install in the project's parent dir, reports failure and hides the workspace from list |
-| 57 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
-| 58 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
-| 59 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
-| 60 | PAN-4374 | S | high | ok |  |  | Memory extraction has no working provider on subscription-only hosts; nothing extracted since 2026-08-13. Add claude-cli |
-| 61 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
-| 62 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
-| 63 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
+| 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
+| 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
+| 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
+| 24 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
+| 25 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
+| 27 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
+| 28 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
+| 29 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
+| 30 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
+| 31 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
+| 32 | PAN-4166 | S | critical | ok |  |  | write-sequence replays every superseded sequence commit and dies on an old one, so the ranked order never reaches origin/main |
+| 33 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
+| 34 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
+| 35 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
+| 36 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
+| 37 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
+| 38 | PAN-4240 | S | critical | ok |  |  | Closed-issue reaper rm -rf's polyrepo workspaces with unmerged work: merge check runs in the non-git root and reads 'no-branch'. |
+| 39 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
+| 40 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
+| 41 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
+| 42 | PAN-4241 | XS | high | ok |  |  | computeWorkspaceRepoRoots joins an absolute repoPath, so polyrepo repos named unlike their path (fe/frontend) are skipped by pan task done. |
+| 43 | PAN-4396 | XS | critical | ok |  |  | test-skip gate fails closed on any branch diff over 1 MiB (execFile default maxBuffer); one-line fix unblocks big PRs |
+| 44 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
+| 45 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
+| 46 | PAN-3630 | M | critical | ok |  |  | pan tell reported three deliveries to a live agent, moved all three to read/, and the agent received none — the delivery door lies. |
+| 47 | PAN-3805 | S | critical | needs-refinement |  |  | Codex idle poke spawns codex exec instead of the app-server door; failed sends still tick the counter and pause healthy agents |
+| 48 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
+| 49 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
+| 50 | PAN-4439 | S | high | ok |  |  | CI relay has no backstop for webhooks missed during pan reload; red test jobs never reach the agent, PRs stall |
+| 51 | PAN-4407 | XS | high | ok |  |  | Every pan vault verb crashes (Commander passes Command as io); setup saves a key but never shows the recovery phrase |
+| 52 | PAN-4392 | XS | high | ok |  |  | pan task done accepts an Item: trailer from another issue's merged commit (history-wide grep); gate passes with no evidence |
+| 53 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
+| 54 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
+| 55 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
+| 56 | PAN-4391 | S | high | ok |  |  | pan worker run fails in polyrepo workspaces because the root is not a git repo; delegation is broken for MYN |
+| 57 | PAN-4390 | S | high | ok |  |  | Polyrepo workspace create runs npm install in the project's parent dir, reports failure and hides the workspace from list |
+| 58 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
+| 59 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
+| 60 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
+| 61 | PAN-4374 | S | high | ok |  |  | Memory extraction has no working provider on subscription-only hosts; nothing extracted since 2026-08-13. Add claude-cli |
+| 62 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
+| 63 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
+| 64 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
+| 66 | PAN-4622 | M | high | ok |  |  | Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. PAN-4532 merged |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
+| 70 | PAN-4624 | S | high | ok |  |  | Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed. |
 | 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 74 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 75 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
+| 76 | PAN-4623 | XS | high | ok |  |  | deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10 |
 | 77 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 78 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
 | 79 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
@@ -215,7 +209,7 @@ _Last sequenced: 2026-10-24T09:57:22Z · model: claude-opus-5-5 · open: 844_
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 223 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 224 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 225 | PAN-4596 | S | high | ok |  |  | Ended held handoff shows generic "no saved history"; hides kickoff focus/brief and offers no Start. Sat 20 days as "waiting on operator". |
+| 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -843,12 +837,11 @@ _Last sequenced: 2026-10-24T09:57:22Z · model: claude-opus-5-5 · open: 844_
 | 871 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
 | 872 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
 | 873 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
-| 874 | PAN-4585 | XL | medium | needs-refinement | ✓ |  | New opt-in Semgrep SAST epic; no children filed yet and 4 operator decisions open (gate default, Guardian, opengrep). |
-| 875 | PAN-4590 | L | medium | ok |  | PAN-4585 | Semgrep sast verification gate + review-context findings; first buildable child of PAN-4585, needs its config block. |
-| 876 | PAN-4591 | L | medium | ok |  | PAN-4585 | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; blocked by PAN-4585. |
-| 877 | PAN-4592 | M | low | ok |  | PAN-4585, PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs PAN-4585 and gate mode from PAN-4590. |
-| 878 | PAN-4594 | M | low | ok |  | PAN-4585, PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
-| 879 | PAN-4593 | L | low | needs-refinement |  | PAN-4585, PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 875 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
+| 876 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
+| 877 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
+| 878 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
+| 879 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 
 ## Rationale detail
 
@@ -859,10 +852,6 @@ Observed 2026-10-04 on PR #4525: an approved, all-green PR was stranded because 
 ### PAN-4527 (rank 2)
 
 Root cause is pinned to two lines (sameHead always true, launch-time headShort reused). A wrong verdict tells agents to fix failures that no longer exist and spends verification budget, so it corrupts the core feedback loop. It also defines the head-equivalence rule PAN-4532 and PAN-4531 build on, so it goes first in the verification bundle.
-
-### PAN-4532 (rank 3)
-
-Every pan reload during a verification orphans its waiter, and four issues were exposed on 2026-10-04 alone. The re-run holds the single CPU admission slot for a head that already passed, starving every other issue. Needs PAN-4527's head-equivalence rule to decide when a finished result can be consumed, so it follows that fix.
 
 ### PAN-4531 (rank 4)
 
@@ -880,18 +869,6 @@ New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup fa
 
 New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.
 
-### PAN-4583 (rank 8)
-
-New since the prior run and already in the pipeline (live workspace), so it is pinned near the top rather than ranked against the queue. Well-specified ACs including symlink, prefix and extension containment tests; the PR must state who can reach /ws/rpc before the read widening ships.
-
-### PAN-4605 (rank 9)
-
-New since the prior run and already in the pipeline. Supervised handoffs (the TENET-10 path for pipeline-machinery fixes) open PRs from plain worktrees, and handlePullRequest silently drops them when startReview finds no workspace; PRs #4599/#4602/#4603 sat unreviewed on 2026-10-24. Placed in the open rank 9 slot of the critical top tier because it gates review for every handoff-produced PR, including PAN-4527 and PAN-4532.
-
-### PAN-4546 (rank 10)
-
-Operator decision 2026-10-04: the single admission slot, not agent count, bounded overnight throughput (5-7 PRs waiting 1-2 h at near-zero PSI). Doubling slots under low pressure is the largest throughput lever on the board. Ranks after the bundle because PAN-4531/4532 remove wasted slot time first.
-
 ### PAN-4547 (rank 11)
 
 Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by hand. With false DoD refusals fixed by PAN-4543, auto close-out only needs a patrol on the existing verify-on-main path and live settings. High because unclosed issues distort every pipeline view.
@@ -908,193 +885,177 @@ Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls th
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.
 
-### PAN-4589 (rank 15)
-
-New since the prior run and already in the pipeline, so it is pinned in a free top-tier slot. Without it a Dagger, Buildkite or Jenkins project never shows a passed test job, so merge gate and auto-merge stall; ACs are precise and unit-testable.
-
-### PAN-4595 (rank 16)
-
-New since the prior run. pan show --health is what the Flywheel reads to decide whether to resume or nudge an agent, and on Herdr the CLI path has only the spawn timestamp as an activity signal, so every working agent older than 30 minutes is classified stuck. A false stuck verdict drives recovery actions against healthy agents, which is a pipeline-integrity problem. The root cause and fix are precise (register the heartbeat lookup on the CLI path, guard against an import cycle, add one test), so it is small and ranks into the top tier beside the other Herdr substrate fixes.
-
-### PAN-4597 (rank 17)
-
-New issue filed 2026-10-24 after PR #4587 was approved, green and clean yet absent from Awaiting Merge. deriveState needs a cached approved-at-head gate answer that only the auto-merge scheduler, merge doors and sibling walks write, and it expires after 5 minutes, so non-opted-in ready PRs vanish from the operator's merge view. Root cause and fix options are already in the body with file and line references, so it is well-scoped. Ranked just behind the in-pipeline pins and next to the auto-merge re-arm fix (PAN-4540) because it touches the same approval-at-head and merge-gate code.
-
-### PAN-4598 (rank 18)
-
-New since the prior run and labeled substrate-improvement: the merge train reconciler has built no UAT batch for any project since the PAN-3917 cut, so approved green PRs reach main only through a hidden escape-hatch link. It ranks into the open slot beside PAN-4597 (Awaiting Merge hides ready PRs) because both block the operator's last step from approved PR to main; the ACs are concrete (reconciler decision tests, per-row Merge button, honest copy, MERGE-WORKFLOW.md).
-
-### PAN-4572 (rank 19)
+### PAN-4572 (rank 21)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
 
-### PAN-4586 (rank 22)
+### PAN-4586 (rank 23)
 
 New issue. Verified against herdr 0.9.1: HerdrApiClient.call returns response.result, whose pane_read text sits under read.text, but readHerdrPaneText, diagnoseDetectionFailure and the herdr-submit composer read a top-level text, so every pane-text consumer on the default backend sees an empty string. A three-site fix plus corrected test stubs; placed in a free rank slot just above the Herdr pane-sizing pair (PAN-4582, PAN-3952) because it is smaller and likely explains part of PAN-3952's 'pane read returns nothing' observation.
 
-### PAN-4217 (rank 23)
+### PAN-4217 (rank 24)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
 
-### PAN-4219 (rank 24)
+### PAN-4219 (rank 25)
 
 New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.
 
-### PAN-4229 (rank 25)
+### PAN-4229 (rank 27)
 
 New bug filed from PAN-4222: after all eleven top-level items were closed through pan task done, pan done refused on 39 pending acceptance-criterion children that pan task next never surfaced, and the agent had to make 39 empty trailer commits to get through. It blocks completion of every issue planned with nested ACs, the default planner shape, so it ranks critical beside PAN-4217 and PAN-4219. It is marked needs-refinement because it describes the same missing AC-status writer as PAN-4217 and PAN-4219; the three should be fixed by one change and the extras closed as duplicates.
 
-### PAN-4582 (rank 26)
-
-New issue. Verified 2026-10-23: HerdrBackend.startAgent splits each agent pane out of its workspace's single tab, so the shared conversations workspace halved space until the newest pane had height 0 and a 1-row PTY; restored idle shells after reboot are never reaped. Every conversation past about the fifth renders a blank Terminal tab, and issue workspaces share the split path. Ranked beside PAN-3952 (same Herdr pane-sizing family) because both blind pane consumers; manual relief was applied but recurs on the next conversation spawn.
-
-### PAN-3566 (rank 27)
+### PAN-3566 (rank 28)
 
 New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.
 
-### PAN-3952 (rank 28)
+### PAN-3952 (rank 29)
 
 On the default backend the harness TUI renders into a one-line terminal until an operator opens it, so stuck detection, readiness scans, health capture, AUQ/permission detection and screenshots all see nothing. Deterministic pane sizing in the Herdr adapter is a small change with fleet-wide effect.
 
-### PAN-3285 (rank 29)
+### PAN-3285 (rank 30)
 
 New this pass, labelled critical. A supervisor unit pinned to a pan reload generation SIGTERMs every correctly-running dashboard and is structurally incapable of starting a replacement; the observed outcome was a 3.5-hour total outage with 1,107 consecutive failed recovery attempts and no operator escalation. Manual recovery also fails, because the supervisor kills the operator's dashboard within 30 seconds. Nothing else in the backlog can take the whole product down for hours with the recovery path itself broken.
 
-### PAN-3524 (rank 30)
+### PAN-3524 (rank 31)
 
 Triage: verify the --changed verification-loop relaunch against deacon-lite's smaller suppression surface. Kept in the critical band: an unstoppable server-owned test loop is the worst kind of runaway.
 
-### PAN-4166 (rank 31)
+### PAN-4166 (rank 32)
 
 New issue (2026-09-24), the only delta since the prior run. pushPlanArtifacts replays the whole local range through git merge-tree, so one superseded rendering of .pan/backlog/sequence.md aborts the push and origin keeps serving a stale ranked order that the Flywheel reads for pickup; the silent reset --keep refusal then adds another unpushed commit every run, so the failure compounds. Ranked 31 rather than into the vacated top slots: the acute incident was hand-repaired (main is level with origin, the identical untracked drafts removed), so the bug is latent until the next untracked-draft collision, and it ranks behind the actively-biting pipeline blockers at 19-30 while staying in the critical band because a stale sequence misdirects every Flywheel pickup. Root cause is verified in the body with a named file, a proposed fix, and three mechanical acceptance criteria.
 
-### PAN-3250 (rank 32)
+### PAN-3250 (rank 33)
 
 New this pass, labelled blocks-main and substrate. Two spawn sites branch from the local HEAD or defaultBranch instead of origin/main, so every new feature branch inherits whatever unpushed commits are sitting on the shared local main. Four branches were already contaminated when it was filed, two of them created after the problem was identified, and their PRs read MERGEABLE/CLEAN. It spreads with each spawn, so the cost of leaving it grows.
 
-### PAN-3946 (rank 33)
+### PAN-3946 (rank 34)
 
 Merge-safety bug seen on PR #3933: an approval on fd3334e6 satisfied the request for head ae9d82f0. Approval must count only when its commit_id is the current head; add --force as the explicit override.
 
-### PAN-2954 (rank 34)
+### PAN-2954 (rank 35)
 
 Dependency cleared: PAN-2882 (the missing GitLab merged-MR oracle this blocked on) closed since the last pass, so postMergeLifecycle's GitLab refusal is now directly workable. Re-ranked up from 67 to sit with the other unblocked critical merge-path fixes.
 
-### PAN-3935 (rank 35)
+### PAN-3935 (rank 36)
 
 The PAN-2858 defect in a new shape: complete-planning promotes to the primary checkout, where nothing commits, and removes the workspace copy the planning commit would have picked up. Evidence: untracked pan-3927.md on main. Also a write-to-main hazard.
 
-### PAN-3657 (rank 36)
+### PAN-3657 (rank 37)
 
 New this pass. The merge-train queues endpoint correctly gathers eligible candidates and then hands them to the monorepo queue builder, which does git rev-parse against a polyrepo project root that is not a git repository — so every polyrepo project's train is permanently empty while monorepo projects populate fine. MYN and Auricle cannot use merge trains at all until this lands.
 
-### PAN-4240 (rank 37)
+### PAN-4240 (rank 38)
 
 New this pass. The deacon closed-issue reaper gates deletion on isBranchMerged, which runs git in the polyrepo project root; that root is not a git repository, so the check silently returns no-branch and the fallback rmSync deletes a workspace holding unmerged, local-only commits, with nothing logged. It destroyed the MIN-489 workspace twice. Silent data loss in the substrate outranks routine work, and the fix is small and well specified (per-sub-repo check, unknown means skip, no rmSync over worktrees, log actions). It sits beside PAN-3657 and PAN-3708 in the same polyrepo-root-is-not-git bug class.
 
-### PAN-3565 (rank 38)
+### PAN-3565 (rank 39)
 
 New this pass. Three review-lifecycle defects, one of them severe: when all four reviewer lanes died at spawn on a record lock, the supervisor wrote a synthesis declaring CHANGES REQUESTED with every lane marked failed — an infrastructure flake recorded as a real code verdict. It was caught only because a human was watching live. Same integrity family as PAN-3283 and PAN-2746.
 
-### PAN-3554 (rank 39)
+### PAN-3554 (rank 40)
 
 New this pass. Main stayed red for about five hours because nothing owns the state 'the latest main-push CI run failed' — no needs-you, no activity entry, no strike recommendation. The failure actively hides itself: the merge gate renders red main as an empty eligible set, so the operator sees a quiet queue rather than an alarm. Detection must not depend on the flywheel being awake, since it frequently is not. Condition changed after the PAN-3917 cut: the merge gate that rendered red main as an empty queue was deleted by the cut; red-main ownership still needs a home — re-scope.
 
-### PAN-3532 (rank 40)
+### PAN-3532 (rank 41)
 
 New this pass. The CI test job runs root npm test, whose frontend leg is a hand-picked list of files, so two frontend test files were red on main for hours while every main CI run reported success. Green CI that does not mean green is worse than no CI, because every downstream gate and every close-out trusts it.
 
-### PAN-4241 (rank 41)
+### PAN-4241 (rank 42)
 
 New this pass. computeWorkspaceRepoRoots builds its fallback candidate by joining the workspace path with an absolute repoPath, so any polyrepo repo whose configured name differs from its directory is never found. That makes pan task done refuse valid Item trailers and also affects head snapshots and merge completeness for MYN. The fix is a one-line candidate change plus a test, and a symlink workaround exists, so it ranks high rather than critical.
 
-### PAN-4396 (rank 42)
+### PAN-4396 (rank 43)
 
 New issue. The test-skip verification gate fails every branch whose diff exceeds 1 MiB before it inspects a test, as PAN-4362 showed; that blocks verification outright for large but legitimate PRs. The fix is one maxBuffer argument, so it ranks in the critical pipeline block.
 
-### PAN-3085 (rank 43)
+### PAN-3085 (rank 44)
 
 New this pass and a one-line class of defect with outsized cost. Review feedback is written to the resolved .overdeck/feedback directory but the path handed to the work agent is a hardcoded .pan/feedback that no longer exists after the rebrand, and the deacon merge gate reads the same dead path. Agents are told to fix findings they cannot find, and the gate counts zero feedback files no matter how many exist. Condition changed after the PAN-3917 cut: the deacon merge gate is gone; only the agent-side .pan/feedback path pointer remains to verify — re-scope.
 
-### PAN-3653 (rank 44)
+### PAN-3653 (rank 45)
 
 New this pass, labelled blocks-main. A strike that correctly stops because its gate is blocked by red main has no owner that wakes it when main goes green: the session stays alive, so liveness calls it healthy and pan recover refuses with 'already has a live harness runtime'. The urgent path exists precisely to unblock the pipeline fast, so a strike that silently idles through the clearing of its own blocker defeats the mechanism.
 
-### PAN-3630 (rank 45)
+### PAN-3630 (rank 46)
 
 New this pass. pan tell reported successful delivery three times to a live, heart-beating agent, moved all three messages into the read mailbox, and the agent's transcript shows it received none of them. The delivery door is the sanctioned way every part of the system talks to a running agent; a door that lies about delivery makes every downstream 'we told it' claim unreliable.
 
-### PAN-3805 (rank 46)
+### PAN-3805 (rank 47)
 
 Idle remediation is now deacon-lite nudge routines; triage asks to verify the Codex app-server delivery bypass against that implementation. The persistent-session invariant still forbids codex exec; rank held.
 
-### PAN-3560 (rank 47)
+### PAN-3560 (rank 48)
 
 New this pass. Under concurrent review convoys the PTY supervisor returns 502 'input echo confirmation failed' fleet-wide, so no agent can be booted or re-booted and pipeline feedback delivery fails while load is high — confirmed across at least six unrelated agents in one hour. Delivery failing exactly when the pipeline is busiest is what turns a load spike into a stall.
 
-### PAN-3520 (rank 48)
+### PAN-3520 (rank 49)
 
 New this pass. The test gate records a real 'test failed' verdict for uniform 5000ms timeout signatures under host load, proven on multiple branches where the same files pass in isolation in about 19 seconds. Every false verdict costs a full rework cycle and another saturated re-test, so this is both a correctness and a cost fix. Retrying timeout-only failures in isolation before writing a verdict is the minimal change.
 
-### PAN-4439 (rank 49)
+### PAN-4439 (rank 50)
 
 New issue. The polling backstop for the CI failure relay was deleted in the Cut, so a check that completes while the dashboard reloads is never relayed and the PR stalls. Reloads are frequent, and its stated dependency PAN-4432 has closed, so it ranks high in the pipeline block.
 
-### PAN-4407 (rank 50)
+### PAN-4407 (rank 51)
 
 New issue. All fifteen pan vault verbs throw from the CLI, and setup leaves a vault the user cannot join because the recovery phrase is never printed. Session Vault is shipped and is the base of the Anywhere hand-off, so this XS fix is high importance.
 
-### PAN-4392 (rank 51)
+### PAN-4392 (rank 52)
 
 New issue. hasTrailerCommit greps all reachable history, so generic item ids such as docs or tests are satisfied by any merged commit and the checklist gate certifies work that was never committed. It is a gate-integrity hole with an XS fix.
 
-### PAN-3500 (rank 52)
+### PAN-3500 (rank 53)
 
 New this pass. A review sub-role that had already written its report was resumed by a later message and edited seven tracked files, and pan start --fresh then auto-committed those reviewer-owned changes into the feature history during sync-main. Review isolation is currently prompt-level only; it has to be mechanical, because a contaminated branch is very hard to detect after the fact.
 
-### PAN-3313 (rank 53)
+### PAN-3313 (rank 54)
 
 New this pass. A transient upstream stream error benches CLIProxy's only auth entry, so every GPT-routed request returns 503 auth_unavailable until an internal cooldown lapses — 35 failures against 14 successes in one hour, with valid credentials throughout. The message reads as 'your credentials are gone' and sends the operator to re-authenticate, which fixes nothing. Every GPT-routed agent on the machine is affected at once.
 
-### PAN-3282 (rank 54)
+### PAN-3282 (rank 55)
 
 New this pass. Review agents terminate before writing their report across five issues and two projects, twice recurring after a successful recovery, leaving a verdict-shaped status with no artifact behind it and a stuck flag that blocks progress until someone restarts the reviewer by hand. This is the upstream condition PAN-3283 then converts into a false passed verdict.
 
-### PAN-4391 (rank 55)
+### PAN-4391 (rank 56)
 
 New issue. Worker delegation is the supported path for sub-tasks, and it fails outright in every polyrepo workspace, so MYN issues cannot delegate without a manual --cwd workaround. Polyrepo correctness bugs sit in the high band in this sequence.
 
-### PAN-4390 (rank 56)
+### PAN-4390 (rank 57)
 
 New issue. Workspace creation for a polyrepo project reports failure and omits the workspace from pan workspace list although it is usable, which misleads every caller. It belongs with the other polyrepo substrate bugs.
 
-### PAN-2695 (rank 57)
+### PAN-2695 (rank 58)
 
 Concurrent review dispatches race fresh-spawn vs resume, second dispatch resumes a still-booting parent and wedges.
 
-### PAN-2742 (rank 58)
+### PAN-2742 (rank 59)
 
 Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as infra-failure, bypassing review.
 
-### PAN-2706 (rank 59)
+### PAN-2706 (rank 60)
 
 Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.
 
-### PAN-4374 (rank 60)
+### PAN-4374 (rank 61)
 
 New issue split out of the now-closed PAN-4370. No memory observation has been extracted on the operator's host since 2026-08-13 because neither provider can authenticate, so the memory substrate is silently dead; it informs PAN-1449.
 
-### PAN-4344 (rank 61)
+### PAN-4344 (rank 62)
 
 New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.
 
-### PAN-4550 (rank 62)
+### PAN-4550 (rank 63)
 
 Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
 
-### PAN-4566 (rank 63)
+### PAN-4566 (rank 64)
 
 Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
+
+### PAN-4622 (rank 66)
+
+Rank held: its only dependency, PAN-4532, closed 2026-10-24, so this follow-up is now unblocked and workable; the residual cases still recover via deacon-lite, so it stays below the active verification bundle.
 
 ### PAN-2940 (rank 67)
 
@@ -1107,6 +1068,10 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 ### PAN-3605 (rank 69)
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
+
+### PAN-4624 (rank 70)
+
+New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.
 
 ### PAN-3557 (rank 71)
 
@@ -1127,6 +1092,10 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 ### PAN-3278 (rank 75)
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
+
+### PAN-4623 (rank 76)
+
+New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.
 
 ### PAN-3234 (rank 77)
 
@@ -1172,6 +1141,30 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
 
 Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (502) after pan reload.
 
+### PAN-2935 (rank 88)
+
+Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.
+
+### PAN-2337 (rank 89)
+
+Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
+
+### PAN-2422 (rank 90)
+
+Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
+
+### PAN-2699 (rank 91)
+
+npm run build regenerates the committed record-cost-event.js bundle, dirtying every workspace tree and blocking clean-workspace gates.
+
+### PAN-2957 (rank 92)
+
+npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
+
+### PAN-2850 (rank 93)
+
+npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1179,10 +1172,10 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T09:57:22Z",
+  "generatedAt": "2026-10-24T15:45:08Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 844,
+  "openCount": 837,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1207,21 +1200,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "dependsOn": [],
       "why": "Re-review joins a worker started on the old head and fails the new head on stale CI; burns attempts. TENET-10: supervised handoff",
       "rationale": "Root cause is pinned to two lines (sameHead always true, launch-time headShort reused). A wrong verdict tells agents to fix failures that no longer exist and spends verification budget, so it corrupts the core feedback loop. It also defines the head-equivalence rule PAN-4532 and PAN-4531 build on, so it goes first in the verification bundle.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4532",
-      "rank": 3,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4527"
-      ],
-      "why": "Dashboard restart during verification drops review dispatch; re-request re-runs 25-45 min of passed gates. TENET-10: supervised handoff",
-      "rationale": "Every pan reload during a verification orphans its waiter, and four issues were exposed on 2026-10-04 alone. The re-run holds the single CPU admission slot for a head that already passed, starving every other issue. Needs PAN-4527's head-equivalence rule to decide when a finished result can be consumed, so it follows that fix.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1278,32 +1256,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "planning": "auto"
     },
     {
-      "issue": "PAN-4583",
-      "rank": 8,
-      "size": "S",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: editor pane reads markdown anywhere under $HOME read-only; writes stay limited to project roots + OVERDECK_HOME.",
-      "rationale": "New since the prior run and already in the pipeline (live workspace), so it is pinned near the top rather than ranked against the queue. Well-specified ACs including symlink, prefix and extension containment tests; the PR must state who can reach /ws/rpc before the read widening ships.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4546",
-      "rank": 10,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff",
-      "rationale": "Operator decision 2026-10-04: the single admission slot, not agent count, bounded overnight throughput (5-7 PRs waiting 1-2 h at near-zero PSI). Doubling slots under low pressure is the largest throughput lever on the board. Ranks after the bundle because PAN-4531/4532 remove wasted slot time first.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4547",
       "rank": 11,
       "size": "M",
@@ -1351,7 +1303,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "condition": "ok",
       "dependsOn": [
         "PAN-4527",
-        "PAN-4532",
         "PAN-4531",
         "PAN-4540",
         "PAN-4534"
@@ -1362,60 +1313,8 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "planning": "auto"
     },
     {
-      "issue": "PAN-4589",
-      "rank": 15,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: CI test gate ignores commit-status CI (Dagger Cloud); read status context as check name, baseline + feedback.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned in a free top-tier slot. Without it a Dagger, Buildkite or Jenkins project never shows a passed test job, so merge gate and auto-merge stall; ACs are precise and unit-testable.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4595",
-      "rank": 16,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CLI health never registers the transcript heartbeat, so Herdr agents read STUCK after 30 min and invite recovery on healthy agents.",
-      "rationale": "New since the prior run. pan show --health is what the Flywheel reads to decide whether to resume or nudge an agent, and on Herdr the CLI path has only the spawn timestamp as an activity signal, so every working agent older than 30 minutes is classified stuck. A false stuck verdict drives recovery actions against healthy agents, which is a pipeline-integrity problem. The root cause and fix are precise (register the heartbeat lookup on the CLI path, guard against an import cycle, add one test), so it is small and ranks into the top tier beside the other Herdr substrate fixes.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4597",
-      "rank": 17,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Awaiting Merge hides approved green PRs: ready needs a 5-min gate answer only auto-merge refreshes. Merge machinery: supervised handoff",
-      "rationale": "New issue filed 2026-10-24 after PR #4587 was approved, green and clean yet absent from Awaiting Merge. deriveState needs a cached approved-at-head gate answer that only the auto-merge scheduler, merge doors and sibling walks write, and it expires after 5 minutes, so non-opted-in ready PRs vanish from the operator's merge view. Root cause and fix options are already in the body with file and line references, so it is well-scoped. Ranked just behind the in-pipeline pins and next to the auto-merge re-arm fix (PAN-4540) because it touches the same approval-at-head and merge-gate code.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4598",
-      "rank": 18,
-      "size": "M",
-      "importance": "critical",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "No UAT batch has assembled since the cut (newest 2026-09-20, failed); Flywheel card offers only an escape-hatch merge link",
-      "rationale": "New since the prior run and labeled substrate-improvement: the merge train reconciler has built no UAT batch for any project since the PAN-3917 cut, so approved green PRs reach main only through a hidden escape-hatch link. It ranks into the open slot beside PAN-4597 (Awaiting Merge hides ready PRs) because both block the operator's last step from approved PR to main; the ACs are concrete (reconciler decision tests, per-row Merge button, honest copy, MERGE-WORKFLOW.md).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4572",
-      "rank": 19,
+      "rank": 21,
       "size": "M",
       "importance": "medium",
       "score": 58,
@@ -1428,7 +1327,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4586",
-      "rank": 22,
+      "rank": 23,
       "size": "XS",
       "importance": "critical",
       "score": 90,
@@ -1441,7 +1340,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4217",
-      "rank": 23,
+      "rank": 24,
       "size": "S",
       "importance": "critical",
       "score": 87,
@@ -1454,7 +1353,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4219",
-      "rank": 24,
+      "rank": 25,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1467,7 +1366,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4229",
-      "rank": 25,
+      "rank": 27,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -1481,21 +1380,8 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "planning": "auto"
     },
     {
-      "issue": "PAN-4582",
-      "rank": 26,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Herdr splits every conversation pane out of one shared tab, so new PTYs get 0-1 rows and the Terminal tab is blank",
-      "rationale": "New issue. Verified 2026-10-23: HerdrBackend.startAgent splits each agent pane out of its workspace's single tab, so the shared conversations workspace halved space until the newest pane had height 0 and a 1-row PTY; restored idle shells after reboot are never reaped. Every conversation past about the fifth renders a blank Terminal tab, and issue workspaces share the split path. Ranked beside PAN-3952 (same Herdr pane-sizing family) because both blind pane consumers; manual relief was applied but recurs on the next conversation spawn.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3566",
-      "rank": 27,
+      "rank": 28,
       "size": "XS",
       "importance": "critical",
       "score": 92,
@@ -1508,7 +1394,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3952",
-      "rank": 28,
+      "rank": 29,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1521,7 +1407,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3285",
-      "rank": 29,
+      "rank": 30,
       "size": "M",
       "importance": "critical",
       "score": 92,
@@ -1534,7 +1420,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3524",
-      "rank": 30,
+      "rank": 31,
       "size": "M",
       "importance": "critical",
       "score": 90,
@@ -1547,7 +1433,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4166",
-      "rank": 31,
+      "rank": 32,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1560,7 +1446,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3250",
-      "rank": 32,
+      "rank": 33,
       "size": "S",
       "importance": "critical",
       "score": 90,
@@ -1573,7 +1459,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3946",
-      "rank": 33,
+      "rank": 34,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1586,7 +1472,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-2954",
-      "rank": 34,
+      "rank": 35,
       "size": "XS",
       "importance": "critical",
       "score": 90,
@@ -1599,7 +1485,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3935",
-      "rank": 35,
+      "rank": 36,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -1612,7 +1498,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3657",
-      "rank": 36,
+      "rank": 37,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1625,7 +1511,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4240",
-      "rank": 37,
+      "rank": 38,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1638,7 +1524,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3565",
-      "rank": 38,
+      "rank": 39,
       "size": "M",
       "importance": "critical",
       "score": 88,
@@ -1651,7 +1537,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3554",
-      "rank": 39,
+      "rank": 40,
       "size": "M",
       "importance": "critical",
       "score": 88,
@@ -1664,7 +1550,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3532",
-      "rank": 40,
+      "rank": 41,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1677,7 +1563,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4241",
-      "rank": 41,
+      "rank": 42,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -1690,7 +1576,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4396",
-      "rank": 42,
+      "rank": 43,
       "size": "XS",
       "importance": "critical",
       "score": 86,
@@ -1703,7 +1589,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3085",
-      "rank": 43,
+      "rank": 44,
       "size": "XS",
       "importance": "critical",
       "score": 88,
@@ -1716,7 +1602,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3653",
-      "rank": 44,
+      "rank": 45,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1729,7 +1615,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3630",
-      "rank": 45,
+      "rank": 46,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1742,7 +1628,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3805",
-      "rank": 46,
+      "rank": 47,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1755,7 +1641,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3560",
-      "rank": 47,
+      "rank": 48,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1768,7 +1654,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3520",
-      "rank": 48,
+      "rank": 49,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1781,7 +1667,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4439",
-      "rank": 49,
+      "rank": 50,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -1794,7 +1680,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4407",
-      "rank": 50,
+      "rank": 51,
       "size": "XS",
       "importance": "high",
       "score": 84,
@@ -1807,7 +1693,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4392",
-      "rank": 51,
+      "rank": 52,
       "size": "XS",
       "importance": "high",
       "score": 82,
@@ -1820,7 +1706,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3500",
-      "rank": 52,
+      "rank": 53,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1833,7 +1719,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3313",
-      "rank": 53,
+      "rank": 54,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1846,7 +1732,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-3282",
-      "rank": 54,
+      "rank": 55,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1859,7 +1745,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4391",
-      "rank": 55,
+      "rank": 56,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -1872,7 +1758,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4390",
-      "rank": 56,
+      "rank": 57,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -1885,7 +1771,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-2695",
-      "rank": 57,
+      "rank": 58,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -1898,7 +1784,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-2742",
-      "rank": 58,
+      "rank": 59,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -1911,7 +1797,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-2706",
-      "rank": 59,
+      "rank": 60,
       "size": "M",
       "importance": "high",
       "score": 84,
@@ -1924,7 +1810,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4374",
-      "rank": 60,
+      "rank": 61,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -1937,7 +1823,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4344",
-      "rank": 61,
+      "rank": 62,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -1950,7 +1836,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4550",
-      "rank": 62,
+      "rank": 63,
       "size": "XS",
       "importance": "medium",
       "score": 64,
@@ -1963,7 +1849,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "issue": "PAN-4566",
-      "rank": 63,
+      "rank": 64,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3863,19 +3749,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "dependsOn": [],
       "why": "Kimi ACP cancel is sent with id:\"\" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked.",
       "rationale": "Source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. Its prerequisite PAN-4563 (replay fixture and pinned host-replay test) merged in #4576, so the dependency is cleared; the rank stays at 224 because it already sat in the high tier with peers of equal score and nothing else about the issue changed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4596",
-      "rank": 225,
-      "size": "S",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Ended held handoff shows generic \"no saved history\"; hides kickoff focus/brief and offers no Start. Sat 20 days as \"waiting on operator\".",
-      "rationale": "New since the prior run. ConversationPanel treats every ended conversation without a timeline as orphaned and never reads forkRequest.hold, so a held handoff loses its kickoff text, brief path and Start action. The substrate-improvement label sets a high floor; impact is operator visibility rather than pipeline correctness, so it ranks with other Needs-you visibility gaps such as PAN-3276.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11610,31 +11483,15 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "planning": "skip"
     },
     {
-      "issue": "PAN-4585",
-      "rank": 874,
-      "size": "XL",
-      "importance": "medium",
-      "score": 40,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "New opt-in Semgrep SAST epic; no children filed yet and 4 operator decisions open (gate default, Guardian, opengrep).",
-      "rationale": "New since the prior run. Epic container with a detailed 9-item plan but no child issues filed and four operator decisions unresolved, so it is not workable; ranked by aggregate value as a medium-impact opt-in feature, appended to avoid shifting existing ranks.",
-      "gate": "auto",
-      "planning": "auto",
-      "isEpic": true
-    },
-    {
       "issue": "PAN-4590",
       "rank": 875,
       "size": "L",
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4585"
-      ],
-      "why": "Semgrep sast verification gate + review-context findings; first buildable child of PAN-4585, needs its config block.",
-      "rationale": "New since the prior run. Phase-2 child of the Semgrep epic with a detailed scope and probe results; blocked by PAN-4585 and unblocks PAN-4592/4593/4594, so it leads the appended Semgrep group.",
+      "dependsOn": [],
+      "why": "Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11645,11 +11502,9 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "importance": "medium",
       "score": 45,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4585"
-      ],
-      "why": "Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; blocked by PAN-4585.",
-      "rationale": "New since the prior run. Independent of the gate child, blocked only by PAN-4585; appended after PAN-4590 to avoid shifting existing ranks.",
+      "dependsOn": [],
+      "why": "Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11661,11 +11516,10 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "score": 38,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4585",
         "PAN-4590"
       ],
-      "why": "pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs PAN-4585 and gate mode from PAN-4590.",
-      "rationale": "New since the prior run. Opt-in CI workflow child; depends on the epic config block and PAN-4590 gate mode, so it follows the gate child.",
+      "why": "pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11677,11 +11531,10 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "score": 36,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4585",
         "PAN-4590"
       ],
       "why": "Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590.",
-      "rationale": "New since the prior run. UI child that needs findings and the verification.sast override from PAN-4590 to exist first.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11693,24 +11546,62 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "score": 30,
       "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-4585",
         "PAN-4590"
       ],
       "why": "Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work.",
-      "rationale": "New since the prior run. Two operator decisions from PAN-4585 are unresolved and Guardian provisioning touches liveness and pan done, so it is needs-refinement and last in the group.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4605",
-      "rank": 9,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
+      "issue": "PAN-4616",
+      "rank": 226,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: feature/ PRs opened from handoff worktrees get no workspace, so review never starts and only a console.log records it",
-      "rationale": "New since the prior run and already in the pipeline. Supervised handoffs (the TENET-10 path for pipeline-machinery fixes) open PRs from plain worktrees, and handlePullRequest silently drops them when startReview finds no workspace; PRs #4599/#4602/#4603 sat unreviewed on 2026-10-24. Placed in the open rank 9 slot of the critical top tier because it gates review for every handoff-produced PR, including PAN-4527 and PAN-4532.",
+      "why": "After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback",
+      "rationale": "New issue: an observation follow-up to in-pipeline PAN-4614; ranked mid-tier because it only matters if GitHub ignores union, and any fallback touches the merge gate's trust boundary and needs its own plan.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4622",
+      "rank": 66,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. PAN-4532 merged",
+      "rationale": "Rank held: its only dependency, PAN-4532, closed 2026-10-24, so this follow-up is now unblocked and workable; the residual cases still recover via deacon-lite, so it stays below the active verification bundle.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4623",
+      "rank": 76,
+      "size": "XS",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10",
+      "rationale": "New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4624",
+      "rank": 70,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed.",
+      "rationale": "New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -12943,13 +12834,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "from": "PAN-4527",
-      "to": "PAN-4532",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4527",
       "to": "PAN-4531",
       "type": "informs",
       "source": "github-ref",
@@ -12957,13 +12841,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
     },
     {
       "from": "PAN-4527",
-      "to": "PAN-4551",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4532",
       "to": "PAN-4551",
       "type": "unblocks",
       "source": "github-ref",
@@ -12989,20 +12866,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.8
-    },
-    {
-      "from": "PAN-4531",
-      "to": "PAN-4546",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4532",
-      "to": "PAN-4546",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
     },
     {
       "from": "PAN-4552",
@@ -13047,13 +12910,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "confidence": 0.6
     },
     {
-      "from": "PAN-4582",
-      "to": "PAN-3952",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-4586",
       "to": "PAN-3952",
       "type": "informs",
@@ -13061,83 +12917,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "confidence": 1
     },
     {
-      "from": "PAN-4586",
-      "to": "PAN-4582",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4590",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4590",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4591",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4591",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4592",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4592",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4593",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4593",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4594",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4594",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4590",
       "to": "PAN-4592",
       "type": "unblocks",
@@ -13159,43 +12938,8 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "confidence": 1
     },
     {
-      "from": "PAN-4595",
-      "to": "PAN-3297",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4596",
-      "to": "PAN-2193",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-4540",
-      "to": "PAN-4597",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4597",
-      "to": "PAN-4598",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4605",
-      "to": "PAN-4527",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4605",
-      "to": "PAN-4532",
+      "from": "PAN-4527",
+      "to": "PAN-4624",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
