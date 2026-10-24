@@ -80,9 +80,12 @@ export async function classifyVerificationHead(
   current: string | undefined,
 ): Promise<VerificationHeadRelation> {
   if (!launch || !current) return 'unknown';
-  if (launch === current) return 'same';
   const launchHeads = anchorHeads(launch, roots);
   const currentHeads = anchorHeads(current, roots);
+  // A snapshot omits a repo whose HEAD it could not read; equal partial
+  // anchors are no evidence about that repo.
+  if (roots.some((candidate) => !launchHeads.has(candidate.repoKey) || !currentHeads.has(candidate.repoKey))) return 'unknown';
+  if (launch === current) return 'same';
   if (launchHeads.size === 0 || launchHeads.size !== currentHeads.size) return 'unknown';
   let relation: VerificationHeadRelation = 'same';
   for (const [repoKey, launchSha] of launchHeads) {
