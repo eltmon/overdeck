@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4618",
   "created": "2026-10-24T12:05:55.935Z",
-  "updated": "2026-10-24T13:14:00.426Z",
+  "updated": "2026-10-24T13:16:07.179Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -79,6 +79,10 @@
       "claimedBy": "agent-pan-4618",
       "claimedAt": "2026-10-24T13:01:03.250Z",
       "doneAt": "2026-10-24T13:02:34.579Z"
+    },
+    "ci-push-paths-ignore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:16:07.178Z"
     }
   },
   "feedback": [
