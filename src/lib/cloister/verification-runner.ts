@@ -48,7 +48,7 @@ import { appendPipelineEntry } from './pipeline-journal.js';
 import { resolveIssueFeedbackTarget } from './feedback-target.js';
 import { messageAgent } from '../agents.js';
 import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
-import { resolveWorkspaceRepoRoots } from '../project-repos.js';
+import { resolveWorkspaceRepoRoots, type WorkspaceRepoRoot } from '../project-repos.js';
 import { getXBriefACStatus } from '../xbrief/acceptance-criteria.js';
 import { XBriefMergeConflictError } from '../xbrief/io.js';
 import { isXBriefFilename } from '../xbrief/lifecycle.js';
@@ -57,6 +57,7 @@ import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 import { snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
 import { primaryShaFromAnchor } from './verified-head.js';
+import { classifyVerificationHead, isSameVerificationHead } from './verification-head.js';
 
 const execAsync = promisify(exec);
 
@@ -264,6 +265,23 @@ async function readWorkspaceHeadShort(workspacePath: string): Promise<string | u
 }
 
 /**
+ * PAN-4527: the eight-char head a verdict belongs to. The launch head while
+ * HEAD is still that head or the worker's own sync merge of it
+ * (verification-head.ts); otherwise the workspace's current HEAD.
+ */
+async function resolveVerifiedHeadShort(
+  repoRoots: WorkspaceRepoRoot[],
+  launchHead: HeadAnchor | undefined,
+  launchHeadShort: string | undefined,
+  issueId: string,
+  workspacePath: string,
+): Promise<string | undefined> {
+  const currentHead = await snapshotWorkspaceHeads(issueId, workspacePath);
+  if (isSameVerificationHead(await classifyVerificationHead(repoRoots, launchHead, currentHead))) return launchHeadShort;
+  return (await readWorkspaceHeadShort(workspacePath)) ?? launchHeadShort;
+}
+
+/**
  * FR-8: report the run as an `overdeck/verification` check run where the GitHub
  * App is installed. Non-fatal — the workspace artifact is the primary record.
  */
@@ -346,7 +364,8 @@ export async function runVerificationForIssueInProcess(
     // PAN-3906: the head a test-skip waiver is pinned to. Snapshotted BEFORE the
     // sync below, which merges `origin/<target>` in and moves HEAD — that would
     // expire a waiver the operator just recorded. The gate diff is three-dot.
-    const testSkipHead = await snapshotWorkspaceHeads(issueId, workspacePath);
+    // PAN-4527: it is also the launch head later heads are classified against.
+    const launchHead = await snapshotWorkspaceHeads(issueId, workspacePath);
 
     // === Sync target branch ===
     if (options.syncTargetBranch !== false) {
@@ -526,7 +545,7 @@ export async function runVerificationForIssueInProcess(
     // repository root and violations aggregate, so a skipped test in a secondary
     // repo cannot slip past it.
     const testSkipStart = Date.now();
-    const testSkip = await evaluateTestSkipGate(workspacePath, repoRoots, testSkipHead);
+    const testSkip = await evaluateTestSkipGate(workspacePath, repoRoots, launchHead);
     // PAN-1728: the spec is immutable after planning; a work-agent edit to it fails
     // a required `plan-integrity` check before the quality gates run.
     const planIntegrityStart = Date.now();
@@ -576,16 +595,22 @@ export async function runVerificationForIssueInProcess(
     // test job. When it is already known red, re-requesting review on the same
     // head fails `test` again instead of passing on typecheck+lint alone — so a
     // resubmit without a fix counts against the attempt budget as it always did.
+    // PAN-4527: the verdict is for the head being verified now. The worker's own
+    // sync merge keeps the launch head (CI never sees that local merge commit);
+    // an agent commit since launch makes the new commit the verified head.
+    const verifiedHeadShort = testsMode === 'ci'
+      ? await resolveVerifiedHeadShort(repoRoots, launchHead, headShort, issueId, workspacePath)
+      : headShort;
     const ciTestRed = testsMode === 'ci'
       && !localGateResults.some((r) => !r.passed && r.required !== false)
-      && readLatestCiTestResult(workspacePath, headShort) === 'failed';
+      && readLatestCiTestResult(workspacePath, verifiedHeadShort) === 'failed';
     const gateResults = ciTestRed
       ? [...localGateResults, {
         name: 'test',
         passed: false,
         required: true,
         durationMs: 0,
-        output: `The CI test job already failed on this head (${headShort}). Fix it and push a new commit; see .pan/feedback/ for the CI failure details.`,
+        output: `The CI test job already failed on this head (${verifiedHeadShort}). Fix it and push a new commit; see .pan/feedback/ for the CI failure details.`,
       }]
       : localGateResults;
 

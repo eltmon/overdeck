@@ -409,6 +409,74 @@ gates keep their slots; nothing is preempted. The file layout and stale-owner
 reclaim are described in the CPU-pressure bullet of
 [Agent Auto-Resume Gates](#agent-auto-resume-gates).
 
+### Same head: joining or restarting a live worker (PAN-4527)
+
+Verification runs in a detached worker process
+(`cloister/verification-worker-supervisor.ts`) inside the agent's own
+workspace, so the workspace HEAD can move while it runs. One rule,
+`cloister/verification-head.ts`, decides whether a later head is still the
+head the worker launched on:
+
+- **same** — the head has not moved.
+- **synced** — the head is the worker's own target-branch sync: a merge commit
+  whose first parent is the launch head and whose second parent is on
+  `origin/<target>`, or a fast-forward of the launch head onto it. This still
+  counts as the launch head.
+- **moved** — anything else, such as an agent commit since launch. An
+  unreadable head counts as moved.
+
+When a review request arrives while a worker for the issue is alive and has
+no result yet, the supervisor **joins** it (waits for its result) only when
+the requested head is the same or synced head. When the agent has committed
+since the worker launched, the supervisor kills that worker and starts a
+fresh one on the new head, so a re-review after a fix push never gets the old
+head's verdict. Merge verification never syncs, so it joins only on the
+exact launch head.
+
+The same rule picks the head the CI test verdict is read for in `ci` tests
+mode: the launch head while HEAD is the same or synced head (CI never sees the
+worker's local sync merge commit), otherwise the workspace's current head.
+
+### Verification survives a dashboard restart (PAN-4532)
+
+The worker outlives a dashboard restart, but the request-review continuation
+that waits for its result (push the verified branch, dispatch review) lived in
+the old process. Two mechanisms carry it over, and neither re-runs a gate the
+worker already ran:
+
+- **Results are adopted, not re-run.** The worker state
+  (`~/.overdeck/verification-workers/<issue>/state.json`) records the door
+  that launched it (`logPrefix`), its options, and `resultConsumedAt` once a
+  waiter takes its result. When a request arrives and the latest worker has
+  finished with a result nobody consumed, the supervisor returns that result
+  instead of starting a fresh worker, provided the head is the same or synced
+  head (above), the options match, and the outcome is not `error`. A result is
+  consumed at most once, so a second request on the same head is a real
+  re-run and still counts against the attempt budget.
+- **Boot re-attaches.** On boot the primary dashboard
+  (`cloister/verification-boot-adoption.ts`) re-enters the review-request door,
+  with source `verification-adoption`, for every `request-review` worker that
+  is still running or holds an unconsumed result. The door's verify step joins
+  the live worker or adopts its result, then pushes and dispatches review as
+  the original request would have. A `review` (`/trigger`) or `merge-verify`
+  worker is not re-attached; its door owns the retry.
+
+When either mechanism cannot apply, the old recovery still runs, and it re-runs
+the gates. A result whose consumption cannot be written to the state file is
+never used: adoption skips it, and a waiter returns an `error` outcome instead,
+so one result never dispatches twice. A worker
+started by a dashboard older than PAN-4532 has no `logPrefix` or `options`, so
+it is neither re-attached nor adopted on the restart that deploys this change.
+If boot adoption is refused (for example, the workspace is dirty), the worker
+still writes `verification.passed`, and `recoverUndispatchedReviews` re-requests
+the review. If the dashboard dies between taking an already-finished result and
+dispatching review, the journal tail is `review.requested`, and only
+`recoverStalledReviews` would re-request it. Its re-request fallback does not
+run in the deacon child yet
+([PAN-4623](https://github.com/eltmon/overdeck/issues/4623)), so that review
+waits for the next request. [PAN-4622](https://github.com/eltmon/overdeck/issues/4622)
+tracks closing this window.
+
 ## Verification artifacts (FR-8)
 
 Each verification run writes an immutable artifact named by run time and
@@ -1727,6 +1795,10 @@ door: the route re-verifies against current main and journals
 `review.requested` itself, which moves the tail and makes the recovery
 exactly-once. The first deacon-lite patrol runs at deacon start, so a stall that
 began before a restart is covered as soon as the process comes back up.
+Since PAN-4532 that re-verify no longer re-runs the gates for an unchanged
+head: the supervisor adopts the worker's unconsumed result (see "Verification
+survives a dashboard restart"), and boot adoption usually dispatches the review
+before this routine's 5-minute age threshold.
 
 `recoverSilentReviewers` (PAN-4433) covers a reviewer that was dispatched and
 never ran. `agent-pan-4383-review` (quick mode) was dispatched on 2026-09-29,
