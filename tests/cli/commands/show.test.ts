@@ -325,6 +325,7 @@ describe('showCommand', () => {
       expect(payload.agentId).toBe('agent-pan-8');
       expect(payload.state).toBe('ready');
       expect(payload).toHaveProperty('attention');
+      expect(payload.prOutsidePipeline).toBeNull();
       expect(payload).toHaveProperty('health');
       expect(payload).toHaveProperty('cv');
     });

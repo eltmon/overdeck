@@ -251,3 +251,35 @@ describe('the batch door derives an outside PR', () => {
     }
   });
 });
+
+describe('the batch door lists worktrees once (PAN-4605)', () => {
+  let projectPath: string;
+
+  beforeEach(() => {
+    projectPath = mkdtempSync(join(tmpdir(), 'derived-issue-state-worktrees-'));
+    git.calls.length = 0;
+    git.handler = () => '';
+  });
+
+  afterEach(() => {
+    rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  it('runs git worktree list at most once for two qualifying issues', async () => {
+    const prRow = (n: number) => ({
+      number: n, url: `https://github.com/o/r/pull/${n}`, state: 'OPEN', headRefName: `feature/pan-${n}`, headRefOid: sha('a'),
+      mergeable: 'MERGEABLE', reviewDecision: '', statusCheckRollup: [], isDraft: false,
+    });
+
+    const states = await loadIssueStatesForProject(projectPath, ['PAN-1', 'PAN-2'], {
+      panes: [],
+      issues: openIssues(['PAN-1', 'PAN-2']),
+      listPullRequests: async () => [prRow(1), prRow(2)],
+      approvalAtHead: () => undefined,
+    });
+
+    expect(git.calls.filter((args) => args[0] === 'worktree')).toHaveLength(1);
+    expect(states.get('PAN-1')?.attention).toBe('pr-outside-pipeline');
+    expect(states.get('PAN-2')?.attention).toBe('pr-outside-pipeline');
+  });
+});

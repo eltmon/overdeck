@@ -542,12 +542,17 @@ describe('handlePullRequest → review pipeline (PAN-3917 W12)', () => {
   });
 
   it('does not adopt for any other review-start refusal (PAN-4605)', async () => {
-    startReview.mockResolvedValue({ started: false, reason: 'dirty-workspace', error: 'bun.lock' } as never);
+    startReview.mockResolvedValueOnce({ started: false, reason: 'dirty-workspace', error: 'bun.lock' } as never);
+    startReview.mockResolvedValueOnce({ started: false, reason: 'already-running' } as never);
 
-    await handlePullRequest(makePayload({
-      action: 'opened',
-      pull_request: { number: 9, head: { ref: 'feature/pan-1', sha: 'f00d' } },
-    }));
+    for (let delivery = 0; delivery < 2; delivery += 1) {
+      await handlePullRequest(makePayload({
+        action: 'opened',
+        pull_request: { number: 9, head: { ref: 'feature/pan-1', sha: 'f00d' } },
+      }));
+    }
+
+    expect(startReview).toHaveBeenCalledTimes(2);
 
     expect(mockAdopt).not.toHaveBeenCalled();
   });

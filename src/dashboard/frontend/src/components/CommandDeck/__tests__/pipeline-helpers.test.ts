@@ -101,6 +101,9 @@ describe('pr-outside-pipeline classification (PAN-4605)', () => {
 
     expect(isNeedsYouFeature(feature, derived)).toBe(true);
     expect(sublineFor(makeBucket(feature, derived))).toBe(`review never started — ${fix}`);
+    const groups = groupPipelineEntries([makeBucket(feature, derived)]);
+    expect(groups[0]?.key).toBe('needs-you');
+    expect(groups[0]?.entries).toHaveLength(1);
   });
 });
 
