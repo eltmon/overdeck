@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4609",
   "created": "2026-10-24T10:37:57.966Z",
-  "updated": "2026-10-24T10:54:45.027Z",
+  "updated": "2026-10-24T10:55:07.070Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "w4-choosing-gates.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T10:54:45.027Z"
+    },
+    "w4-choosing-gates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:55:07.070Z"
     }
   }
 }
