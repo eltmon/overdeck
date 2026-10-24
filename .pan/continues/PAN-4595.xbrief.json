@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4595",
+  "created": "2026-10-24T08:32:14.826Z",
+  "updated": "2026-10-24T08:32:14.826Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "register-heartbeat-in-health": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4595",
+      "claimedAt": "2026-10-24T08:32:14.826Z"
+    }
+  }
+}
