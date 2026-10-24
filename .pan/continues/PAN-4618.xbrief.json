@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4618",
   "created": "2026-10-24T12:05:55.935Z",
-  "updated": "2026-10-24T13:19:53.662Z",
+  "updated": "2026-10-24T13:20:09.555Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -135,6 +135,10 @@
     "dod-later-green-skips-ci-less.ac4": {
       "status": "completed",
       "doneAt": "2026-10-24T13:19:53.661Z"
+    },
+    "dod-later-green-skips-ci-less.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:20:09.555Z"
     }
   },
   "feedback": [
