@@ -45,6 +45,22 @@ the **CI test job on the PR head is the test gate**:
   Every relay decision not to deliver logs one `[ci-failure-feedback]` line
   with its reason. A webhook missed while the dashboard is down is not
   replayed; nothing polls for it.
+- **What the CI failure feedback contains (PAN-4534).** The relay reads the
+  failing checks from the PR head's **check runs**
+  (`GET /repos/{owner}/{repo}/commits/{sha}/check-runs`,
+  `cloister/ci-check-run-failures.ts`), which conclude per job, so the failing
+  shard is found while its workflow run is still in progress. An aggregate
+  job (the `test` job that only echoes `test-shard: failure`) is dropped when
+  a job it aggregates failed. For each failing GitHub Actions job the feedback
+  file has a section with the check name, its job-log command, its details
+  URL, and an excerpt of the job log
+  (`GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs`): from the first
+  Vitest `FAIL` line through the `❯ file:line` frames to the
+  `Test Files … failed` summary, about 2000 characters, or the log's tail when
+  it has no Vitest failure. A log GitHub has not published yet is re-read with
+  backoff for about two minutes; if it never appears, the section still names
+  the check and its URL. Only when no check run reports a failure does the
+  relay fall back to the completed failed workflow runs (`gh run list`).
 - **Attempt budget.** A CI test failure counts against the local gate's budget
   (`VERIFICATION_MAX_CYCLES` = 3, `cloister/verification-cycles.ts`), read
   from the same per-run artifacts. The local count is per head — every commit

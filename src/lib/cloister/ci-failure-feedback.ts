@@ -43,6 +43,7 @@ import {
 } from './verification-cycles.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import { readDefaultBranchFailingTestChecks } from './ci-default-branch-tests.js';
+import { collectCheckRunFailures } from './ci-check-run-failures.js';
 import { resolveVerificationTestsMode, TEST_GATE_NAME } from './verification-tests-mode.js';
 
 function execFilePromise(
@@ -74,7 +75,12 @@ export interface CiFailureFeedbackOptions {
 export interface CiFailure {
   name: string;
   workflowName?: string;
-  runId: number;
+  /** A failed workflow run (the fallback lookup). */
+  runId?: number;
+  /** PAN-4534: a failing check run's Actions job. */
+  jobId?: number;
+  /** PAN-4534: the failing check's details page. */
+  url?: string;
   excerpt: string;
   inheritedFromMain: boolean;
 }
@@ -489,6 +495,13 @@ async function collectFailures(
   headSha: string,
   mainFailingNames: Set<string>,
 ): Promise<CiFailure[]> {
+  // PAN-4534: the head's check runs conclude per job, so a failing shard is
+  // visible while its workflow run is still in progress. The workflow-run
+  // lookup below stays as the fallback when no check run reports a failure.
+  const checkRunFailures = await collectCheckRunFailures(owner, repo, headSha);
+  if (checkRunFailures && checkRunFailures.length > 0) {
+    return checkRunFailures.map((failure) => ({ ...failure, inheritedFromMain: mainFailingNames.has(failure.name) }));
+  }
   const runs = await listFailingRuns(owner, repo, branch, headSha);
   const failures: CiFailure[] = [];
   for (const run of runs) {
@@ -539,7 +552,9 @@ function buildFeedbackBody(opts: {
       if (f.workflowName && f.workflowName !== f.name) {
         body += `Workflow: ${f.workflowName}  \n`;
       }
-      body += `Run: \`gh run view ${f.runId} --repo ${opts.repo}\`  \n`;
+      if (f.runId !== undefined) body += `Run: \`gh run view ${f.runId} --repo ${opts.repo}\`  \n`;
+      if (f.jobId !== undefined) body += `Job log: \`gh api repos/${opts.repo}/actions/jobs/${f.jobId}/logs\`  \n`;
+      if (f.url) body += `Check: ${f.url}  \n`;
       if (f.excerpt) {
         body += '```\n' + f.excerpt + '\n```\n\n';
       } else {
