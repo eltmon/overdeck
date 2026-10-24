@@ -416,8 +416,12 @@ reads that answer for the head in the PR listing (`headRefOid`); a miss or an
 answer for another head derives `in-review`, never `ready`. A changed answer
 re-derives the issue and reaches the board as `issue_state.changed`. No forge
 read is added and the frontend does not poll. A PR held for UAT is not gated by
-the scheduler, so its button appears once some gate evaluation or marker read
-has proven it; the Merge endpoint itself always asks the gate. Conditions 3 and
+the scheduler. Since PAN-4597 the approval refresher
+(`services/approval-at-head-refresh.ts`) asks the gate on the same 60-second
+tick for every PR the forge reports approved, green and mergeable. It asks again
+before the answer expires, so the button appears within about a minute and stays
+until the PR merges, its head moves, or a check goes red. The Merge endpoint
+itself always asks the gate. Conditions 3 and
 4 still surface as the refusal when the button is clicked. The UAT train's
 candidate set (`listReadyIssuesForProject`) keeps the forge's own decision: it
 is mostly held issues the scheduler never gates. Promoting a UAT batch lands
