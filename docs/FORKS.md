@@ -192,7 +192,9 @@ The kickoff door, `src/lib/overdeck/conversation-kickoff.ts` and the route
 (`GET`/`POST /api/conversations/:name/kickoff`), is the only path that sends a
 held kickoff, and it sends it at most once:
 
-- `GET` answers `{ held: true, text }` or `{ held: false }`.
+- `GET` answers `{ held: true, text, focus? }` or `{ held: false }`. `focus` is
+  the trimmed `handoffFocus` from `fork_request` (`heldKickoffFocus`), omitted
+  when there is none (PAN-4596).
 - `POST` (optional body `{ text }`) atomically claims the held kickoff
   (`claimHeldKickoff`, a single SQLite transaction — D's exactly-once guarantee
   needs no client-side locking). A second `POST`, or one on a conversation that
@@ -207,6 +209,28 @@ held kickoff, and it sends it at most once:
 - `pan handoff start <conv>` (`src/cli/commands/handoff-start.ts`) is the CLI
   front-end: it POSTs the door and polls with the same
   `waitForForkPipeline` helper `pan handoff` itself uses.
+
+**Ended held conversations (PAN-4596).** A held conversation whose session
+ended before anyone started it has no transcript, because Claude Code writes
+the JSONL only on the first message. Its panel used to show the generic "no
+saved history" state with Resume Session. Now `ConversationView`
+(`ConversationPanel.tsx`) reads the door for every ended conversation
+(`useHeldKickoff(name, { enabled: !sessionAlive, pollAlways: true })`) and,
+when the kickoff is held, renders `HeldHandoffView.tsx`: the title "Held
+handoff — kickoff not sent", the focus, the working directory, the handoff doc
+with an **Open handoff doc** button, the kickoff text behind a disclosure,
+**Start** and **Archive**. There is no Resume: a resume would start the agent
+with a resume contract instead of its kickoff and leave the kickoff held.
+Start POSTs the door with no text, and the door relaunches the ended session
+through `ensureForkSessionReady(conv, sessionId, resume=false)` before it
+delivers. After a failed Start the door restores the hold and marks the fork
+failed; the panel re-reads the door, shows the held view again with "The last
+start failed: <error>", and Start retries. The panel shows "no saved history"
+only after the lookup answers `{ held: false }`: a pending lookup shows the
+loading skeleton, and a failed one shows a retryable warning. The
+pending-input feed also lists every unarchived held conversation (alive or
+ended) with `heldKickoff: { since, focus? }`, so Awareness → Needs you shows
+it under Waiting until it is started or archived.
 
 `pan handoff --skill <name>` / `--pack <id>` write only the successor's
 `conversations.skill_overrides` (PAN-4486's per-conversation skill layer) —
