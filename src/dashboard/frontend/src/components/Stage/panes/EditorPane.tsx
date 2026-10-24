@@ -10,7 +10,7 @@ import styles from '../stage.module.css'
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'ready'; text: string; mtimeMs: number }
+  | { status: 'ready'; text: string; mtimeMs: number; writable: boolean }
   | { status: 'error'; code?: string; message: string }
 
 const TEXTAREA_STYLE: React.CSSProperties = {
@@ -34,6 +34,9 @@ const TEXTAREA_STYLE: React.CSSProperties = {
  * with no workspace context, e.g. a repo-root file chip inside a conversation).
  * Edit|Preview mirrors DocsPane's sub-tab styling; Preview reuses MarkdownTab
  * so there is exactly one markdown renderer in the app (PAN-3260 decision).
+ * A file outside the write roots (registered project roots + OVERDECK_HOME)
+ * reads fine but comes back with writable: false and opens read-only — the
+ * textarea, Save, and Ctrl/Cmd+S all become no-ops (PAN-4583).
  */
 export function EditorPane({ pane }: PaneWrapperProps) {
   const filePath = pane.editorFilePath
@@ -50,8 +53,8 @@ export function EditorPane({ pane }: PaneWrapperProps) {
     void getTransport()
       .request((client) => (client as PanRpcProtocolClient)[WS_METHODS.readFileAtPath]({ path: filePath }))
       .then((result) => {
-        const r = result as { text: string; mtimeMs: number }
-        setLoad({ status: 'ready', text: r.text, mtimeMs: r.mtimeMs })
+        const r = result as { text: string; mtimeMs: number; writable?: boolean }
+        setLoad({ status: 'ready', text: r.text, mtimeMs: r.mtimeMs, writable: r.writable === true })
         setDraft(r.text)
       })
       .catch((error: unknown) => {
@@ -66,10 +69,11 @@ export function EditorPane({ pane }: PaneWrapperProps) {
   }, [loadFile])
 
   const dirty = load.status === 'ready' && draft !== load.text
+  const writable = load.status === 'ready' && load.writable
 
   const save = useCallback(
     (opts?: { overwrite?: boolean }) => {
-      if (load.status !== 'ready' || !filePath) return
+      if (load.status !== 'ready' || !load.writable || !filePath) return
       setSaving(true)
       void getTransport()
         .request((client) =>
@@ -81,7 +85,7 @@ export function EditorPane({ pane }: PaneWrapperProps) {
         )
         .then((result) => {
           const r = result as { mtimeMs: number }
-          setLoad({ status: 'ready', text: draft, mtimeMs: r.mtimeMs })
+          setLoad({ status: 'ready', text: draft, mtimeMs: r.mtimeMs, writable: true })
           setConflict(false)
           toast.success('Saved')
         })
@@ -109,10 +113,10 @@ export function EditorPane({ pane }: PaneWrapperProps) {
     (event: KeyboardEvent<HTMLDivElement>) => {
       if ((event.metaKey || event.ctrlKey) && event.key === 's') {
         event.preventDefault()
-        if (dirty && !saving) save()
+        if (writable && dirty && !saving) save()
       }
     },
-    [dirty, saving, save],
+    [writable, dirty, saving, save],
   )
 
   const openExternally = useCallback(() => {
@@ -191,10 +195,15 @@ export function EditorPane({ pane }: PaneWrapperProps) {
         </button>
         <span style={{ flex: 1 }} />
         {dirty && <span data-testid="editor-pane-dirty" title="Unsaved changes" style={{ color: 'var(--muted-foreground)' }}>●</span>}
-        <button type="button" disabled={!dirty || saving} onClick={() => save()} data-testid="editor-pane-save">
+        <button type="button" disabled={!writable || !dirty || saving} onClick={() => save()} data-testid="editor-pane-save">
           Save
         </button>
       </div>
+      {!writable && (
+        <div data-testid="editor-pane-readonly-note" style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--muted-foreground)' }}>
+          Read-only — this file is outside the registered project roots.
+        </div>
+      )}
       {conflict && (
         <div data-testid="editor-pane-conflict" style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
           File changed on disk since it was read.
@@ -212,7 +221,8 @@ export function EditorPane({ pane }: PaneWrapperProps) {
             data-testid="editor-pane-textarea"
             style={TEXTAREA_STYLE}
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            readOnly={!writable}
+            onChange={writable ? (event) => setDraft(event.target.value) : undefined}
             spellCheck={false}
           />
         ) : (
