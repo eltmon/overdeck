@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4596",
   "created": "2026-10-24T08:38:08.714Z",
-  "updated": "2026-10-24T08:39:45.420Z",
+  "updated": "2026-10-24T08:45:22.430Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-10-24T08:39:38.527Z"
     },
     "held-handoff-view": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4596",
-      "claimedAt": "2026-10-24T08:39:45.420Z"
+      "claimedAt": "2026-10-24T08:39:45.420Z",
+      "doneAt": "2026-10-24T08:45:22.430Z"
     }
   }
 }
