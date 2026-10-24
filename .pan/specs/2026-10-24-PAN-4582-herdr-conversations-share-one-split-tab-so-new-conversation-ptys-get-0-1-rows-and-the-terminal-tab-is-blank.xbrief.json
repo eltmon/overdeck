@@ -4,17 +4,17 @@
     "created": "2026-10-24T07:34:50Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4582: Herdr: conversations share one split tab, so new conversation PTYs get 0-1 rows and the Terminal tab is blank",
-    "updated": "2026-10-24T07:39:33.291Z"
+    "updated": "2026-10-24T07:40:13.826Z"
   },
   "plan": {
     "id": "pan-4582",
     "title": "Herdr: conversations share one split tab, so new conversation PTYs get 0-1 rows and the Terminal tab is blank",
-    "status": "proposed",
+    "status": "running",
     "uid": "4818321f-0e95-4ee1-a5ec-cc98a32b1449",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T07:34:50Z",
-    "updated": "2026-10-24T07:39:33.291Z",
+    "updated": "2026-10-24T07:40:13.826Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4582",
@@ -604,5 +604,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
