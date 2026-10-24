@@ -8,18 +8,29 @@ const execFile = vi.hoisted(() => vi.fn());
 vi.mock('node:child_process', () => ({ execFile }));
 
 import {
+  commitStatusAsCheckRun,
   defaultBranchCommitTestVerdict,
   readDefaultBranchFailingTestChecks,
 } from '../ci-default-branch-tests.js';
 
 type Run = { name: string; status: string; conclusion: string | null };
+type Status = { name: string; state: string; targetUrl?: string };
 
-/** `gh api` answers: the commit list, then each commit's check runs. */
-function forge(commits: Record<string, Run[]>): void {
+/**
+ * `gh api` answers: the commit list, each commit's check runs, and (D-shaped
+ * per PAN-4589) each commit's status page — `statuses[sha]` defaults to `[]`,
+ * so every pre-existing test's verdict is unchanged.
+ */
+function forge(commits: Record<string, Run[]>, statuses: Record<string, Status[]> = {}): void {
   execFile.mockImplementation((_file: string, args: string[], _opts: unknown, callback: (err: Error | null, stdout?: string) => void) => {
-    const path = args[1] ?? '';
+    const path = args.find((a) => a.startsWith('repos/o/r/commits')) ?? '';
     if (path.startsWith('repos/o/r/commits?')) {
       callback(null, JSON.stringify(Object.keys(commits)));
+      return;
+    }
+    if (path.includes('/status?')) {
+      const sha = path.match(/^repos\/o\/r\/commits\/([^/]+)\/status/)?.[1] ?? '';
+      callback(null, JSON.stringify(statuses[sha] ?? []));
       return;
     }
     const sha = path.match(/^repos\/o\/r\/commits\/([^/]+)\/check-runs/)?.[1];
@@ -79,6 +90,32 @@ describe('readDefaultBranchFailingTestChecks', () => {
 
     await expect(readDefaultBranchFailingTestChecks('o/r')).resolves.toBeNull();
   });
+
+  it('counts failing Dagger Cloud commit statuses with no check runs (PAN-4589)', async () => {
+    const daggerUrl = (context: string) => `https://dagger.cloud/o/checks/github.com/o/r@head?check=${context}`;
+    forge(
+      { head: [] },
+      { head: [
+        { name: 'go-client/test', state: 'failure', targetUrl: daggerUrl('go-client/test') },
+        { name: 'helm/lint', state: 'failure', targetUrl: daggerUrl('helm/lint') },
+      ] },
+    );
+
+    await expect(readDefaultBranchFailingTestChecks('o/r')).resolves.toEqual(new Set(['go-client/test']));
+  });
+
+  it('walks back past a pending Dagger test status to an older green one (PAN-4589)', async () => {
+    const daggerUrl = (context: string) => `https://dagger.cloud/o/checks/github.com/o/r@sha?check=${context}`;
+    forge(
+      { head: [], prev: [] },
+      {
+        head: [{ name: 'go-client/test', state: 'pending', targetUrl: daggerUrl('go-client/test') }],
+        prev: [{ name: 'go-client/test', state: 'success', targetUrl: daggerUrl('go-client/test') }],
+      },
+    );
+
+    await expect(readDefaultBranchFailingTestChecks('o/r')).resolves.toEqual(new Set());
+  });
 });
 
 describe('defaultBranchCommitTestVerdict', () => {
@@ -88,5 +125,43 @@ describe('defaultBranchCommitTestVerdict', () => {
       done('test-shard (1/4)', 'success'),
       done('lint', 'failure'),
     ])).toEqual(new Set(['test-e2e']));
+  });
+
+  it('counts an errored Dagger Cloud commit status via commitStatusAsCheckRun (PAN-4589)', () => {
+    expect(defaultBranchCommitTestVerdict([
+      commitStatusAsCheckRun({
+        name: 'go-client/test',
+        state: 'error',
+        targetUrl: 'https://dagger.cloud/o/checks/github.com/o/r@x?check=go-client/test',
+      }),
+    ])).toEqual(new Set(['go-client/test']));
+  });
+});
+
+describe('ghJsonPages flattening (PAN-4589)', () => {
+  it('flattens every page of a paginated status call into the resolved set', async () => {
+    const daggerUrl = (context: string) => `https://dagger.cloud/o/checks/github.com/o/r@head?check=${context}`;
+    execFile.mockImplementation((_file: string, args: string[], _opts: unknown, callback: (err: Error | null, stdout?: string) => void) => {
+      const path = args.find((a) => a.startsWith('repos/o/r/commits')) ?? '';
+      if (path.startsWith('repos/o/r/commits?')) {
+        callback(null, JSON.stringify(['head']));
+        return;
+      }
+      if (path.includes('/status?')) {
+        const page1 = [{ name: 'go-client/test', state: 'failure', targetUrl: daggerUrl('go-client/test') }];
+        const page2 = [{ name: 'golang/packages/tests/test', state: 'failure', targetUrl: daggerUrl('golang/packages/tests/test') }];
+        callback(null, `${JSON.stringify(page1)}\n${JSON.stringify(page2)}`);
+        return;
+      }
+      if (path.includes('/check-runs')) {
+        callback(null, JSON.stringify([]));
+        return;
+      }
+      callback(new Error(`unexpected gh call: ${args.join(' ')}`));
+    });
+
+    await expect(readDefaultBranchFailingTestChecks('o/r')).resolves.toEqual(
+      new Set(['go-client/test', 'golang/packages/tests/test']),
+    );
   });
 });

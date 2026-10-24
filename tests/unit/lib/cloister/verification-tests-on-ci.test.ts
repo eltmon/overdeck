@@ -79,6 +79,8 @@ import { readPipelineJournal } from '../../../../src/lib/cloister/pipeline-journ
 import {
   findPullRequestTestJob,
   isCiTestCheckName,
+  isCiTestRollupCheck,
+  isDaggerCloudTestCheck,
   resolveVerificationTestsMode,
   resolveVerificationTestsModeDecision,
   selectLocalVerificationGates,
@@ -393,6 +395,26 @@ describe('resolveVerificationTestsMode (review of #3993: a PR-triggered test job
       reason: 'verification.tests: ci in projects.yaml',
     });
   });
+
+  it('names dagger.toml in the local reason when no workflow qualifies (PAN-4589)', () => {
+    expect(resolveVerificationTestsModeDecision(base, { ...workflowsIn({}), fileExists: (p: string) => p === '/p/dagger.toml' }))
+      .toEqual({ mode: 'local', reason: 'no GitHub Actions workflows; dagger.toml present; set verification.tests: ci if Dagger Cloud checks are on' });
+  });
+
+  it('leaves the reason unchanged with no dagger.toml (PAN-4589)', () => {
+    expect(resolveVerificationTestsModeDecision(base, { ...workflowsIn({}), fileExists: () => false }))
+      .toEqual({ mode: 'local', reason: 'no GitHub Actions workflows' });
+  });
+
+  it('stays ci with the workflow reason when a qualifying workflow exists alongside dagger.toml (PAN-4589)', () => {
+    expect(resolveVerificationTestsModeDecision(
+      base,
+      { ...workflowsIn({ '/p/.github/workflows': at(PR_TEST_WORKFLOW) }), fileExists: (p: string) => p === '/p/dagger.toml' },
+    )).toEqual({
+      mode: 'ci',
+      reason: '.github/workflows/ci.yml runs test job "test" on pull requests',
+    });
+  });
 });
 
 describe('findPullRequestTestJob', () => {
@@ -463,5 +485,39 @@ describe('isCiTestCheckName', () => {
     expect(isCiTestCheckName('lint')).toBe(false);
     expect(isCiTestCheckName('testing-tools')).toBe(false);
     expect(isCiTestCheckName(undefined)).toBe(false);
+  });
+});
+
+describe('isDaggerCloudTestCheck (PAN-4589)', () => {
+  const daggerUrl = 'https://dagger.cloud/dagger/checks/github.com/dagger/dagger@abc?check=x';
+
+  it('matches a Dagger Cloud check path whose segment the single-name matcher accepts', () => {
+    expect(isDaggerCloudTestCheck('go-client/test', daggerUrl)).toBe(true);
+    expect(isDaggerCloudTestCheck('golang/packages/tests/test', daggerUrl)).toBe(true);
+    expect(isDaggerCloudTestCheck('vitest/projects/tests/test', daggerUrl)).toBe(true);
+    expect(isDaggerCloudTestCheck('test-split/test-llm', daggerUrl)).toBe(true);
+  });
+
+  it('rejects a Dagger Cloud check path with no test segment', () => {
+    expect(isDaggerCloudTestCheck('python-client/format', daggerUrl)).toBe(false);
+    expect(isDaggerCloudTestCheck('helm/lint', daggerUrl)).toBe(false);
+    expect(isDaggerCloudTestCheck('engine-lab/wcprof-report-test', daggerUrl)).toBe(false);
+  });
+
+  it('rejects a test-named check whose target URL is not Dagger Cloud', () => {
+    expect(isDaggerCloudTestCheck('go-client/test', 'https://buildkite.com/o/p/builds/1')).toBe(false);
+    expect(isDaggerCloudTestCheck('go-client/test', undefined)).toBe(false);
+    expect(isDaggerCloudTestCheck('go-client/test', 'not a url')).toBe(false);
+    expect(isDaggerCloudTestCheck('go-client/test', 'http://dagger.cloud/x')).toBe(false);
+    expect(isDaggerCloudTestCheck('go-client/test', 'https://dagger.cloud.evil.example/x')).toBe(false);
+  });
+});
+
+describe('isCiTestRollupCheck (PAN-4589)', () => {
+  it('recognizes a check run by name and a commit status by context', () => {
+    expect(isCiTestRollupCheck({ name: 'test (22)' })).toBe(true);
+    expect(isCiTestRollupCheck({ name: 'lint' })).toBe(false);
+    expect(isCiTestRollupCheck({ context: 'test', targetUrl: 'https://buildkite.com/x' })).toBe(true);
+    expect(isCiTestRollupCheck({ context: 'go-client/test', targetUrl: 'https://buildkite.com/x' })).toBe(false);
   });
 });

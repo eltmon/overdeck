@@ -36,7 +36,7 @@ import {
   type TrustedAuthors,
 } from './forge-identity.js';
 import { parseUatVerdict } from './uat-verdict-marker.js';
-import { isCiTestCheckName } from './verification-tests-mode.js';
+import { isCiTestRollupCheck } from './verification-tests-mode.js';
 
 export type { ForgeAuthor, ReadAuthorKinds, TrustedAuthors } from './forge-identity.js';
 
@@ -129,6 +129,8 @@ export interface UatVerdict {
 export interface FailedCheck {
   name: string;
   conclusion: string;
+  /** A commit status's link (Dagger Cloud check page), when the check is a status. */
+  targetUrl?: string;
 }
 
 export interface PrFactsDeps {
@@ -285,14 +287,19 @@ export function listFailedTestChecks(
 ): FailedCheck[] {
   const failed: FailedCheck[] = [];
   for (const check of rollup ?? []) {
-    if (!isCiTestCheckName(check.name)) continue;
+    if (!isCiTestRollupCheck(check)) continue;
+    const failure = (verdict: string): FailedCheck => ({
+      name: check.name ?? check.context ?? '',
+      conclusion: verdict,
+      ...(check.targetUrl ? { targetUrl: check.targetUrl } : {}),
+    });
     const status = normalize(check.status);
     const conclusion = normalize(check.conclusion);
     const state = normalize(check.state);
     if (status === 'COMPLETED' && conclusion && !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(conclusion)) {
-      failed.push({ name: check.name ?? '', conclusion });
+      failed.push(failure(conclusion));
     } else if (state === 'FAILURE' || state === 'ERROR') {
-      failed.push({ name: check.name ?? '', conclusion: state });
+      failed.push(failure(state));
     }
   }
   return failed;
@@ -302,7 +309,7 @@ export function listFailedTestChecks(
 export function summarizeTestChecks(
   rollup: IssuePullRequestData['statusCheckRollup'] | null | undefined,
 ): ChecksVerdict {
-  return summarizeStatusCheckRollup((rollup ?? []).filter((check) => isCiTestCheckName(check.name)));
+  return summarizeStatusCheckRollup((rollup ?? []).filter((check) => isCiTestRollupCheck(check)));
 }
 
 /**
@@ -313,7 +320,7 @@ export function testJobSucceeded(
   rollup: IssuePullRequestData['statusCheckRollup'] | null | undefined,
 ): boolean {
   return (rollup ?? []).some((check) => (
-    isCiTestCheckName(check.name)
+    isCiTestRollupCheck(check)
     && (normalize(check.conclusion) === 'SUCCESS' || normalize(check.state) === 'SUCCESS')
   ));
 }

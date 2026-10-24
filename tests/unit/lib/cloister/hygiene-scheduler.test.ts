@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   reapMergedStrikeWorkspaces: vi.fn(async () => [] as string[]),
   reapOrphanedDashboardServers: vi.fn(async () => [] as string[]),
   reapLeftoverPlaywrightBrowsers: vi.fn(async () => [] as string[]),
+  reapHerdrResiduePanes: vi.fn(async () => [] as string[]),
   sweepTranscriptRetention: vi.fn(async () => [] as string[]),
   reconcileMergedIssueDocker: vi.fn(async () => [] as string[]),
   sweepOrphanedSwarmSlots: vi.fn(async () => [] as string[]),
@@ -28,6 +29,9 @@ vi.mock('../../../../src/lib/cloister/orphan-dashboard-server-reaper.js', () => 
 }));
 vi.mock('../../../../src/lib/cloister/playwright-mcp-reaper.js', () => ({
   reapLeftoverPlaywrightBrowsers: mocks.reapLeftoverPlaywrightBrowsers,
+}));
+vi.mock('../../../../src/lib/cloister/herdr-residue-reaper.js', () => ({
+  reapHerdrResiduePanes: mocks.reapHerdrResiduePanes,
 }));
 vi.mock('../../../../src/lib/cloister/transcript-retention.js', () => ({
   sweepTranscriptRetention: mocks.sweepTranscriptRetention,
@@ -80,6 +84,7 @@ describe('hygiene-scheduler', () => {
     expect(mocks.reapMergedStrikeWorkspaces).toHaveBeenCalledTimes(1);
     expect(mocks.reapOrphanedDashboardServers).toHaveBeenCalledTimes(1);
     expect(mocks.reapLeftoverPlaywrightBrowsers).toHaveBeenCalledTimes(1);
+    expect(mocks.reapHerdrResiduePanes).toHaveBeenCalledTimes(1);
     expect(mocks.sweepTranscriptRetention).toHaveBeenCalledTimes(1);
     expect(mocks.reconcileMergedIssueDocker).toHaveBeenCalledTimes(1);
     expect(mocks.sweepOrphanedSwarmSlots).toHaveBeenCalledTimes(1);
@@ -105,6 +110,7 @@ describe('hygiene-scheduler', () => {
     // ~10-minute-cadence routines must not have fired yet.
     expect(mocks.reapOrphanedDashboardServers).not.toHaveBeenCalled();
     expect(mocks.reapLeftoverPlaywrightBrowsers).not.toHaveBeenCalled();
+    expect(mocks.reapHerdrResiduePanes).not.toHaveBeenCalled();
   });
 
   it('fires the 15s-cadence resource-pressure routines on their own interval', async () => {
@@ -124,11 +130,13 @@ describe('hygiene-scheduler', () => {
     await vi.advanceTimersByTimeAsync(0);
     mocks.reapOrphanedDashboardServers.mockClear();
     mocks.reapLeftoverPlaywrightBrowsers.mockClear();
+    mocks.reapHerdrResiduePanes.mockClear();
 
     await vi.advanceTimersByTimeAsync(10 * 60_000);
 
     expect(mocks.reapOrphanedDashboardServers).toHaveBeenCalledTimes(1);
     expect(mocks.reapLeftoverPlaywrightBrowsers).toHaveBeenCalledTimes(1);
+    expect(mocks.reapHerdrResiduePanes).toHaveBeenCalledTimes(1);
   });
 
   it('fires the hourly transcript retention sweep after an hour', async () => {

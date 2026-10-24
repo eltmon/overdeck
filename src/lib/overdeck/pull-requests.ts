@@ -72,6 +72,10 @@ export interface IssuePullRequestData {
   reviewRequests: Array<{ login?: string; name?: string; __typename?: string }>;
   statusCheckRollup: Array<{
     name?: string;
+    /** A commit status's context (StatusContext rows carry no `name`). */
+    context?: string;
+    /** A commit status's details link (StatusContext). */
+    targetUrl?: string;
     state?: string;
     conclusion?: string;
     status?: string;
