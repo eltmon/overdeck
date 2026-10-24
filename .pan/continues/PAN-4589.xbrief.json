@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4589",
   "created": "2026-10-24T08:19:18.820Z",
-  "updated": "2026-10-24T09:09:29.919Z",
+  "updated": "2026-10-24T09:09:48.376Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "status-webhook-records-pass.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T09:09:29.919Z"
+    },
+    "feedback-status-check-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:09:48.376Z"
     }
   }
 }
