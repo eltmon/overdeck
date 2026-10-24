@@ -4,17 +4,17 @@
     "created": "2026-10-24T13:38:53.000Z",
     "author": "overdeck/0.69.0",
     "description": "Plan for PAN-4527: Re-review joins a verification worker started on the previous head and fails the new head on the old head's CI result",
-    "updated": "2026-10-24T13:40:23.095Z"
+    "updated": "2026-10-24T13:47:54.412Z"
   },
   "plan": {
     "id": "pan-4527",
     "title": "Re-review joins a verification worker started on the previous head and fails the new head on the old head's CI result",
-    "status": "proposed",
+    "status": "running",
     "uid": "596a9dca-0273-4cbf-bbf9-6585bcedaf6c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T13:38:53.000Z",
-    "updated": "2026-10-24T13:40:23.095Z",
+    "updated": "2026-10-24T13:47:54.412Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4527",
@@ -236,5 +236,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
