@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T11:46:56.340Z",
+  "updated": "2026-10-24T11:47:11.688Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -206,6 +206,10 @@
     "command-deck-renders-attention.ac4": {
       "status": "completed",
       "doneAt": "2026-10-24T11:46:56.340Z"
+    },
+    "pan-show-prints-fix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:47:11.688Z"
     }
   }
 }
