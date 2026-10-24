@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4596",
   "created": "2026-10-24T08:38:08.714Z",
-  "updated": "2026-10-24T09:32:30.054Z",
+  "updated": "2026-10-24T09:32:44.826Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "panel-held-branch.ac6": {
       "status": "completed",
       "doneAt": "2026-10-24T09:32:30.054Z"
+    },
+    "feed-held-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:32:44.826Z"
     }
   }
 }
