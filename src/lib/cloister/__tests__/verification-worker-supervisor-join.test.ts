@@ -285,6 +285,23 @@ describe('adopting an unconsumed result (PAN-4532)', () => {
     registerFinishedWorker(commit('a'));
     mocks.failConsumptionWrite = true;
 
+    // The write still fails for the fresh worker, so its waiter fails closed too.
+    expect(await review()).toMatchObject({ outcome: 'error' });
+    expect(mocks.launches).toHaveLength(1);
+  });
+
+  it('a waiter that cannot record consumption fails closed, and the next request adopts the result once', async () => {
+    const liveResult = registerLiveWorker(commit('a'), { logPrefix: 'request-review', options: {} });
+    mocks.failConsumptionWrite = true;
+    expect(await joinAndFinish(liveResult, review)).toMatchObject({ outcome: 'error' });
+    vi.useRealTimers();
+    alivePids.delete(LIVE_PID);
+    mocks.failConsumptionWrite = false;
+
+    expect(await review()).toEqual({ outcome: 'passed' });
+    expect(mocks.launches).toHaveLength(0);
+    expect(readVerificationWorkerState('PAN-1')?.resultConsumedAt).toEqual(expect.any(String));
+    // Handed to one continuation already: the next request is a real re-run.
     expect(await review()).toEqual({ outcome: 'passed' });
     expect(mocks.launches).toHaveLength(1);
   });

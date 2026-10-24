@@ -207,9 +207,13 @@ async function waitForResult(state: WorkerState): Promise<VerificationRunnerOutc
   for (;;) {
     if (existsSync(state.resultPath)) {
       const result = JSON.parse(readFileSync(state.resultPath, 'utf8')) as VerificationRunnerOutcome;
-      // The waiter owns this result; adoption checks the write, so it is
-      // never used a second time even when this write fails.
-      markResultConsumed(state.issueId, state.runId);
+      // Fail closed: a result whose consumption is not on disk could be
+      // adopted again after a restart, so this waiter does not use it. The
+      // next request adopts it once the write succeeds. A newer run that
+      // replaced the state owns the issue now, and this result is not adoptable.
+      if (!markResultConsumed(state.issueId, state.runId) && readVerificationWorkerState(state.issueId)?.runId === state.runId) {
+        return { outcome: 'error', message: `Verification worker ${state.pid} finished, but its result could not be recorded as consumed; re-request review to use it` };
+      }
       return result;
     }
     if (!isProcessAlive(state.pid)) {
