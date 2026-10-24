@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T11:38:55.810Z",
+  "updated": "2026-10-24T11:39:11.461Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "contract-pr-outside-pipeline.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T11:38:55.810Z"
+    },
+    "contract-pr-outside-pipeline.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:39:11.460Z"
     }
   }
 }
