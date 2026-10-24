@@ -239,3 +239,13 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   papers-please and tindra workspaces. Restic home backups failed 8 times in
   7 days, all from a full disk on 2026-10-22.
 - Merged #4600 (PAN-4582) at 09:32 through the merge door.
+- 2026-10-24 10:20 UTC, operator-approved speedups: (1) local verification
+  gates for panopticon-cli trimmed to install + typecheck + CI-deferred test
+  in ~/.overdeck/projects.yaml (backup `projects.yaml.bak-2026-10-24-gates`;
+  machine memory `overdeck-local-gates-trimmed`); CI owns lint, build and the
+  server smoke test. (2) PAN-4546 (two concurrent gate slots) started with
+  `pan start --plan auto` despite needs-handoff, on the operator's word.
+  (3) PAN-4531 (skip gates when CI already failed) is in conversation 3304.
+- Handoff-built issues have no xBRIEF, so verification fails
+  `incomplete-plan-items`; handoff agents must write an xBRIEF and record items
+  (told 3304/3305; added to PAN-4605).
