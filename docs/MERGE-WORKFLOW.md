@@ -149,6 +149,37 @@ an entry's `strike/<issue>` branch instead whenever one existed, without that
 gate; strikes now open their own PR (PAN-3973), so the queue no longer looks
 for strike branches.
 
+## What makes a PR "ready" (Awaiting Merge, Merge to main)
+
+The Awaiting Merge page lists every issue whose derived state is `ready`.
+The issue view offers **Merge to main** for the same state (`canMerge` in
+`src/dashboard/frontend/src/lib/issueActions.ts`). An open PR derives
+`ready` when all of these hold (`deriveState` in
+`src/lib/overdeck/derived-issue-state.ts`):
+
+- the forge reports its checks green and the PR mergeable, and nobody has
+  requested changes;
+- the merge gate's cached answer for the PR's **current head** says the
+  approval stands at that head (`cachedApprovalAtHead` in
+  `src/lib/cloister/approval-at-head.ts`). That means a trusted verdict
+  marker naming the head, or a trusted reviewer's GitHub review of it.
+  `reviewDecision` alone never derives `ready` (#3983, #4066).
+
+A gate answer lives `GATE_ANSWER_TTL_MS` (5 minutes). The approval refresher
+(`src/dashboard/server/services/approval-at-head-refresh.ts`, PAN-4597)
+runs on the 60-second UAT-train tick. It asks the gate again for every open,
+non-draft PR that the forge reports approved, green and mergeable, once that
+PR's answer is missing, belongs to another head, or is older than
+`GATE_ANSWER_REFRESH_AFTER_MS` (3 minutes). The read model then re-derives
+the issue. So an approved, green PR shows on Awaiting Merge within about a
+minute and stays there until it merges, a push moves its head, or a check
+goes red. Before PAN-4597 only auto-merge, the merge doors and the post-merge
+sibling walk ran the gate. A PR held for UAT showed as `ready` for five
+minutes after some other merge, then dropped back to `in-review`. The
+refresher runs only in the primary dashboard process, and it tries each
+issue head at most once per refresh window, so a failing forge read is not
+retried every tick.
+
 ## Review freshness
 
 A review verdict is a PR review against a specific commit. A push after

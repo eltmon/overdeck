@@ -48,7 +48,7 @@ function host(agentId = 'conv-2884'): RunawayProcessFact[] {
 function context(overrides: Partial<RunawayContext> = {}): RunawayContext {
   return {
     idleAgentIds: new Set(),
-    admissionOwnerPid: null,
+    admissionOwnerPids: [],
     dashboardPid: DASHBOARD_PID,
     windowMs: 10 * MIN,
     ...overrides,
@@ -205,8 +205,19 @@ describe('classifyRunaways (PAN-4311 AC-3)', () => {
       fact({ pid: 951, ppid: 950, comm: 'node', cmdline: 'node vitest', ageMs: 40 * MIN, sustainedCores: 3 }),
     ];
 
-    expect(classifyRunaways(facts, context({ admissionOwnerPid: 950 })).runaways).toEqual([]);
+    expect(classifyRunaways(facts, context({ admissionOwnerPids: [950] })).runaways).toEqual([]);
     expect(classifyRunaways(facts, context()).runaways).toHaveLength(2);
+  });
+
+  it('never flags the descendants of any admission slot owner (PAN-4546)', () => {
+    const facts = [
+      ...host(),
+      fact({ pid: 960, ppid: 1917, comm: 'node', cmdline: 'node verification-worker.js', ageMs: 40 * MIN, sustainedCores: 1 }),
+      fact({ pid: 961, ppid: 960, comm: 'node', cmdline: 'node vitest', ageMs: 40 * MIN, sustainedCores: 3 }),
+    ];
+
+    expect(classifyRunaways(facts, context({ admissionOwnerPids: [950, 960] })).runaways).toEqual([]);
+    expect(classifyRunaways(facts, context({ admissionOwnerPids: [950] })).runaways).toHaveLength(2);
   });
 
   it('treats a tool call left under Herdr after its harness exited as outlived, not orphaned', () => {

@@ -869,6 +869,26 @@ export async function listReadyIssuesForProject(
   return ready;
 }
 
+/**
+ * PAN-4597: the project's open, non-draft PRs (GitHub) or MRs (GitLab) by
+ * issue, from the same cached listings the board derives from, so the
+ * approval refresher sees exactly the heads the board looks up.
+ */
+export async function listOpenPullRequestsForProject(
+  projectPath: string,
+): Promise<Array<{ readonly issueId: string; readonly pr: LoadedPr }>> {
+  const gitlab = forgeForProject(projectPath) === 'gitlab';
+  const rows = gitlab
+    ? (await listRepoMergeRequests(projectPath)).map((row) => ({ branch: row.source_branch, draft: row.draft === true, pr: mrFromGlabRow(row) }))
+    : (await listRepoPullRequests(projectPath)).map((row) => ({ branch: row.headRefName, draft: row.isDraft === true, pr: prFromGhRow(row) }));
+  const open: Array<{ issueId: string; pr: LoadedPr }> = [];
+  for (const row of rows) {
+    const issueId = issueIdFromBranch(row.branch);
+    if (issueId && !row.draft && row.pr && !row.pr.merged) open.push({ issueId, pr: row.pr });
+  }
+  return open;
+}
+
 // ─── the batch door ──────────────────────────────────────────────────────────
 
 /**

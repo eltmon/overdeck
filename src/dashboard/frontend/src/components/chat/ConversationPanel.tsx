@@ -49,6 +49,8 @@ import { useMessagesHttpFallback } from './useMessagesHttpFallback';
 import { SubagentRail, updateSelectedSubagent, useSubagentSelection } from './SubagentRail';
 import { SubagentTranscript } from './SubagentTranscript';
 import { ForkProgressView } from './ForkProgressView';
+import { HeldHandoffView, HeldKickoffLookupFailedView } from './HeldHandoffView';
+import { useHeldKickoff } from './heldKickoff';
 import { TranscriptLoadingSkeleton } from './TranscriptLoadingSkeleton';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
 import { ViewToggle } from '../shared/ViewToggle';
@@ -1270,6 +1272,25 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
   // content parsed, the row is interrupted, not starting.
   const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking
     && isWithinSpawnWindow(conversation.createdAt) && !hasTimelineActivity;
+  // PAN-4596: an ended empty conversation may be a --hold successor whose kickoff was
+  // never sent. Until the kickoff lookup answers { held: false } it is not orphaned.
+  const heldKickoff = useHeldKickoff(conversation.name, { enabled: !conversation.sessionAlive && !hasTimelineActivity, pollAlways: true });
+  const heldLookupOpen = data != null && !data.error && !conversation.sessionAlive && !hasTimelineActivity
+    && !isSpawning && !isSpawnFailed && !isForkInProgress;
+  const heldLookupPending = heldLookupOpen && heldKickoff.status === 'loading';
+  const heldLookupFailed = heldLookupOpen && heldKickoff.status === 'error';
+  const isHeldUnsent = heldLookupOpen && heldKickoff.held && heldKickoff.text !== undefined;
+  // After Start, show "Starting…" until the server moves forkStatus off its value at
+  // Start time, the session comes up, or a failed start restores the hold. Once seen,
+  // the start is spent: a later null forkStatus or session end must not revive it.
+  const [kickoffStartedFrom, setKickoffStartedFrom] = useState<{ name: string; forkStatus: string | null } | null>(null);
+  const kickoffStartSeen = !kickoffStartedFrom || kickoffStartedFrom.name !== conversation.name
+    || kickoffStartedFrom.forkStatus !== (conversation.forkStatus ?? null) || conversation.sessionAlive;
+  const kickoffStartPending = !kickoffStartSeen && !(isForkFailed && heldKickoff.held) && !hasTimelineActivity;
+  useEffect(() => { if (kickoffStartedFrom && kickoffStartSeen) setKickoffStartedFrom(null); }, [kickoffStartedFrom, kickoffStartSeen]);
+  useEffect(() => { if (heldKickoff.held) setKickoffStartedFrom(null); }, [heldKickoff.held]);
+  // The door restores the hold before it marks the fork failed: re-read it at once.
+  useEffect(() => { if (isForkFailed) heldKickoff.refresh(); }, [isForkFailed, heldKickoff.refresh]);
   const isFirstMessage = !isLoading && !isDiscovering && !awaitingFirstPayload && !hasTimelineActivity && failedMessages.length === 0 && conversation.sessionAlive;
   // A failed /messages fetch leaves `data` undefined — that is NOT the same as a
   // successful empty response. Rendering it as "no saved history" (the old
@@ -1279,7 +1300,8 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
   const messagesFetchFailed =
     !isLoading && !isDiscovering && !awaitingFirstPayload && !streamMessagesEnabled && data == null &&
     !isSpawning && !isSpawnFailed && !isForking;
-  const isOrphaned = !isLoading && !isDiscovering && !awaitingFirstPayload && data != null && !hasTimelineActivity && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
+  const isOrphaned = !isLoading && !isDiscovering && !awaitingFirstPayload && data != null && !hasTimelineActivity && !conversation.sessionAlive && !isSpawnFailed && !isSpawning
+    && !heldLookupPending && !heldLookupFailed && !isHeldUnsent && !kickoffStartPending;
 
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
@@ -1303,7 +1325,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
 
   return (
     <div className={styles.conversationView}>
-      {isLoading || isDiscovering || awaitingFirstPayload ? (
+      {isLoading || isDiscovering || awaitingFirstPayload || heldLookupPending ? (
         <TranscriptLoadingSkeleton discovering={isDiscovering} />
       ) : data?.error ? (
         <div className={styles.conversationEmptyState}>
@@ -1331,7 +1353,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
             </button>
           </div>
         </div>
-      ) : isSpawning ? (
+      ) : isSpawning || kickoffStartPending ? (
         <div className={styles.conversationEmptyState}>
           <p className={styles.conversationEmptyStateTitle}>
             <Loader2 size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6, animation: 'spin 1s linear infinite' }} />
@@ -1349,12 +1371,30 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
             </button>
           </div>
         </div>
+      ) : isHeldUnsent ? (
+        <HeldHandoffView
+          conversationName={conversation.name}
+          kickoffText={heldKickoff.text!}
+          focus={heldKickoff.focus}
+          cwd={conversation.cwd}
+          handoffDocPath={conversation.handoffDocPath}
+          startError={isForkFailed ? conversation.forkError : null}
+          onStarted={() => {
+            setKickoffStartedFrom({ name: conversation.name, forkStatus: conversation.forkStatus ?? null });
+            heldKickoff.refresh();
+            void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+          }}
+          onArchive={onArchive}
+          archivePending={archivePending}
+        />
       ) : isForking && messages.length === 0 ? (
         <ForkProgressView
           forkStatus={conversation.forkStatus!}
           forkError={conversation.forkError}
           parentTitle={parentTitle}
         />
+      ) : heldLookupFailed ? (
+        <HeldKickoffLookupFailedView onRetry={heldKickoff.refresh} onArchive={onArchive} archivePending={archivePending} />
       ) : isOrphaned ? (
         <div className={styles.conversationEmptyState}>
           {conversation.transcriptMissing ? (
@@ -1438,7 +1478,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           banner linking to the sibling that continues the work. The composer/resume bar
           is suppressed because the conversation is permanently ended — interacting here
           would either fail or branch off historical content. */}
-      {isOrphaned ? null : conversation.clearedToConvId ? (
+      {isOrphaned || isHeldUnsent || heldLookupPending || heldLookupFailed || kickoffStartPending ? null : conversation.clearedToConvId ? (
         <button
           type="button"
           className={styles.conversationClearedBanner}

@@ -60,6 +60,9 @@ import {
  * registerPipelineTelemetryAgentReader in agent-state.ts. When no lookup is
  * registered (a process that never loads the runtime registry), the idle
  * signals degrade to the runtime mirror alone, the pre-PAN-3677 behavior.
+ * src/lib/health.ts imports the registry for this side effect (PAN-4595), so
+ * CLI health checks see the transcript heartbeat; on Herdr in a CLI process
+ * it is the only activity signal.
  */
 export type LivenessHeartbeatLookup = (agentId: string) => { timestamp: Date } | null;
 

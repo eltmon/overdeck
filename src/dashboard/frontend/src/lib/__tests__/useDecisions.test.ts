@@ -6,11 +6,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { useDashboardStore } from '../store';
 import { isBlockingDecision, useDecisions } from '../useDecisions';
 
-function renderDecisions() {
+function renderDecisions(convRows: unknown[] = []) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
-  queryClient.setQueryData(['conv-ask-user-question'], []);
+  queryClient.setQueryData(['conv-ask-user-question'], convRows);
 
   return renderHook(() => useDecisions(), {
     wrapper: ({ children }: { children: ReactNode }) =>
@@ -81,6 +81,38 @@ describe('useDecisions', () => {
     expect(result.current.find((decision) => decision.id === 'agent-unbound')).toMatchObject({
       label: 'agent-unbound',
     });
+  });
+});
+
+describe('useDecisions held kickoff (PAN-4596)', () => {
+  const heldRow = { name: 'conv-held', title: 'Bundle', heldKickoff: { since: '2026-10-04T13:19:27.000Z', focus: 'Read the brief' } };
+
+  it('maps a held conversation row to a non-blocking heldKickoff decision', () => {
+    const { result } = renderDecisions([heldRow]);
+
+    expect(result.current).toHaveLength(1);
+    expect(result.current[0]).toMatchObject({
+      id: 'conv-held',
+      source: 'conversation',
+      label: 'Bundle',
+      kinds: ['heldKickoff'],
+      blocking: false,
+      since: '2026-10-04T13:19:27.000Z',
+      heldKickoffFocus: 'Read the brief',
+    });
+  });
+
+  it('keeps the other kind of a row that is also held', () => {
+    const { result } = renderDecisions([{
+      ...heldRow,
+      pendingPermission: {
+        signature: 'sig', answerable: true, agentLabel: 'Main agent', agentKey: null, toolName: 'Bash',
+        header: null, clipped: false, detailLines: [], since: '2026-10-05T00:00:00.000Z',
+      },
+    }]);
+
+    expect(result.current[0]?.kinds).toEqual(['permissionRequest', 'heldKickoff']);
+    expect(result.current[0]?.blocking).toBe(true);
   });
 });
 
