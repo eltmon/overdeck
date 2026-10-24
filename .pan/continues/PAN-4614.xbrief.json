@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4614",
   "created": "2026-10-24T11:11:53.918Z",
-  "updated": "2026-10-24T11:11:53.918Z",
+  "updated": "2026-10-24T11:12:42.044Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "gitattributes-union": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4614",
-      "claimedAt": "2026-10-24T11:11:53.918Z"
+      "claimedAt": "2026-10-24T11:11:53.918Z",
+      "doneAt": "2026-10-24T11:12:42.043Z"
     }
   }
 }
