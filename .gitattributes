@@ -5,6 +5,14 @@
 # therefore inert — git silently fell back to 3-way merge. See PAN-1901.)
 .beads/issues.jsonl merge=union
 
+# .overdeck/context/codebase/concerns.md is an append-style markdown bullet list: concurrent
+# PRs each add bullets near the end, and both sides' bullets should survive. union is safe
+# because every entry is line-oriented text with no structure to break (PAN-4614). Known
+# artifact: if both sides also stamp different `<!-- last-verified -->` dates, both footer
+# lines survive; the next editor deletes the stray one. Prose files (architecture.md) do not
+# get union: it would interleave paragraphs.
+.overdeck/context/codebase/concerns.md merge=union
+
 # WARNING: The single-JSON state files under .pan/specs/, .pan/continues/, and .pan/records/
 # must NOT receive a content-merge driver like `union`. union concatenates hunks into
 # invalid JSON. These files need a take-one-whole-side strategy, not line-level merging.
