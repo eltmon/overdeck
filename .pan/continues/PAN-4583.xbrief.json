@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4583",
   "created": "2026-10-24T07:18:16.083Z",
-  "updated": "2026-10-24T07:49:41.049Z",
+  "updated": "2026-10-24T07:49:54.218Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,10 @@
     "docs-editor-pane-split-door.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T07:49:41.049Z"
+    },
+    "docs-editor-pane-split-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:49:54.217Z"
     }
   }
 }
