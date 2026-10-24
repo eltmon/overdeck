@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T10:10:31.353Z",
+  "updated": "2026-10-24T10:34:44.066Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-10-24T10:10:05.581Z"
     },
     "pr-outside-pipeline-helpers": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4605",
-      "claimedAt": "2026-10-24T10:10:31.353Z"
+      "claimedAt": "2026-10-24T10:10:31.353Z",
+      "doneAt": "2026-10-24T10:34:44.066Z"
     }
   }
 }
