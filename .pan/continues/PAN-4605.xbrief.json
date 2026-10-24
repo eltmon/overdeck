@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T11:43:14.815Z",
+  "updated": "2026-10-24T11:43:31.307Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "webhook-adopts-no-workspace.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T11:43:14.815Z"
+    },
+    "webhook-adopts-no-workspace.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:43:31.306Z"
     }
   }
 }
