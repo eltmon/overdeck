@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T10:38:02Z 路 model: claude-opus-5-5 路 open: 845_
+_Last sequenced: 2026-10-24T10:38:36Z 路 model: claude-opus-5-5 路 open: 845_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1180,7 +1180,7 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass 鈥
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T10:38:02Z",
+  "generatedAt": "2026-10-24T10:38:36Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 845,
