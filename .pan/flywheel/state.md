@@ -261,3 +261,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   `~/.overdeck/verification-workers/admission/waiter-*.json` for that issue.
   Recovery: stop the worker pid and `pan review request <id>`. Fix folded into
   PAN-4546. Used on PAN-4532 at 10:40.
+- concerns.md conflicts recur on concurrent PRs (PAN-4595 hit it twice on
+  2026-10-24) → PAN-4614 (`merge=union` in .gitattributes), started. The
+  merge door rebases onto main, so a PR GitHub calls CLEAN can still be
+  refused for a conflict. A first "not approved at PR HEAD" refusal right
+  after a review lands can be stale PR facts; retry once after ~1 min.
