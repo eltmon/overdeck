@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4589",
   "created": "2026-10-24T08:19:18.820Z",
-  "updated": "2026-10-24T08:51:33.896Z",
+  "updated": "2026-10-24T08:53:38.208Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-10-24T08:51:29.126Z"
     },
     "docs-dagger-cloud-ci": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4589",
-      "claimedAt": "2026-10-24T08:51:33.896Z"
+      "claimedAt": "2026-10-24T08:51:33.896Z",
+      "doneAt": "2026-10-24T08:53:38.208Z"
     }
   }
 }
