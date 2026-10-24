@@ -116,6 +116,61 @@ describe('readDefaultBranchFailingTestChecks', () => {
 
     await expect(readDefaultBranchFailingTestChecks('o/r')).resolves.toEqual(new Set());
   });
+
+  it('walks past any number of no-tests (bookkeeping) commits to a failing one (PAN-4618 ac1)', async () => {
+    const commits: Record<string, Run[]> = {};
+    for (let i = 1; i <= 20; i += 1) commits[`bk-${i}`] = [done('reject-planning-paths', 'success')];
+    commits.fail = [done('test', 'failure')];
+    forge(commits);
+
+    await expect(readDefaultBranchFailingTestChecks('o/r')).resolves.toEqual(new Set(['test']));
+  });
+
+  it('walks past more than DEFAULT_BRANCH_LOOKBACK indecisive commits to a failing one (PAN-4618 ac2)', async () => {
+    const commits: Record<string, Run[]> = {};
+    for (let i = 1; i <= 12; i += 1) commits[`cx-${i}`] = [done('test', 'cancelled')];
+    commits.fail = [done('test', 'failure')];
+    forge(commits);
+
+    await expect(readDefaultBranchFailingTestChecks('o/r')).resolves.toEqual(new Set(['test']));
+  });
+
+  it('gives up after DEFAULT_BRANCH_LOOKBACK pending commits and never fetches the ones past it (PAN-4618 ac3)', async () => {
+    const commits: Record<string, Run[]> = {};
+    for (let i = 1; i <= 12; i += 1) commits[`pend-${i}`] = [running('test')];
+    forge(commits);
+
+    await expect(readDefaultBranchFailingTestChecks('o/r')).resolves.toBeNull();
+
+    const checkRunCalls = execFile.mock.calls.filter(([, args]) =>
+      (args as string[]).some((a) => a.includes('/check-runs')));
+    const fetchedShas = checkRunCalls.map(([, args]) => (args as string[])
+      .find((a) => a.includes('/check-runs'))!.match(/commits\/([^/]+)\/check-runs/)![1]);
+    expect(fetchedShas).toEqual(['pend-1', 'pend-2', 'pend-3', 'pend-4', 'pend-5', 'pend-6', 'pend-7', 'pend-8', 'pend-9', 'pend-10']);
+  });
+
+  it('is unknown (null) when a full commit-window page carries no test checks at all (PAN-4618 ac4)', async () => {
+    const commits: Record<string, Run[]> = {};
+    for (let i = 1; i <= 100; i += 1) commits[`bk-${i}`] = [done('reject-planning-paths', 'success')];
+    forge(commits);
+
+    await expect(readDefaultBranchFailingTestChecks('o/r')).resolves.toBeNull();
+  });
+
+  it('is an empty set when a partial commit-window page carries no test checks (PAN-4618 ac4)', async () => {
+    forge({ head: [done('reject-planning-paths', 'success')], prev: [], tail: [] });
+
+    await expect(readDefaultBranchFailingTestChecks('o/r')).resolves.toEqual(new Set());
+  });
+
+  it('requests the commit list with per_page=100 (PAN-4618 ac4)', async () => {
+    forge({ head: [done('test', 'success')] });
+
+    await readDefaultBranchFailingTestChecks('o/r');
+
+    expect(execFile.mock.calls.some(([, args]) =>
+      (args as string[]).some((a) => a === 'repos/o/r/commits?per_page=100'))).toBe(true);
+  });
 });
 
 describe('defaultBranchCommitTestVerdict', () => {
@@ -135,6 +190,14 @@ describe('defaultBranchCommitTestVerdict', () => {
         targetUrl: 'https://dagger.cloud/o/checks/github.com/o/r@x?check=go-client/test',
       }),
     ])).toEqual(new Set(['go-client/test']));
+  });
+
+  it('is indecisive for a single completed test check with conclusion cancelled (PAN-4618 ac5)', () => {
+    expect(defaultBranchCommitTestVerdict([done('test', 'cancelled')])).toBe('indecisive');
+  });
+
+  it('is pending (not indecisive) when a test check is still running, even alongside a completed one', () => {
+    expect(defaultBranchCommitTestVerdict([running('test-shard (1/4)'), done('test-shard (2/4)', 'cancelled')])).toBe('pending');
   });
 });
 
