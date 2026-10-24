@@ -271,7 +271,8 @@ describe('relayCiFailureFeedback', () => {
     await relayCiFailureFeedback(opts);
     await relayCiFailureFeedback(opts);
 
-    expect(execFile).toHaveBeenCalledTimes(4); // 2 list + 2 view (only once because debounced)
+    // 2 list + 2 view + 1 check-runs read (PAN-4534), all once because debounced
+    expect(execFile).toHaveBeenCalledTimes(5);
     expect(mockMessageAgent).toHaveBeenCalledTimes(1);
   });
 
@@ -996,5 +997,114 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     expect(passRecorded).toBe(false);
     expect(readPipelineJournal(workspacePath)).toEqual([]);
     expect(log).toHaveBeenCalledWith(expect.stringContaining('tests are not in CI mode'));
+  });
+});
+
+describe('PAN-4534: failures come from the head\'s check runs, with the failing test named', () => {
+  const HEAD = 'abc123def456';
+  const SHARD_URL = 'https://github.com/test-owner/test-repo/actions/runs/900/job/456';
+  const VITEST_LOG = [
+    '2026-10-04T04:14:40.1000000Z ##[group]Run npm test',
+    '2026-10-04T04:14:41.2000000Z  RUN  v4.1.11 /home/runner/work',
+    '2026-10-04T04:14:46.3000000Z  FAIL  tests/unit/lib/access-tokens.test.ts > refreshAccessTokens > keeps the newest token',
+    '2026-10-04T04:14:46.3100000Z AssertionError: expected 2 to be 1',
+    '2026-10-04T04:14:46.3200000Z  ❯ tests/unit/lib/access-tokens.test.ts:55:21',
+    '2026-10-04T04:14:46.4000000Z  Test Files  1 failed | 311 passed (312)',
+    '2026-10-04T04:14:46.5000000Z ##[error]Process completed with exit code 1.',
+  ].join('\n');
+
+  type Call = (args: string[]) => { stdout?: string; error?: Error } | undefined;
+
+  /** gh responses: the workflow run is still in progress, so `gh run list` finds nothing. */
+  function mockGh(checkRuns: unknown[], jobLog: Call) {
+    (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation((file: string, args: string[], _opts: unknown, callback: (err: Error | null, stdout?: string, stderr?: string) => void) => {
+      const joined = args.join(' ');
+      if (file === 'gh' && joined.startsWith('run list')) return callback(null, '[]', '');
+      if (file === 'gh' && joined === `api repos/test-owner/test-repo/commits/${HEAD}/check-runs?per_page=100`) {
+        return callback(null, JSON.stringify({ check_runs: checkRuns }), '');
+      }
+      if (file === 'gh' && /^api repos\/test-owner\/test-repo\/actions\/jobs\/\d+\/logs$/.test(joined)) {
+        const answer = jobLog(args);
+        if (answer?.error) return callback(answer.error, '', '');
+        return callback(null, answer?.stdout ?? '', '');
+      }
+      return callback(new Error(`Unexpected execFile call: ${file} ${joined}`), '', '');
+    });
+  }
+
+  const shard = (name: string, id: number) => ({ id, name, conclusion: 'failure', details_url: `https://github.com/test-owner/test-repo/actions/runs/900/job/${id}`, app: { slug: 'github-actions' } });
+
+  async function relay() {
+    await relayCiFailureFeedback({
+      issueId: 'PAN-1801',
+      repo: 'test-owner/test-repo',
+      prNumber: 42,
+      headSha: HEAD,
+      headRef: 'feature/pan-1801',
+      source: 'check_run:test-shard (4/4)',
+    });
+    return mockWriteFeedbackFile.mock.calls[0]?.[0]?.markdownBody as string | undefined;
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('names the failing test file and title from the shard\'s job log while the workflow run is in progress', async () => {
+    mockGh([shard('test-shard (4/4)', 456), { id: 457, name: 'lint', conclusion: 'success', app: { slug: 'github-actions' } }], () => ({ stdout: VITEST_LOG }));
+
+    const body = await relay();
+
+    expect(body).toContain('### test-shard (4/4)');
+    expect(body).toContain('FAIL  tests/unit/lib/access-tokens.test.ts > refreshAccessTokens > keeps the newest token');
+    expect(body).toContain('❯ tests/unit/lib/access-tokens.test.ts:55:21');
+    expect(body).toContain('Test Files  1 failed | 311 passed (312)');
+    expect(body).toContain(`Check: ${SHARD_URL}`);
+    expect(body).not.toContain('##[group]Run npm test');
+    expect(body).not.toContain('no failing workflow runs were found');
+  });
+
+  it('reports the shard\'s failure, not the aggregate test job\'s echo', async () => {
+    mockGh([shard('test', 450), shard('test-shard (4/4)', 456)], ([, path]) => (path!.includes('/450/')
+      ? { stdout: 'test-shard: failure\n##[error]Process completed with exit code 1.' }
+      : { stdout: VITEST_LOG }));
+
+    const body = await relay();
+
+    expect(body).toContain('## Failing checks (1)');
+    expect(body).toContain('### test-shard (4/4)');
+    expect(body).not.toContain('test-shard: failure');
+  });
+
+  it('retries a job log that is not published yet, and includes it once it is', async () => {
+    vi.useFakeTimers();
+    let reads = 0;
+    mockGh([shard('test-shard (4/4)', 456)], () => (++reads === 1 ? { error: new Error('HTTP 404: Not Found') } : { stdout: VITEST_LOG }));
+
+    const pending = relay();
+    await vi.advanceTimersByTimeAsync(5_000);
+    const body = await pending;
+
+    expect(reads).toBe(2);
+    expect(body).toContain('FAIL  tests/unit/lib/access-tokens.test.ts');
+  });
+
+  it('lists the failing check names and URLs when no job log ever appears', async () => {
+    vi.useFakeTimers();
+    let reads = 0;
+    mockGh([shard('test-shard (2/4)', 452), shard('test-shard (4/4)', 456)], () => {
+      reads++;
+      return { error: new Error('HTTP 404: Not Found') };
+    });
+
+    const pending = relay();
+    await vi.advanceTimersByTimeAsync(2 * 125_000);
+    const body = await pending;
+
+    expect(reads).toBe(12);
+    expect(body).toContain('### test-shard (2/4)');
+    expect(body).toContain('Check: https://github.com/test-owner/test-repo/actions/runs/900/job/452');
+    expect(body).toContain(`Check: ${SHARD_URL}`);
+    expect(body).toContain('*(No log excerpt available.)*');
   });
 });
