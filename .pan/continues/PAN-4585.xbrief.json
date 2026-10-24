@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4585",
   "created": "2026-10-24T08:22:26.190Z",
-  "updated": "2026-10-24T10:39:00.483Z",
+  "updated": "2026-10-24T10:39:27.884Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "install-entrypoints.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T10:39:00.483Z"
+    },
+    "prereq-registration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:39:27.884Z"
     }
   }
 }
