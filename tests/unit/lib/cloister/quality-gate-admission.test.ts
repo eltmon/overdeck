@@ -20,6 +20,7 @@ vi.mock('node:os', async (importOriginal) => {
 import {
   acquireQualityGateAdmission,
   QualityGateAdmissionTimeoutError,
+  readQualityGateAdmissionOwnerPids,
   sampleQualityGatePressure,
   type QualityGateAdmissionDeps,
   type QualityGatePressureSample,
@@ -43,6 +44,7 @@ function deps(rootDir: string, samples: QualityGatePressureSample[] = [low]): Qu
     settleMs: 200,
     staleMs: 1_000,
     tornGraceMs: 10_000,
+    slots: 1,
     isProcessAlive: (pid) => pid === process.pid,
     samplePressure: vi.fn(async () => samples[Math.min(sampleIndex++, samples.length - 1)]!),
   }
@@ -51,8 +53,8 @@ function deps(rootDir: string, samples: QualityGatePressureSample[] = [low]): Qu
 // Captured before vi.useFakeTimers() so it always schedules real wall-clock time.
 const nativeSetTimeout = globalThis.setTimeout
 
-async function driveUntil(done: () => boolean): Promise<void> {
-  for (let attempt = 0; attempt < 100 && !done(); attempt++) {
+async function drive(attempts: number, done: () => boolean = () => false): Promise<void> {
+  for (let attempt = 0; attempt < attempts && !done(); attempt++) {
     // The admission loop awaits real fs promises that resolve on the libuv
     // threadpool; on a loaded host a bare setImmediate spin exhausts every
     // attempt before a single fs op completes. A 1ms real yield per attempt
@@ -61,7 +63,24 @@ async function driveUntil(done: () => boolean): Promise<void> {
     await realSetImmediate()
     await vi.runOnlyPendingTimersAsync()
   }
+}
+
+async function driveUntil(done: () => boolean): Promise<void> {
+  await drive(100, done)
   expect(done()).toBe(true)
+}
+
+/** A slot owner file body for `pid`, acquired at `acquiredAt`. */
+function ownerJson(pid: number, acquiredAt: number): string {
+  return JSON.stringify({
+    ticketId: `owner-${pid}`,
+    pid,
+    createdAt: acquiredAt,
+    acquiredAt,
+    workspacePath: '/tmp/owner',
+    gateName: 'test',
+    attempt: 1,
+  })
 }
 
 async function driveUntilResolved<T>(promise: Promise<T>): Promise<T> {
@@ -178,6 +197,137 @@ describe('quality gate admission', () => {
     )).rejects.toBeInstanceOf(QualityGateAdmissionTimeoutError)
 
     expect(readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-'))).toEqual([])
+  })
+
+  describe('N slots (PAN-4546)', () => {
+    const request = { workspacePath: '/tmp/one', gateName: 'test', attempt: 1 }
+
+    it('admits two concurrent requests with two slots', async () => {
+      const rootDir = home()
+      const firstPromise = acquireQualityGateAdmission(request, { ...deps(rootDir), slots: 2, now: () => 1 })
+      const secondPromise = acquireQualityGateAdmission(request, { ...deps(rootDir), slots: 2, now: () => 2 })
+
+      const first = await driveUntilResolved(firstPromise)
+      const second = await driveUntilResolved(secondPromise)
+
+      expect(first).toMatchObject({ slot: 0, slots: 2 })
+      expect(second).toMatchObject({ slot: 1, slots: 2 })
+      expect(readdirSync(rootDir)).toEqual(expect.arrayContaining(['owner.json', 'slot-1.json']))
+      await first.release()
+      await second.release()
+    })
+
+    it('keeps a pressured second request waiting until slot 0 frees and pressure clears', async () => {
+      const rootDir = home()
+      const first = await driveUntilResolved(acquireQualityGateAdmission(
+        request,
+        { ...deps(rootDir, [low, low]), slots: 2, now: () => 1 },
+      ))
+      const samplePressure = vi.fn().mockResolvedValue(high)
+      const secondPromise = acquireQualityGateAdmission(request, { ...deps(rootDir), slots: 2, now: () => 2, samplePressure })
+      let secondResolved = false
+      void secondPromise.then(() => { secondResolved = true })
+
+      await drive(20)
+      expect(secondResolved).toBe(false)
+      expect(existsSync(join(rootDir, 'slot-1.json'))).toBe(false)
+
+      await first.release()
+      samplePressure.mockResolvedValue(low)
+      const second = await driveUntilResolved(secondPromise)
+      expect(second.slot).toBe(0)
+      await second.release()
+    })
+
+    it('reclaims a dead owner in slot 1 and leaves the live slot 0 owner alone', async () => {
+      const rootDir = home()
+      const liveOwner = ownerJson(process.pid, 10_000)
+      writeFileSync(join(rootDir, 'owner.json'), liveOwner)
+      writeFileSync(join(rootDir, 'slot-1.json'), ownerJson(999_999, 10_000))
+
+      const handle = await driveUntilResolved(acquireQualityGateAdmission(
+        request,
+        { ...deps(rootDir), slots: 2, now: () => 10_000 },
+      ))
+
+      expect(handle.slot).toBe(1)
+      expect(readFileSync(join(rootDir, 'owner.json'), 'utf8')).toBe(liveOwner)
+      await handle.release()
+    })
+
+    it('clears a torn slot file older than the torn grace', async () => {
+      const rootDir = home()
+      const tornPath = join(rootDir, 'slot-1.json')
+      writeFileSync(tornPath, '{')
+      const sixtySecondsAgo = new Date(Date.now() - 60_000)
+      utimesSync(tornPath, sixtySecondsAgo, sixtySecondsAgo)
+
+      const handle = await driveUntilResolved(acquireQualityGateAdmission(request, { ...deps(rootDir), slots: 2 }))
+
+      expect(handle.slot).toBe(0)
+      expect(existsSync(tornPath)).toBe(false)
+      await handle.release()
+    })
+
+    it('treats a fresh torn slot file as occupied', async () => {
+      const rootDir = home()
+      const tornPath = join(rootDir, 'slot-1.json')
+      writeFileSync(tornPath, '{')
+
+      const handle = await driveUntilResolved(acquireQualityGateAdmission(request, { ...deps(rootDir), slots: 2 }))
+
+      expect(handle.slot).toBe(0)
+      expect(readFileSync(tornPath, 'utf8')).toBe('{')
+      await handle.release()
+    })
+
+    it('counts a held slot above a lowered slot count against capacity', async () => {
+      const rootDir = home()
+      writeFileSync(join(rootDir, 'slot-1.json'), ownerJson(process.pid, 10_000))
+      const admission = acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 10_000 })
+      let resolved = false
+      void admission.then(() => { resolved = true })
+
+      await drive(20)
+      expect(resolved).toBe(false)
+
+      unlinkSync(join(rootDir, 'slot-1.json'))
+      const handle = await driveUntilResolved(admission)
+      expect(handle.slot).toBe(0)
+      await handle.release()
+    })
+
+    it('ignores non-canonical slot file names', async () => {
+      const rootDir = home()
+      const aliasBody = { 'slot-0.json': ownerJson(4_242, 10_000), 'slot-01.json': ownerJson(4_343, 10_000) }
+      for (const [name, body] of Object.entries(aliasBody)) writeFileSync(join(rootDir, name), body)
+
+      const handle = await driveUntilResolved(acquireQualityGateAdmission(request, {
+        ...deps(rootDir),
+        now: () => 10_000,
+        isProcessAlive: (pid) => pid === process.pid || pid === 4_242 || pid === 4_343,
+      }))
+
+      expect(handle.slot).toBe(0)
+      expect(await readQualityGateAdmissionOwnerPids(rootDir)).toEqual([process.pid])
+      await handle.release()
+      for (const [name, body] of Object.entries(aliasBody)) {
+        expect(readFileSync(join(rootDir, name), 'utf8')).toBe(body)
+      }
+      expect(await readQualityGateAdmissionOwnerPids(rootDir)).toEqual([])
+    })
+
+    it('reads the pid of every canonical slot owner', async () => {
+      const rootDir = home()
+      writeFileSync(join(rootDir, 'owner.json'), ownerJson(111, 1))
+      writeFileSync(join(rootDir, 'slot-1.json'), 'nope')
+      writeFileSync(join(rootDir, 'slot-2.json'), ownerJson(222, 1))
+      writeFileSync(join(rootDir, 'waiter-x.json'), ownerJson(333, 1))
+      writeFileSync(join(rootDir, 'owner.break'), JSON.stringify({ pid: 444, acquiredAt: 1 }))
+
+      expect((await readQualityGateAdmissionOwnerPids(rootDir)).sort((a, b) => a - b)).toEqual([111, 222])
+      expect(await readQualityGateAdmissionOwnerPids(join(rootDir, 'missing'))).toEqual([])
+    })
   })
 
   describe('ticket durability (PAN-4610)', () => {

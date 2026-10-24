@@ -7,6 +7,10 @@ import { readCpuPsi, type CpuPsi } from '../system-health/cpu-psi.js'
 
 /**
  * Machine-wide CPU admission for quality gates and direct Vitest runs.
+ * Admission has N slots (`resources.quality_gate_slots`, default 2): slot 0 is
+ * `owner.json`, slot i >= 1 is `slot-<i>.json`. Waiters queue FIFO, and every
+ * slot needs an unpressured sample before and after settling, so a pressured
+ * sample blocks every new admission while running gates keep their slots.
  * Admitted parents set OVERDECK_GATE_ADMITTED=1 for child-process reentrancy.
  */
 
@@ -26,6 +30,7 @@ const QUALITY_GATE_ADMISSION_STALE_MS = 25 * 60 * 1_000
  * by an old-version process, so pollers leave it alone until it ages out.
  */
 const QUALITY_GATE_ADMISSION_TORN_GRACE_MS = 10_000
+export const DEFAULT_QUALITY_GATE_SLOTS = 2
 
 export interface QualityGatePressureSample {
   cpuUtilization: number
@@ -44,6 +49,10 @@ export interface QualityGateAdmissionRequest {
 
 export interface QualityGateAdmissionHandle {
   admittedAt: string
+  /** 0-based slot this lease holds. */
+  slot: number
+  /** Slot count the lease was admitted under. */
+  slots: number
   release(): Promise<void>
 }
 
@@ -73,6 +82,7 @@ export interface QualityGateAdmissionDeps {
   settleMs?: number
   staleMs?: number
   tornGraceMs?: number
+  slots?: number
   maxWaitMs?: number
 }
 
@@ -141,12 +151,26 @@ function admissionRoot(rootDir?: string): string {
   return rootDir ?? join(getOverdeckHome(), 'verification-workers', 'admission')
 }
 
-function ownerPath(root: string): string {
-  return join(root, 'owner.json')
+function slotOwnerPath(root: string, slot: number): string {
+  return join(root, slot === 0 ? 'owner.json' : `slot-${slot}.json`)
 }
 
-function breakerPath(root: string): string {
-  return join(root, 'owner.break')
+function slotBreakerPath(root: string, slot: number): string {
+  return join(root, slot === 0 ? 'owner.break' : `slot-${slot}.break`)
+}
+
+/** Canonical slot owner files only; aliases such as `slot-0.json` or `slot-01.json` are not slots (D6a). */
+async function listSlotOwnerFiles(root: string): Promise<{ slot: number; path: string }[]> {
+  const files: { slot: number; path: string }[] = []
+  for (const entry of await readdir(root)) {
+    if (entry === 'owner.json') {
+      files.push({ slot: 0, path: join(root, entry) })
+      continue
+    }
+    const slot = Number(/^slot-([1-9]\d*)\.json$/.exec(entry)?.[1])
+    if (Number.isSafeInteger(slot)) files.push({ slot, path: join(root, entry) })
+  }
+  return files
 }
 
 function ticketPath(root: string, ticketId: string): string {
@@ -206,11 +230,12 @@ function ownerIsStale(
 
 async function acquireBreaker(
   root: string,
+  slot: number,
   now: () => number,
   staleMs: number,
   isProcessAlive: (pid: number) => boolean,
 ): Promise<boolean> {
-  const path = breakerPath(root)
+  const path = slotBreakerPath(root, slot)
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       await publishExclusive(path, { pid: process.pid, acquiredAt: now() })
@@ -231,23 +256,25 @@ async function acquireBreaker(
 
 async function clearStaleOwner(
   root: string,
+  slot: number,
   observed: AdmissionOwner | null,
   now: () => number,
   staleMs: number,
   isProcessAlive: (pid: number) => boolean,
 ): Promise<void> {
-  if (!await acquireBreaker(root, now, staleMs, isProcessAlive)) return
+  if (!await acquireBreaker(root, slot, now, staleMs, isProcessAlive)) return
+  const path = slotOwnerPath(root, slot)
   try {
-    const current = await readJson<AdmissionOwner>(ownerPath(root))
+    const current = await readJson<AdmissionOwner>(path)
     if (
       (!observed && !current)
       || (observed && sameOwner(current, observed)
         && ownerIsStale(observed, now(), staleMs, isProcessAlive))
     ) {
-      await unlinkIfExists(ownerPath(root))
+      await unlinkIfExists(path)
     }
   } finally {
-    await unlinkIfExists(breakerPath(root))
+    await unlinkIfExists(slotBreakerPath(root, slot))
   }
 }
 
@@ -294,6 +321,20 @@ async function listLiveTickets(
     || left.ticketId.localeCompare(right.ticketId))
 }
 
+/** Pids of every live-file slot owner, for the runaway patrol (D9); never throws. */
+export async function readQualityGateAdmissionOwnerPids(rootDir?: string): Promise<number[]> {
+  try {
+    const pids: number[] = []
+    for (const { path } of await listSlotOwnerFiles(admissionRoot(rootDir))) {
+      const pid = (await readJson<Partial<AdmissionOwner>>(path))?.pid
+      if (typeof pid === 'number' && Number.isInteger(pid)) pids.push(pid)
+    }
+    return pids
+  } catch {
+    return []
+  }
+}
+
 export async function acquireQualityGateAdmission(
   request: QualityGateAdmissionRequest,
   deps: QualityGateAdmissionDeps = {},
@@ -308,6 +349,7 @@ export async function acquireQualityGateAdmission(
   const settleMs = deps.settleMs ?? QUALITY_GATE_ADMISSION_SETTLE_MS
   const staleMs = deps.staleMs ?? QUALITY_GATE_ADMISSION_STALE_MS
   const tornGraceMs = deps.tornGraceMs ?? QUALITY_GATE_ADMISSION_TORN_GRACE_MS
+  const slots = Number.isInteger(deps.slots) && deps.slots! >= 1 ? deps.slots! : DEFAULT_QUALITY_GATE_SLOTS
   const maxWaitMs = deps.maxWaitMs
 
   await mkdir(root, { recursive: true })
@@ -338,11 +380,32 @@ export async function acquireQualityGateAdmission(
         continue
       }
 
-      const observedOwner = await readJson<AdmissionOwner>(ownerPath(root))
-      if (observedOwner) {
-        if (ownerIsStale(observedOwner, now(), staleMs, isProcessAlive)) {
-          await clearStaleOwner(root, observedOwner, now, staleMs, isProcessAlive)
+      let reclaimed = false
+      const taken = new Set<number>()
+      for (const { slot, path } of await listSlotOwnerFiles(root)) {
+        const observed = await readJson<AdmissionOwner>(path)
+        if (observed) {
+          if (ownerIsStale(observed, now(), staleMs, isProcessAlive)) {
+            await clearStaleOwner(root, slot, observed, now, staleMs, isProcessAlive)
+            reclaimed = true
+          } else {
+            taken.add(slot)
+          }
+          continue
         }
+        // D14: a torn slot file may be an old-version process mid-write; it holds
+        // the slot until it outlives the torn grace, then it is cleared.
+        const ageMs = await fileAgeMs(path)
+        if (ageMs == null) continue
+        if (ageMs > tornGraceMs) {
+          await clearStaleOwner(root, slot, null, now, staleMs, isProcessAlive)
+          reclaimed = true
+        } else {
+          taken.add(slot)
+        }
+      }
+      // `taken` counts every slot file, so a held slot above a lowered N still counts (D3).
+      if (reclaimed || taken.size >= slots) {
         await sleep(pollMs)
         continue
       }
@@ -353,13 +416,17 @@ export async function acquireQualityGateAdmission(
         continue
       }
 
+      // taken.size < slots guarantees a free index below `slots`.
+      let slot = 0
+      while (taken.has(slot)) slot++
+      const path = slotOwnerPath(root, slot)
       const owner: AdmissionOwner = { ...ticket, acquiredAt: now() }
       try {
-        await publishExclusive(ownerPath(root), owner)
+        await publishExclusive(path, owner)
       } catch (error) {
         if (isErrnoException(error) && error.code === 'EEXIST') {
-          if (!await readJson<AdmissionOwner>(ownerPath(root))) {
-            await clearStaleOwner(root, null, now, staleMs, isProcessAlive)
+          if (!await readJson<AdmissionOwner>(path)) {
+            await clearStaleOwner(root, slot, null, now, staleMs, isProcessAlive)
           }
           await sleep(pollMs)
           continue
@@ -370,8 +437,8 @@ export async function acquireQualityGateAdmission(
       await sleep(settleMs)
       const settledPressure = await samplePressure()
       if (settledPressure.pressured) {
-        if (sameOwner(await readJson<AdmissionOwner>(ownerPath(root)), owner)) {
-          await unlinkIfExists(ownerPath(root))
+        if (sameOwner(await readJson<AdmissionOwner>(path), owner)) {
+          await unlinkIfExists(path)
         }
         await sleep(pollMs)
         continue
@@ -381,11 +448,13 @@ export async function acquireQualityGateAdmission(
       let released = false
       return {
         admittedAt: new Date(owner.acquiredAt).toISOString(),
+        slot,
+        slots,
         async release() {
           if (released) return
           released = true
-          if (sameOwner(await readJson<AdmissionOwner>(ownerPath(root)), owner)) {
-            await unlinkIfExists(ownerPath(root))
+          if (sameOwner(await readJson<AdmissionOwner>(path), owner)) {
+            await unlinkIfExists(path)
           }
         },
       }
