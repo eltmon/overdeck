@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4583",
   "created": "2026-10-24T07:18:16.083Z",
-  "updated": "2026-10-24T07:48:16.872Z",
+  "updated": "2026-10-24T07:48:33.464Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,10 @@
     "server-split-read-write-containment.ac5": {
       "status": "completed",
       "doneAt": "2026-10-24T07:48:16.872Z"
+    },
+    "editor-pane-read-only-mode.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:48:33.464Z"
     }
   }
 }
