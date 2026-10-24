@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T10:51:24.658Z",
+  "updated": "2026-10-24T10:57:14.764Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-10-24T10:51:14.524Z"
     },
     "adopt-and-review-orchestrator": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4605",
-      "claimedAt": "2026-10-24T10:51:24.658Z"
+      "claimedAt": "2026-10-24T10:51:24.658Z",
+      "doneAt": "2026-10-24T10:57:14.764Z"
     }
   }
 }
