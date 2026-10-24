@@ -619,7 +619,7 @@ Keep e2e, Playwright, and other heavy browser tests out of the local per-change 
 
 ### Tests on CI (`verification.tests`)
 
-A project with CI does not run its `quality_gates.test` gate on the host at all (PAN-3965): the verification gate runs typecheck, lint, and the project's other non-`test` gates, and the CI test job on the PR head is the test gate. One full-suite run per push, on CI.
+A project with CI does not run its `quality_gates.test` gate on the host at all (PAN-3965): the verification gate runs the project's declared non-`test` gates (see [What a verification run does](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#what-a-verification-run-does)), and the CI test job on the PR head is the test gate. One full-suite run per push, on CI.
 
 ```yaml
 verification:

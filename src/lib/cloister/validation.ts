@@ -417,7 +417,7 @@ export async function runQualityGates(
             gateName: name,
             attempt,
           });
-          console.log(`[quality-gate] Admitted: ${identity}`);
+          console.log(`[quality-gate] Admitted (slot ${admission.slot + 1}/${admission.slots}): ${identity}`);
           opts.onAdmissionPhase?.({
             phase: 'running',
             gateName: name,

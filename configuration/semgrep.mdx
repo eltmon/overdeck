@@ -1,0 +1,86 @@
+---
+title: Semgrep (opt-in SAST)
+description: Opt-in, off-by-default Semgrep CLI managed by Overdeck
+---
+
+# Semgrep (opt-in SAST)
+
+Overdeck can install and manage its own copy of [Semgrep](https://semgrep.dev), a static
+analysis (SAST) scanner. It is **off by default**.
+
+## What it is
+
+Phase 1 (this page) covers config, the managed install, and `pan doctor` rows only: turning
+the feature on makes Overdeck install a pinned Semgrep binary and report its health, nothing
+more. Later phases — a verification-gate scan (#4590), review-lane findings (#4591), in-session
+MCP/hooks (#4592), CI (#4593), and a Platform/Guardian tier (#4594) — are planned but not part
+of this release.
+
+## Turn it on
+
+Add a `security:` block to `~/.overdeck/config.yaml`:
+
+```yaml
+security:
+  semgrep:
+    enabled: true
+```
+
+Then run `pan sync` (or `pan install`) to trigger the managed install.
+
+A repo-committed `.pan.yaml` project layer **cannot** set `security` — any `security:` block
+there is silently ignored. A work agent can commit a `.pan.yaml` to its own feature branch, so
+a security setting that controls whether a scanner runs must come only from a file the operator
+owns, never from a file in the tree being scanned.
+
+## What gets installed
+
+Semgrep Community Edition **1.180.0** (pinned), installed via [`uv`](https://docs.astral.sh/uv/)
+(falling back to `pipx` when `uv` is not available) into `~/.overdeck/tools/semgrep/`, with a
+launcher symlinked at `~/.overdeck/bin/semgrep` — the only path Overdeck ever runs Semgrep from.
+The install is about 350&nbsp;MB and happens once per machine; a version check on every `pan sync`
+reinstalls only when the pinned version drifts.
+
+Your own Semgrep install, wherever it lives (`~/.local/bin/semgrep`, a different `uv tool`,
+`pipx`, Homebrew, or anywhere else on `PATH`), is never touched, overwritten, or removed.
+Overdeck's installer refuses to replace anything at `~/.overdeck/bin/semgrep` that it did not
+create itself — a regular file or a symlink pointing somewhere else there is left alone, and the
+install reports `failed` with a fix telling you to move it out of the way first.
+
+If neither `uv` nor `pipx` is on the host, the install reports `failed` with the message
+"Neither uv nor pipx is installed" and a fix pointing at
+[the uv install docs](https://docs.astral.sh/uv/getting-started/installation/).
+
+## `pan doctor`
+
+With the feature off, `pan doctor` prints no Semgrep rows at all. With it on:
+
+| Condition | Row | Status |
+| --- | --- | --- |
+| Not installed | `Enabled, but not installed at ~/.overdeck/bin/semgrep` | error, fix `pan sync` |
+| Installed, version mismatch | `Installed <v>, expected 1.180.0` | warn, fix `pan sync` |
+| Installed, pinned version | `1.180.0 (pinned)` | ok |
+| `semgrep.dev` reachable | `semgrep.dev reachable` | ok |
+| `semgrep.dev` unreachable, non-2xx/3xx, or a 5s timeout | `semgrep.dev unreachable — registry rule packs such as p/default cannot be downloaded` | warn |
+| Platform is Windows | `Enabled, but Semgrep support is Linux and macOS only` | warn |
+
+## Data egress
+
+| Action | Talks to | Sends code? |
+| --- | --- | --- |
+| Install (`uv`/`pipx`) | PyPI (`pypi.org`, `files.pythonhosted.org`) | No |
+| `pan doctor` registry check | `semgrep.dev` (bare `HEAD` request) | No |
+| Version check / metrics | Disabled (`SEMGREP_ENABLE_VERSION_CHECK=0`, `SEMGREP_SEND_METRICS=off`) | n/a |
+| Semgrep Platform / Guardian | Not available in this release | — |
+
+## Licensing
+
+The Semgrep engine is licensed under LGPL-2.1. Registry rule packs (such as `p/default`) are
+licensed under the [Semgrep Rules License v1.0](https://semgrep.dev/legal/rules-license/) and
+are downloaded only by your own CLI, on your own machine, when a future scan runs — Overdeck
+never bundles or serves rule packs itself.
+
+## Platforms
+
+Linux and macOS. **Windows is unsupported** — `ensureSemgrepInstalled` returns `unsupported`
+immediately on `win32`, before any install attempt.

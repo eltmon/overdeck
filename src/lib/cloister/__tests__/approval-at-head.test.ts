@@ -5,6 +5,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  GATE_ANSWER_REFRESH_AFTER_MS,
+  GATE_ANSWER_TTL_MS,
+  approvalAtHeadNeedsRefresh,
   approvalProvenAtHead,
   cachedApprovalAtHead,
   onApprovalAtHeadChanged,
@@ -133,5 +136,30 @@ describe('onApprovalAtHeadChanged', () => {
     recordReadApprovalAtHead(facts({ headSha: OTHER }));
     unsubscribe();
     expect(listener.mock.calls).toEqual([['PAN-1'], ['PAN-1'], ['PAN-1']]);
+  });
+});
+
+describe('approvalAtHeadNeedsRefresh (PAN-4597)', () => {
+  it('asks again before the answer expires, for a new head, and when nothing was judged', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-24T08:00:00.000Z'));
+    expect(GATE_ANSWER_REFRESH_AFTER_MS).toBeLessThan(GATE_ANSWER_TTL_MS);
+    expect(approvalAtHeadNeedsRefresh('PAN-1', HEAD)).toBe(true);
+    expect(approvalAtHeadNeedsRefresh('PAN-1', null)).toBe(false);
+
+    recordApprovalAtHead(facts());
+    expect(approvalAtHeadNeedsRefresh('pan-1', HEAD)).toBe(false);
+    expect(approvalAtHeadNeedsRefresh('PAN-1', OTHER)).toBe(true);
+
+    vi.advanceTimersByTime(GATE_ANSWER_REFRESH_AFTER_MS);
+    expect(approvalAtHeadNeedsRefresh('PAN-1', HEAD)).toBe(true);
+    // Still unexpired, so the board keeps reading ready while the refresh runs.
+    expect(cachedApprovalAtHead('PAN-1', HEAD)).toBe(true);
+  });
+
+  it('a read proof alone does not count as a fresh gate answer', () => {
+    recordReadApprovalAtHead(facts());
+    expect(cachedApprovalAtHead('PAN-1', HEAD)).toBe(true);
+    expect(approvalAtHeadNeedsRefresh('PAN-1', HEAD)).toBe(true);
   });
 });

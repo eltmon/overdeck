@@ -57,6 +57,12 @@ vi.mock('../../src/lib/agents/liveness.js', () => ({
     !verdict.alive && verdict.reason !== 'runtime-indeterminate',
 }));
 
+// PAN-4595: health.ts now imports this module for its registration side effect.
+// This file's liveness mock is wholesale, so the registration is never exercised
+// here; stub it out rather than load the real runtime modules against the fs/agents
+// mocks above, which lack the exports those modules read at import time.
+vi.mock('../../src/lib/runtimes/index.js', () => ({}));
+
 describe('health runtime-state classification', () => {
   beforeEach(() => {
     vi.resetModules();
