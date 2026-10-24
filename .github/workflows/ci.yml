@@ -16,7 +16,7 @@ on:
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-# verify: ci-concurrency-group.ac2 trigger commit 1
+# verify: ci-concurrency-group.ac2 trigger commit 2
 
 # PAN-1659: skip the heavy docs-index build in CI. The docs-RAG index is a
 # repo-wide, publish-time artifact (built by prepublishOnly / build-for-publish.mjs
