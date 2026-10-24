@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4598",
   "created": "2026-10-24T10:10:10.024Z",
-  "updated": "2026-10-24T10:53:58.874Z",
+  "updated": "2026-10-24T10:54:19.802Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -51,6 +51,10 @@
     "docs-merge-workflow.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T10:53:58.874Z"
+    },
+    "docs-merge-workflow.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:54:19.801Z"
     }
   }
 }
