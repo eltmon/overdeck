@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T11:26:48.595Z",
+  "updated": "2026-10-24T11:38:09.048Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
       "claimedBy": "agent-pan-4605",
       "claimedAt": "2026-10-24T11:25:34.898Z",
       "doneAt": "2026-10-24T11:26:48.594Z"
+    },
+    "worktree-fetch-feature-branch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:38:09.048Z"
     }
   }
 }
