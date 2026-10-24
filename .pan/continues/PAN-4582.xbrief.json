@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4582",
   "created": "2026-10-24T07:40:29.074Z",
-  "updated": "2026-10-24T08:13:24.003Z",
+  "updated": "2026-10-24T08:13:49.380Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4582",
       "claimedAt": "2026-10-24T08:02:48.138Z",
       "doneAt": "2026-10-24T08:13:24.002Z"
+    },
+    "bridge-controller-output": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4582",
+      "claimedAt": "2026-10-24T08:13:49.380Z"
     }
   }
 }
