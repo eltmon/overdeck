@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4540",
   "created": "2026-10-24T15:41:16.095Z",
-  "updated": "2026-10-24T15:43:19.626Z",
+  "updated": "2026-10-24T15:43:35.282Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,6 +28,10 @@
     "refused-blocks.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T15:43:19.626Z"
+    },
+    "refused-blocks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:43:35.282Z"
     }
   }
 }
