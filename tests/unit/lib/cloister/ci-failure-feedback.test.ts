@@ -271,8 +271,8 @@ describe('relayCiFailureFeedback', () => {
     await relayCiFailureFeedback(opts);
     await relayCiFailureFeedback(opts);
 
-    // 2 list + 2 view + 1 check-runs read (PAN-4534), all once because debounced
-    expect(execFile).toHaveBeenCalledTimes(5);
+    // 2 list + 2 view + 2 check-runs reads (head and main, PAN-4534), all once because debounced
+    expect(execFile).toHaveBeenCalledTimes(6);
     expect(mockMessageAgent).toHaveBeenCalledTimes(1);
   });
 
@@ -1016,11 +1016,14 @@ describe('PAN-4534: failures come from the head\'s check runs, with the failing 
   type Call = (args: string[]) => { stdout?: string; error?: Error } | undefined;
 
   /** gh responses: the workflow run is still in progress, so `gh run list` finds nothing. */
-  function mockGh(checkRuns: unknown[], jobLog: Call) {
+  function mockGh(checkRuns: unknown[], jobLog: Call, mainFailing: string[] = []) {
     (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation((file: string, args: string[], _opts: unknown, callback: (err: Error | null, stdout?: string, stderr?: string) => void) => {
       const joined = args.join(' ');
       if (file === 'gh' && joined.startsWith('run list')) return callback(null, '[]', '');
-      if (file === 'gh' && joined === `api --paginate repos/test-owner/test-repo/commits/${HEAD}/check-runs?per_page=100 --jq .check_runs[]`) {
+      if (file === 'gh' && joined.startsWith('api --paginate repos/test-owner/test-repo/commits/main/check-runs')) {
+        return callback(null, mainFailing.join('\n'), '');
+      }
+      if (file === 'gh' && joined.startsWith(`api --paginate repos/test-owner/test-repo/commits/${HEAD}/check-runs?per_page=100 --jq .check_runs[] | {id, name, conclusion,`)) {
         // `--paginate --jq` prints one check run per line across every page.
         return callback(null, checkRuns.map((run) => JSON.stringify(run)).join('\n'), '');
       }
@@ -1089,6 +1092,14 @@ describe('PAN-4534: failures come from the head\'s check runs, with the failing 
 
     expect(reads).toBe(2);
     expect(body).toContain('FAIL  tests/unit/lib/access-tokens.test.ts');
+  });
+
+  it('marks a shard that also fails on main as inherited', async () => {
+    mockGh([shard('test-shard (4/4)', 456)], () => ({ stdout: VITEST_LOG }), ['test-shard (4/4)']);
+
+    const body = await relay();
+
+    expect(body).toContain('### test-shard (4/4) [INHERITED FROM MAIN');
   });
 
   it('reads a failing check run past the first page of check runs', async () => {

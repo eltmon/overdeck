@@ -46,7 +46,7 @@ import {
 } from './verification-cycles.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import { readDefaultBranchFailingTestChecks } from './ci-default-branch-tests.js';
-import { collectCheckRunFailures } from './ci-check-run-failures.js';
+import { collectCheckRunFailures, listFailingCheckRunNames } from './ci-check-run-failures.js';
 import { isDaggerCloudUrl, resolveVerificationTestsMode, TEST_GATE_NAME } from './verification-tests-mode.js';
 
 function execFilePromise(
@@ -692,7 +692,12 @@ async function relayCiFailureFeedbackInQueue(
 
   // Diff against main's current failing checks so agents do not chase inherited failures.
   const mainRuns = await listFailingRuns(owner, repo, 'main');
-  const mainFailingNames = new Set(mainRuns.map((r) => r.name || r.workflowName || `run-${r.databaseId}`));
+  // PAN-4534: check-run failures carry job names, workflow runs carry workflow
+  // names, so main's failing jobs are listed too.
+  const mainFailingNames = new Set([
+    ...mainRuns.map((r) => r.name || r.workflowName || `run-${r.databaseId}`),
+    ...await listFailingCheckRunNames(owner, repo, 'main'),
+  ]);
 
   // Collect the concrete failures for this PR head.
   const failures = await collectFailures(owner, repo, opts.headRef, opts.headSha, mainFailingNames);

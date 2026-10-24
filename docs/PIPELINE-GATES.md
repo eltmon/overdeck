@@ -239,11 +239,13 @@ the **CI test job on the PR head is the test gate**:
   Vitest `FAIL` line through the `❯ file:line` frames to the
   `Test Files … failed` summary, about 2000 characters, or the log's tail when
   it has no Vitest failure. A log GitHub has not published yet is re-read with
-  backoff for about two minutes; if it never appears, the section still names
+  backoff for about two minutes per job (the jobs are read one after another);
+  if it never appears, the section still names
   the check and its URL. Only when no check run reports a failure does the
   relay fall back to the completed failed workflow runs (`gh run list`). If
   that finds nothing either, the feedback still names the failed check the
-  `check_run` webhook fired on, with its link and job-log command.
+  `check_run` webhook fired on, with its link and job-log command. A failing
+  job whose check also fails on main is marked inherited from main.
 - **Attempt budget.** A CI test failure counts against the local gate's budget
   (`VERIFICATION_MAX_CYCLES` = 3, `cloister/verification-cycles.ts`), read
   from the same per-run artifacts. The local count is per head — every commit

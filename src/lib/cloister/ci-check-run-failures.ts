@@ -31,7 +31,24 @@ interface GhCheckRun {
   app?: { slug?: string } | null;
 }
 
-/** Waits between job-log reads: about two minutes in all (PAN-4534). */
+/** `gh api --jq` projection: one check run per line, without its `output`. */
+const CHECK_RUN_FIELDS = '.check_runs[] | {id, name, conclusion, details_url, html_url, app: {slug: .app.slug}}';
+
+/**
+ * The names of the failing check runs on `ref` (every page), or none when they
+ * cannot be read. The relay compares job names with these to mark a failure
+ * inherited from main.
+ */
+export async function listFailingCheckRunNames(owner: string, repo: string, ref: string): Promise<string[]> {
+  try {
+    const stdout = await gh(['api', '--paginate', `repos/${owner}/${repo}/commits/${ref}/check-runs?per_page=100`, '--jq', '.check_runs[] | select(.conclusion == "failure") | .name']);
+    return stdout.split('\n').map((line) => line.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/** Waits between one job's log reads: about two minutes per job (PAN-4534). */
 export const JOB_LOG_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 40_000, 45_000] as const;
 
 const EXCERPT_MAX_CHARS = 2_000;
@@ -105,7 +122,8 @@ export async function collectCheckRunFailures(owner: string, repo: string, headS
   let checkRuns: GhCheckRun[];
   try {
     // Every page: a commit can carry more than 100 check runs.
-    const stdout = await gh(['api', '--paginate', `repos/${owner}/${repo}/commits/${headSha}/check-runs?per_page=100`, '--jq', '.check_runs[]']);
+    // Only the fields used here: a check run's `output` text can run to 64 KB.
+    const stdout = await gh(['api', '--paginate', `repos/${owner}/${repo}/commits/${headSha}/check-runs?per_page=100`, '--jq', CHECK_RUN_FIELDS]);
     checkRuns = stdout.split('\n').filter((line) => line.trim()).map((line) => JSON.parse(line) as GhCheckRun);
   } catch (err) {
     console.warn(`[ci-failure-feedback] Could not read check runs for ${headSha.slice(0, 8)}: ${err instanceof Error ? err.message : String(err)}`);
