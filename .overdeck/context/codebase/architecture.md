@@ -105,6 +105,12 @@ panes (Herdr default; legacy tmux on `tmux -L overdeck`), with state in
 `src/lib/agents/liveness.ts`; the dashboard's live pane list is
 `services/backend-inventory.ts` (`backendPanesById` in the read model).
 
+CI test-job classification (`verification.tests: ci`, PAN-3965) lives in
+`cloister/verification-tests-mode.ts` (`isCiTestCheckName`); PR checks
+(`cloister/pr-facts.ts`), the default-branch baseline
+(`cloister/ci-default-branch-tests.ts`) and the `check_run`/`status` webhooks
+(`webhook-handlers.ts` → `cloister/ci-failure-feedback.ts`) all filter through it.
+
 ## Spawn sites (harness decision points)
 
 1. Plan kickoff — `planning/spawn-planning-session.ts` (~:558)

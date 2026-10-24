@@ -23,7 +23,11 @@ the **CI test job on the PR head is the test gate**:
   `test-e2e`, …) must have concluded `SUCCESS`. No test check, or a test job
   that only `SKIPPED` (a path filter, a job-level `if:`, a renamed or deleted
   job), blocks the merge. `PrFacts.testChecks` is the verdict over just the
-  test job; `PrFacts.testJobSucceeded` is the positive evidence.
+  test job; `PrFacts.testJobSucceeded` is the positive evidence. The matcher
+  also recognizes commit-status CI (PAN-4589, `isCiTestRollupCheck`): a
+  `status` whose `context` it names directly, or a Dagger Cloud status whose
+  check path has a test segment — see
+  [Dagger Cloud checks](#dagger-cloud-checks-pan-4589).
 - A red CI test job reaches the work agent through
   `src/lib/cloister/ci-failure-feedback.ts` (fired by the `check_run`,
   `check_suite` and `status` webhooks). The webhook route runs the handlers
@@ -67,8 +71,9 @@ the **CI test job on the PR head is the test gate**:
   `pan unpause`, and an operator start that clears the start gates
   (`pan start --force`). Review and UAT feedback still go through the
   resurrection ladder, which lifts any `needs-you:` pause (PAN-2461), this
-  one included. A green CI test job (`check_run` success for the test job,
-  confirmed against the PR checks) records a passed CI artifact — the reset.
+  one included. A green CI test job (a `check_run` success for the test job,
+  or a `status` success for a test status, confirmed against the PR checks)
+  records a passed CI artifact — the reset.
   What is not counted (review of #3993): a red test job on a `strike/` or
   `bypass/` PR (it is not the work agent's branch; the relay falls back to the
   plain CI FAILED message, which reaches only a live work agent); a test job
@@ -79,7 +84,9 @@ the **CI test job on the PR head is the test gate**:
   branch's test verdict is unknown. The default branch's verdict is its newest
   commit (of the last 10) whose test checks all finished decisively: main's CI
   is often still running on HEAD, and a cancelled run says nothing
-  (`cloister/ci-default-branch-tests.ts`). When no such commit exists, or the
+  (`cloister/ci-default-branch-tests.ts`). It reads both check runs and commit
+  statuses (PAN-4589) — a Dagger Cloud status is mapped to a check run
+  (`commitStatusAsCheckRun`) before the verdict is judged. When no such commit exists, or the
   forge cannot be read, the failure is not counted; the plain CI FAILED
   message still reaches a live work agent. Relays for one issue
   run one at a time, so concurrent webhooks for one red head (the shards of a
@@ -105,6 +112,40 @@ the **CI test job on the PR head is the test gate**:
 verification:
   tests: ci      # or: local
 ```
+
+#### Dagger Cloud checks (PAN-4589)
+
+A Dagger Cloud project reports its checks as commit statuses, not GitHub
+Actions check runs: the GitHub Statuses API has no `name`, `status` or
+`conclusion` field, only a `context` (the check path, e.g.
+`golang/packages/tests/test`) and a `target_url` pointing at
+`https://dagger.cloud/...`. `isCiTestRollupCheck` recognizes one when any
+`/`-separated segment of its `context` matches the test-check matcher and its
+`target_url` is `https://dagger.cloud/...` or an `https://*.dagger.cloud/...`
+subdomain:
+
+- Test checks: `go-client/test`, `golang/packages/tests/test`,
+  `test-split/test-llm`.
+- Not test checks: `python-client/format`, `helm/lint`,
+  `engine-lab/wcprof-report-test`.
+
+Detection only reads `.github/workflows` files, so it cannot see commit-status
+CI on its own — a Dagger Cloud project must set the mode explicitly:
+
+```yaml
+verification:
+  tests: ci
+```
+
+Until it does, the mode-detection reason names the gap: a project root with
+`dagger.toml` and no qualifying workflow gets the reason `no GitHub Actions
+workflows; dagger.toml present; set verification.tests: ci if Dagger Cloud
+checks are on` instead of the plain `no GitHub Actions workflows`.
+
+A failing Dagger Cloud test status is named in CI failure feedback with its
+own `## Failing test checks reported as commit statuses` section: the check's
+name, its conclusion, its `target_url` under `Details:`, and a
+`` `dagger check dag://<check path>` `` line to rerun just that check.
 
 Unset, the mode is `ci` only when the project has a `github_repo` and a
 GitHub Actions workflow (in the project root or a polyrepo member) that runs on
