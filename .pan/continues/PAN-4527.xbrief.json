@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4527",
   "created": "2026-10-24T10:10:19.162Z",
-  "updated": "2026-10-24T13:43:27.024Z",
+  "updated": "2026-10-24T13:43:42.746Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -51,6 +51,10 @@
     "supervisor-join.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T13:43:27.024Z"
+    },
+    "supervisor-join.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:43:42.746Z"
     }
   }
 }
