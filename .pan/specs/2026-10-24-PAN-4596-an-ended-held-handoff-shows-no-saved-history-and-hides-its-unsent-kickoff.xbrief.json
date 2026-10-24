@@ -1,0 +1,572 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T08:24:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4596: An ended held handoff shows 'no saved history' and hides its unsent kickoff",
+    "updated": "2026-10-24T08:36:48.062Z"
+  },
+  "plan": {
+    "id": "pan-4596",
+    "title": "An ended held handoff shows 'no saved history' and hides its unsent kickoff",
+    "status": "proposed",
+    "uid": "dcdad02b-319c-4d6a-ae29-201e87250310",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-24T08:24:52Z",
+    "updated": "2026-10-24T08:36:48.062Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4596",
+        "label": "PAN-4596",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4596.md",
+        "label": "PRD draft (.pan/drafts/PAN-4596.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "handoff",
+      "held-kickoff",
+      "dashboard",
+      "needs-you"
+    ],
+    "narratives": {
+      "Problem": "A conversation created by `pan handoff --hold` whose session ended before its kickoff was sent renders the generic orphaned state ('This conversation has no saved history…') with Resume Session and Archive. ConversationView's isOrphaned branch (ConversationPanel.tsx line 1282) never reads the held kickoff (conversations.held_kickoff), and the held-kickoff UI from PAN-4499 lives only in ComposerFooter, which is not mounted for ended rows. The pending-input feed that drives Awareness → Needs you scans only live sessions and never reports a held kickoff, so a held handoff can wait unseen for weeks (conversation 3230 waited 20 days).",
+      "Proposal": "1) The kickoff door GET also returns the handoff focus parsed from fork_request. 2) A new HeldHandoffView component renders for ended conversations whose kickoff is held: 'Held handoff — kickoff not sent', focus, working directory, handoff doc path with Open, the kickoff text behind a disclosure, Start (POSTs the existing kickoff door, which already relaunches an ended session via ensureForkSessionReady(resume=false)) and Archive, no Resume. It wins over a failed fork status (shows the error, Start retries) but not over an in-flight one. useHeldKickoff gains an enabled flag so live conversations are not polled twice. 3) The pending-input feed adds every unarchived, non-superseded held conversation (alive or ended) with heldKickoff: { since, focus? }. 4) The frontend maps that to a non-blocking heldKickoff kind in Needs you with an Open button that navigates to the conversation. 5) Docs describe both.",
+      "NonGoals": "- Changing the live held conversation UI (composer HeldKickoffNotice).\n- Handling a held conversation that is ended AND has transcript activity (out-of-band terminal input); it keeps today's timeline + Resume behavior.\n- Changing pan handoff, pan handoff start, the kickoff door POST semantics, or ensureForkSessionReady.\n- Making heldKickoff a blocking kind, adding toasts/desktop notifications for held kickoffs, or a Start button inside the Needs you row.\n- Setting pendingInputKinds on pending-input feed rows.\n- The Flywheel's own reporting of held conversations.\n- Restoring or un-archiving archived held conversations (row 3230 is archived).\n- Raising any scripts/file-size-allowlist.txt cap.\n- Surfacing held conversations outside the newest 1000 unarchived rows returned by listConversations({ limit: 1000 })."
+    },
+    "autoDecisions": [
+      {
+        "summary": "'Kickoff not sent' is conversations.held_kickoff IS NOT NULL, not forkRequest.hold.",
+        "rationale": "forkRequest.hold stays true after the kickoff is sent; held_kickoff is cleared atomically on claim and restored on failure (PAN-4499 design)."
+      },
+      {
+        "summary": "Start reuses POST /api/conversations/:name/kickoff with an empty body via startHeldKickoff(name).",
+        "rationale": "Verified: the door already relaunches an ended session through ensureForkSessionReady(conv, sessionId, false) and delivers through deliverForkSeed; pan handoff start is the same call. No new spawn path."
+      },
+      {
+        "summary": "The held view hides Resume Session.",
+        "rationale": "handleConversationResume finds no transcript, spawns fresh and sends a CONVERSATION RESUME contract as the first message, starting the agent without its brief and leaving the kickoff held."
+      },
+      {
+        "summary": "The held view wins over forkStatus 'failed' and shows the error with Start to retry; ForkProgressView still wins while a Start is in flight.",
+        "rationale": "ForkProgressView has no retry control, so a failed Start would otherwise strand the operator with no way to send the restored kickoff."
+      },
+      {
+        "summary": "Only ended conversations get the new panel view; useHeldKickoff gets an enabled flag and the panel passes enabled: !sessionAlive. For ended conversations the panel also passes pollAlways: true and gates the orphan text on a successful { held: false } lookup (plan critique round 1).",
+        "rationale": "Live held conversations already show the composer notice (PAN-4499); the flag avoids a second 5 s poll per open live conversation."
+      },
+      {
+        "summary": "'Brief path' is shown as the working directory plus the handoff doc path with an Open handoff doc button.",
+        "rationale": "The focus names a brief relative to the cwd (.pan/handoff-brief.md) and the authored handoff doc is handoffDocPath; both answer 'what was it waiting for'."
+      },
+      {
+        "summary": "Needs you lists held conversations whether alive or ended, excluding archived and superseded rows.",
+        "rationale": "The issue asks for visibility while the kickoff waits; archived rows are deliberately dismissed and superseded /clear rows own no runtime."
+      },
+      {
+        "summary": "heldKickoff is a non-blocking kind (Needs you 'Waiting' group).",
+        "rationale": "Nothing is stalled mid-turn; the operator deliberately held the kickoff."
+      },
+      {
+        "summary": "A held-only Needs you row (kinds exactly ['heldKickoff']) gets one Open button that navigates to /conv/<name> instead of Answer; mixed rows keep Answer.",
+        "rationale": "requestReopen opens no dialog for a held kickoff, which is the dead-button defect PAN-3276 fixed in the sidebar."
+      },
+      {
+        "summary": "Feed row since = conversation createdAt; the server adds heldKickoff: { since, focus? } and never pendingInputKinds.",
+        "rationale": "The hold begins at creation; the frontend's conversationKinds uses explicit pendingInputKinds verbatim and would drop other kinds on the same row."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Six small vertical items across the kickoff door, the conversation panel, the pending-input feed, Needs you, and docs; files_scope stays under 25 files.",
+      "canonicalFilename": "2026-10-24-PAN-4596-an-ended-held-handoff-shows-no-saved-history-and-hides-its-unsent-kickoff.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "kickoff-get-focus",
+        "title": "Kickoff door GET returns the handoff focus",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T08:24:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4596",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-kickoff-store.ts",
+            "src/dashboard/server/routes/conversation-kickoff.ts",
+            "src/dashboard/server/routes/__tests__/conversation-kickoff-route.test.ts",
+            "src/lib/overdeck/__tests__/conversation-kickoff-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-kickoff-route.test.ts src/lib/overdeck/__tests__/conversation-kickoff-store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass, including the new focus and ended-start cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add the pure helper heldKickoffFocus(forkRequest: string | null | undefined): string | null to src/lib/overdeck/conversation-kickoff-store.ts (JSON.parse in try/catch, return the trimmed handoffFocus string or null). In the GET handler of src/dashboard/server/routes/conversation-kickoff.ts replace `return text === null ? jsonResponse({ held: false }) : jsonResponse({ held: true, text });` with: return { held: false } when text is null, else { held: true, text, ...(focus ? { focus } : {}) } where focus = heldKickoffFocus(conv.forkRequest). Tests: store test for the helper (trimmed focus; null for null, invalid JSON, missing field, whitespace-only); route tests for GET with focus (seed via setForkRequest from conversations.ts), GET without fork_request (no focus key), and an ended-start regression pin: seed held, markConversationEnded, POST → 200, after waitForInFlightForkPipelines(0) the mocked ensureForkSessionReady was called with (objectContaining({ name }), '<name>-session', false) and deliverForkSeed received the held text."
+        },
+        "items": [
+          {
+            "id": "kickoff-get-focus.ac1",
+            "title": "Given a held conversation whose fork_request has handoffFocus '  Read the brief  ', when GET /api/conversations/:name/kickoff is called, then it returns { held: true, text, focus: 'Read the brief' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kickoff-get-focus.ac2",
+            "title": "Given a held conversation with no fork_request, when GET is called, then the response has no focus key; heldKickoffFocus returns null for null, invalid JSON, a missing field and a whitespace-only focus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kickoff-get-focus.ac3",
+            "title": "Given a held conversation marked ended, when POST /api/conversations/:name/kickoff is called, then it returns 200 and the mocked ensureForkSessionReady is called with resume=false and deliverForkSeed receives the held text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "held-handoff-view",
+        "title": "HeldHandoffView component and useHeldKickoff enabled/pollAlways/status options",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T08:24:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4596",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/heldKickoff.tsx",
+            "src/dashboard/frontend/src/components/chat/HeldHandoffView.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/HeldHandoffView.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/heldKickoff.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/HeldHandoffView.test.tsx src/dashboard/frontend/src/components/chat/__tests__/heldKickoff.test.tsx src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "HeldHandoffView.test.tsx, heldKickoff.test.tsx and ComposerFooter.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-9",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "panel-held-branch"
+          ],
+          "acJustification": "Five ACs: the view, Start outcomes, failure line, the enabled flag, and the lookup status/pollAlways contract the panel depends on."
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/dashboard/frontend/src/components/chat/heldKickoff.tsx add focus?: string to HeldKickoff and change useHeldKickoff to (conversationName, options: { enabled?: boolean; pollAlways?: boolean } = {}). When enabled is false: { held: false }, status 'ready', no fetch, no interval. The hook also returns status: 'loading' | 'ready' | 'error' — 'loading' on mount and on name/enabled change; fetchHeldKickoff returns null for non-OK, non-JSON or rejected fetches; null before any success → 'error', after a success → keep last state; refresh() re-runs the lookup (status → 'loading' only from 'error'). The 5 s interval reloads when held OR pollAlways. Existing ComposerFooter caller passes nothing and keeps today's behavior (see PRD WI-2 and Critique response). Create src/dashboard/frontend/src/components/chat/HeldHandoffView.tsx with props { conversationName, kickoffText, focus?, cwd, handoffDocPath?, startError?, onStarted, onArchive? } rendering data-testid='held-handoff-view' using the command-deck.module.css empty-state classes: title 'Held handoff — kickoff not sent', a subtitle explaining pan handoff --hold and that Start relaunches an ended session, 'Focus: …' when present, 'Working directory: <cwd>', 'Handoff doc: <path>' plus an Open handoff doc button (window.open of /api/conversations/<name>/handoff-doc, '_blank', 'noopener,noreferrer') when present, 'The last start failed: <startError>' in var(--warning) when present, <details><summary>Show the kickoff</summary><pre> with the text, and Start + Archive buttons (no Resume). Start calls startHeldKickoff(conversationName) with exactly one argument, disables itself as 'Starting…', calls onStarted on success; HeldKickoffConflictError → toast.info('This handoff was already started') then onStarted; other errors → toast.error(message, { duration: 8000 }) without onStarted."
+        },
+        "items": [
+          {
+            "id": "held-handoff-view.ac1",
+            "title": "Given props with focus, cwd, handoffDocPath and kickoffText, when HeldHandoffView renders, then it shows 'Held handoff — kickoff not sent', the focus, the cwd, the handoff doc path, the kickoff text, Start and Archive, and no element with text 'Resume'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "held-handoff-view.ac2",
+            "title": "When Start is clicked, then startHeldKickoff is called with exactly ('conv-a') and onStarted runs; a HeldKickoffConflictError shows the info toast and still calls onStarted; any other error calls toast.error and does not call onStarted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "held-handoff-view.ac3",
+            "title": "Given startError 'spawn timed out', the view renders 'The last start failed: spawn timed out'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "held-handoff-view.ac4",
+            "title": "Given useHeldKickoff('c', { enabled: false }), no request is made to /api/conversations/c/kickoff and the hook returns held: false with status 'ready'; given ComposerFooter calls useHeldKickoff with no options, it still issues GET /api/conversations/<name>/kickoff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "held-handoff-view.ac5",
+            "title": "Given the first kickoff GET is pending the hook returns status 'loading'; given it answers 500 the hook returns status 'error', and refresh() after a { held: true, text } response returns held: true with status 'ready'; given pollAlways: true and a { held: false } response, advancing fake timers 5 s sends a second GET",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "panel-held-branch",
+        "title": "ConversationView renders HeldHandoffView for an ended held conversation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T08:24:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4596",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationPanel.test.tsx passes including the held-ended, failed-start, not-held, live-no-request, pending-lookup, failed-lookup and restored-after-failed-Start cases",
+            "file-size guard reports no failure for ConversationPanel.tsx (cap 1531)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-9",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "acJustification": "Six ACs: the panel branch has six distinct render states (held, Start POST, failed start, not-held/live regression, pending/failed lookup, restored hold after a failed background delivery) and each needs its own observable check."
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (revised after plan critique). In ConversationView add `const heldKickoff = useHeldKickoff(conversation.name, { enabled: !conversation.sessionAlive, pollAlways: true });`, a `kickoffStartPending` state cleared when forkStatus is set, the session is alive, the hold returns, or the conversation name changes, and predicates heldLookupPending = !sessionAlive && status 'loading', heldLookupFailed = !sessionAlive && status 'error'. Append `&& !heldLookupPending && !heldLookupFailed && !kickoffStartPending` to isOrphaned. isHeldUnsent = held && text !== undefined && !sessionAlive && !isForkInProgress && !isSpawnFailed && !isSpawning && !hasTimelineActivity. Render chain: the skeleton condition also covers heldLookupPending && !hasTimelineActivity; the isSpawning branch also covers kickoffStartPending ('Starting…'); a held branch (HeldHandoffView with startError={isForkFailed ? forkError : null} and onStarted={() => { setKickoffStartPending(true); heldKickoff.refresh(); invalidate ['conversations'] }}) sits after isSpawnFailed and before `isForking && messages.length === 0`; a lookup-failure branch ('⚠ Couldn't check whether this conversation is waiting to start', Retry → heldKickoff.refresh(), Archive) sits before isOrphaned. Tail: `{isOrphaned || isHeldUnsent || heldLookupPending || heldLookupFailed || kickoffStartPending ? null : …`. In ConversationPanel.test.tsx answer GET …/kickoff with { held: false } in defaultConversationResponse and every ended-conversation handler, then add the PRD WI-3 cases (fake timers for the 5 s poll). Implementation checkpoint (live, isolated): create a throwaway `pan handoff --hold`, stop it, press Start, confirm relaunch + kickoff as the first user turn; if it cannot run, say so in the PR body."
+        },
+        "items": [
+          {
+            "id": "panel-held-branch.ac1",
+            "title": "Given an ended conversation with no timeline whose kickoff GET returns { held: true, text: 'KICKOFF BODY', focus: 'Read the brief' }, when the panel renders, then held-handoff-view shows 'Held handoff — kickoff not sent' and 'Read the brief', no text matches /no saved history/, and no Resume control renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel-held-branch.ac2",
+            "title": "When Start is clicked in that panel, then a POST to /api/conversations/<name>/kickoff is issued with body {}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel-held-branch.ac3",
+            "title": "Given the same conversation with forkStatus 'failed' and forkError 'spawn timed out', the held view renders with 'The last start failed: spawn timed out' instead of ForkProgressView",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel-held-branch.ac4",
+            "title": "Given kickoff GET returns { held: false }, the ended panel still renders the 'no saved history' text; given sessionAlive true, the panel issues no GET …/kickoff request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel-held-branch.ac5",
+            "title": "Given an ended empty conversation whose kickoff GET is still pending, the panel renders the loading skeleton and no 'no saved history' text; given the GET answers 500, it renders 'Couldn't check whether this conversation is waiting to start' with a Retry that sends another GET",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel-held-branch.ac6",
+            "title": "Given Start's POST returns 200, the next GET returns held: false, then forkStatus becomes 'failed' and the following GET returns held: true, when fake timers advance 5 s, then the held view renders again with 'The last start failed: …' and an enabled Start",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feed-held-rows",
+        "title": "Pending-input feed emits rows for held conversations",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T08:24:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4596",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "needs-you-held-kind"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-kickoff-store.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/lib/overdeck/__tests__/conversation-pending-feed-held-kickoff.test.ts",
+            "src/lib/overdeck/__tests__/conversation-pending-feed-clear-chain.test.ts",
+            "src/lib/overdeck/__tests__/conversation-permission-feed.test.ts",
+            "src/lib/overdeck/__tests__/conversation-kickoff-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-pending-feed-held-kickoff.test.ts src/lib/overdeck/__tests__/conversation-pending-feed-clear-chain.test.ts src/lib/overdeck/__tests__/conversation-permission-feed.test.ts src/lib/overdeck/__tests__/conversation-kickoff-store.test.ts",
+            "wc -l src/lib/overdeck/conversation-reads.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all four test files pass",
+            "conversation-reads.ts is 1000 lines or fewer",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add listHeldKickoffNames(): Set<string> to conversation-kickoff-store.ts (SELECT name FROM conversations WHERE held_kickoff IS NOT NULL AND archived_at IS NULL). In getConversationsPendingInputFeed (conversation-reads.ts line 376) keep the live scan unchanged; afterwards, for every conversation in the listConversations result whose name is held and which is not isSupersededConversation, attach heldKickoff: { since: conv.createdAt, ...(focus ? { focus } : {}) } (focus = heldKickoffFocus(conv.forkRequest)) to the existing scanned row, or push a new row { name, title, issueId, harness, heldKickoff }. Never set pendingInputKinds. Add vi.mock('../conversation-kickoff-store.js', () => ({ listHeldKickoffNames: () => new Set(), heldKickoffFocus: () => null })) to conversation-pending-feed-clear-chain.test.ts and conversation-permission-feed.test.ts. New test conversation-pending-feed-held-kickoff.test.ts covering ended held, live held with permission, superseded held, non-held ended, and no pendingInputKinds. Record the NFR-3 consumer audit (usePendingInputDialogs, useHeldMessageRelease, useTerminalPermissionDialog, usePermissionNotifications, useConversationPaneChoice ignore a heldKickoff-only row) in the commit body. In conversation-kickoff-store.test.ts add a case: listHeldKickoffNames returns held, unarchived names only (an archived held row and a non-held row are absent)."
+        },
+        "items": [
+          {
+            "id": "feed-held-rows.ac1",
+            "title": "Given an ended held conversation whose session is not in listSessionNames, the feed returns { name, heldKickoff: { since: <createdAt>, focus } } and resolveSessionFile is not called for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-held-rows.ac2",
+            "title": "Given a live held conversation whose scan finds a pending permission, the feed row keeps pendingPermission and also carries heldKickoff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-held-rows.ac3",
+            "title": "Given a held superseded row (clearedToConvId set) or a non-held ended conversation, the feed omits it; no returned row carries pendingInputKinds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-held-rows.ac4",
+            "title": "Given listHeldKickoffNames returns an empty set, the clear-chain and permission feed fixtures produce the same rows as before; given an archived held row and a non-held row, listHeldKickoffNames returns neither",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-held-kind",
+        "title": "Needs you lists held conversations as the heldKickoff kind",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:24:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4596",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/pendingInput.ts",
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
+            "src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useDecisions.test.ts, DecisionsPanel.test.tsx and SessionFeedSidebar.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "acJustification": "Five ACs: the extra one pins that a mixed held+permission row keeps its Answer path."
+        },
+        "narrative": {
+          "Action": "PRD WI-5. pendingInput.ts: add 'heldKickoff' to PendingInputKind and PENDING_INPUT_KIND_LABEL.heldKickoff = 'Held handoff — kickoff not sent'. useDecisions.ts: ConversationPendingInputRow gains heldKickoff?: { since: string; focus?: string }; conversationKinds appends 'heldKickoff' when c.heldKickoff (derived branch only); conversationSince falls back to c.heldKickoff?.since; Decision gains heldKickoffFocus?: string set from c.heldKickoff?.focus; do NOT add heldKickoff to BLOCKING_KINDS. DecisionsPanel.tsx DecisionRow: heldOnly = decision.kinds.length === 1 && decision.kinds[0] === 'heldKickoff' (a row that also carries a permission/AUQ/plan/pane-choice kind keeps its normal Answer path); prompt falls back to heldKickoffFocus ?? 'Its kickoff was never sent. Open the conversation to start it.'; when heldOnly render one Open button (title 'Go to the conversation') calling onOpenSubject?.(decision) or navigateToDecisionSubject(decision), and no Answer button. If PendingInputSubject in store.ts must change for typecheck, add only the optional field. Tests per PRD WI-5."
+        },
+        "items": [
+          {
+            "id": "needs-you-held-kind.ac1",
+            "title": "Given a feed row { name: 'conv-held', heldKickoff: { since: '2026-10-04T13:19:27.000Z', focus: 'Read the brief' } }, useDecisions returns a decision with kinds ['heldKickoff'], blocking false, that since, and heldKickoffFocus 'Read the brief'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-held-kind.ac2",
+            "title": "Given a feed row with both pendingPermission and heldKickoff, the decision's kinds contain both 'permissionRequest' and 'heldKickoff'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-held-kind.ac3",
+            "title": "DecisionsPanel renders the held decision in the 'Waiting' group with badge 'Held handoff — kickoff not sent', prompt 'Read the brief', and no Answer button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-held-kind.ac4",
+            "title": "Clicking the held row's Open navigates to /conv/conv-held when no onOpenSubject is passed, and calls onOpenSubject with the decision when one is passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-held-kind.ac5",
+            "title": "Given a decision with kinds ['permissionRequest', 'heldKickoff'], DecisionsPanel still renders its Answer button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-held-handoff",
+        "title": "Document the ended held handoff view and its Needs you entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:24:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4596",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FORKS.md",
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-4596' docs/FORKS.md docs/DASHBOARD-ARCHITECTURE.md .overdeck/context/codebase/architecture.md",
+            "grep -n 'Held handoff — kickoff not sent' features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "each of the three files has a PAN-4596 line",
+            "features/conversations.mdx names the 'Held handoff — kickoff not sent' view"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. docs/FORKS.md '## Held kickoff (PAN-4499)': add an 'Ended held conversations (PAN-4596)' paragraph (HeldHandoffView instead of 'no saved history'; focus, working directory, handoff doc, kickoff text, Start + Archive, no Resume and why; Start POSTs the door which relaunches via ensureForkSessionReady(…, resume=false); a failed Start shows the error and Start retries) and change the GET bullet to { held: true, text, focus? }. features/conversations.mdx '### Holding a handoff': if the session ends before you start it, the page shows 'Held handoff — kickoff not sent' with focus, handoff doc and a Start button (same as pan handoff start <conv>); held conversations appear in Awareness → Needs you under Waiting until started or archived. docs/DASHBOARD-ARCHITECTURE.md '## Awareness feed (PAN-4301)': the pending-input feed also returns unarchived held conversations with heldKickoff: { since, focus? }, shown as the non-blocking heldKickoff kind whose Open navigates to the conversation (PAN-4596). .overdeck/context/codebase/architecture.md: extend the Held kickoff line (~186) and the Needs you sources line (~171) with PAN-4596 and update the last-verified date."
+        },
+        "items": [
+          {
+            "id": "docs-held-handoff.ac1",
+            "title": "docs/FORKS.md contains an 'Ended held conversations (PAN-4596)' paragraph stating Start relaunches via ensureForkSessionReady with resume=false and Resume is not offered, and its GET bullet shows { held: true, text, focus? }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-held-handoff.ac2",
+            "title": "Given features/conversations.mdx, its 'Holding a handoff' section contains the 'Held handoff — kickoff not sent' view with its Start button and states that held conversations appear in Awareness → Needs you under Waiting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-held-handoff.ac3",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md 'Awareness feed' and .overdeck/context/codebase/architecture.md, each contains a PAN-4596 sentence stating the pending-input feed returns heldKickoff rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "kickoff-get-focus",
+        "to": "feed-held-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "held-handoff-view",
+        "to": "panel-held-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-held-rows",
+        "to": "needs-you-held-kind",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
