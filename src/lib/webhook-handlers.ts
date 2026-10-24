@@ -282,9 +282,12 @@ export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
           headRef: pr.head.ref,
           prUrl: prUrlFor(repo, pr.number),
           source: sourceKey,
-          ...(run.name ? {
+          // PAN-4534: only a check that ran on this head names it; a cancelled
+          // run of a superseded commit can arrive with the PR's new head.
+          ...(run.name && (!run.head_sha || run.head_sha === pr.head.sha) ? {
             trigger: {
               name: run.name,
+              conclusion: run.conclusion,
               ...(run.details_url || run.html_url ? { url: (run.details_url || run.html_url)! } : {}),
               ...(run.app?.slug === 'github-actions' && run.id !== undefined ? { jobId: run.id } : {}),
             },

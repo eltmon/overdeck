@@ -1038,7 +1038,7 @@ describe('PAN-4534: failures come from the head\'s check runs, with the failing 
 
   const shard = (name: string, id: number) => ({ id, name, conclusion: 'failure', details_url: `https://github.com/test-owner/test-repo/actions/runs/900/job/${id}`, app: { slug: 'github-actions' } });
 
-  async function relay(trigger?: { name: string; url?: string; jobId?: number }) {
+  async function relay(trigger?: { name: string; conclusion: string; url?: string; jobId?: number }) {
     await relayCiFailureFeedback({
       issueId: 'PAN-1801',
       repo: 'test-owner/test-repo',
@@ -1118,12 +1118,33 @@ describe('PAN-4534: failures come from the head\'s check runs, with the failing 
       return callback(new Error('HTTP 502: Bad Gateway'), '', '');
     });
 
-    const body = await relay({ name: 'test-shard (4/4)', url: SHARD_URL, jobId: 456 });
+    const body = await relay({ name: 'test-shard (4/4)', conclusion: 'failure', url: SHARD_URL, jobId: 456 });
 
     expect(body).toContain('### test-shard (4/4)');
     expect(body).toContain(`Check: ${SHARD_URL}`);
     expect(body).toContain('Job log: `gh api repos/test-owner/test-repo/actions/jobs/456/logs`');
     expect(body).not.toContain('no failing workflow runs were found');
+  });
+
+  it('writes nothing for a cancelled triggering check when no check run or workflow run has failed', async () => {
+    // A push cancels the previous commit's in-progress jobs, and GitHub reports
+    // those cancelled check runs with the PR's new head.
+    mockGh([{ id: 456, name: 'test-shard (4/4)', conclusion: 'cancelled', details_url: SHARD_URL, app: { slug: 'github-actions' } }], () => undefined);
+
+    const body = await relay({ name: 'test-shard (4/4)', conclusion: 'cancelled', url: SHARD_URL, jobId: 456 });
+
+    expect(body).toBeUndefined();
+    expect(mockWriteFeedbackFile).not.toHaveBeenCalled();
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+  });
+
+  it('reports a timed-out shard with its job-log excerpt', async () => {
+    mockGh([{ ...shard('test-shard (3/4)', 455), conclusion: 'timed_out' }], () => ({ stdout: VITEST_LOG }));
+
+    const body = await relay();
+
+    expect(body).toContain('### test-shard (3/4)');
+    expect(body).toContain('FAIL  tests/unit/lib/access-tokens.test.ts');
   });
 
   it('lists the failing check names and URLs when no job log ever appears', async () => {

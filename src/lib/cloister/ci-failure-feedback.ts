@@ -46,7 +46,7 @@ import {
 } from './verification-cycles.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import { readDefaultBranchFailingTestChecks } from './ci-default-branch-tests.js';
-import { collectCheckRunFailures, listFailingCheckRunNames } from './ci-check-run-failures.js';
+import { collectCheckRunFailures, FAILED_CHECK_RUN_CONCLUSIONS, listFailingCheckRunNames } from './ci-check-run-failures.js';
 import { isDaggerCloudUrl, resolveVerificationTestsMode, TEST_GATE_NAME } from './verification-tests-mode.js';
 
 function execFilePromise(
@@ -76,9 +76,11 @@ export interface CiFailureFeedbackOptions {
   /**
    * PAN-4534: the failed check that fired this relay, from the webhook. When
    * neither lookup finds a failure (the check-run read failed, the workflow run
-   * is still in progress), the feedback still names and links it.
+   * is still in progress), the feedback still names and links it. Only a
+   * failed or timed-out check is reported this way: a cancelled one (a
+   * superseded run) is not a failure of this head.
    */
-  trigger?: { name: string; url?: string; jobId?: number };
+  trigger?: { name: string; conclusion: string; url?: string; jobId?: number };
 }
 
 export interface CiFailure {
@@ -701,7 +703,7 @@ async function relayCiFailureFeedbackInQueue(
 
   // Collect the concrete failures for this PR head.
   const failures = await collectFailures(owner, repo, opts.headRef, opts.headSha, mainFailingNames);
-  if (failures.length === 0 && opts.trigger) {
+  if (failures.length === 0 && opts.trigger && FAILED_CHECK_RUN_CONCLUSIONS.has(opts.trigger.conclusion.toLowerCase())) {
     const { name, url, jobId } = opts.trigger;
     failures.push({ name, ...(url ? { url } : {}), ...(jobId !== undefined ? { jobId } : {}), excerpt: '', inheritedFromMain: mainFailingNames.has(name) });
   }

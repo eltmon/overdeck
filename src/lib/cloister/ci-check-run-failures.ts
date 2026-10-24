@@ -31,6 +31,13 @@ interface GhCheckRun {
   app?: { slug?: string } | null;
 }
 
+/**
+ * Check-run conclusions that are a failure of the job itself. `cancelled`,
+ * `stale`, `action_required` and `startup_failure` say the job did not run to
+ * a verdict (a superseded run is cancelled), so they are not reported.
+ */
+export const FAILED_CHECK_RUN_CONCLUSIONS: ReadonlySet<string> = new Set(['failure', 'timed_out']);
+
 /** `gh api --jq` projection: one check run per line, without its `output`. */
 const CHECK_RUN_FIELDS = '.check_runs[] | {id, name, conclusion, details_url, html_url, app: {slug: .app.slug}}';
 
@@ -41,7 +48,7 @@ const CHECK_RUN_FIELDS = '.check_runs[] | {id, name, conclusion, details_url, ht
  */
 export async function listFailingCheckRunNames(owner: string, repo: string, ref: string): Promise<string[]> {
   try {
-    const stdout = await gh(['api', '--paginate', `repos/${owner}/${repo}/commits/${ref}/check-runs?per_page=100`, '--jq', '.check_runs[] | select(.conclusion == "failure") | .name']);
+    const stdout = await gh(['api', '--paginate', `repos/${owner}/${repo}/commits/${ref}/check-runs?per_page=100`, '--jq', '.check_runs[] | select(.conclusion == "failure" or .conclusion == "timed_out") | .name']);
     return stdout.split('\n').map((line) => line.trim()).filter(Boolean);
   } catch {
     return [];
@@ -130,7 +137,7 @@ export async function collectCheckRunFailures(owner: string, repo: string, headS
     return null;
   }
   const failing: Array<CheckRunFailure & { log?: string }> = [];
-  for (const run of checkRuns.filter((candidate) => candidate.conclusion === 'failure')) {
+  for (const run of checkRuns.filter((candidate) => FAILED_CHECK_RUN_CONCLUSIONS.has(candidate.conclusion ?? ''))) {
     const isActionsJob = run.app?.slug === 'github-actions';
     const log = isActionsJob ? await readJobLog(owner, repo, run.id) : '';
     failing.push({

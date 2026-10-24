@@ -225,7 +225,8 @@ the **CI test job on the PR head is the test gate**:
   with its reason. A webhook missed while the dashboard is down is not
   replayed; nothing polls for it.
 - **What the CI failure feedback contains (PAN-4534).** The relay reads the
-  failing checks from the PR head's **check runs**
+  failing checks (conclusion `failure` or `timed_out`) from the PR head's
+  **check runs**
   (`GET /repos/{owner}/{repo}/commits/{sha}/check-runs`,
   `cloister/ci-check-run-failures.ts`), which conclude per job, so the failing
   shard is found while its workflow run is still in progress. It reads every
@@ -244,7 +245,10 @@ the **CI test job on the PR head is the test gate**:
   the check and its URL. Only when no check run reports a failure does the
   relay fall back to the completed failed workflow runs (`gh run list`). If
   that finds nothing either, the feedback still names the failed check the
-  `check_run` webhook fired on, with its link and job-log command. A failing
+  `check_run` webhook fired on, with its link and job-log command, when that
+  check ran on the PR head and failed or timed out. A cancelled check (a push
+  cancels the previous commit's in-progress jobs, and GitHub reports them with
+  the PR's new head) is not reported, so no feedback is written. A failing
   job whose check also fails on main is marked inherited from main.
 - **Attempt budget.** A CI test failure counts against the local gate's budget
   (`VERIFICATION_MAX_CYCLES` = 3, `cloister/verification-cycles.ts`), read
