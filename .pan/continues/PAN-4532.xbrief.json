@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4532",
   "created": "2026-10-24T10:48:18.142Z",
-  "updated": "2026-10-24T12:58:10.789Z",
+  "updated": "2026-10-24T12:58:26.437Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -47,6 +47,10 @@
     "adopt-result.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T12:58:10.789Z"
+    },
+    "boot-adoption.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T12:58:26.437Z"
     }
   }
 }
