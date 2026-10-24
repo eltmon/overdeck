@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T16:05:11Z · model: claude-opus-5-5 · open: 837_
+_Last sequenced: 2026-10-24T16:28:46Z · model: claude-opus-5-5 · open: 838_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -16,6 +16,7 @@ _Last sequenced: 2026-10-24T16:05:11Z · model: claude-opus-5-5 · open: 837_
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
+| 22 | PAN-4625 | S | high | ok |  | PAN-4534 | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 24 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 25 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
@@ -889,6 +890,10 @@ Moves 705 importing files off a four-month-old beta onto the supported line, whi
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
 
+### PAN-4625 (rank 22)
+
+New issue since the prior run. The same-head debounce in ci-failure-feedback.ts drops a second failed check (e.g. a test shard after lint), so the work agent fixes lint and never learns which test failed, which costs a full extra CI and verification cycle per occurrence. It is a small, well-specified fix with clear ACs, but it edits the same relay code that in-pipeline PAN-4534 is rewriting, so it is sequenced right behind that work rather than ahead of it; it sits beside PAN-4439 (the missed-webhook backstop) as the second gap in CI failure delivery.
+
 ### PAN-4586 (rank 23)
 
 New issue. Verified against herdr 0.9.1: HerdrApiClient.call returns response.result, whose pane_read text sits under read.text, but readHerdrPaneText, diagnoseDetectionFailure and the herdr-submit composer read a top-level text, so every pane-text consumer on the default backend sees an empty string. A three-site fix plus corrected test stubs; placed in a free rank slot just above the Herdr pane-sizing pair (PAN-4582, PAN-3952) because it is smaller and likely explains part of PAN-3952's 'pane read returns nothing' observation.
@@ -1161,10 +1166,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 
 npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
 
-### PAN-2850 (rank 93)
-
-npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1172,10 +1173,10 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T16:05:11Z",
+  "generatedAt": "2026-10-24T16:28:46Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 837,
+  "openCount": 838,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11604,6 +11605,21 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "rationale": "New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4625",
+      "rank": 22,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4534"
+      ],
+      "why": "CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file)",
+      "rationale": "New issue since the prior run. The same-head debounce in ci-failure-feedback.ts drops a second failed check (e.g. a test shard after lint), so the work agent fixes lint and never learns which test failed, which costs a full extra CI and verification cycle per occurrence. It is a small, well-specified fix with clear ACs, but it edits the same relay code that in-pipeline PAN-4534 is rewriting, so it is sequenced right behind that work rather than ahead of it; it sits beside PAN-4439 (the missed-webhook backstop) as the second gap in CI failure delivery.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12943,6 +12959,20 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4534",
+      "to": "PAN-4625",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4439",
+      "to": "PAN-4625",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
