@@ -13,6 +13,8 @@ import { promisify } from "node:util";
 import chalk from "chalk";
 import { Effect } from "effect";
 import { detectPlatform } from "../platform.js";
+import { loadConfigSync } from "../config-yaml.js";
+import { ensureSemgrepInstalled, managedSemgrepPath, readSemgrepVersion, SEMGREP_VERSION } from "../semgrep/install.js";
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -26,6 +28,7 @@ export const PREREQ_REGISTRY = {
   runClaudeCodeHooks: ["jq"],
   useClaudeCodeRoutedAgents: [],
   useOxAgents: ["ox"],
+  useSemgrep: ["semgrep"],
 } as const;
 
 export type PrereqFeature = keyof typeof PREREQ_REGISTRY;
@@ -38,6 +41,7 @@ export const INSTALLABLE_TOOLS: readonly PrereqTool[] = [
   "mkcert",
   "jq",
   "ox",
+  "semgrep",
 ];
 
 async function checkCommand(cmd: string, args: string[] = ["--version"]): Promise<boolean> {
@@ -141,6 +145,12 @@ export async function isToolInstalled(tool: PrereqTool): Promise<boolean> {
     // tmux has no --version; it only accepts -V (and exits 1 on --version).
     return checkCommand("tmux", ["-V"]);
   }
+  if (tool === "semgrep") {
+    // PAN-4585 (FR-1): no probe while the feature is off.
+    if (!loadConfigSync().config.security.semgrep.enabled) return false;
+    // The managed binary is ~/.overdeck/bin/semgrep, not a PATH entry.
+    return (await readSemgrepVersion(managedSemgrepPath())) === SEMGREP_VERSION;
+  }
   return checkCommand(tool);
 }
 
@@ -164,6 +174,8 @@ export async function installTool(tool: PrereqTool): Promise<InstallResult> {
         return await installJq();
       case "ox":
         return await installOx();
+      case "semgrep":
+        return await installSemgrep();
       default:
         return {
           tool,
@@ -306,5 +318,22 @@ async function installOx(): Promise<InstallResult> {
     tool: "ox",
     success: true,
     message: "ox installed to ~/.local/bin/ox",
+  };
+}
+
+async function installSemgrep(): Promise<InstallResult> {
+  // PAN-4585 (FR-1): an explicit install still needs the feature switched on.
+  if (!loadConfigSync().config.security.semgrep.enabled) {
+    return {
+      tool: "semgrep",
+      success: false,
+      message: "Semgrep support is off (security.semgrep.enabled: false in ~/.overdeck/config.yaml)",
+    };
+  }
+  const outcome = await ensureSemgrepInstalled();
+  return {
+    tool: "semgrep",
+    success: outcome.status === "present" || outcome.status === "installed",
+    message: outcome.fix ? `${outcome.message} — ${outcome.fix}` : outcome.message,
   };
 }

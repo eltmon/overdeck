@@ -179,13 +179,20 @@ export function markVerificationWorkerAdmissionPhase(
   });
 }
 
-/** Record that `runId`'s result has a consumer, unless a newer run replaced the state. */
-function markResultConsumed(issueId: string, runId: string): void {
+/**
+ * Record that `runId`'s result has a consumer, unless a newer run replaced the
+ * state. Returns whether the consumption is on disk: adoption uses the result
+ * only then, so a failed write can never let one result dispatch twice.
+ */
+function markResultConsumed(issueId: string, runId: string): boolean {
   const state = readVerificationWorkerState(issueId);
-  if (!state || state.runId !== runId) return;
+  if (!state || state.runId !== runId) return false;
   try {
     writeJsonAtomic(statePath(issueId), { ...state, resultConsumedAt: new Date().toISOString() });
-  } catch { /* best-effort: an unrecorded consumption costs one re-run, never a lost result */ }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function readResult(path: string): VerificationRunnerOutcome | null {
@@ -200,7 +207,13 @@ async function waitForResult(state: WorkerState): Promise<VerificationRunnerOutc
   for (;;) {
     if (existsSync(state.resultPath)) {
       const result = JSON.parse(readFileSync(state.resultPath, 'utf8')) as VerificationRunnerOutcome;
-      markResultConsumed(state.issueId, state.runId);
+      // Fail closed: a result whose consumption is not on disk could be
+      // adopted again after a restart, so this waiter does not use it. The
+      // next request adopts it once the write succeeds. A newer run that
+      // replaced the state owns the issue now, and this result is not adoptable.
+      if (!markResultConsumed(state.issueId, state.runId) && readVerificationWorkerState(state.issueId)?.runId === state.runId) {
+        return { outcome: 'error', message: `Verification worker ${state.pid} finished, but its result could not be recorded as consumed; re-request review to use it` };
+      }
       return result;
     }
     if (!isProcessAlive(state.pid)) {
@@ -261,8 +274,8 @@ async function adoptUnconsumedResult(
   const result = readResult(existing.resultPath);
   if (!result || result.outcome === 'error') return null;
   if (!await workerVerifiesHead(existing, issueId, workspacePath, headAnchor, options)) return null;
-  markResultConsumed(issueId, existing.runId);
-  return result;
+  // An unrecorded consumption falls back to a fresh run, never a second use.
+  return markResultConsumed(issueId, existing.runId) ? result : null;
 }
 
 /** PAN-4531: fresh workers started for a head that moved under verification, before giving up. */

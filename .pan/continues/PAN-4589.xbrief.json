@@ -1,0 +1,189 @@
+{
+  "version": "1",
+  "issueId": "PAN-4589",
+  "created": "2026-10-24T08:19:18.820Z",
+  "updated": "2026-10-24T09:12:34.236Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "dagger-predicates": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4589",
+      "claimedAt": "2026-10-24T08:19:18.820Z",
+      "doneAt": "2026-10-24T08:21:20.221Z"
+    },
+    "rollup-status-context-pr-facts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4589",
+      "claimedAt": "2026-10-24T08:21:27.664Z",
+      "doneAt": "2026-10-24T08:30:45.437Z"
+    },
+    "default-branch-commit-statuses": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4589",
+      "claimedAt": "2026-10-24T08:30:52.059Z",
+      "doneAt": "2026-10-24T08:35:19.319Z"
+    },
+    "mode-detection-dagger-reason": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4589",
+      "claimedAt": "2026-10-24T08:35:26.208Z",
+      "doneAt": "2026-10-24T08:39:13.800Z"
+    },
+    "status-webhook-records-pass": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4589",
+      "claimedAt": "2026-10-24T08:39:18.827Z",
+      "doneAt": "2026-10-24T08:42:47.278Z"
+    },
+    "feedback-status-check-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4589",
+      "claimedAt": "2026-10-24T08:42:52.998Z",
+      "doneAt": "2026-10-24T08:47:54.460Z"
+    },
+    "to-checks-state-status-state": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4589",
+      "claimedAt": "2026-10-24T08:47:58.477Z",
+      "doneAt": "2026-10-24T08:51:29.126Z"
+    },
+    "docs-dagger-cloud-ci": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4589",
+      "claimedAt": "2026-10-24T08:51:33.896Z",
+      "doneAt": "2026-10-24T08:53:38.208Z"
+    },
+    "dagger-predicates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:03:50.174Z"
+    },
+    "dagger-predicates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:04:05.908Z"
+    },
+    "dagger-predicates.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:04:24.801Z"
+    },
+    "dagger-predicates.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:04:43.848Z"
+    },
+    "dagger-predicates.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:05:05.872Z"
+    },
+    "rollup-status-context-pr-facts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:05:31.473Z"
+    },
+    "rollup-status-context-pr-facts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:05:47.206Z"
+    },
+    "rollup-status-context-pr-facts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:06:02.821Z"
+    },
+    "rollup-status-context-pr-facts.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:06:22.139Z"
+    },
+    "rollup-status-context-pr-facts.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:06:37.698Z"
+    },
+    "default-branch-commit-statuses.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:06:55.681Z"
+    },
+    "default-branch-commit-statuses.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:07:10.104Z"
+    },
+    "default-branch-commit-statuses.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:07:24.443Z"
+    },
+    "default-branch-commit-statuses.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:07:39.795Z"
+    },
+    "default-branch-commit-statuses.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:07:54.619Z"
+    },
+    "mode-detection-dagger-reason.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:08:11.799Z"
+    },
+    "mode-detection-dagger-reason.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:08:26.055Z"
+    },
+    "mode-detection-dagger-reason.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:08:40.594Z"
+    },
+    "status-webhook-records-pass.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:08:58.461Z"
+    },
+    "status-webhook-records-pass.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:09:14.380Z"
+    },
+    "status-webhook-records-pass.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:09:29.919Z"
+    },
+    "feedback-status-check-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:09:48.376Z"
+    },
+    "feedback-status-check-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:10:04.211Z"
+    },
+    "feedback-status-check-links.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:10:20.793Z"
+    },
+    "feedback-status-check-links.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:10:36.742Z"
+    },
+    "to-checks-state-status-state.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:10:55.834Z"
+    },
+    "to-checks-state-status-state.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:11:11.403Z"
+    },
+    "to-checks-state-status-state.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:11:27.172Z"
+    },
+    "to-checks-state-status-state.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:11:42.509Z"
+    },
+    "docs-dagger-cloud-ci.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:12:01.472Z"
+    },
+    "docs-dagger-cloud-ci.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:12:17.826Z"
+    },
+    "docs-dagger-cloud-ci.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:12:34.236Z"
+    }
+  }
+}

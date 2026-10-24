@@ -1,7 +1,7 @@
 /**
  * Machine-wide CPU admission for direct Vitest runs (PAN-3344).
  *
- * Verification gates already hold the shared lease and set
+ * Verification gates already hold a shared admission slot and set
  * OVERDECK_GATE_ADMITTED=1. Direct agent-shell suites enter through this
  * global setup so every local Vitest invocation uses the same admission door.
  */

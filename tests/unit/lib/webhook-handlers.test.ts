@@ -615,4 +615,47 @@ describe('handleStatus', () => {
 
     expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
   });
+
+  it('records the CI test gate pass for a green Dagger Cloud test status (PAN-4589)', async () => {
+    await handleStatus(makePayload({
+      state: 'success',
+      sha: 'feedface',
+      context: 'go-client/test',
+      target_url: 'https://dagger.cloud/o/checks/github.com/o/r@feedface?check=go-client/test',
+      branches: [{ name: 'feature/pan-1801' }],
+    }));
+
+    expect(mockRecordCiTestGatePass).toHaveBeenCalledOnce();
+    expect(mockRecordCiTestGatePass).toHaveBeenCalledWith({
+      issueId: 'PAN-1801',
+      headSha: 'feedface',
+      headRef: 'feature/pan-1801',
+      source: 'status:go-client/test',
+    });
+    expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
+  });
+
+  it('does not record a pass for a green non-test Dagger status (PAN-4589)', async () => {
+    await handleStatus(makePayload({
+      state: 'success',
+      sha: 'feedface',
+      context: 'helm/lint',
+      target_url: 'https://dagger.cloud/o/checks/github.com/o/r@feedface?check=helm/lint',
+      branches: [{ name: 'feature/pan-1801' }],
+    }));
+
+    expect(mockRecordCiTestGatePass).not.toHaveBeenCalled();
+  });
+
+  it('does not record a pass for a green test-named status whose URL is not Dagger Cloud (PAN-4589)', async () => {
+    await handleStatus(makePayload({
+      state: 'success',
+      sha: 'feedface',
+      context: 'go-client/test',
+      target_url: 'https://buildkite.com/o/p/builds/1',
+      branches: [{ name: 'feature/pan-1801' }],
+    }));
+
+    expect(mockRecordCiTestGatePass).not.toHaveBeenCalled();
+  });
 });

@@ -19,6 +19,7 @@ import { AwaitingInputIndicator } from './AwaitingInputIndicator';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { formatIssueRef } from '../lib/issueLabel';
 import { useNow } from '../hooks/useNow';
+import { navigateToDecisionSubject } from '../lib/navigateToDecision';
 import styles from './styles/decisions.module.css';
 
 function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSubject?: (d: Decision) => void }) {
@@ -31,9 +32,13 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
         pendingQuestionCount: 1,
       })
     : undefined;
+  // PAN-4596 (D9) — a held kickoff has no dialog for Answer to reopen; its row
+  // offers one Open that goes to the conversation, where Start sends it.
+  const heldOnly = decision.kinds.length === 1 && decision.kinds[0] === 'heldKickoff';
+  const heldPrompt = heldOnly ? decision.heldKickoffFocus ?? 'Its kickoff was never sent. Open the conversation to start it.' : undefined;
   const prompt =
     decision.pendingAskUserQuestion?.questions?.[0]?.question ??
-    (decision.pendingProposedPlan ? 'A plan is ready for your review.' : enrichmentTitle ?? decision.permissionSummary ?? describePendingInput(decision.kinds, decision.turnEndAssessment));
+    (decision.pendingProposedPlan ? 'A plan is ready for your review.' : enrichmentTitle ?? decision.permissionSummary ?? heldPrompt ?? describePendingInput(decision.kinds, decision.turnEndAssessment));
   const issueRef = formatIssueRef(decision.issueId, decision.issueTitle);
 
   return (
@@ -59,7 +64,16 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
           {decision.since && <span>· waiting {formatRelativeTime(decision.since, now)}</span>}
         </div>
       </div>
-      {onOpenSubject && (
+      {heldOnly ? (
+        <button
+          type="button"
+          className={styles.answer}
+          title="Go to the conversation"
+          onClick={() => (onOpenSubject ? onOpenSubject(decision) : navigateToDecisionSubject(decision))}
+        >
+          Open
+        </button>
+      ) : onOpenSubject && (
         <button
           type="button"
           className={styles.answer}
@@ -69,9 +83,11 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
           Open
         </button>
       )}
-      <button type="button" className={styles.answer} onClick={() => requestReopen(decision.id)}>
-        Answer
-      </button>
+      {!heldOnly && (
+        <button type="button" className={styles.answer} onClick={() => requestReopen(decision.id)}>
+          Answer
+        </button>
+      )}
     </div>
   );
 }

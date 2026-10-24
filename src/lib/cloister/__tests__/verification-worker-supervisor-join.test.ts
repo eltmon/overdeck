@@ -16,7 +16,19 @@ const mocks = vi.hoisted(() => ({
   launches: [] as Array<{ resultPath: string }>,
   /** Results the next fresh workers write, in order; then `passed`. */
   results: [] as Array<Record<string, unknown>>,
+  failConsumptionWrite: false,
 }));
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    writeFileSync: (...args: Parameters<typeof actual.writeFileSync>) => {
+      if (mocks.failConsumptionWrite && String(args[1]).includes('resultConsumedAt')) throw new Error('ENOSPC');
+      return actual.writeFileSync(...args);
+    },
+  };
+});
 
 vi.mock('../../project-repos.js', () => ({
   resolveWorkspaceRepoRoots: () => [{
@@ -131,6 +143,7 @@ beforeEach(() => {
   mocks.workspace = join(root, 'workspace');
   mocks.launches = [];
   mocks.results = [];
+  mocks.failConsumptionWrite = false;
   execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin]);
   execFileSync('git', ['clone', '-q', origin, mocks.workspace], { stdio: 'ignore' });
   git('checkout', '-q', '-b', 'main');
@@ -267,6 +280,31 @@ describe('adopting an unconsumed result (PAN-4532)', () => {
     vi.useRealTimers();
     alivePids.delete(LIVE_PID);
 
+    expect(await review()).toEqual({ outcome: 'passed' });
+    expect(mocks.launches).toHaveLength(1);
+  });
+
+  it('a result whose consumption cannot be recorded is not adopted: a fresh worker runs', async () => {
+    registerFinishedWorker(commit('a'));
+    mocks.failConsumptionWrite = true;
+
+    // The write still fails for the fresh worker, so its waiter fails closed too.
+    expect(await review()).toMatchObject({ outcome: 'error' });
+    expect(mocks.launches).toHaveLength(1);
+  });
+
+  it('a waiter that cannot record consumption fails closed, and the next request adopts the result once', async () => {
+    const liveResult = registerLiveWorker(commit('a'), { logPrefix: 'request-review', options: {} });
+    mocks.failConsumptionWrite = true;
+    expect(await joinAndFinish(liveResult, review)).toMatchObject({ outcome: 'error' });
+    vi.useRealTimers();
+    alivePids.delete(LIVE_PID);
+    mocks.failConsumptionWrite = false;
+
+    expect(await review()).toEqual({ outcome: 'passed' });
+    expect(mocks.launches).toHaveLength(0);
+    expect(readVerificationWorkerState('PAN-1')?.resultConsumedAt).toEqual(expect.any(String));
+    // Handed to one continuation already: the next request is a real re-run.
     expect(await review()).toEqual({ outcome: 'passed' });
     expect(mocks.launches).toHaveLength(1);
   });

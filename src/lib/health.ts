@@ -14,6 +14,11 @@ import { AGENTS_DIR } from './paths.js';
 import { recoverAgent, stopAgent, getAgentState, getAgentRuntimeStateSync } from './agents.js';
 import { listSessionNames } from './tmux.js';
 import { getAgentEffectiveLastActivityMs, isAlive, isConfirmedDead, type LivenessVerdict } from './agents/liveness.js';
+// PAN-4595: loading the runtime registry registers the transcript-heartbeat
+// lookup with liveness.ts (which cannot import the registry itself — that
+// closes a cycle). Without it a CLI process sees no activity for a Herdr
+// agent (empty runtime mirror, no tmux window_activity) and calls it stuck.
+import './runtimes/index.js';
 
 /** A health-monitor operation (ping, classify, recover) failed unexpectedly. */
 class HealthError extends Data.TaggedError('HealthError')<{
