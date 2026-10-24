@@ -43,6 +43,19 @@ export interface MergeGateDeps {
   overdeckLogins?: () => Promise<readonly string[]>;
 }
 
+/**
+ * PAN-4540: GitHub recomputes `mergeable` after the base branch moves and
+ * answers UNKNOWN (null) meanwhile. The first gate read after another PR
+ * merges usually lands in that window, so an otherwise-ready PR is read once
+ * more after this delay before the gate decides.
+ */
+export const MERGEABILITY_REREAD_MS = 3_000;
+
+/** An open, green PR whose only missing fact may be the forge's mergeability. */
+function mergeabilityPending(facts: PrFacts): boolean {
+  return !facts.error && facts.open && !facts.draft && facts.checks === 'green' && facts.mergeable === null;
+}
+
 export interface MergeGateResult extends MergeReadiness {
   facts: PrFacts;
 }
@@ -98,9 +111,14 @@ export async function evaluateIssueMergeGate(
   deps: MergeGateDeps = {},
   options: PrFactsOptions = {},
 ): Promise<MergeGateResult> {
-  const read = deps.getFacts
-    ? await deps.getFacts(issueId, options)
-    : await getPrFacts(issueId, {}, options);
+  const getFacts = (readOptions: PrFactsOptions) => deps.getFacts
+    ? deps.getFacts(issueId, readOptions)
+    : getPrFacts(issueId, {}, readOptions);
+  let read = await getFacts(options);
+  if (mergeabilityPending(read)) {
+    await new Promise<void>((resolve) => setTimeout(resolve, MERGEABILITY_REREAD_MS));
+    read = await getFacts({ ...options, fresh: true });
+  }
   const facts = await withForgeApprovalAtHead(read, deps.readReviews, deps.overdeckLogins);
   // #4066 review: the board's derived `ready` reads this answer (no forge read).
   recordApprovalAtHead(facts);

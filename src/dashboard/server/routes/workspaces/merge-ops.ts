@@ -278,7 +278,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     if (ineligible) return ineligible;
   }
   const gate = await forgeMergeGate(issueId, request);
-  if (gate.refusal) return { ...gate.refusal, state: derived.state };
+  if (gate.refusal) return { ...gate.refusal, state: derived.state, refused: true };
   const approvedHead = automaticMergeHead(request);
 
   if (run?.phase === 'merging') {

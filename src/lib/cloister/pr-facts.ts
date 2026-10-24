@@ -160,6 +160,8 @@ export interface PrFactsOptions {
    * `strike/<issue>`), so an open feature PR cannot stand in for it.
    */
   preferBranch?: string;
+  /** PAN-4540: skip the cached answer; the fresh one still refreshes the cache. */
+  fresh?: boolean;
 }
 
 export interface GitLabMrView {
@@ -605,7 +607,7 @@ export async function getPrFacts(
 ): Promise<PrFacts> {
   const cacheable = Object.keys(deps).length === 0 && !options.preferBranch;
   const key = issueId.toUpperCase();
-  if (cacheable) {
+  if (cacheable && !options.fresh) {
     const hit = prFactsCache.get(key);
     if (hit && Date.now() - hit.at < PR_FACTS_TTL_MS) return hit.facts;
   }
@@ -942,7 +944,11 @@ export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPol
   if (facts.draft) return { ready: false, reason: 'PR is a draft' };
   if (facts.changesRequested) return { ready: false, reason: 'latest review requested changes' };
   if (policy.requireApprovalAtHead && facts.forge === 'github') {
-    if (!approvalProvenAtHead(facts)) {
+    // PAN-4540: the reviews are read only for a green, mergeable PR
+    // (withForgeApprovalAtHead), so an unproven approval on any other PR is a
+    // missing read, not a missing review. Let the checks and mergeability
+    // below give the real reason; neither lets such a PR through.
+    if (!approvalProvenAtHead(facts) && facts.checks === 'green' && facts.mergeable === true) {
       return {
         ready: false,
         reason: `PR is not approved at PR HEAD ${head} (needs a review approving that commit)`,

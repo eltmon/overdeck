@@ -8,6 +8,7 @@ vi.mock('../../../../lib/overdeck/merge-sync.js', () => ({
   markBlocked: vi.fn(() => true),
   markFailed: vi.fn(() => true),
   markMerged: vi.fn(() => true),
+  markMergeRefused: vi.fn(() => true),
   markMergeRetriesExhausted: vi.fn(() => true),
   requeueToPending: vi.fn(() => true),
   transitionToMerging: vi.fn(() => true),
@@ -415,6 +416,36 @@ describe('auto-merge executor', () => {
     expect(markFailed).toHaveBeenCalledWith(1, 'merge exploded');
     expect(announceFailure).toHaveBeenCalledWith('PAN-1486', 'merge exploded');
     expect(requeueToPending).not.toHaveBeenCalled();
+  });
+
+  it('blocks, never fails, a row whose merge the gate inside triggerMerge refused (PAN-4540)', async () => {
+    const markFailed = vi.fn();
+    const markRefused = vi.fn(() => true);
+    const announceFailure = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry()],
+      isPaused: () => false,
+      // The executor's own gate read passes; the one inside triggerMerge refuses.
+      mergeGate: async () => gate(),
+      hasPendingDeploy: async () => false,
+      isEligible: async () => ({ eligible: true }),
+      transition: () => true,
+      mergeIssue: async () => ({
+        success: false,
+        statusCode: 400,
+        refused: true,
+        error: 'Cannot merge: the forge has not computed mergeability yet (state=unknown)',
+      }),
+      markFailed,
+      markRefused,
+      announceFailure,
+    });
+
+    expect(markRefused).toHaveBeenCalledWith(1, 'PAN-1486 is not ready to merge: Cannot merge: the forge has not computed mergeability yet (state=unknown)');
+    expect(markFailed).not.toHaveBeenCalled();
+    expect(announceFailure).not.toHaveBeenCalled();
   });
 
   it('ticks every 30 seconds when started', async () => {

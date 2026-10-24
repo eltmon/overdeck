@@ -193,6 +193,8 @@ describe('triggerMerge server rebase escalation', () => {
       statusCode: 400,
       error: `Cannot merge: no CI test job reported on PR HEAD ${HEAD_SHA} (verification.tests: ci)`,
       state: 'ready',
+      // PAN-4540: a gate refusal ran no merge, so auto-merge records it as blocked.
+      refused: true,
     });
     expect(mocks.setMergeRun).not.toHaveBeenCalled();
     expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();

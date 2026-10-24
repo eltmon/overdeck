@@ -129,6 +129,30 @@ bypasses it.
 Content failures — red CI, a closed or draft PR, unresolved conflicts — are
 visible directly on the PR; there is no separate failure status to set.
 
+## Auto-merge rows: `failed` vs `blocked` (PAN-4540)
+
+Each scheduled auto-merge is a `pending_auto_merges` row. Two of its end
+states mean different things, and the scheduler treats them differently at
+the same PR head (`latestAutoMergeAllowsSchedule`):
+
+- **`failed`** means a merge command actually ran and failed, or the retry
+  budget ran out. A failed row is never re-armed at the same head; a new head
+  re-arms it.
+- **`blocked`** means nothing was merged because something refused first: the
+  executor's own gate read, eligibility, a closed tracker issue, or the merge
+  gate that `triggerMerge` re-reads before it merges (`refused: true` on its
+  result, recorded by `markMergeRefused`). The scheduler re-arms a blocked row
+  as soon as the gate passes again.
+
+The two gate reads can disagree seconds apart: GitHub recomputes `mergeable`
+after the base branch moves and answers UNKNOWN meanwhile, so the first read
+after another PR merges often lands in that window. The merge gate
+(`cloister/merge-gate.ts`) therefore re-reads an open, green PR whose
+mergeability is unknown once, `MERGEABILITY_REREAD_MS` (3 s) later, bypassing
+the PR-facts cache. A still-unknown answer is reported as "the forge has not
+computed mergeability yet", never as a missing approval: the reviews that
+prove approval at the head are read only for a green, mergeable PR.
+
 ## The per-project merge queue
 
 Merges are serialized per project. A Merge clicked while another merge holds

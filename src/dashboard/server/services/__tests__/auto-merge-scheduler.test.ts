@@ -513,6 +513,11 @@ describe('latestAutoMergeAllowsSchedule (#3983)', () => {
     expect(latestAutoMergeAllowsSchedule(row('blocked', { headSha: 'abc123' }), pr)).toBe(true);
     expect(latestAutoMergeAllowsSchedule(row('failed', { prUrl: `${PR_URL}0` }), pr)).toBe(true);
   });
+
+  it('re-arms a row blocked by a refusal inside triggerMerge at the same head (PAN-4540)', () => {
+    const refused = row('blocked', { headSha: 'abc123', failureReason: 'PAN-1 is not ready to merge: Cannot merge: the forge has not computed mergeability yet' });
+    expect(latestAutoMergeAllowsSchedule(refused, pr)).toBe(true);
+  });
 });
 
 describe('listScheduleCandidates (#3983)', () => {
