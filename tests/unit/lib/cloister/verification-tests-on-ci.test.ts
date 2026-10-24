@@ -338,6 +338,26 @@ describe('resolveVerificationTestsMode (review of #3993: a PR-triggered test job
       reason: 'verification.tests: ci in projects.yaml',
     });
   });
+
+  it('names dagger.toml in the local reason when no workflow qualifies (PAN-4589)', () => {
+    expect(resolveVerificationTestsModeDecision(base, { ...workflowsIn({}), fileExists: (p: string) => p === '/p/dagger.toml' }))
+      .toEqual({ mode: 'local', reason: 'no GitHub Actions workflows; dagger.toml present; set verification.tests: ci if Dagger Cloud checks are on' });
+  });
+
+  it('leaves the reason unchanged with no dagger.toml (PAN-4589)', () => {
+    expect(resolveVerificationTestsModeDecision(base, { ...workflowsIn({}), fileExists: () => false }))
+      .toEqual({ mode: 'local', reason: 'no GitHub Actions workflows' });
+  });
+
+  it('stays ci with the workflow reason when a qualifying workflow exists alongside dagger.toml (PAN-4589)', () => {
+    expect(resolveVerificationTestsModeDecision(
+      base,
+      { ...workflowsIn({ '/p/.github/workflows': at(PR_TEST_WORKFLOW) }), fileExists: (p: string) => p === '/p/dagger.toml' },
+    )).toEqual({
+      mode: 'ci',
+      reason: '.github/workflows/ci.yml runs test job "test" on pull requests',
+    });
+  });
 });
 
 describe('findPullRequestTestJob', () => {

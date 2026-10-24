@@ -32,6 +32,11 @@
  * invisible to `isCiTestCheckName` alone. `isCiTestRollupCheck` (PAN-4589)
  * also recognizes a commit status whose `context` the matcher names, or whose
  * target URL is a Dagger Cloud page and whose check path has a test segment.
+ *
+ * This mode-detection scan reads only `.github/workflows` files, so it cannot
+ * see commit-status CI on its own: when it finds no qualifying workflow and a
+ * project root has `dagger.toml`, its reason names that so a Dagger Cloud
+ * project knows to set `verification.tests: ci` explicitly (PAN-4589).
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
@@ -60,6 +65,8 @@ export interface WorkflowFile {
 export interface VerificationTestsModeDeps {
   /** The GitHub Actions workflow files in `dir` (a `.github/workflows` directory). */
   readWorkflowFiles?: (dir: string) => WorkflowFile[];
+  /** Whether `path` exists (default `existsSync`); overridden in tests. */
+  fileExists?: (path: string) => boolean;
 }
 
 function defaultReadWorkflowFiles(dir: string): WorkflowFile[] {
@@ -274,11 +281,14 @@ function detectGitHubActionsTestJobSync(
       if (job) return { found: true, workflow: relative(project.path, join(dir, file.name)), job };
     }
   }
+  const reason = sawWorkflow
+    ? 'no GitHub Actions workflow runs a test job (a check named test, tests, test-*, test (…)) on pull requests'
+    : 'no GitHub Actions workflows';
+  const fileExists = deps.fileExists ?? existsSync;
+  const dagger = roots.some((root) => fileExists(join(root, 'dagger.toml')));
   return {
     found: false,
-    reason: sawWorkflow
-      ? 'no GitHub Actions workflow runs a test job (a check named test, tests, test-*, test (…)) on pull requests'
-      : 'no GitHub Actions workflows',
+    reason: dagger ? `${reason}; dagger.toml present; set verification.tests: ci if Dagger Cloud checks are on` : reason,
   };
 }
 
