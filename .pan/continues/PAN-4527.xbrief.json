@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4527",
   "created": "2026-10-24T10:10:19.162Z",
-  "updated": "2026-10-24T13:42:28.434Z",
+  "updated": "2026-10-24T13:42:57.068Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -39,6 +39,10 @@
     "docs": {
       "status": "completed",
       "doneAt": "2026-10-24T13:42:28.434Z"
+    },
+    "head-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:42:57.068Z"
     }
   }
 }
