@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4585",
   "created": "2026-10-24T08:22:26.190Z",
-  "updated": "2026-10-24T10:27:55.629Z",
+  "updated": "2026-10-24T10:34:40.750Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
       "claimedBy": "agent-pan-4585",
       "claimedAt": "2026-10-24T10:14:39.474Z",
       "doneAt": "2026-10-24T10:27:55.629Z"
+    },
+    "config-security-semgrep.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:34:40.750Z"
     }
   }
 }
