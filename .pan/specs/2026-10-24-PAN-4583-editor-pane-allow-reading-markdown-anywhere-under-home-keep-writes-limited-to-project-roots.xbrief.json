@@ -4,17 +4,17 @@
     "created": "2026-10-24T07:15:37Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4583: Editor pane: allow reading markdown anywhere under $HOME; keep writes limited to project roots",
-    "updated": "2026-10-24T07:17:10.774Z"
+    "updated": "2026-10-24T07:17:58.233Z"
   },
   "plan": {
     "id": "pan-4583",
     "title": "Editor pane: allow reading markdown anywhere under $HOME; keep writes limited to project roots",
-    "status": "proposed",
+    "status": "running",
     "uid": "f8482bf5-3cba-4953-9c7b-bdd96e250960",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T07:15:37Z",
-    "updated": "2026-10-24T07:17:10.774Z",
+    "updated": "2026-10-24T07:17:58.233Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4583",
@@ -304,5 +304,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
