@@ -129,6 +129,61 @@ The gap between `Queued` and `Admitted` is queue wait; the gap between
 `~/.overdeck/verification-workers/admission/`, holds `owner.json` for the
 current holder and one `waiter-*.json` per queued attempt.
 
+### Choosing a project's local gates
+
+When CI already runs a check as a required PR check, a local gate for that
+same check only repeats it under the single machine-wide admission slot (see
+[Why verification is slow](#why-verification-is-slow)) — it adds queue time
+without catching anything CI would not catch anyway. Keep locally what CI
+does not run, or what must fail before review ever starts.
+
+The configuration the Overdeck maintainers run (per-machine
+`~/.overdeck/projects.yaml`, not tracked in this repo) is an example of
+applying that rule:
+
+```yaml
+panopticon-cli:
+  quality_gates:
+    install:
+      command: bun install --frozen-lockfile
+      required: true
+    typecheck:
+      command: npm run typecheck
+      required: true
+    test:
+      # Changed-file Vitest, root + frontend; deferred to CI in `ci` tests mode.
+      command: >
+        OVERDECK_VERIFICATION=1 npx vitest run --changed {{CHANGED_BASE}} &
+        r=$!; (cd src/dashboard/frontend && OVERDECK_VERIFICATION=1 npx vitest
+        run --changed {{CHANGED_BASE}}) & f=$!; rc=0; wait $r || rc=1; wait $f
+        || rc=1; exit $rc
+      retry: 1
+```
+
+`lint`, `build`, the frontend's strict typecheck, and the server bundle build
+were dropped from that list, not because they do not matter, but because CI
+already runs the equivalent of each one as a required check: `npm run build`
+already runs `build:dashboard:server:bundle` and the frontend's strict `tsc`,
+and `npm run typecheck` already runs `typecheck:frontend` — though
+`typecheck:frontend` is a baseline ratchet (the error count may not grow), not
+the strict zero-error check `build:dashboard:frontend`'s `tsc` runs, so the two
+are not the same check. CI's `build` and `lint` jobs run both.
+
+An `install` gate such as `bun install --frozen-lockfile` is worth keeping
+even though the runner always installs dependencies on its own: that built-in
+install is warn-only (see
+[What a verification run does](#what-a-verification-run-does), step 4), so an
+explicit `install` gate is what turns a stale or broken lockfile into a real
+failure instead of a log warning.
+
+The tradeoff: dropping a local `lint` or `build` gate means a lint or build
+failure no longer blocks review from starting. It instead shows up after
+review has already begun, as a red CI check — delivered to a live work agent
+as a plain "CI FAILED" message, not counted against the verification attempt
+budget. The merge gate still requires that check to go green before the PR
+can merge, so nothing merges broken; it only changes when in the pipeline the
+failure surfaces.
+
 ### One full-suite run per push, on CI (PAN-3965)
 
 For a project with CI, the verification gate runs **typecheck and lint only**
