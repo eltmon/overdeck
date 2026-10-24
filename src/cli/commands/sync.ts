@@ -5,6 +5,8 @@ import { existsSync, readdirSync, readFileSync, writeFileSync, statSync, symlink
 import { homedir } from 'os';
 import { join } from 'path';
 import { loadConfigSync } from '../../lib/config.js';
+import { loadConfigSync as loadYamlConfig } from '../../lib/config-yaml.js';
+import { ensureSemgrepInstalled, formatSemgrepInstallOutcome, SEMGREP_VERSION } from '../../lib/semgrep/install.js';
 import { isXBriefFilename, parseXBriefFilename } from '../../lib/xbrief/lifecycle.js';
 import { resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { createBackup } from '../../lib/backup.js';
@@ -253,6 +255,10 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
 
     console.log(chalk.cyan('Herdr: would install/verify binary, config, session server, integrations'));
+
+    if (loadYamlConfig().config.security.semgrep.enabled) {
+      console.log(chalk.cyan(`Semgrep: would install/verify ${SEMGREP_VERSION} at ~/.overdeck/bin/semgrep`));
+    }
 
     console.log('');
     console.log(chalk.dim('Run without --dry-run to apply changes.'));
@@ -506,6 +512,13 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     renderHerdrReport(herdrSpinner, await timeAsync('herdr', () => ensureHerdr({ mode: 'sync' })));
   } catch (error) {
     herdrSpinner.warn(`Herdr verification failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  // PAN-4585: opt-in Semgrep CLI. Nothing runs, installs or prints when security.semgrep.enabled is false.
+  if (loadYamlConfig().config.security.semgrep.enabled) {
+    const semgrepSpinner = ora(`Verifying Semgrep ${SEMGREP_VERSION}...`).start();
+    const { level, text } = formatSemgrepInstallOutcome(await timeAsync('semgrep', () => ensureSemgrepInstalled()));
+    semgrepSpinner[level](text);
   }
 
   // A project with no tracker config gets `github_repo` from its GitHub origin

@@ -118,6 +118,7 @@
               "configuration/terminal-backend",
               "configuration/memory-governor",
               "configuration/jev",
+              "configuration/semgrep",
               "configuration/context-layers",
               "configuration/memory",
               "configuration/appearance",

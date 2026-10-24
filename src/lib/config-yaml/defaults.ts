@@ -8,6 +8,7 @@ import { computeGovernorReserveDefaultsGb, computeSpawnMemoryThresholdDefaultsGb
 import type { NormalizedConfig } from './schema.js';
 import { DEFAULT_NORMALIZED_OLLAMA } from './ollama.js';
 import { DEFAULT_NORMALIZED_JEV } from './jev.js';
+import { DEFAULT_NORMALIZED_SECURITY } from './semgrep.js';
 
 /**
  * PAN-2500: default deacon memory-governor reserves as fractions of total RAM,
@@ -50,6 +51,8 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   ollama: { ...DEFAULT_NORMALIZED_OLLAMA },
   // PAN-4369: Jev is off until some layer has a `jev:` block; there is no default model.
   jev: { ...DEFAULT_NORMALIZED_JEV },
+  // PAN-4585: Semgrep support is off until security.semgrep.enabled is true.
+  security: { semgrep: { ...DEFAULT_NORMALIZED_SECURITY.semgrep } },
   enabledProviders: new Set(['anthropic']), // Only Anthropic by default
   // Seeded conversation-model default for brand-new installs (operator
   // decision, 2026-07-12): the new-conversation picker must never be empty.

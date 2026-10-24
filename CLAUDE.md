@@ -60,6 +60,7 @@
 | Issue views, God View | [docs/ISSUE-VIEW.md](docs/ISSUE-VIEW.md), [docs/GOD-VIEW.md](docs/GOD-VIEW.md) |
 | Context layers (rules/skills distribution) | [docs/CONTEXT-LAYERS.md](docs/CONTEXT-LAYERS.md) |
 | Jev (TypeSafe) optional judgment client, config and data disclosure | [configuration/jev.mdx](configuration/jev.mdx) |
+| Semgrep (opt-in SAST): managed install, doctor, tiers | [configuration/semgrep.mdx](configuration/semgrep.mdx) |
 | Flywheel page and loop skill | [docs/FLYWHEEL.md](docs/FLYWHEEL.md) |
 | Gauntlet lanes (`pan lane`) | [reference/lanes.mdx](reference/lanes.mdx) |
 | Shared Sessions share service (Cloudflare Worker, Durable Objects, TURN) | [docs/SHARED-SESSIONS.md](docs/SHARED-SESSIONS.md) |

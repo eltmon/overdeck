@@ -18,6 +18,8 @@ import {
   SYNC_SOURCES,
 } from '../../lib/paths.js';
 import { getDefaultConfig, saveConfig, loadConfigSync } from '../../lib/config.js';
+import { loadConfigSync as loadYamlConfig } from '../../lib/config-yaml.js';
+import { ensureSemgrepInstalled, formatSemgrepInstallOutcome, SEMGREP_VERSION } from '../../lib/semgrep/install.js';
 import { Effect } from 'effect';
 import { detectPlatform } from '../../lib/platform.js';
 import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
@@ -434,6 +436,14 @@ async function installCommand(options: InstallOptions): Promise<void> {
     }
   } else {
     spinner.info('ast-grep already installed');
+  }
+
+  // Step 5d: Semgrep (opt-in, PAN-4585). Nothing runs, installs or prints when
+  // security.semgrep.enabled is false.
+  if (loadYamlConfig().config.security.semgrep.enabled) {
+    spinner.start(`Verifying Semgrep ${SEMGREP_VERSION}...`);
+    const { level, text } = formatSemgrepInstallOutcome(await ensureSemgrepInstalled());
+    spinner[level](text);
   }
 
   // Step 5e: Herdr — the default terminal backend (PAN-3956). Binary from
