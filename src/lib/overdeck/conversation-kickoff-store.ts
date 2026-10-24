@@ -27,3 +27,14 @@ export function claimHeldKickoff(name: string): string | null {
 export function restoreHeldKickoff(name: string, text: string): void {
   getOverdeckDatabase().prepare('UPDATE conversations SET held_kickoff = ? WHERE name = ? AND held_kickoff IS NULL').run(text, name);
 }
+
+/** PAN-4596: the handoff focus stored in a conversation's fork_request JSON, or null. */
+export function heldKickoffFocus(forkRequest: string | null | undefined): string | null {
+  if (!forkRequest) return null;
+  try {
+    const focus = (JSON.parse(forkRequest) as { handoffFocus?: unknown }).handoffFocus;
+    return typeof focus === 'string' && focus.trim() ? focus.trim() : null;
+  } catch {
+    return null;
+  }
+}

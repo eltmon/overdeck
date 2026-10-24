@@ -66,4 +66,14 @@ describe('conversation kickoff store', () => {
     restoreHeldKickoff('conv-d', 'ignored');
     expect(readHeldKickoff('conv-d')).toBe('other text');
   });
+
+  it('heldKickoffFocus returns the trimmed focus, or null when there is none (PAN-4596)', async () => {
+    const { heldKickoffFocus } = await import('../conversation-kickoff-store.js');
+    expect(heldKickoffFocus(JSON.stringify({ hold: true, handoffFocus: '  Read the brief  ' }))).toBe('Read the brief');
+    expect(heldKickoffFocus(null)).toBeNull();
+    expect(heldKickoffFocus(undefined)).toBeNull();
+    expect(heldKickoffFocus('{not json')).toBeNull();
+    expect(heldKickoffFocus(JSON.stringify({ hold: true }))).toBeNull();
+    expect(heldKickoffFocus(JSON.stringify({ hold: true, handoffFocus: '   ' }))).toBeNull();
+  });
 });
