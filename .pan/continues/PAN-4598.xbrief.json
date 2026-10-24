@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4598",
   "created": "2026-10-24T10:10:10.024Z",
-  "updated": "2026-10-24T10:55:24.874Z",
+  "updated": "2026-10-24T10:55:47.579Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -67,6 +67,10 @@
     "uat-card-merge-controls": {
       "status": "completed",
       "doneAt": "2026-10-24T10:55:24.873Z"
+    },
+    "docs-merge-workflow": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:55:47.579Z"
     }
   }
 }
