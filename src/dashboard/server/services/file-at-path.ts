@@ -1,4 +1,5 @@
 import { readFile, realpath, stat, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { extname, posix as pathPosix, sep, win32 as pathWin32 } from 'node:path';
 
 import { Effect } from 'effect';
@@ -13,6 +14,14 @@ import {
 import { listProjectsSync } from '../../../lib/projects.js';
 import { OVERDECK_HOME } from '../../../lib/paths.js';
 import { languageForPath } from './read-workspace-file.js';
+
+/**
+ * The file-at-path door (PAN-3260): `readFileAtPath` and `writeFileAtPath`
+ * read or write one markdown file by absolute path, with no issueId. Reads
+ * accept the home root + the write roots and report `writable`; writes
+ * accept only the write roots and never create files (PAN-4583). Containment
+ * is always evaluated on the realpath, never the lexical path.
+ */
 
 // 1 MiB — errors instead of truncating (PAN-3260 NFR-1): the internal
 // markdown editor must never save a truncated buffer over a larger file.
@@ -43,11 +52,11 @@ function countLines(text: string): number {
 }
 
 /**
- * Registered project roots + OVERDECK_HOME, realpath'd. This is the file
- * door's allowlist — narrower than the open-any-path `shellOpenInEditor`
- * precedent, since this door also grants writes.
+ * Registered project roots + OVERDECK_HOME, realpath'd: the write roots.
+ * writeFileAtPath accepts only these; readFileAtPath also accepts the home
+ * root (PAN-4583).
  */
-async function resolveAllowedRoots(): Promise<string[]> {
+async function resolveWriteRoots(): Promise<string[]> {
   const roots: string[] = [];
   for (const { config } of listProjectsSync()) {
     try {
@@ -65,12 +74,28 @@ async function resolveAllowedRoots(): Promise<string[]> {
 }
 
 /**
+ * The operator's home directory, realpath'd — the extra read root (PAN-4583).
+ * Every /ws/rpc caller holds the admin scope, which already grants a shell as
+ * this user (docs/MARKDOWN-EDITOR-PANE.md, "Who can call this door"), so
+ * reading markdown under $HOME grants no new access. Null when it is missing.
+ */
+async function resolveHomeRoot(): Promise<string | null> {
+  try {
+    return await realpath(homedir());
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Shared read+write validation: absolute path, markdown extension, resolves
  * (via realpath, so symlink escapes are caught) inside an allowlisted root,
  * and is an existing regular file. The write door never creates files
- * (PAN-3260 NonGoal) — this same existing-file check gates both.
+ * (PAN-3260 NonGoal) — this same existing-file check gates both. Containment
+ * depends on `door`: a write must land inside a write root; a read may also
+ * land inside the home root (PAN-4583).
  */
-async function validateAndResolve(path: string): Promise<{ realPath: string }> {
+async function validateAndResolve(path: string, door: 'read' | 'write'): Promise<{ realPath: string; writable: boolean }> {
   if (path.length > MAX_PATH_LENGTH) {
     throw new PanRpcError({ message: `Path exceeds ${MAX_PATH_LENGTH} characters`, code: 'PATH_NOT_ALLOWED' });
   }
@@ -95,9 +120,19 @@ async function validateAndResolve(path: string): Promise<{ realPath: string }> {
     throw new PanRpcError({ message: `Unsupported file type: ${realExt || '(none)'}`, code: 'UNSUPPORTED_FILE_TYPE' });
   }
 
-  const allowedRoots = await resolveAllowedRoots();
-  if (!allowedRoots.some((root) => isInsidePath(root, realPath))) {
+  const writeRoots = await resolveWriteRoots();
+  const writable = writeRoots.some((root) => isInsidePath(root, realPath));
+  if (door === 'write' && !writable) {
     throw new PanRpcError({ message: 'Path is outside the allowed project roots', code: 'PATH_NOT_ALLOWED' });
+  }
+  if (door === 'read' && !writable) {
+    const homeRoot = await resolveHomeRoot();
+    if (homeRoot === null || !isInsidePath(homeRoot, realPath)) {
+      throw new PanRpcError({
+        message: 'Path is outside your home directory and the registered project roots',
+        code: 'PATH_NOT_ALLOWED',
+      });
+    }
   }
 
   const fileStat = await stat(realPath);
@@ -105,7 +140,7 @@ async function validateAndResolve(path: string): Promise<{ realPath: string }> {
     throw new PanRpcError({ message: 'Path is not a file', code: 'FILE_NOT_FOUND' });
   }
 
-  return { realPath };
+  return { realPath, writable };
 }
 
 function asPanRpcError(error: unknown, fallbackCode: string): PanRpcError {
@@ -115,7 +150,7 @@ function asPanRpcError(error: unknown, fallbackCode: string): PanRpcError {
 }
 
 export async function readFileAtPath(input: ReadFileAtPathInput): Promise<ReadFileAtPathResult> {
-  const { realPath } = await validateAndResolve(input.path);
+  const { realPath, writable } = await validateAndResolve(input.path, 'read');
   const fileStat = await stat(realPath);
   if (fileStat.size > MAX_FILE_AT_PATH_BYTES) {
     throw new PanRpcError({ message: `File exceeds ${MAX_FILE_AT_PATH_BYTES} bytes`, code: 'FILE_TOO_LARGE' });
@@ -127,6 +162,7 @@ export async function readFileAtPath(input: ReadFileAtPathInput): Promise<ReadFi
     lang: languageForPath(realPath),
     mtimeMs: fileStat.mtimeMs,
     totalLines: countLines(text),
+    writable,
   };
 }
 
@@ -138,7 +174,7 @@ export function readFileAtPathEffect(input: ReadFileAtPathInput): Effect.Effect<
 }
 
 export async function writeFileAtPath(input: WriteFileAtPathInput): Promise<WriteFileAtPathResult> {
-  const { realPath } = await validateAndResolve(input.path);
+  const { realPath } = await validateAndResolve(input.path, 'write');
 
   if (input.expectedMtimeMs !== undefined) {
     const current = await stat(realPath);

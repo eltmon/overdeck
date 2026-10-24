@@ -1,4 +1,4 @@
-# Internal Markdown Editor Pane (PAN-3260)
+# Internal Markdown Editor Pane (PAN-3260, PAN-4583)
 
 Markdown file chips in chat (e.g. a PRD chip on
 `.pan/drafts/<issue>.md`) open in an internal, editable Stage tab by
@@ -43,24 +43,29 @@ in `src/dashboard/server/services/file-at-path.ts` (wired into
 `src/dashboard/server/ws-rpc.ts` next to `readWorkspaceFile`):
 
 - **`pan.readFileAtPath`** (`WS_METHODS.readFileAtPath`) — `{ path }` →
-  `{ text, lang, mtimeMs, totalLines }`.
+  `{ text, lang, mtimeMs, totalLines, writable }`.
 - **`pan.writeFileAtPath`** (`WS_METHODS.writeFileAtPath`) — `{ path, content,
   expectedMtimeMs? }` → `{ mtimeMs }`.
 
 Unlike `readWorkspaceFile`, neither takes an `issueId` — this is what lets
 the editor pane serve a repo-root file opened from a workspace-less
 conversation. Both share one validation function
-(`validateAndResolve` in `file-at-path.ts`):
+(`validateAndResolve(path, door)` in `file-at-path.ts`), and the containment
+check depends on `door`:
 
 - The path must be absolute and ≤4096 characters.
 - The extension must be `.md`, `.mdx`, or `.markdown` — anything else
   rejects with `PanRpcError` code `UNSUPPORTED_FILE_TYPE`.
 - The path is `realpath`'d (so a symlink that resolves outside the
-  allowlist is caught, not just a lexical prefix check) and must land
-  inside a registered project root (`listProjectsSync()`, each
-  `config.path`) or `OVERDECK_HOME` — otherwise `PATH_NOT_ALLOWED`. This
-  allowlist is deliberately narrower than the open-any-path
-  `shellOpenInEditor` precedent, since this door also grants writes.
+  allowlist is caught, not just a lexical prefix check). For a **write**,
+  the realpath must land inside a write root — a registered project root
+  (`listProjectsSync()`, each `config.path`) or `OVERDECK_HOME` — otherwise
+  `PATH_NOT_ALLOWED` ("Path is outside the allowed project roots"). For a
+  **read**, the realpath may also land inside the operator's home
+  directory (`os.homedir()`, realpath'd); outside both rejects with
+  `PATH_NOT_ALLOWED` ("Path is outside your home directory and the
+  registered project roots"). `writable` is `true` exactly when the file is
+  inside a write root, so `writeFileAtPath` will accept it (PAN-4583).
 - It must already exist as a regular file, or the call rejects with
   `FILE_NOT_FOUND`. **The write door never creates files** — writing to a
   path that doesn't exist fails the same way reading it would.
@@ -76,6 +81,45 @@ write is rejected with `WRITE_CONFLICT` and nothing is written. Omitting
 `EditorPane` shows an inline banner on `WRITE_CONFLICT` with two actions:
 **Reload from disk** (discards the draft, re-reads via `readFileAtPath`)
 and **Overwrite** (resends `writeFileAtPath` without `expectedMtimeMs`).
+
+`EditorPane` opens a `writable: false` file read-only (PAN-4583): the
+textarea gets the `readonly` attribute and ignores change events, the Save
+button is disabled, Ctrl/Cmd+S sends no write, and a note
+(`data-testid="editor-pane-readonly-note"`) reads "Read-only — this file is
+outside the registered project roots."
+
+## Who can call this door
+
+Every `/ws/rpc` caller — including this one — already holds admin-equivalent
+access, so the PAN-4583 read widening (home root, not just the write roots)
+grants no caller anything it didn't already have:
+
+1. **Every `/ws/rpc` caller holds the `admin` scope.**
+   `rejectUnauthorizedRpcUpgrade` (`src/dashboard/server/ws-rpc.ts`) and the
+   upgrade handler call `authorizeDashboardUpgrade(headers, method)`
+   (`src/dashboard/server/ws-auth.ts`), whose default `requiredScope` is
+   `'admin'`. It checks the origin, then requires a credential (session
+   cookie, internal token, or an `odk_` registry credential), then requires
+   the scope. `docs/DASHBOARD-AUTH.md` lists `/ws/rpc` under `admin`.
+2. **`admin` already grants a shell as the dashboard user.** `scopeSatisfies`
+   (`src/lib/access-tokens.ts`) returns true for any required scope when
+   `admin` is granted, and `/ws/terminal` needs only `operate`. So every
+   `/ws/rpc` caller can already open a terminal pane and `cat` any file the
+   dashboard user can read, which includes everything under `$HOME`.
+3. **Callers by surface.** The local operator's browser (session cookie for
+   loopback peers), the domain/Traefik-exposed dashboard (same credential
+   requirement — `remote-request-gate.ts` and `ws-auth.ts` apply to remote
+   peers too), paired devices (pairing always grants `['admin']`), and the
+   desktop app (runs the same server, authenticates the same way) all reach
+   `/ws/rpc` only with `admin`. A token without `admin` gets 403 at the
+   upgrade.
+4. **Shared Sessions viewers cannot reach `/ws/rpc`.** The share service
+   (`services/share`, `docs/SHARED-SESSIONS.md`) is a Cloudflare Worker that
+   relays WebRTC signaling only; no host-side transport in this repo routes
+   a viewer message to any RPC handler. If a later Shared Sessions phase
+   proxies RPCs over the DataChannel, `readFileAtPath` and `writeFileAtPath`
+   must be excluded from the proxied set — a hazard for that future work,
+   not a change made here.
 
 ## StageDeckContext — how a chip reaches its deck
 
