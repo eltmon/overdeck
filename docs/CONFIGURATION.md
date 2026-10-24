@@ -628,11 +628,23 @@ verification:
 
 | Value | Behavior |
 | --- | --- |
-| `ci` | Skip the local `test` gate. Merge readiness requires the PR checks green; a red CI job named `test` (or `tests`, `test (22)`, …) is journaled as `verification.failed { failedCheck: 'test' }` and sent to the work agent as verification feedback. |
+| `ci` | Skip the local `test` gate. Merge readiness requires the PR checks green; a red CI job named `test` (or `tests`, `test (22)`, …) **or a commit status recognized as a test check** (Dagger Cloud: any check path with a test segment) is journaled as `verification.failed { failedCheck: 'test' }` and sent to the work agent as verification feedback. |
 | `local` | Run `quality_gates.test` on the host during verification, as before. |
-| unset | `ci` when the project has `github_repo` and a GitHub Actions workflow that runs on pull requests and defines a job named `test`/`tests`/`test-*`/`test (…)`, else `local`. The verification artifact's `testsMode` records the mode and the reason. |
+| unset | `ci` when the project has `github_repo` and a GitHub Actions workflow that runs on pull requests and defines a job named `test`/`tests`/`test-*`/`test (…)`, else `local`. The verification artifact's `testsMode` records the mode and the reason. Commit-status CI such as Dagger Cloud is never auto-detected — set `ci` explicitly. |
 
 Agent feedback for a red CI test job comes from the GitHub webhooks, so a GitLab project that sets `ci` gets the pipeline merge gate but no automatic feedback message. See [PIPELINE-GATES.md](PIPELINE-GATES.md#one-full-suite-run-per-push-on-ci-pan-3965).
+
+**Dagger Cloud.** Dagger Cloud posts its checks as commit statuses (no `name`,
+only a `context` check path and a `dagger.cloud` `target_url`), which
+auto-detection cannot see. Set the mode explicitly:
+
+```yaml
+verification:
+  tests: ci
+```
+
+See [Dagger Cloud checks](PIPELINE-GATES.md#dagger-cloud-checks-pan-4589) for
+the check-path matching rule and the feedback it produces.
 
 ### Cloudflare Tunnels
 

@@ -14,7 +14,7 @@
 
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 import { recordCiTestGatePass, relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
-import { isCiTestCheckName } from './cloister/verification-tests-mode.js';
+import { isCiTestCheckName, isCiTestRollupCheck } from './cloister/verification-tests-mode.js';
 import { getPrFacts } from './cloister/pr-facts.js';
 import { bumpIssuePrTabCacheGeneration } from '../dashboard/server/services/pr-tab-cache.js';
 import { ADVISORY_CHECK_NAMES, isAdvisoryCheckName } from './advisory-checks.js';
@@ -69,6 +69,7 @@ export interface WebhookPayload {
   sha?: string;
   state?: string;
   context?: string;
+  target_url?: string | null;
   branches?: Array<{ name: string }>;
 }
 
@@ -454,6 +455,14 @@ export async function handleStatus(payload: WebhookPayload): Promise<void> {
     const issueId = issueIdFromBranch(branch.name);
     if (!issueId) continue;
     bumpIssuePrTabCacheGeneration(issueId);
+    if (state === 'success') {
+      // PAN-4589: a green commit-status test check (Dagger Cloud) is the CI test
+      // gate's pass, exactly as a green test check_run is.
+      if (payload.sha && isCiTestRollupCheck({ context, targetUrl: payload.target_url ?? undefined })) {
+        await recordCiTestGatePass({ issueId, headSha: payload.sha, headRef: branch.name, source: sourceKey });
+      }
+      continue;
+    }
     if (state !== 'failure' && state !== 'error') continue;
     if (!payload.sha) continue;
 
