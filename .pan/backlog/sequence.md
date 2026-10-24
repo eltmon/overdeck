@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T08:12:30Z · model: claude-opus-5-5 · open: 840_
+_Last sequenced: 2026-10-24T08:16:01Z · model: claude-opus-5-5 · open: 842_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -20,6 +20,7 @@ _Last sequenced: 2026-10-24T08:12:30Z · model: claude-opus-5-5 · open: 840_
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 15 | PAN-4589 | M | high | ok |  |  | In pipeline: CI test gate ignores commit-status CI (Dagger Cloud); read status context as check name, baseline + feedback. |
+| 16 | PAN-4595 | S | critical | ok |  |  | CLI health never registers the transcript heartbeat, so Herdr agents read STUCK after 30 min and invite recovery on healthy agents. |
 | 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 22 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
@@ -212,6 +213,7 @@ _Last sequenced: 2026-10-24T08:12:30Z · model: claude-opus-5-5 · open: 840_
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 223 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 224 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
+| 225 | PAN-4596 | S | high | ok |  |  | Ended held handoff shows generic "no saved history"; hides kickoff focus/brief and offers no Start. Sat 20 days as "waiting on operator". |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -908,6 +910,10 @@ Moves 705 importing files off a four-month-old beta onto the supported line, whi
 
 New since the prior run and already in the pipeline, so it is pinned in a free top-tier slot. Without it a Dagger, Buildkite or Jenkins project never shows a passed test job, so merge gate and auto-merge stall; ACs are precise and unit-testable.
 
+### PAN-4595 (rank 16)
+
+New since the prior run. pan show --health is what the Flywheel reads to decide whether to resume or nudge an agent, and on Herdr the CLI path has only the spawn timestamp as an activity signal, so every working agent older than 30 minutes is classified stuck. A false stuck verdict drives recovery actions against healthy agents, which is a pipeline-integrity problem. The root cause and fix are precise (register the heartbeat lookup on the CLI path, guard against an import cycle, add one test), so it is small and ranks into the top tier beside the other Herdr substrate fixes.
+
 ### PAN-4572 (rank 19)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
@@ -1164,10 +1170,6 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
 
 Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
 
-### PAN-2422 (rank 90)
-
-Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1175,10 +1177,10 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T08:12:30Z",
+  "generatedAt": "2026-10-24T08:16:01Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 840,
+  "openCount": 842,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11657,6 +11659,32 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "rationale": "New since the prior run. Two operator decisions from PAN-4585 are unresolved and Guardian provisioning touches liveness and pan done, so it is needs-refinement and last in the group.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4595",
+      "rank": 16,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CLI health never registers the transcript heartbeat, so Herdr agents read STUCK after 30 min and invite recovery on healthy agents.",
+      "rationale": "New since the prior run. pan show --health is what the Flywheel reads to decide whether to resume or nudge an agent, and on Herdr the CLI path has only the spawn timestamp as an activity signal, so every working agent older than 30 minutes is classified stuck. A false stuck verdict drives recovery actions against healthy agents, which is a pipeline-integrity problem. The root cause and fix are precise (register the heartbeat lookup on the CLI path, guard against an import cycle, add one test), so it is small and ranks into the top tier beside the other Herdr substrate fixes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4596",
+      "rank": 225,
+      "size": "S",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Ended held handoff shows generic \"no saved history\"; hides kickoff focus/brief and offers no Start. Sat 20 days as \"waiting on operator\".",
+      "rationale": "New since the prior run. ConversationPanel treats every ended conversation without a timeline as orphaned and never reads forkRequest.hold, so a held handoff loses its kickoff text, brief path and Start action. The substrate-improvement label sets a high floor; impact is operator visibility rather than pipeline correctness, so it ranks with other Needs-you visibility gaps such as PAN-3276.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13101,6 +13129,20 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4595",
+      "to": "PAN-3297",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4596",
+      "to": "PAN-2193",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
