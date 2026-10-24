@@ -224,3 +224,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   2026-10-24).
 - Hold `pan reload` while `pgrep -af dist/verification-worker.js` shows a
   worker; the serialized gate queue means waiting for a gap between issues.
+- A `pan handoff` conversation working in its own `hoff-*` worktree opens
+  PRs the pipeline never sees: no `workspaces/feature-pan-<n>` means no
+  verification, no review, and `pan review request` fails "Workspace does not
+  exist". Every handoff brief must say: when a PR is ready, remove the hoff
+  worktree, `pan workspace create PAN-<n>`, confirm HEAD = PR head, then
+  `pan review request PAN-<n>` (sent to conversations 3304 and 3305 at 09:20).
