@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T13:29:55Z · model: claude-opus-5-5 · open: 840_
+_Last sequenced: 2026-10-24T13:31:56Z · model: claude-opus-5-5 · open: 841_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -65,6 +65,7 @@ _Last sequenced: 2026-10-24T13:29:55Z · model: claude-opus-5-5 · open: 840_
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
+| 70 | PAN-4624 | S | high | ok |  |  | Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed. |
 | 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -1088,6 +1089,10 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
+### PAN-4624 (rank 70)
+
+New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.
+
 ### PAN-3557 (rank 71)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
@@ -1164,10 +1169,6 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
 
 Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
 
-### PAN-2422 (rank 90)
-
-Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1175,10 +1176,10 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T13:29:55Z",
+  "generatedAt": "2026-10-24T13:31:56Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 840,
+  "openCount": 841,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11651,6 +11652,19 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "rationale": "New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4624",
+      "rank": 70,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed.",
+      "rationale": "New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13022,6 +13036,13 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
     {
       "from": "PAN-4532",
       "to": "PAN-4623",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4527",
+      "to": "PAN-4624",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
