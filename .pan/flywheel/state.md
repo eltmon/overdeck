@@ -202,3 +202,11 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   for PAN-4554 (planning finalizes but no work agent spawns).
 - `pan handoff self` fails from the Flywheel's Bash ("Could not determine the
   current conversation"); name the source explicitly: `pan handoff conv-flywheel`.
+- 2026-10-24 ~08:50 UTC: the merge train has not assembled a UAT batch since
+  2026-09-20 (overdeck) / 2026-08-14 (MYN), so the Flywheel UAT card offers only
+  the "Escape hatch: Merge one feature to main…" link; Awaiting Merge also
+  drops approved PRs after 5 min (PAN-4597). Operator asked to restore
+  in-Overdeck merging → PAN-4598 + PAN-4597 as supervised handoff conversation
+  3305 (`~/Projects/hoff-merge-train`). Until they land, merge a ready
+  feature with the Flywheel UAT card's "Merge one feature to main…" link.
+- PAN-4584 deployed (build 8a41a2dff) and closed with `pan close --force`.
