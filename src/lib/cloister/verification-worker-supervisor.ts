@@ -265,12 +265,41 @@ async function adoptUnconsumedResult(
   return result;
 }
 
+/** PAN-4531: fresh workers started for a head that moved under verification, before giving up. */
+const MAX_SUPERSEDED_RESTARTS = 3;
+
+/**
+ * PAN-4531: a run the agent's commit superseded restarts on the new head, so
+ * the waiting door gets the verdict for the head it will push. Past the bound
+ * the door gets a plain `deferred`.
+ */
 async function runSupervisedVerificationInternal(
   issueId: string,
   workspacePath: string,
   workspaceInfo: WorkspaceInfo,
   logPrefix: string,
   options: SupervisedOptions = {},
+): Promise<VerificationRunnerOutcome> {
+  let outcome = await runSupervisedVerificationOnce(issueId, workspacePath, workspaceInfo, logPrefix, options);
+  for (let restarts = 0; outcome.outcome === 'deferred' && outcome.superseded; restarts++) {
+    if (restarts >= MAX_SUPERSEDED_RESTARTS) {
+      return {
+        outcome: 'deferred',
+        reason: `${outcome.reason}; the head moved again after ${MAX_SUPERSEDED_RESTARTS} restarts, so verification waits for the next review request`,
+      };
+    }
+    console.log(`[${logPrefix}] ${issueId}: ${outcome.reason} — restarting verification on the new head`);
+    outcome = await runSupervisedVerificationOnce(issueId, workspacePath, workspaceInfo, logPrefix, options);
+  }
+  return outcome;
+}
+
+async function runSupervisedVerificationOnce(
+  issueId: string,
+  workspacePath: string,
+  workspaceInfo: WorkspaceInfo,
+  logPrefix: string,
+  options: SupervisedOptions,
 ): Promise<VerificationRunnerOutcome> {
   const headAnchor = await snapshotWorkspaceHeads(issueId, workspacePath);
   const existing = readVerificationWorkerState(issueId);

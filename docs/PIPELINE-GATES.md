@@ -160,6 +160,32 @@ The same rule picks the head the CI test verdict is read for in `ci` tests
 mode: the launch head while HEAD is the same or synced head (CI never sees the
 worker's local sync merge commit), otherwise the workspace's current head.
 
+### A decided run stops before its next gate (PAN-4531)
+
+Heavy local gates take the single machine-wide CPU admission slot one at a
+time (`cloister/quality-gate-admission.ts`), so a run whose outcome is
+already known must not keep queueing for it. The runner checks three decided
+conditions, in this order, before the first local gate (dependency install,
+test-skip and plan-integrity included), before each quality gate requests
+admission (`runQualityGates`' `shouldStop`), and once after the last gate:
+
+1. **The PR merged.** The run ends with the existing merged skip
+   (`skipMergedVerification`).
+2. **The agent committed past the head under verification** (review
+   verification only, using the same-head rule above). The worker returns a
+   `deferred` result marked `superseded`; the supervisor starts a fresh worker
+   on the new head and gives the waiting door that run's verdict, so a review
+   request answered "already running" still gets the head it pushed. After 3
+   restarts in a row the door gets a plain `deferred`. A superseded run counts
+   no attempt and journals nothing beyond its `verification.started`.
+3. **In `ci` tests mode, the CI test job for the verified head is red** — a
+   known-red CI head short-circuits the local gates. The run fails at `test`
+   with the usual message ("The CI test job already failed on this head …"),
+   counts against the attempt budget as before, and the artifact lists the
+   gates it did not start in `notRun`.
+
+With CI passed or unknown, every gate runs as before.
+
 ### Verification survives a dashboard restart (PAN-4532)
 
 The worker outlives a dashboard restart, but the request-review continuation

@@ -190,6 +190,11 @@ export interface QualityGateRunOptions {
   /** PAN-2665: raw stdout/stderr chunks from the RUNNING gate, streamed as
    *  they arrive so the Test/Lint panel can show a live output tail. */
   onGateOutput?: (name: string, chunk: string) => void;
+  /**
+   * PAN-4531: asked before each gate starts, so before it requests CPU
+   * admission. True ends the run with the results so far; the caller knows why.
+   */
+  shouldStop?: () => Promise<boolean>;
   /** Durable worker phase update; queued time does not consume execution timeout. */
   onAdmissionPhase?: (state: {
     phase: 'queued' | 'running';
@@ -279,6 +284,11 @@ export async function runQualityGates(
   for (const [name, gate] of Object.entries(gates)) {
     const gatePhase = gate.phase || 'pre_push';
     if (gatePhase !== phase) continue;
+
+    if (await opts.shouldStop?.()) {
+      console.log(`[quality-gate] Run already decided — not starting "${name}" or any later gate`);
+      break;
+    }
 
     const required = gate.required !== false; // default true
     const cwd = gate.path ? join(projectPath, gate.path) : projectPath;

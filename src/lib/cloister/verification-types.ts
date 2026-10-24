@@ -2,7 +2,15 @@
 export type VerificationRunnerOutcome =
   | { outcome: 'passed' }
   | { outcome: 'skipped'; reason: string }
-  | { outcome: 'deferred'; reason: string }
+  | {
+    outcome: 'deferred';
+    reason: string;
+    /**
+     * PAN-4531: the agent committed past the head under verification, so the
+     * run stopped. The supervisor restarts on the new head; doors never see it.
+     */
+    superseded?: { from: string | undefined; to: string | undefined };
+  }
   | { outcome: 'failed'; failedCheck: string; cycleCount: number; maxCycles: number }
   | { outcome: 'error'; message: string };
 

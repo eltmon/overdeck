@@ -94,6 +94,24 @@ echo "pass stderr diagnostic" >&2
     });
   });
 
+  describe('runQualityGates shouldStop (PAN-4531)', () => {
+    it('a run decided after the first gate never asks for CPU admission again', async () => {
+      admissionMocks.acquire.mockClear();
+      let decided = false;
+      const results = await runQualityGates({
+        typecheck: { command: 'true' },
+        lint: { command: 'true' },
+      }, testDir, 'pre_push', {
+        onGateResult: () => { decided = true; },
+        shouldStop: async () => decided,
+      });
+
+      expect(results.map((r) => r.name)).toEqual(['typecheck']);
+      expect(admissionMocks.acquire).toHaveBeenCalledTimes(1);
+      expect(admissionMocks.release).toHaveBeenCalled();
+    });
+  });
+
   describe('autoRevertMerge', () => {
     it('should revert last commit when successful', async () => {
       // Initialize git repo with a real merge so ORIG_HEAD is set
