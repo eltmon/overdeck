@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4582",
   "created": "2026-10-24T07:40:29.074Z",
-  "updated": "2026-10-24T08:48:30.025Z",
+  "updated": "2026-10-24T08:48:46.388Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "control-frames.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T08:48:30.025Z"
+    },
+    "size-terminal-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:48:46.388Z"
     }
   }
 }
