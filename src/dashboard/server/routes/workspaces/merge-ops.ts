@@ -815,7 +815,8 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
             console.error(`[merge] ${error}`);
             setStatus(issueId, { phase: 'failed', notes: error });
             completePendingOperation(issueId, error);
-            return { success: false, statusCode: 409, error };
+            // PAN-4540: no merge ran, and the merge gate re-checks this before it re-arms the row.
+            return { success: false, statusCode: 409, error, refused: true };
           }
           // Defense-in-depth: refuse to merge when the PR is CONFLICTING with its base.
           // Without this, a clean-CI-but-conflicting PR sails into the rebase/retry loop in
@@ -830,7 +831,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
             console.error(`[merge] ${error}`);
             setStatus(issueId, { phase: 'failed', notes: error });
             completePendingOperation(issueId, error);
-            return { success: false, statusCode: 409, error };
+            return { success: false, statusCode: 409, error, refused: true };
           }
           if (prState.merged) {
             console.log(`[merge] PR #${githubPrRef.number} for ${issueId} is already merged — running post-merge lifecycle`);

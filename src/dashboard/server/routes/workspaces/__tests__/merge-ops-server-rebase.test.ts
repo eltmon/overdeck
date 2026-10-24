@@ -424,9 +424,19 @@ describe('triggerMerge server rebase escalation', () => {
 
     const result = await triggerMerge('PAN-3110');
 
-    expect(result).toEqual(expect.objectContaining({ success: false, statusCode: 409 }));
+    // PAN-4540: no merge ran, so auto-merge blocks the row and re-arms it once CI is green.
+    expect(result).toEqual(expect.objectContaining({ success: false, statusCode: 409, refused: true }));
     expect(result).not.toHaveProperty('retryable');
     expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
     expect(mocks.setMergeRun).toHaveBeenCalledWith('PAN-3110', expect.objectContaining({ phase: 'failed' }));
+  });
+
+  it('refuses a CONFLICTING PR before any merge command, as a refusal (PAN-4540)', async () => {
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState({ mergeable: false, mergeableState: 'dirty' }));
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual(expect.objectContaining({ success: false, statusCode: 409, refused: true }));
+    expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
   });
 });

@@ -94,9 +94,9 @@ pushed next: only re-scheduling it through the endpoint starts it again. A
 failed entry (the merge was attempted, including the retry circuit breaker)
 holds for that PR head only: a new push re-arms the issue. A blocked entry (the
 executor refused it before merging, for example because checks went red or the
-head moved during the cooldown, or the merge gate refused it inside the merge
-call before any merge command ran) re-arms as soon as the merge gate passes
-again.
+head moved during the cooldown, or the merge call refused it before any merge
+command ran because the merge gate, failing required checks or a conflict said
+no) re-arms as soon as the merge gate passes again.
 An entry written before heads were recorded never re-arms by itself. The insert
 re-checks the latest entry, so a cancel that lands while the scheduler is
 reading the forge sticks.
@@ -282,8 +282,10 @@ problems list; read it from the endpoint.
 
 When the executor fires and the merge fails (e.g. surface-level rebase
 conflict raised at merge time), the row is moved to `failed` with the failure
-reason captured. `failed` always means a merge command ran; a refusal by the
-merge gate before any merge ran leaves the row `blocked` instead. For a failed
+reason captured. `failed` means a merge command ran, or the refusal needs the
+operator (a closed PR, a polyrepo merge set, `.planning/` files). A refusal the
+merge gate re-checks (the gate itself, failing required checks, a conflict)
+leaves the row `blocked` instead. For a failed
 row, a TTS announcement plays, and the orchestrator surfaces the
 entry as an `investigate` suggestion in its next tick snapshot. The operator
 can then either fix the underlying problem and reschedule, or cancel the

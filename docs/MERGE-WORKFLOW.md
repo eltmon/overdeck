@@ -176,13 +176,17 @@ states mean different things, and the scheduler treats them differently at
 the same PR head (`latestAutoMergeAllowsSchedule`):
 
 - **`failed`** means a merge command actually ran and failed, or the retry
-  budget ran out. A failed row is never re-armed at the same head; a new head
-  re-arms it.
-- **`blocked`** means nothing was merged because something refused first: the
-  executor's own gate read, eligibility, a closed tracker issue, or the merge
-  gate that `triggerMerge` re-reads before it merges (`refused: true` on its
-  result, recorded by `markMergeRefused`). The scheduler re-arms a blocked row
-  as soon as the gate passes again.
+  budget ran out. It also covers a refusal that only the operator can clear:
+  a closed PR, a PR other than the one the gate judged, a polyrepo merge set,
+  or `.planning/` files. A failed row is never re-armed at the same head; a
+  new head re-arms it.
+- **`blocked`** means nothing was merged because something refused first, and
+  the merge gate checks the same thing again before it re-arms the row. That
+  covers the executor's own gate read, eligibility, and a closed tracker issue.
+  It also covers refusals inside `triggerMerge` before any merge command runs:
+  the merge gate it re-reads, failing required checks, and a CONFLICTING PR.
+  Those results carry `refused: true` and are recorded by `markMergeRefused`.
+  The scheduler re-arms a blocked row as soon as the gate passes again.
 
 The two gate reads can disagree seconds apart: GitHub recomputes `mergeable`
 after the base branch moves and answers UNKNOWN meanwhile, so the first read
