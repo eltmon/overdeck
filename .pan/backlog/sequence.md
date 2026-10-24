@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T13:53:13Z · model: claude-opus-5-5 · open: 841_
+_Last sequenced: 2026-10-24T13:57:02Z · model: claude-opus-5-5 · open: 840_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -17,7 +17,6 @@ _Last sequenced: 2026-10-24T13:53:13Z · model: claude-opus-5-5 · open: 841_
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
-| 18 | PAN-4598 | M | critical | ok |  |  | No UAT batch has assembled since the cut (newest 2026-09-20, failed); Flywheel card offers only an escape-hatch merge link |
 | 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 24 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
@@ -897,10 +896,6 @@ Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls th
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.
 
-### PAN-4598 (rank 18)
-
-New since the prior run and labeled substrate-improvement: the merge train reconciler has built no UAT batch for any project since the PAN-3917 cut, so approved green PRs reach main only through a hidden escape-hatch link. It ranks into the open slot beside PAN-4597 (Awaiting Merge hides ready PRs) because both block the operator's last step from approved PR to main; the ACs are concrete (reconciler decision tests, per-row Merge button, honest copy, MERGE-WORKFLOW.md).
-
 ### PAN-4572 (rank 21)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
@@ -1169,6 +1164,10 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
 
 Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
 
+### PAN-2422 (rank 90)
+
+Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1176,10 +1175,10 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T13:53:13Z",
+  "generatedAt": "2026-10-24T13:57:02Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 841,
+  "openCount": 840,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1329,19 +1328,6 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       ],
       "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
       "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4598",
-      "rank": 18,
-      "size": "M",
-      "importance": "critical",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "No UAT batch has assembled since the cut (newest 2026-09-20, failed); Flywheel card offers only an escape-hatch merge link",
-      "rationale": "New since the prior run and labeled substrate-improvement: the merge train reconciler has built no UAT batch for any project since the PAN-3917 cut, so approved green PRs reach main only through a hidden escape-hatch link. It ranks into the open slot beside PAN-4597 (Awaiting Merge hides ready PRs) because both block the operator's last step from approved PR to main; the ACs are concrete (reconciler decision tests, per-row Merge button, honest copy, MERGE-WORKFLOW.md).",
       "gate": "auto",
       "planning": "auto"
     },
