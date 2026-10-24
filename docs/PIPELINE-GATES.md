@@ -160,6 +160,30 @@ The same rule picks the head the CI test verdict is read for in `ci` tests
 mode: the launch head while HEAD is the same or synced head (CI never sees the
 worker's local sync merge commit), otherwise the workspace's current head.
 
+### Verification survives a dashboard restart (PAN-4532)
+
+The worker outlives a dashboard restart, but the request-review continuation
+that waits for its result (push the verified branch, dispatch review) lived in
+the old process. Two mechanisms carry it over, and neither re-runs a gate the
+worker already ran:
+
+- **Results are adopted, not re-run.** The worker state
+  (`~/.overdeck/verification-workers/<issue>/state.json`) records the door
+  that launched it (`logPrefix`), its options, and `resultConsumedAt` once a
+  waiter takes its result. When a request arrives and the latest worker has
+  finished with a result nobody consumed, the supervisor returns that result
+  instead of starting a fresh worker, provided the head is the same or synced
+  head (above), the options match, and the outcome is not `error`. A result is
+  consumed at most once, so a second request on the same head is a real
+  re-run and still counts against the attempt budget.
+- **Boot re-attaches.** On boot the primary dashboard
+  (`cloister/verification-boot-adoption.ts`) re-enters the review-request door,
+  with source `verification-adoption`, for every `request-review` worker that
+  is still running or holds an unconsumed result. The door's verify step joins
+  the live worker or adopts its result, then pushes and dispatches review as
+  the original request would have. A `review` (`/trigger`) or `merge-verify`
+  worker is not re-attached; its door owns the retry.
+
 ## Verification artifacts (FR-8)
 
 Each verification run writes an immutable artifact named by run time and
@@ -1394,6 +1418,10 @@ door: the route re-verifies against current main and journals
 `review.requested` itself, which moves the tail and makes the recovery
 exactly-once. The first deacon-lite patrol runs at deacon start, so a stall that
 began before a restart is covered as soon as the process comes back up.
+Since PAN-4532 that re-verify no longer re-runs the gates for an unchanged
+head: the supervisor adopts the worker's unconsumed result (see "Verification
+survives a dashboard restart"), and boot adoption usually dispatches the review
+before this routine's 5-minute age threshold.
 
 `recoverSilentReviewers` (PAN-4433) covers a reviewer that was dispatched and
 never ran. `agent-pan-4383-review` (quick mode) was dispatched on 2026-09-29,
