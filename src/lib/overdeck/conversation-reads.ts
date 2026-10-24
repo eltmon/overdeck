@@ -46,6 +46,7 @@ import {
   type LegacyConversation as Conversation,
 } from './conversations.js';
 import { isSupersededConversation } from './conversation-clear-chain.js';
+import { heldKickoffFocus, listHeldKickoffNames } from './conversation-kickoff-store.js';
 import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import {
@@ -442,7 +443,24 @@ export async function getConversationsPendingInputFeed(
       }),
       8,
     );
-    return result(rows.filter((row) => row !== null));
+    // PAN-4596 — a held handoff's unsent kickoff waits on the operator whether
+    // or not its session is alive. Merged in; pendingInputKinds stays unset so
+    // the frontend derives every kind from the payload fields.
+    type FeedRow = NonNullable<(typeof rows)[number]> & { heldKickoff?: { since: string; focus?: string } };
+    const out: FeedRow[] = rows.filter((row) => row !== null);
+    const held = listHeldKickoffNames();
+    if (held.size > 0) {
+      const byName = new Map(out.map((row) => [row.name, row]));
+      for (const conv of conversations) {
+        if (!held.has(conv.name) || isSupersededConversation(conv)) continue;
+        const focus = heldKickoffFocus(conv.forkRequest);
+        const heldKickoff = { since: conv.createdAt, ...(focus ? { focus } : {}) };
+        const existing = byName.get(conv.name);
+        if (existing) existing.heldKickoff = heldKickoff;
+        else out.push({ name: conv.name, title: conv.title ?? null, issueId: conv.issueId ?? null, harness: conv.harness ?? 'claude-code', heldKickoff });
+      }
+    }
+    return result(out);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[conversations] pending-input feed failed:', msg);

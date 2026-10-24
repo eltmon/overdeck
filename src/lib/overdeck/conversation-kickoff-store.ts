@@ -24,6 +24,14 @@ export function claimHeldKickoff(name: string): string | null {
   })();
 }
 
+/** PAN-4596: names of unarchived conversations whose kickoff is still held. */
+export function listHeldKickoffNames(): Set<string> {
+  const rows = getOverdeckDatabase()
+    .prepare('SELECT name FROM conversations WHERE held_kickoff IS NOT NULL AND archived_at IS NULL')
+    .all<{ name: string }>();
+  return new Set(rows.map((row) => row.name));
+}
+
 export function restoreHeldKickoff(name: string, text: string): void {
   getOverdeckDatabase().prepare('UPDATE conversations SET held_kickoff = ? WHERE name = ? AND held_kickoff IS NULL').run(text, name);
 }

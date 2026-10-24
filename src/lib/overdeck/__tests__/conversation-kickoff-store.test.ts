@@ -76,4 +76,16 @@ describe('conversation kickoff store', () => {
     expect(heldKickoffFocus(JSON.stringify({ hold: true }))).toBeNull();
     expect(heldKickoffFocus(JSON.stringify({ hold: true, handoffFocus: '   ' }))).toBeNull();
   });
+
+  it('listHeldKickoffNames returns held, unarchived names only (PAN-4596)', async () => {
+    const { createConversation, archiveConversation } = await import('../conversations.js');
+    const { holdKickoff, listHeldKickoffNames } = await import('../conversation-kickoff-store.js');
+    createConversation({ name: 'held', tmuxSession: 'held', cwd: testHome, harness: 'claude-code' });
+    createConversation({ name: 'held-archived', tmuxSession: 'held-archived', cwd: testHome, harness: 'claude-code' });
+    createConversation({ name: 'not-held', tmuxSession: 'not-held', cwd: testHome, harness: 'claude-code' });
+    holdKickoff('held', 'do the thing');
+    holdKickoff('held-archived', 'do the thing');
+    archiveConversation('held-archived');
+    expect([...listHeldKickoffNames()]).toEqual(['held']);
+  });
 });
