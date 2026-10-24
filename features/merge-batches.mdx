@@ -56,8 +56,21 @@ PR branch itself and its CI run a duplicate, so that feature merges on its own
 global require-UAT setting when the project sets no default) keeps a batch when
 it is the only one ready, because that batch is the stack you test on.
 
-Merging a single feature on its own is still available as an escape hatch; doing
-so simply restales the live batches and a fresh one reassembles automatically.
+**When no tested batch exists, merge from the row.** While a batch is still
+assembling, while a lone feature merges directly, or after an assembly failed,
+each ready feature on the Flywheel's UAT batches card has its own **Merge**
+button. It merges that feature to main through the merge gate, and the issue
+closes out through the normal post-merge flow. When a batch exists, **Merge
+batch (N) to main** is the main action, and "Merge one feature to main…"
+stays below the rows as an escape hatch. Using the escape hatch restales the live
+batches, and a fresh one reassembles automatically.
+
+**A failed assembly is named, not hidden.** If the last attempt to build a batch
+failed, the card names that batch and its time, and offers **Retry batch
+assembly**. After three failed attempts in a row, the train stops retrying
+on its own. Failures more than six hours old no longer count toward that limit,
+so the train recovers once the cause is fixed. **Retry batch assembly** tries
+again at once.
 
 ## Projects that span several repos
 
