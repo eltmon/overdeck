@@ -324,6 +324,17 @@ export async function loadConfigNoMigration(): Promise<ConfigLoadResult> {
 }
 
 /**
+ * Global config.yaml merged over defaults, never a project file. For
+ * machine-wide settings such as resources.quality_gate_slots (PAN-4546).
+ * Rejects only if mergeConfigs throws; a missing or unreadable global file
+ * yields the defaults (loadGlobalConfigFromDisk returns null).
+ */
+export async function loadGlobalConfigNoMigration(): Promise<ConfigLoadResult> {
+  const { config } = mergeConfigs(await loadGlobalConfigFromDisk());
+  return { config };
+}
+
+/**
  * Load complete configuration (global + project + defaults)
  * Also loads API keys from environment variables as fallback.
  * Never writes config.yaml.

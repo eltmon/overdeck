@@ -259,6 +259,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       governorCpuPsiHoldAvg60: DEFAULT_CONFIG.resources.governorCpuPsiHoldAvg60,
       governorCpuPsiRecoveryAvg60: DEFAULT_CONFIG.resources.governorCpuPsiRecoveryAvg60,
       governorCpuHoldDispatch: DEFAULT_CONFIG.resources.governorCpuHoldDispatch,
+      qualityGateSlots: DEFAULT_CONFIG.resources.qualityGateSlots,
     },
     issues: {
       closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays,

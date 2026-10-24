@@ -308,6 +308,7 @@ api_keys:
         governorCpuPsiHoldAvg60: 50,
         governorCpuPsiRecoveryAvg60: 25,
         governorCpuHoldDispatch: false,
+        qualityGateSlots: 2,
       });
     });
 
@@ -321,6 +322,7 @@ api_keys:
           governor_cpu_psi_hold_avg60: 60,
           governor_cpu_psi_recovery_avg60: 30,
           governor_cpu_hold_dispatch: true,
+          quality_gate_slots: 3,
         },
       }).config.resources).toMatchObject({
         dashboardCpuWeight: 400,
@@ -330,6 +332,7 @@ api_keys:
         governorCpuPsiHoldAvg60: 60,
         governorCpuPsiRecoveryAvg60: 30,
         governorCpuHoldDispatch: true,
+        qualityGateSlots: 3,
       });
     });
 
@@ -343,6 +346,7 @@ api_keys:
           governor_cpu_psi_hold_avg60: 101,
           governor_cpu_psi_recovery_avg60: -1,
           governor_cpu_hold_dispatch: 'yes' as never,
+          quality_gate_slots: 0,
         },
       }).config.resources).toMatchObject({
         dashboardCpuWeight: 1000,
@@ -352,7 +356,12 @@ api_keys:
         governorCpuPsiHoldAvg60: 50,
         governorCpuPsiRecoveryAvg60: 25,
         governorCpuHoldDispatch: false,
+        qualityGateSlots: 2,
       });
+    });
+
+    it.each([1.5, 17])('ignores quality_gate_slots %s and keeps the default of 2 (PAN-4546)', (slots) => {
+      expect(mergeConfigs({ resources: { quality_gate_slots: slots } }).config.resources.qualityGateSlots).toBe(2);
     });
 
     it('warns and falls back to defaults when CPU PSI recovery is at or above hold', () => {

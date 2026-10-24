@@ -39,4 +39,20 @@ describe('async yaml config loading', () => {
     expect(loadConfigSync().config.tts.daemonHost).toBe('127.0.0.1');
     expect(loadConfigSync().config.tts.daemonPort).toBe(8787);
   });
+
+  it('reads resources.quality_gate_slots from the global config only (PAN-4546)', async () => {
+    writeFileSync(join(testHome, 'config.yaml'), 'resources:\n  quality_gate_slots: 1\n', 'utf8');
+    writeFileSync(join(projectRoot, '.pan.yaml'), 'resources:\n  quality_gate_slots: 3\n', 'utf8');
+    const { loadConfigNoMigration, loadGlobalConfigNoMigration } = await import('../config-yaml/load.js');
+
+    expect((await loadGlobalConfigNoMigration()).config.resources.qualityGateSlots).toBe(1);
+    expect((await loadConfigNoMigration()).config.resources.qualityGateSlots).toBe(3);
+  });
+
+  it('defaults quality_gate_slots to 2 when there is no global config (PAN-4546)', async () => {
+    writeFileSync(join(projectRoot, '.pan.yaml'), 'resources:\n  quality_gate_slots: 3\n', 'utf8');
+    const { loadGlobalConfigNoMigration } = await import('../config-yaml/load.js');
+
+    expect((await loadGlobalConfigNoMigration()).config.resources.qualityGateSlots).toBe(2);
+  });
 });
