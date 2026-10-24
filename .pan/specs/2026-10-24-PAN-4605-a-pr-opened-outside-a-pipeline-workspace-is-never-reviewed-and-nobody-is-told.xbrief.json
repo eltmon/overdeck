@@ -1,0 +1,895 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T09:50:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4605: A PR opened outside a pipeline workspace is never reviewed and nobody is told",
+    "updated": "2026-10-24T09:55:15.418Z"
+  },
+  "plan": {
+    "id": "pan-4605",
+    "title": "A PR opened outside a pipeline workspace is never reviewed and nobody is told",
+    "status": "running",
+    "uid": "eaef5695-04f5-4ccd-8e39-89f9e2a859bf",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-24T09:50:00Z",
+    "updated": "2026-10-24T09:55:15.418Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4605",
+        "label": "PAN-4605",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4605.md",
+        "label": "PRD draft",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "webhook",
+      "review",
+      "workspace",
+      "needs-you",
+      "derived-state"
+    ],
+    "narratives": {
+      "Problem": "handlePullRequest in src/lib/webhook-handlers.ts starts the review pipeline for an opened or readied non-draft feature/ PR, but when the review starter returns started:false (reason no-workspace) it only console.logs. PRs opened from supervised handoff worktrees (pan handoff --cwd) have no workspaces/feature-<issue> worktree, so they are never verified or reviewed and nobody is told; pan review request then fails with 'Workspace does not exist'. The handoff worktrees are worktrees of the primary checkout, so the PR branch is usually still checked out elsewhere. The pipeline journal cannot be written without a workspace, and Command Deck's Needs-you group reads derived attention, not activity entries. createWorktree also re-cuts an unfetched remote feature branch from main.",
+      "Proposal": "Adopt the PR branch into a pipeline workspace when the starter reports no-workspace: fetch feature/<issue>, verify the fetched ref equals the PR head, refuse if the branch is checked out in another worktree, reconcile the local branch (create / equal / fast-forward / refuse when diverged), call createWorkspace, assert workspace HEAD equals the PR head, journal workspace.adopted, then start the review pipeline. Never push, force, or delete. Every refusal is announced once via surfaceIssueFeedbackNeedsYou, and a new derived attention 'pr-outside-pipeline' (with prOutsidePipeline { prNumber, fix, worktreePath? }) puts the issue under Command Deck's Needs you with the exact fix and is printed by pan show. The /api/review/:issueId/request route adopts too, so the fix text 'git worktree remove …, then pan review request' works. createWorktree fetches the feature branch first. See .pan/drafts/PAN-4605.md (D1-D11, WI-1..WI-11).",
+      "NonGoals": "- Adopting strike/, bypass/, or mixed-case branches (only exact feature/<issue-lower>)\n- Forcing a checkout, removing the other worktree, deleting any branch, or pushing as part of adoption\n- Adoption for polyrepo projects (refused with a pan workspace create fix)\n- Surfacing review-start reasons other than no-workspace (dirty-workspace, already-running, no-project) from the webhook\n- Starting review on reopened or synchronize webhook actions\n- Kanban NeedsYouStrip / simple-mode projection of the new attention\n- Routing changes-requested feedback to the handoff conversation that owns the branch\n- Changing the /api/review/:issueId/trigger route or the dashboard Review button for issues with no workspace\n- Raising any scripts/file-size-allowlist.txt row\n- Adopting GitLab merge requests (findOpenPipelinePr returns none for a GitLab project)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The pipeline-journal entry is written only when a workspace exists (workspace.adopted on success, workspace.adoption-failed when a failure leaves a workspace); a failure with no workspace is made visible by a derived attention instead.",
+        "rationale": "appendPipelineEntry skips writes when the workspace directory does not exist (pipeline-journal.ts ~L80), so the issue's literal 'append a journal entry' cannot land without resurrecting a ghost directory; a derived attention follows the PAN-4399 work-not-started precedent and keeps the 'store nothing derivable' invariant."
+      },
+      {
+        "summary": "Needs-you visibility = new derived IssueAttention 'pr-outside-pipeline' rendered in Command Deck's Needs-you group, state badge and pan show, plus one surfaceIssueFeedbackNeedsYou announcement at refusal time.",
+        "rationale": "Command Deck's Needs-you group (isNeedsYouFeature) reads derived.attention; surfaceIssueFeedbackNeedsYou is the established 31-caller announcement door but only emits an activity entry. The derived signal also catches PRs opened while the dashboard was down and clears itself when a workspace appears."
+      },
+      {
+        "summary": "POST /api/review/:issueId/request asks answerMissingWorkspace before any approved-head/nudge/breaker shortcut: an unmerged issue with no workspace and an open pipeline-branch PR (read fresh with gh pr list --head) is adopted (202 adopting:true); no PR → 400 + hint; forge failure → 503.",
+        "rationale": "The issue's fix text for the checked-out case is 'git worktree remove …, then pan review request'; without route adoption that command would still fail with 'Workspace does not exist'. review-pipeline.ts is 983 lines and lint-file-size.sh passes any file <= CEILING=1000, so a ~6-line route change fits; logic lives in the new lib module."
+      },
+      {
+        "summary": "createWorktree best-effort fetches +refs/heads/feature/<x>:refs/remotes/origin/feature/<x> before deciding whether the branch exists.",
+        "rationale": "Today an unfetched remote branch makes createWorktree run 'git worktree add -b feature/<x> … origin/main', cutting a new branch with the PR branch's name; adoption pre-fetches anyway, and the fix also corrects the manual pan workspace create path."
+      },
+      {
+        "summary": "A webhook payload without pull_request.head.sha is refused (head-unknown); only the exact branch feature/<issue-lower> is adopted; polyrepo projects are refused.",
+        "rationale": "The issue forbids adopting a branch whose head differs from the PR head, which cannot be checked without the SHA; the pipeline only verifies and pushes feature/<issue-lower>; polyrepo sub-repo adoption needs its own design."
+      },
+      {
+        "summary": "The Kanban NeedsYouStrip / simple-mode projection is out of scope; Command Deck plus pan show carry the signal.",
+        "rationale": "Keeps the plan inside the finalize size lint (≤25 files, ≤6 subsystems) while satisfying the acceptance criterion that the operator sees a Needs-you item naming the PR and the fix."
+      },
+      {
+        "summary": "Plan-critic round 1 findings (5 blocks-the-design) all accepted and answered under '## Critique response' in the PRD.",
+        "rationale": "Each finding was verified against the cited code: the guard shortcuts precede workspace checks, the cached listing can hide new PRs and swallows failures, a post-adoption review refusal left no journal signal, a stale registry row skipped the .git check, and the diverged fix said branch -D."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4605.md",
+      "sizeJustification": "26 files across 7 first-two-segment paths; the seventh, tests/cli, exists only because the pan show tests live in tests/cli/commands/show.test.ts, and package.json is touched only to add two frontend tests to the CI subset. Every slice serves the one behavior (an outside PR is adopted or its refusal is visible), each item is small, and the pan show change is 3 lines plus its test.",
+      "canonicalFilename": "2026-10-24-PAN-4605-a-pr-opened-outside-a-pipeline-workspace-is-never-reviewed-and-nobody-is-told.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "worktree-fetch-feature-branch",
+        "title": "createWorktree checks out an unfetched remote feature branch instead of re-cutting it from main",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T09:50:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4605",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/worktree-ops.ts",
+            "tests/unit/lib/workspace-manager/create-worktree-fetch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace-manager/create-worktree-fetch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "create-worktree-fetch.test.ts passes both cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In createWorktree (src/lib/workspace-manager/worktree-ops.ts ~L97), before `await execAsync('git worktree prune', ...)`, add a best-effort `execFileAsync('git', ['fetch', 'origin', `+refs/heads/${branchName}:refs/remotes/origin/${branchName}`], { cwd: repoPath }).catch(() => {})` with the PAN-4605 comment from the PRD. Add tests/unit/lib/workspace-manager/create-worktree-fetch.test.ts using real git in mkdtempSync dirs (bare origin + two clones) as specified in WI-1."
+        },
+        "items": [
+          {
+            "id": "worktree-fetch-feature-branch.ac1",
+            "title": "Given a primary clone that never fetched origin's feature/pan-1, when createWorktree(clone, ws, 'feature/pan-1', 'main') runs, then `git -C ws rev-parse HEAD` returns the SHA of origin's feature/pan-1 (not origin/main)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worktree-fetch-feature-branch.ac2",
+            "title": "Given a branch name that does not exist on origin, when createWorktree runs, then it still creates the worktree on a new branch at origin/main and returns success: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worktree-fetch-feature-branch.ac3",
+            "title": "The fetch passes the refspec as an argv element to execFile (no shell string) and a rejected fetch is swallowed without changing the returned message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contract-pr-outside-pipeline",
+        "title": "Contract: add the pr-outside-pipeline attention and the DerivedPrOutsidePipeline detail",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T09:50:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4605",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/derived-issue-state.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix packages/contracts run build",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "packages/contracts/dist/index.d.ts contains \"pr-outside-pipeline\"",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In packages/contracts/src/derived-issue-state.ts add the \"pr-outside-pipeline\" literal to IssueAttention (with its doc comment), add the DerivedPrOutsidePipeline struct { prNumber: Number, fix: String, worktreePath?: String } and its type, add `prOutsidePipeline: Schema.optional(DerivedPrOutsidePipeline)` to DerivedIssueState, and append \"pr-outside-pipeline\" to ISSUE_ATTENTIONS. index.ts already re-exports the file (`export * from \"./derived-issue-state\"`). Rebuild the contracts package."
+        },
+        "items": [
+          {
+            "id": "contract-pr-outside-pipeline.ac1",
+            "title": "isIssueAttention('pr-outside-pipeline') returns true and ISSUE_ATTENTIONS includes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-pr-outside-pipeline.ac2",
+            "title": "packages/contracts/src/derived-issue-state.ts contains DerivedPrOutsidePipeline as Schema.Struct({ prNumber: Schema.Number, fix: Schema.String, worktreePath: Schema.optional(Schema.String) }) and DerivedIssueState contains prOutsidePipeline: Schema.optional(DerivedPrOutsidePipeline)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-pr-outside-pipeline.ac3",
+            "title": "After the package build, packages/contracts/dist/index.d.ts contains the \"pr-outside-pipeline\" literal and `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-outside-pipeline-helpers",
+        "title": "Outside-PR helpers module (worktree lookup, fix text, workspace detection, derived detail) plus the workspace.* journal types",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T09:50:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4605",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "adopt-pr-workspace",
+            "derive-pr-outside-pipeline-attention",
+            "pan-show-prints-fix"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/pr-outside-pipeline.ts",
+            "src/lib/cloister/pipeline-journal.ts",
+            "tests/unit/lib/overdeck/pr-outside-pipeline.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/pr-outside-pipeline.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "pr-outside-pipeline.test.ts passes",
+            "typecheck and lint complete without errors (no new circular import)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/lib/overdeck/pr-outside-pipeline.ts exporting pipelineBranchFor, findBranchWorktree (pure porcelain parser, skips prunable entries and the excluded canonical path), prOutsidePipelineFix (the two exact fix texts from the PRD), pipelineWorkspacePath (first of the registry row path and <project>/workspaces/feature-<lower> that contains .git — a stale registry row with a missing directory is ignored — or a remote: sentinel from remote metadata; deps registryPath/remoteMetadata are the test seam), and readPrOutsidePipeline (the 4-step rule in WI-3; never throws). Import only pipeline-journal.js, workspaces/resolver.js, remote/workspace-metadata.js, @overdeck/contracts types and node built-ins. Add 'workspace.adopted' | 'workspace.adoption-failed' to PipelineJournalEntryType in src/lib/cloister/pipeline-journal.ts. Write the unit tests listed in WI-3. Mock the notifier in tests exactly as tests/unit/lib/cloister/review-verdict-feedback.test.ts does: vi.mock('<rel>/src/lib/pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() })) so journal appends never reach the network."
+        },
+        "items": [
+          {
+            "id": "pr-outside-pipeline-helpers.ac1",
+            "title": "findBranchWorktree returns the hoff worktree path for a porcelain fixture where it holds refs/heads/feature/pan-1, and returns null for the excluded canonical path, a prunable entry, or no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-outside-pipeline-helpers.ac2",
+            "title": "prOutsidePipelineFix with worktreePath returns text containing `git -C <projectPath> worktree remove <worktreePath>` and `pan review request PAN-1`; without it, text containing `pan review request PAN-1` and no `worktree remove`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-outside-pipeline-helpers.ac3",
+            "title": "readPrOutsidePipeline returns a detail with worktreePath when no workspace exists and a worktree holds the branch; returns the journal entry's data.fix when the workspace journal ends with workspace.adoption-failed; returns undefined when the journal ends with review.requested",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-outside-pipeline-helpers.ac4",
+            "title": "When listWorktrees rejects, readPrOutsidePipeline resolves to a detail without worktreePath instead of throwing; given an injected registryPath pointing at a missing directory and no canonical workspace, it returns a detail (the stale row does not hide the PR)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "adopt-pr-workspace",
+        "title": "Adoption core: preflight the PR branch in git and create the workspace at the PR head",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T09:50:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4605",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "adopt-and-review-orchestrator",
+            "webhook-adopts-no-workspace",
+            "request-route-adopts"
+          ],
+          "files_scope": [
+            "src/lib/cloister/pr-workspace-adoption.ts",
+            "tests/unit/lib/cloister/pr-workspace-adoption.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/pr-workspace-adoption.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "pr-workspace-adoption.test.ts passes all eight cases",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3",
+            "NFR-6"
+          ],
+          "parallelSafeReason": "Touches only its two new files; its one dependency (pr-outside-pipeline-helpers) lands first, and no other item edits these files."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Create src/lib/cloister/pr-workspace-adoption.ts with AdoptablePr, AdoptionRefusal, AdoptionOutcome, AdoptionDeps, adoptPrWorkspace and adoptionRefusalFix. Run the ten steps in the exact PRD order: exact-branch check, head-sha check, project/polyrepo check, fetch +refs/heads/<branch>:refs/remotes/origin/<branch>, compare remote ref to pr.headSha, worktree prune + findBranchWorktree, local-branch rule (absent → git branch --track; equal → nothing; ancestor → git update-ref CAS; else refuse), createWorkspace, assert workspace HEAD and current branch, journal workspace.adopted. Failures with an existing workspace journal workspace.adoption-failed with data { prNumber, reason, detail, fix }. Never run push, --force, branch -D, worktree remove, or removeWorkspace. All git via promisified execFile argv. Fix texts per the WI-4 table. Tests use real git in temp dirs with an injected createWorkspace (runs git worktree add) and injected resolveProject. Mock the notifier in tests exactly as tests/unit/lib/cloister/review-verdict-feedback.test.ts does: vi.mock('<rel>/src/lib/pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() })) so journal appends never reach the network. The local-branch-diverged fix text must never tell the operator to delete the branch: it says to inspect `git -C <projectPath> log <headSha>..<branch>`, push the commits to the PR or move them to another branch, then run pan review request (PRD WI-4 table)."
+        },
+        "items": [
+          {
+            "id": "adopt-pr-workspace.ac1",
+            "title": "Given a bare origin whose feature/pan-1 equals pr.headSha and no local branch, adoptPrWorkspace returns { adopted: true, workspacePath } and `git -C workspacePath rev-parse HEAD` equals pr.headSha and the workspace journal's last entry is workspace.adopted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-pr-workspace.ac2",
+            "title": "Given feature/pan-1 checked out in another worktree of the primary clone, adoptPrWorkspace returns reason checked-out-elsewhere with that worktreePath and the injected createWorkspace is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-pr-workspace.ac3",
+            "title": "Given origin's feature/pan-1 differs from pr.headSha it returns head-moved; given a local branch with an extra commit it returns local-branch-diverged and leaves the local ref unchanged; given a local ancestor it fast-forwards and adopts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-pr-workspace.ac4",
+            "title": "When the injected createWorkspace creates the worktree but returns success: false, it returns create-failed and the workspace journal ends with workspace.adoption-failed whose data.fix contains `pan workspace create PAN-1`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-pr-workspace.ac5",
+            "title": "Across all test cases the recorded git argv never contains push, --force, -D, or worktree remove, and no adoptionRefusalFix text contains `branch -D`, `--force`, or `reset --hard`; headSha undefined returns head-unknown and headRef strike/pan-1 returns not-feature-branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "adopt-and-review-orchestrator",
+        "title": "Orchestrator: adopt, start review, journal and announce refusals, coalesce per issue, and answer the missing-workspace route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T09:50:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4605",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/pr-adoption-review.ts",
+            "tests/unit/lib/cloister/pr-adoption-review.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/pr-adoption-review.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "pr-adoption-review.test.ts passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-7",
+            "FR-11",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create src/lib/cloister/pr-adoption-review.ts exporting adoptPrAndStartReview (module-level Map<string, Promise> coalescing keyed by upper-case issue id, deleted in finally; __resetPrAdoptionForTests), findOpenPipelinePr (fresh branch-targeted `gh pr list --head <branch> --state open --limit 10 --json number,url,headRefName,headRefOid,isDraft` via runGh with caller 'pr-adoption'; returns { kind: 'found' | 'none' | 'error' }; GitLab project → none; never the cached repo listing), and answerMissingWorkspace(issueId, source, { derivedState, workspaceExists }) (null when the workspace exists or the issue is merged; 503 on lookup error; 400 + hint on none; 202 { success, queued, adopting: true, message } plus a detached adoptAndReview call on found). Refusal → one announce(issueId, `PR #<n> was not reviewed: <fix>`, details). Adopted → startReview(issueId, { note, source }); a null starter or a started:false answer appends workspace.adoption-failed to the adopted workspace with data.reason 'no-starter' or 'review-not-started', the starter's error text when present (e.g. dirty-workspace), and a fix, then announces it, so the derived attention stays on until a later review.requested. Any throw is caught and announced, never rethrown. Defaults: adoptPrWorkspace, getRequestReviewStarter(), surfaceIssueFeedbackNeedsYou, appendPipelineEntry. Tests inject every dep (no git, no network)."
+        },
+        "items": [
+          {
+            "id": "adopt-and-review-orchestrator.ac1",
+            "title": "When the injected adopt refuses with checked-out-elsewhere, adoptPrAndStartReview calls announce exactly once with a reason containing the PR number and the fix, never calls startReview, and returns kind refused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-and-review-orchestrator.ac2",
+            "title": "When adopt succeeds, startReview is called once with the issue id and { source, note mentioning the PR number }; started:true returns kind started; a { started: false, reason: 'dirty-workspace', error } answer records workspace.adoption-failed with reason review-not-started and the error text in the journal, announces it, and returns review-not-started; a null starter records reason no-starter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-and-review-orchestrator.ac3",
+            "title": "Two concurrent adoptPrAndStartReview calls for the same issue invoke adopt once and both resolve to the same outcome; an adopt that throws is caught, announced, and the call resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-and-review-orchestrator.ac4",
+            "title": "findOpenPipelinePr with an injected gh skips draft rows and rows on other branches, maps headRefOid to headSha, returns none for [] and error when gh rejects; answerMissingWorkspace returns null when the workspace exists or the issue is merged, 202 with adopting: true (calling adoptAndReview once) for an approved-PR derived state with no workspace, 400 with a hint for none, and 503 for error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "webhook-adopts-no-workspace",
+        "title": "Webhook routes a no-workspace review start to adoption and refreshes the PR listing on PR events",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T09:50:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4605",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/webhook-handlers.ts",
+            "tests/unit/lib/webhook-handlers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/webhook-handlers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "webhook-handlers.test.ts passes including the new PAN-4605 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In handlePullRequest (src/lib/webhook-handlers.ts), replace the `if (!outcome.started) { console.log(...Review not started...) }` block with the PRD's after-snippet: on reason 'no-workspace' and pr.number != null, dynamically import ./cloister/pr-adoption-review.js and await adoptPrAndStartReview({ issueId, number: pr.number, headRef: pr.head.ref, headSha: pr.head.sha, repo }, { source: 'webhook', startReview }), logging the outcome kind; other reasons keep the existing log. The surrounding try/catch stays. Extend tests/unit/lib/webhook-handlers.test.ts with vi.mock of pr-adoption-review.js and the three cases in WI-6. Also, in the existing membership-refresh block (`if (['opened', 'closed', 'reopened'].includes(payload.action ?? ''))`), add 'ready_for_review' to the list and, after enqueueProjectResourceRefresh, dynamically import ../dashboard/server/services/issue-pr-refresh.js and call refreshIssuePullRequestStateNow(issueId), so the cached repo PR listing cannot hide a just-opened outside PR from the derived attention. Mock that module in the test."
+        },
+        "items": [
+          {
+            "id": "webhook-adopts-no-workspace.ac1",
+            "title": "Given the registered starter returns { started: false, reason: 'no-workspace' } for an opened feature/pan-1 PR with head.sha, handlePullRequest calls adoptPrAndStartReview once with { issueId: 'PAN-1', number, headRef: 'feature/pan-1', headSha, repo } and { source: 'webhook', startReview }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-adopts-no-workspace.ac2",
+            "title": "Given the starter returns dirty-workspace or already-running, adoptPrAndStartReview is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-adopts-no-workspace.ac3",
+            "title": "Given adoptPrAndStartReview rejects, handlePullRequest still resolves without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-adopts-no-workspace.ac4",
+            "title": "Given an opened or ready_for_review pull_request payload for feature/pan-1, handlePullRequest calls refreshIssuePullRequestStateNow('PAN-1')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "request-route-adopts",
+        "title": "Review request route asks answerMissingWorkspace before the approved-head, nudge and breaker shortcuts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T09:50:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4605",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/review-pipeline.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "npx vitest run tests/unit/lib/cloister/pr-adoption-review.test.ts tests/unit/dashboard/routes/review-pipeline-request-guards.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint-file-size.sh reports no failure and review-pipeline.ts is at or under 1000 lines",
+            "both vitest files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In src/dashboard/server/routes/workspaces/review-pipeline.ts, postWorkspaceRequestReviewRoute: directly after `const derived = yield* Effect.promise(() => getDerivedIssueState(canonicalIssueId));` and before the `// The operator overrides of an approved head` comment, insert the PRD block that dynamically imports answerMissingWorkspace from lib/cloister/pr-adoption-review.js, calls it with (canonicalIssueId, requestSource, { derivedState: derived.state, workspaceExists: getWorkspaceInfoForIssue(canonicalIssueId).exists }) and returns jsonResponse(missingWorkspace.body, { status: missingWorkspace.status }) when it is non-null. Leave the existing `case 'no-workspace':` arm unchanged as a race fallback. Net growth ≤ 10 lines; keep the file at or under 1000 lines (currently 983); do not touch the allowlist. No CLI change: request-review.ts already prints ✓ message for 2xx and error + hint otherwise."
+        },
+        "items": [
+          {
+            "id": "request-route-adopts.ac1",
+            "title": "In postWorkspaceRequestReviewRoute the call `answerMissingWorkspace(canonicalIssueId, requestSource, {` appears after `getDerivedIssueState(canonicalIssueId)` and before both the `forceReview && shouldTreatAsRerun(derived)` block and the `requestReviewGuarded(issueId, {` call, and a non-null answer returns `jsonResponse(missingWorkspace.body, { status: missingWorkspace.status })`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "request-route-adopts.ac2",
+            "title": "`wc -l src/dashboard/server/routes/workspaces/review-pipeline.ts` reports at most 1000 and `bash scripts/lint-file-size.sh` exits 0 with scripts/file-size-allowlist.txt unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "derive-pr-outside-pipeline-attention",
+        "title": "Derived issue state computes the pr-outside-pipeline attention",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T09:50:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4605",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/derived-issue-state.ts",
+            "tests/unit/lib/overdeck/derived-issue-state.test.ts",
+            "tests/unit/lib/overdeck/derived-issue-state-batch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/derived-issue-state.test.ts tests/unit/lib/overdeck/derived-issue-state-batch.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both derived-issue-state test files pass",
+            "typecheck completes without errors",
+            "lint-file-size.sh reports no failure (derived-issue-state.ts at or under 1000 lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In src/lib/overdeck/derived-issue-state.ts: add headRef and isDraft to LoadedPr (set in prFromGhRow from headRefName/isDraft and in mrFromGlabRow from source_branch/draft); add prOutsidePipeline to IssueStateFacts; in deriveAttention return 'pr-outside-pipeline' right after the api-error line when facts.prOutsidePipeline is set and issueOpen !== false; copy facts.prOutsidePipeline onto the derived state under the same condition. In both loadIssueStateFacts and loadIssueStatesForProject, for a PR that is open, not merged, not draft, and whose headRef === pipelineBranchFor(issueId), await readPrOutsidePipeline with a lazy listWorktrees (memoized once per batch in loadIssueStatesForProject) running `git worktree list --porcelain` via execFileAsync. Add a readPrOutsidePipeline seam to IssueStateLoaderDeps. If the file would exceed 1000 lines, move gitWorktreeList and the predicate into pr-outside-pipeline.ts."
+        },
+        "items": [
+          {
+            "id": "derive-pr-outside-pipeline-attention.ac1",
+            "title": "deriveIssueState with prOutsidePipeline facts and issueOpen true returns attention 'pr-outside-pipeline' and copies prOutsidePipeline; with issueOpen false returns neither; a blocked live pane still yields attention 'needs-you'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derive-pr-outside-pipeline-attention.ac2",
+            "title": "loadIssueStatesForProject with an injected listing holding an open non-draft feature/pan-1 PR and an injected readPrOutsidePipeline returning a detail produces attention 'pr-outside-pipeline' for PAN-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derive-pr-outside-pipeline-attention.ac3",
+            "title": "Given a draft PR, a merged PR, or a feature/PAN-1 (upper-case) head, when loadIssueStatesForProject runs, then the injected readPrOutsidePipeline is never called and the derived state contains no attention",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derive-pr-outside-pipeline-attention.ac4",
+            "title": "Given two qualifying issues in one loadIssueStatesForProject call, when it resolves, then the worktree listing function was called at most once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "command-deck-renders-attention",
+        "title": "Command Deck groups pr-outside-pipeline under Needs you with the fix as subline and badge tooltip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T09:50:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4605",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/pipeline-helpers.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/featureStateBadge.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/pipeline-helpers.test.ts src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. pipeline-helpers.ts: isNeedsYouFeature returns true for derived.attention === 'pr-outside-pipeline'; sublineFor (needs-you branch, before the work-not-started check) returns `review never started — ${derived.prOutsidePipeline?.fix ?? 'run pan review request'}`. featureStateBadge.ts: add prOutsidePipeline?: DerivedPrOutsidePipeline | null to FeatureStateBadgeInput and, inside `if (state !== null) {` before the workStart checks, return { key: 'pr-outside-pipeline', label: 'Review never started', tone: 'human', title: input.prOutsidePipeline.fix }. FeatureItem.tsx (~L634): pass prOutsidePipeline: storeDerived?.prOutsidePipeline. Use existing tones only (style guide: no new colors, no pills). Extend the two test files. Append both test paths (src/components/CommandDeck/__tests__/pipeline-helpers.test.ts and src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts) to the root package.json `test:frontend-subset` script if they are not already listed, so CI runs them (conventions: CI runs only listed frontend files)."
+        },
+        "items": [
+          {
+            "id": "command-deck-renders-attention.ac1",
+            "title": "groupPipelineEntries places an entry whose derived attention is 'pr-outside-pipeline' in the 'needs-you' group, and sublineFor returns text starting 'review never started — ' followed by the fix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-deck-renders-attention.ac2",
+            "title": "resolveFeatureStateBadge with storeState 'in-review' and a prOutsidePipeline detail returns { key: 'pr-outside-pipeline', label: 'Review never started', tone: 'human', title: <the fix> }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-deck-renders-attention.ac3",
+            "title": "FeatureItem passes storeDerived.prOutsidePipeline into resolveFeatureStateBadge, and a feature with no prOutsidePipeline still renders its ordinary state badge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-deck-renders-attention.ac4",
+            "title": "The root package.json `test:frontend-subset` script contains src/components/CommandDeck/__tests__/pipeline-helpers.test.ts and src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-show-prints-fix",
+        "title": "pan show prints the outside-PR fix and summarizes the workspace.* journal entries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T09:50:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4605",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/show.ts",
+            "tests/cli/commands/show.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/cli/commands/show.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "show.test.ts passes including the new PAN-4605 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. In src/cli/commands/show.ts: inside the `if (issueState.attention) {` block print `  fix      <issueState.prOutsidePipeline.fix>` when prOutsidePipeline is set; add `prOutsidePipeline: issueState.prOutsidePipeline ?? null` after `attention` in the --json object; add summarizePipelineEntry cases for 'workspace.adopted' (`PR #<n> at <shortSha(headSha)>`) and 'workspace.adoption-failed' (`<reason> — <detail>`). Extend tests/cli/commands/show.test.ts modeled on the existing 'stuck' attention test (~L186)."
+        },
+        "items": [
+          {
+            "id": "pan-show-prints-fix.ac1",
+            "title": "Given a derived state with attention 'pr-outside-pipeline' and prOutsidePipeline.fix, showCommand prints a line containing 'fix' and the fix text after the 'needs' line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-show-prints-fix.ac2",
+            "title": "showCommand --json emits a prOutsidePipeline field (null when absent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-show-prints-fix.ac3",
+            "title": "summarizePipelineEntry returns 'PR #4599 at <8-char sha>' for a workspace.adopted entry and '<reason> — <detail>' for a workspace.adoption-failed entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-outside-pr-pipeline",
+        "title": "Document how a PR opened outside a workspace enters the pipeline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T09:50:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4605",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'A PR opened outside a pipeline workspace (PAN-4605)' docs/PIPELINE-GATES.md",
+            "grep -n 'workspace.adoption-failed' docs/PIPELINE-GATES.md",
+            "grep -n 'pr-adoption-review.ts' docs/MERGE-WORKFLOW.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. docs/PIPELINE-GATES.md: add workspace.adopted and workspace.adoption-failed rows to the 'Entry types and who writes them' table (after operator.decision-withdrawn), and add a subsection '### A PR opened outside a pipeline workspace (PAN-4605)' directly after '### Work agent not started (PAN-4399)' covering: exact-branch-only adoption at the PR head, the preflight order (D2), the local-branch rule (D4), never pushes/forces/deletes, the pr-outside-pipeline attention rule (D6) and its two fix texts, that pan review request adopts too (D7), and that polyrepo projects are refused (D10). docs/MERGE-WORKFLOW.md step 2: add sentences that a PR with no workspace is adopted by cloister/pr-adoption-review.ts and, when adoption is refused, the issue shows 'Review never started' under Needs you with the exact fix, linking the new PIPELINE-GATES subsection. Write in the docs' existing plain-prose voice."
+        },
+        "items": [
+          {
+            "id": "docs-outside-pr-pipeline.ac1",
+            "title": "docs/PIPELINE-GATES.md contains the heading '### A PR opened outside a pipeline workspace (PAN-4605)' directly after the 'Work agent not started (PAN-4399)' subsection, and it names the git worktree remove + pan review request fix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-outside-pr-pipeline.ac2",
+            "title": "The PIPELINE-GATES journal table contains rows for workspace.adopted and workspace.adoption-failed that name adoptPrWorkspace as the writer and list their data fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-outside-pr-pipeline.ac3",
+            "title": "docs/MERGE-WORKFLOW.md step 2 names cloister/pr-adoption-review.ts, says a refused adoption shows 'Review never started' under Needs you, and links the PIPELINE-GATES subsection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contract-pr-outside-pipeline",
+        "to": "pr-outside-pipeline-helpers",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-outside-pipeline-helpers",
+        "to": "adopt-pr-workspace",
+        "type": "blocks"
+      },
+      {
+        "from": "adopt-pr-workspace",
+        "to": "adopt-and-review-orchestrator",
+        "type": "blocks"
+      },
+      {
+        "from": "adopt-and-review-orchestrator",
+        "to": "webhook-adopts-no-workspace",
+        "type": "blocks"
+      },
+      {
+        "from": "adopt-and-review-orchestrator",
+        "to": "request-route-adopts",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-pr-outside-pipeline",
+        "to": "derive-pr-outside-pipeline-attention",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-outside-pipeline-helpers",
+        "to": "derive-pr-outside-pipeline-attention",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-pr-outside-pipeline",
+        "to": "command-deck-renders-attention",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-pr-outside-pipeline",
+        "to": "pan-show-prints-fix",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-outside-pipeline-helpers",
+        "to": "pan-show-prints-fix",
+        "type": "blocks"
+      },
+      {
+        "from": "adopt-and-review-orchestrator",
+        "to": "docs-outside-pr-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "derive-pr-outside-pipeline-attention",
+        "to": "docs-outside-pr-pipeline",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

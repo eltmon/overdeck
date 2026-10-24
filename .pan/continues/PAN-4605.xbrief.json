@@ -1,0 +1,243 @@
+{
+  "version": "1",
+  "issueId": "PAN-4605",
+  "created": "2026-10-24T09:55:25.836Z",
+  "updated": "2026-10-24T12:27:39.588Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-10-24T12:27:39.587Z"
+    }
+  ],
+  "items": {
+    "worktree-fetch-feature-branch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4605",
+      "claimedAt": "2026-10-24T09:55:25.836Z",
+      "doneAt": "2026-10-24T10:02:29.882Z"
+    },
+    "contract-pr-outside-pipeline": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4605",
+      "claimedAt": "2026-10-24T10:02:40.611Z",
+      "doneAt": "2026-10-24T10:10:05.581Z"
+    },
+    "pr-outside-pipeline-helpers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4605",
+      "claimedAt": "2026-10-24T10:10:31.353Z",
+      "doneAt": "2026-10-24T10:34:44.066Z"
+    },
+    "adopt-pr-workspace": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4605",
+      "claimedAt": "2026-10-24T10:34:51.021Z",
+      "doneAt": "2026-10-24T10:51:14.524Z"
+    },
+    "adopt-and-review-orchestrator": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4605",
+      "claimedAt": "2026-10-24T10:51:24.658Z",
+      "doneAt": "2026-10-24T10:57:14.764Z"
+    },
+    "webhook-adopts-no-workspace": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4605",
+      "claimedAt": "2026-10-24T10:57:21.970Z",
+      "doneAt": "2026-10-24T11:08:45.192Z"
+    },
+    "request-route-adopts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4605",
+      "claimedAt": "2026-10-24T11:08:52.027Z",
+      "doneAt": "2026-10-24T11:13:44.611Z"
+    },
+    "derive-pr-outside-pipeline-attention": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4605",
+      "claimedAt": "2026-10-24T11:13:50.782Z",
+      "doneAt": "2026-10-24T11:19:01.666Z"
+    },
+    "command-deck-renders-attention": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4605",
+      "claimedAt": "2026-10-24T11:19:07.246Z",
+      "doneAt": "2026-10-24T11:22:19.279Z"
+    },
+    "pan-show-prints-fix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4605",
+      "claimedAt": "2026-10-24T11:22:25.687Z",
+      "doneAt": "2026-10-24T11:25:27.029Z"
+    },
+    "docs-outside-pr-pipeline": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4605",
+      "claimedAt": "2026-10-24T11:25:34.898Z",
+      "doneAt": "2026-10-24T11:26:48.594Z"
+    },
+    "worktree-fetch-feature-branch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:38:09.048Z"
+    },
+    "worktree-fetch-feature-branch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:38:24.462Z"
+    },
+    "worktree-fetch-feature-branch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:38:40.453Z"
+    },
+    "contract-pr-outside-pipeline.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:38:55.810Z"
+    },
+    "contract-pr-outside-pipeline.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:39:11.460Z"
+    },
+    "contract-pr-outside-pipeline.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:39:27.108Z"
+    },
+    "pr-outside-pipeline-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:39:42.881Z"
+    },
+    "pr-outside-pipeline-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:39:59.123Z"
+    },
+    "pr-outside-pipeline-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:40:19.126Z"
+    },
+    "pr-outside-pipeline-helpers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:40:35.250Z"
+    },
+    "adopt-pr-workspace.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:40:51.594Z"
+    },
+    "adopt-pr-workspace.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:41:07.465Z"
+    },
+    "adopt-pr-workspace.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:41:22.845Z"
+    },
+    "adopt-pr-workspace.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:41:38.992Z"
+    },
+    "adopt-pr-workspace.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:41:55.126Z"
+    },
+    "adopt-and-review-orchestrator.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:42:10.987Z"
+    },
+    "adopt-and-review-orchestrator.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:42:25.907Z"
+    },
+    "adopt-and-review-orchestrator.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:42:40.964Z"
+    },
+    "adopt-and-review-orchestrator.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:42:58.555Z"
+    },
+    "webhook-adopts-no-workspace.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:43:14.815Z"
+    },
+    "webhook-adopts-no-workspace.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:43:31.306Z"
+    },
+    "webhook-adopts-no-workspace.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:43:48.864Z"
+    },
+    "webhook-adopts-no-workspace.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:44:06.071Z"
+    },
+    "request-route-adopts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:44:21.838Z"
+    },
+    "request-route-adopts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:44:39.426Z"
+    },
+    "derive-pr-outside-pipeline-attention.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:44:55.299Z"
+    },
+    "derive-pr-outside-pipeline-attention.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:45:11.874Z"
+    },
+    "derive-pr-outside-pipeline-attention.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:45:29.189Z"
+    },
+    "derive-pr-outside-pipeline-attention.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:45:47.071Z"
+    },
+    "command-deck-renders-attention.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:46:07.814Z"
+    },
+    "command-deck-renders-attention.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:46:24.174Z"
+    },
+    "command-deck-renders-attention.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:46:40.064Z"
+    },
+    "command-deck-renders-attention.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:46:56.340Z"
+    },
+    "pan-show-prints-fix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:47:11.688Z"
+    },
+    "pan-show-prints-fix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:47:27.220Z"
+    },
+    "pan-show-prints-fix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:47:42.755Z"
+    },
+    "docs-outside-pr-pipeline.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:47:58.375Z"
+    },
+    "docs-outside-pr-pipeline.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:48:13.727Z"
+    },
+    "docs-outside-pr-pipeline.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:48:30.559Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

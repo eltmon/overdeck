@@ -42,6 +42,7 @@ export type PipelineJournalEntryType =
   | 'conflict.repair-requested' | 'conflict.repair-escalated'
   | 'blocked.declared' | 'blocked.woken'
   | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned'
+  | 'workspace.adopted' | 'workspace.adoption-failed'
   | 'operator.decision-requested' | 'operator.decision-answered' | 'operator.decision-withdrawn';
 
 export interface PipelineJournalEntry {

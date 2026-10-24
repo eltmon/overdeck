@@ -239,3 +239,28 @@ describe('the loader reads an open operator decision from the workspace journal 
     expect(loaded.operatorDecisionOpen).toBe(false);
   });
 });
+
+// PAN-4605: an open PR on the pipeline branch that no pipeline workspace picked up.
+describe('an outside PR is the operator\'s move', () => {
+  const outside = { prNumber: 7, fix: 'Run `pan review request PAN-3917`.', worktreePath: '/home/me/hoff' };
+
+  it('derives the attention and copies the detail for an open issue', () => {
+    const derived = deriveIssueState(facts({ prOutsidePipeline: outside }));
+    expect(derived.attention).toBe('pr-outside-pipeline');
+    expect(derived.prOutsidePipeline).toEqual(outside);
+  });
+
+  it('derives neither for a closed issue', () => {
+    const derived = deriveIssueState(facts({ issueOpen: false, prOutsidePipeline: outside }));
+    expect(derived.attention).toBeUndefined();
+    expect(derived.prOutsidePipeline).toBeUndefined();
+  });
+
+  it('a blocked live pane still wins', () => {
+    const pane = {
+      id: 'w1:p1', issue: 'PAN-3917', role: 'work' as const, harness: 'claude-code',
+      model: 'opus', state: 'blocked' as const, stateSince: NOW, terminalId: 'w1:p1',
+    };
+    expect(deriveIssueState(facts({ panes: [pane], prOutsidePipeline: outside })).attention).toBe('needs-you');
+  });
+});

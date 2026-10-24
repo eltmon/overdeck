@@ -1,0 +1,667 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T08:11:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4585: Opt-in first-class Semgrep support — phase 1 (config, managed install, doctor)",
+    "updated": "2026-10-24T08:22:03.986Z"
+  },
+  "plan": {
+    "id": "pan-4585",
+    "title": "Opt-in first-class Semgrep support: managed install, sast verification gate, review-lane findings, in-session MCP/hooks, Platform/Guardian tier, CI",
+    "status": "running",
+    "uid": "895810b8-7986-4c6a-82d5-ebcc1fed03b5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-24T08:11:52Z",
+    "updated": "2026-10-24T08:22:03.986Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4585",
+        "label": "PAN-4585",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4590",
+        "label": "#4590",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4591",
+        "label": "#4591",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4592",
+        "label": "#4592",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4593",
+        "label": "#4593",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4594",
+        "label": "#4594",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "semgrep",
+      "security",
+      "sast",
+      "config",
+      "install",
+      "doctor",
+      "epic-phase-1"
+    ],
+    "narratives": {
+      "Problem": "Overdeck has no SAST support; its only security scanning is the regex secret scan and the LLM security review lane. PAN-4585 asks for opt-in Semgrep support across install, doctor, the verification gate, review, in-session hooks, CI, the dashboard and a Platform tier, which is far larger (about 37 files for items 1-3 alone) than one plan can carry under the 25-file finalize cap.",
+      "Proposal": "Ship phase 1 here: an off-by-default security.semgrep.enabled config block that a repo-committed .pan.yaml cannot set, a managed Semgrep CE 1.180.0 install (uv, else pipx) isolated under ~/.overdeck/tools/semgrep with the launcher at ~/.overdeck/bin/semgrep, wired into pan sync, pan install and the dashboard prereq install route, pan doctor rows for the binary and the registry, and the configuration/semgrep.mdx page. Items 2-8 of the issue are filed as children #4590 (sast gate, review context, suppression surfacing), #4591 (MCP, edit hook, skill), #4592 (CI), #4593 (Platform/Guardian) and #4594 (dashboard); the gate's probe research is preserved in the PRD's Phase 2 design section.",
+      "NonGoals": "- No sast verification gate, no Semgrep scan of any kind, and no review-context findings in this issue (#4590)\n- No semgrep mcp server, no PostToolUse edit hook, and no semgrep skill (#4591)\n- No GitHub Actions workflow and no CI failure relay (#4592)\n- No Semgrep Platform tier, no SEMGREP_APP_TOKEN handling, no buildChildEnv or secret-redaction change, and no Guardian plugin provisioning (#4593)\n- No dashboard Settings UI, per-project override UI, or settings-api.ts change (#4594)\n- No gate, severity, configs, timeout_seconds, tier, mcp, edit_hook or guardian config keys yet; only security.semgrep.enabled is read\n- No per-project override in projects.yaml yet (verification.sast lands with #4590), and the repo .pan.yaml must never be able to set security\n- No semgrep entry in PREREQUISITES (system-prerequisites.ts) and no semgrep in ensureHostTools\n- No Homebrew, system pip, sudo, per-workspace install, or write to the user's own uv/pipx tool directories or ~/.local/bin\n- No Opengrep engine option\n- No registry rule file committed to the repo or written to any shared or hosted location\n- No Windows support (installer returns unsupported, doctor warns)\n- No change to scripts/file-size-allowlist.txt"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plan only issue work item 1 (config, install, doctor, docs) in PAN-4585 and file items 2-8 as child issues #4590-#4594",
+        "rationale": "Items 1-3 together are about 37 files against the 25-file finalize cap; the issue says items 1-3 can ship before 4-7, and config/install/doctor separate from the gate along one dependency edge, so sizeJustification would misstate the work as inseparable."
+      },
+      {
+        "summary": "Phase 1 config reads only security.semgrep.enabled; later keys are ignored, not rejected",
+        "rationale": "gate/severity/configs have no consumer until #4590 and documenting them now would mislead; ignoring unknown keys lets a config written for a later phase load cleanly."
+      },
+      {
+        "summary": "Strip security from the repo .pan.yaml project layer; per-project override goes to projects.yaml verification.sast in #4590",
+        "rationale": ".pan.yaml is resolved from process.cwd() and committed in the repo a work agent edits, so it could disable security checks; projects.yaml is operator-owned and ProjectVerificationConfig lives in uncapped workspace-config.ts."
+      },
+      {
+        "summary": "Pin Semgrep 1.180.0 rather than PyPI latest 1.182.1",
+        "rationale": "1.180.0 is 17 days old (>= two weeks supply-chain hygiene) and is the exact version every planning probe ran against."
+      },
+      {
+        "summary": "Install with uv, else pipx, into ~/.overdeck/tools/semgrep with a launcher symlink at ~/.overdeck/bin/semgrep; fail with a fix message if neither exists",
+        "rationale": "Issue specifies uv then pipx and no system pip; isolated UV_TOOL_DIR/PIPX_HOME keeps the user's own Semgrep untouched (verified with a scratch uv install that printed 1.180.0)."
+      },
+      {
+        "summary": "The dashboard prereq install for semgrep refuses while security.semgrep.enabled is false, and semgrep is not added to the PREREQUISITES setup checklist",
+        "rationale": "FR-1 says nothing installs when off; PREREQUISITES renders for every user regardless of config."
+      },
+      {
+        "summary": "Default gate mode when enabled is recorded as advisory for #4590 (issue operator decision 1)",
+        "rationale": "The issue proposes advisory; no gate exists in phase 1, so the choice only travels to the child."
+      },
+      {
+        "summary": "Guardian, Opengrep, and Semgrep partnerships contact are not decided here",
+        "rationale": "They are open operator decisions in the issue and belong to #4593 or later; phase 1 does not touch them."
+      },
+      {
+        "summary": "Child #4590 must not use semgrep --baseline-commit; it uses explicit file targets plus a hunk filter on the working-tree diff",
+        "rationale": "strace on 1.180.0 shows baseline mode runs git worktree add/remove in the shared .git, which Overdeck worktree patrols list and a killed scan would leave registered; explicit targets touch no git state."
+      }
+    ],
+    "metadata": {
+      "childIssues": [
+        4590,
+        4591,
+        4592,
+        4593,
+        4594
+      ],
+      "canonicalFilename": "2026-10-24-PAN-4585-opt-in-first-class-semgrep-support-managed-install-sast-verification-gate-review-lane-findings-in-session-mcp-hooks-platform-guardian-tier-ci.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "config-security-semgrep",
+        "title": "Add the security.semgrep config block (enabled flag, default off)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T08:11:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4585",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/semgrep.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/__tests__/semgrep-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/config-yaml/__tests__/semgrep-config.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in semgrep-config.test.ts passed",
+            "typecheck completes without errors",
+            "lint-file-size.sh exits 0 with schema.ts and merge.ts under their caps"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "foundationFor": [
+            "project-layer-strip",
+            "install-entrypoints",
+            "prereq-registration",
+            "doctor-semgrep"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly: create src/lib/config-yaml/semgrep.ts with YamlSecurityConfig, YamlSemgrepConfig, NormalizedSemgrepConfig, NormalizedSecurityConfig, DEFAULT_NORMALIZED_SECURITY and normalizeSecurityConfig (modelled on jev.ts), add the two type references to schema.ts next to the jev lines (~569, ~808), the default to defaults.ts next to the jev default (~52), and the fresh-copy init (~170) plus the per-layer fold (~480) to mergeConfigs in merge.ts. Phase 1 reads only `enabled`; unknown keys under security.semgrep are ignored; bad types throw at load."
+        },
+        "items": [
+          {
+            "id": "config-security-semgrep.ac1",
+            "title": "Given no security block, mergeConfigs returns config.security.semgrep.enabled === false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-security-semgrep.ac2",
+            "title": "Given a global layer with security.semgrep.enabled: true, mergeConfigs returns enabled === true and DEFAULT_CONFIG.security.semgrep.enabled stays false on the next merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-security-semgrep.ac3",
+            "title": "Given security.semgrep.enabled: 'yes', loading throws an error that contains 'security.semgrep.enabled must be true or false'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-security-semgrep.ac4",
+            "title": "Given security: [] the loader throws 'security must be a mapping', and given unknown keys gate/tier under security.semgrep the loader accepts them and returns { enabled: true } only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-layer-strip",
+        "title": "Drop security settings from the repo-committed .pan.yaml project layer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:11:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/load.ts",
+            "src/lib/config-yaml/__tests__/semgrep-project-layer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/config-yaml/__tests__/semgrep-project-layer.test.ts",
+            "grep -c 'stripProjectSecurity(stripProjectTtsEndpoint' src/lib/config-yaml/load.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in semgrep-project-layer.test.ts passed",
+            "grep prints 4",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2: add exported stripProjectSecurity(config) directly below stripProjectTtsEndpoint in load.ts (line ~70) and wrap all four project-layer reads (lines ~87, ~95, ~140, ~147) as stripProjectSecurity(stripProjectTtsEndpoint(...)), so a work agent cannot change security settings by committing a .pan.yaml to its branch."
+        },
+        "items": [
+          {
+            "id": "project-layer-strip.ac1",
+            "title": "Given a project config with security and jev keys, stripProjectSecurity returns an object without security and with jev preserved, and returns null for null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-layer-strip.ac2",
+            "title": "Given a stripped project layer with security.semgrep.enabled: false and a global layer with enabled: true, mergeConfigs returns enabled === true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-layer-strip.ac3",
+            "title": "load.ts contains stripProjectSecurity(stripProjectTtsEndpoint( at all four project-layer read sites (grep count prints 4)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "semgrep-install-module",
+        "title": "Create the managed Semgrep installer module pinned to 1.180.0",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T08:11:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4585",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/semgrep/install.ts",
+            "src/lib/semgrep/__tests__/install.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/semgrep/__tests__/install.test.ts",
+            "npm run typecheck",
+            "grep -nE 'execSync|sudo|pip install|brew' src/lib/semgrep/install.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in install.test.ts passed",
+            "typecheck completes without errors",
+            "grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5",
+            "NFR-6",
+            "NFR-7"
+          ],
+          "foundationFor": [
+            "install-entrypoints",
+            "prereq-registration",
+            "doctor-semgrep"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3: create src/lib/semgrep/install.ts exporting SEMGREP_VERSION='1.180.0', SEMGREP_QUIET_ENV, managedSemgrepPath, semgrepToolsDir, readSemgrepVersion, ensureSemgrepInstalled and formatSemgrepInstallOutcome with the exact signatures in the PRD. Install with uv (UV_TOOL_DIR/UV_TOOL_BIN_DIR under ~/.overdeck/tools/semgrep), fall back to pipx (PIPX_HOME/PIPX_BIN_DIR), else fail with the fix message; symlink ~/.overdeck/bin/semgrep; verify the version. Async promisified execFile with timeouts only; every dependency injectable so tests never run uv, pipx, semgrep or the network. Before installing, inspect ~/.overdeck/bin/semgrep with lstat/readlink and refuse (status failed, file untouched) unless it is absent or a symlink to the managed target; pass deps to both readSemgrepVersion calls."
+        },
+        "items": [
+          {
+            "id": "semgrep-install-module.ac1",
+            "title": "Given the injected execFile reports 1.180.0 for the managed binary, ensureSemgrepInstalled returns status 'present' and runs no uv or pipx command (the fake throws on any unscripted call, so both version checks go through the injected runner)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-install-module.ac2",
+            "title": "Given uv is available, the installer runs uv with argv ['tool','install','--force','semgrep==1.180.0'] and env UV_TOOL_DIR=<home>/tools/semgrep/uv, UV_TOOL_BIN_DIR=<home>/tools/semgrep/bin, SEMGREP_ENABLE_VERSION_CHECK=0 and SEMGREP_SEND_METRICS=off, links <home>/bin/semgrep to <home>/tools/semgrep/bin/semgrep, and returns 'installed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-install-module.ac3",
+            "title": "Given uv --version fails and pipx --version succeeds, the installer falls back to pipx with argv ['install','--force','semgrep==1.180.0'] and PIPX_HOME/PIPX_BIN_DIR under <home>/tools/semgrep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-install-module.ac4",
+            "title": "Given neither uv nor pipx, or a post-install version other than 1.180.0, the installer returns 'failed' with a message, and on platform win32 it returns 'unsupported' without running any command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-install-module.ac5",
+            "title": "Given <home>/bin/semgrep is a regular file or a symlink to another path, ensureSemgrepInstalled returns 'failed' with a 'Move ~/.overdeck/bin/semgrep' fix, runs no installer, and preserves the existing file unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "install-entrypoints",
+        "title": "Run the Semgrep install step from pan sync and pan install only when enabled",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:11:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/sync.ts",
+            "src/cli/commands/install.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "grep -c 'security.semgrep.enabled' src/cli/commands/sync.ts",
+            "grep -c 'security.semgrep.enabled' src/cli/commands/install.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "sync.ts grep prints at least 2 (dry-run guard and install guard)",
+            "install.ts grep prints at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4: in sync.ts add a dry-run line after the Herdr dry-run line (~255) and a guarded install step after the Herdr try/catch block (~509) that calls ensureSemgrepInstalled and prints formatSemgrepInstallOutcome through an ora spinner; in install.ts add the same guarded step after the ast-grep step (~437). Every Semgrep call is inside if (loadConfigSync().config.security.semgrep.enabled)."
+        },
+        "items": [
+          {
+            "id": "install-entrypoints.ac1",
+            "title": "When security.semgrep.enabled is false, the branch build's `sync --dry-run` (node dist/cli/index.js after npm run build) prints no line containing 'Semgrep'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-entrypoints.ac2",
+            "title": "When security.semgrep.enabled is true, the dry-run path prints 'Semgrep: would install/verify 1.180.0 at ~/.overdeck/bin/semgrep' and the real run prints one spinner line from formatSemgrepInstallOutcome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-entrypoints.ac3",
+            "title": "grep -c 'security.semgrep.enabled' prints at least 2 for sync.ts and at least 1 for install.ts, and both files call ensureSemgrepInstalled only inside that guard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prereq-registration",
+        "title": "Register semgrep as an installable dashboard prerequisite that refuses while disabled",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:11:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/prereqs/registry.ts",
+            "tests/unit/lib/prereqs/registry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/prereqs/registry.test.ts",
+            "npm run typecheck",
+            "git diff --quiet origin/main -- src/lib/system-prerequisites.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in registry.test.ts passed",
+            "typecheck completes without errors",
+            "git diff exits 0 (system-prerequisites.ts unchanged)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5: add useSemgrep: ['semgrep'] to PREREQ_REGISTRY, 'semgrep' to INSTALLABLE_TOOLS, a semgrep branch in isToolInstalled that compares readSemgrepVersion() of the managed binary to SEMGREP_VERSION (never a PATH lookup), and a 'semgrep' case in installTool that refuses while security.semgrep.enabled is false and otherwise maps ensureSemgrepInstalled to an InstallResult. Do not add semgrep to ensureHostTools or to PREREQUISITES in system-prerequisites.ts. isToolInstalled('semgrep') returns false before any probe while the feature is off."
+        },
+        "items": [
+          {
+            "id": "prereq-registration.ac1",
+            "title": "Given security.semgrep.enabled is false, installTool('semgrep') resolves success: false with a message containing 'security.semgrep.enabled' and never calls ensureSemgrepInstalled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereq-registration.ac2",
+            "title": "Given the feature is enabled and ensureSemgrepInstalled returns 'installed', installTool('semgrep') returns success: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereq-registration.ac3",
+            "title": "Given the feature is enabled, isToolInstalled('semgrep') returns true only when the managed binary reports SEMGREP_VERSION, and INSTALLABLE_TOOLS contains 'semgrep'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereq-registration.ac4",
+            "title": "Given security.semgrep.enabled is false, isToolInstalled('semgrep') returns false and readSemgrepVersion is never called, so GET /api/prereqs/useSemgrep starts no process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-semgrep",
+        "title": "Add pan doctor Semgrep and Semgrep registry rows, silent when disabled",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:11:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-semgrep.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor-semgrep.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-semgrep.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in doctor-semgrep.test.ts passed",
+            "typecheck completes without errors",
+            "lint-file-size.sh exits 0 with doctor.ts under its cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6: create src/cli/commands/doctor-semgrep.ts mirroring doctor-ollama.ts with checkSemgrep(options) and the exact rows in the PRD table (disabled, win32, missing, version mismatch, pin match, registry reachable, registry unreachable or 5 s timeout via AbortController + setTimeout), and wire it into doctor.ts with one import next to checkOllama (~36) and one loop line after the Ollama loop (~751). Test the timeout row with vi.useFakeTimers and advanceTimersByTimeAsync, never a real wait."
+        },
+        "items": [
+          {
+            "id": "doctor-semgrep.ac1",
+            "title": "Given security.semgrep.enabled is false, checkSemgrep returns an empty array and makes no fetch call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-semgrep.ac2",
+            "title": "Given the managed binary reports 1.180.0, checkSemgrep returns a 'Semgrep' row with status ok and message '1.180.0 (pinned)'; given 1.181.0 it returns status warn with fix 'pan sync'; given no binary it returns status error with fix 'pan sync'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-semgrep.ac3",
+            "title": "Given the registry HEAD request rejects or does not answer within 5 s (fake timers), checkSemgrep returns a 'Semgrep registry' row with status warn; given a 2xx answer it returns status ok",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-semgrep.ac4",
+            "title": "Given platform win32 with the feature enabled, checkSemgrep returns one warn row saying Semgrep support is Linux and macOS only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-semgrep",
+        "title": "Write the configuration/semgrep.mdx page and link it from docs.json and CLAUDE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:11:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4585",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/semgrep.mdx",
+            "docs.json",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'configuration/semgrep' docs.json",
+            "grep -cE '1.180.0|~/.overdeck/bin/semgrep|Windows|Sends code\\?|Semgrep Rules License' configuration/semgrep.mdx",
+            "grep -c 'configuration/semgrep.mdx' CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "docs.json grep prints 1",
+            "semgrep.mdx grep prints at least 5",
+            "CLAUDE.md grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-11",
+            "NFR-1",
+            "NFR-2",
+            "NFR-6",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7: create configuration/semgrep.mdx (frontmatter like jev.mdx) with sections What it is, Turn it on, What gets installed, pan doctor, Data egress, Licensing and Platforms, stating only phase-1 behavior and linking the child issues #4590-#4594 as planned work; add 'configuration/semgrep' after 'configuration/jev' in docs.json (~120); add the Semgrep row after the Jev row in the CLAUDE.md Topic Index."
+        },
+        "items": [
+          {
+            "id": "docs-semgrep.ac1",
+            "title": "configuration/semgrep.mdx shows the YAML block security.semgrep.enabled: true and states that a repo .pan.yaml cannot set security",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-semgrep.ac2",
+            "title": "configuration/semgrep.mdx contains a data egress table with an Action, Talks to and 'Sends code?' column whose install row names PyPI and whose doctor row names semgrep.dev",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-semgrep.ac3",
+            "title": "configuration/semgrep.mdx contains the pinned version 1.180.0, the path ~/.overdeck/bin/semgrep, a statement that Windows is unsupported, and the Semgrep Rules License note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-semgrep.ac4",
+            "title": "docs.json lists configuration/semgrep directly after configuration/jev, and the CLAUDE.md Topic Index contains a row linking configuration/semgrep.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-security-semgrep",
+        "to": "project-layer-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "config-security-semgrep",
+        "to": "install-entrypoints",
+        "type": "blocks"
+      },
+      {
+        "from": "config-security-semgrep",
+        "to": "prereq-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "config-security-semgrep",
+        "to": "doctor-semgrep",
+        "type": "blocks"
+      },
+      {
+        "from": "semgrep-install-module",
+        "to": "install-entrypoints",
+        "type": "blocks"
+      },
+      {
+        "from": "semgrep-install-module",
+        "to": "prereq-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "semgrep-install-module",
+        "to": "doctor-semgrep",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

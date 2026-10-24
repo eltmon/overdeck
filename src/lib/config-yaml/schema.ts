@@ -567,6 +567,7 @@ export interface YamlConfig {
   /** Local Ollama endpoint used by `ollama:<tag>` models (PAN-1641). */
   ollama?: YamlOllamaConfig;
   jev?: import('./jev.js').YamlJevConfig;
+  security?: import('./semgrep.js').YamlSecurityConfig;
 
   /** Conversation-specific configuration */
   conversations?: ConversationsConfig;
@@ -806,6 +807,7 @@ export interface NormalizedConfig {
   /** Local Ollama endpoint and the context window an Overdeck-started serve gets (PAN-1641). */
   ollama: NormalizedOllamaConfig;
   jev: import('./jev.js').NormalizedJevConfig;
+  security: import('./semgrep.js').NormalizedSecurityConfig;
 
   /** Enabled providers */
   enabledProviders: Set<ModelProvider>;

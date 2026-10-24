@@ -1,0 +1,586 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T10:30:20Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4609: Docs: explain what verification runs, why it is slow, and how to choose a project's local gates",
+    "updated": "2026-10-24T10:37:32.354Z"
+  },
+  "plan": {
+    "id": "pan-4609",
+    "title": "Docs: explain what verification runs, why it is slow, and how to choose a project's local gates",
+    "status": "running",
+    "uid": "b9ddbc46-5b62-4756-bb47-9ab2f8105709",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-24T10:30:20Z",
+    "updated": "2026-10-24T10:37:32.354Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4609",
+        "label": "PAN-4609",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4609.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docs",
+      "verification",
+      "quality-gates",
+      "cpu-admission"
+    ],
+    "metadata": {
+      "sizeJustification": "Four doc files, one subsystem (docs). The four PIPELINE-GATES.md items are a shared-mutation chain on one file.",
+      "canonicalFilename": "2026-10-24-PAN-4609-docs-explain-what-verification-runs-why-it-is-slow-and-how-to-choose-a-project-s-local-gates.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "docs/PIPELINE-GATES.md says verification runs a fixed 'typecheck, lint, test' list, never lists the real steps, and never explains the machine-wide CPU admission queue that made seven concurrent verifications take 50+ minutes each on 2026-10-24. configuration/projects.mdx does not document the quality_gates block. docs/CONFIGURATION.md repeats the stale fixed list. Nothing tells an operator which gates to keep locally when CI already runs them.",
+      "Proposal": "Docs-only change, written from the verified facts F1-F5 in .pan/drafts/PAN-4609.md. In docs/PIPELINE-GATES.md, rewrite the Verification Gate opening and add three subsections directly after it (before '### One full-suite run per push'): 'What a verification run does' (the 15 steps of runVerificationForIssueInProcess in code order), 'Why verification is slow' (admission thresholds, FIFO, per-gate re-queue, Vitest sharing the queue, nice -n 19, CPUWeight, logged times include queue wait, how to read worker logs), and 'Choosing a project's local gates' (keep what CI does not run; Overdeck example; CI FAILED tradeoff). Add a '### Quality gates' reference with all 12 QualityGateConfig keys to configuration/projects.mdx. Fix the stale sentence in docs/CONFIGURATION.md. Merge main, re-verify every citation with git grep, run npm run lint:docs.",
+      "NonGoals": "- No change to any source, test, script, role prompt, CI workflow or config file (src/, tests/, scripts/, roles/, .github/, projects.yaml).\n- No change to the tracked example projects.yaml text in src/lib/projects.ts.\n- No description of PAN-4546 or PAN-4531 internals beyond one sentence each.\n- No edit to the PAN-3965 bullets, the 'Agent Auto-Resume Gates' section, or any subsection another open PR (#4599, #4602, #4604, #4608) adds.\n- No instruction telling the reader to delete owner.json, waiter files or ~/.overdeck/verification-workers/.\n- No recommendation to remove an install gate; the docs state what it adds and leave the choice to the reader.\n- No OKF bundle (../overdeck-knowledge) edit."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The ordered step list follows runVerificationForIssueInProcess, not the issue's list (sync before test-skip; install step, AC gate and empty-changeset guard included).",
+        "rationale": "The issue's own acceptance requires the list to match the code; the code is the authority."
+      },
+      {
+        "summary": "New subsections go between the rewritten opening and '### One full-suite run per push, on CI (PAN-3965)'.",
+        "rationale": "Open PRs #4599/#4602/#4608 insert after line ~132 and #4604 edits the PAN-3965 bullets; lines 3-11 are untouched by all of them, so this placement avoids merge conflicts."
+      },
+      {
+        "summary": "Headings and anchors are pinned in the PRD (D3) so projects.mdx can link before the PIPELINE-GATES items land.",
+        "rationale": "Lets the projects.mdx item run in parallel with the PIPELINE-GATES chain."
+      },
+      {
+        "summary": "Cite functions, constants and grep anchors instead of bare line numbers.",
+        "rationale": "#4608 edits validation.ts and verification-runner.ts, so line numbers will drift before merge."
+      },
+      {
+        "summary": "Overdeck's own gate set is shown as an example of the maintainers' per-machine config, not as a repo fact.",
+        "rationale": "~/.overdeck/projects.yaml is not tracked; the acceptance requires every claim to cite something on main."
+      },
+      {
+        "summary": "docs/CONFIGURATION.md line 622 is corrected in this issue.",
+        "rationale": "It repeats the exact stale 'typecheck, lint' claim the issue removes from PIPELINE-GATES.md; leaving it would contradict the new text."
+      },
+      {
+        "summary": "The new 'Why verification is slow' text includes facts the issue omits: CPU utilization >= 0.75 also blocks admission, the 1.5 s settle re-sample, FIFO order, per-gate and per-retry re-queueing, agent-shell Vitest runs sharing the queue, CPUWeight=20, the 65-minute worker budget from first admission, and the merge-time second run.",
+        "rationale": "These are verified in code and each one explains part of the observed 50-minute runs."
+      }
+    ],
+    "items": [
+      {
+        "id": "w1-opening",
+        "title": "Rewrite the Verification Gate opening paragraph in PIPELINE-GATES.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T10:30:20Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'typecheck, lint, test' docs/PIPELINE-GATES.md; test $? -eq 1",
+            "grep -n '^## Verification Gate (PAN-174)$' docs/PIPELINE-GATES.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "first grep prints nothing and the test exits 0",
+            "the section heading is still present verbatim",
+            "lint:docs prints 'docs lint passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W1. In docs/PIPELINE-GATES.md replace the paragraph that starts '`pan done` runs quality gates (typecheck, lint, test) from `projects.yaml`' (lines 5-10) with the 'After' text in the PRD: a review request starts a verification run; the run executes the project's declared quality_gates in declaration order, or DEFAULT_GATES in cloister/validation.ts when none are declared, plus the diff and plan checks; a failure sends feedback and review does not start; keep the 'no separate stuck counter' sentence. Add a three-link list to the anchors pinned in PRD D3. Keep the '## Verification Gate (PAN-174)' heading text exactly the same."
+        },
+        "items": [
+          {
+            "id": "w1-opening.ac1",
+            "title": "When `grep -n 'typecheck, lint, test' docs/PIPELINE-GATES.md` runs, then it returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-opening.ac2",
+            "title": "The opening paragraph contains `quality_gates`, 'declaration order' and `DEFAULT_GATES`, and the '## Verification Gate (PAN-174)' heading line is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-opening.ac3",
+            "title": "The opening contains links to `#what-a-verification-run-does`, `#why-verification-is-slow` and `#choosing-a-projects-local-gates`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-run-steps",
+        "title": "Add the 'What a verification run does' subsection to PIPELINE-GATES.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T10:30:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '^### What a verification run does$' docs/PIPELINE-GATES.md",
+            "awk '/^### What a verification run does/{p=1} /^### One full-suite run per push/{p=0} p' docs/PIPELINE-GATES.md | grep -no 'syncSingleRepo\\|evaluateTestSkipGate\\|evaluatePlanIntegrityGate\\|runQualityGates\\|getXBriefACStatus\\|checkIncompletePlanItems\\|workspaceChangesetHasContent\\|deliverVerificationPass'",
+            "for s in runVerificationForIssueInProcess syncSingleRepo selectLocalVerificationGates evaluateTestSkipGate evaluatePlanIntegrityGate runQualityGates getXBriefACStatus checkIncompletePlanItems workspaceChangesetHasContent liftVerificationStuckPause deliverVerificationPass postOverdeckTestsStatus startRequestReviewPipeline triggerMerge createRequestReviewPipeline; do git grep -q \"$s\" -- src || echo MISSING $s; done",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading is found once, before the '### One full-suite run per push' line",
+            "the function names print in the order listed (sync first, deliverVerificationPass last)",
+            "the loop prints no MISSING line",
+            "lint:docs prints 'docs lint passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W2 using table F1. Insert '### What a verification run does' directly after the W1 opening and before '### One full-suite run per push, on CI (PAN-3965)'. Write a numbered list of F1 steps 0-14 in exactly the F1 order; each step is full prose, names its function in backticks, and names its failedCheck (sync-target-branch, test-skip, plan-integrity, the gate's name, test, vbrief-conflicts / vbrief-ac, incomplete-plan-items, empty-changeset) where one exists. State that step 4 (install and workspace_packages builds) is warn-only and not admission-gated. Then one paragraph: after a pass, createRequestReviewPipeline in cloister/request-review-pipeline.ts runs pushBranch then dispatchReview. Then one paragraph on the two doors: startRequestReviewPipeline (pan done, pan review request, PR webhook, deacon-lite) and triggerMerge (merge-verify, no target sync, skipped when CI is green on the exact tip, PAN-2487). Link the existing sections #test-skip-gate-pan-3847-pan-3906, #plan-integrity-gate-pan-1728, #verification-artifacts-fr-8 and #one-full-suite-run-per-push-on-ci-pan-3965 instead of repeating them."
+        },
+        "items": [
+          {
+            "id": "w2-run-steps.ac1",
+            "title": "docs/PIPELINE-GATES.md contains '### What a verification run does' located after the Verification Gate opening and before '### One full-suite run per push'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-run-steps.ac2",
+            "title": "The subsection shows `syncSingleRepo` before `evaluateTestSkipGate`, `evaluateTestSkipGate` before `runQualityGates`, `runQualityGates` before `checkIncompletePlanItems`, and `checkIncompletePlanItems` before `deliverVerificationPass`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-run-steps.ac3",
+            "title": "The subsection contains the failedCheck names `sync-target-branch`, `incomplete-plan-items`, `vbrief-ac` and `empty-changeset`, and names both `startRequestReviewPipeline` and `merge-verify` as doors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-run-steps.ac4",
+            "title": "When the MISSING loop in verify_commands runs, then it prints nothing (every cited function exists in src/)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-why-slow",
+        "title": "Add the 'Why verification is slow' subsection to PIPELINE-GATES.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T10:30:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "sec=$(awk '/^### Why verification is slow/{p=1;next} /^###? /{p=0} p' docs/PIPELINE-GATES.md); for t in '0.75' '25' 'nice -n 19' 'CPUWeight' 'tests/vitest-cpu-admission.ts' 'Queued for CPU admission' 'Admitted' 'worker-<runId>.log' 'state.json' 'PAN-4546' 'PAN-4531' 'acquireQualityGateAdmission'; do grep -qF \"$t\" <<<\"$sec\" || echo \"MISSING $t\"; done",
+            "for s in QUALITY_GATE_CPU_START_THRESHOLD QUALITY_GATE_PSI_SOME_AVG10_START_THRESHOLD QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD QUALITY_GATE_ADMISSION_SETTLE_MS QUALITY_GATE_ADMISSION_STALE_MS GATE_TIMEOUT_MS MAX_RUN_MS buildVerificationWorkerLaunch sampleQualityGatePressure; do git grep -q \"$s\" -- src || echo MISSING $s; done",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the first loop prints no MISSING line",
+            "the second loop prints no MISSING line",
+            "lint:docs prints 'docs lint passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W3 using facts F2, F3 and F4. Insert '### Why verification is slow' directly after the W2 subsection. Cover, in this order: (1) one machine-wide admission holder, FIFO waiters, a separate admission for every gate and every retry attempt; (2) the pressure rule: CPU utilization >= 0.75, or PSI some avg10 >= 25, or (only without PSI) load per core >= 1, plus the 1 s poll and the 1.5 s settle re-sample that gives the slot back; (3) direct agent-shell Vitest runs share the queue via the tests/vitest-cpu-admission.ts globalSetup (30-minute max wait; skipped when OVERDECK_GATE_ADMITTED=1, OVERDECK_GATE_ADMISSION=0 or CI is set); (4) local gates run under nice -n 19 and the worker runs in a systemd scope with CPUWeight=resources.verification_cpu_weight (default 20); (5) the 'passed (Nms)' time and artifact durationMs include queue wait and retries because runQualityGates takes startTime before acquireQualityGateAdmission; (6) limits: 20-minute per-attempt GATE_TIMEOUT_MS, 65-minute MAX_RUN_MS counted from first admission, stale holder cleared after 25 minutes or a dead pid (no manual deletion); (7) the ungated install step and the second run at merge time; (8) the PAN-4546 / PAN-4531 sentence exactly per PRD D9 (if either PR has merged and added its own paragraph, link it). End with a 'Reading the logs' part: the path ~/.overdeck/verification-workers/<issue>/worker-<runId>.log, a fenced text example of the Queued / Admitted / passed lines, how to compute queue time and run time from them, the state.json fields phase, admittedAt, currentGate, currentAttempt, and the admission/ directory (owner.json = holder, waiter-*.json = queue)."
+        },
+        "items": [
+          {
+            "id": "w3-why-slow.ac1",
+            "title": "The subsection contains the thresholds 0.75 and 25, the strings 'nice -n 19' and 'CPUWeight', and states that each gate and each retry requests admission separately",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-why-slow.ac2",
+            "title": "The subsection contains `tests/vitest-cpu-admission.ts` and the statement that agent-shell Vitest runs wait in the same queue as verification gates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-why-slow.ac3",
+            "title": "The subsection states that the logged 'passed' time includes queue wait and shows a fenced example containing 'Queued for CPU admission', 'Admitted' and a '✓ … passed (…ms)' line, with the path worker-<runId>.log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-why-slow.ac4",
+            "title": "The subsection contains one sentence each linking PAN-4546 and PAN-4531 and contains no instruction to delete owner.json, waiter files or the verification-workers directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-why-slow.ac5",
+            "title": "When both MISSING loops in verify_commands run, then they print nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-choosing-gates",
+        "title": "Add the 'Choosing a project's local gates' subsection to PIPELINE-GATES.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T10:30:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "sec=$(awk '/^### Choosing a project.s local gates/{p=1;next} /^###? /{p=0} p' docs/PIPELINE-GATES.md); for t in 'typecheck:frontend' 'server bundle' 'tsc' 'CI FAILED' 'frozen-lockfile' 'ci-failure-feedback'; do grep -qF \"$t\" <<<\"$sec\" || echo \"MISSING $t\"; done",
+            "grep -n 'build:dashboard:server:bundle\\|build:dashboard:frontend' scripts/build-post-cli.mjs",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the loop prints no MISSING line",
+            "both build scripts are listed in build-post-cli.mjs",
+            "lint:docs prints 'docs lint passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W4 using fact F5. Insert '### Choosing a project's local gates' directly after the W3 subsection and before '### One full-suite run per push, on CI (PAN-3965)'. Write: (1) the rule — a local gate that repeats a required CI check only repeats it under the single admission slot; keep locally what CI does not run or what must fail before review starts; (2) the maintainers' Overdeck gate set as a YAML fence (install: bun install --frozen-lockfile; typecheck: npm run typecheck; test: changed-file vitest with retry: 1, deferred to CI in ci mode), labelled as the per-machine projects.yaml the maintainers run (PRD D6); (3) why lint, build, frontend-typecheck and server-bundle were dropped: npm run build runs scripts/build-post-cli.mjs, which includes build:dashboard:server:bundle (the server bundle) and build:dashboard:frontend (strict tsc && vite build); npm run typecheck already includes typecheck:frontend, which is a baseline ratchet (scripts/lint-frontend-types.sh), not the strict build tsc; CI's build, lint-group and test jobs run them; (4) the install note per PRD D7: the runner's built-in install is warn-only, so an install gate adds a failing lockfile check; (5) the tradeoff: a lint or build failure then appears as a red CI check after review starts; relayCiFailureFeedbackInQueue in cloister/ci-failure-feedback.ts sends a live work agent a plain 'CI FAILED' message, it is not counted against VERIFICATION_MAX_CYCLES, and the merge gate still requires the checks green."
+        },
+        "items": [
+          {
+            "id": "w4-choosing-gates.ac1",
+            "title": "The subsection contains a YAML fence with the gates install, typecheck and test, and labels it as the maintainers' per-machine configuration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-choosing-gates.ac2",
+            "title": "The subsection states that npm run build covers the server bundle and the frontend's strict tsc, and that typecheck:frontend is a ratchet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-choosing-gates.ac3",
+            "title": "The subsection contains the tradeoff: lint/build failures arrive as a 'CI FAILED' message after review starts and do not count against the verification attempt budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-projects-mdx",
+        "title": "Add the quality_gates reference to configuration/projects.mdx",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T10:30:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/projects.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "sec=$(awk '/^### Quality gates$/{p=1;next} /^###? /{p=0} p' configuration/projects.mdx); for k in command path required env phase type url wait expect_status container container_name retry DEFAULT_GATES; do grep -qF '`'\"$k\"'`' <<<\"$sec\" || echo \"MISSING $k\"; done",
+            "grep -c 'blob/main/docs/PIPELINE-GATES.md#' configuration/projects.mdx",
+            "grep -n '| `quality_gates` |' configuration/projects.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the loop prints no MISSING line",
+            "the count is 3 or more",
+            "the Configuration Fields table has a quality_gates row",
+            "lint:docs prints 'docs lint passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W5. In configuration/projects.mdx: (1) add a '| `quality_gates` | No | … |' row after the verification.tests row in the Configuration Fields table, linking #quality-gates; (2) add '### Quality gates' after the '*Not required if …' footnote and before '### Separate the issue tracker from the code host'. It contains: a paragraph (map of gates run in declaration order; DEFAULT_GATES typecheck/lint/test when absent; the gate named test is skipped in ci tests mode); a table of all 12 QualityGateConfig keys from src/lib/workspace-config.ts with the defaults listed in the PRD (required true, phase pre_push, type command, wait 120, expect_status 200, retry 0); a paragraph on {{CHANGED_BASE}} / {{FEATURE_FOLDER}} / {{WORKSPACE_PATH}} placeholders and the gate env scrub (OVERDECK_* dropped except OVERDECK_HOME; API_PORT, PORT, DASHBOARD_URL dropped unless set in env; SKIP_DOCS_INDEX=1), linking https://github.com/eltmon/overdeck/blob/main/docs/CONFIGURATION.md#change-scoped-verification-gates; a fenced YAML example with a command gate, a path gate, a container gate and a retry gate; and absolute links to https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#what-a-verification-run-does, #why-verification-is-slow and #choosing-a-projects-local-gates. This page is published: keep every $ inside a fence or inline code and never put < directly before a digit."
+        },
+        "items": [
+          {
+            "id": "w5-projects-mdx.ac1",
+            "title": "configuration/projects.mdx contains '### Quality gates' and its table names all 12 keys: command, path, required, env, phase, type, url, wait, expect_status, container, container_name, retry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-projects-mdx.ac2",
+            "title": "The section shows the defaults required true, phase pre_push, wait 120, expect_status 200, retry 0 and contains a fenced YAML example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-projects-mdx.ac3",
+            "title": "The page contains at least three absolute links to blob/main/docs/PIPELINE-GATES.md anchors and a quality_gates row in the Configuration Fields table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-projects-mdx.ac4",
+            "title": "When `npm run lint:docs` runs, then it exits 0 with no projects.mdx dollar-sign or '<digit' error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-configuration-md",
+        "title": "Replace the stale 'typecheck, lint' sentence in docs/CONFIGURATION.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-10-24T10:30:20Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONFIGURATION.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'runs typecheck, lint' docs/CONFIGURATION.md; test $? -eq 1",
+            "grep -n 'PIPELINE-GATES.md#what-a-verification-run-does' docs/CONFIGURATION.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "first grep prints nothing and the test exits 0",
+            "the new link is found in the 'Tests on CI' section",
+            "lint:docs prints 'docs lint passed'"
+          ],
+          "readiness": "ready",
+          "acJustification": "A one-sentence edit; two criteria cover it.",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W6. In docs/CONFIGURATION.md, section '### Tests on CI (`verification.tests`)', change 'the verification gate runs typecheck, lint, and the project's other non-`test` gates' to 'the verification gate runs the project's declared non-`test` gates' and add a link to [What a verification run does](PIPELINE-GATES.md#what-a-verification-run-does). Change nothing else in the file."
+        },
+        "items": [
+          {
+            "id": "w6-configuration-md.ac1",
+            "title": "When `grep -n 'runs typecheck, lint' docs/CONFIGURATION.md` runs, then it returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-configuration-md.ac2",
+            "title": "The 'Tests on CI' section contains a link to PIPELINE-GATES.md#what-a-verification-run-does",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-merge-verify",
+        "title": "Merge main, re-verify every citation, and run the docs lint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T10:30:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "configuration/projects.mdx",
+            "docs/CONFIGURATION.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "git fetch origin main && git merge-base --is-ancestor origin/main HEAD && echo MERGED",
+            "git diff --name-only origin/main...HEAD | grep -v '^\\.pan/\\|^\\.overdeck/' ",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "prints MERGED",
+            "lists only docs/PIPELINE-GATES.md, configuration/projects.mdx and docs/CONFIGURATION.md",
+            "lint:docs prints 'docs lint passed'"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W7. Run `git fetch origin && git merge origin/main` (never rebase onto a different branch, never git stash). Resolve any conflict in docs/PIPELINE-GATES.md by keeping both sides' text: other open PRs (#4599, #4602, #4604, #4608) add subsections after the PAN-3965 text; keep them verbatim. After the merge, re-read verification-runner.ts and validation.ts on the merged tree: if #4608 (PAN-4531) landed and added shouldStop checks or a 'A decided run stops before its next gate' subsection, make the W3 sentence link that subsection rather than restate it, and make sure the W2 step order still matches the code. For every backticked function, constant or path the new text names, run `git grep -n '<name>' -- src tests scripts package.json .github` and fix the text for any that no longer exist. Then run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "w7-merge-verify.ac1",
+            "title": "When `git merge-base --is-ancestor origin/main HEAD` runs after the merge, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-merge-verify.ac2",
+            "title": "`git diff --name-only origin/main...HEAD`, excluding .pan/ and .overdeck/, returns only docs/PIPELINE-GATES.md, configuration/projects.mdx and docs/CONFIGURATION.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-merge-verify.ac3",
+            "title": "Every subsection that open PRs #4599, #4602, #4604 or #4608 added to docs/PIPELINE-GATES.md on main survives the merge unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-merge-verify.ac4",
+            "title": "When `npm run lint:docs` runs on the merged tree, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-opening",
+        "to": "w2-run-steps",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-run-steps",
+        "to": "w3-why-slow",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-why-slow",
+        "to": "w4-choosing-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-choosing-gates",
+        "to": "w7-merge-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-projects-mdx",
+        "to": "w7-merge-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "w6-configuration-md",
+        "to": "w7-merge-verify",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

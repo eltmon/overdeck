@@ -112,6 +112,7 @@ function isPlanApprovalPending(feature: ProjectFeature): boolean {
 export function isNeedsYouFeature(feature: ProjectFeature, derived: DerivedIssueState | undefined): boolean {
   if (derived?.attention === 'needs-you') return true;
   if (derived?.attention === 'work-not-started') return true;
+  if (derived?.attention === 'pr-outside-pipeline') return true;
   if (derived?.state === 'ready') return true;
   if (feature.sessions?.some(session => session.type === 'planning' && session.awaitingInput)) return true;
   // The membership resolver distinguishes a real planned backlog from terminal
@@ -233,6 +234,7 @@ export function sublineFor(entry: BucketedFeature): string {
     : null;
 
   if (isNeedsYouFeature(feature, derived)) {
+    if (derived?.attention === 'pr-outside-pipeline') return `review never started — ${derived.prOutsidePipeline?.fix ?? 'run pan review request'}`;
     if (derived?.attention === 'work-not-started') {
       return `work agent not started — ${derived.workStart?.error ?? 'run pan start'}`;
     }

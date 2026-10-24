@@ -2,12 +2,187 @@
 
 ## Verification Gate (PAN-174)
 
-`pan done` runs quality gates (typecheck, lint, test) from `projects.yaml`
-before opening or updating the PR and requesting review. If a gate fails,
-feedback goes to the agent's session and the command refuses to proceed, so
-the agent can fix and retry. There is no separate stuck counter stored on a
-record — a run that keeps failing is visible directly in the PR's check
-history.
+A review request (`pan done`, `pan review request`, the PR webhook) starts a
+verification run before the review convoy. The run executes the quality gates
+the project declares under `quality_gates` in `projects.yaml`, in declaration
+order (or `DEFAULT_GATES` in `cloister/validation.ts` when the project declares
+none), plus the diff and plan checks listed below. If any check fails, feedback
+goes to the work agent and review does not start, so the agent can fix and
+retry. There is no separate stuck counter stored on a record — a run that keeps
+failing is visible directly in the PR's check history.
+
+- [What a verification run does](#what-a-verification-run-does)
+- [Why verification is slow](#why-verification-is-slow)
+- [Choosing a project's local gates](#choosing-a-projects-local-gates)
+
+### What a verification run does
+
+`runVerificationForIssueInProcess` (`src/lib/cloister/verification-runner.ts`)
+runs these steps in order. Each step that fails returns early with the named
+`failedCheck`; later steps do not run.
+
+0. Skip the run if the PR already merged, or if this head already used its
+   `VERIFICATION_MAX_CYCLES` (3) attempts (outcome `skipped`, no `failedCheck`).
+1. Snapshot the head for the test-skip waiver.
+2. Merge the target branch into each repo root (`syncSingleRepo`), unless the
+   project sets `syncTargetBranch: false` — `failedCheck: sync-target-branch`.
+3. Pick the gates to run: the project's declared `quality_gates`, or
+   `DEFAULT_GATES` when it declares none; drop the gate named `test` in `ci`
+   tests mode (`selectLocalVerificationGates`).
+4. Non-polyrepo only: run the package manager's install (60 s timeout) and
+   each `workspace_packages[].build_command` (30 s timeout). Warn-only — a
+   failure here is logged, not a `failedCheck`, and does not block the run.
+5. Run the test-skip diff check (`evaluateTestSkipGate`) — `failedCheck:
+   test-skip`. See [Test-skip gate](#test-skip-gate-pan-3847-pan-3906).
+6. If step 5 passed, run the plan-integrity check (`evaluatePlanIntegrityGate`)
+   — `failedCheck: plan-integrity`. See
+   [Plan-integrity gate](#plan-integrity-gate-pan-1728).
+7. Run each declared `pre_push` gate in declaration order (`runQualityGates`);
+   the first failing *required* gate stops the loop and its name becomes the
+   `failedCheck`.
+8. In `ci` tests mode, if the CI test job already failed on this head, record
+   a failed `test` result — `failedCheck: test`.
+9. A gate that could not run at all (a missing container, Docker down) defers
+   the run without counting an attempt against it, rather than failing it.
+10. Write the per-run verification artifact and `verification-latest.json`
+    (see [Verification artifacts](#verification-artifacts-fr-8)); on a gate
+    failure, post a failed check run and send feedback to the work agent.
+11. Run the acceptance-criteria check on the xBRIEF (`getXBriefACStatus`) —
+    `failedCheck: vbrief-conflicts` or `vbrief-ac`.
+12. Run the plan checklist check (`checkIncompletePlanItems`) —
+    `failedCheck: incomplete-plan-items`.
+13. Run the empty-changeset guard, which catches a changeset that touched only
+    `.pan/` task state — `failedCheck: empty-changeset`.
+14. On a full pass: post a success check run, lift any verification-stuck
+    pause, journal `verification.passed`, deliver the pass to the work agent
+    (`deliverVerificationPass`), and report `overdeck/test` as success.
+
+After a pass, `createRequestReviewPipeline`
+(`src/lib/cloister/request-review-pipeline.ts`) pushes the branch
+(`pushBranch`) and dispatches the review convoy (`dispatchReview`).
+
+Verification starts from two doors: `startRequestReviewPipeline`
+(`src/dashboard/server/routes/workspaces/review-pipeline.ts`), reached by
+`pan done`, `pan review request`, the PR webhook, and deacon-lite; and
+`triggerMerge` (`src/dashboard/server/routes/workspaces/merge-ops.ts`, log
+prefix `merge-verify`), which runs the same checks again at merge time with no
+target-branch sync, skipped when CI is already green on the exact tip commit
+(PAN-2487). So one issue's gates can run twice.
+
+### Why verification is slow
+
+- **One machine-wide slot.** `acquireQualityGateAdmission`
+  (`src/lib/cloister/quality-gate-admission.ts`) lets one gate attempt run at a
+  time across every issue and every agent shell on the host, served FIFO.
+  Each gate re-queues for admission separately, and `retry: N` means up to
+  N + 1 separate waits for that one gate — seven concurrent runs with three
+  gates each wait behind roughly 21 admissions.
+- **The pressure rule.** Before granting the slot, the admission queue samples
+  the host: it is pressured when CPU utilization is at or above `0.75`, or
+  when PSI `some avg10` is at or above `25`, or — only when PSI is
+  unavailable — when 1-minute load per core is at or above `1`. If not
+  pressured, it writes the holder record, waits 1.5 seconds, and samples
+  again; if the host is pressured on that second look, it gives the slot back
+  and keeps waiting.
+- **Agent shells share the queue.** Both `vitest.config.ts` and
+  `src/dashboard/frontend/vitest.config.ts` load
+  `tests/vitest-cpu-admission.ts` as `globalSetup`, which calls
+  `acquireQualityGateAdmission` for a gate named `vitest` unless the process
+  already has `OVERDECK_GATE_ADMITTED=1` or `OVERDECK_GATE_ADMISSION=0`, or
+  `CI` is set. An agent's own `npx vitest run <files>` therefore competes with
+  every verification run for the same single slot.
+- **Gates yield CPU.** Local host gates run as `nice -n 19`, and the whole
+  verification worker runs under a systemd user scope with `CPUWeight=20`
+  (default), so gates run slower when the dashboard or other agents are busy.
+- **Logged times include the queue wait.** `runQualityGates` records the
+  start time before calling `acquireQualityGateAdmission`, so both the
+  `✓ "<name>" passed (<N>ms)` log line and the artifact's `durationMs` cover
+  queue time plus every retry, not just the command's own run time.
+- **Limits.** Each gate attempt has a 20-minute timeout, with a process-group
+  watchdog 30 seconds after that. The whole verification worker has a
+  65-minute budget counted from its first admission, not from launch — time
+  spent queued before that first admission does not use the budget. A holder
+  record older than 25 minutes, or one whose process has died, is cleared
+  automatically.
+- **Other time in the run.** The install and `workspace_packages` build steps
+  (see [What a verification run does](#what-a-verification-run-does), step 4)
+  are not admission-gated but still take wall-clock time; and the gates can
+  run a second time at merge, adding another pass through the queue.
+- **Changes to admission.** PAN-4546 allows two concurrent admission slots;
+  PAN-4531 stops a run whose outcome is already decided before its next gate.
+  Each change documents itself where it lands.
+
+**Reading the logs.** Each worker writes
+`~/.overdeck/verification-workers/<issue>/worker-<runId>.log` (issue id
+lowercased):
+
+```text
+[quality-gate] Queued for CPU admission: PAN-1234 gate="typecheck" attempt=1/1 workspace=/…/workspaces/feature-pan-1234
+[quality-gate] Admitted: PAN-1234 gate="typecheck" attempt=1/1 workspace=/…
+[quality-gate] ✓ "typecheck" passed (912345ms)
+```
+
+The gap between `Queued` and `Admitted` is queue wait; the gap between
+`Admitted` and `passed` is close to the command's own run time. The sibling
+`state.json` carries `phase` (`queued` or `running`), `admittedAt`,
+`currentGate`, and `currentAttempt`. The admission directory itself,
+`~/.overdeck/verification-workers/admission/`, holds `owner.json` for the
+current holder and one `waiter-*.json` per queued attempt.
+
+### Choosing a project's local gates
+
+When CI already runs a check as a required PR check, a local gate for that
+same check only repeats it under the single machine-wide admission slot (see
+[Why verification is slow](#why-verification-is-slow)) — it adds queue time
+without catching anything CI would not catch anyway. Keep locally what CI
+does not run, or what must fail before review ever starts.
+
+The configuration the Overdeck maintainers run (per-machine
+`~/.overdeck/projects.yaml`, not tracked in this repo) is an example of
+applying that rule:
+
+```yaml
+panopticon-cli:
+  quality_gates:
+    install:
+      command: bun install --frozen-lockfile
+      required: true
+    typecheck:
+      command: npm run typecheck
+      required: true
+    test:
+      # Changed-file Vitest, root + frontend; deferred to CI in `ci` tests mode.
+      command: >
+        OVERDECK_VERIFICATION=1 npx vitest run --changed {{CHANGED_BASE}} &
+        r=$!; (cd src/dashboard/frontend && OVERDECK_VERIFICATION=1 npx vitest
+        run --changed {{CHANGED_BASE}}) & f=$!; rc=0; wait $r || rc=1; wait $f
+        || rc=1; exit $rc
+      retry: 1
+```
+
+`lint`, `build`, the frontend's strict typecheck, and the server bundle build
+were dropped from that list, not because they do not matter, but because CI
+already runs the equivalent of each one as a required check: `npm run build`
+already runs `build:dashboard:server:bundle` and the frontend's strict `tsc`,
+and `npm run typecheck` already runs `typecheck:frontend` — though
+`typecheck:frontend` is a baseline ratchet (the error count may not grow), not
+the strict zero-error check `build:dashboard:frontend`'s `tsc` runs, so the two
+are not the same check. CI's `build` and `lint` jobs run both.
+
+An `install` gate such as `bun install --frozen-lockfile` is worth keeping
+even though the runner always installs dependencies on its own: that built-in
+install is warn-only (see
+[What a verification run does](#what-a-verification-run-does), step 4), so an
+explicit `install` gate is what turns a stale or broken lockfile into a real
+failure instead of a log warning.
+
+The tradeoff: dropping a local `lint` or `build` gate means a lint or build
+failure no longer blocks review from starting. It instead shows up after
+review has already begun, as a red CI check — delivered to a live work agent
+as a plain "CI FAILED" message, not counted against the verification attempt
+budget. The merge gate still requires that check to go green before the PR
+can merge, so nothing merges broken; it only changes when in the pipeline the
+failure surfaces.
 
 ### One full-suite run per push, on CI (PAN-3965)
 
@@ -219,6 +394,20 @@ Work agents run only the tests they touched (the work prompt names
 `npx vitest run <files>` only in a vitest project, and says "the suite runs on
 CI" only in a CI-mode project); reviewers never run the suite — they read the
 CI result on the head (`gh pr checks <pr>`) where tests run on CI.
+
+### CPU admission (PAN-4311, PAN-4546)
+
+Before each local gate starts, it waits in a machine-wide FIFO queue under
+`~/.overdeck/verification-workers/admission/`. Direct local Vitest runs join
+the same queue. Up to `resources.quality_gate_slots` gates hold admission at
+once (default 2; set it in the global `~/.overdeck/config.yaml`, because a
+project `.pan.yaml` value is ignored). A gate is admitted only when its CPU
+sample is unpressured both before and 1.5 s after it takes its slot:
+utilization below 75 %, and CPU PSI `some avg10` below 25, or load per core
+below 1 where PSI is unavailable. Under pressure, new gates wait while running
+gates keep their slots; nothing is preempted. The file layout and stale-owner
+reclaim are described in the CPU-pressure bullet of
+[Agent Auto-Resume Gates](#agent-auto-resume-gates).
 
 ## Verification artifacts (FR-8)
 
@@ -504,8 +693,12 @@ reads that answer for the head in the PR listing (`headRefOid`); a miss or an
 answer for another head derives `in-review`, never `ready`. A changed answer
 re-derives the issue and reaches the board as `issue_state.changed`. No forge
 read is added and the frontend does not poll. A PR held for UAT is not gated by
-the scheduler, so its button appears once some gate evaluation or marker read
-has proven it; the Merge endpoint itself always asks the gate. Conditions 3 and
+the scheduler. Since PAN-4597 the approval refresher
+(`services/approval-at-head-refresh.ts`) asks the gate on the same 60-second
+tick for every PR the forge reports approved, green and mergeable. It asks again
+before the answer expires, so the button appears within about a minute and stays
+until the PR merges, its head moves, or a check goes red. The Merge endpoint
+itself always asks the gate. Conditions 3 and
 4 still surface as the refusal when the button is clicked. The UAT train's
 candidate set (`listReadyIssuesForProject`) keeps the forge's own decision: it
 is mostly held issues the scheduler never gates. Promoting a UAT batch lands
@@ -990,7 +1183,17 @@ Auto-resume is intentionally suppressible:
   `cpu-pressure sample` calibration line (PSI some avg10/avg60, load per core)
   to `~/.overdeck/logs/deacon.log` every 5 minutes. Quality-gate admission
   (`quality-gate-admission.ts`) treats the host as contended at PSI `some
-  avg10 >= 25`, with load per core `>= 1` as the fallback.
+  avg10 >= 25`, with load per core `>= 1` as the fallback. Admission has
+  `resources.quality_gate_slots` slots (default 2, read from the global
+  config only): slot 0 is `owner.json` and slot *i* is `slot-<i>.json`.
+  Waiters stay FIFO, and the head takes the lowest free slot only while fewer
+  than that many slot files are held. Every slot needs an unpressured sample
+  and a settle re-check, so under pressure new gates wait while running gates
+  keep their slots (nothing is preempted). A stale owner (dead pid or older
+  than 25 minutes) is reclaimed per slot through that slot's breaker file.
+  Ticket and owner files are published atomically (written to a temp file,
+  then hard-linked into place), and a waiter whose ticket disappears
+  recreates it in place with its original queue position (PAN-4610).
 - **Runaway processes (PAN-4311):** the runaway patrol
   (`cloister/runaway-process-patrol.ts`, classifier `runaway-classify.ts`)
   runs every 30 s in the dashboard main process and is observe-only: it
@@ -1004,8 +1207,8 @@ Auto-resume is intentionally suppressible:
   its agent idle or its harness gone), or `long-burn` (age >= 30 min).
   Never flagged: harness processes and their pane shells, Herdr, tmux, the
   dashboard, Docker/containerd cgroups, gate-shaped groups (leader at nice
-  19, younger than the 20.5-minute gate watchdog), and the quality-gate
-  admission owner with its descendants. Ownership resolves from the
+  19, younger than the 20.5-minute gate watchdog), and every quality-gate
+  admission slot owner with its descendants. Ownership resolves from the
   process's environ (`OVERDECK_CONVERSATION`, `OVERDECK_AGENT_ID`), then an
   ancestor's environ, then the cgroup unit, then a `workspaces/feature-*`
   cwd. The feed gets one `warn` per group (naming `kill -TERM -<pgid>`),
@@ -1209,6 +1412,8 @@ One piece of stored pipeline state came back, and it is not a status.
 | `operator.decision-requested` | `pan ask` (`src/cli/commands/ask.ts`), when a work agent needs an operator decision |
 | `operator.decision-answered` | the dashboard answer route, a delivered dashboard message, or a delivered `pan tell` to the asking agent |
 | `operator.decision-withdrawn` | `pan ask --withdraw` |
+| `workspace.adopted` | `cloister/pr-workspace-adoption.ts` `adoptPrWorkspace`, after it creates the pipeline workspace on an outside PR's head (`data.prNumber`, `headSha`, `repo`) |
+| `workspace.adoption-failed` | the same function, when a failure leaves a workspace behind; also `cloister/pr-adoption-review.ts` when the review does not start after a successful adoption (`data.reason`, `detail`, `fix`) |
 
 `pan show <id>` prints the last six entries under the derived state; `--json`
 carries the whole journal.
@@ -1249,6 +1454,74 @@ subline naming the recorded error. The Needs-you strip's "Start work" card
 (`NeedsYouStrip.tsx`) shows the same "Work agent not started" label and error
 text in place of the generic "Plan ready" card, with its existing Start work
 button (`POST /api/agents`) unchanged.
+
+### A PR opened outside a pipeline workspace (PAN-4605)
+
+The review pipeline runs in the issue's `workspaces/feature-<issue>` worktree.
+A PR pushed from anywhere else, usually a supervised `pan handoff --cwd`
+worktree, used to get `no-workspace` from the review starter and nothing
+else: it was never verified or reviewed, and nobody was told. Now the
+webhook (`handlePullRequest` in `src/lib/webhook-handlers.ts`) hands that PR
+to `adoptPrAndStartReview` (`cloister/pr-adoption-review.ts`), which adopts
+the branch into a pipeline workspace and then starts the review.
+
+Adoption (`cloister/pr-workspace-adoption.ts`) takes only the exact branch
+`feature/<issue>` (case-sensitive) and only at the head the PR reports. A
+PR with no head commit in the payload is refused (`head-unknown`). Every
+check runs in git before `createWorkspace`, in this order:
+
+1. Fetch `+refs/heads/<branch>:refs/remotes/origin/<branch>` and compare the
+   fetched ref to the PR head. A mismatch refuses (`head-moved`).
+2. Run `git worktree prune`, then refuse when another worktree has the branch
+   checked out (`checked-out-elsewhere`).
+3. Reconcile the local branch. When it is absent, create it at the verified
+   remote ref with tracking. When it equals the PR head, use it. When it is a
+   strict ancestor, fast-forward it with a compare-and-swap `git update-ref`.
+   Otherwise refuse (`local-branch-diverged`), because it may hold unpushed
+   work.
+4. Create the workspace, then assert that its HEAD and current branch match
+   the PR (`workspace-head-mismatch`).
+
+Adoption never pushes, forces, deletes a branch or removes a worktree, and it
+removes nothing after a mismatch: `removeWorktree` and `removeWorkspace` run
+`git branch -D`, which would destroy unpushed commits. Polyrepo projects are
+refused (`polyrepo`); the fix tells the operator to run
+`pan workspace create <ID>` by hand. Adoption is coalesced per issue, so an
+`opened` and `ready_for_review` pair, a redelivery, or `pan review request`
+racing the webhook share one attempt. `createWorktree` also fetches the
+feature branch before it decides whether the branch exists, so
+`pan workspace create` checks out an existing remote branch instead of
+cutting a same-named branch from `main`.
+
+The derived attention `pr-outside-pipeline` makes a refusal visible. It holds
+while an open, non-draft PR on the exact pipeline branch exists for an open
+issue and either no pipeline workspace exists or the workspace journal's last
+entry is `workspace.adoption-failed`. It carries
+`prOutsidePipeline: { prNumber, fix, worktreePath? }`
+(`overdeck/pr-outside-pipeline.ts`). It outranks `stuck` and `work-not-started`;
+`needs-you` and `api-error` still outrank it. Once a workspace exists, a
+later `review.requested` in its journal clears it. The fix has two forms. When another worktree holds the branch:
+"PR #<n> (<branch>) is checked out in <path>, so Overdeck cannot create the
+pipeline workspace … run `git -C <project> worktree remove <path>`, then
+`pan review request <ID>`." Otherwise: "PR #<n> (<branch>) was opened outside
+a pipeline workspace … Run `pan review request <ID>` to adopt the branch into
+a workspace and start verification." Each refusal is also announced once on
+the activity stream. The webhook calls `refreshIssuePullRequestStateNow` on
+`opened`, `reopened`, `ready_for_review` and `closed`, so the cached PR
+listing does not hide a just-opened PR for five minutes.
+
+`pan review request` adopts too. The `/api/review/:issueId/request` route
+asks `answerMissingWorkspace` right after it reads the derived state, before
+the approved-head force and nudge shortcuts and `requestReviewGuarded`. With
+no workspace and an open pipeline-branch PR it starts adoption in the
+background and answers 202. A forge failure answers 503, never "no PR". With
+no PR it answers 400 with a hint to run `pan start` or
+`pan workspace create`. A merged issue skips the check.
+
+Command Deck groups the attention into Needs you with the subline
+"review never started — <fix>" and the state badge "Review never started",
+whose tooltip is the fix. `pan show <id>` prints the fix on a `fix` line, and
+`--json` carries `prOutsidePipeline`.
 
 ## Operator decisions (PAN-4383)
 

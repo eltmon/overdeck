@@ -1,0 +1,76 @@
+{
+  "version": "1",
+  "issueId": "PAN-4597",
+  "created": "2026-10-24T10:43:53.166Z",
+  "updated": "2026-10-24T10:51:15.717Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-24T10:43Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-10-24T10:43:53.168Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-10-24T10:43:53Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4597 (attempt 1/3):\n\nFailed check: vbrief-ac\n\nAcceptance criteria check FAILED — 8/8 AC incomplete:\n\n### Expose the gate answer's refresh age in approval-at-head (2/2 incomplete)\n  - [ ] Given a gate answer recorded at the head, when less than GATE_ANSWER_REFRESH_AFTER_MS has passed, then approvalAtHeadNeedsRefresh returns false\n  - [ ] Given a gate answer older than GATE_ANSWER_REFRESH_AFTER_MS or for another head, when asked, then approvalAtHeadNeedsRefresh returns true\n\n### List a project's open PRs and MRs by issue (2/2 incomplete)\n  - [ ] Given a GitHub project, when listOpenPullRequestsForProject runs, then it returns open non-draft PRs keyed by the issue in their feature branch\n  - [ ] Given a GitLab project, when listOpenPullRequestsForProject runs, then it reads the merge request listing instead of gh\n\n### Refresh gate answers for approved green PRs on the UAT-train tick (2/2 incomplete)\n  - [ ] Given an approved green mergeable PR and ticks every minute, when 12 minutes pass, then the issue still derives ready\n  - [ ] Given two ticks inside the refresh window for the same head, when the tick runs, then the gate is asked once\n\n### Document what makes a PR ready (2/2 incomplete)\n  - [ ] Given docs/MERGE-WORKFLOW.md, when read, then it lists the conditions for derived ready\n  - [ ] Given docs/MERGE-WORKFLOW.md, when read, then it describes the approval refresher and its refresh window\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed task with `pan task close` — the canonical writer publishes the close and AC statuses sync automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request PAN-4597 -m \"Completed acceptance criteria\"\n\nDo NOT resubmit until all AC are completed."
+    }
+  ],
+  "items": {
+    "approval-refresh-accessor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:47:50.299Z"
+    },
+    "approval-refresh-accessor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:48:06.176Z"
+    },
+    "open-pr-listing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:48:22.141Z"
+    },
+    "open-pr-listing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:48:39.077Z"
+    },
+    "approval-refresh-tick.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:48:56.415Z"
+    },
+    "approval-refresh-tick.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:49:13.158Z"
+    },
+    "docs-ready-definition.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:49:34.577Z"
+    },
+    "docs-ready-definition.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:50:00.962Z"
+    },
+    "approval-refresh-accessor": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:50:19.466Z"
+    },
+    "open-pr-listing": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:50:38.229Z"
+    },
+    "approval-refresh-tick": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:50:56.900Z"
+    },
+    "docs-ready-definition": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:51:15.717Z"
+    }
+  }
+}

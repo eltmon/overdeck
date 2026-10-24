@@ -470,4 +470,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   decisive test run, DoD row 6 skips candidates missing a required check, and the
   Command Deck chip uses `resolveCiHead` (`ci/project-ci-github.ts`, newest push
   run of `ci.yml`).
+- **The transcript heartbeat exists only where `runtimes/index.ts` loaded** —
+  `liveness.ts` cannot import the registry (cycle), so `registerLivenessHeartbeatLookup`
+  runs as a side effect of `src/lib/runtimes/index.ts`. A process that never loads it
+  (most CLI verbs) gets `null` heartbeats; on Herdr, with an empty runtime mirror and no
+  tmux `window_activity`, activity then reads as the spawn time. PAN-4595 adds the import
+  to `src/lib/health.ts`; `pan worker wait`/`pan lane wait` (`agents/worker/wait.ts`)
+  still lack it. Verify with a Node `indexOf` scan of `dist/*.js`, not grep.
 <!-- last-verified: 2026-10-24 -->

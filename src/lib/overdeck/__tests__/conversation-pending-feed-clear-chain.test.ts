@@ -6,6 +6,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 const { listConversations } = vi.hoisted(() => ({ listConversations: vi.fn() }));
 vi.mock('../conversations.js', () => ({ listConversations }));
+// PAN-4596: the feed merges held kickoffs from the store; nothing is held here,
+// and the real store would open a database under HOME.
+vi.mock('../conversation-kickoff-store.js', () => ({ listHeldKickoffNames: () => new Set(), heldKickoffFocus: () => null }));
 vi.mock('../conversation-delivery.js', () => ({ codexConversationPendingInput: async () => ({}) }));
 vi.mock('../conversation-pane-choice.js', () => ({ claudeConversationPaneChoice: async () => null }));
 vi.mock('../conversation-permission.js', () => ({

@@ -51,6 +51,15 @@ export const FAILED_RETRY_BACKOFF_MS = 10 * 60 * 1000;
  * underlying cause is fixed.
  */
 const MAX_CONSECUTIVE_FAILED_ASSEMBLIES = 3;
+/**
+ * PAN-4598: a failed row older than this no longer counts toward the cutoff.
+ * Without an age bound the cutoff latched forever: three September failures
+ * (caused by the FK that the same PAN-3963 fix dropped) blocked every later
+ * tick, and no newer non-failed row could ever appear to break the streak.
+ * A fixed cause now self-heals within the window; a deterministic failure
+ * still costs at most three worktrees per window.
+ */
+export const FAILED_STREAK_WINDOW_MS = 6 * 60 * 60 * 1000;
 /** PAN-3965: the smallest ready set worth a batch; one feature merges directly. */
 const MIN_BATCH_FEATURES = 2;
 
@@ -299,14 +308,17 @@ export async function reconcileUatGenerations(
       const chain = deps.store.listChain(projectRoot);
       let failedStreak = 0;
       for (const gen of chain) {
-        if (gen.status === 'failed') failedStreak += 1;
-        else break;
+        if (gen.status !== 'failed') break;
+        // PAN-4598: an expired failure ends the streak, like a non-failed row.
+        const failedAt = Date.parse(gen.updatedAt || gen.createdAt || '');
+        if (Number.isFinite(failedAt) && now() - failedAt >= FAILED_STREAK_WINDOW_MS) break;
+        failedStreak += 1;
       }
       if (failedStreak >= MAX_CONSECUTIVE_FAILED_ASSEMBLIES) {
         const names = chain.slice(0, failedStreak).map((gen) => gen.name).join(', ');
         log(
           `[uat-reconciler] BLOCKED — ${failedStreak} consecutive assemblies failed (${names}); `
-          + 'not re-assembling. Fix the logged cause, then force a rebuild from the Merge train page',
+          + `not re-assembling for ${Math.round(FAILED_STREAK_WINDOW_MS / 3_600_000)}h. Fix the logged cause, then click Retry batch assembly on the Flywheel UAT card`,
         );
         return { action: 'assembly-blocked', invalidated };
       }

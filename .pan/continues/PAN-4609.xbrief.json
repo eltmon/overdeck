@@ -1,0 +1,161 @@
+{
+  "version": "1",
+  "issueId": "PAN-4609",
+  "created": "2026-10-24T10:37:57.966Z",
+  "updated": "2026-10-24T10:59:37.350Z",
+  "gitState": {},
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Docs-only PRD (no src/tests/config changes, see .pan/drafts/PAN-4609.md Rules section: 'Docs-only... npm run typecheck is not needed'). Existing scripts/lint-docs.js (commit d28b981533204b4171a84e0bf2768b62cb9c6ac3) is the test that covers this change: it runs in CI and in this session (npm run lint:docs, passing) and validates every published/.md doc file touched, including the three files this issue edits.",
+      "recordedAt": "2026-10-24T10:59:37.350Z"
+    }
+  ],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-opening": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4609",
+      "claimedAt": "2026-10-24T10:37:57.966Z",
+      "doneAt": "2026-10-24T10:38:36.582Z"
+    },
+    "w2-run-steps": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4609",
+      "claimedAt": "2026-10-24T10:38:44.288Z",
+      "doneAt": "2026-10-24T10:39:51.779Z"
+    },
+    "w3-why-slow": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4609",
+      "claimedAt": "2026-10-24T10:39:56.326Z",
+      "doneAt": "2026-10-24T10:40:56.584Z"
+    },
+    "w4-choosing-gates": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4609",
+      "claimedAt": "2026-10-24T10:41:01.409Z",
+      "doneAt": "2026-10-24T10:42:12.153Z"
+    },
+    "w5-projects-mdx": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4609",
+      "claimedAt": "2026-10-24T10:42:16.579Z",
+      "doneAt": "2026-10-24T10:43:15.502Z"
+    },
+    "w6-configuration-md": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4609",
+      "claimedAt": "2026-10-24T10:43:19.799Z",
+      "doneAt": "2026-10-24T10:43:55.088Z"
+    },
+    "w7-merge-verify": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4609",
+      "claimedAt": "2026-10-24T10:43:59.474Z",
+      "doneAt": "2026-10-24T10:47:01.814Z"
+    },
+    "w1-opening.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:50:51.680Z"
+    },
+    "w1-opening.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:51:11.263Z"
+    },
+    "w1-opening.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:51:28.844Z"
+    },
+    "w2-run-steps.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:51:48.862Z"
+    },
+    "w2-run-steps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:52:05.359Z"
+    },
+    "w2-run-steps.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:52:23.062Z"
+    },
+    "w2-run-steps.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:52:42.857Z"
+    },
+    "w3-why-slow.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:53:01.733Z"
+    },
+    "w3-why-slow.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:53:20.375Z"
+    },
+    "w3-why-slow.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:53:37.711Z"
+    },
+    "w3-why-slow.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:54:00.821Z"
+    },
+    "w3-why-slow.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:54:22.516Z"
+    },
+    "w4-choosing-gates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:54:45.027Z"
+    },
+    "w4-choosing-gates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:55:07.070Z"
+    },
+    "w4-choosing-gates.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:55:31.400Z"
+    },
+    "w5-projects-mdx.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:55:54.416Z"
+    },
+    "w5-projects-mdx.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:56:13.752Z"
+    },
+    "w5-projects-mdx.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:56:36.742Z"
+    },
+    "w5-projects-mdx.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:56:52.562Z"
+    },
+    "w6-configuration-md.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:57:11.315Z"
+    },
+    "w6-configuration-md.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:57:31.186Z"
+    },
+    "w7-merge-verify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:57:49.781Z"
+    },
+    "w7-merge-verify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:58:09.056Z"
+    },
+    "w7-merge-verify.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:58:27.453Z"
+    },
+    "w7-merge-verify.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:58:48.726Z"
+    }
+  }
+}

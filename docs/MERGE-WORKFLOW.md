@@ -25,6 +25,38 @@ verdict, every time it's asked.
 > when it is the only one: that batch is the UAT stack the operator tests on.
 > An `auto-merge` label releases the feature in a held project.
 
+### Merging from the Flywheel UAT card (PAN-4598)
+
+The Flywheel page's UAT BATCHES card (`MergeTrainView`) is the merge control.
+
+1. **A batch exists.** Ready features gather into a UAT batch. Click
+   **Start & open UAT frontend** to run the batch's test stack, work through
+   its "What to UAT" checklist, then click **Merge batch (N) to main**. That
+   lands exactly the tree you tested. The small "Merge one feature to main…"
+   escape hatch stays below the rows for the rare case where one feature must
+   go first.
+2. **No tested batch exists.** This covers a batch that is still assembling,
+   a lone feature in a project that does not hold for UAT, and a failed
+   assembly. Each ready row then shows its own **Merge** button. It posts
+   `/api/merge-train/merge-next` with `{ n: 1, project, issueId }`, so the
+   merge gate re-checks that one feature and the issue closes out through the
+   normal post-merge flow. An `issueId` outside the project's ready set gets
+   a 409.
+3. **The last assembly failed.** The card names the failed batch and its time
+   instead of promising a batch. It offers **Retry batch assembly**, which is
+   a forced `/api/merge-train/assemble` for that project, next to the row
+   Merge buttons.
+
+**Failed assemblies stop blocking after six hours.** After three consecutive
+failed assemblies, the reconciler stops and logs `BLOCKED` instead of burning
+a worktree on every retry (PAN-3963). Only failures from the last
+`FAILED_STREAK_WINDOW_MS` (6 hours) count toward that streak. Before
+PAN-4598 the streak had no age bound: three failures on 2026-09-20 (caused by
+the `issues` foreign key that the same PAN-3963 fix dropped) blocked every
+batch for every later tick, because no newer row could ever form to break the
+streak. A fixed cause now heals itself within the window, and **Retry batch
+assembly** bypasses the cutoff at once.
+
 **Grant labels are operator-only.** `released`, `auto-merge` and `hold-for-uat`
 carry operator decisions. The agent `gh` shim refuses to add or remove them
 (`gh issue|pr edit|create` label flags and `gh api` writes on
@@ -58,7 +90,15 @@ bypasses it.
    [`src/lib/cloister/request-review-pipeline.ts`](../src/lib/cloister/request-review-pipeline.ts),
    never by importing a route, and `requestReviewPipeline.isInFlight` coalesces
    it with the request `pan done` just made. The webhook path logs and returns
-   on every failure — it never throws.
+   on every failure — it never throws. When the issue has no pipeline
+   workspace (the PR was pushed from a handoff worktree), the webhook adopts
+   the PR branch into one through
+   [`src/lib/cloister/pr-adoption-review.ts`](../src/lib/cloister/pr-adoption-review.ts)
+   and then starts the pipeline. When adoption is refused (the branch is
+   checked out in another worktree, the head moved, or the local branch
+   diverged), the issue shows "Review never started" under Needs you with the
+   exact fix. See
+   [A PR opened outside a pipeline workspace](PIPELINE-GATES.md#a-pr-opened-outside-a-pipeline-workspace-pan-4605).
 3. **Review and test.** The four reviewer roles (correctness, security,
    performance, requirements) post PR reviews — approve or request changes.
    Verification (typecheck, lint, tests) runs as check runs on the PR.
@@ -141,6 +181,37 @@ an entry's `strike/<issue>` branch instead whenever one existed, without that
 gate; strikes now open their own PR (PAN-3973), so the queue no longer looks
 for strike branches.
 
+## What makes a PR "ready" (Awaiting Merge, Merge to main)
+
+The Awaiting Merge page lists every issue whose derived state is `ready`.
+The issue view offers **Merge to main** for the same state (`canMerge` in
+`src/dashboard/frontend/src/lib/issueActions.ts`). An open PR derives
+`ready` when all of these hold (`deriveState` in
+`src/lib/overdeck/derived-issue-state.ts`):
+
+- the forge reports its checks green and the PR mergeable, and nobody has
+  requested changes;
+- the merge gate's cached answer for the PR's **current head** says the
+  approval stands at that head (`cachedApprovalAtHead` in
+  `src/lib/cloister/approval-at-head.ts`). That means a trusted verdict
+  marker naming the head, or a trusted reviewer's GitHub review of it.
+  `reviewDecision` alone never derives `ready` (#3983, #4066).
+
+A gate answer lives `GATE_ANSWER_TTL_MS` (5 minutes). The approval refresher
+(`src/dashboard/server/services/approval-at-head-refresh.ts`, PAN-4597)
+runs on the 60-second UAT-train tick. It asks the gate again for every open,
+non-draft PR that the forge reports approved, green and mergeable, once that
+PR's answer is missing, belongs to another head, or is older than
+`GATE_ANSWER_REFRESH_AFTER_MS` (3 minutes). The read model then re-derives
+the issue. So an approved, green PR shows on Awaiting Merge within about a
+minute and stays there until it merges, a push moves its head, or a check
+goes red. Before PAN-4597 only auto-merge, the merge doors and the post-merge
+sibling walk ran the gate. A PR held for UAT showed as `ready` for five
+minutes after some other merge, then dropped back to `in-review`. The
+refresher runs only in the primary dashboard process, and it tries each
+issue head at most once per refresh window, so a failing forge read is not
+retried every tick.
+
 ## Review freshness
 
 A review verdict is a PR review against a specific commit. A push after
@@ -199,6 +270,17 @@ CI on a conflicting PR, so the patrol does not wait for CI before the repair
 (PAN-4451); CI runs again on the pushed head. If CI fails
 after the merge, treat the failing check as the evidence: fix it and let
 review and verification run again.
+
+Two files are union-merged in `.gitattributes`:
+`.overdeck/context/codebase/concerns.md` and `.beads/issues.jsonl`. When two
+PRs append to them, git keeps both sides' lines, so the merge door's server
+rebase and a local `git merge` or `git merge-tree` report no conflict. Git does
+not dedupe, so a concerns.md merge can leave two `<!-- last-verified -->` lines
+when both PRs stamped different dates. A `pan sync-main` merge into a branch
+created before the attribute landed (PAN-4614) can still conflict once.
+GitHub's own mergeable check may ignore the attribute and still report the PR
+conflicting; that path is tracked in PAN-4616. JSON state files under `.pan/`
+never get union.
 
 An agent that parked an item with `pan task block <issue> <item> --on <ref>...`
 gets one `BLOCKERS MERGED` message within about two minutes of the last of

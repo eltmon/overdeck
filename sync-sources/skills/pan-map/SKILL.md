@@ -19,7 +19,7 @@ Create or refresh these four files:
 Each file should be an orientation digest, not full documentation:
 
 - Keep each file to roughly 150 lines or fewer.
-- End each file with `<!-- last-verified: YYYY-MM-DD -->`.
+- End each file with exactly one `<!-- last-verified: YYYY-MM-DD -->` line. A union merge of concerns.md can leave a second one mid-file; delete it.
 - Prefer stable facts and conclusions over broad file listings.
 - Update stale statements and the `last-verified` date when you confirm a change.
 
