@@ -255,3 +255,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   remaining PAN-4540 and PAN-4534, and the docs issue PAN-4609), cut an npm release with
   `pan release stable --version X.Y.Z`, push main + tag, write the report,
   then pause the Flywheel.
+- PAN-4610 (2026-10-24): a verification worker can wait forever in CPU
+  admission when another poller deletes its half-written ticket. Symptom:
+  `phase: queued`, `admittedAt: null` for 30+ min and no
+  `~/.overdeck/verification-workers/admission/waiter-*.json` for that issue.
+  Recovery: stop the worker pid and `pan review request <id>`. Fix folded into
+  PAN-4546. Used on PAN-4532 at 10:40.
