@@ -13,9 +13,9 @@
  * command line itself from Herdr's agent manifest, so it cannot run Overdeck's
  * generated launcher script — the script that carries the provider exports,
  * the system-prompt files, the session id, and every harness-specific launch
- * field. Instead the adapter splits a pane with the launch env and runs the
- * launcher in it with `pane.send_input` (text plus Enter in one ordered
- * submission).
+ * field. Instead the adapter opens a tab for the agent (PAN-4582) with the
+ * launch env and runs the launcher in it with `pane.send_input` (text plus
+ * Enter in one ordered submission).
  *
  * What happens next depends on the launch's DETECTION POLICY
  * (`detectionPolicyFor`, `./launch.ts`):
@@ -38,6 +38,7 @@
 
 import { Effect } from 'effect';
 
+import { openAgentTab } from './herdr-agent-tab.js';
 import {
   getHerdrApiClient,
   HerdrApiClient,
@@ -238,7 +239,7 @@ async function findAgentIdPane(
  * command reports that command with a different pid and process group. So the
  * question is whether any foreground process is NOT the shell.
  */
-async function paneProcessLiveness(
+export async function paneProcessLiveness(
   paneId: string,
   api: HerdrApiClient,
 ): Promise<'running' | 'exited' | 'indeterminate'> {
@@ -584,15 +585,9 @@ export class HerdrBackend implements TerminalBackend {
     spec: StartAgentSpec,
   ): Effect.Effect<BackendResult<AgentPaneRef>, TerminalBackendError> {
     return attempt('startAgent', async () => {
-      const split = await this.api.call<{ pane?: HerdrPaneInfo }>('pane.split', {
-        workspace_id: workspace.workspaceId,
-        direction: 'down',
-        cwd: spec.cwd ?? workspace.cwd,
-        env: spec.env,
-        focus: false,
+      const pane: HerdrPaneInfo = await openAgentTab(this.api, {
+        workspaceId: workspace.workspaceId, cwd: spec.cwd ?? workspace.cwd, env: spec.env, label: spec.name ?? spec.tokens.role,
       });
-      const pane = split.pane;
-      if (!pane) throw new Error('pane.split returned no pane');
       const agentName = spec.name ?? `${spec.tokens.role}-${pane.pane_id.replace(':', '-')}`;
 
       if ((spec.detection ?? 'required') === 'not-required') {

@@ -51,8 +51,12 @@ describe('startAgent detection failure', () => {
   it('reports the pane foreground process and its last output, then closes the pane', async () => {
     const { api, log } = fakeApi(({ method }) => {
       switch (method) {
-        case 'pane.split':
-          return { pane: { pane_id: 'wE:p2', terminal_id: 'term_1', workspace_id: 'wE' } };
+        case 'tab.create':
+          return {
+            type: 'tab_created',
+            tab: { tab_id: 'wE:t2' },
+            root_pane: { pane_id: 'wE:p2', terminal_id: 'term_1', workspace_id: 'wE' },
+          };
         // never detected: `agent` stays absent
         case 'pane.get':
           return { pane: { pane_id: 'wE:p2', terminal_id: 'term_1', workspace_id: 'wE' } };
@@ -91,7 +95,9 @@ describe('startAgent detection failure', () => {
 
   it('still fails cleanly when the diagnosis probes themselves fail', async () => {
     const { api } = fakeApi(({ method }) => {
-      if (method === 'pane.split') return { pane: { pane_id: 'wE:p2', terminal_id: 't', workspace_id: 'wE' } };
+      if (method === 'tab.create') {
+        return { type: 'tab_created', tab: { tab_id: 'wE:t2' }, root_pane: { pane_id: 'wE:p2', terminal_id: 't', workspace_id: 'wE' } };
+      }
       if (method === 'pane.get') return { pane: { pane_id: 'wE:p2', terminal_id: 't', workspace_id: 'wE' } };
       if (method === 'pane.process_info' || method === 'pane.read') {
         return new HerdrApiError({ method, code: 'timeout', message: 'no answer' });
