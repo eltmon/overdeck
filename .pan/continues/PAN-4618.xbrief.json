@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4618",
   "created": "2026-10-24T12:05:55.935Z",
-  "updated": "2026-10-24T12:08:48.749Z",
+  "updated": "2026-10-24T12:09:48.329Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4618",
       "claimedAt": "2026-10-24T12:05:55.935Z",
       "doneAt": "2026-10-24T12:08:48.748Z"
+    },
+    "ci-concurrency-group": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:09:48.329Z"
     }
   }
 }
