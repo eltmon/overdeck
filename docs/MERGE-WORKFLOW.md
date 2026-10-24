@@ -263,6 +263,17 @@ CI on a conflicting PR, so the patrol does not wait for CI before the repair
 after the merge, treat the failing check as the evidence: fix it and let
 review and verification run again.
 
+Two files are union-merged in `.gitattributes`:
+`.overdeck/context/codebase/concerns.md` and `.beads/issues.jsonl`. When two
+PRs append to them, git keeps both sides' lines, so the merge door's server
+rebase and a local `git merge` or `git merge-tree` report no conflict. Git does
+not dedupe, so a concerns.md merge can leave two `<!-- last-verified -->` lines
+when both PRs stamped different dates. A `pan sync-main` merge into a branch
+created before the attribute landed (PAN-4614) can still conflict once.
+GitHub's own mergeable check may ignore the attribute and still report the PR
+conflicting; that path is tracked in PAN-4616. JSON state files under `.pan/`
+never get union.
+
 An agent that parked an item with `pan task block <issue> <item> --on <ref>...`
 gets one `BLOCKERS MERGED` message within about two minutes of the last of
 those issues or PRs merging. See
