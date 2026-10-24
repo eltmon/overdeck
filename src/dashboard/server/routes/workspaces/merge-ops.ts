@@ -275,10 +275,12 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   } else {
     const pendingOp = run?.phase === 'merging' ? getPendingOperation(issueId) : null;
     const ineligible = normalMergeEligibility(derived, pendingOp?.type === 'merge' && pendingOp?.status === 'running', run);
-    if (ineligible) return ineligible;
+    // PAN-4540: a merge of this issue already running ran nothing for this
+    // call; deferred lets an automatic merge retry instead of failing its head.
+    if (ineligible) return ineligible.outcome === 'merging' ? { ...ineligible, deferred: true } : ineligible;
   }
   const gate = await forgeMergeGate(issueId, request);
-  if (gate.refusal) return { ...gate.refusal, state: derived.state };
+  if (gate.refusal) return { ...gate.refusal, state: derived.state, refused: true };
   const approvedHead = automaticMergeHead(request);
 
   if (run?.phase === 'merging') {
@@ -815,7 +817,8 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
             console.error(`[merge] ${error}`);
             setStatus(issueId, { phase: 'failed', notes: error });
             completePendingOperation(issueId, error);
-            return { success: false, statusCode: 409, error };
+            // PAN-4540: no merge ran, and the merge gate re-checks this before it re-arms the row.
+            return { success: false, statusCode: 409, error, refused: true };
           }
           // Defense-in-depth: refuse to merge when the PR is CONFLICTING with its base.
           // Without this, a clean-CI-but-conflicting PR sails into the rebase/retry loop in
@@ -830,7 +833,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
             console.error(`[merge] ${error}`);
             setStatus(issueId, { phase: 'failed', notes: error });
             completePendingOperation(issueId, error);
-            return { success: false, statusCode: 409, error };
+            return { success: false, statusCode: 409, error, refused: true };
           }
           if (prState.merged) {
             console.log(`[merge] PR #${githubPrRef.number} for ${issueId} is already merged — running post-merge lifecycle`);

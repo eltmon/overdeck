@@ -1,0 +1,261 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T15:19:23.000Z",
+    "author": "overdeck/0.69.0",
+    "description": "Plan for PAN-4540: Auto-merge records a gate refusal inside triggerMerge as a failed merge; approved green PRs are stranded forever at that head",
+    "updated": "2026-10-24T15:21:42.320Z"
+  },
+  "plan": {
+    "id": "pan-4540",
+    "title": "Auto-merge records a gate refusal inside triggerMerge as a failed merge; approved green PRs are stranded forever at that head",
+    "status": "proposed",
+    "uid": "d46a0ac3-b844-4ec5-9555-7a8c78b281e1",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-24T15:19:23.000Z",
+    "updated": "2026-10-24T15:21:42.320Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4540",
+        "label": "PAN-4540",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "verification",
+      "pipeline"
+    ],
+    "narratives": {
+      "Problem": "A merge-gate refusal inside triggerMerge, raised before any merge ran, was recorded as a failed auto-merge row, which is never re-armed at the same head; a transient mergeable:null read was also reported as a missing approval.",
+      "Proposal": "Return gate refusals from triggerMerge as refused and mark the row blocked so the scheduler re-arms it; report checks and mergeability before an unproven approval; re-read an unknown mergeability once after 3 s, bypassing the PR-facts cache.",
+      "NonGoals": "- No change to the #3983 rule that a failed row stays failed at its head\n- No retry loop beyond one mergeability re-read\n- No new HTTP route, CLI verb or setting"
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "refused-blocks",
+        "title": "Mark a row blocked, not failed, when the gate inside triggerMerge refuses",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T15:19:23.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4540",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-strike.ts",
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/lib/overdeck/merge-sync.ts",
+            "src/dashboard/server/services/auto-merge-executor.ts",
+            "src/dashboard/server/services/__tests__/auto-merge-executor.test.ts",
+            "src/dashboard/server/services/__tests__/auto-merge-scheduler.test.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/auto-merge-executor.test.ts src/dashboard/server/services/__tests__/auto-merge-scheduler.test.ts src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run src/dashboard/server/services/__tests__/auto-merge-executor.test.ts src/dashboard/server/services/__tests__/auto-merge-scheduler.test.ts src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "triggerMerge returns refused: true for a gate refusal; the executor calls markMergeRefused (status blocked) and the scheduler re-arms the blocked row."
+        },
+        "items": [
+          {
+            "id": "refused-blocks.ac1",
+            "title": "Given the executor's gate passes but triggerMerge's gate refuses, when the executor handles the result, then the row ends blocked, not failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "refused-blocks.ac2",
+            "title": "Given a row blocked by such a refusal, when the gate passes again at the same head, then the scheduler re-arms it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "refused-blocks.ac3",
+            "title": "Given failing required checks or a CONFLICTING PR at the pre-merge PR-state check, when triggerMerge returns, then the result carries refused true and no merge command ran",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readiness-order",
+        "title": "Report checks and mergeability before an unproven approval",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T15:19:23.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4540",
+          "files_scope": [
+            "src/lib/cloister/pr-facts.ts",
+            "src/lib/cloister/gitlab-mr-types.ts",
+            "src/lib/cloister/__tests__/pr-facts-readiness-order.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/pr-facts-readiness-order.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run src/lib/cloister/__tests__/pr-facts-readiness-order.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "evaluateMergeReadiness raises the GitHub approval-at-head refusal only for a green, mergeable PR. The GitLab MR interfaces move to gitlab-mr-types.ts (re-exported) to keep pr-facts.ts under the file-size ceiling."
+        },
+        "items": [
+          {
+            "id": "readiness-order.ac1",
+            "title": "Given an approving review at head, green checks and mergeable null, when evaluateMergeReadiness runs, then it returns a mergeability reason, not not approved at PR HEAD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-order.ac2",
+            "title": "Given red checks and no proven approval, when evaluateMergeReadiness runs, then it reports the checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mergeability-reread",
+        "title": "Re-read an unknown mergeability once before deciding",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T15:19:23.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4540",
+          "files_scope": [
+            "src/lib/cloister/merge-gate.ts",
+            "src/lib/cloister/pr-facts.ts",
+            "src/lib/cloister/__tests__/merge-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/merge-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run src/lib/cloister/__tests__/merge-gate.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "evaluateIssueMergeGate waits MERGEABILITY_REREAD_MS and re-reads fresh PR facts once when an open, green PR has mergeable null."
+        },
+        "items": [
+          {
+            "id": "mergeability-reread.ac1",
+            "title": "Given mergeable is null on the first read and true on the re-read, when the gate runs under fake timers, then the gate passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mergeability-reread.ac2",
+            "title": "Given mergeable is still null on the re-read, when the gate runs, then it reports mergeability, not a missing approval",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document failed vs blocked auto-merge rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T15:19:23.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4540",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "configuration/auto-merge.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "npm run lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add the Auto-merge rows failed vs blocked section and update the auto-merge configuration page."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/MERGE-WORKFLOW.md, when the auto-merge rows section is read, then it states that failed means a merge ran and blocked means it was refused and re-arms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given configuration/auto-merge.mdx, when the failure handling text is read, then it matches the failed vs blocked rule and the mergeability re-read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "readiness-order",
+        "to": "mergeability-reread",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-24-PAN-4540-auto-merge-records-a-gate-refusal-inside-triggermerge-as-a-failed-merge-approved-green-prs-are-stranded-forever-at-that-head.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}

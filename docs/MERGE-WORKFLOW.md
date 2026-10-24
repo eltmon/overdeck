@@ -169,6 +169,37 @@ bypasses it.
 Content failures — red CI, a closed or draft PR, unresolved conflicts — are
 visible directly on the PR; there is no separate failure status to set.
 
+## Auto-merge rows: `failed` vs `blocked` (PAN-4540)
+
+Each scheduled auto-merge is a `pending_auto_merges` row. Two of its end
+states mean different things, and the scheduler treats them differently at
+the same PR head (`latestAutoMergeAllowsSchedule`):
+
+- **`failed`** means a merge command actually ran and failed, or the retry
+  budget ran out. It also covers a refusal that only the operator can clear:
+  a closed PR, a PR other than the one the gate judged, a polyrepo merge set,
+  or `.planning/` files. A failed row is never re-armed at the same head; a
+  new head re-arms it.
+- **`blocked`** means nothing was merged because something refused first, and
+  the merge gate checks the same thing again before it re-arms the row. That
+  covers the executor's own gate read, eligibility, and a closed tracker issue.
+  It also covers refusals inside `triggerMerge` before any merge command runs:
+  the merge gate it re-reads, failing required checks, and a CONFLICTING PR.
+  Those results carry `refused: true` and are recorded by `markMergeRefused`.
+  The scheduler re-arms a blocked row as soon as the gate passes again.
+- A merge call made while a merge of the same issue is already running is
+  `deferred`: the row goes back to `pending` and is retried, because this call
+  ran nothing.
+
+The two gate reads can disagree seconds apart: GitHub recomputes `mergeable`
+after the base branch moves and answers UNKNOWN meanwhile, so the first read
+after another PR merges often lands in that window. The merge gate
+(`cloister/merge-gate.ts`) therefore re-reads an open, green PR whose
+mergeability is unknown once, `MERGEABILITY_REREAD_MS` (3 s) later, bypassing
+both the PR-facts cache and the PR tab cache under `fetchIssuePullRequest`. A still-unknown answer is reported as "the forge has not
+computed mergeability yet", never as a missing approval: the reviews that
+prove approval at the head are read only for a green, mergeable PR.
+
 ## The per-project merge queue
 
 Merges are serialized per project. A Merge clicked while another merge holds

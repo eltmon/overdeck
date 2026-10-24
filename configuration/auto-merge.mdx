@@ -94,7 +94,9 @@ pushed next: only re-scheduling it through the endpoint starts it again. A
 failed entry (the merge was attempted, including the retry circuit breaker)
 holds for that PR head only: a new push re-arms the issue. A blocked entry (the
 executor refused it before merging, for example because checks went red or the
-head moved during the cooldown) re-arms as soon as the merge gate passes again.
+head moved during the cooldown, or the merge call refused it before any merge
+command ran because the merge gate, failing required checks or a conflict said
+no) re-arms as soon as the merge gate passes again.
 An entry written before heads were recorded never re-arms by itself. The insert
 re-checks the latest entry, so a cancel that lands while the scheduler is
 reading the forge sticks.
@@ -198,8 +200,10 @@ only when **all** of these are true:
   project must set `verification.tests: ci` in `projects.yaml` explicitly,
   since commit-status CI cannot be auto-detected.
 - The forge reports the PR as `mergeable` (no merge conflicts, branch
-  protection satisfied). A PR whose mergeability the forge has not computed
-  yet is not eligible.
+  protection satisfied). GitHub recomputes mergeability after the base branch
+  moves, so the gate re-reads an open, green PR whose mergeability is unknown
+  once, 3 seconds later. A PR whose mergeability is still not computed is not
+  eligible, and the reason says so rather than reporting a missing approval.
 - The issue is not held for UAT (its label, then the project default, then the
   global setting; see above)
 - None of the **blocker labels** are present on the issue:
@@ -278,7 +282,11 @@ problems list; read it from the endpoint.
 
 When the executor fires and the merge fails (e.g. surface-level rebase
 conflict raised at merge time), the row is moved to `failed` with the failure
-reason captured, a TTS announcement plays, and the orchestrator surfaces the
+reason captured. `failed` means a merge command ran, or the refusal needs the
+operator (a closed PR, a polyrepo merge set, `.planning/` files). A refusal the
+merge gate re-checks (the gate itself, failing required checks, a conflict)
+leaves the row `blocked` instead. For a failed
+row, a TTS announcement plays, and the orchestrator surfaces the
 entry as an `investigate` suggestion in its next tick snapshot. The operator
 can then either fix the underlying problem and reschedule, or cancel the
 failed entry to clear it.
