@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4609",
   "created": "2026-10-24T10:37:57.966Z",
-  "updated": "2026-10-24T10:53:01.734Z",
+  "updated": "2026-10-24T10:53:20.375Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "w3-why-slow.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T10:53:01.733Z"
+    },
+    "w3-why-slow.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:53:20.375Z"
     }
   }
 }
