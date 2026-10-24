@@ -6,8 +6,9 @@
  * the gate reaches are kept here per issue, keyed by the head they were judged
  * at, so the board agrees with the gate without a forge read of its own: every
  * gate evaluation records one (the auto-merge scheduler's each tick, the merge
- * doors', the merge-ready walk), and a PR-facts read whose trusted marker
- * names the head records a proof. A miss, an expired answer or an answer for
+ * doors', the merge-ready walk, and — PAN-4597 — the approval refresher, which
+ * keeps every approved, green, mergeable PR's answer fresh), and a PR-facts
+ * read whose trusted marker names the head records a proof. A miss, an expired answer or an answer for
  * another head is unknown, which never derives `ready`.
  *
  * Process-local and short-lived, like the PR-facts cache: nothing here is
@@ -44,7 +45,13 @@ export function approvalProvenAtHead(facts: ApprovalFacts): boolean {
 }
 
 /** A gate's answer outlives a few scheduler ticks, never much more. */
-const GATE_ANSWER_TTL_MS = 5 * 60_000;
+export const GATE_ANSWER_TTL_MS = 5 * 60_000;
+/**
+ * PAN-4597: the approval refresher re-asks the gate once an answer is this
+ * old, so an approved, green, mergeable PR keeps an unexpired answer and stays
+ * `ready` between merges instead of decaying after `GATE_ANSWER_TTL_MS`.
+ */
+export const GATE_ANSWER_REFRESH_AFTER_MS = 3 * 60_000;
 /** A read's marker proof lives as long as the PR-facts cache entry it came from. */
 const READ_PROOF_TTL_MS = 60_000;
 
@@ -125,6 +132,18 @@ export function cachedApprovalAtHead(issueId: string, headSha: string | null | u
   const read = readProofs.get(key);
   if (read && now - read.at < READ_PROOF_TTL_MS && sameCommit(read.head, headSha)) return true;
   return undefined;
+}
+
+/**
+ * PAN-4597: whether the gate should judge this issue at this head again — no
+ * gate answer, an answer for another head, or one older than
+ * `GATE_ANSWER_REFRESH_AFTER_MS`. A read proof does not count: it lives only
+ * as long as one PR-facts cache entry.
+ */
+export function approvalAtHeadNeedsRefresh(issueId: string, headSha: string | null | undefined): boolean {
+  if (!headSha) return false;
+  const judged = gateAnswers.get(issueId.toUpperCase());
+  return !judged || !sameCommit(judged.head, headSha) || Date.now() - judged.at >= GATE_ANSWER_REFRESH_AFTER_MS;
 }
 
 /**
