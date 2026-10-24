@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4546",
   "created": "2026-10-24T10:44:02.967Z",
-  "updated": "2026-10-24T10:54:39.181Z",
+  "updated": "2026-10-24T10:57:56.707Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-10-24T10:54:36.770Z"
     },
     "admission-n-slots": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4546",
-      "claimedAt": "2026-10-24T10:54:39.181Z"
+      "claimedAt": "2026-10-24T10:54:39.181Z",
+      "doneAt": "2026-10-24T10:57:56.706Z"
     }
   }
 }
