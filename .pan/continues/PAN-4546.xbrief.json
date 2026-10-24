@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4546",
   "created": "2026-10-24T10:44:02.967Z",
-  "updated": "2026-10-24T10:50:28.683Z",
+  "updated": "2026-10-24T10:50:48.916Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4546",
       "claimedAt": "2026-10-24T10:44:02.967Z",
       "doneAt": "2026-10-24T10:50:28.682Z"
+    },
+    "config-quality-gate-slots": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4546",
+      "claimedAt": "2026-10-24T10:50:48.916Z"
     }
   }
 }
