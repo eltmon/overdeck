@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4582",
   "created": "2026-10-24T07:40:29.074Z",
-  "updated": "2026-10-24T08:55:08.211Z",
+  "updated": "2026-10-24T08:55:22.659Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -149,6 +149,10 @@
     "docs-herdr-tabs.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T08:55:08.210Z"
+    },
+    "docs-herdr-tabs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T08:55:22.659Z"
     }
   }
 }
