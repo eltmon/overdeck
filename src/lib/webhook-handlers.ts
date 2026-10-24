@@ -23,7 +23,7 @@ import {
   observationFromCheckSuite,
   resolveProjectForRepo,
 } from './ci/project-ci-observation.js';
-import { resolveDefaultBranchHead } from './ci/project-ci-github.js';
+import { resolveCiHead } from './ci/project-ci-github.js';
 
 export { ADVISORY_CHECK_NAMES, isAdvisoryCheckName };
 
@@ -169,7 +169,10 @@ async function resolvePullRequestsForHead(
 export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
   // PAN-3537: a push to the default branch produces a check suite with an empty
   // pull_requests array. Record it for the Command Deck CI chip, then fall
-  // through to the existing PR-scoped merge-gate logic.
+  // through to the existing PR-scoped merge-gate logic. PAN-4618: a
+  // default-branch suite is recorded only when it belongs to the CI head (the
+  // newest push run of the CI workflow), so a bookkeeping head's guard suite
+  // never replaces the CI head's suites.
   const project = resolveProjectForRepo(payload.repository?.full_name);
   const projectSuite = payload.check_suite;
   if (
@@ -180,7 +183,7 @@ export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
     && projectSuite.id != null
   ) {
     try {
-      const authoritativeHead = await resolveDefaultBranchHead(
+      const authoritativeHead = await resolveCiHead(
         project.repo,
         project.branch,
       );
