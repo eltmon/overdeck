@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4585",
   "created": "2026-10-24T08:22:26.190Z",
-  "updated": "2026-10-24T08:42:37.671Z",
+  "updated": "2026-10-24T08:54:00.428Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-10-24T08:42:29.945Z"
     },
     "project-layer-strip": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4585",
-      "claimedAt": "2026-10-24T08:42:37.671Z"
+      "claimedAt": "2026-10-24T08:42:37.671Z",
+      "doneAt": "2026-10-24T08:54:00.427Z"
     }
   }
 }
