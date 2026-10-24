@@ -1,20 +1,17 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T17:04:21Z · model: claude-opus-5-5 · open: 838_
+_Last sequenced: 2026-10-24T17:27:16Z · model: claude-opus-5-5 · open: 835_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-4540 | S | critical | ok |  |  | Gate refusal inside triggerMerge is marked failed, so approved green PRs never re-arm auto-merge. TENET-10: supervised handoff |
-| 2 | PAN-4527 | S | critical | ok |  |  | Re-review joins a worker started on the old head and fails the new head on stale CI; burns attempts. TENET-10: supervised handoff |
-| 4 | PAN-4531 | S | critical | ok |  |  | Verification runs ~25 min of local gates on a head whose CI test already failed, holding the CPU slot. TENET-10: supervised handoff |
 | 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
-| 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
+| 14 | PAN-4551 | L | high | ok |  | PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 22 | PAN-4625 | S | high | ok |  | PAN-4534 | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
@@ -846,18 +843,6 @@ _Last sequenced: 2026-10-24T17:04:21Z · model: claude-opus-5-5 · open: 838_
 
 ## Rationale detail
 
-### PAN-4540 (rank 1)
-
-Observed 2026-10-04 on PR #4525: an approved, all-green PR was stranded because a transient mergeability read inside triggerMerge was recorded as a failed merge, and failed rows never re-arm at the same head. Every stranded PR needs an operator click or a head change that costs a full re-verification, so this directly blocks pipeline throughput. Fix is scoped to the executor result mapping and gate ordering. Verification/merge machinery, so it goes through a supervised handoff.
-
-### PAN-4527 (rank 2)
-
-Root cause is pinned to two lines (sameHead always true, launch-time headShort reused). A wrong verdict tells agents to fix failures that no longer exist and spends verification budget, so it corrupts the core feedback loop. It also defines the head-equivalence rule PAN-4532 and PAN-4531 build on, so it goes first in the verification bundle.
-
-### PAN-4531 (rank 4)
-
-A run certain to fail holds the machine-wide admission slot while seven waiters queue, including the agent's own isolation test for the fix. Checking the CI verdict before each gate is a small change with large queue relief. The body routes it with or after PAN-4527, which owns the headShort fix it must not reintroduce.
-
 ### PAN-4534 (rank 5)
 
 Both CI failures observed on 2026-10-04 reached agents as 'no failing workflow runs were found', so agents re-run tests locally through the serialized queue to rediscover failures. Building failures from check runs puts the failing test in the feedback and removes that queue load. Fourth member of the verification bundle.
@@ -884,7 +869,7 @@ Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls th
 
 ### PAN-4551 (rank 14)
 
-Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.
+Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.
 
 ### PAN-4572 (rank 21)
 
@@ -1166,6 +1151,18 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 
 npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
 
+### PAN-2850 (rank 93)
+
+npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
+
+### PAN-2758 (rank 94)
+
+Triage: verify whether a provider-capacity zombie can still read as running under the current liveness definition. Rank held.
+
+### PAN-2817 (rank 95)
+
+Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; verify the composer-freeze detection gap against it. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1173,50 +1170,11 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T17:04:21Z",
+  "generatedAt": "2026-10-24T17:27:16Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 838,
+  "openCount": 835,
   "nodes": [
-    {
-      "issue": "PAN-4540",
-      "rank": 1,
-      "size": "S",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Gate refusal inside triggerMerge is marked failed, so approved green PRs never re-arm auto-merge. TENET-10: supervised handoff",
-      "rationale": "Observed 2026-10-04 on PR #4525: an approved, all-green PR was stranded because a transient mergeability read inside triggerMerge was recorded as a failed merge, and failed rows never re-arm at the same head. Every stranded PR needs an operator click or a head change that costs a full re-verification, so this directly blocks pipeline throughput. Fix is scoped to the executor result mapping and gate ordering. Verification/merge machinery, so it goes through a supervised handoff.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4527",
-      "rank": 2,
-      "size": "S",
-      "importance": "critical",
-      "score": 89,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Re-review joins a worker started on the old head and fails the new head on stale CI; burns attempts. TENET-10: supervised handoff",
-      "rationale": "Root cause is pinned to two lines (sameHead always true, launch-time headShort reused). A wrong verdict tells agents to fix failures that no longer exist and spends verification budget, so it corrupts the core feedback loop. It also defines the head-equivalence rule PAN-4532 and PAN-4531 build on, so it goes first in the verification bundle.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4531",
-      "rank": 4,
-      "size": "S",
-      "importance": "critical",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Verification runs ~25 min of local gates on a head whose CI test already failed, holding the CPU slot. TENET-10: supervised handoff",
-      "rationale": "A run certain to fail holds the machine-wide admission slot while seven waiters queue, including the agent's own isolation test for the fix. Checking the CI verdict before each gate is a small change with large queue relief. The body routes it with or after PAN-4527, which owns the headShort fix it must not reintroduce.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-4534",
       "rank": 5,
@@ -1303,13 +1261,10 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "score": 74,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4527",
-        "PAN-4531",
-        "PAN-4540",
         "PAN-4534"
       ],
       "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
-      "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.",
+      "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12849,34 +12804,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "confidence": 0.5
     },
     {
-      "from": "PAN-4527",
-      "to": "PAN-4531",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4527",
-      "to": "PAN-4551",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4531",
-      "to": "PAN-4551",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4540",
-      "to": "PAN-4551",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-4534",
       "to": "PAN-4551",
       "type": "unblocks",
@@ -12952,13 +12879,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4527",
-      "to": "PAN-4624",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-4534",
