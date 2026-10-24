@@ -1,0 +1,234 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T16:22:54.000Z",
+    "author": "overdeck/0.69.0",
+    "description": "Plan for PAN-4534: CI failure feedback names no failing test: relay looks up completed failed workflow runs while the run is still in progress",
+    "updated": "2026-10-24T16:25:11.074Z"
+  },
+  "plan": {
+    "id": "pan-4534",
+    "title": "CI failure feedback names no failing test: relay looks up completed failed workflow runs while the run is still in progress",
+    "status": "proposed",
+    "uid": "a17a9e01-60de-41a3-a3fc-32cb4d91fd13",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-24T16:22:54.000Z",
+    "updated": "2026-10-24T16:25:11.074Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4534",
+        "label": "PAN-4534",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "verification",
+      "pipeline"
+    ],
+    "narratives": {
+      "Problem": "The CI failure relay fires on a failing shard's check run, but looked only for completed failed workflow runs, which do not exist yet while the run is in progress, so the feedback named no failing test.",
+      "Proposal": "Build failures from the head's check runs, read each GitHub Actions job's log with bounded retry, extract the Vitest failure section, drop aggregate gate checks whose shard failed, and fall back to the workflow-run lookup or a list of failing check names and URLs.",
+      "NonGoals": "- No change to when the relay fires, its debounce or attempt accounting\n- No GitLab change\n- No new HTTP route, CLI verb or setting"
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "check-run-failures",
+        "title": "Collect failing check runs with their job-log test excerpts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T16:22:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4534",
+          "files_scope": [
+            "src/lib/cloister/ci-check-run-failures.ts",
+            "src/lib/cloister/__tests__/ci-check-run-failures.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/ci-check-run-failures.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run src/lib/cloister/__tests__/ci-check-run-failures.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "collectCheckRunFailures reads the head's failing check runs, fetches each Actions job log with bounded retry, extracts the Vitest failure section and drops aggregate checks whose shard failed."
+        },
+        "items": [
+          {
+            "id": "check-run-failures.ac1",
+            "title": "Given a job log with a Vitest failure section, when extractTestFailureExcerpt runs, then it returns the FAIL lines through the Test Files summary, not the head of the log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "check-run-failures.ac2",
+            "title": "Given a failing aggregate test check whose log reports test-shard: failure and a failing shard, when withoutAggregateChecks runs, then it drops the aggregate, and keeps an independent same-prefix check or one with no log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "check-run-failures.ac3",
+            "title": "Given more than 100 check runs on the head, when collectCheckRunFailures runs, then a failure on the second page is found",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-uses-check-runs",
+        "title": "Write CI failure feedback from the head's check runs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T16:22:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4534",
+          "files_scope": [
+            "src/lib/cloister/ci-failure-feedback.ts",
+            "tests/unit/lib/cloister/ci-failure-feedback.test.ts",
+            "src/lib/webhook-handlers.ts",
+            "tests/unit/lib/webhook-handlers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/ci-failure-feedback.test.ts tests/unit/lib/webhook-handlers.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run tests/unit/lib/cloister/ci-failure-feedback.test.ts tests/unit/lib/webhook-handlers.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "collectFailures tries collectCheckRunFailures first and falls back to listFailingRuns; buildFeedbackBody prints Run, Job log and Check lines when present."
+        },
+        "items": [
+          {
+            "id": "relay-uses-check-runs.ac1",
+            "title": "Given a failing test-shard check run while the workflow run is in progress, when the relay writes feedback, then it names the failing test file and title from the job log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-uses-check-runs.ac2",
+            "title": "Given only the aggregate test job and one failing shard, when the relay writes feedback, then it reports the shard's failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-uses-check-runs.ac3",
+            "title": "Given the job log returns 404 first and is available on retry, when the relay runs under fake timers, then the feedback contains the excerpt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-uses-check-runs.ac4",
+            "title": "Given no job log ever appears, when the relay writes feedback, then it lists the failing check names and URLs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-uses-check-runs.ac5",
+            "title": "Given the check runs cannot be read and no workflow run has failed, when the relay runs for a check_run webhook, then the feedback names and links the triggering check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document what the CI failure feedback contains",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T16:22:54.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4534",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "npm run lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add the 'What the CI failure feedback contains' bullet to the CI test gate section."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/PIPELINE-GATES.md, when the CI failure feedback bullet is read, then it states that failures come from check runs with job-log test excerpts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given docs/PIPELINE-GATES.md, when the CI failure feedback bullet is read, then it states the retry bound and the fallback contents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "check-run-failures",
+        "to": "relay-uses-check-runs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-24-PAN-4534-ci-failure-feedback-names-no-failing-test-relay-looks-up-completed-failed-workflow-runs-while-the-run-is-still-in-progress.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
