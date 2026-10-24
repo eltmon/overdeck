@@ -17,6 +17,14 @@ vi.mock('node:os', async (importOriginal) => {
   return { ...actual, cpus: () => osMocks.cpus(), loadavg: () => osMocks.loadavg() }
 })
 
+const configMocks = vi.hoisted(() => ({
+  loadGlobalConfigNoMigration: vi.fn(),
+  loadConfigNoMigration: vi.fn(),
+}))
+
+// PAN-4546 D5: the slot count comes from the global-only loader, never the project-merged one.
+vi.mock('../../../../src/lib/config-yaml/load.js', () => configMocks)
+
 import {
   acquireQualityGateAdmission,
   QualityGateAdmissionTimeoutError,
@@ -233,6 +241,8 @@ describe('quality gate admission', () => {
       expect(existsSync(join(rootDir, 'slot-1.json'))).toBe(false)
 
       await first.release()
+      // Let B finish any pass that listed slot 0 as held before it sees low pressure.
+      await drive(5)
       samplePressure.mockResolvedValue(low)
       const second = await driveUntilResolved(secondPromise)
       expect(second.slot).toBe(0)
@@ -327,6 +337,77 @@ describe('quality gate admission', () => {
 
       expect((await readQualityGateAdmissionOwnerPids(rootDir)).sort((a, b) => a - b)).toEqual([111, 222])
       expect(await readQualityGateAdmissionOwnerPids(join(rootDir, 'missing'))).toEqual([])
+    })
+  })
+
+  describe('slot count from config (PAN-4546)', () => {
+    const request = { workspacePath: '/tmp/one', gateName: 'test', attempt: 1 }
+
+    function configuredSlots(qualityGateSlots: number) {
+      configMocks.loadGlobalConfigNoMigration.mockResolvedValue({ config: { resources: { qualityGateSlots } } })
+    }
+
+    /** deps() without the explicit `slots`, so the resolver decides. */
+    function configDeps(rootDir: string, createdAt: number): QualityGateAdmissionDeps {
+      const { slots: _slots, ...rest } = deps(rootDir)
+      return { ...rest, now: () => createdAt }
+    }
+
+    beforeEach(() => {
+      configMocks.loadGlobalConfigNoMigration.mockReset()
+      configMocks.loadConfigNoMigration.mockReset()
+    })
+
+    it('admits as many concurrent requests as the global config allows', async () => {
+      const rootDir = home()
+      configuredSlots(3)
+      // Started one after another: concurrent dynamic imports of a vi.mock'ed
+      // module stall in Vitest. The three leases are still held at once.
+      const handles = []
+      for (const createdAt of [1, 2, 3]) {
+        handles.push(await driveUntilResolved(acquireQualityGateAdmission(request, configDeps(rootDir, createdAt))))
+      }
+
+      expect(handles.map((handle) => handle.slot)).toEqual([0, 1, 2])
+      expect(handles.every((handle) => handle.slots === 3)).toBe(true)
+      expect(configMocks.loadConfigNoMigration).not.toHaveBeenCalled()
+      for (const handle of handles) await handle.release()
+    })
+
+    it('falls back to two slots when the config loader rejects', async () => {
+      const rootDir = home()
+      configMocks.loadGlobalConfigNoMigration.mockRejectedValue(new Error('broken config.yaml'))
+      const first = await driveUntilResolved(acquireQualityGateAdmission(request, configDeps(rootDir, 1)))
+      const second = await driveUntilResolved(acquireQualityGateAdmission(request, configDeps(rootDir, 2)))
+      const thirdPromise = acquireQualityGateAdmission(request, configDeps(rootDir, 3))
+      let thirdSettled = false
+      thirdPromise.finally(() => { thirdSettled = true }).catch(() => undefined)
+
+      await drive(20)
+      expect([first.slots, second.slots]).toEqual([2, 2])
+      expect(thirdSettled).toBe(false)
+
+      await first.release()
+      const third = await driveUntilResolved(thirdPromise)
+      expect(third.slot).toBe(0)
+      await second.release()
+      await third.release()
+    })
+
+    it('lets an explicit deps.slots win over the config', async () => {
+      const rootDir = home()
+      configuredSlots(3)
+      const first = await driveUntilResolved(acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 1 }))
+      const secondPromise = acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 2 })
+      let secondResolved = false
+      void secondPromise.then(() => { secondResolved = true })
+
+      await drive(20)
+      expect(secondResolved).toBe(false)
+      expect(configMocks.loadGlobalConfigNoMigration).not.toHaveBeenCalled()
+
+      await first.release()
+      await (await driveUntilResolved(secondPromise)).release()
     })
   })
 

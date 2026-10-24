@@ -321,6 +321,21 @@ async function listLiveTickets(
     || left.ticketId.localeCompare(right.ticketId))
 }
 
+/**
+ * Slot count from the global config only, so every workspace sharing the
+ * machine-wide admission root sees the same limit (D5). Never throws: the
+ * Vitest globalSetup runs without admission when acquire rejects.
+ */
+async function resolveQualityGateSlots(): Promise<number> {
+  try {
+    const { loadGlobalConfigNoMigration } = await import('../config-yaml/load.js')
+    const slots = (await loadGlobalConfigNoMigration()).config.resources.qualityGateSlots
+    return Number.isInteger(slots) && slots >= 1 ? slots : DEFAULT_QUALITY_GATE_SLOTS
+  } catch {
+    return DEFAULT_QUALITY_GATE_SLOTS
+  }
+}
+
 /** Pids of every live-file slot owner, for the runaway patrol (D9); never throws. */
 export async function readQualityGateAdmissionOwnerPids(rootDir?: string): Promise<number[]> {
   try {
@@ -349,7 +364,7 @@ export async function acquireQualityGateAdmission(
   const settleMs = deps.settleMs ?? QUALITY_GATE_ADMISSION_SETTLE_MS
   const staleMs = deps.staleMs ?? QUALITY_GATE_ADMISSION_STALE_MS
   const tornGraceMs = deps.tornGraceMs ?? QUALITY_GATE_ADMISSION_TORN_GRACE_MS
-  const slots = Number.isInteger(deps.slots) && deps.slots! >= 1 ? deps.slots! : DEFAULT_QUALITY_GATE_SLOTS
+  const slots = Number.isInteger(deps.slots) && deps.slots! >= 1 ? deps.slots! : await resolveQualityGateSlots()
   const maxWaitMs = deps.maxWaitMs
 
   await mkdir(root, { recursive: true })
