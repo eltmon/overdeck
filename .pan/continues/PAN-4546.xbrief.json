@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4546",
   "created": "2026-10-24T10:44:02.967Z",
-  "updated": "2026-10-24T11:18:01.103Z",
+  "updated": "2026-10-24T11:18:18.116Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "admission-n-slots.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T11:18:01.102Z"
+    },
+    "admission-n-slots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:18:18.116Z"
     }
   }
 }
