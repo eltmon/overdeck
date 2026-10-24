@@ -1,0 +1,328 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T11:04:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4614: Shared concerns.md conflicts on every concurrent PR; mark it merge=union",
+    "updated": "2026-10-24T11:10:07.565Z"
+  },
+  "plan": {
+    "id": "pan-4614",
+    "title": "Shared concerns.md conflicts on every concurrent PR; mark it merge=union",
+    "status": "proposed",
+    "uid": "f52e3c95-4757-4d65-a721-6fb12dd604bc",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-24T11:04:12Z",
+    "updated": "2026-10-24T11:10:07.565Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4614",
+        "label": "PAN-4614",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4616",
+        "label": "PAN-4616",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "git",
+      "merge",
+      "gitattributes",
+      "codebase-map"
+    ],
+    "narratives": {
+      "Problem": "Concurrent PRs that each append a bullet to .overdeck/context/codebase/concerns.md conflict under git's default 3-way merge. On 2026-10-24 this blocked PAN-4595 twice (GitHub CONFLICTING, then the merge door's server rebase failed with 'Rebase conflicts in: .overdeck/context/codebase/concerns.md'). Each round costs a re-verification and a re-review; 14 commits touched the file since 2026-10-01.",
+      "Proposal": "Mark concerns.md merge=union in .gitattributes (built-in driver, no git config), with a comment stating why union is safe for a line-oriented bullet list and naming the duplicate-footer artifact, keeping the existing JSON WARNING verbatim. Add a real-git regression test that seeds the repo's real .gitattributes and proves both merge-door rebase entry points (in-place and approved-head worktree) keep both bullets, the merge-tree conflict probe reports clean, and the same fixture without the attribute conflicts. Document the union-merged files in docs/MERGE-WORKFLOW.md, and add one self-healing guidance sentence (keep exactly one last-verified footer) to the pan-map skill and the plan role. Full detail: .pan/drafts/PAN-4614.md. Scope is the local-git paths (merge-door rebases, git merge-tree, pan sync-main on post-attribute branches); GitHub's mergeable path is tracked in PAN-4616.",
+      "NonGoals": "- No merge=union (or any merge attribute) for architecture.md, conventions.md, stack.md, or any other file\n- No code change in merge-rebase.ts, merge-strike.ts, conflict-gate.ts, merge-gate.ts, conflict-repair.ts, or sync-main.ts\n- No change to which signal the merge gate trusts for conflicts (GitHub mergeable)\n- No throwaway GitHub repo or other outward action to probe GitHub's mergeable behavior\n- No content-merge driver for any JSON file under .pan/\n- No edit to the content of .overdeck/context/codebase/concerns.md in this PR\n- No verification of GitHub's mergeable handling of merge=union and no merge-gate fallback; both are tracked in PAN-4616 (https://github.com/eltmon/overdeck/issues/4616)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Only concerns.md gets merge=union; architecture.md, conventions.md and stack.md stay on the default merge.",
+        "rationale": "concerns.md is an append-style bullet list where keeping both sides is always right; architecture.md is sectioned prose that union would interleave silently, and the other two rarely change."
+      },
+      {
+        "summary": "Handle the duplicate last-verified footer with self-healing guidance (keep exactly one, delete a stray one), not a new footer policy or code.",
+        "rationale": "6 of 14 recent commits bumped the footer, so union will sometimes keep two footer lines; nothing parses the footer, so the artifact is cosmetic and one guidance sentence in the pan-map skill and plan role fixes it on the next edit."
+      },
+      {
+        "summary": "Do not verify GitHub's mergeable behavior for merge=union during planning; record it as a post-landing check.",
+        "rationale": "Settling it needs an outward action (a throwaway GitHub repo). The fix pays off regardless: the merge door's rebase and sync-main on post-attribute branches stop conflicting."
+      },
+      {
+        "summary": "The regression test seeds the fixture from the repo's real .gitattributes and includes a no-attribute control case.",
+        "rationale": "Seeding from the real file makes the test fail if the line is removed; the control proves the fixture's appends genuinely overlap, so a pass is not vacuous."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-24-PAN-4614-shared-concerns-md-conflicts-on-every-concurrent-pr-mark-it-merge-union.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "gitattributes-union",
+        "title": "Mark concerns.md merge=union in .gitattributes with a safety comment",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T11:04:12Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4614",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".gitattributes"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git check-attr merge -- .overdeck/context/codebase/concerns.md",
+            "git check-attr merge -- .pan/specs/x.json",
+            "git diff origin/main -- .gitattributes"
+          ],
+          "expected_outputs": [
+            ".overdeck/context/codebase/concerns.md: merge: union",
+            ".pan/specs/x.json: merge: unspecified",
+            "diff shows only added lines (comment block + concerns.md merge=union); the WARNING block is unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit the repo-root .gitattributes per PRD .pan/drafts/PAN-4614.md work item W1. Insert, after the existing '.beads/issues.jsonl merge=union' line and a blank line, a comment block stating: concerns.md is an append-style markdown bullet list; union is safe because every entry is line-oriented text with no structure to break (PAN-4614); known artifact: if both sides stamp different <!-- last-verified --> dates both footer lines survive and the next editor deletes the stray one; prose files (architecture.md) do not get union. Then the line '.overdeck/context/codebase/concerns.md merge=union'. Leave the existing WARNING block about .pan/specs/, .pan/continues/, .pan/records/ JSON files byte-identical. Do not edit concerns.md itself."
+        },
+        "items": [
+          {
+            "id": "gitattributes-union.ac1",
+            "title": "Given the edited .gitattributes, when `git check-attr merge -- .overdeck/context/codebase/concerns.md` runs, then it returns `merge: union`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitattributes-union.ac2",
+            "title": "Given the edited .gitattributes, when `git check-attr merge -- .pan/specs/x.json` runs, then it returns `merge: unspecified`, and `git diff origin/main -- .gitattributes` shows the three WARNING lines unchanged (preserves the JSON warning).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitattributes-union.ac3",
+            "title": "The comment directly above the new attribute line contains the phrases 'line-oriented', 'PAN-4614', and 'last-verified' (names why union is safe and the duplicate-footer artifact).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "union-rebase-test",
+        "title": "Real-git regression test: concurrent concerns.md appends rebase without conflict",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T11:04:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4614",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/__tests__/merge-rebase-union-concerns.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/merge-rebase-union-concerns.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-source-introspection.sh"
+          ],
+          "expected_outputs": [
+            "merge-rebase-union-concerns.test.ts: 4 tests passed",
+            "typecheck completes without errors",
+            "lint-source-introspection exits 0 (no new offender)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/__tests__/merge-rebase-union-concerns.test.ts per PRD work item W2, modeled on src/lib/cloister/__tests__/merge-rebase-plan-artifacts.test.ts (execFileSync git helper with GIT_AUTHOR_*/GIT_COMMITTER_* env, mkdtempSync root, local bare remote 'remote.git' cloned to 'work', rmSync in afterEach). Read the repo's real .gitattributes via readFileSync(fileURLToPath(new URL('../../../../.gitattributes', import.meta.url)), 'utf-8'). A setup(attributes) builder commits .gitattributes=attributes and .overdeck/context/codebase/concerns.md='# Concerns / hazards\\n\\n- base one\\n- base two\\n<!-- last-verified: 2026-10-01 -->\\n' on main, branches feature/pan-77 adding '- feature bullet' after '- base two' (pushed), then a second clone adds '- main bullet' after '- base two' on main (pushed). Four tests: (1) union in-place rebaseFeatureBranch(work,'feature/pan-77','main','PAN-77') succeeds and HEAD's concerns.md has both bullets and no '<<<<<<<'; (2) union approved-head path with { expectedHead: git rev-parse HEAD } succeeds and the remote branch's concerns.md has both bullets; (3) union probeBranchConflictPaths(work,'main') returns { mergeability: 'clean', paths: [] }; (4) control setup('') — rebaseFeatureBranch fails; capture with Effect.runPromise(Effect.flip(...)) (Effect 4 beta has no Effect.either; idiom from src/lib/__tests__/errors.test.ts line 35) and assert _tag 'MergeConflictError' with conflictedFiles containing '.overdeck/context/codebase/concerns.md'. No fake timers needed (no delay logic). Do not modify merge-rebase.ts or conflict-gate.ts."
+        },
+        "items": [
+          {
+            "id": "union-rebase-test.ac1",
+            "title": "Given two branches that each add a bullet after '- base two' and the repo's real .gitattributes, when rebaseFeatureBranch runs in place, then it returns success and HEAD:.overdeck/context/codebase/concerns.md contains both '- main bullet' and '- feature bullet' with no '<<<<<<<'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "union-rebase-test.ac2",
+            "title": "Given the same fixture, when rebaseFeatureBranch runs with { expectedHead } (the detached server-worktree path), then it returns success and the pushed remote branch's concerns.md contains both bullets.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "union-rebase-test.ac3",
+            "title": "Given the same fixture, when probeBranchConflictPaths(work, 'main') runs, then it returns { mergeability: 'clean', paths: [] }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "union-rebase-test.ac4",
+            "title": "Given the same appends with an empty .gitattributes, when rebaseFeatureBranch runs, then it fails with MergeConflictError whose conflictedFiles contains '.overdeck/context/codebase/concerns.md'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "union-rebase-test.ac5",
+            "title": "Given the finished test file, when `npx vitest run src/lib/cloister/__tests__/merge-rebase-union-concerns.test.ts` runs, then it reports 4 passed; and when the concerns.md line is temporarily deleted from .gitattributes, then tests 1-3 fail (the test is bound to the real attribute file).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-workflow-docs",
+        "title": "Document union-merged files in docs/MERGE-WORKFLOW.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T11:04:12Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4614",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"union-merged\" docs/MERGE-WORKFLOW.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "exactly one matching line inside the '## After another feature merges' section",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/MERGE-WORKFLOW.md, section '## After another feature merges', insert the paragraph from PRD work item W3 (copy it verbatim) after the paragraph ending '...let review and verification run again.' and before the 'pan task block' paragraph. It names the two union-merged files (.overdeck/context/codebase/concerns.md and .beads/issues.jsonl); says git keeps both sides' lines so the merge door's server rebase and a local git merge or git merge-tree report no conflict; says git does not dedupe, so a concerns.md merge can leave two <!-- last-verified --> lines when both PRs stamped different dates; says a pan sync-main merge into a branch created before the attribute landed (PAN-4614) can still conflict once; says GitHub's own mergeable check may ignore the attribute and still report the PR conflicting, tracked in PAN-4616; and says JSON state files under .pan/ never get union. It must not claim concurrent appends 'never conflict'."
+        },
+        "items": [
+          {
+            "id": "merge-workflow-docs.ac1",
+            "title": "docs/MERGE-WORKFLOW.md's 'After another feature merges' section contains a paragraph naming both `.overdeck/context/codebase/concerns.md` and `.beads/issues.jsonl` as union-merged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-workflow-docs.ac2",
+            "title": "The same paragraph states that a union merge can leave two `last-verified` lines, that a `pan sync-main` merge into a pre-attribute branch can still conflict once, that GitHub's mergeable check may still report the PR conflicting (names PAN-4616), and that `.pan/` JSON files never get union; `npm run lint:docs` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-workflow-docs.ac3",
+            "title": "Given the edited docs/MERGE-WORKFLOW.md, when `grep -n \"never conflict\" docs/MERGE-WORKFLOW.md` runs, then it returns no match (the doc does not overclaim the GitHub path).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "footer-dedupe-guidance",
+        "title": "Tell map editors to keep exactly one last-verified footer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T11:04:12Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4614",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-map/SKILL.md",
+            "roles/plan.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c \"exactly one\" sync-sources/skills/pan-map/SKILL.md roles/plan.md",
+            "npm run lint:prompt-trailer",
+            "npm run lint:prompts"
+          ],
+          "expected_outputs": [
+            "each file reports a count of 1",
+            "prompt-trailer: Prompt-Change trailer found; ok",
+            "lint:prompts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD work item W4: in sync-sources/skills/pan-map/SKILL.md replace the bullet '- End each file with `<!-- last-verified: YYYY-MM-DD -->`.' with '- End each file with exactly one `<!-- last-verified: YYYY-MM-DD -->` line. A union merge of concerns.md can leave a second one mid-file; delete it.' In roles/plan.md, append to the end of the '**If present:**' bullet under 'Codebase Map — read first, keep fresh' the sentence ' Keep exactly one `<!-- last-verified: -->` line, at the end; delete a stray one a union merge left mid-file.' roles/plan.md is a load-bearing prompt: the commit editing it MUST include the trailer line 'Prompt-Change: plan role: keep one last-verified footer in codebase map files (PAN-4614)' or lint:prompt-trailer fails."
+        },
+        "items": [
+          {
+            "id": "footer-dedupe-guidance.ac1",
+            "title": "Given the edited sync-sources/skills/pan-map/SKILL.md, when `grep -c \"exactly one\" sync-sources/skills/pan-map/SKILL.md` runs, then it returns 1, and that bullet tells the editor to delete a stray `last-verified` line a union merge of concerns.md left mid-file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "footer-dedupe-guidance.ac2",
+            "title": "roles/plan.md's 'If present' codebase-map bullet contains the sentence keeping exactly one `last-verified` line at the end, and `npm run lint:prompt-trailer` exits 0 because a branch commit carries a `Prompt-Change:` trailer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "gitattributes-union",
+        "to": "union-rebase-test",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
