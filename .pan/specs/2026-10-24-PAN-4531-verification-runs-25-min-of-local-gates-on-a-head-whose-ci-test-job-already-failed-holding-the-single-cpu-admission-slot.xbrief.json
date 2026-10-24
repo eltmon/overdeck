@@ -1,0 +1,273 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T14:21:33.000Z",
+    "author": "overdeck/0.69.0",
+    "description": "Plan for PAN-4531: Verification runs ~25 min of local gates on a head whose CI test job already failed, holding the single CPU admission slot",
+    "updated": "2026-10-24T14:24:03.074Z"
+  },
+  "plan": {
+    "id": "pan-4531",
+    "title": "Verification runs ~25 min of local gates on a head whose CI test job already failed, holding the single CPU admission slot",
+    "status": "proposed",
+    "uid": "c9beb815-24c2-4eae-8d15-f91d1788171e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-24T14:21:33.000Z",
+    "updated": "2026-10-24T14:24:03.074Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4531",
+        "label": "PAN-4531",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "verification",
+      "pipeline"
+    ],
+    "narratives": {
+      "Problem": "In ci tests mode the runner read the CI verdict only after every local gate had run, so a head with red CI held the single CPU admission slot for ~25 minutes before failing test.",
+      "Proposal": "Check whether the run is already decided (CI red for the verified head, PR merged, or HEAD superseded by an agent commit) before install and before each gate requests admission; a ci-red stop fails test with today's message and records the skipped gates as notRun, a superseded run restarts on the new head in the supervisor (bounded).",
+      "NonGoals": "- No preemption of a gate that is already running\n- No change to the attempt budget or the test failure message\n- No new HTTP route, CLI verb or setting"
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "gate-stop",
+        "title": "Let runQualityGates stop before a gate requests CPU admission",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T14:21:33.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4531",
+          "files_scope": [
+            "src/lib/cloister/validation.ts",
+            "tests/unit/lib/cloister/validation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/validation.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run tests/unit/lib/cloister/validation.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add QualityGateRunOptions.shouldStop, asked at the top of each gate after the phase filter; true stops the run."
+        },
+        "items": [
+          {
+            "id": "gate-stop.ac1",
+            "title": "Given a runQualityGates call whose shouldStop turns true after the first gate, when the next gate is reached, then it does not request CPU admission",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-stop.ac2",
+            "title": "Given shouldStop is absent or false, when runQualityGates runs, then every gate runs as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-red-stop",
+        "title": "Stop a ci-mode run whose verified head is already red on CI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T14:21:33.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4531",
+          "files_scope": [
+            "src/lib/cloister/verification-decided-stop.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "src/lib/cloister/verification-artifact.ts",
+            "tests/unit/lib/cloister/verification-tests-on-ci.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-tests-on-ci.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run tests/unit/lib/cloister/verification-tests-on-ci.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "createDecidedStopCheck answers merged, superseded or ci-red; the runner checks before install, between gates and after the last gate, fails test on ci-red with the existing message and records notRun."
+        },
+        "items": [
+          {
+            "id": "ci-red-stop.ac1",
+            "title": "Given CI recorded failed for the verified head before verification starts, when the runner runs, then no local gate runs, the run fails at test with the existing message, and notRun lists the gates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-red-stop.ac2",
+            "title": "Given CI flips to failed during a gate, when the next gate is reached, then it does not run and the run fails at test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-red-stop.ac3",
+            "title": "Given CI passed or unknown, when the runner runs, then every gate runs as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "superseded-restart",
+        "title": "Stop a merged or superseded run and restart a superseded one on the new head",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T14:21:33.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4531",
+          "files_scope": [
+            "src/lib/cloister/verification-runner.ts",
+            "src/lib/cloister/verification-types.ts",
+            "src/lib/cloister/verification-worker-supervisor.ts",
+            "tests/unit/lib/cloister/verification-tests-on-ci.test.ts",
+            "src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-tests-on-ci.test.ts src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run tests/unit/lib/cloister/verification-tests-on-ci.test.ts src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "A merged run returns the merged skip; a superseded run returns deferred with superseded, and runSupervisedVerificationInternal restarts on the new head up to MAX_SUPERSEDED_RESTARTS."
+        },
+        "items": [
+          {
+            "id": "superseded-restart.ac1",
+            "title": "Given the PR merges during a gate, when the next gate is reached, then the run stops with the merged skip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "superseded-restart.ac2",
+            "title": "Given an agent commit during a gate, when the next gate is reached, then the run is superseded and the supervisor returns the restarted run's verdict",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "superseded-restart.ac3",
+            "title": "Given the head keeps moving past the restart bound, when the supervisor gives up, then the door gets a plain deferred outcome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document that a decided run stops before its next gate",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T14:21:33.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4531",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "npm run lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add the 'A decided run stops before its next gate' subsection to the verification gate section."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/PIPELINE-GATES.md, when the decided-run subsection is read, then it states that a known-red CI head short-circuits local gates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given docs/PIPELINE-GATES.md, when the decided-run subsection is read, then it states the merged and superseded stops",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "gate-stop",
+        "to": "ci-red-stop",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-red-stop",
+        "to": "superseded-restart",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-24-PAN-4531-verification-runs-25-min-of-local-gates-on-a-head-whose-ci-test-job-already-failed-holding-the-single-cpu-admission-slot.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
