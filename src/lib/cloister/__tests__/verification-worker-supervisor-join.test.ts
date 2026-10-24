@@ -14,6 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   workspace: '',
   launches: [] as Array<{ resultPath: string }>,
+  /** Results the next fresh workers write, in order; then `passed`. */
+  results: [] as Array<Record<string, unknown>>,
   failConsumptionWrite: false,
 }));
 
@@ -47,7 +49,7 @@ vi.mock('../verification-worker-launcher.js', () => ({
   launchVerificationWorker: ({ request }: { request: string }) => {
     const { resultPath } = JSON.parse(request) as { resultPath: string };
     mocks.launches.push({ resultPath });
-    writeFileSync(resultPath, JSON.stringify({ outcome: 'passed' }));
+    writeFileSync(resultPath, JSON.stringify(mocks.results.shift() ?? { outcome: 'passed' }));
     return { pid: FRESH_PID, unref: () => undefined };
   },
 }));
@@ -140,6 +142,7 @@ beforeEach(() => {
   const origin = join(root, 'origin.git');
   mocks.workspace = join(root, 'workspace');
   mocks.launches = [];
+  mocks.results = [];
   mocks.failConsumptionWrite = false;
   execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin]);
   execFileSync('git', ['clone', '-q', origin, mocks.workspace], { stdio: 'ignore' });
@@ -368,5 +371,29 @@ describe('re-attaching on dashboard boot (PAN-4532)', () => {
     expect(pushBranch).toHaveBeenCalledTimes(1);
     expect(mocks.launches).toHaveLength(0);
     expect(signalled).toEqual([]);
+  });
+});
+
+describe('a run superseded by an agent commit (PAN-4531)', () => {
+  const superseded = { outcome: 'deferred', reason: 'HEAD moved during verification', superseded: { from: 'aaaaaaaa', to: 'bbbbbbbb' } };
+
+  it('restarts on the new head and returns that run\'s verdict to the door', async () => {
+    commit('a');
+    mocks.results = [superseded];
+
+    expect(await review()).toEqual({ outcome: 'passed' });
+    expect(mocks.launches).toHaveLength(2);
+    expect(readVerificationWorkerState('PAN-1')?.headAnchor).toBe(git('rev-parse', 'HEAD'));
+  });
+
+  it('gives the door a plain deferred once the head keeps moving past the restart bound', async () => {
+    commit('a');
+    mocks.results = [superseded, superseded, superseded, superseded, superseded];
+
+    const outcome = await review();
+
+    expect(outcome).toMatchObject({ outcome: 'deferred' });
+    expect(outcome).not.toHaveProperty('superseded');
+    expect(mocks.launches).toHaveLength(4);
   });
 });

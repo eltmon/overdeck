@@ -190,6 +190,11 @@ export interface QualityGateRunOptions {
   /** PAN-2665: raw stdout/stderr chunks from the RUNNING gate, streamed as
    *  they arrive so the Test/Lint panel can show a live output tail. */
   onGateOutput?: (name: string, chunk: string) => void;
+  /**
+   * PAN-4531: asked before each gate starts, so before it requests CPU
+   * admission. True ends the run with the results so far; the caller knows why.
+   */
+  shouldStop?: () => Promise<boolean>;
   /** Durable worker phase update; queued time does not consume execution timeout. */
   onAdmissionPhase?: (state: {
     phase: 'queued' | 'running';
@@ -279,6 +284,11 @@ export async function runQualityGates(
   for (const [name, gate] of Object.entries(gates)) {
     const gatePhase = gate.phase || 'pre_push';
     if (gatePhase !== phase) continue;
+
+    if (await opts.shouldStop?.()) {
+      console.log(`[quality-gate] Run already decided — not starting "${name}" or any later gate`);
+      break;
+    }
 
     const required = gate.required !== false; // default true
     const cwd = gate.path ? join(projectPath, gate.path) : projectPath;
@@ -402,7 +412,14 @@ export async function runQualityGates(
     let lastError: any = null;
     let passedGate = false;
     let passOutput = '';
+    // PAN-4531: a run decided while this gate waited for admission, or between
+    // its retries, does not start the command; the slot is released at once.
+    let stopped = false;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (attempt > 1 && await opts.shouldStop?.()) {
+        stopped = true;
+        break;
+      }
       let gatePgid: number | undefined;
       let admission: QualityGateAdmissionHandle | null = null;
       try {
@@ -418,6 +435,10 @@ export async function runQualityGates(
             attempt,
           });
           console.log(`[quality-gate] Admitted (slot ${admission.slot + 1}/${admission.slots}): ${identity}`);
+          if (await opts.shouldStop?.()) {
+            stopped = true;
+            break;
+          }
           opts.onAdmissionPhase?.({
             phase: 'running',
             gateName: name,
@@ -468,6 +489,11 @@ export async function runQualityGates(
         }
       }
       if (passedGate) break;
+    }
+
+    if (stopped) {
+      console.log(`[quality-gate] Run already decided — not running "${name}" or any later gate`);
+      break;
     }
 
     if (passedGate) {
