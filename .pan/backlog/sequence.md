@@ -1,13 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T14:09:04Z · model: claude-opus-5-5 · open: 839_
+_Last sequenced: 2026-10-24T14:23:05Z · model: claude-opus-5-5 · open: 837_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4540 | S | critical | ok |  |  | Gate refusal inside triggerMerge is marked failed, so approved green PRs never re-arm auto-merge. TENET-10: supervised handoff |
 | 2 | PAN-4527 | S | critical | ok |  |  | Re-review joins a worker started on the old head and fails the new head on stale CI; burns attempts. TENET-10: supervised handoff |
-| 3 | PAN-4532 | M | critical | ok |  | PAN-4527 | Dashboard restart during verification drops review dispatch; re-request re-runs 25-45 min of passed gates. TENET-10: supervised handoff |
 | 4 | PAN-4531 | S | critical | ok |  |  | Verification runs ~25 min of local gates on a head whose CI test already failed, holding the CPU slot. TENET-10: supervised handoff |
 | 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
@@ -15,7 +14,7 @@ _Last sequenced: 2026-10-24T14:09:04Z · model: claude-opus-5-5 · open: 839_
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
-| 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
+| 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 24 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
@@ -58,8 +57,7 @@ _Last sequenced: 2026-10-24T14:09:04Z · model: claude-opus-5-5 · open: 839_
 | 62 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
 | 63 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
 | 64 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
-| 65 | PAN-4618 | S | critical | ok |  |  | In pipeline: CI runs full suite on .pan/ bookkeeping pushes to main (95 of 99 runs), starving PR checks of runners |
-| 66 | PAN-4622 | M | high | ok |  | PAN-4532 | Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. Follows PAN-4532 |
+| 66 | PAN-4622 | M | high | ok |  |  | Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. PAN-4532 merged |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
@@ -855,10 +853,6 @@ Observed 2026-10-04 on PR #4525: an approved, all-green PR was stranded because 
 
 Root cause is pinned to two lines (sameHead always true, launch-time headShort reused). A wrong verdict tells agents to fix failures that no longer exist and spends verification budget, so it corrupts the core feedback loop. It also defines the head-equivalence rule PAN-4532 and PAN-4531 build on, so it goes first in the verification bundle.
 
-### PAN-4532 (rank 3)
-
-Every pan reload during a verification orphans its waiter, and four issues were exposed on 2026-10-04 alone. The re-run holds the single CPU admission slot for a head that already passed, starving every other issue. Needs PAN-4527's head-equivalence rule to decide when a finished result can be consumed, so it follows that fix.
-
 ### PAN-4531 (rank 4)
 
 A run certain to fail holds the machine-wide admission slot while seven waiters queue, including the agent's own isolation test for the fix. Checking the CI verdict before each gate is a small change with large queue relief. The body routes it with or after PAN-4527, which owns the headShort fix it must not reintroduce.
@@ -1059,13 +1053,9 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 
 Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
 
-### PAN-4618 (rank 65)
-
-New in-pipeline substrate bug: path-filtering bookkeeping commits off the main push trigger frees runners for every PR check, so it is critical; placed in the free top-tier slot 65 so no existing rank moves.
-
 ### PAN-4622 (rank 66)
 
-New follow-up to in-pipeline PAN-4532: two restart windows still discard a passed verification and re-run every gate on the single CPU admission slot, so it ranks high in the free top-tier slot 66; it builds on PAN-4532's adoption code, so it depends on that merge.
+Rank held: its only dependency, PAN-4532, closed 2026-10-24, so this follow-up is now unblocked and workable; the residual cases still recover via deacon-lite, so it stays below the active verification bundle.
 
 ### PAN-2940 (rank 67)
 
@@ -1167,6 +1157,14 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
 
 npm run build regenerates the committed record-cost-event.js bundle, dirtying every workspace tree and blocking clean-workspace gates.
 
+### PAN-2957 (rank 92)
+
+npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
+
+### PAN-2850 (rank 93)
+
+npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1174,10 +1172,10 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T14:09:04Z",
+  "generatedAt": "2026-10-24T14:23:05Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 839,
+  "openCount": 837,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1202,21 +1200,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "dependsOn": [],
       "why": "Re-review joins a worker started on the old head and fails the new head on stale CI; burns attempts. TENET-10: supervised handoff",
       "rationale": "Root cause is pinned to two lines (sameHead always true, launch-time headShort reused). A wrong verdict tells agents to fix failures that no longer exist and spends verification budget, so it corrupts the core feedback loop. It also defines the head-equivalence rule PAN-4532 and PAN-4531 build on, so it goes first in the verification bundle.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4532",
-      "rank": 3,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4527"
-      ],
-      "why": "Dashboard restart during verification drops review dispatch; re-request re-runs 25-45 min of passed gates. TENET-10: supervised handoff",
-      "rationale": "Every pan reload during a verification orphans its waiter, and four issues were exposed on 2026-10-04 alone. The re-run holds the single CPU admission slot for a head that already passed, starving every other issue. Needs PAN-4527's head-equivalence rule to decide when a finished result can be consumed, so it follows that fix.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1320,7 +1303,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "condition": "ok",
       "dependsOn": [
         "PAN-4527",
-        "PAN-4532",
         "PAN-4531",
         "PAN-4540",
         "PAN-4534"
@@ -11585,30 +11567,15 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "planning": "auto"
     },
     {
-      "issue": "PAN-4618",
-      "rank": 65,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: CI runs full suite on .pan/ bookkeeping pushes to main (95 of 99 runs), starving PR checks of runners",
-      "rationale": "New in-pipeline substrate bug: path-filtering bookkeeping commits off the main push trigger frees runners for every PR check, so it is critical; placed in the free top-tier slot 65 so no existing rank moves.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4622",
       "rank": 66,
       "size": "M",
       "importance": "high",
       "score": 72,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4532"
-      ],
-      "why": "Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. Follows PAN-4532",
-      "rationale": "New follow-up to in-pipeline PAN-4532: two restart windows still discard a passed verification and re-run every gate on the single CPU admission slot, so it ranks high in the free top-tier slot 66; it builds on PAN-4532's adoption code, so it depends on that merge.",
+      "dependsOn": [],
+      "why": "Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. PAN-4532 merged",
+      "rationale": "Rank held: its only dependency, PAN-4532, closed 2026-10-24, so this follow-up is now unblocked and workable; the residual cases still recover via deacon-lite, so it stays below the active verification bundle.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12867,13 +12834,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "from": "PAN-4527",
-      "to": "PAN-4532",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4527",
       "to": "PAN-4531",
       "type": "informs",
       "source": "github-ref",
@@ -12881,13 +12841,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "from": "PAN-4527",
-      "to": "PAN-4551",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4532",
       "to": "PAN-4551",
       "type": "unblocks",
       "source": "github-ref",
@@ -12983,20 +12936,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4532",
-      "to": "PAN-4622",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4532",
-      "to": "PAN-4623",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-4527",
