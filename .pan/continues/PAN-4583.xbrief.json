@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4583",
   "created": "2026-10-24T07:18:16.083Z",
-  "updated": "2026-10-24T07:49:12.417Z",
+  "updated": "2026-10-24T07:49:28.141Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
     "editor-pane-read-only-mode.ac4": {
       "status": "completed",
       "doneAt": "2026-10-24T07:49:12.417Z"
+    },
+    "docs-editor-pane-split-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:49:28.140Z"
     }
   }
 }
