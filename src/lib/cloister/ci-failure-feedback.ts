@@ -73,6 +73,12 @@ export interface CiFailureFeedbackOptions {
   headRef: string;
   prUrl?: string;
   source: string;
+  /**
+   * PAN-4534: the failed check that fired this relay, from the webhook. When
+   * neither lookup finds a failure (the check-run read failed, the workflow run
+   * is still in progress), the feedback still names and links it.
+   */
+  trigger?: { name: string; url?: string; jobId?: number };
 }
 
 export interface CiFailure {
@@ -690,6 +696,10 @@ async function relayCiFailureFeedbackInQueue(
 
   // Collect the concrete failures for this PR head.
   const failures = await collectFailures(owner, repo, opts.headRef, opts.headSha, mainFailingNames);
+  if (failures.length === 0 && opts.trigger) {
+    const { name, url, jobId } = opts.trigger;
+    failures.push({ name, ...(url ? { url } : {}), ...(jobId !== undefined ? { jobId } : {}), excerpt: '', inheritedFromMain: mainFailingNames.has(name) });
+  }
 
   // If we cannot find any failing workflow run for this SHA, still write a short
   // feedback file for explicit status events and authoritative polling so the

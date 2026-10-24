@@ -49,12 +49,19 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 /**
  * Drop an aggregate gate job (the `test` job that only echoes
- * `test-shard: failure`) when a job it aggregates failed too: a failing check
- * named `X` goes when another failing check is `X-…`, `X (…)` or `X / …`.
+ * `test-shard: failure`) when a job it aggregates failed too. A failing check
+ * `X` goes only with evidence: another failing check is `X-…`, `X (…)` or
+ * `X / …`, and X's own log reports that check's job as `<job>: failure`. A
+ * same-prefix check that failed on its own, or one with no log, is kept.
  */
-export function withoutAggregateChecks<T extends { name: string }>(failures: T[]): T[] {
+export function withoutAggregateChecks<T extends { name: string; log?: string }>(failures: T[]): T[] {
+  const reportsFailure = (log: string | undefined, child: string) => {
+    const job = child.replace(/ \(.*\)$/, '').split(' / ')[0]!;
+    return log !== undefined && new RegExp(`(^|\\s)${job.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\s*failure`, 'm').test(log);
+  };
   return failures.filter((failure) => !failures.some((other) => other !== failure
-    && [`${failure.name}-`, `${failure.name} (`, `${failure.name} / `].some((prefix) => other.name.startsWith(prefix))));
+    && [`${failure.name}-`, `${failure.name} (`, `${failure.name} / `].some((prefix) => other.name.startsWith(prefix))
+    && reportsFailure(failure.log, other.name)));
 }
 
 /**
@@ -97,23 +104,24 @@ async function readJobLog(owner: string, repo: string, jobId: number): Promise<s
 export async function collectCheckRunFailures(owner: string, repo: string, headSha: string): Promise<CheckRunFailure[] | null> {
   let checkRuns: GhCheckRun[];
   try {
-    const stdout = await gh(['api', `repos/${owner}/${repo}/commits/${headSha}/check-runs?per_page=100`]);
-    checkRuns = (JSON.parse(stdout) as { check_runs?: GhCheckRun[] }).check_runs ?? [];
+    // Every page: a commit can carry more than 100 check runs.
+    const stdout = await gh(['api', '--paginate', `repos/${owner}/${repo}/commits/${headSha}/check-runs?per_page=100`, '--jq', '.check_runs[]']);
+    checkRuns = stdout.split('\n').filter((line) => line.trim()).map((line) => JSON.parse(line) as GhCheckRun);
   } catch (err) {
     console.warn(`[ci-failure-feedback] Could not read check runs for ${headSha.slice(0, 8)}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
-  const failing = withoutAggregateChecks(checkRuns.filter((run) => run.conclusion === 'failure'));
-  const failures: CheckRunFailure[] = [];
-  for (const run of failing) {
+  const failing: Array<CheckRunFailure & { log?: string }> = [];
+  for (const run of checkRuns.filter((candidate) => candidate.conclusion === 'failure')) {
     const isActionsJob = run.app?.slug === 'github-actions';
     const log = isActionsJob ? await readJobLog(owner, repo, run.id) : '';
-    failures.push({
+    failing.push({
       name: run.name,
       ...(isActionsJob ? { jobId: run.id } : {}),
       ...(run.details_url || run.html_url ? { url: (run.details_url || run.html_url)! } : {}),
       excerpt: log ? extractTestFailureExcerpt(log) : '',
+      ...(log ? { log } : {}),
     });
   }
-  return failures;
+  return withoutAggregateChecks(failing).map(({ log: _log, ...failure }) => failure);
 }

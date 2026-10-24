@@ -52,6 +52,9 @@ export interface WebhookPayload {
   check_run?: {
     id?: number;
     name?: string;
+    html_url?: string;
+    details_url?: string;
+    app?: { slug?: string };
     status?: string;
     conclusion?: string | null;
     head_sha?: string;
@@ -279,6 +282,13 @@ export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
           headRef: pr.head.ref,
           prUrl: prUrlFor(repo, pr.number),
           source: sourceKey,
+          ...(run.name ? {
+            trigger: {
+              name: run.name,
+              ...(run.details_url || run.html_url ? { url: (run.details_url || run.html_url)! } : {}),
+              ...(run.app?.slug === 'github-actions' && run.id !== undefined ? { jobId: run.id } : {}),
+            },
+          } : {}),
         });
       }
     } else if (run.conclusion?.toUpperCase() === 'SUCCESS' && isCiTestCheckName(run.name) && pr.head.sha) {

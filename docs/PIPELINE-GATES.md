@@ -228,9 +228,11 @@ the **CI test job on the PR head is the test gate**:
   failing checks from the PR head's **check runs**
   (`GET /repos/{owner}/{repo}/commits/{sha}/check-runs`,
   `cloister/ci-check-run-failures.ts`), which conclude per job, so the failing
-  shard is found while its workflow run is still in progress. An aggregate
-  job (the `test` job that only echoes `test-shard: failure`) is dropped when
-  a job it aggregates failed. For each failing GitHub Actions job the feedback
+  shard is found while its workflow run is still in progress. It reads every
+  page of check runs. An aggregate job (the `test` job that only echoes
+  `test-shard: failure`) is dropped only when its own log reports a failing
+  same-prefix job as `<job>: failure`; a same-prefix check that failed on its
+  own is kept. For each failing GitHub Actions job the feedback
   file has a section with the check name, its job-log command, its details
   URL, and an excerpt of the job log
   (`GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs`): from the first
@@ -239,7 +241,9 @@ the **CI test job on the PR head is the test gate**:
   it has no Vitest failure. A log GitHub has not published yet is re-read with
   backoff for about two minutes; if it never appears, the section still names
   the check and its URL. Only when no check run reports a failure does the
-  relay fall back to the completed failed workflow runs (`gh run list`).
+  relay fall back to the completed failed workflow runs (`gh run list`). If
+  that finds nothing either, the feedback still names the failed check the
+  `check_run` webhook fired on, with its link and job-log command.
 - **Attempt budget.** A CI test failure counts against the local gate's budget
   (`VERIFICATION_MAX_CYCLES` = 3, `cloister/verification-cycles.ts`), read
   from the same per-run artifacts. The local count is per head — every commit

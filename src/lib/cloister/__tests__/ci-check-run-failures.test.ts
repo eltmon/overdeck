@@ -35,10 +35,18 @@ describe('extractTestFailureExcerpt (PAN-4534)', () => {
 });
 
 describe('withoutAggregateChecks (PAN-4534)', () => {
-  it('drops an aggregate whose shard failed, and keeps an aggregate that failed alone', () => {
-    const names = (list: Array<{ name: string }>) => withoutAggregateChecks(list).map((f) => f.name);
-    expect(names([{ name: 'test' }, { name: 'test-shard (4/4)' }])).toEqual(['test-shard (4/4)']);
-    expect(names([{ name: 'test' }, { name: 'lint' }])).toEqual(['test', 'lint']);
-    expect(names([{ name: 'test' }, { name: 'test / unit' }])).toEqual(['test / unit']);
+  const names = (list: Array<{ name: string; log?: string }>) => withoutAggregateChecks(list).map((f) => f.name);
+  const ECHO = '2026-10-04T04:16:20.1000000Z test-shard: failure\n2026-10-04T04:16:20.2000000Z test-e2e:   success';
+
+  it('drops an aggregate whose log reports its failing shard, and keeps an aggregate that failed alone', () => {
+    expect(names([{ name: 'test', log: ECHO }, { name: 'test-shard (4/4)' }])).toEqual(['test-shard (4/4)']);
+    expect(names([{ name: 'test', log: ECHO }, { name: 'lint' }])).toEqual(['test', 'lint']);
+    expect(names([{ name: 'test', log: 'test: failure' }, { name: 'test / unit' }])).toEqual(['test / unit']);
+  });
+
+  it('keeps an independent same-prefix pair, and an aggregate with no log', () => {
+    // `test` failed on its own: its log reports no test-e2e result.
+    expect(names([{ name: 'test', log: ' FAIL  tests/a.test.ts > a' }, { name: 'test-e2e' }])).toEqual(['test', 'test-e2e']);
+    expect(names([{ name: 'test' }, { name: 'test-shard (4/4)' }])).toEqual(['test', 'test-shard (4/4)']);
   });
 });

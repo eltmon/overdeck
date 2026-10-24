@@ -1020,8 +1020,9 @@ describe('PAN-4534: failures come from the head\'s check runs, with the failing 
     (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation((file: string, args: string[], _opts: unknown, callback: (err: Error | null, stdout?: string, stderr?: string) => void) => {
       const joined = args.join(' ');
       if (file === 'gh' && joined.startsWith('run list')) return callback(null, '[]', '');
-      if (file === 'gh' && joined === `api repos/test-owner/test-repo/commits/${HEAD}/check-runs?per_page=100`) {
-        return callback(null, JSON.stringify({ check_runs: checkRuns }), '');
+      if (file === 'gh' && joined === `api --paginate repos/test-owner/test-repo/commits/${HEAD}/check-runs?per_page=100 --jq .check_runs[]`) {
+        // `--paginate --jq` prints one check run per line across every page.
+        return callback(null, checkRuns.map((run) => JSON.stringify(run)).join('\n'), '');
       }
       if (file === 'gh' && /^api repos\/test-owner\/test-repo\/actions\/jobs\/\d+\/logs$/.test(joined)) {
         const answer = jobLog(args);
@@ -1034,7 +1035,7 @@ describe('PAN-4534: failures come from the head\'s check runs, with the failing 
 
   const shard = (name: string, id: number) => ({ id, name, conclusion: 'failure', details_url: `https://github.com/test-owner/test-repo/actions/runs/900/job/${id}`, app: { slug: 'github-actions' } });
 
-  async function relay() {
+  async function relay(trigger?: { name: string; url?: string; jobId?: number }) {
     await relayCiFailureFeedback({
       issueId: 'PAN-1801',
       repo: 'test-owner/test-repo',
@@ -1042,6 +1043,7 @@ describe('PAN-4534: failures come from the head\'s check runs, with the failing 
       headSha: HEAD,
       headRef: 'feature/pan-1801',
       source: 'check_run:test-shard (4/4)',
+      ...(trigger ? { trigger } : {}),
     });
     return mockWriteFeedbackFile.mock.calls[0]?.[0]?.markdownBody as string | undefined;
   }
@@ -1087,6 +1089,30 @@ describe('PAN-4534: failures come from the head\'s check runs, with the failing 
 
     expect(reads).toBe(2);
     expect(body).toContain('FAIL  tests/unit/lib/access-tokens.test.ts');
+  });
+
+  it('reads a failing check run past the first page of check runs', async () => {
+    const page1 = Array.from({ length: 100 }, (_, index) => ({ id: 1000 + index, name: `lint-${index}`, conclusion: 'success', app: { slug: 'github-actions' } }));
+    mockGh([...page1, shard('test-shard (4/4)', 456)], () => ({ stdout: VITEST_LOG }));
+
+    const body = await relay();
+
+    expect(body).toContain('### test-shard (4/4)');
+    expect(body).toContain('FAIL  tests/unit/lib/access-tokens.test.ts');
+  });
+
+  it('names and links the triggering check when the check runs cannot be read and no workflow run has failed yet', async () => {
+    (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation((file: string, args: string[], _opts: unknown, callback: (err: Error | null, stdout?: string, stderr?: string) => void) => {
+      if (file === 'gh' && args.join(' ').startsWith('run list')) return callback(null, '[]', '');
+      return callback(new Error('HTTP 502: Bad Gateway'), '', '');
+    });
+
+    const body = await relay({ name: 'test-shard (4/4)', url: SHARD_URL, jobId: 456 });
+
+    expect(body).toContain('### test-shard (4/4)');
+    expect(body).toContain(`Check: ${SHARD_URL}`);
+    expect(body).toContain('Job log: `gh api repos/test-owner/test-repo/actions/jobs/456/logs`');
+    expect(body).not.toContain('no failing workflow runs were found');
   });
 
   it('lists the failing check names and URLs when no job log ever appears', async () => {
