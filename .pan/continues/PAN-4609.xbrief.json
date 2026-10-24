@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4609",
   "created": "2026-10-24T10:37:57.966Z",
-  "updated": "2026-10-24T10:51:48.862Z",
+  "updated": "2026-10-24T10:52:05.359Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "w2-run-steps.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T10:51:48.862Z"
+    },
+    "w2-run-steps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:52:05.359Z"
     }
   }
 }
