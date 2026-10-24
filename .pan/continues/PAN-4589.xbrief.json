@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4589",
   "created": "2026-10-24T08:19:18.820Z",
-  "updated": "2026-10-24T08:21:20.221Z",
+  "updated": "2026-10-24T08:21:27.664Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4589",
       "claimedAt": "2026-10-24T08:19:18.820Z",
       "doneAt": "2026-10-24T08:21:20.221Z"
+    },
+    "rollup-status-context-pr-facts": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4589",
+      "claimedAt": "2026-10-24T08:21:27.664Z"
     }
   }
 }
