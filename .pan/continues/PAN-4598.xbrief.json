@@ -1,0 +1,79 @@
+{
+  "version": "1",
+  "issueId": "PAN-4598",
+  "created": "2026-10-24T10:10:10.024Z",
+  "updated": "2026-10-24T11:29:27.767Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-24T10:10Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-10-24T10:10:10.025Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-10-24T11:16Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-10-24T11:16:05.785Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-10-24T11:29:27.767Z"
+    }
+  ],
+  "feedback": [],
+  "items": {
+    "cutoff-window.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:52:06.590Z"
+    },
+    "cutoff-window.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:52:23.750Z"
+    },
+    "merge-next-issue-id.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:52:42.953Z"
+    },
+    "merge-next-issue-id.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:53:01.452Z"
+    },
+    "uat-card-merge-controls.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:53:20.070Z"
+    },
+    "uat-card-merge-controls.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:53:36.792Z"
+    },
+    "docs-merge-workflow.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:53:58.874Z"
+    },
+    "docs-merge-workflow.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:54:19.801Z"
+    },
+    "cutoff-window": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:54:41.479Z"
+    },
+    "merge-next-issue-id": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:55:02.488Z"
+    },
+    "uat-card-merge-controls": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:55:24.873Z"
+    },
+    "docs-merge-workflow": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:55:47.579Z"
+    }
+  },
+  "agentModel": "claude-opus-5-5"
+}
