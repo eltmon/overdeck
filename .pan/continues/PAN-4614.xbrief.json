@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4614",
   "created": "2026-10-24T11:11:53.918Z",
-  "updated": "2026-10-24T11:37:23.533Z",
+  "updated": "2026-10-24T11:37:39.884Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
     "union-rebase-test.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T11:37:23.532Z"
+    },
+    "union-rebase-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:37:39.883Z"
     }
   }
 }
