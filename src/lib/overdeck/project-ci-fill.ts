@@ -5,7 +5,7 @@ import type {
 import { appendDomainEventAsync } from '../activity-logger.js';
 import {
   projectCiGhApi,
-  resolveDefaultBranchHead,
+  resolveCiHead,
   type ProjectCiGhApi,
 } from '../ci/project-ci-github.js';
 import { listProjectsSync, type ProjectConfig } from '../projects.js';
@@ -47,9 +47,11 @@ function projectionFingerprint(observation: HeadObservation): string {
   ]);
 }
 
-/** Fetch a complete Actions projection for the independently-resolved default
- * branch head. The second branch lookup prevents publishing a projection when
- * the branch advances while workflow pages are being collected. */
+/** Fetch a complete Actions projection for the independently-resolved CI head
+ * (PAN-4618: the newest push run of the CI workflow, not necessarily the
+ * branch head — a bookkeeping push advances the branch but starts no run).
+ * The second CI-head lookup prevents publishing a projection when a CI run
+ * started meanwhile would make it stale. */
 export async function fillProjectCiObservation(
   project: Project,
   deps: { ghApi?: ProjectCiGhApi; now?: () => string } = {},
@@ -60,7 +62,7 @@ export async function fillProjectCiObservation(
   const ghApi = deps.ghApi ?? projectCiGhApi;
 
   try {
-    const headSha = await resolveDefaultBranchHead(repo, branch, ghApi);
+    const headSha = await resolveCiHead(repo, branch, ghApi);
     if (!headSha) return null;
 
     const runs: WorkflowRun[] = [];
@@ -74,7 +76,7 @@ export async function fillProjectCiObservation(
       if (pageRuns.length < 100) break;
     }
 
-    const verifiedHeadSha = await resolveDefaultBranchHead(repo, branch, ghApi);
+    const verifiedHeadSha = await resolveCiHead(repo, branch, ghApi);
     if (verifiedHeadSha !== headSha) return null;
 
     const observedAt = deps.now?.() ?? new Date().toISOString();

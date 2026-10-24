@@ -32,13 +32,15 @@ function run(id: number, overrides: Record<string, unknown> = {}) {
   };
 }
 
+const CI_HEAD_PATH = 'repos/eltmon/overdeck/actions/workflows/ci.yml/runs?branch=main&event=push&per_page=1';
+
 function ghApiWithRuns(pages: unknown[][], heads = ['sha-current', 'sha-current']) {
   let headCall = 0;
   return vi.fn(async (path: string) => {
-    if (path === 'repos/eltmon/overdeck/branches/main') {
+    if (path === CI_HEAD_PATH) {
       const sha = heads[Math.min(headCall, heads.length - 1)]!;
       headCall += 1;
-      return { commit: { sha } };
+      return { workflow_runs: [{ head_sha: sha }] };
     }
     const page = Number(new URL(`https://example.test/?${path.split('?')[1]}`).searchParams.get('page'));
     return { workflow_runs: pages[page - 1] ?? [] };
@@ -46,7 +48,7 @@ function ghApiWithRuns(pages: unknown[][], heads = ['sha-current', 'sha-current'
 }
 
 describe('fillProjectCiObservation', () => {
-  it('anchors the projection to the independently-resolved branch head', async () => {
+  it('anchors the projection to the independently-resolved CI head', async () => {
     const ghApi = ghApiWithRuns([[
       run(101),
       run(99, { head_sha: 'sha-old', conclusion: 'failure' }),
@@ -57,12 +59,12 @@ describe('fillProjectCiObservation', () => {
       now: () => '2026-08-04T08:12:00.000Z',
     });
 
-    expect(ghApi).toHaveBeenNthCalledWith(1, 'repos/eltmon/overdeck/branches/main');
+    expect(ghApi).toHaveBeenNthCalledWith(1, CI_HEAD_PATH);
     expect(ghApi).toHaveBeenNthCalledWith(
       2,
       'repos/eltmon/overdeck/actions/runs?branch=main&head_sha=sha-current&per_page=100&page=1',
     );
-    expect(ghApi).toHaveBeenNthCalledWith(3, 'repos/eltmon/overdeck/branches/main');
+    expect(ghApi).toHaveBeenNthCalledWith(3, CI_HEAD_PATH);
     expect(observation).toEqual({
       projectKey: 'overdeck',
       repo: 'eltmon/overdeck',
@@ -101,10 +103,21 @@ describe('fillProjectCiObservation', () => {
     expect(observation).toMatchObject({ headSha: 'sha-current', suites: {} });
   });
 
-  it('drops a projection when the branch advances during pagination', async () => {
+  it('drops a projection when the CI head advances during pagination', async () => {
     const ghApi = ghApiWithRuns([[run(101)]], ['sha-current', 'sha-new']);
 
     await expect(fillProjectCiObservation(project, { ghApi })).resolves.toBeNull();
+  });
+
+  it("projects the CI head's suites when the branch head is a bookkeeping commit", async () => {
+    const ghApi = ghApiWithRuns([[run(101, { head_sha: 'sha-code' })]], ['sha-code', 'sha-code']);
+
+    const observation = await fillProjectCiObservation(project, { ghApi });
+
+    expect(observation).toMatchObject({
+      headSha: 'sha-code',
+      suites: { '101': expect.objectContaining({ status: 'completed', conclusion: 'success' }) },
+    });
   });
 
   it('returns null when gh api rejects', async () => {
