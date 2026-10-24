@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4589",
   "created": "2026-10-24T08:19:18.820Z",
-  "updated": "2026-10-24T09:06:02.821Z",
+  "updated": "2026-10-24T09:06:22.140Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "rollup-status-context-pr-facts.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T09:06:02.821Z"
+    },
+    "rollup-status-context-pr-facts.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:06:22.139Z"
     }
   }
 }
