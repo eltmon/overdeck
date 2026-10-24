@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4614",
   "created": "2026-10-24T11:11:53.918Z",
-  "updated": "2026-10-24T11:37:56.604Z",
+  "updated": "2026-10-24T11:38:12.813Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,10 @@
     "union-rebase-test.ac5": {
       "status": "completed",
       "doneAt": "2026-10-24T11:37:56.603Z"
+    },
+    "merge-workflow-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:38:12.812Z"
     }
   }
 }
