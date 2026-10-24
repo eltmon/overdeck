@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4614",
   "created": "2026-10-24T11:11:53.918Z",
-  "updated": "2026-10-24T11:12:42.044Z",
+  "updated": "2026-10-24T11:12:53.998Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4614",
       "claimedAt": "2026-10-24T11:11:53.918Z",
       "doneAt": "2026-10-24T11:12:42.043Z"
+    },
+    "union-rebase-test": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4614",
+      "claimedAt": "2026-10-24T11:12:53.997Z"
     }
   }
 }
