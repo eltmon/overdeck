@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4618",
   "created": "2026-10-24T12:05:55.935Z",
-  "updated": "2026-10-24T12:52:20.006Z",
+  "updated": "2026-10-24T12:55:12.777Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-10-24T12:51:55.213Z"
     },
     "reload-bookkeeping-head-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4618",
-      "claimedAt": "2026-10-24T12:52:20.006Z"
+      "claimedAt": "2026-10-24T12:52:20.006Z",
+      "doneAt": "2026-10-24T12:55:12.777Z"
     }
   }
 }
