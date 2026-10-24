@@ -179,3 +179,18 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   (needs-handoff). Automatic close-out restored → PAN-4547 (needs-handoff;
   until it lands, the Flywheel closes deployed issues itself with
   `pan close <id> --force`, never with an override).
+
+### Run start 2026-10-24 08:10 UTC (conversation 3302)
+
+- `pan show <id> --health` is not a reliable stall signal on Herdr: it calls
+  working agents `stuck` because the CLI never registers the transcript
+  heartbeat lookup (`src/lib/agents/liveness.ts` line 72; registration only in
+  `src/lib/runtimes/index.ts` line 162) → PAN-4595 (needs-handoff, agents
+  runtime). Until it lands, judge activity by the newest transcript mtime
+  under `~/.claude/projects/<workspace-slug>/` and workspace file changes.
+- `pan show --health` on an issue still in planning pings `agent-<id>` and
+  reports `dead`; the live agent is `planning-<id>`. Expected, not a stall.
+- Conversation 3230 (the PAN-4527/4532/4531/4540/4534 held handoff) was never
+  sent; its session ended 2026-10-15 with no transcript, and its worktree
+  base is 352 commits behind main. The dashboard shows it as "no saved
+  history" → PAN-4596 (needs-handoff, conversation live-control).
