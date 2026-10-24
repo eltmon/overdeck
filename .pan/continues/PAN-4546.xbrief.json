@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4546",
   "created": "2026-10-24T10:44:02.967Z",
-  "updated": "2026-10-24T11:15:25.856Z",
+  "updated": "2026-10-24T11:15:45.565Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,10 @@
     "admission-ticket-durability.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T11:15:25.855Z"
+    },
+    "admission-ticket-durability.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:15:45.565Z"
     }
   }
 }
