@@ -4,17 +4,17 @@
     "created": "2026-10-24T16:22:54.000Z",
     "author": "overdeck/0.69.0",
     "description": "Plan for PAN-4534: CI failure feedback names no failing test: relay looks up completed failed workflow runs while the run is still in progress",
-    "updated": "2026-10-24T16:25:11.074Z"
+    "updated": "2026-10-24T16:51:48.277Z"
   },
   "plan": {
     "id": "pan-4534",
     "title": "CI failure feedback names no failing test: relay looks up completed failed workflow runs while the run is still in progress",
-    "status": "proposed",
+    "status": "running",
     "uid": "a17a9e01-60de-41a3-a3fc-32cb4d91fd13",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T16:22:54.000Z",
-    "updated": "2026-10-24T16:25:11.074Z",
+    "updated": "2026-10-24T16:51:48.277Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4534",
@@ -230,5 +230,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
