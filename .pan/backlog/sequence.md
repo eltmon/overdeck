@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T12:55:29Z · model: claude-opus-5-5 · open: 847_
+_Last sequenced: 2026-10-24T12:56:53Z · model: claude-opus-5-5 · open: 848_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -76,6 +76,7 @@ _Last sequenced: 2026-10-24T12:55:29Z · model: claude-opus-5-5 · open: 847_
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 74 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 75 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
+| 76 | PAN-4623 | XS | high | ok |  |  | deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10 |
 | 77 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 78 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
 | 79 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
@@ -1139,6 +1140,10 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
+### PAN-4623 (rank 76)
+
+New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.
+
 ### PAN-3234 (rank 77)
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
@@ -1171,10 +1176,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 
 Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
 
-### PAN-3043 (rank 85)
-
-Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1182,10 +1183,10 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T12:55:29Z",
+  "generatedAt": "2026-10-24T12:56:53Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 847,
+  "openCount": 848,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11759,6 +11760,19 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "rationale": "New follow-up to in-pipeline PAN-4532: two restart windows still discard a passed verification and re-run every gate on the single CPU admission slot, so it ranks high in the free top-tier slot 66; it builds on PAN-4532's adoption code, so it depends on that merge.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4623",
+      "rank": 76,
+      "size": "XS",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10",
+      "rationale": "New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13280,6 +13294,13 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4532",
+      "to": "PAN-4623",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
