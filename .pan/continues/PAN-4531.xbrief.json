@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4531",
   "created": "2026-10-24T14:26:57.596Z",
-  "updated": "2026-10-24T14:26:57.596Z",
+  "updated": "2026-10-24T14:27:26.991Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -12,6 +12,10 @@
     "gate-stop": {
       "status": "completed",
       "doneAt": "2026-10-24T14:26:57.596Z"
+    },
+    "ci-red-stop": {
+      "status": "completed",
+      "doneAt": "2026-10-24T14:27:26.991Z"
     }
   }
 }
