@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4583",
   "created": "2026-10-24T07:18:16.083Z",
-  "updated": "2026-10-24T07:48:03.295Z",
+  "updated": "2026-10-24T07:48:16.872Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -42,6 +42,10 @@
     "server-split-read-write-containment.ac4": {
       "status": "completed",
       "doneAt": "2026-10-24T07:48:03.295Z"
+    },
+    "server-split-read-write-containment.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:48:16.872Z"
     }
   }
 }
