@@ -73,6 +73,7 @@ const browseCopy: Conversation = {
 
 const mutations: ConversationMutations = {
   archive: vi.fn(),
+  isArchivePending: vi.fn(() => false),
   stop: vi.fn(),
   rename: vi.fn(),
   retitle: vi.fn(),
