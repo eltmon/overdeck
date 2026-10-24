@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4584",
   "created": "2026-10-24T07:25:13.534Z",
-  "updated": "2026-10-24T07:55:00.732Z",
+  "updated": "2026-10-24T07:55:14.755Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "hook-archive-tests.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T07:55:00.732Z"
+    },
+    "hook-archive-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:55:14.755Z"
     }
   }
 }
