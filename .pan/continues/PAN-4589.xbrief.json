@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4589",
+  "created": "2026-10-24T08:19:18.820Z",
+  "updated": "2026-10-24T08:19:18.821Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "dagger-predicates": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4589",
+      "claimedAt": "2026-10-24T08:19:18.820Z"
+    }
+  }
+}
