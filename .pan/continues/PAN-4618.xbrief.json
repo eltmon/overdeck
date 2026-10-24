@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4618",
   "created": "2026-10-24T12:05:55.935Z",
-  "updated": "2026-10-24T13:17:34.678Z",
+  "updated": "2026-10-24T13:17:50.121Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -99,6 +99,10 @@
     "ci-concurrency-group.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T13:17:34.678Z"
+    },
+    "default-branch-test-window.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:17:50.121Z"
     }
   },
   "feedback": [
