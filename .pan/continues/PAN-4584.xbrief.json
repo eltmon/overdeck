@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4584",
   "created": "2026-10-24T07:25:13.534Z",
-  "updated": "2026-10-24T07:51:47.776Z",
+  "updated": "2026-10-24T07:52:01.363Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,10 @@
     "hook-archive-pending.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T07:51:47.776Z"
+    },
+    "hook-archive-pending.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:52:01.363Z"
     }
   }
 }
