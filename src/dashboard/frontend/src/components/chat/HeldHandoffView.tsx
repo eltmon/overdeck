@@ -104,3 +104,25 @@ export function HeldHandoffView({
     </div>
   );
 }
+
+/** PAN-4596: the kickoff lookup failed, so the panel cannot tell whether an ended empty conversation is held. */
+export function HeldKickoffLookupFailedView({ onRetry, onArchive, archivePending }: { onRetry: () => void; onArchive?: () => void; archivePending?: boolean }) {
+  return (
+    <div className={styles.conversationEmptyState} data-testid="held-kickoff-lookup-failed">
+      <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>
+        ⚠ Couldn&apos;t check whether this conversation is waiting to start
+      </p>
+      <p className={styles.conversationEmptyStateSubtitle}>The kickoff lookup failed. Retry to check again.</p>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+        <button type="button" className={styles.conversationArchiveBtnLarge} onClick={onRetry}>
+          Retry
+        </button>
+        {onArchive && (
+          <button type="button" className={styles.conversationArchiveBtnLarge} onClick={() => onArchive()} disabled={archivePending}>
+            {archivePending ? 'Archiving…' : 'Archive'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

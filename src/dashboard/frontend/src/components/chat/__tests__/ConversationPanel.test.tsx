@@ -151,6 +151,11 @@ function defaultConversationResponse(method: string, url: string): Response | un
   if (method === 'GET' && url.endsWith('/api/conversations/pending-input')) {
     return Response.json([]);
   }
+  // PAN-4596 — an ended conversation asks the kickoff door whether it is a
+  // held handoff before it shows the orphaned state; none is held here.
+  if (method === 'GET' && /^\/api\/conversations\/[^/]+\/kickoff$/.test(url)) {
+    return Response.json({ held: false });
+  }
   // PAN-4498 — ConversationBookmarksProvider fetches on every mount.
   if (method === 'GET' && /^\/api\/conversations\/[^/]+\/bookmarks$/.test(url)) {
     return Response.json({ bookmarks: [] });
@@ -665,17 +670,18 @@ describe('ConversationPanel resume message control', () => {
     vi.clearAllMocks();
   });
 
-  it('places a checked send-message checkbox beside the resume button', () => {
+  it('places a checked send-message checkbox beside the resume button', async () => {
     renderPanel();
 
-    expect(screen.getByRole('checkbox', { name: 'Send resume message' })).toBeChecked();
+    // PAN-4596: the orphaned state waits for the kickoff lookup to answer.
+    expect(await screen.findByRole('checkbox', { name: 'Send resume message' })).toBeChecked();
     expect(screen.getByRole('button', { name: 'Resume Session' })).toBeInTheDocument();
   });
 
   it('passes the checkbox choice to the resume endpoint', async () => {
     renderPanel();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Send resume message' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Send resume message' }));
     fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
 
     await waitFor(() => {
@@ -1167,6 +1173,8 @@ describe('ConversationPanel HTTP /messages fallback (PAN-4312)', () => {
 
     const listener = streamTransportMock.listeners.get('test-conv');
     act(() => { listener?.({ kind: 'messages', snapshot: true, messages: [], workLog: [], streaming: false }); });
+    // PAN-4596: the empty ended transcript shows Resume once the kickoff lookup answers.
+    await act(() => vi.advanceTimersByTimeAsync(0));
 
     fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
     await act(() => vi.advanceTimersByTimeAsync(0));
@@ -1316,6 +1324,9 @@ describe('ConversationPanel archive (PAN-4584)', () => {
       return defaultConversationResponse(method, url);
     });
     renderPanel();
+    // PAN-4596: let the kickoff lookup answer so its loading skeleton (also a
+    // status region) is gone before the header status is read.
+    await screen.findByText(/no saved history/);
 
     openArchiveMenu();
 
@@ -1323,5 +1334,147 @@ describe('ConversationPanel archive (PAN-4584)', () => {
 
     resolveArchive?.(Response.json({ success: true }));
     await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+  });
+});
+
+describe('ConversationPanel held handoff (PAN-4596)', () => {
+  const ended = {
+    ...mockConversation,
+    status: 'ended' as const,
+    sessionAlive: false,
+    endedAt: '2024-01-01T01:00:00Z',
+    handoffDocPath: '/home/user/.overdeck/handoffs/test-conv.md',
+  };
+  const HELD = { held: true, text: 'KICKOFF BODY', focus: 'Read the brief' };
+  // Each kickoff GET takes the next answer; the last one repeats.
+  let kickoffAnswers: Array<() => Response | Promise<Response>>;
+  let kickoffPosts: Array<RequestInit | undefined>;
+
+  function kickoffGetCount(): number {
+    return fetchControl.fetchMock.mock.calls.filter(([input, init]) => (
+      /\/api\/conversations\/test-conv\/kickoff$/.test(String(input)) && (init?.method ?? 'GET') === 'GET'
+    )).length;
+  }
+
+  function tree(client: QueryClient, conversation: typeof ended) {
+    return (
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationPanel conversation={conversation} viewMode="conversation" onArchived={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>
+    );
+  }
+
+  beforeEach(() => {
+    queryClients = [];
+    kickoffAnswers = [() => Response.json(HELD)];
+    kickoffPosts = [];
+    fetchControl = installStrictFetchMock(({ method, url, init }) => {
+      if (url === '/api/conversations/test-conv/kickoff' && method === 'GET') {
+        const answer = kickoffAnswers.length > 1 ? kickoffAnswers.shift()! : kickoffAnswers[0]!;
+        return answer();
+      }
+      if (url === '/api/conversations/test-conv/kickoff' && method === 'POST') {
+        kickoffPosts.push(init);
+        return Response.json({ success: true, conversation: { ...ended, forkStatus: 'spawning' } });
+      }
+      return defaultConversationResponse(method, url);
+    });
+    vi.clearAllMocks();
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+  });
+
+  it('shows the held handoff view instead of "no saved history", with no Resume control', async () => {
+    renderPanel(ended);
+    const view = await screen.findByTestId('held-handoff-view');
+    expect(view).toHaveTextContent('Held handoff — kickoff not sent');
+    expect(view).toHaveTextContent('Read the brief');
+    expect(view).toHaveTextContent('/home/user/.overdeck/handoffs/test-conv.md');
+    expect(screen.queryByText(/no saved history/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Resume Session' })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: 'Send resume message' })).toBeNull();
+  });
+
+  it('Start POSTs the kickoff door with an empty body', async () => {
+    renderPanel(ended);
+    fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+    await waitFor(() => expect(kickoffPosts).toHaveLength(1));
+    expect(JSON.parse(String(kickoffPosts[0]?.body))).toEqual({});
+    // Until the server shows the start, the spawn placeholder covers the gap.
+    expect(await screen.findByText('Waiting for the session to start.')).toBeInTheDocument();
+  });
+
+  it('a failed previous start shows the held view with its error, not the fork progress view', async () => {
+    renderPanel({ ...ended, forkStatus: 'failed', forkError: 'spawn timed out' });
+    expect(await screen.findByText('The last start failed: spawn timed out')).toBeInTheDocument();
+    expect(screen.getByTestId('held-handoff-view')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start' })).not.toBeDisabled();
+  });
+
+  it('a not-held ended conversation still shows "no saved history"', async () => {
+    kickoffAnswers = [() => Response.json({ held: false })];
+    renderPanel(ended);
+    expect(await screen.findByText(/no saved history/)).toBeInTheDocument();
+    expect(screen.queryByTestId('held-handoff-view')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Resume Session' })).toBeInTheDocument();
+  });
+
+  it('a live conversation sends no kickoff request from the panel', async () => {
+    renderPanel({ ...ended, status: 'active', sessionAlive: true, endedAt: null });
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByTestId('composer-footer')).toBeInTheDocument();
+    expect(kickoffGetCount()).toBe(0);
+  });
+
+  it('shows the loading skeleton, never "no saved history", while the lookup is pending', async () => {
+    let answer: (response: Response) => void = () => {};
+    kickoffAnswers = [() => new Promise<Response>((resolve) => { answer = resolve; })];
+    renderPanel(ended);
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.queryByText(/no saved history/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Resume Session' })).toBeNull();
+    await act(async () => { answer(Response.json(HELD)); });
+    expect(await screen.findByTestId('held-handoff-view')).toBeInTheDocument();
+  });
+
+  it('a failed lookup shows a retryable warning; Retry re-reads the door', async () => {
+    kickoffAnswers = [() => Response.json({ error: 'boom' }, { status: 500 }), () => Response.json({ held: false })];
+    renderPanel(ended);
+    expect(await screen.findByText(/Couldn.t check whether this conversation is waiting to start/)).toBeInTheDocument();
+    expect(screen.queryByText(/no saved history/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Resume Session' })).toBeNull();
+    const before = kickoffGetCount();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText(/no saved history/)).toBeInTheDocument();
+    expect(kickoffGetCount()).toBe(before + 1);
+  });
+
+  it('a start that fails in the background brings the held view and Start back', async () => {
+    vi.useFakeTimers();
+    kickoffAnswers = [() => Response.json(HELD), () => Response.json({ held: false }), () => Response.json(HELD)];
+    const { client, rerender } = renderPanel(ended);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.getByTestId('held-handoff-view')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(kickoffPosts).toHaveLength(1);
+    expect(screen.getByText('Waiting for the session to start.')).toBeInTheDocument();
+
+    // The background delivery fails: the door restores the hold and marks the fork failed.
+    rerender(tree(client, { ...ended, forkStatus: 'failed', forkError: 'spawn timed out' }));
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    expect(screen.getByTestId('held-handoff-view')).toBeInTheDocument();
+    expect(screen.getByText('The last start failed: spawn timed out')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start' })).not.toBeDisabled();
   });
 });
