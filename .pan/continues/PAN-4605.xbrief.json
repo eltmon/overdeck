@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T11:47:58.376Z",
+  "updated": "2026-10-24T11:48:13.728Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -222,6 +222,10 @@
     "docs-outside-pr-pipeline.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T11:47:58.375Z"
+    },
+    "docs-outside-pr-pipeline.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:48:13.727Z"
     }
   }
 }
