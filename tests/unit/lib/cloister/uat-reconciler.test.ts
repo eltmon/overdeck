@@ -7,6 +7,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   reconcileUatGenerations,
   FAILED_RETRY_BACKOFF_MS,
+  FAILED_STREAK_WINDOW_MS,
   STUCK_ASSEMBLING_MS,
   type UatReconcilerDeps,
 } from '../../../../src/lib/cloister/uat-reconciler.js';
@@ -401,19 +402,20 @@ describe('single-flight, stuck assemblies, backoff', () => {
 });
 
 describe('consecutive-failure cutoff (PAN-3963)', () => {
-  const failedRow = (proj: string, name: string, hour: number) =>
+  // Failures within the last few hours of T0 (12:00), inside FAILED_STREAK_WINDOW_MS.
+  const failedRow = (proj: string, name: string, hour: number, day = '2026-06-10') =>
     gen(proj, name, 'failed', {
-      createdAt: `2026-06-10T0${hour}:00:00.000Z`,
-      updatedAt: `2026-06-10T0${hour}:00:00.000Z`,
+      createdAt: `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`,
+      updatedAt: `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`,
     });
 
   it('stops re-assembling after three consecutive failed assemblies', async () => {
     const proj = freshProject();
     const deps = makeDeps(proj, {
       rows: [
-        failedRow(proj, 'uat/pan-f1-0610', 6),
-        failedRow(proj, 'uat/pan-f2-0610', 7),
-        failedRow(proj, 'uat/pan-f3-0610', 8),
+        failedRow(proj, 'uat/pan-f1-0610', 9),
+        failedRow(proj, 'uat/pan-f2-0610', 10),
+        failedRow(proj, 'uat/pan-f3-0610', 11),
       ],
     });
     const result = await reconcileUatGenerations(proj, deps);
@@ -425,17 +427,17 @@ describe('consecutive-failure cutoff (PAN-3963)', () => {
   it('still assembles below the cutoff, and a newer non-failed row breaks the streak', async () => {
     const proj = freshProject();
     const twoFailures = makeDeps(proj, {
-      rows: [failedRow(proj, 'uat/pan-f1-0610', 6), failedRow(proj, 'uat/pan-f2-0610', 7)],
+      rows: [failedRow(proj, 'uat/pan-f1-0610', 9), failedRow(proj, 'uat/pan-f2-0610', 10)],
     });
     expect((await reconcileUatGenerations(proj, twoFailures)).action).toBe('assembled');
 
     const proj2 = freshProject();
     const brokenStreak = makeDeps(proj2, {
       rows: [
-        failedRow(proj2, 'uat/pan-f1-0610', 6),
-        failedRow(proj2, 'uat/pan-f2-0610', 7),
-        failedRow(proj2, 'uat/pan-f3-0610', 8),
-        gen(proj2, 'uat/pan-otter-0610', 'invalidated', { createdAt: '2026-06-10T09:00:00.000Z' }),
+        failedRow(proj2, 'uat/pan-f1-0610', 9),
+        failedRow(proj2, 'uat/pan-f2-0610', 10),
+        failedRow(proj2, 'uat/pan-f3-0610', 11),
+        gen(proj2, 'uat/pan-otter-0610', 'invalidated', { createdAt: '2026-06-10T11:30:00.000Z' }),
       ],
     });
     expect((await reconcileUatGenerations(proj2, brokenStreak)).action).toBe('assembled');
@@ -445,12 +447,58 @@ describe('consecutive-failure cutoff (PAN-3963)', () => {
     const proj = freshProject();
     const deps = makeDeps(proj, {
       rows: [
-        failedRow(proj, 'uat/pan-f1-0610', 6),
-        failedRow(proj, 'uat/pan-f2-0610', 7),
-        failedRow(proj, 'uat/pan-f3-0610', 8),
+        failedRow(proj, 'uat/pan-f1-0610', 9),
+        failedRow(proj, 'uat/pan-f2-0610', 10),
+        failedRow(proj, 'uat/pan-f3-0610', 11),
       ],
     });
     expect((await reconcileUatGenerations(proj, deps, { force: true })).action).toBe('assembled');
+  });
+  it('PAN-4598: failures older than the window expire, so a UAT-held lone feature assembles again', async () => {
+    // The live latch: three failed rows from weeks ago, nothing newer.
+    const proj = freshProject();
+    const deps = makeDeps(proj, {
+      readySet: [READY[0]!],
+      holdsForUat: true,
+      rows: [
+        failedRow(proj, 'uat/pan-f1-0520', 16, '2026-05-20'),
+        failedRow(proj, 'uat/pan-f2-0520', 17, '2026-05-20'),
+        failedRow(proj, 'uat/pan-f3-0520', 18, '2026-05-20'),
+      ],
+    });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1']);
+    expect(deps.logs.some((m) => m.includes('BLOCKED'))).toBe(false);
+  });
+
+  it('PAN-4598: only failures inside the window count toward the streak', async () => {
+    // Two recent failures on top of an old one: below the cutoff, so it assembles.
+    const proj = freshProject();
+    const mixed = makeDeps(proj, {
+      readySet: [READY[0]!],
+      holdsForUat: true,
+      rows: [
+        failedRow(proj, 'uat/pan-f0-0610', 5),
+        failedRow(proj, 'uat/pan-f1-0610', 10),
+        failedRow(proj, 'uat/pan-f2-0610', 11),
+      ],
+    });
+    expect((await reconcileUatGenerations(proj, mixed)).action).toBe('assembled');
+
+    // Three failures just inside the window stay blocked.
+    const proj2 = freshProject();
+    const recent = makeDeps(proj2, {
+      readySet: [READY[0]!],
+      holdsForUat: true,
+      rows: [
+        failedRow(proj2, 'uat/pan-f1-0610', 7),
+        failedRow(proj2, 'uat/pan-f2-0610', 8),
+        failedRow(proj2, 'uat/pan-f3-0610', 9),
+      ],
+    });
+    expect(T0 - Date.parse('2026-06-10T07:00:00.000Z')).toBeLessThan(FAILED_STREAK_WINDOW_MS);
+    expect((await reconcileUatGenerations(proj2, recent)).action).toBe('assembly-blocked');
   });
 });
 

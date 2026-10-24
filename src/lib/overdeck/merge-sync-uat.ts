@@ -469,8 +469,15 @@ export function updateUatGeneration(
     if (patch.cleanedAt !== undefined) { sets.push('cleaned_at = ?'); params.push(millisFromIso(patch.cleanedAt)); }
 
     if (sets.length > 0) {
-      sets.push('updated_at = ?');
-      params.push(nowMillis(), name);
+      // PAN-4598: cleaned_at is artifact bookkeeping, not a lifecycle change.
+      // A cleanup-only patch leaves updated_at alone, so on a failed row it
+      // stays the failure time that the reconciler cutoff and the UAT card read.
+      const cleanupOnly = Object.entries(patch).every(([key, value]) => key === 'cleanedAt' || value === undefined);
+      if (!cleanupOnly) {
+        sets.push('updated_at = ?');
+        params.push(nowMillis());
+      }
+      params.push(name);
       const result = db.prepare(`UPDATE uat_generations SET ${sets.join(', ')} WHERE name = ?`).run(...params);
       if (result.changes === 0) {
         throw new Error(`[merge-sync] uat generation not found: ${name}`);

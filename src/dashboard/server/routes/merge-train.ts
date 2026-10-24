@@ -185,6 +185,8 @@ export async function getMergeTrainGenerationsPayload(): Promise<MergeTrainGener
  * PAN-1696 AC3: merge the first N issues of the named project's ready set,
  * one at a time, stopping at the first failure (the rest would need
  * re-rebasing). An unknown project key is a 4xx, never a silent empty merge.
+ * PAN-4598: an `issueId` merges that one ready feature instead of the head of
+ * the queue — the per-row Merge button. It must be in the ready set (409).
  */
 export interface MergeTrainMergeNextDeps {
   getOrderedIssueIds?: (projectPath: string) => Promise<string[]>;
@@ -215,7 +217,7 @@ export async function postMergeTrainMergeNextPayload(
   if (!isJsonObject(payload)) {
     return { status: 400, body: { error: 'body must be a JSON object: { n, project }' } };
   }
-  const body = payload as { n?: unknown; project?: unknown };
+  const body = payload as { n?: unknown; project?: unknown; issueId?: unknown };
   const n = typeof body.n === 'number' && Number.isFinite(body.n) ? Math.floor(body.n) : 0;
   if (n <= 0) return { status: 400, body: { error: 'n must be a positive integer' } };
 
@@ -231,8 +233,20 @@ export async function postMergeTrainMergeNextPayload(
     return { status: 409, body: { error: `merge-train is disabled for project ${projectKey}` } };
   }
 
+  if (body.issueId !== undefined && (typeof body.issueId !== 'string' || body.issueId.trim() === '')) {
+    return { status: 400, body: { error: 'issueId must be a non-empty string when present' } };
+  }
+  const requestedIssueId = typeof body.issueId === 'string' ? body.issueId.trim().toUpperCase() : null;
+
   const ordered = await (deps.getOrderedIssueIds ?? defaultOrderedIssueIdsForProject)(resolve(config.path));
-  const issueIds = ordered.slice(0, n);
+  let issueIds = ordered.slice(0, n);
+  if (requestedIssueId !== null) {
+    const match = ordered.find((id) => id.toUpperCase() === requestedIssueId);
+    if (!match) {
+      return { status: 409, body: { error: `${requestedIssueId} is not in ${projectKey}'s ready set` } };
+    }
+    issueIds = [match];
+  }
   const memberships = await (deps.gatherEligibility ?? gatherMergeEligibility)(issueIds);
   for (const issueId of issueIds) {
     const membership = memberships.get(issueId.toUpperCase());
