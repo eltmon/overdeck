@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4585",
+  "created": "2026-10-24T08:22:26.190Z",
+  "updated": "2026-10-24T08:22:26.190Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "config-security-semgrep": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4585",
+      "claimedAt": "2026-10-24T08:22:26.190Z"
+    }
+  }
+}
