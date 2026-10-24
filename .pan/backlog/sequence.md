@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T13:57:02Z · model: claude-opus-5-5 · open: 840_
+_Last sequenced: 2026-10-24T13:57:45Z · model: claude-opus-5-5 · open: 839_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -12,7 +12,6 @@ _Last sequenced: 2026-10-24T13:57:02Z · model: claude-opus-5-5 · open: 840_
 | 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
-| 9 | PAN-4605 | M | critical | ok |  |  | In pipeline: feature/ PRs opened from handoff worktrees get no workspace, so review never starts and only a console.log records it |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
@@ -876,10 +875,6 @@ New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup fa
 
 New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.
 
-### PAN-4605 (rank 9)
-
-New since the prior run and already in the pipeline. Supervised handoffs (the TENET-10 path for pipeline-machinery fixes) open PRs from plain worktrees, and handlePullRequest silently drops them when startReview finds no workspace; PRs #4599/#4602/#4603 sat unreviewed on 2026-10-24. Placed in the open rank 9 slot of the critical top tier because it gates review for every handoff-produced PR, including PAN-4527 and PAN-4532.
-
 ### PAN-4547 (rank 11)
 
 Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by hand. With false DoD refusals fixed by PAN-4543, auto close-out only needs a patrol on the existing verify-on-main path and live settings. High because unclosed issues distort every pipeline view.
@@ -1168,6 +1163,10 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
 
 Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
 
+### PAN-2699 (rank 91)
+
+npm run build regenerates the committed record-cost-event.js bundle, dirtying every workspace tree and blocking clean-workspace gates.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1175,10 +1174,10 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T13:57:02Z",
+  "generatedAt": "2026-10-24T13:57:45Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 840,
+  "openCount": 839,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11573,19 +11572,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "planning": "auto"
     },
     {
-      "issue": "PAN-4605",
-      "rank": 9,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: feature/ PRs opened from handoff worktrees get no workspace, so review never starts and only a console.log records it",
-      "rationale": "New since the prior run and already in the pipeline. Supervised handoffs (the TENET-10 path for pipeline-machinery fixes) open PRs from plain worktrees, and handlePullRequest silently drops them when startReview finds no workspace; PRs #4599/#4602/#4603 sat unreviewed on 2026-10-24. Placed in the open rank 9 slot of the critical top tier because it gates review for every handoff-produced PR, including PAN-4527 and PAN-4532.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4616",
       "rank": 226,
       "size": "S",
@@ -12997,20 +12983,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4605",
-      "to": "PAN-4527",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4605",
-      "to": "PAN-4532",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-4532",
