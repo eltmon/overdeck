@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4584",
   "created": "2026-10-24T07:25:13.534Z",
-  "updated": "2026-10-24T07:53:47.538Z",
+  "updated": "2026-10-24T07:54:04.160Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "action-menu-archive.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T07:53:47.538Z"
+    },
+    "panel-archive-shared.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:54:04.160Z"
     }
   }
 }
