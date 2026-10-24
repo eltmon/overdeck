@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setImmediate as realSetImmediate } from 'node:timers/promises'
@@ -42,6 +42,7 @@ function deps(rootDir: string, samples: QualityGatePressureSample[] = [low]): Qu
     pollMs: 100,
     settleMs: 200,
     staleMs: 1_000,
+    tornGraceMs: 10_000,
     isProcessAlive: (pid) => pid === process.pid,
     samplePressure: vi.fn(async () => samples[Math.min(sampleIndex++, samples.length - 1)]!),
   }
@@ -50,10 +51,8 @@ function deps(rootDir: string, samples: QualityGatePressureSample[] = [low]): Qu
 // Captured before vi.useFakeTimers() so it always schedules real wall-clock time.
 const nativeSetTimeout = globalThis.setTimeout
 
-async function driveUntilResolved<T>(promise: Promise<T>): Promise<T> {
-  let settled = false
-  promise.finally(() => { settled = true }).catch(() => undefined)
-  for (let attempt = 0; attempt < 100 && !settled; attempt++) {
+async function driveUntil(done: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 100 && !done(); attempt++) {
     // The admission loop awaits real fs promises that resolve on the libuv
     // threadpool; on a loaded host a bare setImmediate spin exhausts every
     // attempt before a single fs op completes. A 1ms real yield per attempt
@@ -62,8 +61,27 @@ async function driveUntilResolved<T>(promise: Promise<T>): Promise<T> {
     await realSetImmediate()
     await vi.runOnlyPendingTimersAsync()
   }
-  expect(settled).toBe(true)
+  expect(done()).toBe(true)
+}
+
+async function driveUntilResolved<T>(promise: Promise<T>): Promise<T> {
+  let settled = false
+  promise.finally(() => { settled = true }).catch(() => undefined)
+  await driveUntil(() => settled)
   return promise
+}
+
+/** Waiter files whose parsed ticket was created at `createdAt`. */
+function ticketFilesCreatedAt(rootDir: string, createdAt: number): string[] {
+  return readdirSync(rootDir)
+    .filter((entry) => entry.startsWith('waiter-') && entry.endsWith('.json'))
+    .filter((entry) => {
+      try {
+        return JSON.parse(readFileSync(join(rootDir, entry), 'utf8')).createdAt === createdAt
+      } catch {
+        return false
+      }
+    })
 }
 
 beforeEach(() => {
@@ -160,6 +178,91 @@ describe('quality gate admission', () => {
     )).rejects.toBeInstanceOf(QualityGateAdmissionTimeoutError)
 
     expect(readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-'))).toEqual([])
+  })
+
+  describe('ticket durability (PAN-4610)', () => {
+    const tornName = 'waiter-0000000000000000-0000000001-000000.json'
+
+    it('leaves a young torn ticket for its writer to finish', async () => {
+      const rootDir = home()
+      writeFileSync(join(rootDir, tornName), '')
+
+      const handle = await driveUntilResolved(acquireQualityGateAdmission(
+        { workspacePath: '/tmp/one', gateName: 'test', attempt: 1 },
+        deps(rootDir),
+      ))
+      await handle.release()
+
+      expect(existsSync(join(rootDir, tornName))).toBe(true)
+    })
+
+    it('deletes a torn ticket older than the torn grace', async () => {
+      const rootDir = home()
+      const tornPath = join(rootDir, tornName)
+      writeFileSync(tornPath, '')
+      const sixtySecondsAgo = new Date(Date.now() - 60_000)
+      utimesSync(tornPath, sixtySecondsAgo, sixtySecondsAgo)
+
+      const handle = await driveUntilResolved(acquireQualityGateAdmission(
+        { workspacePath: '/tmp/one', gateName: 'test', attempt: 1 },
+        deps(rootDir),
+      ))
+      await handle.release()
+
+      expect(existsSync(tornPath)).toBe(false)
+    })
+
+    it('recreates its own deleted ticket and keeps its FIFO place', async () => {
+      const rootDir = home()
+      const first = await driveUntilResolved(acquireQualityGateAdmission(
+        { issueId: 'PAN-1', workspacePath: '/tmp/one', gateName: 'test', attempt: 1 },
+        { ...deps(rootDir), now: () => 1 },
+      ))
+
+      const secondPromise = acquireQualityGateAdmission(
+        { issueId: 'PAN-2', workspacePath: '/tmp/two', gateName: 'test', attempt: 1 },
+        { ...deps(rootDir), now: () => 2 },
+      )
+      let secondResolved = false
+      void secondPromise.then(() => { secondResolved = true })
+      await driveUntil(() => ticketFilesCreatedAt(rootDir, 2).length === 1)
+
+      for (const entry of ticketFilesCreatedAt(rootDir, 2)) unlinkSync(join(rootDir, entry))
+      await driveUntil(() => ticketFilesCreatedAt(rootDir, 2).length === 1)
+
+      const thirdPromise = acquireQualityGateAdmission(
+        { issueId: 'PAN-3', workspacePath: '/tmp/three', gateName: 'test', attempt: 1 },
+        { ...deps(rootDir), now: () => 3 },
+      )
+      let thirdResolved = false
+      void thirdPromise.then(() => { thirdResolved = true })
+      await driveUntil(() => ticketFilesCreatedAt(rootDir, 3).length === 1)
+
+      await first.release()
+      const second = await driveUntilResolved(secondPromise)
+      expect(second.admittedAt).toBe(new Date(2).toISOString())
+      expect(thirdResolved).toBe(false)
+      expect(secondResolved).toBe(true)
+
+      await second.release()
+      const third = await driveUntilResolved(thirdPromise)
+      await third.release()
+    })
+
+    it('leaves no temp files and sweeps the temp file of a dead pid', async () => {
+      const rootDir = home()
+      const deadTemp = join(rootDir, '.tmp-999999-0-waiter-x.json')
+      writeFileSync(deadTemp, '')
+
+      const handle = await driveUntilResolved(acquireQualityGateAdmission(
+        { workspacePath: '/tmp/one', gateName: 'test', attempt: 1 },
+        deps(rootDir),
+      ))
+      await handle.release()
+
+      expect(existsSync(deadTemp)).toBe(false)
+      expect(readdirSync(rootDir).filter((entry) => entry.startsWith('.tmp-'))).toEqual([])
+    })
   })
 })
 

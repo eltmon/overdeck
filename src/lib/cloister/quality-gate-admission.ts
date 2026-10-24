@@ -1,6 +1,6 @@
-import { mkdir, open, readFile, readdir, unlink } from 'node:fs/promises'
+import { link, mkdir, open, readFile, readdir, stat, unlink } from 'node:fs/promises'
 import { cpus, loadavg } from 'node:os'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 
 import { getOverdeckHome } from '../paths.js'
 import { readCpuPsi, type CpuPsi } from '../system-health/cpu-psi.js'
@@ -21,6 +21,11 @@ const QUALITY_GATE_PSI_SOME_AVG10_START_THRESHOLD = 25
 const QUALITY_GATE_ADMISSION_POLL_MS = 1_000
 const QUALITY_GATE_ADMISSION_SETTLE_MS = 1_500
 const QUALITY_GATE_ADMISSION_STALE_MS = 25 * 60 * 1_000
+/**
+ * PAN-4610 D14: an unparseable ticket younger than this may still be mid-write
+ * by an old-version process, so pollers leave it alone until it ages out.
+ */
+const QUALITY_GATE_ADMISSION_TORN_GRACE_MS = 10_000
 
 export interface QualityGatePressureSample {
   cpuUtilization: number
@@ -67,6 +72,7 @@ export interface QualityGateAdmissionDeps {
   pollMs?: number
   settleMs?: number
   staleMs?: number
+  tornGraceMs?: number
   maxWaitMs?: number
 }
 
@@ -78,6 +84,7 @@ export class QualityGateAdmissionTimeoutError extends Error {
 }
 
 let ticketSequence = 0
+let tempSequence = 0
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error
@@ -146,12 +153,23 @@ function ticketPath(root: string, ticketId: string): string {
   return join(root, `waiter-${ticketId}.json`)
 }
 
-async function writeExclusive(path: string, value: unknown): Promise<void> {
-  const file = await open(path, 'wx', 0o600)
+/**
+ * Publish `value` at `path` atomically; throws EEXIST when `path` exists (PAN-4610).
+ * Hard link rather than rename: a rename would replace an existing owner or
+ * breaker file and break the exclusion every caller relies on (D13).
+ */
+async function publishExclusive(path: string, value: unknown): Promise<void> {
+  const temp = join(dirname(path), `.tmp-${process.pid}-${tempSequence++}-${basename(path)}`)
+  const file = await open(temp, 'wx', 0o600)
   try {
     await file.writeFile(`${JSON.stringify(value)}\n`, 'utf8')
   } finally {
     await file.close()
+  }
+  try {
+    await link(temp, path)
+  } finally {
+    await unlinkIfExists(temp)
   }
 }
 
@@ -195,7 +213,7 @@ async function acquireBreaker(
   const path = breakerPath(root)
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      await writeExclusive(path, { pid: process.pid, acquiredAt: now() })
+      await publishExclusive(path, { pid: process.pid, acquiredAt: now() })
       return true
     } catch (error) {
       if (!isErrnoException(error) || error.code !== 'EEXIST') throw error
@@ -233,18 +251,37 @@ async function clearStaleOwner(
   }
 }
 
+/** Milliseconds since `path` was last modified, or null when it no longer exists. */
+async function fileAgeMs(path: string): Promise<number | null> {
+  try {
+    // Wall clock on purpose: mtime is wall-clock, and fake timers fake Date too.
+    return Date.now() - (await stat(path)).mtimeMs
+  } catch (error) {
+    if (isErrnoException(error) && error.code === 'ENOENT') return null
+    throw error
+  }
+}
+
 async function listLiveTickets(
   root: string,
   isProcessAlive: (pid: number) => boolean,
+  tornGraceMs: number,
 ): Promise<AdmissionTicket[]> {
   const entries = await readdir(root)
   const tickets: AdmissionTicket[] = []
   for (const entry of entries) {
+    const tempPid = /^\.tmp-(\d+)-/.exec(entry)?.[1]
+    if (tempPid) {
+      // D16: a process killed between write and link leaks its temp file.
+      if (!isProcessAlive(Number(tempPid))) await unlinkIfExists(join(root, entry))
+      continue
+    }
     if (!entry.startsWith('waiter-') || !entry.endsWith('.json')) continue
     const path = join(root, entry)
     const ticket = await readJson<AdmissionTicket>(path)
     if (!ticket || typeof ticket.ticketId !== 'string' || !Number.isFinite(ticket.createdAt)) {
-      await unlinkIfExists(path)
+      const ageMs = await fileAgeMs(path)
+      if (ageMs != null && ageMs > tornGraceMs) await unlinkIfExists(path)
       continue
     }
     if (!isProcessAlive(ticket.pid)) {
@@ -270,6 +307,7 @@ export async function acquireQualityGateAdmission(
   const pollMs = deps.pollMs ?? QUALITY_GATE_ADMISSION_POLL_MS
   const settleMs = deps.settleMs ?? QUALITY_GATE_ADMISSION_SETTLE_MS
   const staleMs = deps.staleMs ?? QUALITY_GATE_ADMISSION_STALE_MS
+  const tornGraceMs = deps.tornGraceMs ?? QUALITY_GATE_ADMISSION_TORN_GRACE_MS
   const maxWaitMs = deps.maxWaitMs
 
   await mkdir(root, { recursive: true })
@@ -277,14 +315,24 @@ export async function acquireQualityGateAdmission(
   const ticketId = `${String(createdAt).padStart(16, '0')}-${String(pid).padStart(10, '0')}-${String(ticketSequence++).padStart(6, '0')}`
   const ticket: AdmissionTicket = { ...request, ticketId, pid, createdAt }
   const ownTicketPath = ticketPath(root, ticketId)
-  await writeExclusive(ownTicketPath, ticket)
+  await publishExclusive(ownTicketPath, ticket)
 
   try {
     for (;;) {
       if (maxWaitMs != null && now() - createdAt > maxWaitMs) {
         throw new QualityGateAdmissionTimeoutError(maxWaitMs)
       }
-      const waiters = await listLiveTickets(root, isProcessAlive)
+      const waiters = await listLiveTickets(root, isProcessAlive, tornGraceMs)
+      if (!waiters.some((waiter) => waiter.ticketId === ticketId)) {
+        // D15: another poller deleted our ticket; republish it to keep our FIFO place.
+        try {
+          await publishExclusive(ownTicketPath, ticket)
+        } catch (error) {
+          if (!isErrnoException(error) || error.code !== 'EEXIST') throw error
+        }
+        await sleep(pollMs)
+        continue
+      }
       if (waiters[0]?.ticketId !== ticketId) {
         await sleep(pollMs)
         continue
@@ -307,7 +355,7 @@ export async function acquireQualityGateAdmission(
 
       const owner: AdmissionOwner = { ...ticket, acquiredAt: now() }
       try {
-        await writeExclusive(ownerPath(root), owner)
+        await publishExclusive(ownerPath(root), owner)
       } catch (error) {
         if (isErrnoException(error) && error.code === 'EEXIST') {
           if (!await readJson<AdmissionOwner>(ownerPath(root))) {
