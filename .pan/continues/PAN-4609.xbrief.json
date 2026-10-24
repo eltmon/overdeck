@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4609",
   "created": "2026-10-24T10:37:57.966Z",
-  "updated": "2026-10-24T10:39:51.779Z",
+  "updated": "2026-10-24T10:39:56.326Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4609",
       "claimedAt": "2026-10-24T10:38:44.288Z",
       "doneAt": "2026-10-24T10:39:51.779Z"
+    },
+    "w3-why-slow": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4609",
+      "claimedAt": "2026-10-24T10:39:56.326Z"
     }
   }
 }
