@@ -182,6 +182,10 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `${data.agentId ?? 'work agent'} on attempt ${data.attempt ?? '?'}`;
     case 'handoff.abandoned':
       return `${data.outcome ?? 'abandoned'}${typeof data.reason === 'string' ? ` — ${data.reason}` : typeof data.error === 'string' ? ` — ${data.error}` : ''}`;
+    case 'workspace.adopted':
+      return `PR #${data.prNumber ?? '?'} at ${shortSha(data.headSha)}`;
+    case 'workspace.adoption-failed':
+      return `${data.reason ?? 'failed'}${typeof data.detail === 'string' ? ` — ${data.detail}` : ''}`;
     default:
       return '';
   }
@@ -266,6 +270,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
       agentId,
       state: issueState.state,
       attention: issueState.attention ?? null,
+      prOutsidePipeline: issueState.prOutsidePipeline ?? null,
       pr: issueState.pr,
       branch: issueState.branch,
       health: healthData,
@@ -286,6 +291,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   console.log(`  ${chalk.dim('state')}    ${chalk.cyan(issueState.state)}`);
   if (issueState.attention) {
     console.log(`  ${chalk.dim('needs')}    ${chalk.yellow(issueState.attention)}`);
+    if (issueState.prOutsidePipeline) console.log(`  ${chalk.dim('fix')}      ${issueState.prOutsidePipeline.fix}`);
   }
 
   // What Overdeck DID — the last few journal entries, newest last. This is a

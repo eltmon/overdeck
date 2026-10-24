@@ -90,7 +90,15 @@ bypasses it.
    [`src/lib/cloister/request-review-pipeline.ts`](../src/lib/cloister/request-review-pipeline.ts),
    never by importing a route, and `requestReviewPipeline.isInFlight` coalesces
    it with the request `pan done` just made. The webhook path logs and returns
-   on every failure — it never throws.
+   on every failure — it never throws. When the issue has no pipeline
+   workspace (the PR was pushed from a handoff worktree), the webhook adopts
+   the PR branch into one through
+   [`src/lib/cloister/pr-adoption-review.ts`](../src/lib/cloister/pr-adoption-review.ts)
+   and then starts the pipeline. When adoption is refused (the branch is
+   checked out in another worktree, the head moved, or the local branch
+   diverged), the issue shows "Review never started" under Needs you with the
+   exact fix. See
+   [A PR opened outside a pipeline workspace](PIPELINE-GATES.md#a-pr-opened-outside-a-pipeline-workspace-pan-4605).
 3. **Review and test.** The four reviewer roles (correctness, security,
    performance, requirements) post PR reviews — approve or request changes.
    Verification (typecheck, lint, tests) runs as check runs on the PR.

@@ -29,6 +29,7 @@ const routeMocks = vi.hoisted(() => ({
   spawnReviewRoleForIssue: vi.fn(),
   refreshIssuePullRequestStateNow: vi.fn(),
   resolveEffort: vi.fn(),
+  answerMissingWorkspace: vi.fn(),
 }));
 
 vi.mock('../../workspaces.js', async (importOriginal) => {
@@ -79,6 +80,10 @@ vi.mock('../../../../../lib/cloister/review-agent.js', () => ({
 
 vi.mock('../../../../../lib/review-artifacts.js', () => ({
   createReviewArtifactsForIssue: vi.fn(async () => ({ mergeSet: { repos: [] } })),
+}));
+
+vi.mock('../../../../../lib/cloister/pr-adoption-review.js', () => ({
+  answerMissingWorkspace: routeMocks.answerMissingWorkspace,
 }));
 
 vi.mock('../../../services/issue-pr-refresh.js', () => ({
@@ -148,6 +153,7 @@ beforeEach(() => {
   routeMocks.transitionIssueToInReview.mockResolvedValue(undefined);
   routeMocks.pushLocalReviewBranches.mockImplementation(() => new Promise<void>(() => {}));
   routeMocks.resolveEffort.mockReturnValue({ effort: 'high', source: 'default', requested: 'high', clamped: false });
+  routeMocks.answerMissingWorkspace.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -440,6 +446,27 @@ describe('POST /api/review/:issueId/request — PR state refresh (PAN-4457)', ()
     });
 
     expect(result.body).toMatchObject({ success: false, error: 'Workspace does not exist' });
+    expect(routeMocks.refreshIssuePullRequestStateNow).not.toHaveBeenCalled();
+  });
+
+  it('adopts an open PR before the approved-head shortcut when the issue has no workspace (PAN-4605)', async () => {
+    routeMocks.getWorkspaceInfoForIssue.mockReturnValue({ exists: false, isRemote: false, localPath: '' });
+    routeMocks.getDerivedIssueState.mockResolvedValue(derived({
+      state: 'ready',
+      pr: { url: 'https://gh/pr/7', number: 7, reviewState: 'approved', checks: 'green', mergeable: true },
+    }));
+    routeMocks.answerMissingWorkspace.mockResolvedValue({ status: 202, body: { success: true, queued: true, adopting: true, message: 'adopting PR #7' } });
+
+    const result = await post('/api/review/PAN-3340/request', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ source: 'pan-review-request', nudge: true }),
+    });
+
+    expect(result.status).toBe(202);
+    expect(result.body).toMatchObject({ success: true, adopting: true });
+    expect(routeMocks.answerMissingWorkspace).toHaveBeenCalledWith('PAN-3340', 'pan-review-request', { derivedState: 'ready', workspaceExists: false });
+    expect(routeMocks.setPendingOperation).not.toHaveBeenCalled();
     expect(routeMocks.refreshIssuePullRequestStateNow).not.toHaveBeenCalled();
   });
 
