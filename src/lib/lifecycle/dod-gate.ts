@@ -17,6 +17,11 @@ import {
 import type { ProjectConfig } from '../projects.js';
 import { getAutoCloseOutCanonicalState } from './auto-close-out-canonical-state.js';
 import { DEPLOY_PROBE_TIMEOUT_MS, readHealthWithRetry } from './dod-deploy-probe.js';
+import {
+  findLaterGreenDefaultBranchRun,
+  hasRequiredChecksGreen,
+  requiredChecksOutcome,
+} from './dod-later-green.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { readVerificationArtifact, type VerificationArtifact } from '../cloister/verification-artifact.js';
 import {
@@ -653,75 +658,6 @@ export async function checkPostMergeRow(
   }
 }
 
-/**
- * PAN-3202: how many default-branch heads above the merge commit are probed for
- * the later-green-run evidence form. The tip of main is often mid-CI, so a single
- * candidate would usually read as pending; five reaches back far enough to find
- * the newest concluded green head without turning one row into a check-run storm.
- */
-const LATER_GREEN_CANDIDATE_LIMIT = 5;
-
-/**
- * PAN-3202: the fallback evidence form for DoD row 6. When a merge lands inside a
- * red-main window, the merge commit's own check-runs can never turn green, so the
- * row was permanently unsatisfiable even after main went green hundreds of times
- * with the commit included. A later default-branch head whose check-runs all
- * concluded green, and which contains the merge commit, is strictly stronger
- * evidence than the original run: it proves main is healthy *with* the merge in it,
- * which is exactly what "verified on main" means. Row 7 (deploy) already reasons
- * this way through the same containment relation.
- */
-function requiredChecksOutcome(checks: CommitCheckRuns, required: string[]): {
-  missing: string[];
-  unsuccessful: string[];
-} {
-  return {
-    missing: required.filter(check => !checks.names.includes(check)),
-    unsuccessful: required.filter(check => checks.names.includes(check) && !checks.successful.includes(check)),
-  };
-}
-
-function hasRequiredChecksGreen(checks: CommitCheckRuns, required: string[]): boolean {
-  const outcome = requiredChecksOutcome(checks, required);
-  return outcome.missing.length === 0 && outcome.unsuccessful.length === 0;
-}
-
-async function findLaterGreenDefaultBranchRun(
-  ctx: LifecycleContext,
-  mergeCommit: string,
-  required: string[],
-  deps: MainVerifyRowDeps,
-): Promise<{ run: { sha: string; total: number } | null; note: string }> {
-  const readCandidates =
-    deps.readContainingDefaultBranchCommits ?? defaultMainVerifyRowDeps.readContainingDefaultBranchCommits!;
-  let candidates: string[];
-  try {
-    candidates = await readCandidates(ctx, mergeCommit);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { run: null, note: `later-run evidence unavailable: ${message}` };
-  }
-
-  const probed = candidates.slice(0, LATER_GREEN_CANDIDATE_LIMIT);
-  for (const sha of probed) {
-    try {
-      const checks = await deps.readCheckRuns(ctx, sha);
-      if (hasRequiredChecksGreen(checks, required)) {
-        return { run: { sha, total: checks.total }, note: '' };
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return { run: null, note: `later-run evidence unavailable: ${message}` };
-    }
-  }
-  return {
-    run: null,
-    note: probed.length === 0
-      ? 'no later default-branch commit contains the merge'
-      : `no green CI run among the ${probed.length} newest default-branch commit(s) containing the merge`,
-  };
-}
-
 export async function checkMainVerifyRow(
   ctx: LifecycleContext,
   mergeCommit?: string,
@@ -751,7 +687,11 @@ export async function checkMainVerifyRow(
     ];
     const primary = parts.join('; ');
 
-    const later = await findLaterGreenDefaultBranchRun(ctx, mergeCommit, requiredChecks, deps);
+    const later = await findLaterGreenDefaultBranchRun(ctx, mergeCommit, requiredChecks, {
+      readCheckRuns: deps.readCheckRuns,
+      readContainingDefaultBranchCommits:
+        deps.readContainingDefaultBranchCommits ?? defaultMainVerifyRowDeps.readContainingDefaultBranchCommits!,
+    });
     if (later.run) {
       return result(
         'main-verify',
