@@ -19,6 +19,7 @@ import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 import { findHerdrAgent } from '../../../lib/terminal-backends/herdr.js';
 import { controlTerminal, observeTerminal } from '../../../lib/terminal-backends/herdr-stream.js';
 import { resolveLaunchBackend } from '../../../lib/terminal-backends/launch.js';
+import type { TerminalControl, TerminalObservation } from '../../../lib/terminal-backends/types.js';
 
 // ─── Runtime detection ────────────────────────────────────────────────────────
 
@@ -243,30 +244,79 @@ export async function resolveTerminalAttachTarget(
   return { kind: 'missing' };
 }
 
+/** The two Herdr stream openers; the real ones in production, fakes in tests. */
+export interface HerdrTerminalStreams {
+  readonly control: (terminalId: string, deps: { cols: number; rows: number }) => TerminalControl;
+  readonly observe: (terminalId: string, deps: { cols: number; rows: number }) => TerminalObservation;
+}
+
+const defaultHerdrStreams: HerdrTerminalStreams = { control: controlTerminal, observe: observeTerminal };
+
 /**
- * A Herdr terminal wearing the PTY interface: output comes from the `observe`
- * stream, input and resizes go out through `control`. The controller is opened
- * lazily, so a read-only viewer never takes control away from another client
- * (Herdr allows many observers and one controller).
+ * A Herdr terminal wearing the PTY interface. Only a `control` attach resizes
+ * the PTY, and only control frames follow a later resize — an `observe`
+ * stream stays at the size it opened with — so the bridge takes control at
+ * attach and streams the control output. A refused controller (another client
+ * already holds it) falls back to a read-only `observe` stream at the same
+ * dims.
  */
 export class HerdrTerminalProcess implements PtyProcess {
   private readonly dataListeners = new Set<(data: string) => void>();
   private readonly exitListeners = new Set<(exitCode: number) => void>();
-  private readonly observation: ReturnType<typeof observeTerminal>;
-  private controller: ReturnType<typeof controlTerminal> | null = null;
+  private controller: TerminalControl | null = null;
+  private observation: TerminalObservation | null = null;
   private cols: number;
   private rows: number;
+  /** Set by `close()` before anything else, so a concurrent pump never opens a fallback observe stream. */
   private ended = false;
+  private exitEmitted = false;
+  private deliveredFirstFrame = false;
+  private loggedReadOnlyFallback = false;
 
-  constructor(private readonly terminalId: string, cols: number, rows: number) {
+  constructor(
+    private readonly terminalId: string,
+    cols: number,
+    rows: number,
+    private readonly streams: HerdrTerminalStreams = defaultHerdrStreams,
+  ) {
     this.cols = cols;
     this.rows = rows;
-    this.observation = observeTerminal(terminalId, { cols, rows });
-    void this.pump();
+    const controller = streams.control(terminalId, { cols, rows });
+    this.controller = controller;
+    void this.pumpControl(controller);
   }
 
-  private async pump(): Promise<void> {
-    for await (const frame of this.observation.frames) {
+  private async pumpControl(controller: TerminalControl): Promise<void> {
+    for await (const frame of controller.frames) {
+      if (frame.kind === 'snapshot' || frame.kind === 'output') {
+        this.deliveredFirstFrame = true;
+        for (const listener of this.dataListeners) listener(frame.data);
+      } else if (frame.kind === 'exit') {
+        if (!this.deliveredFirstFrame && !this.ended) this.fallBackToReadOnly();
+        else this.emitExit(frame.code ?? 0);
+        return;
+      }
+    }
+    if (!this.deliveredFirstFrame && !this.ended) this.fallBackToReadOnly();
+    else this.emitExit(0);
+  }
+
+  /** The control attach was refused: serve the terminal read-only instead. */
+  private fallBackToReadOnly(): void {
+    this.controller = null;
+    const observation = this.streams.observe(this.terminalId, { cols: this.cols, rows: this.rows });
+    this.observation = observation;
+    if (!this.loggedReadOnlyFallback) {
+      this.loggedReadOnlyFallback = true;
+      console.warn(
+        `[terminal-service] Herdr terminal ${this.terminalId} is controlled by another client; serving it read-only`,
+      );
+    }
+    void this.pumpObserve(observation);
+  }
+
+  private async pumpObserve(observation: TerminalObservation): Promise<void> {
+    for await (const frame of observation.frames) {
       if (frame.kind === 'snapshot' || frame.kind === 'output') {
         for (const listener of this.dataListeners) listener(frame.data);
       } else if (frame.kind === 'exit') {
@@ -278,24 +328,19 @@ export class HerdrTerminalProcess implements PtyProcess {
   }
 
   private emitExit(code: number): void {
-    if (this.ended) return;
-    this.ended = true;
+    if (this.exitEmitted) return;
+    this.exitEmitted = true;
     for (const listener of this.exitListeners) listener(code);
   }
 
-  private ensureController(): ReturnType<typeof controlTerminal> {
-    this.controller ??= controlTerminal(this.terminalId, { cols: this.cols, rows: this.rows });
-    return this.controller;
-  }
-
   write(data: string): void {
-    this.ensureController().write(data);
+    this.controller?.write(data);
   }
 
   resize(cols: number, rows: number): void {
     this.cols = cols;
     this.rows = rows;
-    this.ensureController().resize(cols, rows);
+    this.controller?.resize(cols, rows);
   }
 
   onData(cb: (data: string) => void): () => void {
@@ -309,8 +354,9 @@ export class HerdrTerminalProcess implements PtyProcess {
   }
 
   close(): void {
+    this.ended = true;
     this.controller?.close();
-    this.observation.close();
+    this.observation?.close();
     this.emitExit(0);
   }
 }

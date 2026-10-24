@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T08:46:00Z · model: claude-opus-5-5 · open: 843_
+_Last sequenced: 2026-10-24T09:39:00Z · model: claude-opus-5-5 · open: 844_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -13,6 +13,7 @@ _Last sequenced: 2026-10-24T08:46:00Z · model: claude-opus-5-5 · open: 843_
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 8 | PAN-4583 | S | medium | ok |  |  | In pipeline: editor pane reads markdown anywhere under $HOME read-only; writes stay limited to project roots + OVERDECK_HOME. |
+| 9 | PAN-4605 | M | critical | ok |  |  | In pipeline: feature/ PRs opened from handoff worktrees get no workspace, so review never starts and only a console.log records it |
 | 10 | PAN-4546 | S | high | ok |  |  | Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
@@ -883,6 +884,10 @@ New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan
 
 New since the prior run and already in the pipeline (live workspace), so it is pinned near the top rather than ranked against the queue. Well-specified ACs including symlink, prefix and extension containment tests; the PR must state who can reach /ws/rpc before the read widening ships.
 
+### PAN-4605 (rank 9)
+
+New since the prior run and already in the pipeline. Supervised handoffs (the TENET-10 path for pipeline-machinery fixes) open PRs from plain worktrees, and handlePullRequest silently drops them when startReview finds no workspace; PRs #4599/#4602/#4603 sat unreviewed on 2026-10-24. Placed in the open rank 9 slot of the critical top tier because it gates review for every handoff-produced PR, including PAN-4527 and PAN-4532.
+
 ### PAN-4546 (rank 10)
 
 Operator decision 2026-10-04: the single admission slot, not agent count, bounded overnight throughput (5-7 PRs waiting 1-2 h at near-zero PSI). Doubling slots under low pressure is the largest throughput lever on the board. Ranks after the bundle because PAN-4531/4532 remove wasted slot time first.
@@ -1167,10 +1172,6 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
 
 Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (502) after pan reload.
 
-### PAN-2935 (rank 88)
-
-Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1178,10 +1179,10 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T08:46:00Z",
+  "generatedAt": "2026-10-24T09:39:00Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 843,
+  "openCount": 844,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11699,6 +11700,19 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "rationale": "New since the prior run. Two operator decisions from PAN-4585 are unresolved and Guardian provisioning touches liveness and pan done, so it is needs-refinement and last in the group.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4605",
+      "rank": 9,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: feature/ PRs opened from handoff worktrees get no workspace, so review never starts and only a console.log records it",
+      "rationale": "New since the prior run and already in the pipeline. Supervised handoffs (the TENET-10 path for pipeline-machinery fixes) open PRs from plain worktrees, and handlePullRequest silently drops them when startReview finds no workspace; PRs #4599/#4602/#4603 sat unreviewed on 2026-10-24. Placed in the open rank 9 slot of the critical top tier because it gates review for every handoff-produced PR, including PAN-4527 and PAN-4532.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13171,6 +13185,20 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4605",
+      "to": "PAN-4527",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4605",
+      "to": "PAN-4532",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }

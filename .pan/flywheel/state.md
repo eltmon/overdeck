@@ -224,3 +224,18 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   2026-10-24).
 - Hold `pan reload` while `pgrep -af dist/verification-worker.js` shows a
   worker; the serialized gate queue means waiting for a gap between issues.
+- A `pan handoff` conversation working in its own `hoff-*` worktree opens
+  PRs the pipeline never sees: no `workspaces/feature-pan-<n>` means no
+  verification, no review, and `pan review request` fails "Workspace does not
+  exist". Every handoff brief must say: when a PR is ready, remove the hoff
+  worktree, `pan workspace create PAN-<n>`, confirm HEAD = PR head, then
+  `pan review request PAN-<n>` (sent to conversations 3304 and 3305 at 09:20).
+- 2026-10-24 09:30 UTC disk cleanup (operator-approved): removed 19 MYN
+  worktrees whose HEAD was on origin/main with no local changes (re-verified
+  per repo, then `git worktree remove`), plus `docker image prune -a`
+  (12.6 GB). `/` went from 29 GB to 48 GB free. Kept: cohesion,
+  feature-min-1072, feature-min-1078, intro-video-api, restic-retry,
+  hoff-restic (tracked brief edit, MIN-1053 open), site-style, and the
+  papers-please and tindra workspaces. Restic home backups failed 8 times in
+  7 days, all from a full disk on 2026-10-22.
+- Merged #4600 (PAN-4582) at 09:32 through the merge door.

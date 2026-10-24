@@ -12,6 +12,7 @@ import { patrolDiskPressure } from './disk-pressure-patrol.js';
 import { patrolMemoryPressure } from './memory-pressure-patrol.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
 import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
+import { reapHerdrResiduePanes } from './herdr-residue-reaper.js';
 import { sweepTranscriptRetention } from './transcript-retention.js';
 import { reapMergedStrikeWorkspaces } from './strike-workspace-reaper.js';
 import { reconcileMergedIssueDocker } from './merged-docker-reconcile.js';
@@ -29,6 +30,7 @@ const IDLE_STACK_INTERVAL_MS = 60_000;
 const STRIKE_WORKSPACE_INTERVAL_MS = 60_000;
 const ORPHAN_DASHBOARD_SERVER_INTERVAL_MS = 10 * 60_000;
 const PLAYWRIGHT_REAPER_INTERVAL_MS = 10 * 60_000;
+const HERDR_RESIDUE_INTERVAL_MS = 10 * 60_000;
 const TRANSCRIPT_RETENTION_INTERVAL_MS = 60 * 60_000;
 const RESOURCE_PRESSURE_INTERVAL_MS = 15_000;
 // Both carried over from deacon.ts's 60s runScheduledPatrol cadence: the
@@ -65,6 +67,7 @@ export function startHygieneScheduler(): void {
     ['sweepOrphanedSwarmSlots', sweepOrphanedSwarmSlots, SWARM_ORPHAN_GC_INTERVAL_MS],
     ['reapOrphanedDashboardServers', reapOrphanedDashboardServers, ORPHAN_DASHBOARD_SERVER_INTERVAL_MS],
     ['reapLeftoverPlaywrightBrowsers', reapLeftoverPlaywrightBrowsers, PLAYWRIGHT_REAPER_INTERVAL_MS],
+    ['reapHerdrResiduePanes', reapHerdrResiduePanes, HERDR_RESIDUE_INTERVAL_MS],
     ['sweepTranscriptRetention', runTranscriptRetention, TRANSCRIPT_RETENTION_INTERVAL_MS],
     ['patrolDiskPressure', patrolDiskPressure, RESOURCE_PRESSURE_INTERVAL_MS],
     ['patrolMemoryPressure', patrolMemoryPressure, RESOURCE_PRESSURE_INTERVAL_MS],

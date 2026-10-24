@@ -429,6 +429,16 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`apply_terminal_attach_input`) re-wraps a complete bracketed paste to the
   pane's live mode, so this is safe for panes that never enabled it. Mouse
   modes stay off on purpose (drag-select fix `5d2dafcf16d`).
+- **Herdr PTY size is not the layout rect** (PAN-4582, probed on herdr 0.9.1)
+  — the headless server never pushes a pane's layout rect to its PTY, and a new
+  PTY copies the size of the session's FOCUSED pane (any workspace). A pane with
+  a 40-row rect can run a 1-row harness. Only a `terminal session control`
+  attach (`--cols/--rows`, or `terminal.resize` on stdin) sets the PTY;
+  `observe --cols/--rows` never does, and observe frames stay at the observer's
+  own size. One controller per terminal: a second gets `already has an attached
+  client` on stderr and exits 0. `pane.split` into a shared tab halves the
+  remaining rows per launch. `pane.read` nests its text under `result.read`
+  (PAN-4586), not `result.text`.
 - **Two runtime maps, neither replayed at boot before PAN-4522** — the read
   model's `agentRuntimeById` (`read-model.ts`, served in snapshots) booted `{}`,
   and `syncSnapshot` replaced the client's map wholesale, so a restart showed
