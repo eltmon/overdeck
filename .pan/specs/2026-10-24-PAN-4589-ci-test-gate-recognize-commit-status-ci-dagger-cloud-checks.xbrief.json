@@ -4,17 +4,17 @@
     "created": "2026-10-24T08:13:17Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4589: CI test gate: recognize commit-status CI (Dagger Cloud checks)",
-    "updated": "2026-10-24T08:17:31.271Z"
+    "updated": "2026-10-24T08:18:16.658Z"
   },
   "plan": {
     "id": "pan-4589",
     "title": "CI test gate: recognize commit-status CI (Dagger Cloud checks)",
-    "status": "proposed",
+    "status": "running",
     "uid": "8a9a9c70-fe0a-4810-8d29-894dc5261988",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T08:13:17Z",
-    "updated": "2026-10-24T08:17:31.271Z",
+    "updated": "2026-10-24T08:18:16.658Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4589",
@@ -675,5 +675,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
