@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T07:26:34Z · model: claude-opus-5-5 · open: 832_
+_Last sequenced: 2026-10-24T07:28:54Z · model: claude-opus-5-5 · open: 833_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -837,6 +837,7 @@ _Last sequenced: 2026-10-24T07:26:34Z · model: claude-opus-5-5 · open: 832_
 | 871 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
 | 872 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
 | 873 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
+| 874 | PAN-4585 | XL | medium | needs-refinement | ✓ |  | New opt-in Semgrep SAST epic; no children filed yet and 4 operator decisions open (gate default, Guardian, opengrep). |
 
 ## Rationale detail
 
@@ -1167,10 +1168,10 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T07:26:34Z",
+  "generatedAt": "2026-10-24T07:28:54Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 832,
+  "openCount": 833,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11531,6 +11532,20 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "rationale": "New since the prior run. Clear file-by-file spec, but the change is only correct on or after 2026-12-01, so it ranks at the tail to keep the Flywheel from picking it early.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-4585",
+      "rank": 874,
+      "size": "XL",
+      "importance": "medium",
+      "score": 40,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "New opt-in Semgrep SAST epic; no children filed yet and 4 operator decisions open (gate default, Guardian, opengrep).",
+      "rationale": "New since the prior run. Epic container with a detailed 9-item plan but no child issues filed and four operator decisions unresolved, so it is not workable; ranked by aggregate value as a medium-impact opt-in feature, appended to avoid shifting existing ranks.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": true
     }
   ],
   "edges": [
