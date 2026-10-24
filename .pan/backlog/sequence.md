@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T14:07:12Z · model: claude-opus-5-5 · open: 839_
+_Last sequenced: 2026-10-24T14:09:04Z · model: claude-opus-5-5 · open: 839_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1174,7 +1174,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T14:07:12Z",
+  "generatedAt": "2026-10-24T14:09:04Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 839,
