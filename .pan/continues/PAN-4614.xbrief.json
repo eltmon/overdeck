@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4614",
   "created": "2026-10-24T11:11:53.918Z",
-  "updated": "2026-10-24T11:36:19.031Z",
+  "updated": "2026-10-24T11:36:34.841Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,6 +40,10 @@
     "gitattributes-union.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T11:36:19.031Z"
+    },
+    "gitattributes-union.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:36:34.841Z"
     }
   }
 }
