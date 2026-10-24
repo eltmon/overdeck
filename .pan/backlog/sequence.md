@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T12:31:25Z · model: claude-opus-5-5 · open: 846_
+_Last sequenced: 2026-10-24T12:34:20Z · model: claude-opus-5-5 · open: 847_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -67,6 +67,7 @@ _Last sequenced: 2026-10-24T12:31:25Z · model: claude-opus-5-5 · open: 846_
 | 63 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
 | 64 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
 | 65 | PAN-4618 | S | critical | ok |  |  | In pipeline: CI runs full suite on .pan/ bookkeeping pushes to main (95 of 99 runs), starving PR checks of runners |
+| 66 | PAN-4622 | M | high | ok |  | PAN-4532 | Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. Follows PAN-4532 |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
@@ -1102,6 +1103,10 @@ Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback thi
 
 New in-pipeline substrate bug: path-filtering bookkeeping commits off the main push trigger frees runners for every PR check, so it is critical; placed in the free top-tier slot 65 so no existing rank moves.
 
+### PAN-4622 (rank 66)
+
+New follow-up to in-pipeline PAN-4532: two restart windows still discard a passed verification and re-run every gate on the single CPU admission slot, so it ranks high in the free top-tier slot 66; it builds on PAN-4532's adoption code, so it depends on that merge.
+
 ### PAN-2940 (rank 67)
 
 Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
@@ -1170,10 +1175,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 
 Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
 
-### PAN-1824 (rank 86)
-
-Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass — PAN-3243, PAN-3492, PAN-3520 and PAN-2421 — all trace red or flaky main to real-timer tests under load. This is the shared fix for that family and it is now marked ready, so it should sit with the other CI-integrity work rather than behind it.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1181,10 +1182,10 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T12:31:25Z",
+  "generatedAt": "2026-10-24T12:34:20Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 846,
+  "openCount": 847,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11743,6 +11744,21 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "rationale": "New in-pipeline substrate bug: path-filtering bookkeeping commits off the main push trigger frees runners for every PR check, so it is critical; placed in the free top-tier slot 65 so no existing rank moves.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4622",
+      "rank": 66,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4532"
+      ],
+      "why": "Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. Follows PAN-4532",
+      "rationale": "New follow-up to in-pipeline PAN-4532: two restart windows still discard a passed verification and re-run every gate on the single CPU admission slot, so it ranks high in the free top-tier slot 66; it builds on PAN-4532's adoption code, so it depends on that merge.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13257,6 +13273,13 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4532",
+      "to": "PAN-4622",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
