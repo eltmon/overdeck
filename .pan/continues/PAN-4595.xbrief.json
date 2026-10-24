@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4595",
   "created": "2026-10-24T08:32:14.826Z",
-  "updated": "2026-10-24T08:45:55.876Z",
+  "updated": "2026-10-24T08:50:23.485Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-10-24T08:45:42.042Z"
     },
     "herdr-heartbeat-health-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4595",
-      "claimedAt": "2026-10-24T08:45:55.876Z"
+      "claimedAt": "2026-10-24T08:45:55.876Z",
+      "doneAt": "2026-10-24T08:50:23.485Z"
     }
   }
 }
