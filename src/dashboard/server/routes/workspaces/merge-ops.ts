@@ -275,7 +275,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   } else {
     const pendingOp = run?.phase === 'merging' ? getPendingOperation(issueId) : null;
     const ineligible = normalMergeEligibility(derived, pendingOp?.type === 'merge' && pendingOp?.status === 'running', run);
-    if (ineligible) return ineligible;
+    // PAN-4540: a merge of this issue already running ran nothing for this
+    // call; deferred lets an automatic merge retry instead of failing its head.
+    if (ineligible) return ineligible.outcome === 'merging' ? { ...ineligible, deferred: true } : ineligible;
   }
   const gate = await forgeMergeGate(issueId, request);
   if (gate.refusal) return { ...gate.refusal, state: derived.state, refused: true };

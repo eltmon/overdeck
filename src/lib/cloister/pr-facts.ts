@@ -19,6 +19,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from '../gitlab-merge-requests.js';
+import { bumpIssuePrTabCacheGeneration } from '../../dashboard/server/services/pr-tab-cache.js';
 import { fetchIssuePullRequest, type IssuePullRequestData } from '../overdeck/pull-requests.js';
 import { resolveProjectReposForIssue, type ResolvedProjectRepo } from '../project-repos.js';
 import { approvalProvenAtHead, recordReadApprovalAtHead } from './approval-at-head.js';
@@ -164,7 +165,10 @@ export interface PrFactsOptions {
    * `strike/<issue>`), so an open feature PR cannot stand in for it.
    */
   preferBranch?: string;
-  /** PAN-4540: skip the cached answer; the fresh one still refreshes the cache. */
+  /**
+   * PAN-4540: skip both caches (this module's and the PR tab's under
+   * `fetchIssuePullRequest`); the fresh answer still refreshes them.
+   */
   fresh?: boolean;
 }
 
@@ -653,6 +657,7 @@ async function trustedAuthorsFor(pr: IssuePullRequestData, deps: PrFactsDeps): P
 
 async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsOptions = {}): Promise<PrFacts> {
   const fetchGitHubPr = deps.fetchGitHubPr ?? fetchIssuePullRequest;
+  if (options.fresh) bumpIssuePrTabCacheGeneration(issueId);
   try {
     const gh = await fetchGitHubPr(issueId, options.preferBranch ? { preferBranch: options.preferBranch } : {});
     if (gh.pr) {

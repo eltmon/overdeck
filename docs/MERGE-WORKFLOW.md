@@ -187,13 +187,16 @@ the same PR head (`latestAutoMergeAllowsSchedule`):
   the merge gate it re-reads, failing required checks, and a CONFLICTING PR.
   Those results carry `refused: true` and are recorded by `markMergeRefused`.
   The scheduler re-arms a blocked row as soon as the gate passes again.
+- A merge call made while a merge of the same issue is already running is
+  `deferred`: the row goes back to `pending` and is retried, because this call
+  ran nothing.
 
 The two gate reads can disagree seconds apart: GitHub recomputes `mergeable`
 after the base branch moves and answers UNKNOWN meanwhile, so the first read
 after another PR merges often lands in that window. The merge gate
 (`cloister/merge-gate.ts`) therefore re-reads an open, green PR whose
 mergeability is unknown once, `MERGEABILITY_REREAD_MS` (3 s) later, bypassing
-the PR-facts cache. A still-unknown answer is reported as "the forge has not
+both the PR-facts cache and the PR tab cache under `fetchIssuePullRequest`. A still-unknown answer is reported as "the forge has not
 computed mergeability yet", never as a missing approval: the reviews that
 prove approval at the head are read only for a green, mergeable PR.
 
