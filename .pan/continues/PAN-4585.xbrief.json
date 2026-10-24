@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4585",
   "created": "2026-10-24T08:22:26.190Z",
-  "updated": "2026-10-24T09:20:21.734Z",
+  "updated": "2026-10-24T09:20:29.777Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4585",
       "claimedAt": "2026-10-24T09:08:05.088Z",
       "doneAt": "2026-10-24T09:20:21.733Z"
+    },
+    "prereq-registration": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4585",
+      "claimedAt": "2026-10-24T09:20:29.777Z"
     }
   }
 }
