@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T11:46:24.175Z",
+  "updated": "2026-10-24T11:46:40.065Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -198,6 +198,10 @@
     "command-deck-renders-attention.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T11:46:24.174Z"
+    },
+    "command-deck-renders-attention.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:46:40.064Z"
     }
   }
 }
