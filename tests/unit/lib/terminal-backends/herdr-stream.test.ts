@@ -226,4 +226,20 @@ describe('controlTerminal', () => {
     control.close();
     expect(children[0].killed).toBe(true);
   });
+
+  it('exposes the control stream as frames', async () => {
+    const { spawn, children } = fakeSpawn();
+    const control = controlTerminal('term_g', { spawn });
+    const pending = collect(control.frames, 1);
+    children[0].emitRecord({
+      type: 'terminal.frame',
+      bytes: Buffer.from('hello', 'binary').toString('base64'),
+      encoding: 'ansi',
+      full: true,
+      width: 80,
+      height: 20,
+      seq: 1,
+    });
+    expect((await pending)[0]).toEqual({ kind: 'snapshot', cols: 80, rows: 20, data: 'hello' });
+  });
 });

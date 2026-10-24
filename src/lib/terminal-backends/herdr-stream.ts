@@ -245,6 +245,7 @@ export function controlTerminal(terminalId: string, deps: HerdrStreamDeps = {}):
     }
   };
   return {
+    frames: stream.frames,
     write: (data: string) => send({ type: 'terminal.input', text: data }),
     resize: (cols: number, rows: number) => send({ type: 'terminal.resize', cols, rows }),
     close: stream.close,
