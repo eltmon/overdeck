@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4585",
   "created": "2026-10-24T08:22:26.190Z",
-  "updated": "2026-10-24T09:08:05.088Z",
+  "updated": "2026-10-24T09:20:21.734Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-10-24T09:07:58.258Z"
     },
     "install-entrypoints": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4585",
-      "claimedAt": "2026-10-24T09:08:05.088Z"
+      "claimedAt": "2026-10-24T09:08:05.088Z",
+      "doneAt": "2026-10-24T09:20:21.733Z"
     }
   }
 }
