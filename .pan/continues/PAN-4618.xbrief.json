@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4618",
   "created": "2026-10-24T12:05:55.935Z",
-  "updated": "2026-10-24T12:55:12.777Z",
+  "updated": "2026-10-24T12:55:28.119Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-4618",
       "claimedAt": "2026-10-24T12:52:20.006Z",
       "doneAt": "2026-10-24T12:55:12.777Z"
+    },
+    "flywheel-skills-main-ci": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:55:28.119Z"
     }
   }
 }
