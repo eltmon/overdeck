@@ -1,0 +1,17 @@
+{
+  "version": "1",
+  "issueId": "PAN-4540",
+  "created": "2026-10-24T15:41:16.095Z",
+  "updated": "2026-10-24T15:41:16.095Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "refused-blocks": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:41:16.095Z"
+    }
+  }
+}
