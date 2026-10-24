@@ -40,6 +40,8 @@ export interface ConversationPendingInputRow {
   pendingPaneChoice?: PendingPaneChoice;
   /** PAN-4278 — a Claude Code terminal permission prompt blocking the conversation. */
   pendingPermission?: TerminalPendingPermission;
+  /** PAN-4596 — a `--hold` handoff whose kickoff was never sent (alive or ended). */
+  heldKickoff?: { since: string; focus?: string };
 }
 
 /** Kinds a conversation row reports, derived when the REST door does not spell them out. */
@@ -50,6 +52,7 @@ function conversationKinds(c: ConversationPendingInputRow): string[] {
     ...(c.pendingProposedPlan ? ['exitPlanMode'] : []),
     ...(c.pendingPaneChoice ? ['paneChoice'] : []),
     ...(c.pendingPermission ? ['permissionRequest'] : []),
+    ...(c.heldKickoff ? ['heldKickoff'] : []),
   ];
 }
 
@@ -71,7 +74,7 @@ function permissionCommand(c: ConversationPendingInputRow): string | undefined {
 }
 
 function conversationSince(c: ConversationPendingInputRow): string {
-  return c.pendingPermission?.since ?? c.pendingAskUserQuestion?.askedAt ?? c.pendingProposedPlan?.askedAt ?? '';
+  return c.pendingPermission?.since ?? c.pendingAskUserQuestion?.askedAt ?? c.pendingProposedPlan?.askedAt ?? c.heldKickoff?.since ?? '';
 }
 
 /** One definition, shared with `PendingInputSubject` so the two never drift. */
@@ -109,6 +112,8 @@ export interface Decision {
   pendingQuestionReason?: PendingInputSubject['pendingQuestionReason'];
   /** PAN-4371 — advisory Jev reading of why a bare agentTurnEnded kind happened. */
   turnEndAssessment?: PendingInputSubject['turnEndAssessment'];
+  /** PAN-4596 — the handoff focus of a held kickoff, shown as its prompt. */
+  heldKickoffFocus?: string;
 }
 
 /**
@@ -249,6 +254,7 @@ export function useDecisions(): Decision[] {
         permissionCommand: permissionCommand(c),
         since: conversationSince(c),
         blocking: isBlockingDecision(kinds),
+        heldKickoffFocus: c.heldKickoff?.focus,
       });
     }
 

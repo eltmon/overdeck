@@ -111,6 +111,70 @@ describe('DecisionsPanel', () => {
     expect(screen.getByTestId('decisions-empty')).toBeTruthy();
   });
 
+  describe('held handoff (PAN-4596)', () => {
+    const heldDecision = {
+      id: 'conv-held',
+      source: 'conversation' as const,
+      label: 'Bundle',
+      kinds: ['heldKickoff'],
+      since: '2026-10-04T13:19:27.000Z',
+      blocking: false,
+      heldKickoffFocus: 'Read the brief',
+    };
+
+    beforeEach(() => {
+      window.history.replaceState(null, '', '/');
+    });
+
+    it('lists a held conversation under Waiting with its label and focus, and no Answer button', () => {
+      vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([heldDecision]);
+      const { container } = renderWithQuery(<DecisionsPanel />);
+
+      expect(screen.getByText('Waiting')).toBeTruthy();
+      expect(screen.queryByText('Blocking work')).toBeNull();
+      expect(container.querySelector('[data-decision-id="conv-held"][data-blocking="true"]')).toBeNull();
+      expect(screen.getByText('Held handoff — kickoff not sent')).toBeTruthy();
+      expect(screen.getByText('Read the brief')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Answer' })).toBeNull();
+      expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(1);
+    });
+
+    it('Open navigates to the conversation when no onOpenSubject is passed', async () => {
+      vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([heldDecision]);
+      renderWithQuery(<DecisionsPanel />);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Open' }));
+
+      expect(window.location.pathname).toBe('/conv/conv-held');
+    });
+
+    it('Open calls onOpenSubject when one is passed', async () => {
+      vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([heldDecision]);
+      const onOpenSubject = vi.fn();
+      renderWithQuery(<DecisionsPanel onOpenSubject={onOpenSubject} />);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Open' }));
+
+      expect(onOpenSubject).toHaveBeenCalledWith(heldDecision);
+      expect(window.location.pathname).toBe('/');
+    });
+
+    it('falls back to a fixed prompt without a focus', () => {
+      const { heldKickoffFocus: _omit, ...withoutFocus } = heldDecision;
+      vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([withoutFocus]);
+      renderWithQuery(<DecisionsPanel />);
+      expect(screen.getByText('Its kickoff was never sent. Open the conversation to start it.')).toBeTruthy();
+    });
+
+    it('a held row that also has a permission prompt keeps its Answer button', () => {
+      vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([
+        { ...heldDecision, kinds: ['permissionRequest', 'heldKickoff'], blocking: true },
+      ]);
+      renderWithQuery(<DecisionsPanel />);
+      expect(screen.getByRole('button', { name: 'Answer' })).toBeTruthy();
+    });
+  });
+
   describe('turn-end label (PAN-4371)', () => {
     const turnEndDecision = {
       id: 'conv-20260929-0001',
