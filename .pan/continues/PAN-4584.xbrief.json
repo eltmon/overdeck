@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4584",
   "created": "2026-10-24T07:25:13.534Z",
-  "updated": "2026-10-24T07:47:04.154Z",
+  "updated": "2026-10-24T07:49:11.897Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-10-24T07:46:59.739Z"
     },
     "hook-archive-tests": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4584",
-      "claimedAt": "2026-10-24T07:47:04.154Z"
+      "claimedAt": "2026-10-24T07:47:04.154Z",
+      "doneAt": "2026-10-24T07:49:11.897Z"
     }
   }
 }
