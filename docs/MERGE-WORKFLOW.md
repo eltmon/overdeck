@@ -383,6 +383,11 @@ once it waits on the restart gate, `Deploy: restarting` after approval, and
 `Deploy ✗` for 15 minutes after a failure. The chip's tooltip carries the
 error, the reload's log path and its last lines.
 
+`pan reload` builds `origin/main` HEAD whatever its CI state. When HEAD is a
+bookkeeping commit it has no CI run (PAN-4618); it holds the same code as the
+newest commit CI ran on, so the build is the same. The CI chip next to the
+deploy chip shows the CI head — the newest commit CI was started for.
+
 Nothing is stored. [`deploy-progress.ts`](../src/dashboard/server/services/deploy-progress.ts)
 re-derives the projection on a 3-second server tick from runtime files that
 already exist: the restart lock (`caller: 'pan reload'`, live pid), the restart
