@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4609",
   "created": "2026-10-24T10:37:57.966Z",
-  "updated": "2026-10-24T10:51:11.264Z",
+  "updated": "2026-10-24T10:51:28.844Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "w1-opening.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T10:51:11.263Z"
+    },
+    "w1-opening.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:51:28.844Z"
     }
   }
 }
