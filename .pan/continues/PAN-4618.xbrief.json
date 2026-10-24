@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4618",
+  "created": "2026-10-24T12:05:55.935Z",
+  "updated": "2026-10-24T12:05:55.936Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "ci-push-paths-ignore": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:05:55.935Z"
+    }
+  }
+}
