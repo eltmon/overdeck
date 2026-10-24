@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T13:04:23Z · model: claude-opus-5-5 · open: 848_
+_Last sequenced: 2026-10-24T13:06:48Z · model: claude-opus-5-5 · open: 846_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -22,7 +22,6 @@ _Last sequenced: 2026-10-24T13:04:23Z · model: claude-opus-5-5 · open: 848_
 | 17 | PAN-4597 | S | high | ok |  |  | Awaiting Merge hides approved green PRs: ready needs a 5-min gate answer only auto-merge refreshes. Merge machinery: supervised handoff |
 | 18 | PAN-4598 | M | critical | ok |  |  | No UAT batch has assembled since the cut (newest 2026-09-20, failed); Flywheel card offers only an escape-hatch merge link |
 | 19 | PAN-4614 | XS | high | ok |  |  | In pipeline: union-merge the shared concerns.md so concurrent PRs stop conflicting and re-verifying at the merge door |
-| 20 | PAN-4609 | S | medium | ok |  |  | In pipeline: docs for what verification runs, why it is slow (CPU admission queue), and how to pick local gates |
 | 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 22 | PAN-4610 | S | critical | ok |  |  | Torn-read poller deletes a half-written CPU-admission ticket, stranding a verification worker forever; land with/before PAN-4546 |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
@@ -847,12 +846,11 @@ _Last sequenced: 2026-10-24T13:04:23Z · model: claude-opus-5-5 · open: 848_
 | 871 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
 | 872 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
 | 873 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
-| 874 | PAN-4585 | XL | medium | needs-refinement | ✓ |  | New opt-in Semgrep SAST epic; no children filed yet and 4 operator decisions open (gate default, Guardian, opengrep). |
-| 875 | PAN-4590 | L | medium | ok |  | PAN-4585 | Semgrep sast verification gate + review-context findings; first buildable child of PAN-4585, needs its config block. |
-| 876 | PAN-4591 | L | medium | ok |  | PAN-4585 | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; blocked by PAN-4585. |
-| 877 | PAN-4592 | M | low | ok |  | PAN-4585, PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs PAN-4585 and gate mode from PAN-4590. |
-| 878 | PAN-4594 | M | low | ok |  | PAN-4585, PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
-| 879 | PAN-4593 | L | low | needs-refinement |  | PAN-4585, PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 875 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
+| 876 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
+| 877 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
+| 878 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
+| 879 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 
 ## Rationale detail
 
@@ -923,10 +921,6 @@ New since the prior run and labeled substrate-improvement: the merge train recon
 ### PAN-4614 (rank 19)
 
 New issue filed 2026-10-24 after concerns.md conflicts blocked PR #4601 (PAN-4595) twice at the merge door, each round costing a re-verification and re-review; 14 merged PRs touched the file this month. The fix is one .gitattributes line plus a rebase test, labeled substrate-improvement, and it is already in pipeline, so it sits with the in-pipeline top tier.
-
-### PAN-4609 (rank 20)
-
-New in-pipeline docs issue filed after the 2026-10-24 local-gate trim; pinned at free rank 20 next to the other in-pipeline verification work it documents (PAN-4546, PAN-4531).
 
 ### PAN-4572 (rank 21)
 
@@ -1176,6 +1170,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 
 Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
 
+### PAN-3043 (rank 85)
+
+Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1183,10 +1181,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T13:04:23Z",
+  "generatedAt": "2026-10-24T13:06:48Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 848,
+  "openCount": 846,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11575,31 +11573,15 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "planning": "skip"
     },
     {
-      "issue": "PAN-4585",
-      "rank": 874,
-      "size": "XL",
-      "importance": "medium",
-      "score": 40,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "New opt-in Semgrep SAST epic; no children filed yet and 4 operator decisions open (gate default, Guardian, opengrep).",
-      "rationale": "New since the prior run. Epic container with a detailed 9-item plan but no child issues filed and four operator decisions unresolved, so it is not workable; ranked by aggregate value as a medium-impact opt-in feature, appended to avoid shifting existing ranks.",
-      "gate": "auto",
-      "planning": "auto",
-      "isEpic": true
-    },
-    {
       "issue": "PAN-4590",
       "rank": 875,
       "size": "L",
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4585"
-      ],
-      "why": "Semgrep sast verification gate + review-context findings; first buildable child of PAN-4585, needs its config block.",
-      "rationale": "New since the prior run. Phase-2 child of the Semgrep epic with a detailed scope and probe results; blocked by PAN-4585 and unblocks PAN-4592/4593/4594, so it leads the appended Semgrep group.",
+      "dependsOn": [],
+      "why": "Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11610,11 +11592,9 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "importance": "medium",
       "score": 45,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4585"
-      ],
-      "why": "Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; blocked by PAN-4585.",
-      "rationale": "New since the prior run. Independent of the gate child, blocked only by PAN-4585; appended after PAN-4590 to avoid shifting existing ranks.",
+      "dependsOn": [],
+      "why": "Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11626,11 +11606,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 38,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4585",
         "PAN-4590"
       ],
-      "why": "pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs PAN-4585 and gate mode from PAN-4590.",
-      "rationale": "New since the prior run. Opt-in CI workflow child; depends on the epic config block and PAN-4590 gate mode, so it follows the gate child.",
+      "why": "pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11642,11 +11621,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 36,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4585",
         "PAN-4590"
       ],
       "why": "Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590.",
-      "rationale": "New since the prior run. UI child that needs findings and the verification.sast override from PAN-4590 to exist first.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11658,11 +11636,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 30,
       "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-4585",
         "PAN-4590"
       ],
       "why": "Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work.",
-      "rationale": "New since the prior run. Two operator decisions from PAN-4585 are unresolved and Guardian provisioning touches liveness and pan done, so it is needs-refinement and last in the group.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11676,19 +11653,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "dependsOn": [],
       "why": "In pipeline: feature/ PRs opened from handoff worktrees get no workspace, so review never starts and only a console.log records it",
       "rationale": "New since the prior run and already in the pipeline. Supervised handoffs (the TENET-10 path for pipeline-machinery fixes) open PRs from plain worktrees, and handlePullRequest silently drops them when startReview finds no workspace; PRs #4599/#4602/#4603 sat unreviewed on 2026-10-24. Placed in the open rank 9 slot of the critical top tier because it gates review for every handoff-produced PR, including PAN-4527 and PAN-4532.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4609",
-      "rank": 20,
-      "size": "S",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: docs for what verification runs, why it is slow (CPU admission queue), and how to pick local gates",
-      "rationale": "New in-pipeline docs issue filed after the 2026-10-24 local-gate trim; pinned at free rank 20 next to the other in-pipeline verification work it documents (PAN-4546, PAN-4531).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13114,76 +13078,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 1
     },
     {
-      "from": "PAN-4585",
-      "to": "PAN-4590",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4590",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4591",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4591",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4592",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4592",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4593",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4593",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4594",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4594",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4590",
       "to": "PAN-4592",
       "type": "unblocks",
@@ -13245,20 +13139,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4546",
-      "to": "PAN-4609",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4531",
-      "to": "PAN-4609",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
     },
     {
       "from": "PAN-4610",
