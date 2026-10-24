@@ -3,8 +3,19 @@ name: CI
 on:
   push:
     branches: [main]
+    # PAN-4618: ~95% of main commits are bookkeeping (.pan/** plan/task state,
+    # .overdeck/memory/** curated facts) with no code change to verify. Skip
+    # CI on those pushes so they don't starve PR checks of runners.
+    paths-ignore: ['.pan/**', '.overdeck/memory/**']
   pull_request:
     branches: [main]
+
+# PAN-4618: cancel a superseded run's workflow instead of letting it keep a
+# runner until completion. A quick follow-up push (or PR update) replaces the
+# in-flight run for the same ref/PR rather than queuing behind it.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 # PAN-1659: skip the heavy docs-index build in CI. The docs-RAG index is a
 # repo-wide, publish-time artifact (built by prepublishOnly / build-for-publish.mjs

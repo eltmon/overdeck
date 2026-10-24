@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -873,15 +873,22 @@ describe('Definition-of-Done main-verification row', () => {
       const promoteCommit = git(['rev-parse', 'HEAD']);
       writeFileSync(join(repo, 'history.txt'), 'post-promote\n', 'utf-8');
       const laterMainCommit = commit('post-promote main commit');
-      git(['update-ref', 'refs/remotes/origin/main', laterMainCommit]);
+
+      // PAN-4618 critique finding 1: a bookkeeping commit lands on top of the
+      // promote merge (no pathspec filters it out of readContainingDefaultBranchCommits).
+      mkdirSync(join(repo, '.pan', 'backlog'), { recursive: true });
+      writeFileSync(join(repo, '.pan', 'backlog', 'sequence.md'), 'queue\n', 'utf-8');
+      const bookkeepingCommit = commit('chore(workspace): backlog sequence');
+      git(['update-ref', 'refs/remotes/origin/main', bookkeepingCommit]);
 
       const fixtureCtx = { ...ctx, projectPath: repo };
       expect(await readContainingDefaultBranchCommits(fixtureCtx, batchMerge))
-        .toEqual([laterMainCommit, promoteCommit]);
+        .toEqual([bookkeepingCommit, laterMainCommit, promoteCommit]);
 
       const probed: string[] = [];
       const checkRuns = new Map([
         [batchMerge, runs(required, required.filter(check => check !== 'test'))],
+        [bookkeepingCommit, runs(['reject-planning-paths'])],
         [laterMainCommit, runs(required, required.filter(check => check !== 'test'))],
         [promoteCommit, runs(required)],
       ]);
@@ -893,7 +900,7 @@ describe('Definition-of-Done main-verification row', () => {
         readRequiredChecks: async () => required,
       });
 
-      expect(probed).toEqual([batchMerge, laterMainCommit, promoteCommit]);
+      expect(probed).toEqual([batchMerge, bookkeepingCommit, laterMainCommit, promoteCommit]);
       expect(probed).not.toContain(featureCommit);
       expect(row).toMatchObject({ status: 'pass' });
       expect(row.observed).toContain(`verified on main by later green CI run ${promoteCommit} containing the merge`);
@@ -915,6 +922,55 @@ describe('Definition-of-Done main-verification row', () => {
     });
     expect(probed).toEqual(['head-0', 'head-1', 'head-2', 'head-3', 'head-4']);
     expect(row).toMatchObject({ status: 'miss' });
+  });
+
+  // PAN-4618: most default-branch commits are bookkeeping pushes CI skips
+  // entirely, so a run of them above the merge must not exhaust the probe
+  // budget before a real CI-bearing candidate is reached.
+  it('skips later candidates without a CI run and finds the green run below them', async () => {
+    const probed: string[] = [];
+    const bookkeeping = ['bk1', 'bk2', 'bk3', 'bk4', 'bk5', 'bk6'];
+    const row = await checkMainVerifyRow(ctx, 'mergecommit', {
+      readCheckRuns: async (_ctx, commit) => {
+        if (commit !== 'mergecommit') probed.push(commit);
+        if (commit === 'mergecommit') return runs(required, required.filter(check => check !== 'test'));
+        return bookkeeping.includes(commit) ? runs(['reject-planning-paths']) : runs(required);
+      },
+      readRequiredChecks: async () => required,
+      readContainingDefaultBranchCommits: async () => [...bookkeeping, 'green'],
+    });
+    expect(probed).toEqual([...bookkeeping, 'green']);
+    expect(row).toMatchObject({ status: 'pass' });
+    expect(row.observed).toContain('verified on main by later green CI run green containing the merge');
+  });
+
+  it('counts only CI-bearing candidates toward the five-probe budget', async () => {
+    const probed: string[] = [];
+    const failing = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6'];
+    const row = await checkMainVerifyRow(ctx, 'mergecommit', {
+      readCheckRuns: async (_ctx, commit) => {
+        if (commit !== 'mergecommit') probed.push(commit);
+        return runs(required, required.filter(check => check !== 'test'));
+      },
+      readRequiredChecks: async () => required,
+      readContainingDefaultBranchCommits: async () => [...failing, 'green'],
+    });
+    expect(probed).toEqual(['f1', 'f2', 'f3', 'f4', 'f5']);
+    expect(probed).not.toContain('f6');
+    expect(probed).not.toContain('green');
+    expect(row).toMatchObject({ status: 'miss' });
+  });
+
+  // PAN-4618 critique finding 2: a mixed push (code + bookkeeping in the same
+  // commit) still carries the CI run, so its own tip is accepted directly.
+  it("accepts a mixed push's bookkeeping tip that carries the CI run", async () => {
+    const row = await checkMainVerifyRow(ctx, 'mergecommit', {
+      readCheckRuns: async (_ctx, commit) => (commit === 'bkTip' ? runs(required) : runs(['reject-planning-paths'])),
+      readRequiredChecks: async () => required,
+      readContainingDefaultBranchCommits: async () => ['bkTip', 'codeC'],
+    });
+    expect(row).toMatchObject({ status: 'pass' });
+    expect(row.observed).toContain('verified on main by later green CI run bkTip containing the merge');
   });
 });
 

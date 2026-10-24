@@ -101,8 +101,8 @@ External subscribers may only depend on events in the **public catalog**. Events
 | `workspace.created`              | Workspace provisioned                        | `issueId`, `path` |
 | `workspace.destroyed`            | Workspace torn down                          | `issueId` |
 | `issue.status_changed`           | Tracker status transition                    | `issueId`, `from`, `to` |
-| `project.ci_suite_observed`      | Verified GitHub Actions suite update for the current default-branch head (emitted by the `check_suite` webhook handler) | yes | `projectKey`, `repo`, `branch`, `headSha`, `suiteId`, `status`, `conclusion`, `htmlUrl?`, `observedAt`, `authoritativeHead?` |
-| `project.ci_head_observed`       | Complete REST projection for the verified default-branch head | yes | `projectKey`, `repo`, `branch`, `headSha`, `suites`, `observedAt` |
+| `project.ci_suite_observed`      | Verified GitHub Actions suite update for the current CI head (the newest push run of the CI workflow, PAN-4618) (emitted by the `check_suite` webhook handler) | yes | `projectKey`, `repo`, `branch`, `headSha`, `suiteId`, `status`, `conclusion`, `htmlUrl?`, `observedAt`, `authoritativeHead?` |
+| `project.ci_head_observed`       | Complete REST projection for the verified current CI head (the newest push run of the CI workflow, PAN-4618) | yes | `projectKey`, `repo`, `branch`, `headSha`, `suites`, `observedAt` |
 | `dashboard.lifecycle_started`    | Dashboard restarting                         | `reason`, `trigger` |
 | `dashboard.lifecycle_completed`  | Dashboard restart finished                   | `reason`, `durationMs` |
 | `dashboard.lifecycle_failed`     | Dashboard restart failed                     | `reason`, `error` |

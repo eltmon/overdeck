@@ -29,7 +29,7 @@ const mockBumpIssuePrTabCacheGeneration = vi.fn();
 const mockExecFile = vi.fn();
 const mockPostMergeLifecycle = vi.fn();
 const mockAppendDomainEventAsync = vi.fn(async () => true);
-const mockResolveDefaultBranchHead = vi.fn(async () => 'abc123');
+const mockResolveCiHead = vi.fn(async () => 'abc123');
 const mockEnqueueProjectResourceRefresh = vi.fn();
 const mockRelayCiFailureFeedback = vi.fn(async () => ({ agentMessageSent: false }));
 const mockRecordCiTestGatePass = vi.fn(async () => true);
@@ -99,14 +99,14 @@ vi.mock('../../../src/lib/activity-logger.js', () => ({
 }));
 
 vi.mock('../../../src/lib/ci/project-ci-github.js', () => ({
-  resolveDefaultBranchHead: (...args: unknown[]) => mockResolveDefaultBranchHead(...args),
+  resolveCiHead: (...args: unknown[]) => mockResolveCiHead(...args),
 }));
 
 vi.mock('node:child_process', () => ({ execFile: (...args: unknown[]) => mockExecFile(...args) }));
 vi.mock('child_process', () => ({ execFile: (...args: unknown[]) => mockExecFile(...args) }));
 
 beforeEach(() => {
-  mockResolveDefaultBranchHead.mockResolvedValue('abc123');
+  mockResolveCiHead.mockResolvedValue('abc123');
   mockGetPrFacts.mockResolvedValue({ open: true, number: 7, url: 'https://github.com/test-owner/test-repo/pull/7' });
 });
 

@@ -258,8 +258,9 @@ the **CI test job on the PR head is the test gate**:
   branch too (inherited from a red `main`); and a failure while the default
   branch's test verdict is unknown. The default branch's verdict is its newest
   commit (of the last 10) whose test checks all finished decisively: main's CI
-  is often still running on HEAD, and a cancelled run says nothing
-  (`cloister/ci-default-branch-tests.ts`). It reads both check runs and commit
+  is often still running on HEAD, a bookkeeping commit carries no test checks
+  at all, and a cancelled run says nothing (PAN-4618,
+  `cloister/ci-default-branch-tests.ts`). It reads both check runs and commit
   statuses (PAN-4589) — a Dagger Cloud status is mapped to a check run
   (`commitStatusAsCheckRun`) before the verdict is judged. When no such commit exists, or the
   forge cannot be read, the failure is not counted; the plain CI FAILED
@@ -287,6 +288,52 @@ the **CI test job on the PR head is the test gate**:
 verification:
   tests: ci      # or: local
 ```
+
+### Bookkeeping commits skip CI and superseded runs are cancelled (PAN-4618)
+
+Most commits on `main` are bookkeeping pushes that touch only `.pan/**`
+(plan/task/continue state) or `.overdeck/memory/**` (curated facts), with no
+code to verify. CI's `push` trigger (`.github/workflows/ci.yml`) carries
+`paths-ignore: ['.pan/**', '.overdeck/memory/**']`, so a pure bookkeeping push
+starts no `CI` workflow run at all. GitHub evaluates path filters against the
+*whole push*, not per commit: a push that mixes a bookkeeping commit with a
+code commit still runs CI once, at the pushed tip. The `no-planning-on-main`
+guard workflow has no path filter and always runs, so every push to `main`
+still gets at least one check.
+
+`ci.yml` also carries a workflow-level `concurrency` group
+(`ci-${{ github.event.pull_request.number || github.ref }}`,
+`cancel-in-progress: true`): a newer push's run cancels whatever run was still
+in flight for the same ref or PR, so a burst of merges leaves only the last
+push's run to finish.
+
+Both changes mean a commit — including the newest one — commonly has no CI
+run, or a `cancelled` one, and that is expected, not a signal the forge is
+unreachable. Readers of main's CI now treat the newest commit without a
+decisive run as "keep looking," not "unknown":
+
+- **The default-branch test verdict**
+  (`cloister/ci-default-branch-tests.ts`) scans up to 100 commits, skipping a
+  commit with no test checks (`no-tests`) or an indecisive one (`cancelled`,
+  `stale`, …) for free, and gives up only after 10 commits whose test checks
+  are genuinely still running. A full 100-commit page with no test checks at
+  all returns `null` (unknown); fewer than 100 with no test checks returns an
+  empty set (the branch runs no test checks).
+- **DoD row 6's later-green fallback**
+  (`lifecycle/dod-later-green.ts`, `findLaterGreenDefaultBranchRun`) scans up
+  to 50 default-branch commits containing the merge, skipping a candidate
+  missing any required check (no CI run at all) for free, and spends its
+  5-candidate probe budget only on commits that actually carry a CI run.
+- **The Command Deck CI chip** reads `resolveCiHead`
+  (`ci/project-ci-github.ts`): the `head_sha` of the newest `push` run of
+  `.github/workflows/ci.yml` from the Actions workflow-runs endpoint, not the
+  branch head. It falls back to the branch head when the project has no such
+  workflow. Both the REST fill (`overdeck/project-ci-fill.ts`) and the
+  `check_suite` webhook (`webhook-handlers.ts`) verify against this CI head.
+- **The Flywheel** reads main's CI by the same rule: the red-main verdict is
+  the newest run that concluded `success` or `failure` (skipping queued,
+  in-progress and `cancelled` runs), and the deploy rule requires the newest
+  run to be `completed`/`success` before `pan reload`.
 
 #### Dagger Cloud checks (PAN-4589)
 
