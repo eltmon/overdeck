@@ -1,0 +1,283 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T08:23:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4595: pan show --health calls working Herdr agents stuck: CLI never registers the transcript heartbeat lookup",
+    "updated": "2026-10-24T08:31:13.844Z"
+  },
+  "plan": {
+    "id": "pan-4595",
+    "title": "pan show --health calls working Herdr agents stuck: CLI never registers the transcript heartbeat lookup",
+    "status": "proposed",
+    "uid": "1a49541e-adb9-407b-aaaf-395b642e3968",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-24T08:23:47Z",
+    "updated": "2026-10-24T08:31:13.844Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4595",
+        "label": "PAN-4595",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4595.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "health",
+      "liveness",
+      "herdr",
+      "cli",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "pan show <id> --health classifies actively working Herdr agents as stuck. In a fresh CLI process the runtime mirror is empty, a Herdr pane has no tmux window_activity, and the transcript heartbeat lookup in src/lib/agents/liveness.ts is never registered because only src/lib/runtimes/index.ts registers it and nothing on the CLI health path imports that module. pingAgent then falls back to the spawn-time state.json lastActivity, so every Herdr agent older than 30 minutes reads stuck, which invites a false pan resume / pan tell from the Flywheel.",
+      "Proposal": "Add a side-effect import of ./runtimes/index.js to src/lib/health.ts so any process that loads the health classifier registers the heartbeat lookup (planning verified with madge that this adds no import cycle and only 7 modules to the show-command graph). Prove it with a new test that runs the real liveness and runtime-registry code against a temp OVERDECK_HOME holding a Herdr-style Claude Code agent with a fresh transcript and a stale state.json, verify the built CLI chunk carries the registration, and record the second registrar in the liveness/runtimes comments and docs/TERMINAL-BACKENDS.md.",
+      "NonGoals": "- Fixing pan worker wait / pan lane wait idle detection (src/lib/agents/worker/wait.ts) in a CLI process\n- Changing the 15/30-minute warning/stuck thresholds in pingAgentBody\n- Changing getAgentEffectiveLastActivityMs, isIdle, or idleAgeMs semantics\n- Making the runtime mirror available to CLI processes (HTTP fall-through)\n- Changing non-Claude runtimes' getHeartbeat implementations\n- Importing the runtime registry in src/cli/index.ts for every pan verb\n- Editing sync-sources/skills/pan-show/SKILL.md (flags and help text do not change)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Register the heartbeat lookup by importing ./runtimes/index.js from src/lib/health.ts, not from src/cli/index.ts or the show/health CLI modules.",
+        "rationale": "show.ts and cli/commands/health.ts both import pingAgent from lib/health.ts, so one line fixes pan show, pan show --health and pan show --health ping|check; the other importers of lib/health.ts (cloister service*.ts) already load the registry; a CLI-entry import would load the registry for every pan verb."
+      },
+      {
+        "summary": "Prove the fix with a new test file, tests/lib/health-herdr-heartbeat.test.ts, instead of extending tests/lib/health-runtime-state.test.ts.",
+        "rationale": "The existing file mocks liveness.js wholesale and agents.js with five exports, so it cannot observe registration; a separate file can keep liveness and the runtime registry real."
+      },
+      {
+        "summary": "Leave pan worker wait / pan lane wait (same unregistered lookup) out of scope.",
+        "rationale": "The issue scopes the health verdict; worker.ts does not import lib/health.ts, and a missing signal there fails toward 'no idle age' rather than a false recovery verdict."
+      },
+      {
+        "summary": "Fold the built-CLI verification (PRD WI-4) into the WI-1 plan item's acceptance criteria.",
+        "rationale": "WI-4 commits nothing, and every plan item must land a commit carrying its Item: trailer for pan task done."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-24-PAN-4595-pan-show-health-calls-working-herdr-agents-stuck-cli-never-registers-the-transcript-heartbeat-lookup.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "register-heartbeat-in-health",
+        "title": "Import the runtime registry from src/lib/health.ts so the CLI health path registers the transcript heartbeat lookup",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T08:23:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4595",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/health.ts",
+            "tests/lib/health-runtime-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash scripts/lint-circular-deps.sh",
+            "npm run lint:overdeck-boundaries",
+            "npx vitest run tests/lib/health-runtime-state.test.ts",
+            "npm run build",
+            "node -e 'const fs=require(\"fs\");const hits=fs.readdirSync(\"dist\").filter(f=>f.endsWith(\".js\")&&fs.readFileSync(\"dist/\"+f,\"utf8\").includes(\"getRuntimeForAgent(agentId)?.getHeartbeat(agentId)\"));console.log(hits.length?\"FOUND \"+hits.join(\",\"):\"MISSING\");process.exit(hits.length?0:1)'"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint-circular-deps.sh exits 0 and scripts/circular-deps-baseline.txt has no diff",
+            "tests/lib/health-runtime-state.test.ts reports all tests passed",
+            "the node bundle scan prints FOUND followed by a top-level dist/*.js chunk name"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 and WI-4. In src/lib/health.ts, directly after the import from './agents/liveness.js' (line 16), add the bare side-effect import `import './runtimes/index.js';` preceded by the four-line PAN-4595 comment from the PRD. Change nothing else in health.ts. Add `vi.mock('../../src/lib/runtimes/index.js', () => ({}))` to tests/lib/health-runtime-state.test.ts next to its other vi.mock calls (expected: its fs and agents.js mocks lack exports the newly loaded runtime modules read at import time); change none of its assertions, then run it. Run the circular-deps ratchet, boundaries lint and typecheck. Then run npm run build and the Node bundle scan from metadata.verify_commands, and the scratch-home built-CLI check in PRD WI-4 step 2 (fake agent under .tmp/pan-4595-home/agents/agent-pan-99999/ — never use agent-pan-4595, whose real ~/.overdeck/heartbeats file would bypass the transcript path — run both `show PAN-99999 --health --json` and plain `show PAN-99999`, remove it with the literal `rm -rf .tmp/pan-4595-home`). Never commit dist/ or .tmp/."
+        },
+        "items": [
+          {
+            "id": "register-heartbeat-in-health.ac1",
+            "title": "src/lib/health.ts contains the line `import './runtimes/index.js';` with a comment naming PAN-4595, and `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-heartbeat-in-health.ac2",
+            "title": "`bash scripts/lint-circular-deps.sh` exits 0 and `git diff --exit-code scripts/circular-deps-baseline.txt` exits 0 (no new cycle, no baseline change)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-heartbeat-in-health.ac3",
+            "title": "After `npm run build`, the Node bundle scan prints FOUND for a top-level dist/*.js chunk containing `getRuntimeForAgent(agentId)?.getHeartbeat(agentId)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-heartbeat-in-health.ac4",
+            "title": "Given a scratch OVERDECK_HOME with a claude-code agent-pan-99999 whose state.json lastActivity is 3 h old and whose sessions.json points at a just-written transcript, when `node dist/cli/index.js show PAN-99999 --health --json` runs, then the printed JSON lastActivity is within 2 minutes of now",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-heartbeat-in-health.ac5",
+            "title": "Given the same scratch home on a Herdr host, when `node dist/cli/index.js show PAN-99999` runs without --health, then its health line prints a last activity measured in seconds or minutes, not hours",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "herdr-heartbeat-health-test",
+        "title": "Add tests/lib/health-herdr-heartbeat.test.ts proving a Herdr agent with a fresh transcript is healthy on the CLI path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T08:23:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4595",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/lib/health-herdr-heartbeat.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/health-herdr-heartbeat.test.ts tests/lib/health-runtime-state.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "vitest reports 3 passing tests in tests/lib/health-herdr-heartbeat.test.ts and all tests in tests/lib/health-runtime-state.test.ts passing",
+            "npm run lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. Create tests/lib/health-herdr-heartbeat.test.ts. In beforeEach make a temp dir with mkdtempSync, set process.env.OVERDECK_HOME to it BEFORE vi.resetModules() and the dynamic import of ../../src/lib/health.js, and write agents/agent-pan-4595-heartbeat-test/state.json (role 'work', status 'running', harness 'claude-code', lastActivity 3 h ago), a one-line transcript.jsonl, and sessions.json with one entry whose path is that transcript. Partially mock ../../src/lib/agents/liveness.js with importOriginal, overriding only isAlive to resolve { alive: true, paneAlive: true }; partially mock ../../src/lib/tmux.js so listPaneValuesSync throws and listSessionNames returns Effect.succeed([]). Do not mock or import src/lib/runtimes/index.js. Write the three named tests from the PRD (fresh transcript -> healthy with lastActivity within 60 s; transcript mtime set 3 h back with utimesSync -> stuck; pre-written health.json with consecutiveFailures 2 resets to 0). Restore OVERDECK_HOME and remove the temp dir in afterEach. Once, locally, delete the health.ts import line, confirm the fresh-transcript test fails with status stuck, then restore the line; do not commit that experiment. Follow the PRD's implementation checkpoint and fallback if the real module graph cannot load in the test environment."
+        },
+        "items": [
+          {
+            "id": "herdr-heartbeat-health-test.ac1",
+            "title": "Given a live agent with an empty runtime mirror, a 3 h old state.json lastActivity and a just-written transcript, when pingAgent runs, then it returns status 'healthy', consecutiveFailures 0, and lastActivity within 60 s of now",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-heartbeat-health-test.ac2",
+            "title": "Given the same agent with the transcript mtime set 3 h back, when pingAgent runs, then it returns status 'stuck' with a reason matching /No activity for \\d+ minutes/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-heartbeat-health-test.ac3",
+            "title": "Given a stored health.json with consecutiveFailures 2 and a fresh transcript, when pingAgent runs, then the returned and saved consecutiveFailures resets to 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-heartbeat-health-test.ac4",
+            "title": "The new test file contains no vi.mock of runtimes/index.js and no import of it, and writes only under its mkdtempSync directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "document-health-heartbeat-registrar",
+        "title": "Name src/lib/health.ts as the heartbeat-lookup registrar in liveness.ts, runtimes/index.ts and docs/TERMINAL-BACKENDS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:23:47Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4595",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "src/lib/agents/liveness.ts",
+            "src/lib/runtimes/index.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'PAN-4595' docs/TERMINAL-BACKENDS.md src/lib/agents/liveness.ts src/lib/runtimes/index.ts"
+          ],
+          "expected_outputs": [
+            "npm run lint:docs exits 0",
+            "grep prints at least one PAN-4595 line in each of the three files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In src/lib/agents/liveness.ts, keep the LivenessHeartbeatLookup header comment (lines 52-63) and add the sentence naming src/lib/health.ts as an importer of the registry for this side effect (PAN-4595). In src/lib/runtimes/index.ts, extend the comment at line 157 with 'src/lib/health.ts imports this module for this registration (PAN-4595).' In docs/TERMINAL-BACKENDS.md, after the sentence near line 457 that begins '`pan show --health ping|check` (`lib/health.ts`) reports an unanswered probe as a `warning`', insert the PRD's paragraph explaining that the last-activity age comes from the transcript heartbeat because lib/health.ts loads the runtime registry. Comment and prose changes only; no code changes in liveness.ts or runtimes/index.ts."
+        },
+        "items": [
+          {
+            "id": "document-health-heartbeat-registrar.ac1",
+            "title": "docs/TERMINAL-BACKENDS.md contains a sentence stating that lib/health.ts loads the runtime registry so pan show --health reads the transcript heartbeat on Herdr, citing PAN-4595",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-health-heartbeat-registrar.ac2",
+            "title": "The comments in src/lib/agents/liveness.ts and src/lib/runtimes/index.ts each contain a mention of src/lib/health.ts as a registrar with PAN-4595, and `git diff` of those two files shows only comment lines changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "register-heartbeat-in-health",
+        "to": "herdr-heartbeat-health-test",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
