@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T09:35:13Z · model: claude-opus-5-5 · open: 844_
+_Last sequenced: 2026-10-24T10:42:54Z · model: claude-opus-5-5 · open: 846_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -24,6 +24,8 @@ _Last sequenced: 2026-10-24T09:35:13Z · model: claude-opus-5-5 · open: 844_
 | 17 | PAN-4597 | S | high | ok |  |  | Awaiting Merge hides approved green PRs: ready needs a 5-min gate answer only auto-merge refreshes. Merge machinery: supervised handoff |
 | 18 | PAN-4598 | M | critical | ok |  |  | No UAT batch has assembled since the cut (newest 2026-09-20, failed); Flywheel card offers only an escape-hatch merge link |
 | 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
+| 20 | PAN-4609 | S | medium | ok |  |  | In pipeline: docs for what verification runs, why it is slow (CPU admission queue), and how to pick local gates |
+| 21 | PAN-4610 | S | critical | ok |  |  | Torn-read poller deletes a half-written CPU-admission ticket, stranding a verification worker forever; land with/before PAN-4546 |
 | 22 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
@@ -928,6 +930,14 @@ New since the prior run and labeled substrate-improvement: the merge train recon
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
 
+### PAN-4609 (rank 20)
+
+New in-pipeline docs issue filed after the 2026-10-24 local-gate trim; pinned at free rank 20 next to the other in-pipeline verification work it documents (PAN-4546, PAN-4531).
+
+### PAN-4610 (rank 21)
+
+New issue since the prior run. A waiter poll can unlink a ticket between open(wx) and the JSON write, and the waiter never checks its own ticket, so a live worker queues forever (PAN-4532 sat 40+ min while later gates were admitted). This silently stops verification for that issue, so it is pipeline-blocking substrate work; it takes the free slot right after the in-pipeline cluster and must land with or before PAN-4546, which edits the same admission module.
+
 ### PAN-4586 (rank 22)
 
 New issue. Verified against herdr 0.9.1: HerdrApiClient.call returns response.result, whose pane_read text sits under read.text, but readHerdrPaneText, diagnoseDetectionFailure and the herdr-submit composer read a top-level text, so every pane-text consumer on the default backend sees an empty string. A three-site fix plus corrected test stubs; placed in a free rank slot just above the Herdr pane-sizing pair (PAN-4582, PAN-3952) because it is smaller and likely explains part of PAN-3952's 'pane read returns nothing' observation.
@@ -1164,14 +1174,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 
 Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
 
-### PAN-1824 (rank 86)
-
-Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass — PAN-3243, PAN-3492, PAN-3520 and PAN-2421 — all trace red or flaky main to real-timer tests under load. This is the shared fix for that family and it is now marked ready, so it should sit with the other CI-integrity work rather than behind it.
-
-### PAN-2932 (rank 87)
-
-Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (502) after pan reload.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1179,10 +1181,10 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T09:35:13Z",
+  "generatedAt": "2026-10-24T10:42:54Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 844,
+  "openCount": 846,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11713,6 +11715,32 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "rationale": "New since the prior run and already in the pipeline. Supervised handoffs (the TENET-10 path for pipeline-machinery fixes) open PRs from plain worktrees, and handlePullRequest silently drops them when startReview finds no workspace; PRs #4599/#4602/#4603 sat unreviewed on 2026-10-24. Placed in the open rank 9 slot of the critical top tier because it gates review for every handoff-produced PR, including PAN-4527 and PAN-4532.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4609",
+      "rank": 20,
+      "size": "S",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: docs for what verification runs, why it is slow (CPU admission queue), and how to pick local gates",
+      "rationale": "New in-pipeline docs issue filed after the 2026-10-24 local-gate trim; pinned at free rank 20 next to the other in-pipeline verification work it documents (PAN-4546, PAN-4531).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4610",
+      "rank": 21,
+      "size": "S",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Torn-read poller deletes a half-written CPU-admission ticket, stranding a verification worker forever; land with/before PAN-4546",
+      "rationale": "New issue since the prior run. A waiter poll can unlink a ticket between open(wx) and the JSON write, and the waiter never checks its own ticket, so a live worker queues forever (PAN-4532 sat 40+ min while later gates were admitted). This silently stops verification for that issue, so it is pipeline-blocking substrate work; it takes the free slot right after the in-pipeline cluster and must land with or before PAN-4546, which edits the same admission module.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13199,6 +13227,34 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4546",
+      "to": "PAN-4609",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4531",
+      "to": "PAN-4609",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4610",
+      "to": "PAN-4546",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4610",
+      "to": "PAN-4532",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }

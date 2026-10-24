@@ -1,0 +1,679 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T08:13:17Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4589: CI test gate: recognize commit-status CI (Dagger Cloud checks)",
+    "updated": "2026-10-24T08:18:16.658Z"
+  },
+  "plan": {
+    "id": "pan-4589",
+    "title": "CI test gate: recognize commit-status CI (Dagger Cloud checks)",
+    "status": "running",
+    "uid": "8a9a9c70-fe0a-4810-8d29-894dc5261988",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-24T08:13:17Z",
+    "updated": "2026-10-24T08:18:16.658Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4589",
+        "label": "PAN-4589",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "ci",
+      "verification-gate",
+      "dagger",
+      "pr-facts",
+      "webhooks"
+    ],
+    "narratives": {
+      "Problem": "Every CI test-job classifier calls isCiTestCheckName(check.name). GitHub commit statuses (StatusContext rows) have no name, so commit-status CI such as Dagger Cloud checks is invisible: a Dagger-only project shows testChecks 'none' and testJobSucceeded false forever, the merge gate and auto-merge never see a passed test job, the default-branch baseline is no-tests, a green Dagger test status never resets the attempt streak or lifts the stuck pause, feedback carries no link, and toChecksState shows a Dagger-red PR green.",
+      "Proposal": "Add isDaggerCloudUrl / isDaggerCloudTestCheck / isCiTestRollupCheck beside isCiTestCheckName (unchanged). pr-facts classifies rollup rows with isCiTestRollupCheck and carries a status's targetUrl on FailedCheck. The default-branch baseline also reads each commit's paginated combined status. handleStatus records the CI test pass on a green test status. CI test-gate feedback lists failing status test checks with their link and the `dagger check dag://<context>` rerun command. toChecksState honors state. Mode detection stays workflow-only; dagger.toml only adds a hint to the local reason. Docs gain a Dagger Cloud subsection.",
+      "NonGoals": "- Auto-detecting verification.tests: ci from dagger.toml or live commit statuses (the mode stays local unless set explicitly)\n- Changing isCiTestCheckName or how GitHub Actions check runs classify\n- Recognizing segment-matched contexts on non-dagger.cloud statuses (a Buildkite go-client/test stays unrecognized)\n- GitLab external statuses or pipelines\n- Fetching Dagger Cloud logs into the feedback file\n- Feedback links for non-test failing statuses or for projects not in verification.tests: ci\n- Changes to dod-gate.ts or summarizeStatusCheckRollup\n- Raising any file-size allowlist cap or extracting pr-facts.ts\n- New HTTP routes\n- Editing the OKF knowledge bundle repo"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Predicates live in src/lib/cloister/verification-tests-mode.ts beside isCiTestCheckName",
+        "rationale": "One classifier module already imported by every consumer (pr-facts, ci-default-branch-tests, webhook-handlers, ci-failure-feedback); no new import edges."
+      },
+      {
+        "summary": "Dagger host rule is https plus hostname dagger.cloud or *.dagger.cloud; malformed URL is false",
+        "rationale": "Subdomains are Dagger-controlled; repo writers can post any status URL anyway, so this is classification, not a trust boundary."
+      },
+      {
+        "summary": "Rollup classifier is isCiTestCheckName(name ?? context) || isDaggerCloudTestCheck(context, targetUrl)",
+        "rationale": "Issue scope 1 mandates name ?? context; this recognizes Buildkite/Jenkins statuses named 'test' while the segment rule stays dagger.cloud-only so a non-Dagger go-client/test is not recognized (issue AC)."
+      },
+      {
+        "summary": "Commit status 'error' counts as a failing test check",
+        "rationale": "pr-facts already treats StatusContext ERROR as failed and the relay counts ERROR; the baseline maps error to failure so PR and baseline names line up."
+      },
+      {
+        "summary": "Combined-status reads use gh api --paginate",
+        "rationale": "dagger/dagger posts 90 statuses per commit; a 100-row page would soon drop test statuses and mislabel inherited failures as the PR's."
+      },
+      {
+        "summary": "Include the status-webhook pass path and the toChecksState state fix although the issue did not list them",
+        "rationale": "Without the pass path a Dagger project's stuck pause never lifts (PIPELINE-GATES promises it does); without the toChecksState fix the board shows Dagger-red PRs green and the scheduler enqueues them. Both are small direct consequences of the same blindness."
+      },
+      {
+        "summary": "dod-gate.ts is not changed",
+        "rationale": "Verified: checksOutcome never calls isCiTestCheckName and already reads conclusion ?? state ?? status; the issue's mention is inaccurate."
+      },
+      {
+        "summary": "pr-facts.ts stays under the 1000-line ceiling through call-site swaps, no extraction",
+        "rationale": "File is at 993 lines; the swaps plus one closure and one field net about +3 lines, which is cheaper and lower-risk than an extraction refactor."
+      },
+      {
+        "summary": "FailedCheck.targetUrl comes only from StatusContext targetUrl, never from check-run detailsUrl",
+        "rationale": "Keeps existing toEqual expectations on listFailedTestChecks valid (NFR-1)."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-24-PAN-4589-ci-test-gate-recognize-commit-status-ci-dagger-cloud-checks.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "dagger-predicates",
+        "title": "Add Dagger Cloud test-check predicates beside isCiTestCheckName",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:13:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4589",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-tests-mode.ts",
+            "tests/unit/lib/cloister/verification-tests-on-ci.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-tests-on-ci.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verification-tests-on-ci.test.ts passes including the new isDaggerCloudTestCheck and isCiTestRollupCheck describes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "rollup-status-context-pr-facts",
+            "default-branch-commit-statuses",
+            "status-webhook-records-pass",
+            "feedback-status-check-links",
+            "mode-detection-dagger-reason"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4589.md WI-1. In src/lib/cloister/verification-tests-mode.ts add, right after isCiTestCheckName (leave its body byte-identical), the exported functions isDaggerCloudUrl(targetUrl), isDaggerCloudTestCheck(name, targetUrl) and the CiRollupCheck interface plus isCiTestRollupCheck(check) exactly as written in the PRD (https only; hostname dagger.cloud or *.dagger.cloud; malformed URL false; segment match = name.split('/').some(isCiTestCheckName); rollup = isCiTestCheckName(name ?? context) || isDaggerCloudTestCheck(context, targetUrl)). Add one module-header paragraph citing PAN-4589. Add the two new describe blocks to tests/unit/lib/cloister/verification-tests-on-ci.test.ts with every example listed in the PRD; do not edit the existing describe('isCiTestCheckName') block."
+        },
+        "items": [
+          {
+            "id": "dagger-predicates.ac1",
+            "title": "Given contexts go-client/test, golang/packages/tests/test, vitest/projects/tests/test and test-split/test-llm with a https://dagger.cloud/... target URL, isDaggerCloudTestCheck returns true for each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dagger-predicates.ac2",
+            "title": "Given contexts python-client/format, helm/lint and engine-lab/wcprof-report-test with a dagger.cloud URL, isDaggerCloudTestCheck returns false for each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dagger-predicates.ac3",
+            "title": "isDaggerCloudTestCheck('go-client/test', url) returns false for a buildkite.com URL, an undefined URL, a malformed URL, an http://dagger.cloud URL and https://dagger.cloud.evil.example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dagger-predicates.ac4",
+            "title": "isCiTestRollupCheck returns true for { context: 'test', targetUrl: buildkite } and { name: 'test (22)' }, and false for { context: 'go-client/test', targetUrl: buildkite } and { name: 'lint' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dagger-predicates.ac5",
+            "title": "git diff origin/main shows the isCiTestCheckName function body unchanged and the existing isCiTestCheckName describe block passes without edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rollup-status-context-pr-facts",
+        "title": "Classify StatusContext rollup rows in pr-facts test classifiers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:13:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4589",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/pull-requests.ts",
+            "src/lib/cloister/pr-facts.ts",
+            "src/lib/cloister/__tests__/pr-facts-status-context.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/pr-facts-status-context.test.ts src/lib/cloister/__tests__/pr-facts-test-checks.test.ts src/lib/cloister/__tests__/pr-facts-ci-test-job.test.ts src/lib/cloister/__tests__/merge-gate.test.ts src/lib/cloister/__tests__/auto-merge-eligibility.test.ts",
+            "wc -l src/lib/cloister/pr-facts.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all five test files pass",
+            "pr-facts.ts line count is 1000 or less",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4589.md WI-2. Add context?: string and targetUrl?: string (one-line comments) to the statusCheckRollup element type in src/lib/overdeck/pull-requests.ts (line ~72). In src/lib/cloister/pr-facts.ts replace the isCiTestCheckName import with isCiTestRollupCheck, swap the three classifiers (listFailedTestChecks, summarizeTestChecks, testJobSucceeded) to isCiTestRollupCheck(check), add targetUrl?: string to FailedCheck, and build failed rows through the one-line local `failure` closure from the PRD before/after (name = check.name ?? check.context ?? '', targetUrl only from check.targetUrl, never detailsUrl). Do not touch summarizeStatusCheckRollup. pr-facts.ts must stay <= 1000 lines (it starts at 993; no allowlist edits). Create src/lib/cloister/__tests__/pr-facts-status-context.test.ts with the green/red/pending/non-test/non-Dagger cases from the PRD."
+        },
+        "items": [
+          {
+            "id": "rollup-status-context-pr-facts.ac1",
+            "title": "Given a rollup of Dagger StatusContext rows go-client/test SUCCESS, test-split/test-llm SUCCESS and helm/lint FAILURE, summarizeTestChecks returns 'green', listFailedTestChecks returns [] and testJobSucceeded returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-status-context-pr-facts.ac2",
+            "title": "Given go-client/test FAILURE and golang/packages/tests/test ERROR Dagger statuses, listFailedTestChecks returns both rows with name equal to the context, the reported conclusion and the row's targetUrl, summarizeTestChecks returns 'red' and testJobSucceeded returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-status-context-pr-facts.ac3",
+            "title": "Given go-client/test PENDING plus vitest/projects/tests/test SUCCESS, summarizeTestChecks returns 'pending'; given only helm/lint SUCCESS or a non-dagger go-client/test FAILURE, it returns 'none'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-status-context-pr-facts.ac4",
+            "title": "When pr-facts-test-checks.test.ts, pr-facts-ci-test-job.test.ts, merge-gate.test.ts and auto-merge-eligibility.test.ts run with no assertion edits, each passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-status-context-pr-facts.ac5",
+            "title": "wc -l src/lib/cloister/pr-facts.ts prints 1000 or fewer lines and grep for isCiTestCheckName in pr-facts.ts returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "default-branch-commit-statuses",
+        "title": "Count Dagger commit statuses in the default-branch test baseline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:13:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4589",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/ci-default-branch-tests.ts",
+            "src/lib/cloister/__tests__/ci-default-branch-tests.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/ci-default-branch-tests.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ci-default-branch-tests.test.ts passes including the Dagger-only default branch case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4589.md WI-3. In src/lib/cloister/ci-default-branch-tests.ts: add targetUrl?: string to CheckRun; filter test runs with isCiTestCheckName(run.name) || isDaggerCloudTestCheck(run.name, run.targetUrl); add exported commitStatusAsCheckRun (pending -> in_progress/null, error -> failure, else completed/state); add a ghJsonPages<T> helper that parses each stdout line as one page's array and flattens; per sha fetch check runs and `gh api --paginate repos/<repo>/commits/<sha>/status?per_page=100 --jq '[.statuses[] | {name: .context, state, targetUrl: .target_url}]'` with Promise.all and judge the concatenation. FAILING_CONCLUSIONS unchanged. Extend the test file's forge() to answer the /status path (default [] per sha) so existing tests keep their verdicts with no assertion edits; add the four new cases from the PRD."
+        },
+        "items": [
+          {
+            "id": "default-branch-commit-statuses.ac1",
+            "title": "Given a default-branch commit with no check runs and Dagger statuses go-client/test failure and helm/lint failure, readDefaultBranchFailingTestChecks resolves to a Set containing only 'go-client/test' (not an empty set and not null)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-branch-commit-statuses.ac2",
+            "title": "Given the newest commit's Dagger test status pending and an older commit's success, readDefaultBranchFailingTestChecks walks back and resolves to an empty Set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-branch-commit-statuses.ac3",
+            "title": "defaultBranchCommitTestVerdict applied to commitStatusAsCheckRun({ name: 'go-client/test', state: 'error', targetUrl: dagger URL }) returns a Set containing 'go-client/test'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-branch-commit-statuses.ac4",
+            "title": "Given the status call answers with two stdout lines (two pages), failing Dagger test statuses from both pages appear in the resolved set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-branch-commit-statuses.ac5",
+            "title": "Every pre-existing test in ci-default-branch-tests.test.ts passes with only the forge() fixture extended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mode-detection-dagger-reason",
+        "title": "Name dagger.toml in the local mode-detection reason",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:13:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4589",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-tests-mode.ts",
+            "tests/unit/lib/cloister/verification-tests-on-ci.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-tests-on-ci.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verification-tests-on-ci.test.ts passes including the dagger.toml reason cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4589.md WI-4. Add fileExists?: (path: string) => boolean (default existsSync) to VerificationTestsModeDeps. In detectGitHubActionsTestJobSync, only on the final found:false return (not the no-github_repo / no-path early returns), append '; dagger.toml present; set verification.tests: ci if Dagger Cloud checks are on' to the reason when any workflow root contains dagger.toml. The mode stays local; detectionSignature and issueRunsTestsOnCi are unchanged. Add one header sentence. Add the three test cases from the PRD."
+        },
+        "items": [
+          {
+            "id": "mode-detection-dagger-reason.ac1",
+            "title": "Given a project with github_repo, no workflows and dagger.toml at its root, resolveVerificationTestsModeDecision returns { mode: 'local', reason: 'no GitHub Actions workflows; dagger.toml present; set verification.tests: ci if Dagger Cloud checks are on' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mode-detection-dagger-reason.ac2",
+            "title": "Given the same project without dagger.toml, the reason is exactly 'no GitHub Actions workflows'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mode-detection-dagger-reason.ac3",
+            "title": "Given a qualifying pull-request test workflow and dagger.toml, the decision returns mode 'ci' with the unchanged workflow reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-webhook-records-pass",
+        "title": "Record the CI test pass on a green Dagger test status webhook",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:13:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4589",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/webhook-handlers.ts",
+            "tests/unit/lib/webhook-handlers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/webhook-handlers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "webhook-handlers.test.ts passes including the new handleStatus success cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4589.md WI-5. Add target_url?: string | null to WebhookPayload's status section. In handleStatus, after the advisory early return and inside the branches loop, when state === 'success' and payload.sha is set and isCiTestRollupCheck({ context, targetUrl: payload.target_url ?? undefined }) holds, await recordCiTestGatePass({ issueId, headSha: payload.sha, headRef: branch.name, source: sourceKey }), then continue; failure/error handling is unchanged. Use mockRecordCiTestGatePass (test file line 54) for the three new cases."
+        },
+        "items": [
+          {
+            "id": "status-webhook-records-pass.ac1",
+            "title": "Given a status webhook with state success, context go-client/test, a dagger.cloud target_url and branch feature/pan-1801, handleStatus calls recordCiTestGatePass once with issueId PAN-1801, the payload sha, headRef feature/pan-1801 and source status:go-client/test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-webhook-records-pass.ac2",
+            "title": "Given state success with context helm/lint (dagger.cloud URL) or context go-client/test with a buildkite.com URL, handleStatus does not call recordCiTestGatePass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-webhook-records-pass.ac3",
+            "title": "Given a success status webhook, handleStatus never calls relayCiFailureFeedback, and the existing failure/error handleStatus tests pass unedited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feedback-status-check-links",
+        "title": "Name failing commit-status test checks with link and dagger rerun command in CI feedback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:13:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4589",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/ci-failure-feedback.ts",
+            "tests/unit/lib/cloister/ci-failure-feedback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/ci-failure-feedback.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ci-failure-feedback.test.ts passes including the Dagger and Buildkite feedback-body cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4589.md WI-6. Add failures?: readonly FailedCheck[] to CiTestGateFailure and set it to facts.testCheckFailures ?? [] on both success returns of assessCiTestGateFailure. Give buildFeedbackBody a statusFailures?: readonly FailedCheck[] option rendered as '## Failing test checks reported as commit statuses (N)' with '### <name>', 'Conclusion:', 'Details: <targetUrl>' and, when isDaggerCloudUrl(targetUrl), 'Rerun just this check: `dagger check dag://<name>`'. Print the 'no failing workflow runs were found' paragraph only when both Actions failures and statusFailures are empty. In relayCiFailureFeedbackInQueue pass (counted?.failures ?? []).filter(f => f.targetUrl) and include those names in the writeFeedbackFile summary. Add one header bullet citing PAN-4589."
+        },
+        "items": [
+          {
+            "id": "feedback-status-check-links.ac1",
+            "title": "Given a CI-mode red test job whose testCheckFailures holds go-client/test FAILURE with a dagger.cloud targetUrl and no failing Actions runs, the written markdownBody contains '### go-client/test', the exact targetUrl and '`dagger check dag://go-client/test`'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-status-check-links.ac2",
+            "title": "Given that same Dagger-only failure, the markdownBody does not contain the sentence 'no failing workflow runs were found'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-status-check-links.ac3",
+            "title": "Given a failing status test check with a buildkite.com targetUrl, the markdownBody contains 'Details: https://buildkite.com/' and does not contain 'dagger check'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-status-check-links.ac4",
+            "title": "Every pre-existing test in ci-failure-feedback.test.ts passes unedited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "to-checks-state-status-state",
+        "title": "Make toChecksState honor commit-status state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:13:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4589",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/derived-issue-state.ts",
+            "src/dashboard/server/services/__tests__/derived-issue-state.test.ts",
+            "src/dashboard/server/services/__tests__/auto-merge-scheduler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/derived-issue-state.test.ts src/dashboard/server/services/__tests__/auto-merge-scheduler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass including the new state assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4589.md WI-7. In src/lib/overdeck/derived-issue-state.ts toChecksState (line ~295) accept rows with state?: string and apply the PRD after-snippet: FAILURE/ERROR state -> red (after the conclusion check), PENDING/EXPECTED state -> pending (after the status check). Add state?: string to GhPrRow.statusCheckRollup's element type (line ~315); auto-merge-scheduler's ListedPr derives from GhPrRow so needs no edit. Add the new toChecksState it-block next to the existing one (line ~281) and one listScheduleCandidates case."
+        },
+        "items": [
+          {
+            "id": "to-checks-state-status-state.ac1",
+            "title": "toChecksState returns 'red' for [{ state: 'FAILURE' }] and for [{ state: 'ERROR' }]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "to-checks-state-status-state.ac2",
+            "title": "toChecksState returns 'pending' for [{ state: 'PENDING' }] and 'green' for [{ state: 'SUCCESS' }, { status: 'COMPLETED', conclusion: 'SUCCESS' }]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "to-checks-state-status-state.ac3",
+            "title": "Given a listed open PR whose statusCheckRollup is [{ state: 'FAILURE' }], listScheduleCandidates excludes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "to-checks-state-status-state.ac4",
+            "title": "When the existing toChecksState assertions run unedited, they still pass (check-run-only rollups map as before)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-dagger-cloud-ci",
+        "title": "Document commit-status and Dagger Cloud test-check recognition",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:13:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4589",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/CONFIGURATION.md",
+            "configuration/auto-merge.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Dagger Cloud' docs/PIPELINE-GATES.md docs/CONFIGURATION.md configuration/auto-merge.mdx",
+            "grep -n 'dagger check dag://' docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "each of the three files has at least one 'Dagger Cloud' hit",
+            "PIPELINE-GATES.md contains the dagger check dag:// rerun form"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4589.md WI-8. docs/PIPELINE-GATES.md section 'One full-suite run per push, on CI (PAN-3965)': say the test matcher also recognizes commit statuses (context named by the matcher; Dagger Cloud status with a test path segment), that a status success for a test status records the pass, that the default-branch verdict reads check runs and commit statuses, and add a '#### Dagger Cloud checks (PAN-4589)' subsection after the projects.yaml block with the examples, the explicit verification.tests: ci YAML, the dagger.toml reason, and the feedback link plus `dagger check dag://<check path>`. docs/CONFIGURATION.md 'Tests on CI (verification.tests)': update the ci and unset table rows and add a short Dagger Cloud paragraph with the config line linking the PIPELINE-GATES subsection. configuration/auto-merge.mdx (~line 195 bullet): say the test job may be check runs or commit statuses such as Dagger Cloud checks and that a Dagger Cloud project must set verification.tests: ci."
+        },
+        "items": [
+          {
+            "id": "docs-dagger-cloud-ci.ac1",
+            "title": "docs/PIPELINE-GATES.md renders a 'Dagger Cloud checks (PAN-4589)' subsection that lists go-client/test as a test check and helm/lint as not, shows the verification.tests: ci YAML, and shows the `dagger check dag://<check path>` rerun form",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-dagger-cloud-ci.ac2",
+            "title": "docs/CONFIGURATION.md's verification.tests table shows that commit-status CI such as Dagger Cloud is never auto-detected and must set ci explicitly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-dagger-cloud-ci.ac3",
+            "title": "configuration/auto-merge.mdx's CI test job bullet shows that the test job may be commit statuses such as Dagger Cloud checks and contains the verification.tests: ci line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "dagger-predicates",
+        "to": "rollup-status-context-pr-facts",
+        "type": "blocks"
+      },
+      {
+        "from": "dagger-predicates",
+        "to": "default-branch-commit-statuses",
+        "type": "blocks"
+      },
+      {
+        "from": "dagger-predicates",
+        "to": "mode-detection-dagger-reason",
+        "type": "blocks"
+      },
+      {
+        "from": "dagger-predicates",
+        "to": "status-webhook-records-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "dagger-predicates",
+        "to": "feedback-status-check-links",
+        "type": "blocks"
+      },
+      {
+        "from": "rollup-status-context-pr-facts",
+        "to": "feedback-status-check-links",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
