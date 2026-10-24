@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T11:28:46Z · model: claude-opus-5-5 · open: 848_
+_Last sequenced: 2026-10-24T11:32:03Z · model: claude-opus-5-5 · open: 849_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -69,6 +69,7 @@ _Last sequenced: 2026-10-24T11:28:46Z · model: claude-opus-5-5 · open: 848_
 | 62 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
 | 63 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
 | 64 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
+| 65 | PAN-4618 | S | critical | ok |  |  | In pipeline: CI runs full suite on .pan/ bookkeeping pushes to main (95 of 99 runs), starving PR checks of runners |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
@@ -1112,6 +1113,10 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 
 Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
 
+### PAN-4618 (rank 65)
+
+New in-pipeline substrate bug: path-filtering bookkeeping commits off the main push trigger frees runners for every PR check, so it is critical; placed in the free top-tier slot 65 so no existing rank moves.
+
 ### PAN-2940 (rank 67)
 
 Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
@@ -1172,10 +1177,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 
 New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
 
-### PAN-3084 (rank 84)
-
-Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1183,10 +1184,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T11:28:46Z",
+  "generatedAt": "2026-10-24T11:32:03Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 848,
+  "openCount": 849,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11769,6 +11770,19 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       ],
       "why": "After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback",
       "rationale": "New issue: an observation follow-up to in-pipeline PAN-4614; ranked mid-tier because it only matters if GitHub ignores union, and any fallback touches the merge gate's trust boundary and needs its own plan.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4618",
+      "rank": 65,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: CI runs full suite on .pan/ bookkeeping pushes to main (95 of 99 runs), starving PR checks of runners",
+      "rationale": "New in-pipeline substrate bug: path-filtering bookkeeping commits off the main push trigger frees runners for every PR check, so it is critical; placed in the free top-tier slot 65 so no existing rank moves.",
       "gate": "auto",
       "planning": "auto"
     }
