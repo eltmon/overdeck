@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T10:57:21.970Z",
+  "updated": "2026-10-24T11:08:45.193Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-10-24T10:57:14.764Z"
     },
     "webhook-adopts-no-workspace": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4605",
-      "claimedAt": "2026-10-24T10:57:21.970Z"
+      "claimedAt": "2026-10-24T10:57:21.970Z",
+      "doneAt": "2026-10-24T11:08:45.192Z"
     }
   }
 }
