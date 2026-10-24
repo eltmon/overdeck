@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T07:28:54Z · model: claude-opus-5-5 · open: 833_
+_Last sequenced: 2026-10-24T07:32:45Z · model: claude-opus-5-5 · open: 834_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -20,6 +20,7 @@ _Last sequenced: 2026-10-24T07:28:54Z · model: claude-opus-5-5 · open: 833_
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
+| 22 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -901,6 +902,10 @@ Moves 705 importing files off a four-month-old beta onto the supported line, whi
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
 
+### PAN-4586 (rank 22)
+
+New issue. Verified against herdr 0.9.1: HerdrApiClient.call returns response.result, whose pane_read text sits under read.text, but readHerdrPaneText, diagnoseDetectionFailure and the herdr-submit composer read a top-level text, so every pane-text consumer on the default backend sees an empty string. A three-site fix plus corrected test stubs; placed in a free rank slot just above the Herdr pane-sizing pair (PAN-4582, PAN-3952) because it is smaller and likely explains part of PAN-3952's 'pane read returns nothing' observation.
+
 ### PAN-4217 (rank 23)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
@@ -1157,10 +1162,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
 
 npm run build regenerates the committed record-cost-event.js bundle, dirtying every workspace tree and blocking clean-workspace gates.
 
-### PAN-2957 (rank 92)
-
-npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1168,10 +1169,10 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T07:28:54Z",
+  "generatedAt": "2026-10-24T07:32:45Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 833,
+  "openCount": 834,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11546,6 +11547,19 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "gate": "auto",
       "planning": "auto",
       "isEpic": true
+    },
+    {
+      "issue": "PAN-4586",
+      "rank": 22,
+      "size": "XS",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind",
+      "rationale": "New issue. Verified against herdr 0.9.1: HerdrApiClient.call returns response.result, whose pane_read text sits under read.text, but readHerdrPaneText, diagnoseDetectionFailure and the herdr-submit composer read a top-level text, so every pane-text consumer on the default backend sees an empty string. A three-site fix plus corrected test stubs; placed in a free rank slot just above the Herdr pane-sizing pair (PAN-4582, PAN-3952) because it is smaller and likely explains part of PAN-3952's 'pane read returns nothing' observation.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12885,6 +12899,20 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-4586",
+      "to": "PAN-3952",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4586",
+      "to": "PAN-4582",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
