@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4546",
   "created": "2026-10-24T10:44:02.967Z",
-  "updated": "2026-10-24T11:20:20.863Z",
+  "updated": "2026-10-24T11:20:38.949Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "runaway-patrol-all-slot-owners.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T11:20:20.863Z"
+    },
+    "runaway-patrol-all-slot-owners.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:20:38.949Z"
     }
   }
 }
