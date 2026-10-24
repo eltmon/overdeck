@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4532",
   "created": "2026-10-24T10:48:18.142Z",
-  "updated": "2026-10-24T10:48:18.143Z",
+  "updated": "2026-10-24T12:56:03.120Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,5 +22,11 @@
       "timestamp": "2026-10-24T10:48:18Z",
       "markdownBody": "VERIFICATION FAILED for PAN-4532 (attempt 1/3):\n\nFailed check: incomplete-plan-items\n\nChecklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required xBRIEF checklist is missing or unreadable; return the issue to planning before completion.\n\nComplete each listed item with `pan task done PAN-4532 <item>` after committing and pushing its implementation, then resubmit the review request."
     }
-  ]
+  ],
+  "items": {
+    "adopt-result": {
+      "status": "completed",
+      "doneAt": "2026-10-24T12:56:03.119Z"
+    }
+  }
 }
