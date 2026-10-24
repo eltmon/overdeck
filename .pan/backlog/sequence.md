@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T07:15:03Z · model: claude-opus-5-5 · open: 831_
+_Last sequenced: 2026-10-24T07:18:12Z · model: claude-opus-5-5 · open: 830_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -18,7 +18,6 @@ _Last sequenced: 2026-10-24T07:15:03Z · model: claude-opus-5-5 · open: 831_
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
-| 22 | PAN-4583 | S | medium | ok |  |  | In-pipeline: split file-at-path read/write doors so the editor reads .md under $HOME read-only; writes stay project-root only. |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -891,10 +890,6 @@ Moves 705 importing files off a four-month-old beta onto the supported line, whi
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
 
-### PAN-4583 (rank 22)
-
-New since the prior run and already in the pipeline, so it is pinned in a free top-tier slot (rank 22, next to in-pipeline PAN-4582) without shifting any existing rank. The body is well specified: a root cause in file-at-path.ts, a read/write split, a writable flag on the RPC contract, a read-only editor mode, explicit security checks and numbered ACs. Operator-visible dashboard fix of medium impact with no open dependencies.
-
 ### PAN-4217 (rank 23)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
@@ -1159,6 +1154,10 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 
 npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
 
+### PAN-2758 (rank 94)
+
+Triage: verify whether a provider-capacity zombie can still read as running under the current liveness definition. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1166,10 +1165,10 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T07:15:03Z",
+  "generatedAt": "2026-10-24T07:18:12Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 831,
+  "openCount": 830,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1345,19 +1344,6 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "dependsOn": [],
       "why": "Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs.",
       "rationale": "PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4583",
-      "rank": 22,
-      "size": "S",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: split file-at-path read/write doors so the editor reads .md under $HOME read-only; writes stay project-root only.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned in a free top-tier slot (rank 22, next to in-pipeline PAN-4582) without shifting any existing rank. The body is well specified: a root cause in file-at-path.ts, a read/write split, a writable flag on the RPC contract, a read-only editor mode, explicit security checks and numbered ACs. Operator-visible dashboard fix of medium impact with no open dependencies.",
       "gate": "auto",
       "planning": "auto"
     },
