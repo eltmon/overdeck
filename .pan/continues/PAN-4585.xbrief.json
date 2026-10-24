@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4585",
   "created": "2026-10-24T08:22:26.190Z",
-  "updated": "2026-10-24T09:36:42.948Z",
+  "updated": "2026-10-24T09:36:48.962Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4585",
       "claimedAt": "2026-10-24T09:20:29.777Z",
       "doneAt": "2026-10-24T09:36:42.948Z"
+    },
+    "doctor-semgrep": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4585",
+      "claimedAt": "2026-10-24T09:36:48.962Z"
     }
   }
 }
