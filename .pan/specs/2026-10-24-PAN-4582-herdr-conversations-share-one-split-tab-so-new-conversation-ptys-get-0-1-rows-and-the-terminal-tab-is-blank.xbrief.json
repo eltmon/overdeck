@@ -1,0 +1,608 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T07:34:50Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4582: Herdr: conversations share one split tab, so new conversation PTYs get 0-1 rows and the Terminal tab is blank",
+    "updated": "2026-10-24T07:39:33.291Z"
+  },
+  "plan": {
+    "id": "pan-4582",
+    "title": "Herdr: conversations share one split tab, so new conversation PTYs get 0-1 rows and the Terminal tab is blank",
+    "status": "proposed",
+    "uid": "4818321f-0e95-4ee1-a5ec-cc98a32b1449",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-24T07:34:50Z",
+    "updated": "2026-10-24T07:39:33.291Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4582",
+        "label": "PAN-4582",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3952",
+        "label": "PAN-3952",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4586",
+        "label": "PAN-4586",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "herdr",
+      "terminal-backend",
+      "dashboard-terminal",
+      "hygiene",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "HerdrBackend.startAgent splits every agent pane out of its workspace's current tab, so all operator conversations share one tab and each launch halves the remaining rows; the newest conversation's PTY is 0-1 rows and its dashboard Terminal tab is blank. A new Herdr PTY also copies the session's focused pane size rather than its own layout rect, and the headless server never pushes layout sizes to PTYs. After a Herdr restore, old conversation panes come back as idle shells that nothing closes. The dashboard's Herdr bridge never resizes the PTY to its viewer (it echoes attach dims as the snapshot dims, so the client sends no resize, and observe frames stay at their opening size), so long lines clip.",
+      "Proposal": "Launch every Herdr agent into its own new tab (tab.create) in its workspace; before the launcher runs, set the new PTY to the tab's layout rect through a short-lived control attach (sizeHerdrTerminal), which also resolves PAN-3952's sizing ask. Make the dashboard's HerdrTerminalProcess open its control stream at attach with the viewer's dims and stream output from it, falling back to read-only observe when another client holds control. Add a host-hygiene reaper that closes idle untokened shell panes in issue-tokened Herdr workspaces after two consecutive sightings, never closing a workspace's last pane. Update docs/TERMINAL-BACKENDS.md, docs/DASHBOARD-ARCHITECTURE.md and configuration/terminal-backend.mdx.",
+      "NonGoals": "- Do not re-lay out or move panes that already share a tab; panes stacked before this change keep their tab until they exit.\n- Do not add --takeover or any arbitration between two controllers of one terminal.\n- Do not add a configurable default PTY size.\n- Do not reap panes in workspaces that carry no `issue` token.\n- Do not fix the pane.read response shape (PAN-4586).\n- Do not modify src/dashboard/frontend/src/components/XTerminal.tsx or the tmux backend.\n- Do not raise any row in scripts/file-size-allowlist.txt.\n- Do not add HTTP routes."
+    },
+    "autoDecisions": [
+      {
+        "summary": "One tab per agent in every Herdr workspace, issue workspaces included.",
+        "rationale": "The issue asked the plan to decide; an issue workspace with work agent, four reviewers, synthesis and test reaches 7 panes and hits the same halving, and one rule is simpler than two."
+      },
+      {
+        "summary": "Size each new PTY to its layout rect at launch with a short-lived control attach, in addition to tab.create.",
+        "rationale": "Probed live: a new PTY copies the focused pane's size (10-row focus gave a 10-row PTY under a 40-row rect), and the live session's focused pane is 1 row, so tab.create alone would still start harnesses in 1-row terminals."
+      },
+      {
+        "summary": "The dashboard Herdr bridge opens its controller eagerly at attach and reads output from the control stream, with a read-only observe fallback when control is refused.",
+        "rationale": "Probed live: only a control attach resizes the PTY, observe frames never follow the PTY, and control frames follow their own resizes; a second viewer is already read-only today once the first types or resizes."
+      },
+      {
+        "summary": "The residue reaper runs in the host-hygiene scheduler every 10 minutes, honors the Deacon freeze, uses a two-sighting rule and never closes a workspace's last pane.",
+        "rationale": "Two sightings cover the millisecond windows where a fresh tab or workspace root is an untokened shell without a platform-specific process-age probe; keeping one pane avoids closing a workspace mid-launch (closing a workspace's last pane closes the workspace, verified)."
+      },
+      {
+        "summary": "Do not migrate panes that already share a tab; fix the pane.read shape bug separately as PAN-4586.",
+        "rationale": "Moving live panes every sweep would undo operator layouts; the bridge fix makes stacked panes render in the dashboard anyway. The pane.read bug is unrelated to tab layout and was verified and filed on its own."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "7 items across 4 subsystems (terminal backends, dashboard server, cloister hygiene, docs) and 20 files; the items share one root cause (Herdr PTY size and pane layout) and are each independently reviewable.",
+      "canonicalFilename": "2026-10-24-PAN-4582-herdr-conversations-share-one-split-tab-so-new-conversation-ptys-get-0-1-rows-and-the-terminal-tab-is-blank.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "control-frames",
+        "title": "Expose the Herdr control stream's frames on TerminalControl",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T07:34:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4582",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/types.ts",
+            "src/lib/terminal-backends/herdr-stream.ts",
+            "tests/unit/lib/terminal-backends/herdr-stream.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-stream.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "herdr-stream.test.ts passes including the new control frames case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. Add `readonly frames: AsyncIterable<TerminalFrame>` to `TerminalControl` in src/lib/terminal-backends/types.ts (anchor `export interface TerminalControl {`), with the doc comment from the PRD (control frames follow their own resizes; observer frames stay at their opening size). In src/lib/terminal-backends/herdr-stream.ts `controlTerminal`, return `frames: stream.frames` with write/resize/close. The tmux adapter's control() returns unsupported and needs no change. Add a test in tests/unit/lib/terminal-backends/herdr-stream.test.ts `describe('controlTerminal')` that pushes one full terminal.frame NDJSON line (width 80, height 20) on the fake child's stdout and reads a snapshot frame from control.frames."
+        },
+        "items": [
+          {
+            "id": "control-frames.ac1",
+            "title": "Given a controlTerminal built on fakeSpawn, when the fake child writes one `terminal.frame` line with `full: true, width: 80, height: 20`, then `control.frames` yields `{ kind: 'snapshot', cols: 80, rows: 20 }`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "control-frames.ac2",
+            "title": "Given the change, when `npm run typecheck` runs, then it exits 0 with `TerminalControl.frames` required and every implementer compiling.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "size-terminal-helper",
+        "title": "Add sizeHerdrTerminal: set a PTY size through a short-lived control attach",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T07:34:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4582",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/herdr-stream.ts",
+            "tests/unit/lib/terminal-backends/herdr-stream.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-stream.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "herdr-stream.test.ts passes including the four sizeHerdrTerminal cases under fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. Add `TerminalSizeOutcome = 'sized' | 'refused' | 'timeout'`, `SizeTerminalDeps extends HerdrStreamDeps { timeoutMs?: number }` and `export async function sizeHerdrTerminal(terminalId, cols, rows, deps = {})` after `controlTerminal` in src/lib/terminal-backends/herdr-stream.ts. It calls `startStream('control', terminalId, { ...deps, cols, rows })` (control with --cols/--rows resizes the PTY on attach — verified live), races the first value of `stream.frames` against `setTimeout(deps.timeoutMs ?? 3000)`: snapshot/output => 'sized', exit/end => 'refused', deadline => 'timeout'. Then `stream.close()` and wait for the child's 'close' event (immediately when exitCode or signalCode is already set), bounded by a 1000 ms timer; clear both timers. Never throws (any error => 'refused'). Doc comment per PRD. Tests use vi.useFakeTimers() + vi.advanceTimersByTimeAsync() and the injected fake spawn; never the real herdr binary."
+        },
+        "items": [
+          {
+            "id": "size-terminal-helper.ac1",
+            "title": "Given a fake control child that writes a full frame, when `sizeHerdrTerminal('t1', 120, 40, { spawn })` runs, then it resolves 'sized' and the spawned args contain `control`, `t1`, `--cols`, `120`, `--rows`, `40`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "size-terminal-helper.ac2",
+            "title": "Given a fake child that closes without writing a frame, when sizeHerdrTerminal runs, then it resolves 'refused'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "size-terminal-helper.ac3",
+            "title": "Given a fake child that never writes or closes, when fake timers advance 3000 ms, then sizeHerdrTerminal resolves 'timeout' and the child was killed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "size-terminal-helper.ac4",
+            "title": "Given a frame has arrived, when the fake child has not yet emitted 'close', then the returned promise is still pending, and it resolves after the child emits 'close'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-own-tab",
+        "title": "Launch every Herdr agent into its own tab with openAgentTab instead of pane.split",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T07:34:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4582",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/herdr-agent-tab.ts",
+            "src/lib/terminal-backends/herdr.ts",
+            "src/lib/terminal-backends/herdr-agent-terminals.ts",
+            "tests/unit/lib/terminal-backends/herdr-agent-tab.test.ts",
+            "tests/unit/lib/terminal-backends/herdr-adapter.test.ts",
+            "tests/unit/lib/terminal-backends/herdr-detection-failure.test.ts",
+            "tests/unit/lib/terminal-backends/launch-cpu-class.test.ts",
+            "tests/unit/lib/terminal-backends/herdr-pane-bound.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-agent-tab.test.ts tests/unit/lib/terminal-backends/herdr-adapter.test.ts tests/unit/lib/terminal-backends/herdr-detection-failure.test.ts tests/unit/lib/terminal-backends/launch-cpu-class.test.ts tests/unit/lib/terminal-backends/herdr-pane-bound.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "all five test files pass",
+            "typecheck completes without errors",
+            "lint-file-size exits 0 and herdr.ts <= 1008 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "launch-pty-sizing",
+            "residue-reaper"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3 (decision D1: one tab per agent in EVERY Herdr workspace, conversations and issue workspaces alike; D2: tab label = `spec.name ?? spec.tokens.role`). Create src/lib/terminal-backends/herdr-agent-tab.ts with `AgentTabPane`, `OpenAgentTabRequest` and `openAgentTab(api, request)` exactly as in the PRD: `tab.create { workspace_id, cwd, env, label, focus: false }`, return `root_pane`, throw `tab.create returned no root pane` when absent. In herdr.ts `startAgent`, replace the `pane.split` block (anchor `const split = await this.api.call<{ pane?: HerdrPaneInfo }>('pane.split', {`) with the 3-line `openAgentTab` call from the PRD and add its import. Change `async function paneProcessLiveness(` to `export async function paneProcessLiveness(` (residue-reaper imports it). Line-neutral comment edits: herdr.ts header 'splits a pane' -> 'opens a tab for the agent (PAN-4582)'; herdr-agent-terminals.ts header 'splitting a new pane into it' -> 'in a tab of its own'. Update the four test files' fakes from `pane.split -> { pane }` to `tab.create -> { type: 'tab_created', tab: { tab_id }, root_pane: {...} }`; herdr-pane-bound.test.ts expected sequence becomes ['tab.create', 'pane.report_metadata', 'pane.send_input']. herdr.ts must end <= 1008 lines (NFR-1); never raise the allowlist row. Live checks only on a throwaway `herdr --session pan4582probe server` (PRD checkpoint), never the live `overdeck` session."
+        },
+        "items": [
+          {
+            "id": "agent-own-tab.ac1",
+            "title": "Given a fake HerdrApiClient, when `openAgentTab` runs, then it sends `tab.create` with `workspace_id`, `cwd`, `env`, `label` and `focus: false` and returns the response's `root_pane`; a response without `root_pane` rejects with `tab.create returned no root pane`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-own-tab.ac2",
+            "title": "Given claude-code and codex launch specs, when `HerdrBackend.startAgent` runs against a fake API, then the call log contains `tab.create` with `label` equal to the agent name and never contains `pane.split`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-own-tab.ac3",
+            "title": "Given the change, when `wc -l src/lib/terminal-backends/herdr.ts` and `bash scripts/lint-file-size.sh` run, then the count is at most 1008 and the lint exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-own-tab.ac4",
+            "title": "Given the updated fakes, when the herdr-adapter, herdr-detection-failure, launch-cpu-class and herdr-pane-bound test files run, then they pass with `tab.create` replacing `pane.split`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-pty-sizing",
+        "title": "Size each new agent PTY to its tab's layout rect before the launcher runs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T07:34:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4582",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/herdr-agent-tab.ts",
+            "src/lib/terminal-backends/herdr.ts",
+            "tests/unit/lib/terminal-backends/herdr-agent-tab.test.ts",
+            "tests/unit/lib/terminal-backends/herdr-pane-bound.test.ts",
+            "tests/unit/lib/terminal-backends/herdr-adapter.test.ts",
+            "tests/unit/lib/terminal-backends/herdr-detection-failure.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-agent-tab.test.ts tests/unit/lib/terminal-backends/herdr-pane-bound.test.ts tests/unit/lib/terminal-backends/herdr-adapter.test.ts tests/unit/lib/terminal-backends/herdr-detection-failure.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "all four test files pass with the sizing cases",
+            "typecheck completes without errors",
+            "lint-file-size exits 0 and herdr.ts <= 1008 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4 (decisions D3, D4; resolves PAN-3952's sizing ask). A new Herdr PTY copies the session's focused pane size (verified: 10-row focused pane => new tab PTY `10 120` under a 40x120 rect), so tab.create alone is not enough. In herdr-agent-tab.ts add `export type SizeTerminal = (terminalId, cols, rows) => Promise<unknown>` and a third parameter `sizeTerminal: SizeTerminal = sizeHerdrTerminal` to `openAgentTab`: after tab.create call `pane.layout { pane_id }`, take that pane's `rect`, and when `rect.width >= 2 && rect.height >= 2` await `sizeTerminal(pane.terminal_id, rect.width, rect.height)`. A thrown layout call, a missing entry, a too-small rect, or a non-'sized' outcome is logged with `console.warn('[herdr] could not size <pane_id> to its layout: <reason>')` and the pane is returned anyway (FR-4). In herdr.ts add `readonly sizeTerminal?: SizeTerminal` to `HerdrBackendOptions`, a private field defaulting to `sizeHerdrTerminal`, and pass it to openAgentTab. herdr.ts must still end <= 1008 lines; fallback per PRD W4 step 3 (move diagnoseDetectionFailure's body into herdr-agent-tab.ts). Tests inject a recording sizeTerminal; a fake answering `pane.layout` with `{}` skips sizing so no real herdr is spawned. Update herdr-pane-bound.test.ts expected sequence to ['tab.create', 'pane.layout', 'pane.report_metadata', 'pane.send_input']."
+        },
+        "items": [
+          {
+            "id": "launch-pty-sizing.ac1",
+            "title": "Given `pane.layout` reports `{ width: 120, height: 40 }` for the new pane, when `startAgent` runs with a recording `sizeTerminal`, then `sizeTerminal` receives `(terminalId, 120, 40)` and the shared call log records it before `pane.send_input`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-pty-sizing.ac2",
+            "title": "Given `pane.layout` throws, omits the pane, or reports `height: 1`, when `startAgent` runs, then `sizeTerminal` is not called and `startAgent` resolves with the pane reference.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-pty-sizing.ac3",
+            "title": "Given `sizeTerminal` resolves 'refused', when `startAgent` runs, then it resolves with the pane reference and the launcher is still sent with `pane.send_input`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-pty-sizing.ac4",
+            "title": "Given a throwaway herdr session whose focused pane is 10 rows, when `openAgentTab` runs with the real `sizeHerdrTerminal`, then `stty size` on the new pane's tty reports `40 120` (implementation checkpoint; when no herdr binary is available the PR body states the live check was not run).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bridge-controller-output",
+        "title": "Dashboard Herdr bridge takes control at attach and streams the control output, read-only fallback when refused",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T07:34:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4582",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/terminal-service.ts",
+            "src/dashboard/server/ws-terminal.ts",
+            "tests/unit/dashboard/herdr-terminal-process.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/herdr-terminal-process.test.ts src/dashboard/server/__tests__/ws-terminal-herdr-snapshot.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "herdr-terminal-process.test.ts and ws-terminal-herdr-snapshot.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5 (decision D5). Verified: observe frames stay at the observer's opening size and never resize the PTY; control --cols/--rows resizes the PTY on attach and control frames follow later terminal.resize; a second controller is refused. Today the client never sends a resize because serveHerdrTerminal echoes attach dims as the snapshot dims, so the PTY never matches the viewer. Rework `HerdrTerminalProcess` (anchor `export class HerdrTerminalProcess implements PtyProcess {` in src/dashboard/server/services/terminal-service.ts): add the `HerdrTerminalStreams` seam `{ control, observe }` as a 4th constructor parameter defaulting to `{ control: controlTerminal, observe: observeTerminal }`; open control in the constructor with the given dims and pump `controller.frames`; snapshot/output frames go to data listeners. A control stream that ends before its first snapshot/output frame while `this.ended` is false => set controller null, open observe at the current dims, log once `[terminal-service] Herdr terminal <id> is controlled by another client; serving it read-only`, pump observe; writes/resizes then drop. Remove `ensureController`; `write`/`resize` go to `this.controller?.`. `close()` sets `this.ended = true` first, then closes streams, then emits exit. Update the class doc and the `serveHerdrTerminal` doc comment in ws-terminal.ts (no logic change there). Do NOT modify XTerminal.tsx (NFR-4). Tests use push-driven fake streams; no real spawn."
+        },
+        "items": [
+          {
+            "id": "bridge-controller-output.ac1",
+            "title": "Given fake streams, when a HerdrTerminalProcess is constructed with (120, 40), then `control` is opened with `{ cols: 120, rows: 40 }`, `observe` is not opened, control frames reach `onData`, and `write`/`resize` reach the fake controller.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-controller-output.ac2",
+            "title": "Given a control stream that ends before any frame, when the bridge pumps it, then `observe` is opened at the latest dims, its frames reach `onData`, and later `write`/`resize` calls are dropped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-controller-output.ac3",
+            "title": "Given `close()` is called before the control stream delivers a frame, when the stream then ends, then `observe` is never opened and the exit listener fires exactly once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-controller-output.ac4",
+            "title": "Given the dashboard runs on a Herdr host, when an isolated Playwright browser profile opens a conversation's Terminal tab and captures a screenshot, then the harness UI renders (the screenshot is not blank) and after a viewport resize long lines are not clipped at the right edge.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "residue-reaper",
+        "title": "Reap idle restored shell panes in Overdeck-owned Herdr workspaces from the hygiene scheduler",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T07:34:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4582",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/herdr-residue-reaper.ts",
+            "tests/unit/lib/cloister/herdr-residue-reaper.test.ts",
+            "src/lib/cloister/hygiene-scheduler.ts",
+            "tests/unit/lib/cloister/hygiene-scheduler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/herdr-residue-reaper.test.ts tests/unit/lib/cloister/hygiene-scheduler.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint completes without errors (no circular import)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6 (decisions D6, D7, D8). New src/lib/cloister/herdr-residue-reaper.ts following playwright-mcp-reaper.ts conventions: pure `selectHerdrResiduePanes({ ownedWorkspaceIds, panes, previous })` plus `reapHerdrResiduePanes(deps)` returning string[], and `_resetHerdrResidueSightingsForTests()`. Deps: `isPaused` (default isDeaconGloballyPaused from ../overdeck/control-settings.js), `herdrApi` (default: null unless hostTerminalBackendName() === 'herdr' and probeHerdrAvailability().available, both from ../terminal-backends/select.js; then getHerdrApiClient()), `processLiveness` (default paneProcessLiveness exported from ../terminal-backends/herdr.js). Owned workspace = non-empty `tokens.issue` from `workspace.list`. Candidate = pane in an owned workspace with no `agentId` token, no detected `agent`, and processLiveness 'exited' (probe only panes that passed the token/detection checks). In a workspace where every pane is a candidate, drop the first candidate. Close (`pane.close`) only candidates whose `paneId|terminalId` key was sighted in the previous sweep; store remaining sighted keys in module memory. A thrown Herdr error returns [] and keeps the previous set. Action string per close: `closed idle shell pane <paneId> in workspace <workspaceId>`; when any closed, logDeaconEvent('[herdr-residue-reaper] …') and emitActivityEntry({ source: 'cloister', level: 'warn', message: 'Deacon closed N idle Herdr shell pane(s)' }). Register `['reapHerdrResiduePanes', reapHerdrResiduePanes, HERDR_RESIDUE_INTERVAL_MS]` (10 * 60_000) in hygiene-scheduler.ts and add its vi.mock + startup/10-minute assertions in hygiene-scheduler.test.ts."
+        },
+        "items": [
+          {
+            "id": "residue-reaper.ac1",
+            "title": "Given a residue pane in an `issue`-tokened workspace, when the reaper sweeps once, then it does not call `pane.close`; when it sweeps a second time with the same `paneId|terminalId`, then it calls `pane.close` for that pane and returns `closed idle shell pane <paneId> in workspace <workspaceId>`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "residue-reaper.ac2",
+            "title": "Given panes with an `agentId` token, a detected agent, liveness 'running' or 'indeterminate', or a workspace without an `issue` token, when the reaper sweeps twice, then none of them is closed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "residue-reaper.ac3",
+            "title": "Given a workspace whose every pane is residue, when the reaper sweeps twice, then exactly one pane of that workspace remains unclosed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "residue-reaper.ac4",
+            "title": "Given `isPaused` returns true or `herdrApi` resolves null, when `reapHerdrResiduePanes` runs, then it returns [] and makes zero Herdr API calls.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "residue-reaper.ac5",
+            "title": "Given `startHygieneScheduler()` runs under fake timers, when no time has passed, then `reapHerdrResiduePanes` has been called once, and it is not called again before 10 minutes elapse.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-herdr-tabs",
+        "title": "Document tab-per-agent launches, PTY sizing, the eager terminal controller and the residue reaper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T07:34:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4582",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "configuration/terminal-backend.mdx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n 'splits the pane' docs/TERMINAL-BACKENDS.md || true",
+            "grep -n -i 'own tab' docs/TERMINAL-BACKENDS.md configuration/terminal-backend.mdx"
+          ],
+          "expected_outputs": [
+            "first grep prints no lines",
+            "second grep prints at least one line from each file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. docs/TERMINAL-BACKENDS.md: line ~131 (pane-bound launch 'splits the pane') -> opens a new tab for the agent; line ~172 closeAgentPane row ('launchAgentPane splits every role's pane into it') -> every role gets its own tab, closing an agent's pane closes its tab, closing a workspace's last pane closes the workspace; after the restore paragraph (~313) add the residue reaper paragraph (what it closes, two-sighting rule, last-pane rule, 10-minute host-hygiene cadence, Deacon freeze); in the terminal-stream protocol bullets (~825) add: observe frames stay at the observer's size, control frames follow resizes, only a control attach sets the PTY size, a second controller is refused with `already has an attached client`, a new PTY copies the session's focused pane size; 'Why startAgent does not call agent.start' (~853): opens a tab, sizes its PTY to the tab layout, runs the launcher. docs/DASHBOARD-ARCHITECTURE.md (~51): the Herdr bridge opens control at attach with the client size, reads output from it, and serves a second viewer read-only from observe. configuration/terminal-backend.mdx Herdr section: each agent and conversation opens in its own Herdr tab; after a Herdr restart Overdeck closes the idle shells Herdr restores in its own workspaces (within about 20 minutes, never while the Deacon is frozen); `herdr terminal attach` to a terminal the dashboard is showing needs `--takeover`."
+        },
+        "items": [
+          {
+            "id": "docs-herdr-tabs.ac1",
+            "title": "Given the docs change, when `grep -n 'splits the pane' docs/TERMINAL-BACKENDS.md` runs, then it prints nothing, and the file states that each agent launches into its own tab with its PTY sized to the tab layout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-herdr-tabs.ac2",
+            "title": "Given the docs change, when a reader opens docs/TERMINAL-BACKENDS.md, then it describes the residue reaper's two-sighting rule, last-pane rule, 10-minute cadence and Deacon-freeze behavior, and the control-versus-observe sizing facts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-herdr-tabs.ac3",
+            "title": "Given the docs change, when a reader opens docs/DASHBOARD-ARCHITECTURE.md and configuration/terminal-backend.mdx, then both state that the dashboard's Herdr viewer takes control at attach and a second viewer is read-only, and the .mdx states that restored idle shells are closed and that `herdr terminal attach` needs `--takeover` while the dashboard shows that terminal.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "control-frames",
+        "to": "size-terminal-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "control-frames",
+        "to": "bridge-controller-output",
+        "type": "blocks"
+      },
+      {
+        "from": "size-terminal-helper",
+        "to": "launch-pty-sizing",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-own-tab",
+        "to": "launch-pty-sizing",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-own-tab",
+        "to": "residue-reaper",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
