@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4546",
   "created": "2026-10-24T10:44:02.967Z",
-  "updated": "2026-10-24T11:21:16.284Z",
+  "updated": "2026-10-24T11:21:35.729Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "docs-quality-gate-slots.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T11:21:16.283Z"
+    },
+    "docs-quality-gate-slots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:21:35.729Z"
     }
   }
 }
