@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4546",
   "created": "2026-10-24T10:44:02.967Z",
-  "updated": "2026-10-24T11:17:25.592Z",
+  "updated": "2026-10-24T11:17:43.290Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "config-quality-gate-slots.ac4": {
       "status": "completed",
       "doneAt": "2026-10-24T11:17:25.591Z"
+    },
+    "admission-n-slots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:17:43.290Z"
     }
   }
 }
