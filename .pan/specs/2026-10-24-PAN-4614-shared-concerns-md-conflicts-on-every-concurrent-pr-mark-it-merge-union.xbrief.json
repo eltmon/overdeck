@@ -4,17 +4,17 @@
     "created": "2026-10-24T11:04:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4614: Shared concerns.md conflicts on every concurrent PR; mark it merge=union",
-    "updated": "2026-10-24T11:10:07.565Z"
+    "updated": "2026-10-24T11:11:19.819Z"
   },
   "plan": {
     "id": "pan-4614",
     "title": "Shared concerns.md conflicts on every concurrent PR; mark it merge=union",
-    "status": "proposed",
+    "status": "running",
     "uid": "f52e3c95-4757-4d65-a721-6fb12dd604bc",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T11:04:12Z",
-    "updated": "2026-10-24T11:10:07.565Z",
+    "updated": "2026-10-24T11:11:19.819Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4614",
@@ -324,5 +324,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
