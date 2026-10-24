@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4598",
   "created": "2026-10-24T10:10:10.024Z",
-  "updated": "2026-10-24T10:52:23.751Z",
+  "updated": "2026-10-24T10:52:42.953Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -31,6 +31,10 @@
     "cutoff-window.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T10:52:23.750Z"
+    },
+    "merge-next-issue-id.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:52:42.953Z"
     }
   }
 }
