@@ -73,6 +73,12 @@ vi.mock('../../../src/lib/config.js', () => ({
   getDashboardApiUrl: vi.fn().mockReturnValue('http://localhost:3000'),
 }));
 
+// PAN-4585: sync.ts separately loads the layered YAML config to gate the
+// opt-in Semgrep install step. Mocked off so this suite stays config-free.
+vi.mock('../../../src/lib/config-yaml.js', () => ({
+  loadConfigSync: vi.fn().mockReturnValue({ config: { security: { semgrep: { enabled: false } } } }),
+}));
+
 vi.mock('../../../src/lib/projects.js', () => ({
   listProjectsSync: mockListProjects,
 }));
