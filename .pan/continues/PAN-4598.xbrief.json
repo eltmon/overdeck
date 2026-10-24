@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4598",
   "created": "2026-10-24T10:10:10.024Z",
-  "updated": "2026-10-24T10:52:42.953Z",
+  "updated": "2026-10-24T10:53:01.452Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -35,6 +35,10 @@
     "merge-next-issue-id.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T10:52:42.953Z"
+    },
+    "merge-next-issue-id.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:53:01.452Z"
     }
   }
 }
