@@ -121,7 +121,7 @@ describe('HerdrBackend.startAgent, pane-bound', () => {
         agentName: 'agent-pan-3705-review',
       });
       const methods = log.map((call) => call.method);
-      expect(methods).toEqual(['tab.create', 'pane.report_metadata', 'pane.send_input']);
+      expect(methods).toEqual(['tab.create', 'pane.layout', 'pane.report_metadata', 'pane.send_input']);
       expect(methods).not.toContain('agent.rename');
       expect(methods).not.toContain('pane.get');
       expect(methods).not.toContain('pane.close');

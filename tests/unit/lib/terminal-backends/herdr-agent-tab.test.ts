@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
 
 import { openAgentTab } from '../../../../src/lib/terminal-backends/herdr-agent-tab.js';
@@ -28,34 +28,32 @@ function fakeApi(handler: (call: Call) => unknown, log: Call[] = []) {
   };
 }
 
+const noopSizeTerminal = async () => 'sized' as const;
+
 describe('openAgentTab', () => {
   it('sends tab.create with the workspace, cwd, env and label, and returns the root pane', async () => {
-    const { api, log } = fakeApi(() => ({
-      type: 'tab_created',
-      tab: { tab_id: 'w1:t2' },
-      root_pane: { pane_id: 'w1:p2', terminal_id: 't2', workspace_id: 'w1' },
-    }));
+    const { api, log } = fakeApi(({ method }) => (method === 'tab.create'
+      ? { type: 'tab_created', tab: { tab_id: 'w1:t2' }, root_pane: { pane_id: 'w1:p2', terminal_id: 't2', workspace_id: 'w1' } }
+      : {}));
 
     const pane = await openAgentTab(api as unknown as HerdrApiClient, {
       workspaceId: 'w1',
       cwd: '/w/feature-pan-1',
       env: { OVERDECK_AGENT_ID: 'agent-pan-1' },
       label: 'agent-pan-1',
-    });
+    }, noopSizeTerminal);
 
     expect(pane).toEqual({ pane_id: 'w1:p2', terminal_id: 't2', workspace_id: 'w1' });
-    expect(log).toEqual([
-      {
-        method: 'tab.create',
-        params: {
-          workspace_id: 'w1',
-          cwd: '/w/feature-pan-1',
-          env: { OVERDECK_AGENT_ID: 'agent-pan-1' },
-          label: 'agent-pan-1',
-          focus: false,
-        },
+    expect(log[0]).toEqual({
+      method: 'tab.create',
+      params: {
+        workspace_id: 'w1',
+        cwd: '/w/feature-pan-1',
+        env: { OVERDECK_AGENT_ID: 'agent-pan-1' },
+        label: 'agent-pan-1',
+        focus: false,
       },
-    ]);
+    });
   });
 
   it('rejects when the response carries no root pane', async () => {
@@ -66,7 +64,97 @@ describe('openAgentTab', () => {
       cwd: '/w',
       env: {},
       label: 'agent-pan-1',
-    })).rejects.toThrow('tab.create returned no root pane');
+    }, noopSizeTerminal)).rejects.toThrow('tab.create returned no root pane');
+  });
+});
+
+describe('openAgentTab PTY sizing', () => {
+  const request = { workspaceId: 'w1', cwd: '/w', env: {}, label: 'agent-pan-1' };
+  const rootPane = { pane_id: 'w1:p2', terminal_id: 't2', workspace_id: 'w1' };
+
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('sizes the PTY to the layout rect before returning, after tab.create', async () => {
+    const sizes: Array<[string, number, number]> = [];
+    const { api, log } = fakeApi(({ method }) => {
+      if (method === 'tab.create') return { type: 'tab_created', tab: { tab_id: 'w1:t2' }, root_pane: rootPane };
+      if (method === 'pane.layout') return { layout: { panes: [{ pane_id: 'w1:p2', rect: { width: 120, height: 40 } }] } };
+      return {};
+    });
+    const sizeTerminal = async (terminalId: string, cols: number, rows: number) => {
+      sizes.push([terminalId, cols, rows]);
+      return 'sized' as const;
+    };
+
+    const pane = await openAgentTab(api as unknown as HerdrApiClient, request, sizeTerminal);
+
+    expect(pane).toEqual(rootPane);
+    expect(sizes).toEqual([['t2', 120, 40]]);
+    expect(log.map((call) => call.method)).toEqual(['tab.create', 'pane.layout']);
+  });
+
+  it('skips sizing when pane.layout throws', async () => {
+    let called = false;
+    const { api } = fakeApi(({ method }) => {
+      if (method === 'tab.create') return { type: 'tab_created', tab: { tab_id: 'w1:t2' }, root_pane: rootPane };
+      if (method === 'pane.layout') return new Error('layout unavailable');
+      return {};
+    });
+    const sizeTerminal = async () => { called = true; return 'sized' as const; };
+
+    const pane = await openAgentTab(api as unknown as HerdrApiClient, request, sizeTerminal);
+
+    expect(pane).toEqual(rootPane);
+    expect(called).toBe(false);
+  });
+
+  it('skips sizing when the layout response has no matching pane entry', async () => {
+    let called = false;
+    const { api } = fakeApi(({ method }) => {
+      if (method === 'tab.create') return { type: 'tab_created', tab: { tab_id: 'w1:t2' }, root_pane: rootPane };
+      if (method === 'pane.layout') return { layout: { panes: [] } };
+      return {};
+    });
+    const sizeTerminal = async () => { called = true; return 'sized' as const; };
+
+    const pane = await openAgentTab(api as unknown as HerdrApiClient, request, sizeTerminal);
+
+    expect(pane).toEqual(rootPane);
+    expect(called).toBe(false);
+  });
+
+  it('skips sizing when the rect is too small to use', async () => {
+    let called = false;
+    const { api } = fakeApi(({ method }) => {
+      if (method === 'tab.create') return { type: 'tab_created', tab: { tab_id: 'w1:t2' }, root_pane: rootPane };
+      if (method === 'pane.layout') return { layout: { panes: [{ pane_id: 'w1:p2', rect: { width: 120, height: 1 } }] } };
+      return {};
+    });
+    const sizeTerminal = async () => { called = true; return 'sized' as const; };
+
+    const pane = await openAgentTab(api as unknown as HerdrApiClient, request, sizeTerminal);
+
+    expect(pane).toEqual(rootPane);
+    expect(called).toBe(false);
+  });
+
+  it('still returns the pane when sizeTerminal resolves refused', async () => {
+    const { api } = fakeApi(({ method }) => {
+      if (method === 'tab.create') return { type: 'tab_created', tab: { tab_id: 'w1:t2' }, root_pane: rootPane };
+      if (method === 'pane.layout') return { layout: { panes: [{ pane_id: 'w1:p2', rect: { width: 120, height: 40 } }] } };
+      return {};
+    });
+    const sizeTerminal = async () => 'refused' as const;
+
+    const pane = await openAgentTab(api as unknown as HerdrApiClient, request, sizeTerminal);
+
+    expect(pane).toEqual(rootPane);
   });
 });
 

@@ -38,13 +38,13 @@
 
 import { Effect } from 'effect';
 
-import { openAgentTab } from './herdr-agent-tab.js';
+import { openAgentTab, type SizeTerminal } from './herdr-agent-tab.js';
 import {
   getHerdrApiClient,
   HerdrApiClient,
   HerdrApiError,
 } from './herdr-api.js';
-import { controlTerminal, observeTerminal } from './herdr-stream.js';
+import { controlTerminal, observeTerminal, sizeHerdrTerminal } from './herdr-stream.js';
 import { pasteAndSubmitHerdrPane } from './herdr-submit.js';
 import { adoptIssueWorkspace, listIssueWorkspaces, type HerdrWorkspaceInfo } from './herdr-workspaces.js';
 import { checkPrompt } from './prompt-guard.js';
@@ -534,6 +534,7 @@ export async function readHerdrPaneText(
 export interface HerdrBackendOptions {
   readonly detectTimeoutMs?: number;
   readonly detectPollMs?: number;
+  readonly sizeTerminal?: SizeTerminal;
 }
 
 export class HerdrBackend implements TerminalBackend {
@@ -541,6 +542,7 @@ export class HerdrBackend implements TerminalBackend {
 
   private readonly detectTimeoutMs: number;
   private readonly detectPollMs: number;
+  private readonly sizeTerminal: SizeTerminal;
 
   constructor(
     private readonly api: HerdrApiClient = getHerdrApiClient(),
@@ -548,6 +550,7 @@ export class HerdrBackend implements TerminalBackend {
   ) {
     this.detectTimeoutMs = options.detectTimeoutMs ?? AGENT_DETECT_TIMEOUT_MS;
     this.detectPollMs = options.detectPollMs ?? AGENT_DETECT_POLL_MS;
+    this.sizeTerminal = options.sizeTerminal ?? sizeHerdrTerminal;
   }
 
   /**
@@ -587,7 +590,7 @@ export class HerdrBackend implements TerminalBackend {
     return attempt('startAgent', async () => {
       const pane: HerdrPaneInfo = await openAgentTab(this.api, {
         workspaceId: workspace.workspaceId, cwd: spec.cwd ?? workspace.cwd, env: spec.env, label: spec.name ?? spec.tokens.role,
-      });
+      }, this.sizeTerminal);
       const agentName = spec.name ?? `${spec.tokens.role}-${pane.pane_id.replace(':', '-')}`;
 
       if ((spec.detection ?? 'required') === 'not-required') {
