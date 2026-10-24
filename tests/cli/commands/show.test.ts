@@ -63,7 +63,7 @@ vi.mock('../../../src/lib/agents.js', () => ({
   getAgentRuntimeStateSync: getAgentRuntimeStateMock,
 }));
 
-import { describeLiveness, showCommand } from '../../../src/cli/commands/show.js';
+import { describeLiveness, showCommand, summarizePipelineEntry } from '../../../src/cli/commands/show.js';
 
 describe('showCommand', () => {
   beforeEach(() => {
@@ -197,6 +197,28 @@ describe('showCommand', () => {
 
       expect(text).toContain('needs');
       expect(text).toContain('stuck');
+    });
+
+    it('prints the fix for an outside PR and carries it in --json (PAN-4605)', async () => {
+      const prOutsidePipeline = { prNumber: 7, fix: 'Run `pan review request PAN-4605` to adopt the branch.' };
+      derivedIssueStateMock.mockResolvedValue({
+        issueId: 'PAN-4605',
+        state: 'in-review',
+        attention: 'pr-outside-pipeline',
+        prOutsidePipeline,
+      });
+
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      await showCommand('PAN-4605');
+      const text = logSpy.mock.calls.map(call => String(call[0])).join('\n');
+      logSpy.mockClear();
+      await showCommand('PAN-4605', { json: true });
+      const payload = JSON.parse(String(logSpy.mock.calls[0]?.[0]));
+      logSpy.mockRestore();
+
+      expect(text).toContain('pr-outside-pipeline');
+      expect(text).toMatch(/fix\s+Run `pan review request PAN-4605` to adopt the branch\./);
+      expect(payload.prOutsidePipeline).toEqual(prOutsidePipeline);
     });
 
     it('output stays at or below 25 lines (PRD compact-summary requirement)', async () => {
@@ -492,5 +514,16 @@ describe('describeLiveness (PAN-3917 W12)', () => {
     expect(describeLiveness({ alive: false, reason: 'pane-dead' }).status).toBe('dead');
     expect(describeLiveness({ alive: false, reason: 'runtime-missing' }).status).toBe('dead');
     expect(describeLiveness({ alive: false, reason: 'runtime-indeterminate' }).status).toBe('unknown');
+  });
+});
+
+describe('summarizePipelineEntry — workspace adoption (PAN-4605)', () => {
+  it('summarizes workspace.adopted and workspace.adoption-failed', () => {
+    expect(summarizePipelineEntry({
+      at: '2026-10-24T10:00:00.000Z', type: 'workspace.adopted', issueId: 'PAN-1', data: { prNumber: 7, headSha: 'abcdef1234567890' },
+    })).toBe('PR #7 at abcdef12');
+    expect(summarizePipelineEntry({
+      at: '2026-10-24T10:00:00.000Z', type: 'workspace.adoption-failed', issueId: 'PAN-1', data: { reason: 'head-moved', detail: 'origin moved' },
+    })).toBe('head-moved — origin moved');
   });
 });
