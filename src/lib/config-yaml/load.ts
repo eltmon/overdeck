@@ -74,6 +74,16 @@ export function stripProjectTtsEndpoint(config: YamlConfig | null): YamlConfig |
 }
 
 /**
+ * PAN-4585 (FR-11): security settings come only from operator-owned files. A work agent
+ * can commit a .pan.yaml to the branch it is on, so the project layer never sets them.
+ */
+export function stripProjectSecurity(config: YamlConfig | null): YamlConfig | null {
+  if (!config || config.security === undefined) return config;
+  const { security: _security, ...rest } = config;
+  return rest;
+}
+
+/**
  * Load per-project config (.pan.yaml in project root, with fallback to .overdeck.yaml)
  */
 function loadProjectConfig(): YamlConfig | null {
@@ -84,7 +94,7 @@ function loadProjectConfig(): YamlConfig | null {
 
   const newConfigPath = join(projectRoot, '.pan.yaml');
   if (existsSync(newConfigPath)) {
-    return stripProjectTtsEndpoint(loadYamlFile(newConfigPath));
+    return stripProjectSecurity(stripProjectTtsEndpoint(loadYamlFile(newConfigPath)));
   }
 
   const legacyConfigPath = join(projectRoot, '.overdeck.yaml');
@@ -92,7 +102,7 @@ function loadProjectConfig(): YamlConfig | null {
     process.stderr.write(
       `[overdeck] Deprecation warning: .overdeck.yaml is deprecated. Rename it to .pan.yaml.\n`
     );
-    return stripProjectTtsEndpoint(loadYamlFile(legacyConfigPath));
+    return stripProjectSecurity(stripProjectTtsEndpoint(loadYamlFile(legacyConfigPath)));
   }
 
   return null;
@@ -137,14 +147,14 @@ async function loadProjectConfigFromDisk(): Promise<YamlConfig | null> {
   if (!projectRoot) return null;
 
   const newConfigPath = join(projectRoot, '.pan.yaml');
-  if (await pathExistsFromDisk(newConfigPath)) return stripProjectTtsEndpoint(await loadYamlFileFromDisk(newConfigPath));
+  if (await pathExistsFromDisk(newConfigPath)) return stripProjectSecurity(stripProjectTtsEndpoint(await loadYamlFileFromDisk(newConfigPath)));
 
   const legacyConfigPath = join(projectRoot, '.overdeck.yaml');
   if (await pathExistsFromDisk(legacyConfigPath)) {
     process.stderr.write(
       `[overdeck] Deprecation warning: .overdeck.yaml is deprecated. Rename it to .pan.yaml.\n`
     );
-    return stripProjectTtsEndpoint(await loadYamlFileFromDisk(legacyConfigPath));
+    return stripProjectSecurity(stripProjectTtsEndpoint(await loadYamlFileFromDisk(legacyConfigPath)));
   }
 
   return null;
