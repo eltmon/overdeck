@@ -69,6 +69,66 @@ prefix `merge-verify`), which runs the same checks again at merge time with no
 target-branch sync, skipped when CI is already green on the exact tip commit
 (PAN-2487). So one issue's gates can run twice.
 
+### Why verification is slow
+
+- **One machine-wide slot.** `acquireQualityGateAdmission`
+  (`src/lib/cloister/quality-gate-admission.ts`) lets one gate attempt run at a
+  time across every issue and every agent shell on the host, served FIFO.
+  Each gate re-queues for admission separately, and `retry: N` means up to
+  N + 1 separate waits for that one gate — seven concurrent runs with three
+  gates each wait behind roughly 21 admissions.
+- **The pressure rule.** Before granting the slot, the admission queue samples
+  the host: it is pressured when CPU utilization is at or above `0.75`, or
+  when PSI `some avg10` is at or above `25`, or — only when PSI is
+  unavailable — when 1-minute load per core is at or above `1`. If not
+  pressured, it writes the holder record, waits 1.5 seconds, and samples
+  again; if the host is pressured on that second look, it gives the slot back
+  and keeps waiting.
+- **Agent shells share the queue.** Both `vitest.config.ts` and
+  `src/dashboard/frontend/vitest.config.ts` load
+  `tests/vitest-cpu-admission.ts` as `globalSetup`, which calls
+  `acquireQualityGateAdmission` for a gate named `vitest` unless the process
+  already has `OVERDECK_GATE_ADMITTED=1` or `OVERDECK_GATE_ADMISSION=0`, or
+  `CI` is set. An agent's own `npx vitest run <files>` therefore competes with
+  every verification run for the same single slot.
+- **Gates yield CPU.** Local host gates run as `nice -n 19`, and the whole
+  verification worker runs under a systemd user scope with `CPUWeight=20`
+  (default), so gates run slower when the dashboard or other agents are busy.
+- **Logged times include the queue wait.** `runQualityGates` records the
+  start time before calling `acquireQualityGateAdmission`, so both the
+  `✓ "<name>" passed (<N>ms)` log line and the artifact's `durationMs` cover
+  queue time plus every retry, not just the command's own run time.
+- **Limits.** Each gate attempt has a 20-minute timeout, with a process-group
+  watchdog 30 seconds after that. The whole verification worker has a
+  65-minute budget counted from its first admission, not from launch — time
+  spent queued before that first admission does not use the budget. A holder
+  record older than 25 minutes, or one whose process has died, is cleared
+  automatically.
+- **Other time in the run.** The install and `workspace_packages` build steps
+  (see [What a verification run does](#what-a-verification-run-does), step 4)
+  are not admission-gated but still take wall-clock time; and the gates can
+  run a second time at merge, adding another pass through the queue.
+- **Two upcoming changes to admission.** PAN-4546 allows two concurrent
+  admission slots; PAN-4531 stops a run whose outcome is already decided
+  before its next gate. Each change documents itself where it lands.
+
+**Reading the logs.** Each worker writes
+`~/.overdeck/verification-workers/<issue>/worker-<runId>.log` (issue id
+lowercased):
+
+```text
+[quality-gate] Queued for CPU admission: PAN-1234 gate="typecheck" attempt=1/1 workspace=/…/workspaces/feature-pan-1234
+[quality-gate] Admitted: PAN-1234 gate="typecheck" attempt=1/1 workspace=/…
+[quality-gate] ✓ "typecheck" passed (912345ms)
+```
+
+The gap between `Queued` and `Admitted` is queue wait; the gap between
+`Admitted` and `passed` is close to the command's own run time. The sibling
+`state.json` carries `phase` (`queued` or `running`), `admittedAt`,
+`currentGate`, and `currentAttempt`. The admission directory itself,
+`~/.overdeck/verification-workers/admission/`, holds `owner.json` for the
+current holder and one `waiter-*.json` per queued attempt.
+
 ### One full-suite run per push, on CI (PAN-3965)
 
 For a project with CI, the verification gate runs **typecheck and lint only**
