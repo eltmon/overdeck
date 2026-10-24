@@ -35,10 +35,12 @@ import {
   type ReadAuthorKinds,
   type TrustedAuthors,
 } from './forge-identity.js';
+import type { GitLabMrApprovals, GitLabMrView } from './gitlab-mr-types.js';
 import { parseUatVerdict } from './uat-verdict-marker.js';
 import { isCiTestRollupCheck } from './verification-tests-mode.js';
 
 export type { ForgeAuthor, ReadAuthorKinds, TrustedAuthors } from './forge-identity.js';
+export type { GitLabMrApprovals, GitLabMrView } from './gitlab-mr-types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -164,35 +166,6 @@ export interface PrFactsOptions {
   preferBranch?: string;
   /** PAN-4540: skip the cached answer; the fresh one still refreshes the cache. */
   fresh?: boolean;
-}
-
-export interface GitLabMrView {
-  iid?: number;
-  state?: string;
-  draft?: boolean;
-  web_url?: string;
-  sha?: string;
-  source_branch?: string;
-  detailed_merge_status?: string;
-  merge_status?: string;
-  has_conflicts?: boolean;
-  approvals_before_merge?: number | null;
-  head_pipeline?: { status?: string } | null;
-  pipeline?: { status?: string } | null;
-}
-
-/**
- * #4066 review: what GitLab's `/merge_requests/:iid/approvals` endpoint
- * reports. `glab mr view -F json` carries no approval at all, and the
- * endpoint's own `approved` is true whenever the project requires no approvals
- * (`approvals_required: 0`, as the MYN backend does), so only `approved_by`,
- * which `glab mr approve` fills, is evidence someone approved the MR.
- */
-export interface GitLabMrApprovals {
-  approved?: boolean;
-  approvals_required?: number;
-  approvals_left?: number;
-  approved_by?: ReadonlyArray<{ user?: { username?: string | null } | null }> | null;
 }
 
 /**
