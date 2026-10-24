@@ -33,7 +33,7 @@ release by operator choice.
 | PAN-4531 | #4608 | Verification stops early once CI already failed for the head |
 | PAN-4540 | #4612 | Gate refusals no longer strand approved green PRs in auto-merge |
 
-Closed out: all 17 issues above (plus PAN-4610 and PAN-4614), deployed in
+Closed out: all 18 issues above, plus PAN-4610, deployed in
 build `fb6e836cd` (the v0.70.0 release commit). A clean
 `npx @overdeck/core@0.70.0 --version` printed `0.70.0`.
 
