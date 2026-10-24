@@ -107,4 +107,15 @@ describe('classifyVerificationHead (PAN-4527)', () => {
     expect(await classifyVerificationHead(polyRoots, `fe@${launch}`, `fe@${launch}`)).toBe('same');
     expect(await classifyVerificationHead(polyRoots, `fe@${launch}`, `fe@${agentCommit}`)).toBe('moved');
   });
+
+  it('a polyrepo anchor missing a member repo is unknown, even when both sides match', async () => {
+    const launch = commit(workspace, 'a');
+    const polyRoots = [
+      { repoKey: 'fe', dir: workspace, targetBranch: 'main' },
+      { repoKey: 'api', dir: workspace, targetBranch: 'main' },
+    ];
+
+    expect(await classifyVerificationHead(polyRoots, `fe@${launch}`, `fe@${launch}`)).toBe('unknown');
+    expect(await classifyVerificationHead(polyRoots, `fe@${launch} api@${launch}`, `fe@${launch} api@${launch}`)).toBe('same');
+  });
 });

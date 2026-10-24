@@ -376,7 +376,8 @@ head the worker launched on:
   `origin/<target>`, or a fast-forward of the launch head onto it. This still
   counts as the launch head.
 - **moved** — anything else, such as an agent commit since launch. An
-  unreadable head counts as moved.
+  unreadable head counts as moved, and so does a polyrepo anchor that is
+  missing a member repo whose HEAD could not be read.
 
 When a review request arrives while a worker for the issue is alive and has
 no result yet, the supervisor **joins** it (waits for its result) only when
