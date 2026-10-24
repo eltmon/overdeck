@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T08:32:39Z · model: claude-opus-5-5 · open: 842_
+_Last sequenced: 2026-10-24T08:37:07Z · model: claude-opus-5-5 · open: 843_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -21,6 +21,7 @@ _Last sequenced: 2026-10-24T08:32:39Z · model: claude-opus-5-5 · open: 842_
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 15 | PAN-4589 | M | high | ok |  |  | In pipeline: CI test gate ignores commit-status CI (Dagger Cloud); read status context as check name, baseline + feedback. |
 | 16 | PAN-4595 | S | critical | ok |  |  | CLI health never registers the transcript heartbeat, so Herdr agents read STUCK after 30 min and invite recovery on healthy agents. |
+| 17 | PAN-4597 | S | high | ok |  |  | Awaiting Merge hides approved green PRs: ready needs a 5-min gate answer only auto-merge refreshes. Merge machinery: supervised handoff |
 | 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 22 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
@@ -914,6 +915,10 @@ New since the prior run and already in the pipeline, so it is pinned in a free t
 
 New since the prior run. pan show --health is what the Flywheel reads to decide whether to resume or nudge an agent, and on Herdr the CLI path has only the spawn timestamp as an activity signal, so every working agent older than 30 minutes is classified stuck. A false stuck verdict drives recovery actions against healthy agents, which is a pipeline-integrity problem. The root cause and fix are precise (register the heartbeat lookup on the CLI path, guard against an import cycle, add one test), so it is small and ranks into the top tier beside the other Herdr substrate fixes.
 
+### PAN-4597 (rank 17)
+
+New issue filed 2026-10-24 after PR #4587 was approved, green and clean yet absent from Awaiting Merge. deriveState needs a cached approved-at-head gate answer that only the auto-merge scheduler, merge doors and sibling walks write, and it expires after 5 minutes, so non-opted-in ready PRs vanish from the operator's merge view. Root cause and fix options are already in the body with file and line references, so it is well-scoped. Ranked just behind the in-pipeline pins and next to the auto-merge re-arm fix (PAN-4540) because it touches the same approval-at-head and merge-gate code.
+
 ### PAN-4572 (rank 19)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
@@ -1166,10 +1171,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
 
 Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.
 
-### PAN-2337 (rank 89)
-
-Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1177,10 +1178,10 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T08:32:39Z",
+  "generatedAt": "2026-10-24T08:37:07Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 842,
+  "openCount": 843,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11685,6 +11686,19 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "rationale": "New since the prior run. ConversationPanel treats every ended conversation without a timeline as orphaned and never reads forkRequest.hold, so a held handoff loses its kickoff text, brief path and Start action. The substrate-improvement label sets a high floor; impact is operator visibility rather than pipeline correctness, so it ranks with other Needs-you visibility gaps such as PAN-3276.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4597",
+      "rank": 17,
+      "size": "S",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Awaiting Merge hides approved green PRs: ready needs a 5-min gate answer only auto-merge refreshes. Merge machinery: supervised handoff",
+      "rationale": "New issue filed 2026-10-24 after PR #4587 was approved, green and clean yet absent from Awaiting Merge. deriveState needs a cached approved-at-head gate answer that only the auto-merge scheduler, merge doors and sibling walks write, and it expires after 5 minutes, so non-opted-in ready PRs vanish from the operator's merge view. Root cause and fix options are already in the body with file and line references, so it is well-scoped. Ranked just behind the in-pipeline pins and next to the auto-merge re-arm fix (PAN-4540) because it touches the same approval-at-head and merge-gate code.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13143,6 +13157,13 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4540",
+      "to": "PAN-4597",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
