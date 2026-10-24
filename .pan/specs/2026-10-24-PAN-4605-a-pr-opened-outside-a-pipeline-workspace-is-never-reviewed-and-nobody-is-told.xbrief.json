@@ -4,17 +4,17 @@
     "created": "2026-10-24T09:50:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4605: A PR opened outside a pipeline workspace is never reviewed and nobody is told",
-    "updated": "2026-10-24T09:54:23.191Z"
+    "updated": "2026-10-24T09:55:15.418Z"
   },
   "plan": {
     "id": "pan-4605",
     "title": "A PR opened outside a pipeline workspace is never reviewed and nobody is told",
-    "status": "proposed",
+    "status": "running",
     "uid": "eaef5695-04f5-4ccd-8e39-89f9e2a859bf",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T09:50:00Z",
-    "updated": "2026-10-24T09:54:23.191Z",
+    "updated": "2026-10-24T09:55:15.418Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4605",
@@ -891,5 +891,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
