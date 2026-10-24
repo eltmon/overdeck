@@ -252,6 +252,6 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - 2026-10-24 10:25 UTC operator instruction for THIS run: start no new
   work. When every in-flight Overdeck issue has merged (PAN-4583, 4585,
   4589, 4595, 4596, 4597, 4598, 4527, 4532, 4531, 4605, 4546, plus 3304's
-  remaining PAN-4540 and PAN-4534), cut an npm release with
+  remaining PAN-4540 and PAN-4534, and the docs issue PAN-4609), cut an npm release with
   `pan release stable --version X.Y.Z`, push main + tag, write the report,
   then pause the Flywheel.
