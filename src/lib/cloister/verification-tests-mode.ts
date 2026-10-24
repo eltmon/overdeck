@@ -26,6 +26,12 @@
  * filters or other `if:` expressions, and it does not look inside a reusable
  * workflow: a `uses:` job named `test` counts, and its checks
  * (`test / <inner job>`) match the test-check matcher.
+ *
+ * A project's CI test job is not always a check run: commit-status CI (the
+ * GitHub Statuses API, posted e.g. by Dagger Cloud) has no `name` and is
+ * invisible to `isCiTestCheckName` alone. `isCiTestRollupCheck` (PAN-4589)
+ * also recognizes a commit status whose `context` the matcher names, or whose
+ * target URL is a Dagger Cloud page and whose check path has a test segment.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
@@ -83,6 +89,40 @@ function defaultReadWorkflowFiles(dir: string): WorkflowFile[] {
 export function isCiTestCheckName(name: string | null | undefined): boolean {
   if (!name) return false;
   return /^tests?(?:\s*\(.*\)|[-_:].*|\s+\/\s+.*)?$/i.test(name.trim());
+}
+
+/** True when a commit status's target URL is a Dagger Cloud page (https, `dagger.cloud` or a subdomain). */
+export function isDaggerCloudUrl(targetUrl: string | null | undefined): boolean {
+  if (!targetUrl) return false;
+  try {
+    const url = new URL(targetUrl);
+    return url.protocol === 'https:' && (url.hostname === 'dagger.cloud' || url.hostname.endsWith('.dagger.cloud'));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * PAN-4589: true when a commit status is a Dagger Cloud test check. Dagger
+ * Cloud posts one status per check, its context the check path
+ * (`go-client/test`, `golang/packages/tests/test`); any path segment the
+ * single-name matcher accepts makes it a test check.
+ */
+export function isDaggerCloudTestCheck(name: string | null | undefined, targetUrl: string | null | undefined): boolean {
+  if (!name || !isDaggerCloudUrl(targetUrl)) return false;
+  return name.split('/').some((segment) => isCiTestCheckName(segment));
+}
+
+/** A `statusCheckRollup` row: a check run (`name`) or a commit status (`context`, `targetUrl`). */
+export interface CiRollupCheck {
+  name?: string;
+  context?: string;
+  targetUrl?: string;
+}
+
+/** PAN-4589: true when a rollup row (check run or commit status) is the project's CI test job. */
+export function isCiTestRollupCheck(check: CiRollupCheck): boolean {
+  return isCiTestCheckName(check.name ?? check.context) || isDaggerCloudTestCheck(check.context, check.targetUrl);
 }
 
 /** A GitHub Actions branch-filter glob as a RegExp (`*` stays inside one path segment). */
