@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4585",
   "created": "2026-10-24T08:22:26.190Z",
-  "updated": "2026-10-24T10:39:44.006Z",
+  "updated": "2026-10-24T10:40:00.421Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "prereq-registration.ac2": {
       "status": "completed",
       "doneAt": "2026-10-24T10:39:44.006Z"
+    },
+    "prereq-registration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T10:40:00.420Z"
     }
   }
 }
