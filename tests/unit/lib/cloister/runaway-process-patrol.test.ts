@@ -88,7 +88,7 @@ function host(t0: number) {
     readCmdline,
     readCwd: async () => null,
     readUptimeSeconds: async () => uptimeAt(Date.now()),
-    readAdmissionOwnerPid: async () => null,
+    readAdmissionOwnerPids: async () => [],
     isAgentIdle: () => false,
     readHostCpu: () => ({ cpuPercent: 20, load1: 4, cores: 24 }),
     emit: (entry) => { emitted.push(entry); },

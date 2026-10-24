@@ -127,6 +127,11 @@ Runaway processes (for example a tool call that outlived its agent) are
 reported in the activity feed with the `kill -TERM -<pgid>` command to stop
 them; Overdeck never kills them itself.
 
+Quality gates and local Vitest runs share a CPU admission queue with
+`resources.quality_gate_slots` slots (default 2), set in `~/.overdeck/config.yaml`
+only. A gate starts only while CPU is unpressured; under pressure new gates
+wait and running gates keep their slots.
+
 | Key | Default | What it does |
 | --- | --- | --- |
 | `resources.dashboard_cpu_weight` | `1000` | systemd `CPUWeight` of the dashboard and supervisor units, so the control plane keeps its share of CPU under contention. |
@@ -136,6 +141,7 @@ them; Overdeck never kills them itself.
 | `resources.governor_cpu_psi_hold_avg60` | `50` | CPU PSI `some avg60` percentage at which the governor holds and the doors above react. |
 | `resources.governor_cpu_psi_recovery_avg60` | `25` | The governor stays held until CPU PSI falls below this. Must be lower than the hold threshold, or both fall back to the defaults with a warning. |
 | `resources.governor_cpu_hold_dispatch` | `false` | Hold Flywheel-started work agents while CPU is saturated. Off until calibration data exists. |
+| `resources.quality_gate_slots` | `2` | Quality gates and local Vitest runs that may hold CPU admission at once (1-16). Set it in `~/.overdeck/config.yaml`; a project `.pan.yaml` value is ignored. A gate starts only while CPU is unpressured: utilization below 75 %, and PSI some avg10 below 25 (load per core below 1 without PSI). Under pressure new gates wait; running gates keep their slots. |
 
 The deacon log (`~/.overdeck/logs/deacon.log`) gets one `cpu-pressure sample`
 line every 5 minutes with PSI some avg10/avg60 and load per core, so you can

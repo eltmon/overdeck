@@ -532,6 +532,8 @@ describe('listScheduleCandidates (#3983)', () => {
       listed({ number: 46, headRefName: 'feature/pan-46', isDraft: true }),
       listed({ number: 47, headRefName: 'feature/pan-47', statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'FAILURE' }] }),
       listed({ number: 48, headRefName: 'feature/pan-48', statusCheckRollup: [{ status: 'IN_PROGRESS', conclusion: null }] }),
+      // PAN-4589: a failing commit status (Dagger Cloud) excludes it too.
+      listed({ number: 53, headRefName: 'feature/pan-53', statusCheckRollup: [{ state: 'FAILURE' }] }),
       listed({ number: 49, headRefName: 'feature/pan-49', mergeable: 'CONFLICTING' }),
       listed({ number: 50, headRefName: 'feature/pan-50', state: 'CLOSED' }),
       listed({ number: 51, headRefName: 'feature/pan-51', state: 'MERGED', mergedAt: '2026-09-24T08:00:00Z' }),

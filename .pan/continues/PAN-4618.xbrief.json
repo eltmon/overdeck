@@ -1,0 +1,236 @@
+{
+  "version": "1",
+  "issueId": "PAN-4618",
+  "created": "2026-10-24T12:05:55.935Z",
+  "updated": "2026-10-24T13:25:04.413Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-24T13:06Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-10-24T13:06:34.068Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-10-24T13:14Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-10-24T13:14:00.425Z"
+    }
+  ],
+  "items": {
+    "ci-push-paths-ignore": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:05:55.935Z",
+      "doneAt": "2026-10-24T12:08:48.748Z"
+    },
+    "ci-concurrency-group": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:09:48.329Z",
+      "doneAt": "2026-10-24T12:14:17.191Z"
+    },
+    "default-branch-test-window": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:15:48.692Z",
+      "doneAt": "2026-10-24T12:29:13.077Z"
+    },
+    "dod-later-green-skips-ci-less": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:32:03.249Z",
+      "doneAt": "2026-10-24T12:39:43.927Z"
+    },
+    "ci-head-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:40:11.588Z",
+      "doneAt": "2026-10-24T12:43:13.529Z"
+    },
+    "ci-fill-uses-ci-head": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:43:19.460Z",
+      "doneAt": "2026-10-24T12:48:34.263Z"
+    },
+    "ci-webhook-uses-ci-head": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:48:40.752Z",
+      "doneAt": "2026-10-24T12:51:55.213Z"
+    },
+    "reload-bookkeeping-head-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:52:20.006Z",
+      "doneAt": "2026-10-24T12:55:12.777Z"
+    },
+    "flywheel-skills-main-ci": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:55:28.119Z",
+      "doneAt": "2026-10-24T13:00:47.413Z"
+    },
+    "docs-bookkeeping-ci": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T13:01:03.250Z",
+      "doneAt": "2026-10-24T13:02:34.579Z"
+    },
+    "ci-push-paths-ignore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:16:07.178Z"
+    },
+    "ci-push-paths-ignore.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:16:46.670Z"
+    },
+    "ci-concurrency-group.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:17:02.978Z"
+    },
+    "ci-concurrency-group.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:17:19.057Z"
+    },
+    "ci-concurrency-group.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:17:34.678Z"
+    },
+    "default-branch-test-window.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:17:50.121Z"
+    },
+    "default-branch-test-window.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:18:05.382Z"
+    },
+    "default-branch-test-window.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:18:20.866Z"
+    },
+    "default-branch-test-window.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:18:36.680Z"
+    },
+    "default-branch-test-window.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:18:52.672Z"
+    },
+    "dod-later-green-skips-ci-less.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:19:08.280Z"
+    },
+    "dod-later-green-skips-ci-less.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:19:23.397Z"
+    },
+    "dod-later-green-skips-ci-less.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:19:38.949Z"
+    },
+    "dod-later-green-skips-ci-less.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:19:53.661Z"
+    },
+    "dod-later-green-skips-ci-less.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:20:09.555Z"
+    },
+    "ci-head-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:20:25.947Z"
+    },
+    "ci-head-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:20:41.516Z"
+    },
+    "ci-head-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:20:57.138Z"
+    },
+    "ci-head-resolver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:21:11.087Z"
+    },
+    "ci-fill-uses-ci-head.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:21:26.193Z"
+    },
+    "ci-fill-uses-ci-head.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:21:41.476Z"
+    },
+    "ci-fill-uses-ci-head.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:21:56.642Z"
+    },
+    "ci-webhook-uses-ci-head.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:22:11.307Z"
+    },
+    "ci-webhook-uses-ci-head.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:22:26.491Z"
+    },
+    "reload-bookkeeping-head-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:22:42.180Z"
+    },
+    "reload-bookkeeping-head-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:22:57.326Z"
+    },
+    "reload-bookkeeping-head-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:23:12.502Z"
+    },
+    "flywheel-skills-main-ci.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:23:27.925Z"
+    },
+    "flywheel-skills-main-ci.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:23:43.195Z"
+    },
+    "flywheel-skills-main-ci.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:23:59.146Z"
+    },
+    "flywheel-skills-main-ci.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:24:14.959Z"
+    },
+    "docs-bookkeeping-ci.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:24:31.524Z"
+    },
+    "docs-bookkeeping-ci.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:24:48.118Z"
+    },
+    "docs-bookkeeping-ci.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:25:04.412Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-10-24T13:06:34Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4618 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - .overdeck/context/codebase/concerns.md\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-4618 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-10-24T13:14:00Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4618 (attempt 1/3):\n\nFailed check: vbrief-ac\n\nAcceptance criteria check FAILED — 34/34 AC incomplete:\n\n### Add paths-ignore for .pan/** and .overdeck/memory/** to CI's push trigger (2/2 incomplete)\n  - [ ] Given ci.yml is parsed as YAML, on.push['paths-ignore'] returns exactly ['.pan/**', '.overdeck/memory/**'] and on.pull_request has no paths or paths-ignore key\n  - [ ] git diff origin/main -- .github/workflows/no-planning-on-main.yml produces no output\n\n### Add a cancel-in-progress concurrency group to ci.yml (3/3 incomplete)\n  - [ ] Given ci.yml is parsed as YAML, concurrency.group returns 'ci-${{ github.event.pull_request.number || github.ref }}' and concurrency['cancel-in-progress'] returns true\n  - [ ] Given two pushes to feature/pan-4618 less than a run apart, gh run list --branch feature/pan-4618 --workflow CI shows the first push's CI run with conclusion cancelled and the second push's run not cancelled\n  - [ ] The concurrency block sits at workflow level (a top-level key), so it applies to both push and pull_request runs, and on.push/on.pull_request keys are otherwise unchanged by this item\n\n### Default-branch test verdict skips commits without a decisive test run (100-commit window) (5/5 incomplete)\n  - [ ] Given 20 newest commits carrying only reject-planning-paths above a commit whose 'test' check failed, readDefaultBranchFailingTestChecks returns a set containing 'test'\n  - [ ] Given 12 commits whose test checks concluded cancelled above a commit whose 'test' check failed, it returns a set containing 'test'\n  - [ ] Given 12 commits whose test checks are in progress, it returns null and sends no check-runs request for the 11th and 12th commits\n  - [ ] Given a full 100-commit page with no test checks it returns null, given a 3-commit page with none it returns an empty set, and its commit-list request contains per_page=100\n  - [ ] defaultBranchCommitTestVerdict returns 'indecisive' for a single completed 'test' check with conclusion cancelled\n\n### DoD row 6 later-green fallback counts only candidates that carry a CI run (5/5 incomplete)\n  - [ ] Given candidates bk1..bk6 carrying only reject-planning-paths followed by a candidate with every required check successful, checkMainVerifyRow returns pass citing that candidate\n  - [ ] Given 6 CI-bearing candidates whose 'test' failed followed by a green one, checkMainVerifyRow returns miss and readCheckRuns is not called for the 7th candidate\n  - [ ] Given a promote merge followed by a .pan/backlog/sequence.md commit in a real git repo, readContainingDefaultBranchCommits returns a list that contains the promote commit\n  - [ ] Given candidates [bkTip with every required check green, codeC with no checks], checkMainVerifyRow returns pass citing bkTip\n  - [ ] When the edit is done, wc -l src/lib/lifecycle/dod-gate.ts prints 1000 or fewer lines and git diff origin/main -- scripts/file-size-allowlist.txt prints nothing\n\n### Add resolveCiHead to src/lib/ci/project-ci-github.ts (4/4 incomplete)\n  - [ ] Given the workflow-runs call returns a run on C, resolveCiHead returns C after exactly one request to repos/o/r/actions/workflows/ci.yml/runs?branch=main&event=push&per_page=1\n  - [ ] Given the newest CI run is on B, the bookkeeping tip of a mixed push, resolveCiHead returns B\n  - [ ] Given the workflow-runs call rejects with 'gh: Not Found (HTTP 404)' or returns no runs, resolveCiHead falls back to the branches/main sha\n  - [ ] Given the workflow-runs call rejects with a non-404 error, resolveCiHead rejects with that error; given the fallback branches call returns no sha, it returns null\n\n### Project CI REST fill projects the CI head (3/3 incomplete)\n  - [ ] Given the branch head is a bookkeeping commit and the newest CI run is on sha-code, fillProjectCiObservation returns headSha 'sha-code' with sha-code's suites\n  - [ ] Given a code-commit head with runs from two workflows, the observation's headSha equals the CI head and suites has two entries\n  - [ ] packages/contracts/src/events.ts and src/lib/ci/project-ci-observation.ts contain 'CI head' in the comments of project.ci_suite_observed, project.ci_head_observed and observationFromCheckSuite, and git diff shows no non-comment change in those two files\n\n### check_suite webhook records default-branch suites against the CI head (2/2 incomplete)\n  - [ ] Given resolveCiHead returns 'code-sha', a github-actions check_suite for head_sha 'code-sha' on main appends one project.ci_suite_observed event with headSha 'code-sha'\n  - [ ] Given resolveCiHead returns 'code-sha', a check_suite for head_sha 'bk-sha' appends no project.ci_suite_observed event\n\n### Regression test: pan reload builds origin/main when HEAD is a bookkeeping commit (3/3 incomplete)\n  - [ ] Given origin/main HEAD is a commit touching only .pan/backlog/sequence.md, buildDashboardFromOriginMain returns builtSha equal to that commit's sha\n  - [ ] The deployment worktree contains src/app.ts from the parent code commit and installAndBuild is called with the deployment root\n  - [ ] git diff origin/main -- src/lib/deploy/build-from-origin.ts produces no output\n\n### Flywheel, recap and consolidation skills state the newest-decisive-run rule for main's CI (4/4 incomplete)\n  - [ ] pan-flywheel/SKILL.md contains the red-main rule sentence with select(.conclusion == \"success\" or .conclusion == \"failure\") and 'PAN-4618', and roles/flywheel.md contains the same sentence\n  - [ ] pan-flywheel/SKILL.md (under the line 206 deploy step) contains the deploy rule requiring status completed and conclusion success on gh run list --branch main --workflow CI --limit 1, and roles/flywheel.md contains the same rule after its Deploys bullet\n  - [ ] pan-recap/SKILL.md's main CI command contains --limit 20 and select(.conclusion == \"success\" or .conclusion == \"failure\"), and pan-consolidate-conversations/SKILL.md contains 'newest decisive CI run'\n  - [ ] The commit that changes roles/flywheel.md has a line matching ^Prompt-Change: in its message, and npm run lint:skills exits 0\n\n### Document bookkeeping commits skipping CI in PIPELINE-GATES, MERGE-WORKFLOW and EXTERNAL-EVENT-STREAM (3/3 incomplete)\n  - [ ] docs/PIPELINE-GATES.md contains the heading 'Bookkeeping commits skip CI and superseded runs are cancelled (PAN-4618)' and a section naming .pan/**, .overdeck/memory/**, cancel-in-progress, resolveCiHead, the 100-commit test-verdict window and DoD row 6's skip of candidates missing a required check\n  - [ ] docs/MERGE-WORKFLOW.md contains a paragraph stating that pan reload builds origin/main HEAD whatever its CI state and that a bookkeeping HEAD has no CI run (PAN-4618)\n  - [ ] docs/EXTERNAL-EVENT-STREAM.md contains the text 'newest push run of the CI workflow' in both the project.ci_suite_observed row and the project.ci_head_observed row\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed task with `pan task close` — the canonical writer publishes the close and AC statuses sync automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request PAN-4618 -m \"Completed acceptance criteria\"\n\nDo NOT resubmit until all AC are completed."
+    }
+  ]
+}

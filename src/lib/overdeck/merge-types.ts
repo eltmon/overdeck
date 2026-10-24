@@ -163,5 +163,6 @@ export interface UatGeneration {
   /** ISO timestamp once branch/worktree/stack artifacts have been cleaned. */
   cleanedAt?: string | null;
   createdAt: string;
+  /** Last lifecycle change; cleanup does not move it, so a failed row keeps its failure time. */
   updatedAt: string;
 }

@@ -23,6 +23,7 @@ export const GITHUB_QUOTA_CALLERS = [
   "app-rest",
   "quota-sampler",
   "agent",
+  "pr-adoption",
   "other",
 ] as const
 export const GitHubQuotaCaller = Schema.Literals(GITHUB_QUOTA_CALLERS)

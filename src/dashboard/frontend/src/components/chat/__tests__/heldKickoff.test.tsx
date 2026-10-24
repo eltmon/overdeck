@@ -4,9 +4,10 @@
  * the kickoff door, never the message route.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { ComposerFooter } from '../ComposerFooter';
 import { resetComposerStore } from '../../../lib/composerStore';
+import { useHeldKickoff } from '../heldKickoff';
 
 const { editorState, rootState, mockToastError } = vi.hoisted(() => ({
   editorState: { text: '' },
@@ -247,5 +248,109 @@ describe('held conversation composer (PAN-4499 WI-8)', () => {
     await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('This conversation was already started'));
 
     vi.unstubAllGlobals();
+  });
+});
+
+describe('useHeldKickoff options and lookup status (PAN-4596)', () => {
+  function json(body: unknown, status = 200) {
+    return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  function kickoffGets(fetchMock: ReturnType<typeof vi.fn>, name: string) {
+    return fetchMock.mock.calls.filter(([input]) => String(input) === `/api/conversations/${name}/kickoff`);
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('enabled: false makes no request and reports held false, ready', async () => {
+    const fetchMock = vi.fn(async () => json({ held: true, text: 'nope' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useHeldKickoff('c', { enabled: false }));
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.held).toBe(false);
+    expect(result.current.status).toBe('ready');
+    expect(kickoffGets(fetchMock, 'c')).toHaveLength(0);
+  });
+
+  it('with no options (the ComposerFooter call) it still issues the GET', async () => {
+    const fetchMock = vi.fn(async () => json({ held: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderHook(() => useHeldKickoff('c'));
+    await waitFor(() => expect(kickoffGets(fetchMock, 'c')).toHaveLength(1));
+  });
+
+  it('reports loading before the first answer and ready after { held: false }', async () => {
+    let answer: (response: Response) => void = () => {};
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { answer = resolve; }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useHeldKickoff('c'));
+    expect(result.current.status).toBe('loading');
+    expect(result.current.held).toBe(false);
+    await act(async () => { answer(json({ held: false })); });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.held).toBe(false);
+  });
+
+  it('a failed first lookup reports error; refresh after a held answer reports held, ready', async () => {
+    const responses = [json({ error: 'boom' }, 500), json({ held: true, text: 'KICKOFF', focus: 'Read the brief' })];
+    const fetchMock = vi.fn(async () => responses.shift() ?? json({ held: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useHeldKickoff('c'));
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.held).toBe(false);
+    act(() => { result.current.refresh(); });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.held).toBe(true);
+    expect(result.current.text).toBe('KICKOFF');
+    expect(result.current.focus).toBe('Read the brief');
+  });
+
+  it('a failure after a success keeps the last known state', async () => {
+    const responses = [json({ held: true, text: 'KICKOFF' }), json({ error: 'boom' }, 500)];
+    const fetchMock = vi.fn(async () => responses.shift() ?? json({ error: 'boom' }, 500));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useHeldKickoff('c'));
+    await waitFor(() => expect(result.current.held).toBe(true));
+    act(() => { result.current.refresh(); });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.held).toBe(true);
+    expect(result.current.status).toBe('ready');
+  });
+
+  it('a conversation switch reads loading, never the previous conversation\'s kickoff', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => (
+      String(input).includes('/a/') ? json({ held: true, text: 'A KICKOFF' }) : new Promise<Response>(() => {})
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result, rerender } = renderHook(({ name }) => useHeldKickoff(name), { initialProps: { name: 'a' } });
+    await waitFor(() => expect(result.current.held).toBe(true));
+    rerender({ name: 'b' });
+    expect(result.current.held).toBe(false);
+    expect(result.current.text).toBeUndefined();
+    expect(result.current.status).toBe('loading');
+  });
+
+  it('pollAlways polls every 5s while not held; without it a not-held answer stops polling', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(async () => json({ held: false }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const polling = renderHook(() => useHeldKickoff('p', { pollAlways: true }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(kickoffGets(fetchMock, 'p')).toHaveLength(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(kickoffGets(fetchMock, 'p')).toHaveLength(2);
+    polling.unmount();
+
+    const idle = renderHook(() => useHeldKickoff('q'));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(kickoffGets(fetchMock, 'q')).toHaveLength(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(kickoffGets(fetchMock, 'q')).toHaveLength(1);
+    idle.unmount();
   });
 });

@@ -45,6 +45,7 @@ export function mergeCpuResources(
     resolved.governorCpuPsiRecoveryAvg60 = yaml.governor_cpu_psi_recovery_avg60;
   }
   if (typeof yaml.governor_cpu_hold_dispatch === 'boolean') resolved.governorCpuHoldDispatch = yaml.governor_cpu_hold_dispatch;
+  if (isIntegerInRange(yaml.quality_gate_slots, 1, 16)) resolved.qualityGateSlots = yaml.quality_gate_slots;
   if (resolved.governorCpuPsiRecoveryAvg60 >= resolved.governorCpuPsiHoldAvg60) {
     warnInvertedCpuPsiThresholds(resolved.governorCpuPsiHoldAvg60, resolved.governorCpuPsiRecoveryAvg60, defaults);
     resolved.governorCpuPsiHoldAvg60 = defaults.governorCpuPsiHoldAvg60;

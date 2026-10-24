@@ -102,6 +102,7 @@ const TELEMETRY_GITHUB_CALLERS = [
   "app_rest",
   "quota_sampler",
   "agent",
+  "pr_adoption",
   "other",
 ] as const
 

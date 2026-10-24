@@ -460,4 +460,21 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   pairs from/import with a quoted word (PAN-4508's `from "custom"`) blocks every
   deploy. Even after the lexer fix, the first reload of a change runs the
   *installed* CLI, so never write that syntax in source comments.
+- **Most `main` commits are bookkeeping** (PAN-4618) — ~95% of commits on
+  `main` are `chore(workspace)` commits touching only `.pan/**` or
+  `.overdeck/memory/**`. Once PAN-4618 lands they run no `CI` workflow (only
+  `no-planning-on-main`), and CI's concurrency group cancels superseded runs, so
+  `main` HEAD usually has no CI run and recent runs may be `cancelled`. Main-CI
+  readers decide from CI evidence, never from changed files (a mixed push runs CI
+  at a bookkeeping tip): `ci-default-branch-tests.ts` skips commits without a
+  decisive test run, DoD row 6 skips candidates missing a required check, and the
+  Command Deck chip uses `resolveCiHead` (`ci/project-ci-github.ts`, newest push
+  run of `ci.yml`).
+- **The transcript heartbeat exists only where `runtimes/index.ts` loaded** —
+  `liveness.ts` cannot import the registry (cycle), so `registerLivenessHeartbeatLookup`
+  runs as a side effect of `src/lib/runtimes/index.ts`. A process that never loads it
+  (most CLI verbs) gets `null` heartbeats; on Herdr, with an empty runtime mirror and no
+  tmux `window_activity`, activity then reads as the spawn time. PAN-4595 adds the import
+  to `src/lib/health.ts`; `pan worker wait`/`pan lane wait` (`agents/worker/wait.ts`)
+  still lack it. Verify with a Node `indexOf` scan of `dist/*.js`, not grep.
 <!-- last-verified: 2026-10-24 -->

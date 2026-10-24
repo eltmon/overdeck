@@ -1,0 +1,754 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T11:38:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4618: CI runs the full suite on every .pan/ bookkeeping commit to main, starving PR checks of runners",
+    "updated": "2026-10-24T12:05:29.696Z"
+  },
+  "plan": {
+    "id": "pan-4618",
+    "title": "CI runs the full suite on every .pan/ bookkeeping commit to main, starving PR checks of runners",
+    "status": "running",
+    "uid": "4d937d1f-8605-4169-9472-26545fa59f51",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-24T11:38:47Z",
+    "updated": "2026-10-24T12:05:29.696Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4618",
+        "label": "PAN-4618",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4618.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "ci",
+      "github-actions",
+      "dod-gate",
+      "command-deck",
+      "flywheel",
+      "infra"
+    ],
+    "narratives": {
+      "Problem": ".github/workflows/ci.yml runs the full ~13-job suite on every push to main with no path filter and no concurrency group. ~95% of main commits are bookkeeping commits touching only .pan/** or .overdeck/memory/**, and runs for superseded PR and main heads keep their runners (48 unfinished runs at 11:50 on 2026-10-24). Once bookkeeping commits run no CI and superseded runs are cancelled, several main-CI readers give wrong answers: the default-branch test verdict reports 'no failing tests' after 10 commits without a decisive run, the DoD row 6 later-green fallback burns its 5-candidate budget on commits without CI, the Command Deck CI chip shows a false green from the guard workflow alone, and the Flywheel/recap skills read the newest run even when it is cancelled.",
+      "Proposal": "Add paths-ignore ['.pan/**', '.overdeck/memory/**'] to CI's push trigger and a workflow-level concurrency group ci-${{ github.event.pull_request.number || github.ref }} with cancel-in-progress. Readers classify commits by the CI evidence they carry, never by changed files (critique): the test-verdict reader widens to 100 commits and skips commits without test checks or with only cancelled ones; DoD row 6 skips candidates missing a required check (scan 50, probe 5); the Command Deck chip resolves the CI head as the head_sha of the newest push run of .github/workflows/ci.yml (workflow-runs endpoint, branch-head fallback on 404). pan reload already builds origin/main HEAD with no CI lookup and gets a regression test. Skills, the Flywheel role prompt, event-contract comments and developer docs state the newest-decisive-run rule.",
+      "NonGoals": "- Changing the pull_request trigger's events or adding a path filter to it\n- Changing .github/workflows/no-planning-on-main.yml or any workflow other than ci.yml\n- Reducing how often the backlog sequencer or Flywheel commit to main\n- Per-project configuration of the bookkeeping paths or the CI workflow file\n- Adding a CI lookup or CI gate to pan reload / build-from-origin.ts\n- Changing DoD row 6's primary evidence or DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS\n- Filtering DoD candidates or CI heads by changed files or git pathspecs\n- Schema changes to project.ci_suite_observed / project.ci_head_observed (comments only)\n- Adding .overdeck/context/** to paths-ignore\n- Raising any entry in scripts/file-size-allowlist.txt"
+    },
+    "autoDecisions": [
+      {
+        "summary": "paths-ignore list is exactly ['.pan/**', '.overdeck/memory/**'] on on.push only; .overdeck/context/** stays outside",
+        "rationale": "The issue names these two paths. Recent .overdeck/context changes land only inside code PR squash-merges, so they are never bookkeeping-only commits."
+      },
+      {
+        "summary": "pan reload gets a regression test and no code change",
+        "rationale": "buildDashboardFromOriginMain always builds origin/main HEAD and never reads CI; a bookkeeping HEAD holds the same code as its parent, so the deploy is already correct. The issue's AC allows 'test or a recorded dry run'."
+      },
+      {
+        "summary": "Test-verdict reader: 100-commit window, 10-commit budget counted only on commits with test checks, null (unknown) when a full window has no test checks",
+        "rationale": "null makes ci-failure-feedback spend no attempt, which is the documented safe side; an empty set would blame the PR for a failure inherited from main."
+      },
+      {
+        "summary": "Fix the Command Deck CI chip in this issue by resolving a 'CI head' instead of documenting the false green",
+        "rationale": "The issue says to fix any reader that assumes HEAD always has a run; without the fix the chip reports success 1/1 from the guard workflow and hides a red main, which the operator relies on."
+      },
+      {
+        "summary": "no-planning-on-main.yml stays unchanged",
+        "rationale": "The issue says so explicitly, and DoD row 6 requires its reject-planning-paths check name."
+      },
+      {
+        "summary": "Readers identify CI-bearing commits by the checks/runs they carry, not by changed files",
+        "rationale": "The plan critique showed file-based filtering drops promote merges and misses mixed pushes, where GitHub runs CI at a bookkeeping tip; check evidence is correct in both cases and also handles cancelled runs."
+      },
+      {
+        "summary": "CI head = head_sha of the newest push run from actions/workflows/ci.yml/runs?per_page=1, falling back to the branch head on 404 or no runs",
+        "rationale": "~24 bookkeeping pushes (each with a guard run) can sit above the newest CI run, so an all-workflows page could miss it; the workflow endpoint returns exactly the newest CI run in one small call."
+      },
+      {
+        "summary": "Concurrency group ci-${{ github.event.pull_request.number || github.ref }} with cancel-in-progress: true, applied as written by the operator",
+        "rationale": "Operator scope addition on the issue (2026-10-24T11:49Z); it reverses revision 1's choice to leave cancel-in-progress out, and readers are made to skip cancelled runs."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The plan spans several subsystems but about 22 files, and items 3-6b fix regressions that items 1 and 1b (paths-ignore and cancel-in-progress in ci.yml) introduce: shipping the ci.yml change alone would open a window where the default-branch test verdict reports 'no failing tests' on a red main, DoD row 6 cannot find later green runs, and the Command Deck CI chip shows a false green; shipping the reader fixes first would test them against a ci.yml that skips and cancels nothing. The skills, contract comments and docs describe the same combined behavior. Every item is small and the DAG lets 6 of 10 items start in parallel.",
+      "canonicalFilename": "2026-10-24-PAN-4618-ci-runs-the-full-suite-on-every-pan-bookkeeping-commit-to-main-starving-pr-checks-of-runners.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "ci-push-paths-ignore",
+        "title": "Add paths-ignore for .pan/** and .overdeck/memory/** to CI's push trigger",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T11:38:47Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4618",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const y=require('yaml');const w=y.parse(require('fs').readFileSync('.github/workflows/ci.yml','utf8'));const p=w.on.push['paths-ignore'];if(JSON.stringify(p)!==JSON.stringify(['.pan/**','.overdeck/memory/**'])||w.on.pull_request['paths-ignore']||w.on.pull_request.paths)process.exit(1);console.log('ok')\"",
+            "git diff --exit-code origin/main -- .github/workflows/no-planning-on-main.yml"
+          ],
+          "expected_outputs": [
+            "node prints ok and exits 0",
+            "git diff exits 0 (no change to no-planning-on-main.yml)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 1. In .github/workflows/ci.yml add under on.push (after branches: [main]) the PAN-4618 comment block and paths-ignore: ['.pan/**', '.overdeck/memory/**']. Do not touch on.pull_request or any other workflow. Push over the SSH remote (gh OAuth lacks workflow scope); if the push is refused, stop and pan tell flywheel-orchestrator. The post-merge observation (no CI run for the next bookkeeping push) is in the PRD acceptance list and hazard H7; it is not an xBRIEF AC because it cannot be seen before merge."
+        },
+        "items": [
+          {
+            "id": "ci-push-paths-ignore.ac1",
+            "title": "Given ci.yml is parsed as YAML, on.push['paths-ignore'] returns exactly ['.pan/**', '.overdeck/memory/**'] and on.pull_request has no paths or paths-ignore key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-push-paths-ignore.ac2",
+            "title": "git diff origin/main -- .github/workflows/no-planning-on-main.yml produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-concurrency-group",
+        "title": "Add a cancel-in-progress concurrency group to ci.yml",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T11:38:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4618",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const y=require('yaml');const w=y.parse(require('fs').readFileSync('.github/workflows/ci.yml','utf8'));if(w.concurrency?.group!=='ci-\\${{ github.event.pull_request.number || github.ref }}'||w.concurrency['cancel-in-progress']!==true)process.exit(1);console.log('ok')\"",
+            "gh run list --branch feature/pan-4618 --workflow CI --limit 4 --json headSha,status,conclusion,event"
+          ],
+          "expected_outputs": [
+            "node prints ok and exits 0",
+            "the CI run for the earlier of two quick pushes shows conclusion cancelled"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 1b. Add a workflow-level concurrency block after on: and before env: — group: ci-${{ github.event.pull_request.number || github.ref }}, cancel-in-progress: true — with the PAN-4618 comment. Then push two commits to feature/pan-4618 less than a minute apart and record the gh run list output showing the first push's CI run cancelled (in the commit message of a follow-up commit or a PR comment). pull_request runs use the PR head's workflow file, so this is observable before merge."
+        },
+        "items": [
+          {
+            "id": "ci-concurrency-group.ac1",
+            "title": "Given ci.yml is parsed as YAML, concurrency.group returns 'ci-${{ github.event.pull_request.number || github.ref }}' and concurrency['cancel-in-progress'] returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-concurrency-group.ac2",
+            "title": "Given two pushes to feature/pan-4618 less than a run apart, gh run list --branch feature/pan-4618 --workflow CI shows the first push's CI run with conclusion cancelled and the second push's run not cancelled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-concurrency-group.ac3",
+            "title": "The concurrency block sits at workflow level (a top-level key), so it applies to both push and pull_request runs, and on.push/on.pull_request keys are otherwise unchanged by this item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "default-branch-test-window",
+        "title": "Default-branch test verdict skips commits without a decisive test run (100-commit window)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T11:38:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4618",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/ci-default-branch-tests.ts",
+            "src/lib/cloister/__tests__/ci-default-branch-tests.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/ci-default-branch-tests.test.ts tests/unit/lib/cloister/ci-failure-feedback.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 3. defaultBranchCommitTestVerdict gains an 'indecisive' result (all test checks completed, any indecisive conclusion such as cancelled); 'pending' now means a test check is still running. Add DEFAULT_BRANCH_COMMIT_WINDOW = 100 for the commits?per_page= fetch; keep DEFAULT_BRANCH_LOOKBACK = 10 counted only on 'pending' commits; 'no-tests' and 'indecisive' commits are skipped free. When no commit carried test checks, return new Set() only if fewer than 100 shas came back, else log the 'its test verdict is unknown' line and return null. Update the header comment and add the tests named in the PRD."
+        },
+        "items": [
+          {
+            "id": "default-branch-test-window.ac1",
+            "title": "Given 20 newest commits carrying only reject-planning-paths above a commit whose 'test' check failed, readDefaultBranchFailingTestChecks returns a set containing 'test'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-branch-test-window.ac2",
+            "title": "Given 12 commits whose test checks concluded cancelled above a commit whose 'test' check failed, it returns a set containing 'test'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-branch-test-window.ac3",
+            "title": "Given 12 commits whose test checks are in progress, it returns null and sends no check-runs request for the 11th and 12th commits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-branch-test-window.ac4",
+            "title": "Given a full 100-commit page with no test checks it returns null, given a 3-commit page with none it returns an empty set, and its commit-list request contains per_page=100",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-branch-test-window.ac5",
+            "title": "defaultBranchCommitTestVerdict returns 'indecisive' for a single completed 'test' check with conclusion cancelled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dod-later-green-skips-ci-less",
+        "title": "DoD row 6 later-green fallback counts only candidates that carry a CI run",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T11:38:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4618",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "src/lib/lifecycle/dod-later-green.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "wc -l src/lib/lifecycle/dod-gate.ts",
+            "npm run lint:file-size",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "dod-gate.test.ts passes",
+            "line count is 1000 or less",
+            "file-size guard passes",
+            "no circular dependency reported"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 4. In findLaterGreenDefaultBranchRun scan up to LATER_GREEN_SCAN_LIMIT = 50 candidates; skip (do not count) a candidate whose check names lack any required check; probe at most LATER_GREEN_CANDIDATE_LIMIT = 5 CI-bearing candidates; reword the miss note as in the PRD. Leave readContainingDefaultBranchCommits unchanged (no pathspec). Update the PAN-3202 comments. Decision rule: if dod-gate.ts exceeds 1000 lines, move requiredChecksOutcome, hasRequiredChecksGreen and findLaterGreenDefaultBranchRun into src/lib/lifecycle/dod-later-green.ts; never raise the allowlist. Add the four tests in the PRD, including the extended promote-merge real-git test and the mixed-push tip case."
+        },
+        "items": [
+          {
+            "id": "dod-later-green-skips-ci-less.ac1",
+            "title": "Given candidates bk1..bk6 carrying only reject-planning-paths followed by a candidate with every required check successful, checkMainVerifyRow returns pass citing that candidate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-later-green-skips-ci-less.ac2",
+            "title": "Given 6 CI-bearing candidates whose 'test' failed followed by a green one, checkMainVerifyRow returns miss and readCheckRuns is not called for the 7th candidate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-later-green-skips-ci-less.ac3",
+            "title": "Given a promote merge followed by a .pan/backlog/sequence.md commit in a real git repo, readContainingDefaultBranchCommits returns a list that contains the promote commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-later-green-skips-ci-less.ac4",
+            "title": "Given candidates [bkTip with every required check green, codeC with no checks], checkMainVerifyRow returns pass citing bkTip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-later-green-skips-ci-less.ac5",
+            "title": "When the edit is done, wc -l src/lib/lifecycle/dod-gate.ts prints 1000 or fewer lines and git diff origin/main -- scripts/file-size-allowlist.txt prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-head-resolver",
+        "title": "Add resolveCiHead to src/lib/ci/project-ci-github.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-24T11:38:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4618",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "ci-fill-uses-ci-head",
+            "ci-webhook-uses-ci-head"
+          ],
+          "files_scope": [
+            "src/lib/ci/project-ci-github.ts",
+            "tests/unit/lib/ci/project-ci-head.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/ci/project-ci-head.test.ts tests/unit/lib/ci/project-ci-github-quota.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 5. Export MAIN_CI_WORKFLOW_FILE = 'ci.yml' and async resolveCiHead(repo, branch, ghApi = projectCiGhApi): GET repos/<repo>/actions/workflows/ci.yml/runs?branch=<branch>&event=push&per_page=1 and return workflow_runs[0].head_sha; when the call fails with HTTP 404 (text on the error's stderr or message) or returns no run, fall back to resolveDefaultBranchHead; other errors propagate. Keep resolveDefaultBranchHead and ProjectCiGhApi unchanged. Add project-ci-head.test.ts with the six cases in the PRD."
+        },
+        "items": [
+          {
+            "id": "ci-head-resolver.ac1",
+            "title": "Given the workflow-runs call returns a run on C, resolveCiHead returns C after exactly one request to repos/o/r/actions/workflows/ci.yml/runs?branch=main&event=push&per_page=1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-head-resolver.ac2",
+            "title": "Given the newest CI run is on B, the bookkeeping tip of a mixed push, resolveCiHead returns B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-head-resolver.ac3",
+            "title": "Given the workflow-runs call rejects with 'gh: Not Found (HTTP 404)' or returns no runs, resolveCiHead falls back to the branches/main sha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-head-resolver.ac4",
+            "title": "Given the workflow-runs call rejects with a non-404 error, resolveCiHead rejects with that error; given the fallback branches call returns no sha, it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-fill-uses-ci-head",
+        "title": "Project CI REST fill projects the CI head",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T11:38:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4618",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/project-ci-fill.ts",
+            "src/lib/overdeck/__tests__/project-ci-fill.test.ts",
+            "packages/contracts/src/events.ts",
+            "src/lib/ci/project-ci-observation.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/project-ci-fill.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "project-ci-fill.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 6a. In fillProjectCiObservation replace both resolveDefaultBranchHead calls with resolveCiHead(repo, branch, ghApi) and update the import and doc comment. Update the test fake to answer the workflow-runs path and the call-order assertions; add the bookkeeping-head test. Also change the comments in packages/contracts/src/events.ts (both project.ci_* events) and src/lib/ci/project-ci-observation.ts (observationFromCheckSuite doc) from 'current default-branch head' to the verified CI head, stating authoritativeHead: true means verified CI head. Comment-only contract change."
+        },
+        "items": [
+          {
+            "id": "ci-fill-uses-ci-head.ac1",
+            "title": "Given the branch head is a bookkeeping commit and the newest CI run is on sha-code, fillProjectCiObservation returns headSha 'sha-code' with sha-code's suites",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-fill-uses-ci-head.ac2",
+            "title": "Given a code-commit head with runs from two workflows, the observation's headSha equals the CI head and suites has two entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-fill-uses-ci-head.ac3",
+            "title": "packages/contracts/src/events.ts and src/lib/ci/project-ci-observation.ts contain 'CI head' in the comments of project.ci_suite_observed, project.ci_head_observed and observationFromCheckSuite, and git diff shows no non-comment change in those two files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-webhook-uses-ci-head",
+        "title": "check_suite webhook records default-branch suites against the CI head",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T11:38:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4618",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/webhook-handlers.ts",
+            "tests/unit/lib/webhook-handlers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/webhook-handlers.test.ts tests/unit/lib/ci/project-ci-observation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 6b. In handleCheckSuite replace resolveDefaultBranchHead(project.repo, project.branch) with resolveCiHead(project.repo, project.branch) and change the import from './ci/project-ci-github.js'. Update the PAN-3537 comment. Leave observationFromCheckSuite unchanged. In the test, mock resolveCiHead instead of resolveDefaultBranchHead and add the two CI-head cases from the PRD."
+        },
+        "items": [
+          {
+            "id": "ci-webhook-uses-ci-head.ac1",
+            "title": "Given resolveCiHead returns 'code-sha', a github-actions check_suite for head_sha 'code-sha' on main appends one project.ci_suite_observed event with headSha 'code-sha'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-webhook-uses-ci-head.ac2",
+            "title": "Given resolveCiHead returns 'code-sha', a check_suite for head_sha 'bk-sha' appends no project.ci_suite_observed event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reload-bookkeeping-head-test",
+        "title": "Regression test: pan reload builds origin/main when HEAD is a bookkeeping commit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T11:38:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4618",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/deploy/build-from-origin.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/deploy/build-from-origin.test.ts",
+            "git diff --exit-code origin/main -- src/lib/deploy/build-from-origin.ts"
+          ],
+          "expected_outputs": [
+            "build-from-origin.test.ts passes",
+            "no diff in build-from-origin.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 7. Add 'builds origin/main when its HEAD is a bookkeeping-only commit' using the real-repo pattern of the existing stale-worktree test: commit src/app.ts, then commit .pan/backlog/sequence.md, update-ref refs/remotes/origin/main HEAD, run buildDashboardFromOriginMain with a runGit that no-ops fetch and a stub installAndBuild. Clean up with removeDashboardDeployment. No change to build-from-origin.ts."
+        },
+        "items": [
+          {
+            "id": "reload-bookkeeping-head-test.ac1",
+            "title": "Given origin/main HEAD is a commit touching only .pan/backlog/sequence.md, buildDashboardFromOriginMain returns builtSha equal to that commit's sha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-bookkeeping-head-test.ac2",
+            "title": "The deployment worktree contains src/app.ts from the parent code commit and installAndBuild is called with the deployment root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-bookkeeping-head-test.ac3",
+            "title": "git diff origin/main -- src/lib/deploy/build-from-origin.ts produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-skills-main-ci",
+        "title": "Flywheel, recap and consolidation skills state the newest-decisive-run rule for main's CI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T11:38:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4618",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-flywheel/SKILL.md",
+            "roles/flywheel.md",
+            "sync-sources/skills/pan-consolidate-conversations/SKILL.md",
+            "sync-sources/skills/pan-recap/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:skills",
+            "npm run lint:prompt-trailer",
+            "grep -n 'PAN-4618' sync-sources/skills/pan-flywheel/SKILL.md roles/flywheel.md"
+          ],
+          "expected_outputs": [
+            "lint:skills passes",
+            "lint:prompt-trailer passes after the commit carries a Prompt-Change trailer",
+            "grep prints a match in both files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 8. Add the verbatim red-main rule (newest CI run on main concluded success or failure; queued, in-progress and cancelled are no verdict; headSha usually older than HEAD; PAN-4618) after the Keep-main-green bullet in pan-flywheel/SKILL.md and roles/flywheel.md. Add the verbatim deploy rule (newest CI run, --limit 1, must be completed/success; wait when queued or in progress; ask when cancelled) under SKILL.md line 206 and after the '**Deploys.**' bullet in roles/flywheel.md (line 112); reword SKILL.md row 126. Replace pan-recap/SKILL.md line 203's --limit 1 command with the jq-selected decisive run; reword pan-consolidate-conversations/SKILL.md line 119. Commit with a Prompt-Change: trailer."
+        },
+        "items": [
+          {
+            "id": "flywheel-skills-main-ci.ac1",
+            "title": "pan-flywheel/SKILL.md contains the red-main rule sentence with select(.conclusion == \"success\" or .conclusion == \"failure\") and 'PAN-4618', and roles/flywheel.md contains the same sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-skills-main-ci.ac2",
+            "title": "pan-flywheel/SKILL.md (under the line 206 deploy step) contains the deploy rule requiring status completed and conclusion success on gh run list --branch main --workflow CI --limit 1, and roles/flywheel.md contains the same rule after its Deploys bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-skills-main-ci.ac3",
+            "title": "pan-recap/SKILL.md's main CI command contains --limit 20 and select(.conclusion == \"success\" or .conclusion == \"failure\"), and pan-consolidate-conversations/SKILL.md contains 'newest decisive CI run'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-skills-main-ci.ac4",
+            "title": "The commit that changes roles/flywheel.md has a line matching ^Prompt-Change: in its message, and npm run lint:skills exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-bookkeeping-ci",
+        "title": "Document bookkeeping commits skipping CI in PIPELINE-GATES, MERGE-WORKFLOW and EXTERNAL-EVENT-STREAM",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T11:38:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4618",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/MERGE-WORKFLOW.md",
+            "docs/EXTERNAL-EVENT-STREAM.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Bookkeeping commits skip CI and superseded runs are cancelled (PAN-4618)' docs/PIPELINE-GATES.md",
+            "grep -n 'PAN-4618' docs/MERGE-WORKFLOW.md docs/EXTERNAL-EVENT-STREAM.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep finds the new heading",
+            "grep finds PAN-4618 in both files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 9. Add '### Bookkeeping commits skip CI and superseded runs are cancelled (PAN-4618)' to docs/PIPELINE-GATES.md after the body of '### One full-suite run per push, on CI (PAN-3965)' and before '#### Dagger Cloud checks (PAN-4589)', covering the two paths, the whole-push rule and mixed pushes, the guard workflow, the concurrency group, and one line per reader. Add the pan reload paragraph to MERGE-WORKFLOW.md '## Deploy progress on the project row'. Change the two project.ci_* rows in EXTERNAL-EVENT-STREAM.md to 'current CI head (the newest push run of the CI workflow, PAN-4618)'."
+        },
+        "items": [
+          {
+            "id": "docs-bookkeeping-ci.ac1",
+            "title": "docs/PIPELINE-GATES.md contains the heading 'Bookkeeping commits skip CI and superseded runs are cancelled (PAN-4618)' and a section naming .pan/**, .overdeck/memory/**, cancel-in-progress, resolveCiHead, the 100-commit test-verdict window and DoD row 6's skip of candidates missing a required check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-bookkeeping-ci.ac2",
+            "title": "docs/MERGE-WORKFLOW.md contains a paragraph stating that pan reload builds origin/main HEAD whatever its CI state and that a bookkeeping HEAD has no CI run (PAN-4618)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-bookkeeping-ci.ac3",
+            "title": "docs/EXTERNAL-EVENT-STREAM.md contains the text 'newest push run of the CI workflow' in both the project.ci_suite_observed row and the project.ci_head_observed row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ci-push-paths-ignore",
+        "to": "ci-concurrency-group",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-head-resolver",
+        "to": "ci-fill-uses-ci-head",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-head-resolver",
+        "to": "ci-webhook-uses-ci-head",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

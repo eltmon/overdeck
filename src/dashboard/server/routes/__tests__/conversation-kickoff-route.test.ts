@@ -144,4 +144,39 @@ describe('kickoff door routes (PAN-4499 WI-5)', () => {
     const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
     expect(getConversationByName('conv-e')?.forkStatus).toBe('failed');
   });
+
+  it('GET returns the trimmed handoff focus from fork_request (PAN-4596)', async () => {
+    await seedHeld('conv-f', 'do the thing');
+    const { setForkRequest } = await import('../../../../lib/overdeck/conversations.js');
+    setForkRequest('conv-f', JSON.stringify({ hold: true, handoffFocus: '  Read the brief  ' }));
+    const response = await request('GET', '/api/conversations/conv-f/kickoff');
+    expect(response.status).toBe(200);
+    expect(decode(response)).toEqual({ held: true, text: 'do the thing', focus: 'Read the brief' });
+  });
+
+  it('GET omits focus when the conversation has no fork_request (PAN-4596)', async () => {
+    await seedHeld('conv-g', 'do the thing');
+    const response = await request('GET', '/api/conversations/conv-g/kickoff');
+    const body = decode(response) as Record<string, unknown>;
+    expect(body).toEqual({ held: true, text: 'do the thing' });
+    expect('focus' in body).toBe(false);
+  });
+
+  it('POST on an ended held conversation relaunches the session fresh and delivers the kickoff (PAN-4596)', async () => {
+    await seedHeld('conv-h', 'the held kickoff');
+    const { markConversationEnded } = await import('../../../../lib/overdeck/conversations.js');
+    markConversationEnded('conv-h');
+    const response = await request('POST', '/api/conversations/conv-h/kickoff', {});
+    expect(response.status).toBe(200);
+    const { waitForInFlightForkPipelines } = await import('../../../../lib/overdeck/conversation-forks.js');
+    await waitForInFlightForkPipelines(0);
+    expect(forkMocks.ensureForkSessionReady).toHaveBeenCalledTimes(1);
+    expect(forkMocks.ensureForkSessionReady).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'conv-h' }),
+      'conv-h-session',
+      false,
+    );
+    expect(forkMocks.deliverForkSeed).toHaveBeenCalledTimes(1);
+    expect(forkMocks.deliverForkSeed.mock.calls[0]?.[1]).toBe('the held kickoff');
+  });
 });

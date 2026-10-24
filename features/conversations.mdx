@@ -443,6 +443,15 @@ exactly once. A second `pan handoff start` on the same conversation, or one on
 a conversation that was never held, exits 1 with "No held kickoff: the
 conversation was already started or was never held".
 
+If the held conversation's session ends before you start it, its page shows
+**Held handoff — kickoff not sent** with the focus, the working directory, the
+handoff doc and the kickoff text. **Start** there does the same as
+`pan handoff start <conv>`: it relaunches the session and sends the kickoff.
+Resume Session is not offered, because a resume would start the agent without
+its kickoff. Held conversations, alive or ended, are listed in Awareness →
+Needs you under **Waiting** until you start or archive them; their **Open**
+button takes you to the conversation.
+
 ### Starting fresh
 
 `--fresh` starts a clean conversation that takes only the source's project, cwd, model and effort — not its context. No handoff document is authored, no summary is generated, the source transcript is never read, and the successor has no parent link (no `continues ← #<id>`). The focus is delivered verbatim as the successor's first message:

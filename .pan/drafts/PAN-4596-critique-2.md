@@ -1,0 +1,13 @@
+plan-digest: 28a52eefa4c1e1e6066cd8e294e6793102ed1bd99b86b5e433e80a967b72ae6b
+
+## blocks-the-design: A failed lookup removes Resume from saved conversations
+
+PRD WI-3, step 3 (line 203), suppresses the entire footer whenever `heldLookupPending` or `heldLookupFailed` is true. It does not require an empty timeline there. The warning branch in step 2 (line 187) *does* require `!hasTimelineActivity`, and the current footer contains the Resume control for ended conversations at `src/dashboard/frontend/src/components/chat/ConversationPanel.tsx` lines 1441–1464. Thus an ended conversation with saved transcript activity shows its timeline but loses Resume after any failed kickoff GET, with no visible Retry control. This contradicts the PRD's explicit non-goal of preserving timeline plus Resume for that case. Gate footer suppression for lookup states on `!hasTimelineActivity`, and test an ended conversation with activity whose kickoff GET fails.
+
+## blocks-the-design: A conversation switch can show the previous kickoff
+
+PRD WI-2 says the hook resets to `loading` on a name change, but its specified reset happens in an effect. The current hook stores unkeyed `state` and `heldRef` across prop changes (`src/dashboard/frontend/src/components/chat/heldKickoff.tsx` lines 35–60). `ConversationView` receives a changing `conversation` prop without a `key` at `src/dashboard/frontend/src/components/chat/ConversationPanel.tsx` lines 1025–1038. On the first render after switching from ended held A to ended empty B, the hook can still return A's `{ held: true, text }` and `status: 'ready'`; WI-3's `isHeldUnsent` predicate (PRD lines 181–182) then renders A's kickoff with B's name, cwd, and Start target until the effect runs. Key lookup state by conversation name and make the hook return `loading` with no held text synchronously when its stored name differs, or remount `ConversationView` by name. Add a same-mounted-panel switch test.
+
+## sharpens-framing: Not every failed delivery restores the hold
+
+PRD D4 and WI-3 promise a failed Start restores `held_kickoff` and presents a retryable held view. The door restores only when `ensureForkSessionReady` or `deliverForkSeed` throws (`src/lib/overdeck/conversation-kickoff.ts` lines 18–32). `deliverForkSeed` instead records `forkStatus='failed'` and returns when submission is stranded (`src/lib/overdeck/conversation-forks.ts` lines 333–345), so the kickoff remains claimed. The resulting failed fork has no held view or Start retry; its error directs the operator to the terminal to press Enter. Narrow FR-5 and D4 to failures that restore the hold, and specify the terminal path for a stranded submission so the implementation and tests do not assume every failed status is retryable.

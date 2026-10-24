@@ -67,6 +67,12 @@ the tracker, the PR and the terminal backend.
   state file and the report.
 - **Keep `main` green.** A red or unknown `main` is P0: every PR inherits the
   failing check.
+  > Main's CI verdict is the newest `CI` run on `main` that concluded `success` or
+  > `failure`: `gh run list --branch main --workflow CI --limit 20 --json headSha,status,conclusion --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][0]'`.
+  > Queued, in-progress and `cancelled` runs are no verdict (a newer push cancels a
+  > superseded run), and bookkeeping pushes (only `.pan/**` or
+  > `.overdeck/memory/**` changed) run no CI (PAN-4618), so the verdict's `headSha`
+  > is usually older than `origin/main` HEAD. That is expected, not "unknown".
 - **Fix at the root.** A workaround is a failed tick. File the substrate bug
   (`substrate-improvement` label) and launch its fix with `pan start`. Read the
   code to the exact `file:line` before you file: an issue that restates an
@@ -111,3 +117,9 @@ the tracker, the PR and the terminal backend.
   passes. Never admin-merge while `main` is red.
 - **Deploys.** Only after an Overdeck merge lands with green CI, and only
   through `pan reload`.
+  > Deploy with `pan reload` only when the newest `CI` run on `main` succeeded:
+  > `gh run list --branch main --workflow CI --limit 1 --json status,conclusion,headSha`
+  > must show `status: completed` and `conclusion: success`. Queued or in progress:
+  > wait for it. Cancelled: only an operator cancels the newest run, so ask; do not
+  > deploy. Bookkeeping commits run no CI (PAN-4618), so this run's `headSha` may be
+  > older than HEAD; the build is the same code.

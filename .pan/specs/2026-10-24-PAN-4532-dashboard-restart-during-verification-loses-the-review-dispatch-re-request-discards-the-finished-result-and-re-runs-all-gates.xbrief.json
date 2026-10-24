@@ -1,0 +1,217 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T12:41:09.000Z",
+    "author": "overdeck/0.69.0",
+    "description": "Plan for PAN-4532: Dashboard restart during verification loses the review dispatch; re-request discards the finished result and re-runs all gates",
+    "updated": "2026-10-24T12:43:02.644Z"
+  },
+  "plan": {
+    "id": "pan-4532",
+    "title": "Dashboard restart during verification loses the review dispatch; re-request discards the finished result and re-runs all gates",
+    "status": "proposed",
+    "uid": "764c7a70-d24e-486f-af0d-052efec16995",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-24T12:41:09.000Z",
+    "updated": "2026-10-24T12:43:02.644Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4532",
+        "label": "PAN-4532",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "verification",
+      "pipeline"
+    ],
+    "narratives": {
+      "Problem": "A verification worker survives a dashboard restart and writes passed, but its waiter died with the old process; the re-request ignored the finished result and re-ran every gate.",
+      "Proposal": "Adopt an unconsumed result whose verified head is the current head under the PAN-4527 same-head rule, record consumption so a result is used once, and re-attach request-review continuations to surviving workers on dashboard boot.",
+      "NonGoals": "- No change to deacon-lite recoverUndispatchedReviews\n- No adoption of merge-verification workers\n- No new HTTP route, CLI verb or setting"
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "adopt-result",
+        "title": "Adopt an unconsumed verification result for the current head",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T12:41:09.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4532",
+          "files_scope": [
+            "src/lib/cloister/verification-worker-supervisor.ts",
+            "src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "runSupervisedVerificationInternal returns an unconsumed, same-options, non-error result whose head is the current head, and marks it consumed."
+        },
+        "items": [
+          {
+            "id": "adopt-result.ac1",
+            "title": "Given a finished passed result for the current HEAD and no consumer, when review is re-requested, then no new worker starts and the result is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-result.ac2",
+            "title": "Given a finished result, when the agent has committed since, then a fresh worker starts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-result.ac3",
+            "title": "Given a result already consumed, or a result whose consumption write fails, when review is re-requested, then it is not adopted and a fresh worker runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-adoption",
+        "title": "Re-attach request-review continuations to surviving workers on boot",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T12:41:09.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4532",
+          "files_scope": [
+            "src/lib/cloister/verification-boot-adoption.ts",
+            "src/lib/cloister/verification-worker-supervisor.ts",
+            "src/lib/cloister/request-review-pipeline.ts",
+            "src/dashboard/server/main.ts",
+            "src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "adoptSurvivingVerificationWorkers lists live or unconsumed request-review workers and starts the request-review pipeline for each with source verification-adoption; main.ts calls it on boot."
+        },
+        "items": [
+          {
+            "id": "boot-adoption.ac1",
+            "title": "Given worker states on disk, when listAdoptableVerificationWorkers runs, then it lists only running and unconsumed request-review workers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-adoption.ac2",
+            "title": "Given a live request-review worker at dashboard boot, when it later writes passed, then review dispatches with no re-request and no new worker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document that verification survives a dashboard restart",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T12:41:09.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4532",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "npm run lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add the 'Verification survives a dashboard restart' subsection and a note in the deacon-lite undispatched-review paragraph."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/PIPELINE-GATES.md, when the restart subsection is read, then it states that a surviving worker's result is adopted, not re-run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given docs/PIPELINE-GATES.md, when the deacon-lite undispatched-review paragraph is read, then it states that boot adoption usually dispatches the review first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given docs/PIPELINE-GATES.md, when the restart subsection is read, then it states the fallback cases and that pre-PAN-4532 workers are not adopted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "adopt-result",
+        "to": "boot-adoption",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-24-PAN-4532-dashboard-restart-during-verification-loses-the-review-dispatch-re-request-discards-the-finished-result-and-re-runs-all-gates.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}

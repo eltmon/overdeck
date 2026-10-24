@@ -80,6 +80,17 @@ describe('resolveFeatureStateBadge', () => {
     expect(resolveFeatureStateBadge({})).toBeNull();
   });
 
+  // PAN-4605: an outside PR overrides the plain state badge; the fix is the tooltip.
+  it('shows Review never started for an outside PR, with the fix as the title', () => {
+    const fix = 'PR #7 (feature/pan-1) was opened outside a pipeline workspace. Run `pan review request PAN-1`.';
+    expect(resolveFeatureStateBadge({ restState: 'in-review', prOutsidePipeline: { prNumber: 7, fix } })).toEqual({
+      key: 'pr-outside-pipeline',
+      label: 'Review never started',
+      tone: 'human',
+      title: fix,
+    });
+  });
+
   // PAN-4399: a work-start read overrides the plain state badge, since the
   // operator needs to know the auto-start itself is the story, not "Working".
   it('shows Work agent not started for a not-started workStart', () => {

@@ -285,6 +285,13 @@ describe('forge shape translation', () => {
     expect(toChecksState([{ status: 'COMPLETED', conclusion: 'FAILURE' }])).toBe('red');
     expect(toChecksState([{ status: 'IN_PROGRESS' }])).toBe('pending');
   });
+
+  it('honors a commit status row\'s state (PAN-4589)', () => {
+    expect(toChecksState([{ state: 'FAILURE' }])).toBe('red');
+    expect(toChecksState([{ state: 'ERROR' }])).toBe('red');
+    expect(toChecksState([{ state: 'PENDING' }])).toBe('pending');
+    expect(toChecksState([{ state: 'SUCCESS' }, { status: 'COMPLETED', conclusion: 'SUCCESS' }])).toBe('green');
+  });
 });
 
 describe('deriveIssueState — an open PR is always the pipeline\'s move', () => {
@@ -320,7 +327,7 @@ describe('forge shape translation — GitLab', () => {
       detailed_merge_status: 'mergeable', approved: true, head_pipeline: { status: 'success' },
     })).toEqual({
       url: 'https://gitlab.com/g/r/-/merge_requests/7', number: 7,
-      reviewState: 'approved', checks: 'green', mergeable: true, merged: false, headSha: null,
+      reviewState: 'approved', checks: 'green', mergeable: true, merged: false, headSha: null, isDraft: false,
     });
     expect(mrFromGlabRow({ iid: 7, state: 'opened', has_conflicts: true })?.mergeable).toBe(false);
     expect(mrFromGlabRow({ iid: 7, state: 'merged' })?.merged).toBe(true);

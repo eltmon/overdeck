@@ -1,0 +1,240 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T13:38:53.000Z",
+    "author": "overdeck/0.69.0",
+    "description": "Plan for PAN-4527: Re-review joins a verification worker started on the previous head and fails the new head on the old head's CI result",
+    "updated": "2026-10-24T13:47:54.412Z"
+  },
+  "plan": {
+    "id": "pan-4527",
+    "title": "Re-review joins a verification worker started on the previous head and fails the new head on the old head's CI result",
+    "status": "running",
+    "uid": "596a9dca-0273-4cbf-bbf9-6585bcedaf6c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-24T13:38:53.000Z",
+    "updated": "2026-10-24T13:47:54.412Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4527",
+        "label": "PAN-4527",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "verification",
+      "pipeline"
+    ],
+    "narratives": {
+      "Problem": "A re-review after a fix push joined the verification worker started on the previous head, because the review path treated every head as the same head; the worker then failed the new head with the old head's red CI result.",
+      "Proposal": "Add one same-head rule (cloister/verification-head.ts): a later head is the launch head when it has not moved or is the worker's own target-branch sync merge; an agent commit is a moved head. The supervisor joins only on the same head and otherwise kills the old worker and starts fresh; the runner reads the CI test verdict for the head it verifies now.",
+      "NonGoals": "- No change to merge verification's exact-anchor join rule beyond using the shared classifier\n- No change to isVerificationWorkerActive or deacon-lite recovery\n- No change to the verification artifact head8 label"
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "head-rule",
+        "title": "Add the shared same-head classifier for verification",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T13:38:53.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4527",
+          "files_scope": [
+            "src/lib/cloister/verification-head.ts",
+            "src/lib/cloister/__tests__/verification-head.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/verification-head.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run src/lib/cloister/__tests__/verification-head.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "classifyVerificationHead returns same, synced, moved or unknown for a later head against a launch head, per repo for polyrepo anchors."
+        },
+        "items": [
+          {
+            "id": "head-rule.ac1",
+            "title": "Given the verification-head test repos, when classifyVerificationHead compares an unchanged head with the launch head, then it returns same",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-rule.ac2",
+            "title": "Given the verification-head test repos, when the later head is the worker's sync merge or a fast-forward on origin, then it returns synced, and an agent commit returns moved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-join",
+        "title": "Join a live verification worker only on the same head",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T13:38:53.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4527",
+          "files_scope": [
+            "src/lib/cloister/verification-worker-supervisor.ts",
+            "src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "runSupervisedVerificationInternal joins a live worker only when the requested head is its same or synced head; an agent commit kills it and starts fresh."
+        },
+        "items": [
+          {
+            "id": "supervisor-join.ac1",
+            "title": "Given a live review-verification worker launched on head A, when a request arrives at agent commit B, then the supervisor kills the A worker and starts a fresh worker on B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-join.ac2",
+            "title": "Given a live review-verification worker whose only HEAD change is its own sync merge, when a duplicate request arrives, then the request joins the live worker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runner-ci-head",
+        "title": "Read the CI test verdict for the head being verified",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T13:38:53.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4527",
+          "files_scope": [
+            "src/lib/cloister/verification-runner.ts",
+            "tests/unit/lib/cloister/verification-tests-on-ci.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-tests-on-ci.test.ts"
+          ],
+          "expected_outputs": [
+            "npx vitest run tests/unit/lib/cloister/verification-tests-on-ci.test.ts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In ci tests mode the runner reads the CI test result for the launch head while HEAD is same or synced, otherwise for the current head."
+        },
+        "items": [
+          {
+            "id": "runner-ci-head.ac1",
+            "title": "Given CI recorded failed for head A and passed for head B, when verification of B reaches the ci-mode test gate, then test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runner-ci-head.ac2",
+            "title": "Given a red CI head with only a real target-branch sync merge on top, when verification reaches the ci-mode test gate, then test fails with that head's CI verdict",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document when a re-review joins or restarts a live worker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T13:38:53.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4527",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "npm run lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add the 'Same head: joining or restarting a live worker' subsection to the verification gate section."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/PIPELINE-GATES.md, when the Same head subsection is read, then it states that a re-review joins a live worker on the same or synced head",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given docs/PIPELINE-GATES.md, when the Same head subsection is read, then it states that an agent commit kills the live worker and starts a fresh one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-10-24-PAN-4527-re-review-joins-a-verification-worker-started-on-the-previous-head-and-fails-the-new-head-on-the-old-head-s-ci-result.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

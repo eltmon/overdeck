@@ -29,6 +29,7 @@ import { startCodexPluginImporter, stopCodexPluginImporter } from './services/co
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startUatTrainReconciler, stopUatTrainReconciler } from './services/uat-train.js';
 import { runAutoMergeSchedulerTick } from './services/auto-merge-scheduler.js';
+import { runApprovalAtHeadRefreshTick } from './services/approval-at-head-refresh.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
 import { refreshTtsRuntimeConfig } from './services/tts-runtime-config.js';
@@ -44,6 +45,7 @@ import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overd
 import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
+import { adoptSurvivingVerificationWorkers } from '../../lib/cloister/verification-boot-adoption.js';
 import { setAgentStoppedNotifier, setAgentStatusChangedNotifier } from '../../lib/cloister/deacon-lite.js';
 import { getAgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
@@ -495,8 +497,15 @@ if (!isPeerDashboard && startCodexPluginImporter()) {
 // PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
 // times. Gated per-tick on the merge-train setting; there is no flywheel run
 // to wait for (PAN-3917 D12). #3983: the same tick schedules auto-merges for
-// ready, opted-in PRs; the auto-merge executor then merges them.
-if (startUatTrainReconciler({ onTick: () => runAutoMergeSchedulerTick() })) {
+// ready, opted-in PRs; the auto-merge executor then merges them. PAN-4597: it
+// also re-asks the merge gate for approved, green PRs, so `ready` (Awaiting
+// Merge, the issue view's Merge to main) does not decay after five minutes.
+if (startUatTrainReconciler({
+  onTick: () => Promise.all([
+    runAutoMergeSchedulerTick().catch((err) => console.warn('[auto-merge] scheduler tick failed:', err instanceof Error ? err.message : err)),
+    runApprovalAtHeadRefreshTick().catch((err) => console.warn('[approval-refresh] tick failed:', err instanceof Error ? err.message : err)),
+  ]),
+})) {
   console.log('[overdeck] UAT batch-train reconciler started');
 } else {
   console.log('[overdeck] UAT batch-train reconciler skipped — non-primary dashboard process');
@@ -917,6 +926,22 @@ if (startBlockerWakePatrol()) {
 // that died. A verification result IS its artifact — an interrupted run simply
 // left none, so the next gate run re-verifies. There is no stored status to
 // reconcile.
+// PAN-4532: a verification worker that outlived the previous process still
+// owes its review dispatch. Re-attach the request-review continuation to every
+// worker still running or holding an unconsumed result; the supervisor joins
+// or adopts it rather than re-running the gates.
+if (!isPeerDashboard) {
+  void adoptSurvivingVerificationWorkers()
+    .then((issues) => {
+      if (issues.length > 0) {
+        console.log(`[overdeck] Re-attached review dispatch to ${issues.length} surviving verification worker(s): ${issues.join(', ')}`);
+        emitActivityEntry({ source: 'dashboard', level: 'info', message: `Re-attached review dispatch to surviving verification workers: ${issues.join(', ')}` });
+      }
+    })
+    .catch((err: unknown) => {
+      console.warn('[overdeck] Failed to adopt surviving verification workers:', err);
+    });
+}
 
 if (isPeerDashboard) {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');

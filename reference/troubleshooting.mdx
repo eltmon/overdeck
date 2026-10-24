@@ -409,6 +409,16 @@ tmux send-keys -t agent-min-123 "Your message"
 
 ## Command Deck Issues
 
+### "Review never started" under Needs you
+
+The issue has an open `feature/<issue>` pull request, but no pipeline
+workspace picked it up, so nothing has verified or reviewed it. This usually
+means the PR was pushed from a handoff worktree. Run `pan show <id>`: the
+`fix` line gives the exact commands. When another worktree still has the
+branch checked out, remove that worktree once its session is finished, then
+run `pan review request <id>`. Overdeck then adopts the branch into a
+workspace and starts verification.
+
 ### Command Deck shows "Unknown project"
 
 A URL such as `/command-deck/<slug>` shows an **Unknown project** state when
