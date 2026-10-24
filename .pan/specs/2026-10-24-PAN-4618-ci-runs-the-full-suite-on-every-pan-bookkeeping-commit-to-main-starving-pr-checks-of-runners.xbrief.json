@@ -4,17 +4,17 @@
     "created": "2026-10-24T11:38:47Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4618: CI runs the full suite on every .pan/ bookkeeping commit to main, starving PR checks of runners",
-    "updated": "2026-10-24T12:04:31.644Z"
+    "updated": "2026-10-24T12:05:29.696Z"
   },
   "plan": {
     "id": "pan-4618",
     "title": "CI runs the full suite on every .pan/ bookkeeping commit to main, starving PR checks of runners",
-    "status": "proposed",
+    "status": "running",
     "uid": "4d937d1f-8605-4169-9472-26545fa59f51",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T11:38:47Z",
-    "updated": "2026-10-24T12:04:31.644Z",
+    "updated": "2026-10-24T12:05:29.696Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4618",
@@ -750,5 +750,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
