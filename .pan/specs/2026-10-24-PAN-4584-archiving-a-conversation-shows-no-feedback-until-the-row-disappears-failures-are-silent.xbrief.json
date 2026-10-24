@@ -4,17 +4,17 @@
     "created": "2026-10-24T08:00:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4584: Archiving a conversation shows no feedback until the row disappears; failures are silent",
-    "updated": "2026-10-24T07:24:02.847Z"
+    "updated": "2026-10-24T07:24:46.817Z"
   },
   "plan": {
     "id": "pan-4584",
     "title": "Archiving a conversation shows no feedback until the row disappears; failures are silent",
-    "status": "proposed",
+    "status": "running",
     "uid": "afb0b185-ee1a-4c74-a51d-48aad99119f0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T08:00:00Z",
-    "updated": "2026-10-24T07:24:02.847Z",
+    "updated": "2026-10-24T07:24:46.817Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4584",
@@ -483,5 +483,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
