@@ -3,6 +3,10 @@ name: CI
 on:
   push:
     branches: [main]
+    # PAN-4618: ~95% of main commits are bookkeeping (.pan/** plan/task state,
+    # .overdeck/memory/** curated facts) with no code change to verify. Skip
+    # CI on those pushes so they don't starve PR checks of runners.
+    paths-ignore: ['.pan/**', '.overdeck/memory/**']
   pull_request:
     branches: [main]
 
