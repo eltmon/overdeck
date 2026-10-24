@@ -198,3 +198,88 @@ describe('the batch door reads ready from the merge gate', () => {
     expect((await load('APPROVED', () => undefined)).get('PAN-7')?.state).toBe('in-review');
   });
 });
+
+// PAN-4605: the batch door asks about an outside PR only for an open,
+// non-draft PR on exactly the issue's pipeline branch.
+describe('the batch door derives an outside PR', () => {
+  const row = (overrides: Record<string, unknown> = {}) => ({
+    number: 7, url: 'https://github.com/o/r/pull/7', state: 'OPEN', headRefName: 'feature/pan-1', headRefOid: sha('a'),
+    mergeable: 'MERGEABLE', reviewDecision: '', statusCheckRollup: [], isDraft: false, ...overrides,
+  });
+  let projectPath: string;
+
+  beforeEach(() => {
+    projectPath = mkdtempSync(join(tmpdir(), 'derived-issue-state-outside-'));
+    git.handler = () => '';
+  });
+
+  afterEach(() => {
+    rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  const load = (prRow: Record<string, unknown>, readPrOutsidePipeline: ReturnType<typeof vi.fn>) =>
+    loadIssueStatesForProject(projectPath, ['PAN-1'], {
+      panes: [],
+      issues: openIssues(['PAN-1']),
+      listPullRequests: async () => [prRow],
+      approvalAtHead: () => undefined,
+      readPrOutsidePipeline: readPrOutsidePipeline as never,
+    });
+
+  it('sets the attention from the injected read for a qualifying PR', async () => {
+    const detail = { prNumber: 7, fix: 'Run `pan review request PAN-1`.' };
+    const read = vi.fn(async () => detail);
+
+    const states = await load(row(), read);
+
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledWith(expect.objectContaining({ issueId: 'PAN-1', projectPath, prNumber: 7 }));
+    expect(states.get('PAN-1')?.attention).toBe('pr-outside-pipeline');
+    expect(states.get('PAN-1')?.prOutsidePipeline).toEqual(detail);
+  });
+
+  it('never asks for a draft, a merged, or a mixed-case-branch PR', async () => {
+    for (const prRow of [
+      row({ isDraft: true }),
+      row({ state: 'MERGED', mergedAt: '2026-10-24T00:00:00Z' }),
+      row({ headRefName: 'feature/PAN-1' }),
+    ]) {
+      const read = vi.fn(async () => ({ prNumber: 7, fix: 'x' }));
+      const states = await load(prRow, read);
+      expect(read).not.toHaveBeenCalled();
+      expect(states.get('PAN-1')?.attention).toBeUndefined();
+    }
+  });
+});
+
+describe('the batch door lists worktrees once (PAN-4605)', () => {
+  let projectPath: string;
+
+  beforeEach(() => {
+    projectPath = mkdtempSync(join(tmpdir(), 'derived-issue-state-worktrees-'));
+    git.calls.length = 0;
+    git.handler = () => '';
+  });
+
+  afterEach(() => {
+    rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  it('runs git worktree list at most once for two qualifying issues', async () => {
+    const prRow = (n: number) => ({
+      number: n, url: `https://github.com/o/r/pull/${n}`, state: 'OPEN', headRefName: `feature/pan-${n}`, headRefOid: sha('a'),
+      mergeable: 'MERGEABLE', reviewDecision: '', statusCheckRollup: [], isDraft: false,
+    });
+
+    const states = await loadIssueStatesForProject(projectPath, ['PAN-1', 'PAN-2'], {
+      panes: [],
+      issues: openIssues(['PAN-1', 'PAN-2']),
+      listPullRequests: async () => [prRow(1), prRow(2)],
+      approvalAtHead: () => undefined,
+    });
+
+    expect(git.calls.filter((args) => args[0] === 'worktree')).toHaveLength(1);
+    expect(states.get('PAN-1')?.attention).toBe('pr-outside-pipeline');
+    expect(states.get('PAN-2')?.attention).toBe('pr-outside-pipeline');
+  });
+});

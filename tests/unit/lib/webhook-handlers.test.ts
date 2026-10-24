@@ -34,6 +34,8 @@ const mockEnqueueProjectResourceRefresh = vi.fn();
 const mockRelayCiFailureFeedback = vi.fn(async () => ({ agentMessageSent: false }));
 const mockRecordCiTestGatePass = vi.fn(async () => true);
 const mockGetPrFacts = vi.fn();
+const mockAdopt = vi.fn(async (..._args: unknown[]) => ({ kind: 'started', workspacePath: '/tmp/test-project/workspaces/feature-pan-1' }));
+const mockRefreshIssuePullRequestStateNow = vi.fn();
 
 vi.mock('../../../src/dashboard/server/services/pr-tab-cache.js', () => ({
   bumpIssuePrTabCacheGeneration: (...args: Parameters<typeof mockBumpIssuePrTabCacheGeneration>) =>
@@ -81,6 +83,14 @@ vi.mock('../../../src/lib/projects.js', () => ({
 vi.mock('../../../src/dashboard/server/services/project-resource-refresh-queue.js', () => ({
   enqueueProjectResourceRefresh: (...args: Parameters<typeof mockEnqueueProjectResourceRefresh>) =>
     mockEnqueueProjectResourceRefresh(...args),
+}));
+
+vi.mock('../../../src/lib/cloister/pr-adoption-review.js', () => ({
+  adoptPrAndStartReview: (...args: unknown[]) => mockAdopt(...args),
+}));
+
+vi.mock('../../../src/dashboard/server/services/issue-pr-refresh.js', () => ({
+  refreshIssuePullRequestStateNow: (...args: unknown[]) => mockRefreshIssuePullRequestStateNow(...args),
 }));
 
 vi.mock('../../../src/lib/activity-logger.js', () => ({
@@ -514,6 +524,59 @@ describe('handlePullRequest → review pipeline (PAN-3917 W12)', () => {
       action: 'opened',
       pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } },
     }))).resolves.toBeUndefined();
+  });
+
+  it('adopts the PR into a workspace when the starter answers no-workspace (PAN-4605)', async () => {
+    startReview.mockResolvedValue({ started: false, reason: 'no-workspace' } as never);
+
+    await handlePullRequest(makePayload({
+      action: 'opened',
+      pull_request: { number: 9, head: { ref: 'feature/pan-1', sha: 'f00d' }, draft: false },
+    }));
+
+    expect(mockAdopt).toHaveBeenCalledTimes(1);
+    expect(mockAdopt).toHaveBeenCalledWith(
+      { issueId: 'PAN-1', number: 9, headRef: 'feature/pan-1', headSha: 'f00d', repo: 'test-owner/test-repo' },
+      { source: 'webhook', startReview },
+    );
+  });
+
+  it('does not adopt for any other review-start refusal (PAN-4605)', async () => {
+    startReview.mockResolvedValueOnce({ started: false, reason: 'dirty-workspace', error: 'bun.lock' } as never);
+    startReview.mockResolvedValueOnce({ started: false, reason: 'already-running' } as never);
+
+    for (let delivery = 0; delivery < 2; delivery += 1) {
+      await handlePullRequest(makePayload({
+        action: 'opened',
+        pull_request: { number: 9, head: { ref: 'feature/pan-1', sha: 'f00d' } },
+      }));
+    }
+
+    expect(startReview).toHaveBeenCalledTimes(2);
+
+    expect(mockAdopt).not.toHaveBeenCalled();
+  });
+
+  it('an adopter that rejects does not fail the webhook (PAN-4605)', async () => {
+    startReview.mockResolvedValue({ started: false, reason: 'no-workspace' } as never);
+    mockAdopt.mockRejectedValueOnce(new Error('adoption blew up'));
+
+    await expect(handlePullRequest(makePayload({
+      action: 'opened',
+      pull_request: { number: 9, head: { ref: 'feature/pan-1', sha: 'f00d' } },
+    }))).resolves.toBeUndefined();
+  });
+
+  it('refreshes the issue PR state now on opened and ready_for_review (PAN-4605)', async () => {
+    for (const action of ['opened', 'ready_for_review']) {
+      await handlePullRequest(makePayload({
+        action,
+        pull_request: { number: 9, head: { ref: 'feature/pan-1', sha: 'f00d' } },
+      }));
+    }
+
+    expect(mockRefreshIssuePullRequestStateNow).toHaveBeenCalledTimes(2);
+    expect(mockRefreshIssuePullRequestStateNow).toHaveBeenCalledWith('PAN-1');
   });
 
   it('no registered starter is not a failure', async () => {

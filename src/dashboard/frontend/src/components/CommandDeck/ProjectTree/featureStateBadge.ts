@@ -1,4 +1,4 @@
-import type { DerivedWorkStart, IssueState, PipelineBucket, SessionNode } from '@overdeck/contracts';
+import type { DerivedPrOutsidePipeline, DerivedWorkStart, IssueState, PipelineBucket, SessionNode } from '@overdeck/contracts';
 
 export type FeatureStateTone = 'rest' | 'machine' | 'specialist' | 'human' | 'outcome';
 
@@ -19,6 +19,8 @@ export interface FeatureStateBadgeInput {
   rawTrackerState?: string;
   /** PAN-4399: the workspace journal's read on a post-planning auto-start. */
   workStart?: DerivedWorkStart | null;
+  /** PAN-4605: an open PR the pipeline never picked up. */
+  prOutsidePipeline?: DerivedPrOutsidePipeline | null;
 }
 
 const STATE_BADGES: Record<IssueState, Omit<FeatureStateBadge, 'key'>> = {
@@ -53,6 +55,9 @@ export function resolveFeatureStateBadge(input: FeatureStateBadgeInput): Feature
   }
 
   if (state !== null) {
+    if (input.prOutsidePipeline) {
+      return { key: 'pr-outside-pipeline', label: 'Review never started', tone: 'human', title: input.prOutsidePipeline.fix };
+    }
     if (input.workStart?.status === 'not-started') {
       return {
         key: 'work-not-started',

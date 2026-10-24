@@ -25,6 +25,38 @@ verdict, every time it's asked.
 > when it is the only one: that batch is the UAT stack the operator tests on.
 > An `auto-merge` label releases the feature in a held project.
 
+### Merging from the Flywheel UAT card (PAN-4598)
+
+The Flywheel page's UAT BATCHES card (`MergeTrainView`) is the merge control.
+
+1. **A batch exists.** Ready features gather into a UAT batch. Click
+   **Start & open UAT frontend** to run the batch's test stack, work through
+   its "What to UAT" checklist, then click **Merge batch (N) to main**. That
+   lands exactly the tree you tested. The small "Merge one feature to main…"
+   escape hatch stays below the rows for the rare case where one feature must
+   go first.
+2. **No tested batch exists.** This covers a batch that is still assembling,
+   a lone feature in a project that does not hold for UAT, and a failed
+   assembly. Each ready row then shows its own **Merge** button. It posts
+   `/api/merge-train/merge-next` with `{ n: 1, project, issueId }`, so the
+   merge gate re-checks that one feature and the issue closes out through the
+   normal post-merge flow. An `issueId` outside the project's ready set gets
+   a 409.
+3. **The last assembly failed.** The card names the failed batch and its time
+   instead of promising a batch. It offers **Retry batch assembly**, which is
+   a forced `/api/merge-train/assemble` for that project, next to the row
+   Merge buttons.
+
+**Failed assemblies stop blocking after six hours.** After three consecutive
+failed assemblies, the reconciler stops and logs `BLOCKED` instead of burning
+a worktree on every retry (PAN-3963). Only failures from the last
+`FAILED_STREAK_WINDOW_MS` (6 hours) count toward that streak. Before
+PAN-4598 the streak had no age bound: three failures on 2026-09-20 (caused by
+the `issues` foreign key that the same PAN-3963 fix dropped) blocked every
+batch for every later tick, because no newer row could ever form to break the
+streak. A fixed cause now heals itself within the window, and **Retry batch
+assembly** bypasses the cutoff at once.
+
 **Grant labels are operator-only.** `released`, `auto-merge` and `hold-for-uat`
 carry operator decisions. The agent `gh` shim refuses to add or remove them
 (`gh issue|pr edit|create` label flags and `gh api` writes on
@@ -58,7 +90,15 @@ bypasses it.
    [`src/lib/cloister/request-review-pipeline.ts`](../src/lib/cloister/request-review-pipeline.ts),
    never by importing a route, and `requestReviewPipeline.isInFlight` coalesces
    it with the request `pan done` just made. The webhook path logs and returns
-   on every failure — it never throws.
+   on every failure — it never throws. When the issue has no pipeline
+   workspace (the PR was pushed from a handoff worktree), the webhook adopts
+   the PR branch into one through
+   [`src/lib/cloister/pr-adoption-review.ts`](../src/lib/cloister/pr-adoption-review.ts)
+   and then starts the pipeline. When adoption is refused (the branch is
+   checked out in another worktree, the head moved, or the local branch
+   diverged), the issue shows "Review never started" under Needs you with the
+   exact fix. See
+   [A PR opened outside a pipeline workspace](PIPELINE-GATES.md#a-pr-opened-outside-a-pipeline-workspace-pan-4605).
 3. **Review and test.** The four reviewer roles (correctness, security,
    performance, requirements) post PR reviews — approve or request changes.
    Verification (typecheck, lint, tests) runs as check runs on the PR.

@@ -1,0 +1,17 @@
+plan-digest: 441499ac4c3cc7e5482369b7b434906cd2fcb5e1c57418bd7ac8196825bd2510
+
+## blocks-the-design: PR lookup uses an unregistered quota caller
+
+The PRD's WI-5 specifies `runGh(..., { caller: 'pr-adoption' })` at `.pan/drafts/PAN-4605.md:511-514`. `runGh` types `caller` as `GitHubQuotaCaller` (`src/lib/github-quota/run-gh.ts:47-49`), and the closed list at `packages/contracts/src/github-quota.ts:15-29` has no `pr-adoption`. Implementing the specified call fails typecheck. Use an existing appropriate caller such as `pr-sync`, or add `pr-adoption` to the contract and classify its pause behavior; include that contract file in WI-5's scope and acceptance check if adding it.
+
+## blocks-the-design: a metadata directory can masquerade as a workspace
+
+WI-7 passes `getWorkspaceInfoForIssue(id).exists` to `answerMissingWorkspace` (`.pan/drafts/PAN-4605.md:599-607`), but that resolver returns `exists: true` for any directory at the canonical path (`src/dashboard/server/routes/workspaces.ts:394-405`). `createWorkspace` explicitly handles a pre-worktree directory containing only orchestration metadata (`src/lib/workspace-manager/create.ts:260-279`), and WI-3 itself says a usable local workspace requires `.git` (`.pan/drafts/PAN-4605.md:287-294`). In this real case the route skips adoption; the webhook starter also sees `exists: true` (`src/dashboard/server/routes/workspaces/review-pipeline.ts:233-240`) and cannot return `no-workspace` to WI-6. Define one usable-worktree check and use it in both entry points, while allowing `createWorkspace` to stage the metadata as it already does. Test a canonical directory containing metadata but no `.git` through the route and webhook paths.
+
+## blocks-the-design: later journal activity clears an unresolved refusal
+
+D6 and WI-3 keep the alert only if the workspace journal's *last overall entry* is `workspace.adoption-failed` (`.pan/drafts/PAN-4605.md:107-114,319-325`). The journal accepts other event types, including operator decisions and feedback (`src/lib/cloister/pipeline-journal.ts:33-45`), and `lastPipelineEntry(ws)` without a prefix returns the last entry of any type (`src/lib/cloister/pipeline-journal.ts:158-167`). Thus any unrelated append after a failed review start hides the Needs-you alert even though no `review.requested` occurred. Compare the latest adoption failure with the latest accepted `review.requested` for that PR instead of testing the last overall entry; test a refusal followed by an unrelated journal entry.
+
+## blocks-the-design: refreshing the derived PR cache misses PR-only membership
+
+WI-6 claims the webhook refresh makes a newly opened outside PR visible immediately (`.pan/drafts/PAN-4605.md:569-576`), and the PRD explicitly relies on PR-only issues gaining a Command Deck row (`.pan/drafts/PAN-4605.md:751-758`). `refreshIssuePullRequestStateNow` invalidates only the derived-state PR cache (`src/dashboard/server/services/issue-pr-refresh.ts:10-15`). Resource discovery gets PR-only membership from the separately cached `listOpenPullRequestsSnapshot` (`src/dashboard/server/services/resource-discovery.ts:325-345,666-669`), whose 30-second cache has no invalidation in this plan (`src/lib/pipeline-membership-gather.ts:70-89`). An `opened` resource refresh can therefore reuse a pre-open empty snapshot and publish no row; the derived refresh cannot add a Command Deck row by itself. Invalidate that open-PR snapshot before the event-triggered resource refresh, or pass the webhook PR into membership, and test an opened event after a cached empty snapshot.
