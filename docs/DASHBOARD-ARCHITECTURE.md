@@ -50,6 +50,11 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   the client acks `ready`, and only then does live data flow (`readyForLiveData` in XTerminal.tsx);
   unready clients are closed with `terminal-ready-timeout`. On a Herdr terminal the snapshot `data`
   starts with `\x1b[?2004h` (PAN-4557), because the client resets xterm before writing it.
+- The Herdr bridge (`HerdrTerminalProcess`) opens `control` at attach with the client's own size
+  (PAN-4582) — only a control attach resizes the PTY, and only control frames follow a later
+  resize, so the viewer and the PTY stay in sync and long lines no longer clip. A second viewer of
+  the same terminal gets its control attach refused and is served read-only from `observe` instead,
+  at the size it opened with.
 - App-level heartbeat (PAN-4434): a client that opts in with `?heartbeat=1` on the upgrade URL
   receives a `\u0000{"type":"ping"}` control frame every 20s from connection onward (across the
   attach/respawn wait) and must answer `{"type":"pong"}`; any inbound message resets the missed-interval
