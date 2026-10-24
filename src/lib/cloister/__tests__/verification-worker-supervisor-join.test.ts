@@ -14,7 +14,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   workspace: '',
   launches: [] as Array<{ resultPath: string }>,
+  failConsumptionWrite: false,
 }));
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    writeFileSync: (...args: Parameters<typeof actual.writeFileSync>) => {
+      if (mocks.failConsumptionWrite && String(args[1]).includes('resultConsumedAt')) throw new Error('ENOSPC');
+      return actual.writeFileSync(...args);
+    },
+  };
+});
 
 vi.mock('../../project-repos.js', () => ({
   resolveWorkspaceRepoRoots: () => [{
@@ -128,6 +140,7 @@ beforeEach(() => {
   const origin = join(root, 'origin.git');
   mocks.workspace = join(root, 'workspace');
   mocks.launches = [];
+  mocks.failConsumptionWrite = false;
   execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin]);
   execFileSync('git', ['clone', '-q', origin, mocks.workspace], { stdio: 'ignore' });
   git('checkout', '-q', '-b', 'main');
@@ -263,6 +276,14 @@ describe('adopting an unconsumed result (PAN-4532)', () => {
     expect(await joinAndFinish(liveResult, review)).toEqual({ outcome: 'passed' });
     vi.useRealTimers();
     alivePids.delete(LIVE_PID);
+
+    expect(await review()).toEqual({ outcome: 'passed' });
+    expect(mocks.launches).toHaveLength(1);
+  });
+
+  it('a result whose consumption cannot be recorded is not adopted: a fresh worker runs', async () => {
+    registerFinishedWorker(commit('a'));
+    mocks.failConsumptionWrite = true;
 
     expect(await review()).toEqual({ outcome: 'passed' });
     expect(mocks.launches).toHaveLength(1);

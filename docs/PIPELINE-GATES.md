@@ -414,6 +414,17 @@ worker already ran:
   the original request would have. A `review` (`/trigger`) or `merge-verify`
   worker is not re-attached; its door owns the retry.
 
+When either mechanism cannot apply, the old recovery still runs, and it re-runs
+the gates. The supervisor refuses to adopt a result whose consumption it could
+not write to the state file, so one result never dispatches twice. A worker
+started by a dashboard older than PAN-4532 has no `logPrefix` or `options`, so
+it is neither re-attached nor adopted on the restart that deploys this change.
+If boot adoption is refused (for example, the workspace is dirty) or the
+dashboard dies again between taking the result and dispatching review, the
+deacon-lite patrols re-request the review. `recoverUndispatchedReviews` covers
+a `verification.passed` tail, and `recoverStalledReviews` covers a
+`review.requested` tail older than 15 minutes.
+
 ## Verification artifacts (FR-8)
 
 Each verification run writes an immutable artifact named by run time and
