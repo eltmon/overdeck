@@ -237,6 +237,27 @@ describe('updateUatGeneration patch', () => {
     expect(loaded.baseSha).toBe('abc123');
   });
 
+  it('keeps a failed row\'s updated_at when cleanup later stamps cleanedAt (PAN-4598)', () => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    seedIssue(db, 'PAN-2');
+
+    const gen = makeGeneration();
+    insertUatGeneration(gen);
+    updateUatGeneration(gen.name, { status: 'failed' });
+    const failedAtMs = Date.parse('2026-09-20T18:20:00.000Z');
+    db.prepare('UPDATE uat_generations SET updated_at = ? WHERE name = ?').run(failedAtMs, gen.name);
+
+    updateUatGeneration(gen.name, { cleanedAt: '2026-09-20T19:14:24.000Z' });
+    const cleaned = getUatGeneration(gen.name)!;
+    expect(cleaned.cleanedAt).toBe('2026-09-20T19:14:24.000Z');
+    expect(cleaned.updatedAt).toBe('2026-09-20T18:20:00.000Z');
+
+    // A lifecycle change that also stamps cleanedAt (cleanup trimming a ready row) still bumps it.
+    updateUatGeneration(gen.name, { status: 'invalidated', cleanedAt: '2026-09-20T19:15:00.000Z' });
+    expect(Date.parse(getUatGeneration(gen.name)!.updatedAt)).toBeGreaterThan(failedAtMs);
+  });
+
   it('is a no-op with an empty patch', () => {
     const db = odb.raw();
     seedIssue(db, 'PAN-1');
