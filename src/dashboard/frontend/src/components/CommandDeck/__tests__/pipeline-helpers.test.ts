@@ -88,6 +88,22 @@ describe('needs-you classification', () => {
   });
 });
 
+// PAN-4605: a PR the pipeline never picked up is a Needs-you reason, and the
+// subline carries the exact fix.
+describe('pr-outside-pipeline classification (PAN-4605)', () => {
+  it('is a needs-you feature and its subline carries the fix', () => {
+    const feature = makeFeature();
+    const fix = 'PR #7 (feature/pan-1) is checked out in /home/me/hoff. Run `pan review request PAN-1`.';
+    const derived = derivedState('in-review', {
+      attention: 'pr-outside-pipeline',
+      prOutsidePipeline: { prNumber: 7, fix, worktreePath: '/home/me/hoff' },
+    });
+
+    expect(isNeedsYouFeature(feature, derived)).toBe(true);
+    expect(sublineFor(makeBucket(feature, derived))).toBe(`review never started — ${fix}`);
+  });
+});
+
 // PAN-4399: a not-started work-start is its own Needs-you reason; a retrying
 // one stays out of Needs-you but still explains the "work" phase subline.
 describe('work-not-started classification (PAN-4399)', () => {

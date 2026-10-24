@@ -632,6 +632,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     pipelineBucket: feature.pipelineBucket,
     rawTrackerState: feature.rawTrackerState,
     workStart: storeDerived?.workStart,
+    prOutsidePipeline: storeDerived?.prOutsidePipeline,
   });
 
   // Dominant session state for the feature row StatusDot (blocker-7)
