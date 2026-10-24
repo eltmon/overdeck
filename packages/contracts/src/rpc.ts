@@ -403,6 +403,8 @@ export const ReadFileAtPathResult = Schema.Struct({
   lang: Schema.String,
   mtimeMs: Schema.Number,
   totalLines: Schema.Number,
+  /** True when the resolved file is inside a registered project root or OVERDECK_HOME, so writeFileAtPath will accept it (PAN-4583). */
+  writable: Schema.Boolean,
 })
 export type ReadFileAtPathResult = typeof ReadFileAtPathResult.Type
 
@@ -411,8 +413,11 @@ export type ReadFileAtPathResult = typeof ReadFileAtPathResult.Type
  *
  * Unlike ReadWorkspaceFileRpc this takes no issueId — the internal markdown
  * editor pane opens files reached from surfaces with no workspace context
- * (e.g. a repo-root file chip inside a conversation). The server validates
- * `path` against registered project roots + OVERDECK_HOME before reading.
+ * (e.g. a repo-root file chip inside a conversation). The server reads any
+ * existing markdown file whose realpath is inside the operator's home
+ * directory or a write root (registered project roots + OVERDECK_HOME), and
+ * sets `writable` to whether it is inside a write root (PAN-4583). Writes
+ * stay limited to the write roots — see WriteFileAtPathRpc.
  */
 export const ReadFileAtPathRpc = Rpc.make(WS_METHODS.readFileAtPath, {
   payload: ReadFileAtPathInput,
@@ -438,6 +443,8 @@ export type WriteFileAtPathResult = typeof WriteFileAtPathResult.Type
  * `expectedMtimeMs` enables optimistic concurrency: a stale value is
  * rejected with a PanRpcError code of WRITE_CONFLICT and nothing is
  * written. Omitting it (e.g. an explicit Overwrite action) skips the check.
+ * The path must resolve inside a registered project root or OVERDECK_HOME;
+ * anything else rejects with PATH_NOT_ALLOWED.
  */
 export const WriteFileAtPathRpc = Rpc.make(WS_METHODS.writeFileAtPath, {
   payload: WriteFileAtPathInput,
