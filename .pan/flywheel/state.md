@@ -210,3 +210,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   3305 (`~/Projects/hoff-merge-train`). Until they land, merge a ready
   feature with the Flywheel UAT card's "Merge one feature to main…" link.
 - PAN-4584 deployed (build 8a41a2dff) and closed with `pan close --force`.
+- 2026-10-24 08:43 UTC: operator granted the Flywheel merge authority for
+  approved, green, clean PRs on a green main (memory
+  `flywheel-may-merge-ready-prs`). Merged #4587 (PAN-4583) through
+  `POST /api/issues/PAN-4583/merge`. The issue view's Merge action is hidden
+  by the same 5-minute `ready` flag as Awaiting Merge
+  (`issueActions.ts` line 553) → added to PAN-4597.
