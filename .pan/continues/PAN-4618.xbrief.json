@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4618",
   "created": "2026-10-24T12:05:55.935Z",
-  "updated": "2026-10-24T12:48:34.264Z",
+  "updated": "2026-10-24T12:48:40.752Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4618",
       "claimedAt": "2026-10-24T12:43:19.460Z",
       "doneAt": "2026-10-24T12:48:34.263Z"
+    },
+    "ci-webhook-uses-ci-head": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4618",
+      "claimedAt": "2026-10-24T12:48:40.752Z"
     }
   }
 }
