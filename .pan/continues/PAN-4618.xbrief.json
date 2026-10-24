@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4618",
   "created": "2026-10-24T12:05:55.935Z",
-  "updated": "2026-10-24T12:43:19.460Z",
+  "updated": "2026-10-24T12:48:34.264Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-10-24T12:43:13.529Z"
     },
     "ci-fill-uses-ci-head": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4618",
-      "claimedAt": "2026-10-24T12:43:19.460Z"
+      "claimedAt": "2026-10-24T12:43:19.460Z",
+      "doneAt": "2026-10-24T12:48:34.263Z"
     }
   }
 }
