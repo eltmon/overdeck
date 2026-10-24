@@ -279,6 +279,63 @@ describe('a head whose CI test job is already red (PAN-3965)', () => {
 
     expect(await verify()).toEqual({ outcome: 'passed' });
   });
+
+  it('PAN-4527: a verdict reached after the agent committed B uses B\'s CI result, not the launch head A\'s', async () => {
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: workspacePath, encoding: 'utf-8' }).trim();
+    mockRunQualityGates.mockImplementationOnce(() => {
+      // While the gates run, the agent commits B and CI passes on it.
+      git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'fix');
+      writeVerificationArtifact(workspacePath, 'PAN-3965', [{ name: 'test', passed: true, required: true, output: 'CI green', durationMs: 0 }], {
+        ranAt: '2026-09-23T00:10:00.000Z', head8: git('rev-parse', '--short=8', 'HEAD'), via: 'ci',
+      });
+    });
+
+    expect(await verify()).toEqual({ outcome: 'passed' });
+  });
+});
+
+describe('a red head whose verification merges the target branch in (PAN-4527)', () => {
+  let root: string;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    root = mkdtempSync(join(tmpdir(), 'pan-4527-verify-sync-'));
+    const origin = join(root, 'origin.git');
+    const upstream = join(root, 'upstream');
+    workspacePath = join(root, 'workspace');
+    const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf-8' }).trim();
+    execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin]);
+    execFileSync('git', ['clone', '-q', origin, upstream], { stdio: 'ignore' });
+    git(upstream, 'checkout', '-q', '-b', 'main');
+    git(upstream, 'commit', '-q', '--allow-empty', '-m', 'base');
+    git(upstream, 'push', '-q', 'origin', 'main');
+    execFileSync('git', ['clone', '-q', origin, workspacePath], { stdio: 'ignore' });
+    git(workspacePath, 'config', 'user.name', 't');
+    git(workspacePath, 'config', 'user.email', 't@t');
+    git(workspacePath, 'checkout', '-q', '-b', 'feature/pan-3965');
+    git(workspacePath, 'commit', '-q', '--allow-empty', '-m', 'work');
+    // main moves on, so the verification's sync makes a local merge commit.
+    git(upstream, 'commit', '-q', '--allow-empty', '-m', 'other PR');
+    git(upstream, 'push', '-q', 'origin', 'main');
+    mockFindProject.mockReturnValue(project({ tests: 'ci' }));
+    writeVerificationArtifact(workspacePath, 'PAN-3965', [{ name: 'test', passed: false, required: true, output: 'CI red', durationMs: 0 }], {
+      ranAt: '2026-09-23T00:00:00.000Z', head8: git(workspacePath, 'rev-parse', '--short=8', 'HEAD'), via: 'ci',
+    });
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('still fails test: the sync merge commit is the launch head, whose CI job is red', async () => {
+    const outcome = await runVerificationForIssueInProcess(
+      'PAN-3965', workspacePath, { isRemote: false }, 'test', { skipPlanChecklist: true },
+    );
+
+    expect(outcome).toMatchObject({ outcome: 'failed', failedCheck: 'test' });
+    // The sync really did move HEAD to a merge commit.
+    expect(execFileSync('git', ['rev-list', '--parents', '-n', '1', 'HEAD'], { cwd: workspacePath, encoding: 'utf-8' }).trim().split(' ')).toHaveLength(3);
+  });
 });
 
 describe('resolveVerificationTestsMode (review of #3993: a PR-triggered test job, not any workflow)', () => {

@@ -132,6 +132,34 @@ Work agents run only the tests they touched (the work prompt names
 CI" only in a CI-mode project); reviewers never run the suite — they read the
 CI result on the head (`gh pr checks <pr>`) where tests run on CI.
 
+### Same head: joining or restarting a live worker (PAN-4527)
+
+Verification runs in a detached worker process
+(`cloister/verification-worker-supervisor.ts`) inside the agent's own
+workspace, so the workspace HEAD can move while it runs. One rule,
+`cloister/verification-head.ts`, decides whether a later head is still the
+head the worker launched on:
+
+- **same** — the head has not moved.
+- **synced** — the head is the worker's own target-branch sync: a merge commit
+  whose first parent is the launch head and whose second parent is on
+  `origin/<target>`, or a fast-forward of the launch head onto it. This still
+  counts as the launch head.
+- **moved** — anything else, such as an agent commit since launch. An
+  unreadable head counts as moved.
+
+When a review request arrives while a worker for the issue is alive and has
+no result yet, the supervisor **joins** it (waits for its result) only when
+the requested head is the same or synced head. When the agent has committed
+since the worker launched, the supervisor kills that worker and starts a
+fresh one on the new head, so a re-review after a fix push never gets the old
+head's verdict. Merge verification never syncs, so it joins only on the
+exact launch head.
+
+The same rule picks the head the CI test verdict is read for in `ci` tests
+mode: the launch head while HEAD is the same or synced head (CI never sees the
+worker's local sync merge commit), otherwise the workspace's current head.
+
 ## Verification artifacts (FR-8)
 
 Each verification run writes an immutable artifact named by run time and

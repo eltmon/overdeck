@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { loadConfigSync } from '../config-yaml/load.js';
 import { getOverdeckHome, packageRoot } from '../paths.js';
 import { snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
+import { classifyWorkspaceVerificationHead, isSameVerificationHead } from './verification-head.js';
 import type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 import { buildVerificationWorkerLaunch, launchVerificationWorker } from './verification-worker-launcher.js';
 
@@ -173,10 +174,12 @@ async function runSupervisedVerificationInternal(
   // forever. Kill it and fall through to a fresh worker.
   if (existing && existing.workspacePath === workspacePath && isProcessAlive(existing.pid) && !existsSync(existing.resultPath)) {
     const existingDeadline = verificationWorkerDeadline(existing);
-    // Review verification may legitimately change HEAD while syncing the target
-    // branch. Merge verification disables that sync, so only that path can use
-    // an exact launch-time anchor to decide whether the worker is authoritative.
-    const sameHead = options.syncTargetBranch !== false || existing.headAnchor === headAnchor;
+    // PAN-4527: join only a worker that is still verifying the requested head.
+    // Review verification moves HEAD with its own target-branch sync merge, and
+    // that still counts as the launch head; an agent commit since launch does
+    // not. Merge verification never syncs, so only its exact anchor counts.
+    const relation = await classifyWorkspaceVerificationHead(issueId, workspacePath, existing.headAnchor, headAnchor);
+    const sameHead = options.syncTargetBranch === false ? relation === 'same' : isSameVerificationHead(relation);
     if (sameHead && (existingDeadline === null || Date.now() < existingDeadline)) {
       console.log(`[${logPrefix}] Joining live verification worker ${existing.pid} for ${issueId}`);
       return waitForResult(existing);
