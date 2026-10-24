@@ -251,3 +251,78 @@ export function controlTerminal(terminalId: string, deps: HerdrStreamDeps = {}):
     close: stream.close,
   };
 }
+
+/** What a sizing attach achieved: the PTY took the size, another client holds control, or no frame came. */
+export type TerminalSizeOutcome = 'sized' | 'refused' | 'timeout';
+
+export interface SizeTerminalDeps extends HerdrStreamDeps {
+  /** How long to wait for the first frame. */
+  readonly timeoutMs?: number;
+}
+
+/** Resolves once the stream's first frame proves the attach, or the deadline passes. */
+async function raceFirstFrame(
+  frames: AsyncIterable<TerminalFrame>,
+  timeoutMs: number,
+): Promise<TerminalSizeOutcome> {
+  const iterator = frames[Symbol.asyncIterator]();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await new Promise<TerminalSizeOutcome>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), timeoutMs);
+      iterator.next()
+        .then((result) => {
+          if (result.done) {
+            resolve('refused');
+            return;
+          }
+          resolve(result.value.kind === 'snapshot' || result.value.kind === 'output' ? 'sized' : 'refused');
+        })
+        .catch(() => resolve('refused'));
+    });
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Closes the controller and waits for its child to actually exit, so the next attach is not refused. */
+async function closeAndAwaitExit(stream: StreamChild): Promise<void> {
+  const { child } = stream;
+  const exited = new Promise<void>((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve();
+      return;
+    }
+    const timer = setTimeout(resolve, 1000);
+    child.once('close', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+  stream.close();
+  await exited;
+}
+
+/**
+ * Set a Herdr terminal's PTY size (PAN-4582). The headless server never pushes
+ * a pane's layout rect to its PTY, and a new PTY copies the focused pane's size,
+ * so a launch has to set it. A `control` attach with `--cols/--rows` resizes the
+ * PTY on attach; the first frame proves it. The controller is released, and its
+ * child has exited, before this resolves, so a viewer attaching next is not
+ * refused. Never throws.
+ */
+export async function sizeHerdrTerminal(
+  terminalId: string,
+  cols: number,
+  rows: number,
+  deps: SizeTerminalDeps = {},
+): Promise<TerminalSizeOutcome> {
+  try {
+    const stream = startStream('control', terminalId, { ...deps, cols, rows });
+    const outcome = await raceFirstFrame(stream.frames, deps.timeoutMs ?? 3000);
+    await closeAndAwaitExit(stream);
+    return outcome;
+  } catch {
+    return 'refused';
+  }
+}

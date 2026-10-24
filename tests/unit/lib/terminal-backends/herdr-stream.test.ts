@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import type { ChildProcessWithoutNullStreams } from 'child_process';
 
@@ -6,6 +6,7 @@ import {
   controlTerminal,
   decodeTerminalRecord,
   observeTerminal,
+  sizeHerdrTerminal,
   type TerminalDecodeState,
 } from '../../../../src/lib/terminal-backends/herdr-stream.js';
 import type { TerminalFrame } from '../../../../src/lib/terminal-backends/types.js';
@@ -52,6 +53,8 @@ class FakeChild extends EventEmitter {
   readonly stdout = new EventEmitter() as EventEmitter & { setEncoding(enc: string): void };
   readonly stdin: { write(data: string): boolean } & { writes: string[] };
   killed = false;
+  exitCode: number | null = null;
+  signalCode: string | null = null;
 
   constructor() {
     super();
@@ -68,13 +71,31 @@ class FakeChild extends EventEmitter {
     this.killed = true;
     return true;
   }
+
+  // Mirrors Node's real child_process semantics: `exitCode`/`signalCode` are
+  // set just before a 'close' listener runs, never both left null.
+  emit(event: string | symbol, ...args: unknown[]): boolean {
+    if (event === 'close') {
+      const [code, signal] = args as [number | null, string | null];
+      this.exitCode = code ?? null;
+      this.signalCode = signal ?? (code === null ? 'SIGTERM' : null);
+    }
+    return super.emit(event, ...args);
+  }
 }
 
-function fakeSpawn(): { spawn: () => ChildProcessWithoutNullStreams; children: FakeChild[] } {
+function fakeSpawn(): {
+  spawn: (command: string, args: readonly string[]) => ChildProcessWithoutNullStreams;
+  children: FakeChild[];
+  calls: Array<{ command: string; args: readonly string[] }>;
+} {
   const children: FakeChild[] = [];
+  const calls: Array<{ command: string; args: readonly string[] }> = [];
   return {
     children,
-    spawn: () => {
+    calls,
+    spawn: (command: string, args: readonly string[]) => {
+      calls.push({ command, args });
       const child = new FakeChild();
       children.push(child);
       return child as unknown as ChildProcessWithoutNullStreams;
@@ -241,5 +262,60 @@ describe('controlTerminal', () => {
       seq: 1,
     });
     expect((await pending)[0]).toEqual({ kind: 'snapshot', cols: 80, rows: 20, data: 'hello' });
+  });
+});
+
+describe('sizeHerdrTerminal', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('resolves sized on a first frame, attaching with the requested size', async () => {
+    const { spawn, children, calls } = fakeSpawn();
+    const pending = sizeHerdrTerminal('term_h', 120, 40, { spawn });
+    children[0].emitRecord(FULL_FRAME);
+    children[0].emit('close', 0);
+
+    await expect(pending).resolves.toBe('sized');
+    expect(calls[0].args).toEqual(
+      expect.arrayContaining(['control', 'term_h', '--cols', '120', '--rows', '40']),
+    );
+  });
+
+  it('resolves refused when the child closes before any frame', async () => {
+    const { spawn, children } = fakeSpawn();
+    const pending = sizeHerdrTerminal('term_i', 120, 40, { spawn });
+    children[0].emit('close', 0);
+
+    await expect(pending).resolves.toBe('refused');
+  });
+
+  it('resolves timeout and kills the child when neither a frame nor a close arrives', async () => {
+    const { spawn, children } = fakeSpawn();
+    const pending = sizeHerdrTerminal('term_j', 120, 40, { spawn });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(children[0].killed).toBe(true);
+    children[0].emit('close', null);
+
+    await expect(pending).resolves.toBe('timeout');
+  });
+
+  it('stays pending after a frame arrives until the child actually closes', async () => {
+    const { spawn, children } = fakeSpawn();
+    const pending = sizeHerdrTerminal('term_k', 120, 40, { spawn });
+    children[0].emitRecord(FULL_FRAME);
+
+    let settled = false;
+    void pending.then(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(false);
+
+    children[0].emit('close', 0);
+    await expect(pending).resolves.toBe('sized');
+    expect(settled).toBe(true);
   });
 });
