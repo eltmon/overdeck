@@ -10,6 +10,13 @@ on:
   pull_request:
     branches: [main]
 
+# PAN-4618: cancel a superseded run's workflow instead of letting it keep a
+# runner until completion. A quick follow-up push (or PR update) replaces the
+# in-flight run for the same ref/PR rather than queuing behind it.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 # PAN-1659: skip the heavy docs-index build in CI. The docs-RAG index is a
 # repo-wide, publish-time artifact (built by prepublishOnly / build-for-publish.mjs
 # on release) — it has nothing to do with verifying an individual issue's code,
