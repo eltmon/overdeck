@@ -415,15 +415,20 @@ worker already ran:
   worker is not re-attached; its door owns the retry.
 
 When either mechanism cannot apply, the old recovery still runs, and it re-runs
-the gates. The supervisor refuses to adopt a result whose consumption it could
-not write to the state file, so one result never dispatches twice. A worker
+the gates. A result whose consumption cannot be written to the state file is
+never used: adoption skips it, and a waiter returns an `error` outcome instead,
+so one result never dispatches twice. A worker
 started by a dashboard older than PAN-4532 has no `logPrefix` or `options`, so
 it is neither re-attached nor adopted on the restart that deploys this change.
-If boot adoption is refused (for example, the workspace is dirty) or the
-dashboard dies again between taking the result and dispatching review, the
-deacon-lite patrols re-request the review. `recoverUndispatchedReviews` covers
-a `verification.passed` tail, and `recoverStalledReviews` covers a
-`review.requested` tail older than 15 minutes.
+If boot adoption is refused (for example, the workspace is dirty), the worker
+still writes `verification.passed`, and `recoverUndispatchedReviews` re-requests
+the review. If the dashboard dies between taking an already-finished result and
+dispatching review, the journal tail is `review.requested`, and only
+`recoverStalledReviews` would re-request it. Its re-request fallback does not
+run in the deacon child yet
+([PAN-4623](https://github.com/eltmon/overdeck/issues/4623)), so that review
+waits for the next request. [PAN-4622](https://github.com/eltmon/overdeck/issues/4622)
+tracks closing this window.
 
 ## Verification artifacts (FR-8)
 
