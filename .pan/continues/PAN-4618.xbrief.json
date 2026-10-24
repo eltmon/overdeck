@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4618",
   "created": "2026-10-24T12:05:55.935Z",
-  "updated": "2026-10-24T13:18:20.866Z",
+  "updated": "2026-10-24T13:18:36.681Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -111,6 +111,10 @@
     "default-branch-test-window.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T13:18:20.866Z"
+    },
+    "default-branch-test-window.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:18:36.680Z"
     }
   },
   "feedback": [
