@@ -1,13 +1,17 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useMutationState, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { Conversation } from './ConversationList';
 import { updateConversationTitle } from './ConversationList';
 import { closeConversationPanes } from '../../lib/panesStore';
 
+// Shared across hook instances so every view sees a pending archive (PAN-4584).
+const ARCHIVE_MUTATION_KEY = ['conversation-archive'] as const;
+
 async function archiveConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/archive`, { method: 'POST' });
-  if (!res.ok) throw new Error('Failed to archive conversation');
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || 'Failed to archive conversation');
 }
 
 async function stopConversation(name: string): Promise<void> {
@@ -99,7 +103,8 @@ async function summaryForkConversation(opts: { conv: Conversation; model: string
 }
 
 export interface ConversationMutations {
-  archive: (name: string) => void;
+  archive: (name: string, options?: { onSuccess?: () => void }) => void;
+  isArchivePending: (name: string) => boolean;
   stop: (name: string) => void;
   rename: (opts: { name: string; title: string }) => void;
   retitle: (name: string) => void;
@@ -128,15 +133,30 @@ export function useConversationMutations(
   const pendingFavoriteNamesRef = useRef(new Set<string>());
 
   const archiveMutation = useMutation({
+    mutationKey: ARCHIVE_MUTATION_KEY,
     mutationFn: archiveConversation,
-    onSuccess: (_data, name) => {
+    onMutate: (name: string) => {
+      const title = queryClient.getQueryData<Conversation[]>(['conversations'])
+        ?.find((c) => c.name === name)?.title ?? name;
+      return { title };
+    },
+    onSuccess: (_data, name, ctx) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       // An archived conversation leaves the list — close its deck tab(s) too.
       closeConversationPanes(name);
       if (selectedConversation === name) {
         onSelectConversation(null);
       }
+      toast.success(`Archived "${ctx?.title ?? name}"`, { duration: 4000 });
     },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 6000 });
+    },
+  });
+
+  const pendingArchiveNames = useMutationState({
+    filters: { mutationKey: ARCHIVE_MUTATION_KEY, status: 'pending' },
+    select: (m) => m.state.variables as string,
   });
 
   const stopMutation = useMutation({
@@ -311,7 +331,8 @@ export function useConversationMutations(
   // PAN-4560: one object per meaningful change, so the memoized conversation
   // list items do not all re-render on every list render. TanStack keeps each
   // `.mutate` stable; retitleVersion is a dependency so isRetitlePending
-  // re-evaluates after pending changes.
+  // re-evaluates after pending changes, and pendingArchiveNames is a
+  // dependency so isArchivePending does too.
   const archiveMutate = archiveMutation.mutate;
   const stopMutate = stopMutation.mutate;
   const stopIsPending = stopMutation.isPending;
@@ -323,7 +344,11 @@ export function useConversationMutations(
   const unlinkPullRequestMutate = unlinkPullRequestMutation.mutate;
   const isForkPending = summaryForkMutation.isPending;
   return useMemo<ConversationMutations>(() => ({
-    archive: (name) => archiveMutate(name),
+    archive: (name, options) => {
+      if (queryClient.isMutating({ mutationKey: ARCHIVE_MUTATION_KEY, predicate: (m) => m.state.variables === name }) > 0) return;
+      archiveMutate(name, options?.onSuccess ? { onSuccess: () => options.onSuccess?.() } : undefined);
+    },
+    isArchivePending: (name) => pendingArchiveNames.includes(name),
     stop: (name) => { if (!stopIsPending) stopMutate(name); },
     rename: (opts) => renameMutate(opts),
     retitle: (name) => {
@@ -345,5 +370,5 @@ export function useConversationMutations(
     forkTargetFocus,
     closeForkModal: () => { setForkTarget(null); setForkTargetMode(undefined); setForkTargetFocus(undefined); },
     isForkPending,
-  }), [archiveMutate, stopMutate, stopIsPending, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, retitleVersion]);
+  }), [archiveMutate, pendingArchiveNames, queryClient, stopMutate, stopIsPending, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, retitleVersion]);
 }

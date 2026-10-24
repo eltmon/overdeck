@@ -44,6 +44,7 @@ const conversation: Conversation = {
 
 const mutations: ConversationMutations = {
   archive: vi.fn(),
+  isArchivePending: vi.fn(() => false),
   stop: vi.fn(),
   rename: vi.fn(),
   retitle: vi.fn(),
@@ -458,5 +459,49 @@ describe('ConversationRow Check for new conversations (PAN-4455 WI-12)', () => {
     fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
     expect(screen.queryByRole('menuitem', { name: 'Check for new conversations' })).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('ConversationRow archive pending (PAN-4584)', () => {
+  function renderRowWithMutations(overrides: Partial<ConversationMutations>) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const rowMutations: ConversationMutations = { ...mutations, ...overrides };
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ConversationRow
+          conv={conversation}
+          isSelected={false}
+          onSelect={vi.fn()}
+          mutations={rowMutations}
+        />
+      </QueryClientProvider>,
+    );
+    return rowMutations;
+  }
+
+  it('shows the archiving spinner and marks the row busy while archive-pending', () => {
+    renderRowWithMutations({ isArchivePending: vi.fn(() => true) });
+
+    expect(screen.getByLabelText('Archiving test-conversation')).toBeInTheDocument();
+    expect(screen.getByText('Test conversation').closest('button')).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('shows a disabled, "Archiving…" menu item while archive-pending', () => {
+    renderRowWithMutations({ isArchivePending: vi.fn(() => true) });
+
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    const item = screen.getByRole('menuitem', { name: 'Archiving…' });
+    expect(item).toBeDisabled();
+  });
+
+  it('confirming the Archive dialog calls mutations.archive once with the name', async () => {
+    const archive = vi.fn();
+    renderRowWithMutations({ archive, isArchivePending: vi.fn(() => false) });
+
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive' }));
+
+    await waitFor(() => expect(archive).toHaveBeenCalledTimes(1));
+    expect(archive).toHaveBeenCalledWith('test-conversation');
   });
 });

@@ -1,0 +1,487 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-24T08:00:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4584: Archiving a conversation shows no feedback until the row disappears; failures are silent",
+    "updated": "2026-10-24T07:24:46.817Z"
+  },
+  "plan": {
+    "id": "pan-4584",
+    "title": "Archiving a conversation shows no feedback until the row disappears; failures are silent",
+    "status": "running",
+    "uid": "afb0b185-ee1a-4c74-a51d-48aad99119f0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-24T08:00:00Z",
+    "updated": "2026-10-24T07:24:46.817Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4584",
+        "label": "PAN-4584",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4584.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "conversations",
+      "ux",
+      "feedback"
+    ],
+    "narratives": {
+      "Problem": "After the operator confirms an archive, nothing visible happens for several seconds until the row disappears, because the server ends the session before replying. archiveMutation has no onError, archiveConversation drops the server's error message, ConversationPanel.handleArchive uses a raw fetch that ignores res.ok, and the Stage tab action menu closes the tab before the request resolves.",
+      "Proposal": "Give archiveMutation mutationKey ['conversation-archive'] and derive archive-pending names from the shared TanStack MutationCache with useMutationState, so all seven useConversationMutations instances see the same pending state. Guard duplicate archives with a call-time queryClient.isMutating check. Toast success ('Archived \"<title>\"') and failure (server message). Render pending on the row (Loader2 status, muted title, aria-busy), disable Archive items in all menus, show 'Archiving…' in the panel header, route ConversationPanel through the shared hook with a per-call onSuccess for onArchived, and stop the tab menu from closing the tab eagerly. Full detail in .pan/drafts/PAN-4584.md.",
+      "NonGoals": "- No optimistic removal of the row; it stays until the server confirms\n- No change to the archive server route, archiveConversationByName, or its timing\n- No change to stop, retitle, favorite, move or fork behavior; retitle keeps its per-instance ref\n- No pending indicator on Stage tab labels themselves\n- No confirm dialog added to the panel body Archive buttons\n- No new CSS classes\n- No edits to the OKF knowledge bundle (../overdeck-knowledge)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Archive-pending state lives in the TanStack MutationCache (mutationKey ['conversation-archive'] + useMutationState), not a per-instance ref like retitle",
+        "rationale": "Seven separate useConversationMutations instances exist; the Stage tab menu and ConversationPanel use different instances from ConversationList, so a per-instance ref could never show pending on the row as the issue requires."
+      },
+      {
+        "summary": "The panel header shows Archiving… whenever its conversation is archive-pending, from any entry point",
+        "rationale": "Pending state is global, and showing it consistently is a superset of the issue's 'if triggered from there' that keeps every entry point identical (issue AC: all entry points share the same behavior)."
+      },
+      {
+        "summary": "ConversationActionMenu stops calling onCloseTab right after archive; the hook's closeConversationPanes closes the tab on success",
+        "rationale": "Closing the tab before the request resolves breaks the issue's failure requirement (row and view stay on failure); closeConversationPanes already closes the same agent pane."
+      },
+      {
+        "summary": "ConversationPanel passes onArchived as a per-call onSuccess on archive(name, { onSuccess })",
+        "rationale": "Smallest API change that fires onArchived (standalone window.close) only on success; the standalone panel stays mounted so per-call callbacks fire."
+      },
+      {
+        "summary": "Toast copy and durations follow existing mutations: success 'Archived \"<title>\"' 4000 ms, error server message 6000 ms",
+        "rationale": "Issue specifies the success text; durations match retitleMutation and moveMutation in the same file."
+      }
+    ],
+    "items": [
+      {
+        "id": "hook-archive-pending",
+        "title": "Share archive-pending state across hook instances and toast archive outcomes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:00:00Z",
+        "metadata": {
+          "issueLabel": "pan-4584",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "row-archive-pending",
+            "action-menu-archive",
+            "panel-archive-shared",
+            "hook-archive-tests"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/VaultBrowseCopy.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx src/dashboard/frontend/src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx src/dashboard/frontend/src/components/CommandDeck/__tests__/useConversationMutations.move.test.tsx src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx src/dashboard/frontend/src/components/chat/__tests__/VaultBrowseCopy.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all five listed test files pass"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4584.md). In useConversationMutations.ts: archiveConversation parses the JSON body and throws data?.error || 'Failed to archive conversation'; add ARCHIVE_MUTATION_KEY = ['conversation-archive']; archiveMutation gets mutationKey, onMutate returning { title } looked up from the ['conversations'] cache (fallback name), onSuccess adds toast.success(`Archived \"${title}\"`, { duration: 4000 }) after the existing invalidate/closeConversationPanes/selection clear, onError toast.error(err.message, { duration: 6000 }). Derive pendingArchiveNames with useMutationState({ filters: { mutationKey, status: 'pending' }, select: m => m.state.variables as string }). ConversationMutations gains archive(name, options?: { onSuccess?: () => void }) and isArchivePending(name). archive() returns early when queryClient.isMutating({ mutationKey, predicate: m => m.state.variables === name }) > 0, else archiveMutate(name, options?.onSuccess ? { onSuccess: () => options.onSuccess?.() } : undefined). Add pendingArchiveNames and queryClient to the useMemo deps. Add isArchivePending: vi.fn(() => false) to the hand-built mutation mocks in ConversationRow.test.tsx (~line 50) and VaultBrowseCopy.test.tsx (~line 79)."
+        },
+        "items": [
+          {
+            "id": "hook-archive-pending.ac1",
+            "title": "Given a 500 response with body { error: 'boom' }, when archive runs, then the thrown error message the hook toasts is 'boom' (not the fixed string)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-archive-pending.ac2",
+            "title": "Given a component renders isArchivePending(name) for a conversation, when archive(name) is called, then isArchivePending(name) returns true before the request resolves and returns false after it settles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-archive-pending.ac3",
+            "title": "Given an archive is pending in one hook instance, when archive(name) is called from a second instance sharing the QueryClient, then no second fetch is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-archive-pending.ac4",
+            "title": "ConversationList.render-count.test.tsx and CommandDeck.render-count.test.tsx pass unchanged, showing the mutations object keeps identity when no archive state changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-archive-pending",
+        "title": "Render archive-pending spinner, muted title and disabled Archive item on ConversationRow",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:00:00Z",
+        "metadata": {
+          "issueLabel": "pan-4584",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ConversationRow.test.tsx passes including the 'archive pending (PAN-4584)' describe block"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. const archivePending = mutations.isArchivePending(conv.name). Add a first branch to the status-indicator chain rendering <Loader2 size={spinnerSize} className={styles.conversationWorkingSpinner} aria-label={`Archiving ${conv.name}`} />. Both title spans apply styles.titleRegenerating when archivePending || isRetitlePending. Row <button> gets aria-busy={archivePending || undefined}. handleArchiveClick returns early when pending. Menu Archive item: disabled={archivePending}, Loader2 icon and label 'Archiving…' while pending. No new CSS. Add tests in a describe('archive pending (PAN-4584)') block."
+        },
+        "items": [
+          {
+            "id": "row-archive-pending.ac1",
+            "title": "Given isArchivePending returns true, the row renders an element with aria-label 'Archiving <name>' and the row button has aria-busy='true'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-archive-pending.ac2",
+            "title": "Given isArchivePending returns true, opening the row menu renders the Archive item disabled with text 'Archiving…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-archive-pending.ac3",
+            "title": "Given isArchivePending returns false, confirming the Archive dialog calls mutations.archive exactly once with the conversation name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "action-menu-archive",
+        "title": "Stop the Stage tab action menu from closing the tab before archive succeeds and show its pending item",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:00:00Z",
+        "metadata": {
+          "issueLabel": "pan-4584",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationActionMenu.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationActionMenu.archive.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationActionMenu.archive.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ConversationActionMenu.archive.test.tsx passes"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In handleArchive: return early after onClose() when mutations.isArchivePending(conversation.name); on confirm call only mutations.archive(conversation.name) and delete the onCloseTab?.() call (the hook's onSuccess closes the tab through closeConversationPanes; decision D5). Drop onCloseTab from the useCallback deps and update the onCloseTab prop doc comment. Archive MenuItemButton: disabled while pending, Loader2 (styles.spinnerIcon) and 'Archiving…' while pending. New test file mocks ../DialogProvider (useConfirm resolves true), wraps in QueryClientProvider, stubs fetch to return [] for the registered-projects query."
+        },
+        "items": [
+          {
+            "id": "action-menu-archive.ac1",
+            "title": "Given the operator confirms Archive, mutations.archive is called once with the conversation name and onCloseTab is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "action-menu-archive.ac2",
+            "title": "Given isArchivePending returns true, the Archive item renders disabled with text 'Archiving…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "panel-archive-shared",
+        "title": "Route ConversationPanel archive through the shared hook and show Archiving… in its header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:00:00Z",
+        "metadata": {
+          "issueLabel": "pan-4584",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "wc -l src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ConversationPanel.test.tsx passes including the 'archive (PAN-4584)' block",
+            "ConversationPanel.tsx is at most 1480 lines",
+            "file-size lint passes"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Replace the raw-fetch handleArchive with: const archivePending = convMutations.isArchivePending(conversation.name); const handleArchive = useCallback(() => { convMutations.archive(conversation.name, { onSuccess: onArchived }); }, [convMutations, conversation.name, onArchived]). Remove the closeConversationPanes import if unused. Header ⋮ 'Archive conversation' item: disabled + Loader2 + 'Archiving…' while pending, confirm kept. Next to the {showPiAbort && ( button render, while pending, <span className={styles.conversationAboutToggle} role=\"status\" aria-live=\"polite\"><Loader2 size={14} className={styles.spinnerIcon} /><span>Archiving…</span></span>. Add archivePending?: boolean to ConversationViewProps, pass it, and disable both body 'Archive' buttons with label 'Archiving…' while pending. Tests mock sonner and stub fetch for /api/conversations/<name>/archive."
+        },
+        "items": [
+          {
+            "id": "panel-archive-shared.ac1",
+            "title": "Given the archive request returns 500 { error: 'boom' }, toast.error is called with 'boom' and onArchived is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel-archive-shared.ac2",
+            "title": "Given the archive request returns 200, onArchived is called once and toast.success is called with 'Archived \"<title>\"'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel-archive-shared.ac3",
+            "title": "Given the archive request is unresolved, the panel header renders a role='status' element with text 'Archiving…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel-archive-shared.ac4",
+            "title": "ConversationPanel.tsx no longer contains a fetch to '/archive' and its line count is at most 1480",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hook-archive-tests",
+        "title": "Cover archive pending, cross-instance dedupe, success and error in a hook test file",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:00:00Z",
+        "metadata": {
+          "issueLabel": "pan-4584",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/useConversationMutations.archive.test.tsx"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/useConversationMutations.archive.test.tsx"
+          ],
+          "expected_outputs": [
+            "useConversationMutations.archive.test.tsx passes all five cases"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. New file cloned from useConversationMutations.move.test.tsx scaffolding (sonner mock, ../../../lib/panesStore mock, fetch stub, conv() factory, seeded ['conversations'] cache). Five cases: pending visible before resolve; cross-instance pending and no second fetch; same-act double call sends one fetch; success toasts 'Archived \"Alpha\"' with duration 4000, calls closeConversationPanes and the per-call onSuccess, clears pending; error toasts the server message with duration 6000 (fallback 'Failed to archive conversation' for a non-JSON body), skips closeConversationPanes and onSuccess, clears pending. No timers involved; await with waitFor."
+        },
+        "items": [
+          {
+            "id": "hook-archive-tests.ac1",
+            "title": "Given fetch is unresolved, after archive('a') isArchivePending('a') returns true and isArchivePending('b') returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-archive-tests.ac2",
+            "title": "Given two hook instances share one QueryClient, archiving from one makes the other report pending and its archive call sends no second fetch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-archive-tests.ac3",
+            "title": "Given a 200 response, toast.success is called with 'Archived \"Alpha\"' and isArchivePending('a') returns to false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-archive-tests.ac4",
+            "title": "Given a 500 { error: 'Archive exploded' } response, toast.error is called with 'Archive exploded', closeConversationPanes is not called, and pending clears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-archive-feedback",
+        "title": "Document archive feedback in the dashboard architecture doc and the conversations feature page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-24T08:00:00Z",
+        "metadata": {
+          "issueLabel": "pan-4584",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "trivial",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "features/conversations.mdx"
+          ],
+          "verify_commands": [
+            "grep -n \"conversation-archive\" docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n \"## Archiving a conversation\" features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "DASHBOARD-ARCHITECTURE.md contains a line naming the conversation-archive mutationKey",
+            "conversations.mdx contains the Archiving a conversation heading"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Append one sentence to the 'Streamed deltas reach only the open conversation' bullet in docs/DASHBOARD-ARCHITECTURE.md saying archive-pending state comes from the MutationCache via mutationKey ['conversation-archive'] and useMutationState, shared by every hook instance, and the returned object changes identity only when that list changes (PAN-4584). Add '## Archiving a conversation' before '## See also' in features/conversations.mdx describing: the three menus, the row spinner and disabled 'Archiving…' item while the session ends, the success toast 'Archived \"<title>\"' with the row leaving and its tab closing, and the error toast with the server's message leaving the row and tab in place."
+        },
+        "items": [
+          {
+            "id": "docs-archive-feedback.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md renders a sentence stating archive-pending state is read from the MutationCache under mutationKey ['conversation-archive'] and shared by every hook instance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-archive-feedback.ac2",
+            "title": "features/conversations.mdx renders an 'Archiving a conversation' section that names the 'Archiving…' pending state, the 'Archived \"<title>\"' success toast, and that a failed archive keeps the row and tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "hook-archive-pending",
+        "to": "row-archive-pending",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-archive-pending",
+        "to": "action-menu-archive",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-archive-pending",
+        "to": "panel-archive-shared",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-archive-pending",
+        "to": "hook-archive-tests",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-24-PAN-4584-archiving-a-conversation-shows-no-feedback-until-the-row-disappears-failures-are-silent.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

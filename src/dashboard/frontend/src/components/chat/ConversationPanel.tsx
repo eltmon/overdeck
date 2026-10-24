@@ -41,7 +41,6 @@ import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import { useConfirm } from '../DialogProvider';
 import { useConversationMutations } from '../CommandDeck/useConversationMutations';
 import { ForkModal } from '../CommandDeck/ForkModal';
-import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
 import { buildMessagesQueryFn, fetchFullTranscript, type MessagesResponse } from './messagesQuery';
 import { useOlderHistory } from './useOlderHistory';
@@ -567,17 +566,10 @@ export function ConversationPanel({
     resumeMutation.mutate();
   }, [resumeMutation]);
 
-  const handleArchive = useCallback(async () => {
-    try {
-      await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/archive`, { method: 'POST' });
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      // An archived conversation leaves the list — close its deck tab(s) too.
-      closeConversationPanes(conversation.name);
-      onArchived?.();
-    } catch (err) {
-      console.error('[ConversationPanel] Archive failed:', err);
-    }
-  }, [conversation.name, queryClient, onArchived]);
+  const archivePending = convMutations.isArchivePending(conversation.name);
+  const handleArchive = useCallback(() => {
+    convMutations.archive(conversation.name, { onSuccess: onArchived });
+  }, [convMutations, conversation.name, onArchived]);
 
   const handleExportTranscript = useCallback(async () => {
     // PAN-4558: the panel holds a window; export reads the whole transcript.
@@ -808,6 +800,11 @@ export function ConversationPanel({
                 </button>
               )}
 
+              {archivePending && (
+                <span className={styles.conversationAboutToggle} role="status" aria-live="polite">
+                  <Loader2 size={14} className={styles.spinnerIcon} /><span>Archiving…</span>
+                </span>
+              )}
               {/* Copy link */}
               <button
                 className={styles.copyLinkButton}
@@ -953,6 +950,7 @@ export function ConversationPanel({
                       {onArchived && (
                         <MenuItemButton
                           destructive
+                          disabled={archivePending}
                           onClick={async () => {
                             setMenuOpen(false);
                             const ok = await confirm({
@@ -967,8 +965,8 @@ export function ConversationPanel({
                             if (ok) handleArchive();
                           }}
                         >
-                          <Archive size={14} />
-                          Archive conversation
+                          {archivePending ? <Loader2 size={14} className={styles.spinnerIcon} /> : <Archive size={14} />}
+                          {archivePending ? 'Archiving…' : 'Archive conversation'}
                         </MenuItemButton>
                       )}
                     </MenuSurface>
@@ -1038,6 +1036,7 @@ export function ConversationPanel({
               conversation={conversation}
               onResume={conversation.origin === 'vault' ? undefined : onEmbeddedResume ?? (!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined)}
               onArchive={!embedded ? handleArchive : undefined}
+              archivePending={archivePending}
               resumePending={resumeMutation.isPending}
               resumeLabel={embeddedResumeLabel}
               sendResumeContract={onEmbeddedResume ? undefined : sendResumeContract}
@@ -1126,6 +1125,7 @@ interface ConversationViewProps {
   conversation: Conversation;
   onResume?: () => void;
   onArchive?: () => void;
+  archivePending?: boolean;
   resumePending?: boolean;
   /** Override label for the resume button. Defaults to "Resume Session". */
   resumeLabel?: string;
@@ -1171,7 +1171,7 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, sendResumeContract, onSendResumeContractChange, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled = false, receivedFirstPayload = false, refreshMessagesOverHttp, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, archivePending = false, resumePending, resumeLabel, sendResumeContract, onSendResumeContractChange, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled = false, receivedFirstPayload = false, refreshMessagesOverHttp, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Keep optimistic messages and failed-send retries in the conversation-keyed
   // composer store so switching panes cannot discard them (PAN-1591).
@@ -1344,8 +1344,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           <p className={styles.conversationEmptyStateTitle}>Failed to start</p>
           <p className={styles.conversationEmptyStateSubtitle}>{conversation.spawnError}</p>
           <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
-            <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()}>
-              Archive
+            <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()} disabled={archivePending}>
+              {archivePending ? 'Archiving…' : 'Archive'}
             </button>
           </div>
         </div>
@@ -1383,8 +1383,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
                 className={styles.conversationResumeControls}
               />
             )}
-            <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()}>
-              Archive
+            <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()} disabled={archivePending}>
+              {archivePending ? 'Archiving…' : 'Archive'}
             </button>
           </div>
         </div>

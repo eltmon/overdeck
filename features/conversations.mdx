@@ -643,6 +643,15 @@ change. It applies to the diff in every view, and the panel remembers it in this
 browser. A turn's file list can still name a file whose only change was
 whitespace; opening it then shows no net changes.
 
+## Archiving a conversation
+
+Archive is in the row menu, the tab menu, and the conversation header menu.
+After you confirm, the row shows a spinner and the Archive action reads
+"Archiving…" and is disabled while Overdeck ends the session; on success a
+toast says `Archived "<title>"`, the row leaves the list and its tab closes;
+on failure an error toast shows the server's message and the row and tab
+stay.
+
 ## See also
 
 - [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations

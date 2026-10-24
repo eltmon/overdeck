@@ -216,6 +216,7 @@ export function ConversationRow({
     };
   }, [menuOpen]);
 
+  const archivePending = mutations.isArchivePending(conv.name);
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conv.name] ?? false);
   const isAwaitingPermission = useDashboardStore((s) => s.conversationsAwaitingPermissionByName?.[conv.name] ?? false);
   const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
@@ -296,6 +297,7 @@ export function ConversationRow({
   }, [conv.handoffTargetConvId]);
 
   const handleArchiveClick = useCallback(async () => {
+    if (mutations.isArchivePending(conv.name)) return;
     const ok = await confirm({
       title: conv.isFavorited ? 'Archive favorited conversation' : 'Archive conversation',
       message: conv.isFavorited
@@ -436,6 +438,7 @@ export function ConversationRow({
         setMenuOpen(true);
       }}
       title={conv.name}
+      aria-busy={archivePending || undefined}
     >
       {/* Stop button */}
       {conv.sessionAlive && (
@@ -453,7 +456,13 @@ export function ConversationRow({
       )}
 
       {/* Status indicator */}
-      {conv.forkStatus && conv.forkStatus !== 'failed' ? (
+      {archivePending ? (
+        <Loader2
+          size={spinnerSize}
+          className={styles.conversationWorkingSpinner}
+          aria-label={`Archiving ${conv.name}`}
+        />
+      ) : conv.forkStatus && conv.forkStatus !== 'failed' ? (
         <Loader2
           size={spinnerSize}
           className={styles.conversationWorkingSpinner}
@@ -532,7 +541,7 @@ export function ConversationRow({
           {conv.laneKey && conv.laneRole && (
             <span className={styles.laneLabel}>{`${LANE_GLYPH[conv.laneRole]} ${conv.laneKey} i${conv.laneIteration ?? 1}`}</span>
           )}
-          <span className={`${styles.projectConvLabel} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
+          <span className={`${styles.projectConvLabel} ${archivePending || mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
           {conv.laneKey && conv.laneReport && !(isJudge && conv.laneVerdict) && (
             <span className={`${styles.laneReportBadge} ${LANE_REPORT_TONE[conv.laneReport.status]}`}>
               {conv.laneReport.status.toUpperCase()}
@@ -556,7 +565,7 @@ export function ConversationRow({
       ) : (
         // Flat list rows: title on line 1, muted metadata on line 2.
         <span className={styles.conversationMain}>
-          <span className={`${styles.conversationName} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
+          <span className={`${styles.conversationName} ${archivePending || mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
           <span className={styles.conversationMetaLine}>
             {verdictBadge}
             {conv.branch && (
@@ -774,10 +783,11 @@ export function ConversationRow({
           <MenuSeparator />
           <MenuItemButton
             destructive
+            disabled={archivePending}
             onClick={() => { setMenuOpen(false); void handleArchiveClick(); }}
           >
-            <Archive size={14} />
-            Archive
+            {archivePending ? <Loader2 size={14} className={styles.conversationWorkingSpinner} /> : <Archive size={14} />}
+            {archivePending ? 'Archiving…' : 'Archive'}
           </MenuItemButton>
         </MenuSurface>
       </>,

@@ -18,7 +18,8 @@ interface ConversationActionMenuProps {
   /** Viewport coordinates (fixed positioning) — typically the cursor. */
   position: { top: number; left: number };
   onClose: () => void;
-  /** When provided, adds a "Close tab" item and closes the tab after archiving. */
+  /** When provided, adds a "Close tab" item; a successful archive closes the
+   * tab through `closeConversationPanes` (PAN-4584). */
   onCloseTab?: () => void;
   /** Tab conveniences (PAN-1591) — only present when invoked from a pane tab. */
   onCloseOthers?: () => void;
@@ -113,6 +114,7 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
 
   const handleArchive = useCallback(async () => {
     onClose();
+    if (mutations.isArchivePending(conversation.name)) return;
     const ok = await confirm({
       title: conversation.isFavorited ? 'Archive favorited conversation' : 'Archive conversation',
       message: conversation.isFavorited
@@ -124,9 +126,8 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
     });
     if (ok) {
       mutations.archive(conversation.name);
-      onCloseTab?.();
     }
-  }, [confirm, conversation, mutations, onClose, onCloseTab]);
+  }, [confirm, conversation, mutations, onClose]);
 
   return createPortal(
     <>
@@ -319,10 +320,13 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
             <MenuSeparator />
             <MenuItemButton
               destructive
+              disabled={mutations.isArchivePending(conversation.name)}
               onClick={handleArchive}
             >
-              <Archive size={14} />
-              Archive
+              {mutations.isArchivePending(conversation.name)
+                ? <Loader2 size={14} className={styles.spinnerIcon} />
+                : <Archive size={14} />}
+              {mutations.isArchivePending(conversation.name) ? 'Archiving…' : 'Archive'}
             </MenuItemButton>
             {onCloseTab && (
               <MenuItemButton onClick={() => { onCloseTab(); onClose(); }}>

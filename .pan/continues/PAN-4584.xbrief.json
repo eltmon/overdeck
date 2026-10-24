@@ -1,0 +1,125 @@
+{
+  "version": "1",
+  "issueId": "PAN-4584",
+  "created": "2026-10-24T07:25:13.534Z",
+  "updated": "2026-10-24T07:56:15.183Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "hook-archive-pending": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4584",
+      "claimedAt": "2026-10-24T07:25:13.534Z",
+      "doneAt": "2026-10-24T07:29:41.244Z"
+    },
+    "row-archive-pending": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4584",
+      "claimedAt": "2026-10-24T07:29:45.773Z",
+      "doneAt": "2026-10-24T07:32:17.619Z"
+    },
+    "action-menu-archive": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4584",
+      "claimedAt": "2026-10-24T07:32:22.638Z",
+      "doneAt": "2026-10-24T07:34:22.150Z"
+    },
+    "panel-archive-shared": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4584",
+      "claimedAt": "2026-10-24T07:34:26.646Z",
+      "doneAt": "2026-10-24T07:46:59.739Z"
+    },
+    "hook-archive-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4584",
+      "claimedAt": "2026-10-24T07:47:04.154Z",
+      "doneAt": "2026-10-24T07:49:11.897Z"
+    },
+    "docs-archive-feedback": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4584",
+      "claimedAt": "2026-10-24T07:49:16.433Z",
+      "doneAt": "2026-10-24T07:50:12.006Z"
+    },
+    "hook-archive-pending.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:51:47.776Z"
+    },
+    "hook-archive-pending.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:52:01.363Z"
+    },
+    "hook-archive-pending.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:52:15.430Z"
+    },
+    "hook-archive-pending.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:52:29.543Z"
+    },
+    "row-archive-pending.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:52:46.985Z"
+    },
+    "row-archive-pending.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:53:02.019Z"
+    },
+    "row-archive-pending.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:53:16.814Z"
+    },
+    "action-menu-archive.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:53:35.069Z"
+    },
+    "action-menu-archive.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:53:47.538Z"
+    },
+    "panel-archive-shared.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:54:04.160Z"
+    },
+    "panel-archive-shared.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:54:17.982Z"
+    },
+    "panel-archive-shared.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:54:31.140Z"
+    },
+    "panel-archive-shared.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:54:43.999Z"
+    },
+    "hook-archive-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:55:00.732Z"
+    },
+    "hook-archive-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:55:14.755Z"
+    },
+    "hook-archive-tests.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:55:28.832Z"
+    },
+    "hook-archive-tests.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:55:42.879Z"
+    },
+    "docs-archive-feedback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:55:59.800Z"
+    },
+    "docs-archive-feedback.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:56:15.183Z"
+    }
+  }
+}
