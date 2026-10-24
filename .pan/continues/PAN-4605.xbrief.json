@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T11:45:47.071Z",
+  "updated": "2026-10-24T11:46:07.815Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,6 +190,10 @@
     "derive-pr-outside-pipeline-attention.ac4": {
       "status": "completed",
       "doneAt": "2026-10-24T11:45:47.071Z"
+    },
+    "command-deck-renders-attention.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:46:07.814Z"
     }
   }
 }
