@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T11:01:12Z · model: claude-opus-5-5 · open: 847_
+_Last sequenced: 2026-10-24T11:24:13Z · model: claude-opus-5-5 · open: 848_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -219,6 +219,7 @@ _Last sequenced: 2026-10-24T11:01:12Z · model: claude-opus-5-5 · open: 847_
 | 223 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 224 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
 | 225 | PAN-4596 | S | high | ok |  |  | Ended held handoff shows generic "no saved history"; hides kickoff focus/brief and offers no Start. Sat 20 days as "waiting on operator". |
+| 226 | PAN-4616 | S | medium | ok |  | PAN-4614 | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -1182,10 +1183,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T11:01:12Z",
+  "generatedAt": "2026-10-24T11:24:13Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 847,
+  "openCount": 848,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11755,6 +11756,21 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "rationale": "New issue filed 2026-10-24 after concerns.md conflicts blocked PR #4601 (PAN-4595) twice at the merge door, each round costing a re-verification and re-review; 14 merged PRs touched the file this month. The fix is one .gitattributes line plus a rebase test, labeled substrate-improvement, and it is already in pipeline, so it sits with the in-pipeline top tier.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4616",
+      "rank": 226,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4614"
+      ],
+      "why": "After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback",
+      "rationale": "New issue: an observation follow-up to in-pipeline PAN-4614; ranked mid-tier because it only matters if GitHub ignores union, and any fallback touches the merge gate's trust boundary and needs its own plan.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13276,6 +13292,13 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4614",
+      "to": "PAN-4616",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.9
     }
   ]
 }
