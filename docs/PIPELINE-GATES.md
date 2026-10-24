@@ -2,12 +2,18 @@
 
 ## Verification Gate (PAN-174)
 
-`pan done` runs quality gates (typecheck, lint, test) from `projects.yaml`
-before opening or updating the PR and requesting review. If a gate fails,
-feedback goes to the agent's session and the command refuses to proceed, so
-the agent can fix and retry. There is no separate stuck counter stored on a
-record — a run that keeps failing is visible directly in the PR's check
-history.
+A review request (`pan done`, `pan review request`, the PR webhook) starts a
+verification run before the review convoy. The run executes the quality gates
+the project declares under `quality_gates` in `projects.yaml`, in declaration
+order (or `DEFAULT_GATES` in `cloister/validation.ts` when the project declares
+none), plus the diff and plan checks listed below. If any check fails, feedback
+goes to the work agent and review does not start, so the agent can fix and
+retry. There is no separate stuck counter stored on a record — a run that keeps
+failing is visible directly in the PR's check history.
+
+- [What a verification run does](#what-a-verification-run-does)
+- [Why verification is slow](#why-verification-is-slow)
+- [Choosing a project's local gates](#choosing-a-projects-local-gates)
 
 ### One full-suite run per push, on CI (PAN-3965)
 
