@@ -4,17 +4,17 @@
     "created": "2026-10-24T10:30:20Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4609: Docs: explain what verification runs, why it is slow, and how to choose a project's local gates",
-    "updated": "2026-10-24T10:36:32.085Z"
+    "updated": "2026-10-24T10:37:32.354Z"
   },
   "plan": {
     "id": "pan-4609",
     "title": "Docs: explain what verification runs, why it is slow, and how to choose a project's local gates",
-    "status": "proposed",
+    "status": "running",
     "uid": "b9ddbc46-5b62-4756-bb47-9ab2f8105709",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T10:30:20Z",
-    "updated": "2026-10-24T10:36:32.085Z",
+    "updated": "2026-10-24T10:37:32.354Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4609",
@@ -582,5 +582,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
