@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T08:19:42Z · model: claude-opus-5-5 · open: 842_
+_Last sequenced: 2026-10-24T08:22:47Z · model: claude-opus-5-5 · open: 842_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1177,7 +1177,7 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T08:19:42Z",
+  "generatedAt": "2026-10-24T08:22:47Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 842,
