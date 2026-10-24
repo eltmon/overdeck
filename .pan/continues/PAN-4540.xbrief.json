@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4540",
   "created": "2026-10-24T15:41:16.095Z",
-  "updated": "2026-10-24T15:41:46.148Z",
+  "updated": "2026-10-24T15:42:17.694Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,6 +16,10 @@
     "readiness-order": {
       "status": "completed",
       "doneAt": "2026-10-24T15:41:46.148Z"
+    },
+    "mergeability-reread": {
+      "status": "completed",
+      "doneAt": "2026-10-24T15:42:17.694Z"
     }
   }
 }
