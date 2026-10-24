@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4589",
   "created": "2026-10-24T08:19:18.820Z",
-  "updated": "2026-10-24T08:35:26.209Z",
+  "updated": "2026-10-24T08:39:13.800Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-10-24T08:35:19.319Z"
     },
     "mode-detection-dagger-reason": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4589",
-      "claimedAt": "2026-10-24T08:35:26.208Z"
+      "claimedAt": "2026-10-24T08:35:26.208Z",
+      "doneAt": "2026-10-24T08:39:13.800Z"
     }
   }
 }
