@@ -4,17 +4,17 @@
     "created": "2026-10-24T08:23:47Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4595: pan show --health calls working Herdr agents stuck: CLI never registers the transcript heartbeat lookup",
-    "updated": "2026-10-24T08:31:13.844Z"
+    "updated": "2026-10-24T08:32:01.286Z"
   },
   "plan": {
     "id": "pan-4595",
     "title": "pan show --health calls working Herdr agents stuck: CLI never registers the transcript heartbeat lookup",
-    "status": "proposed",
+    "status": "running",
     "uid": "1a49541e-adb9-407b-aaaf-395b642e3968",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T08:23:47Z",
-    "updated": "2026-10-24T08:31:13.844Z",
+    "updated": "2026-10-24T08:32:01.286Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4595",
@@ -279,5 +279,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
