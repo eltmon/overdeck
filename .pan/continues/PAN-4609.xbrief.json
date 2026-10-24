@@ -2,9 +2,15 @@
   "version": "1",
   "issueId": "PAN-4609",
   "created": "2026-10-24T10:37:57.966Z",
-  "updated": "2026-10-24T10:58:48.727Z",
+  "updated": "2026-10-24T10:59:37.350Z",
   "gitState": {},
-  "decisions": [],
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Docs-only PRD (no src/tests/config changes, see .pan/drafts/PAN-4609.md Rules section: 'Docs-only... npm run typecheck is not needed'). Existing scripts/lint-docs.js (commit d28b981533204b4171a84e0bf2768b62cb9c6ac3) is the test that covers this change: it runs in CI and in this session (npm run lint:docs, passing) and validates every published/.md doc file touched, including the three files this issue edits.",
+      "recordedAt": "2026-10-24T10:59:37.350Z"
+    }
+  ],
   "hazards": [],
   "resumePoint": null,
   "sessionHistory": [],
