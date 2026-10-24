@@ -15,6 +15,60 @@ failing is visible directly in the PR's check history.
 - [Why verification is slow](#why-verification-is-slow)
 - [Choosing a project's local gates](#choosing-a-projects-local-gates)
 
+### What a verification run does
+
+`runVerificationForIssueInProcess` (`src/lib/cloister/verification-runner.ts`)
+runs these steps in order. Each step that fails returns early with the named
+`failedCheck`; later steps do not run.
+
+0. Skip the run if the PR already merged, or if this head already used its
+   `VERIFICATION_MAX_CYCLES` (3) attempts (outcome `skipped`, no `failedCheck`).
+1. Snapshot the head for the test-skip waiver.
+2. Merge the target branch into each repo root (`syncSingleRepo`), unless the
+   project sets `syncTargetBranch: false` — `failedCheck: sync-target-branch`.
+3. Pick the gates to run: the project's declared `quality_gates`, or
+   `DEFAULT_GATES` when it declares none; drop the gate named `test` in `ci`
+   tests mode (`selectLocalVerificationGates`).
+4. Non-polyrepo only: run the package manager's install (60 s timeout) and
+   each `workspace_packages[].build_command` (30 s timeout). Warn-only — a
+   failure here is logged, not a `failedCheck`, and does not block the run.
+5. Run the test-skip diff check (`evaluateTestSkipGate`) — `failedCheck:
+   test-skip`. See [Test-skip gate](#test-skip-gate-pan-3847-pan-3906).
+6. If step 5 passed, run the plan-integrity check (`evaluatePlanIntegrityGate`)
+   — `failedCheck: plan-integrity`. See
+   [Plan-integrity gate](#plan-integrity-gate-pan-1728).
+7. Run each declared `pre_push` gate in declaration order (`runQualityGates`);
+   the first failing *required* gate stops the loop and its name becomes the
+   `failedCheck`.
+8. In `ci` tests mode, if the CI test job already failed on this head, record
+   a failed `test` result — `failedCheck: test`.
+9. A gate that could not run at all (a missing container, Docker down) defers
+   the run without counting an attempt against it, rather than failing it.
+10. Write the per-run verification artifact and `verification-latest.json`
+    (see [Verification artifacts](#verification-artifacts-fr-8)); on a gate
+    failure, post a failed check run and send feedback to the work agent.
+11. Run the acceptance-criteria check on the xBRIEF (`getXBriefACStatus`) —
+    `failedCheck: vbrief-conflicts` or `vbrief-ac`.
+12. Run the plan checklist check (`checkIncompletePlanItems`) —
+    `failedCheck: incomplete-plan-items`.
+13. Run the empty-changeset guard, which catches a changeset that touched only
+    `.pan/` task state — `failedCheck: empty-changeset`.
+14. On a full pass: post a success check run, lift any verification-stuck
+    pause, journal `verification.passed`, deliver the pass to the work agent
+    (`deliverVerificationPass`), and report `overdeck/test` as success.
+
+After a pass, `createRequestReviewPipeline`
+(`src/lib/cloister/request-review-pipeline.ts`) pushes the branch
+(`pushBranch`) and dispatches the review convoy (`dispatchReview`).
+
+Verification starts from two doors: `startRequestReviewPipeline`
+(`src/dashboard/server/routes/workspaces/review-pipeline.ts`), reached by
+`pan done`, `pan review request`, the PR webhook, and deacon-lite; and
+`triggerMerge` (`src/dashboard/server/routes/workspaces/merge-ops.ts`, log
+prefix `merge-verify`), which runs the same checks again at merge time with no
+target-branch sync, skipped when CI is already green on the exact tip commit
+(PAN-2487). So one issue's gates can run twice.
+
 ### One full-suite run per push, on CI (PAN-3965)
 
 For a project with CI, the verification gate runs **typecheck and lint only**
