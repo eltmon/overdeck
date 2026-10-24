@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T10:56:29Z · model: claude-opus-5-5 · open: 846_
+_Last sequenced: 2026-10-24T11:03:47Z · model: claude-opus-5-5 · open: 847_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -23,51 +23,52 @@ _Last sequenced: 2026-10-24T10:56:29Z · model: claude-opus-5-5 · open: 846_
 | 16 | PAN-4595 | S | critical | ok |  |  | CLI health never registers the transcript heartbeat, so Herdr agents read STUCK after 30 min and invite recovery on healthy agents. |
 | 17 | PAN-4597 | S | high | ok |  |  | Awaiting Merge hides approved green PRs: ready needs a 5-min gate answer only auto-merge refreshes. Merge machinery: supervised handoff |
 | 18 | PAN-4598 | M | critical | ok |  |  | No UAT batch has assembled since the cut (newest 2026-09-20, failed); Flywheel card offers only an escape-hatch merge link |
-| 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
+| 19 | PAN-4614 | XS | high | ok |  |  | In pipeline: union-merge the shared concerns.md so concurrent PRs stop conflicting and re-verifying at the merge door |
 | 20 | PAN-4609 | S | medium | ok |  |  | In pipeline: docs for what verification runs, why it is slow (CPU admission queue), and how to pick local gates |
-| 21 | PAN-4610 | S | critical | ok |  |  | Torn-read poller deletes a half-written CPU-admission ticket, stranding a verification worker forever; land with/before PAN-4546 |
-| 22 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
-| 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
-| 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
-| 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
+| 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
+| 22 | PAN-4610 | S | critical | ok |  |  | Torn-read poller deletes a half-written CPU-admission ticket, stranding a verification worker forever; land with/before PAN-4546 |
+| 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
+| 24 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
+| 25 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 26 | PAN-4582 | M | high | ok |  |  | Herdr splits every conversation pane out of one shared tab, so new PTYs get 0-1 rows and the Terminal tab is blank |
-| 27 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
-| 28 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
-| 29 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
-| 30 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
-| 31 | PAN-4166 | S | critical | ok |  |  | write-sequence replays every superseded sequence commit and dies on an old one, so the ranked order never reaches origin/main |
-| 32 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
-| 33 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
-| 34 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
-| 35 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
-| 36 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
-| 37 | PAN-4240 | S | critical | ok |  |  | Closed-issue reaper rm -rf's polyrepo workspaces with unmerged work: merge check runs in the non-git root and reads 'no-branch'. |
-| 38 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
-| 39 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
-| 40 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
-| 41 | PAN-4241 | XS | high | ok |  |  | computeWorkspaceRepoRoots joins an absolute repoPath, so polyrepo repos named unlike their path (fe/frontend) are skipped by pan task done. |
-| 42 | PAN-4396 | XS | critical | ok |  |  | test-skip gate fails closed on any branch diff over 1 MiB (execFile default maxBuffer); one-line fix unblocks big PRs |
-| 43 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
-| 44 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
-| 45 | PAN-3630 | M | critical | ok |  |  | pan tell reported three deliveries to a live agent, moved all three to read/, and the agent received none — the delivery door lies. |
-| 46 | PAN-3805 | S | critical | needs-refinement |  |  | Codex idle poke spawns codex exec instead of the app-server door; failed sends still tick the counter and pause healthy agents |
-| 47 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
-| 48 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
-| 49 | PAN-4439 | S | high | ok |  |  | CI relay has no backstop for webhooks missed during pan reload; red test jobs never reach the agent, PRs stall |
-| 50 | PAN-4407 | XS | high | ok |  |  | Every pan vault verb crashes (Commander passes Command as io); setup saves a key but never shows the recovery phrase |
-| 51 | PAN-4392 | XS | high | ok |  |  | pan task done accepts an Item: trailer from another issue's merged commit (history-wide grep); gate passes with no evidence |
-| 52 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
-| 53 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
-| 54 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
-| 55 | PAN-4391 | S | high | ok |  |  | pan worker run fails in polyrepo workspaces because the root is not a git repo; delegation is broken for MYN |
-| 56 | PAN-4390 | S | high | ok |  |  | Polyrepo workspace create runs npm install in the project's parent dir, reports failure and hides the workspace from list |
-| 57 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
-| 58 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
-| 59 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
-| 60 | PAN-4374 | S | high | ok |  |  | Memory extraction has no working provider on subscription-only hosts; nothing extracted since 2026-08-13. Add claude-cli |
-| 61 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
-| 62 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
-| 63 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
+| 27 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
+| 28 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
+| 29 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
+| 30 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
+| 31 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
+| 32 | PAN-4166 | S | critical | ok |  |  | write-sequence replays every superseded sequence commit and dies on an old one, so the ranked order never reaches origin/main |
+| 33 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
+| 34 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
+| 35 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
+| 36 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
+| 37 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
+| 38 | PAN-4240 | S | critical | ok |  |  | Closed-issue reaper rm -rf's polyrepo workspaces with unmerged work: merge check runs in the non-git root and reads 'no-branch'. |
+| 39 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
+| 40 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
+| 41 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
+| 42 | PAN-4241 | XS | high | ok |  |  | computeWorkspaceRepoRoots joins an absolute repoPath, so polyrepo repos named unlike their path (fe/frontend) are skipped by pan task done. |
+| 43 | PAN-4396 | XS | critical | ok |  |  | test-skip gate fails closed on any branch diff over 1 MiB (execFile default maxBuffer); one-line fix unblocks big PRs |
+| 44 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
+| 45 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
+| 46 | PAN-3630 | M | critical | ok |  |  | pan tell reported three deliveries to a live agent, moved all three to read/, and the agent received none — the delivery door lies. |
+| 47 | PAN-3805 | S | critical | needs-refinement |  |  | Codex idle poke spawns codex exec instead of the app-server door; failed sends still tick the counter and pause healthy agents |
+| 48 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
+| 49 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
+| 50 | PAN-4439 | S | high | ok |  |  | CI relay has no backstop for webhooks missed during pan reload; red test jobs never reach the agent, PRs stall |
+| 51 | PAN-4407 | XS | high | ok |  |  | Every pan vault verb crashes (Commander passes Command as io); setup saves a key but never shows the recovery phrase |
+| 52 | PAN-4392 | XS | high | ok |  |  | pan task done accepts an Item: trailer from another issue's merged commit (history-wide grep); gate passes with no evidence |
+| 53 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
+| 54 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
+| 55 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
+| 56 | PAN-4391 | S | high | ok |  |  | pan worker run fails in polyrepo workspaces because the root is not a git repo; delegation is broken for MYN |
+| 57 | PAN-4390 | S | high | ok |  |  | Polyrepo workspace create runs npm install in the project's parent dir, reports failure and hides the workspace from list |
+| 58 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
+| 59 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
+| 60 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
+| 61 | PAN-4374 | S | high | ok |  |  | Memory extraction has no working provider on subscription-only hosts; nothing extracted since 2026-08-13. Add claude-cli |
+| 62 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
+| 63 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
+| 64 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
@@ -926,183 +927,187 @@ New issue filed 2026-10-24 after PR #4587 was approved, green and clean yet abse
 
 New since the prior run and labeled substrate-improvement: the merge train reconciler has built no UAT batch for any project since the PAN-3917 cut, so approved green PRs reach main only through a hidden escape-hatch link. It ranks into the open slot beside PAN-4597 (Awaiting Merge hides ready PRs) because both block the operator's last step from approved PR to main; the ACs are concrete (reconciler decision tests, per-row Merge button, honest copy, MERGE-WORKFLOW.md).
 
-### PAN-4572 (rank 19)
+### PAN-4614 (rank 19)
 
-PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
+New issue filed 2026-10-24 after concerns.md conflicts blocked PR #4601 (PAN-4595) twice at the merge door, each round costing a re-verification and re-review; 14 merged PRs touched the file this month. The fix is one .gitattributes line plus a rebase test, labeled substrate-improvement, and it is already in pipeline, so it sits with the in-pipeline top tier.
 
 ### PAN-4609 (rank 20)
 
 New in-pipeline docs issue filed after the 2026-10-24 local-gate trim; pinned at free rank 20 next to the other in-pipeline verification work it documents (PAN-4546, PAN-4531).
 
-### PAN-4610 (rank 21)
+### PAN-4572 (rank 21)
+
+PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
+
+### PAN-4610 (rank 22)
 
 New issue since the prior run. A waiter poll can unlink a ticket between open(wx) and the JSON write, and the waiter never checks its own ticket, so a live worker queues forever (PAN-4532 sat 40+ min while later gates were admitted). This silently stops verification for that issue, so it is pipeline-blocking substrate work; it takes the free slot right after the in-pipeline cluster and must land with or before PAN-4546, which edits the same admission module.
 
-### PAN-4586 (rank 22)
+### PAN-4586 (rank 23)
 
 New issue. Verified against herdr 0.9.1: HerdrApiClient.call returns response.result, whose pane_read text sits under read.text, but readHerdrPaneText, diagnoseDetectionFailure and the herdr-submit composer read a top-level text, so every pane-text consumer on the default backend sees an empty string. A three-site fix plus corrected test stubs; placed in a free rank slot just above the Herdr pane-sizing pair (PAN-4582, PAN-3952) because it is smaller and likely explains part of PAN-3952's 'pane read returns nothing' observation.
 
-### PAN-4217 (rank 23)
+### PAN-4217 (rank 24)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
 
-### PAN-4219 (rank 24)
+### PAN-4219 (rank 25)
 
 New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.
-
-### PAN-4229 (rank 25)
-
-New bug filed from PAN-4222: after all eleven top-level items were closed through pan task done, pan done refused on 39 pending acceptance-criterion children that pan task next never surfaced, and the agent had to make 39 empty trailer commits to get through. It blocks completion of every issue planned with nested ACs, the default planner shape, so it ranks critical beside PAN-4217 and PAN-4219. It is marked needs-refinement because it describes the same missing AC-status writer as PAN-4217 and PAN-4219; the three should be fixed by one change and the extras closed as duplicates.
 
 ### PAN-4582 (rank 26)
 
 New issue. Verified 2026-10-23: HerdrBackend.startAgent splits each agent pane out of its workspace's single tab, so the shared conversations workspace halved space until the newest pane had height 0 and a 1-row PTY; restored idle shells after reboot are never reaped. Every conversation past about the fifth renders a blank Terminal tab, and issue workspaces share the split path. Ranked beside PAN-3952 (same Herdr pane-sizing family) because both blind pane consumers; manual relief was applied but recurs on the next conversation spawn.
 
-### PAN-3566 (rank 27)
+### PAN-4229 (rank 27)
+
+New bug filed from PAN-4222: after all eleven top-level items were closed through pan task done, pan done refused on 39 pending acceptance-criterion children that pan task next never surfaced, and the agent had to make 39 empty trailer commits to get through. It blocks completion of every issue planned with nested ACs, the default planner shape, so it ranks critical beside PAN-4217 and PAN-4219. It is marked needs-refinement because it describes the same missing AC-status writer as PAN-4217 and PAN-4219; the three should be fixed by one change and the extras closed as duplicates.
+
+### PAN-3566 (rank 28)
 
 New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.
 
-### PAN-3952 (rank 28)
+### PAN-3952 (rank 29)
 
 On the default backend the harness TUI renders into a one-line terminal until an operator opens it, so stuck detection, readiness scans, health capture, AUQ/permission detection and screenshots all see nothing. Deterministic pane sizing in the Herdr adapter is a small change with fleet-wide effect.
 
-### PAN-3285 (rank 29)
+### PAN-3285 (rank 30)
 
 New this pass, labelled critical. A supervisor unit pinned to a pan reload generation SIGTERMs every correctly-running dashboard and is structurally incapable of starting a replacement; the observed outcome was a 3.5-hour total outage with 1,107 consecutive failed recovery attempts and no operator escalation. Manual recovery also fails, because the supervisor kills the operator's dashboard within 30 seconds. Nothing else in the backlog can take the whole product down for hours with the recovery path itself broken.
 
-### PAN-3524 (rank 30)
+### PAN-3524 (rank 31)
 
 Triage: verify the --changed verification-loop relaunch against deacon-lite's smaller suppression surface. Kept in the critical band: an unstoppable server-owned test loop is the worst kind of runaway.
 
-### PAN-4166 (rank 31)
+### PAN-4166 (rank 32)
 
 New issue (2026-09-24), the only delta since the prior run. pushPlanArtifacts replays the whole local range through git merge-tree, so one superseded rendering of .pan/backlog/sequence.md aborts the push and origin keeps serving a stale ranked order that the Flywheel reads for pickup; the silent reset --keep refusal then adds another unpushed commit every run, so the failure compounds. Ranked 31 rather than into the vacated top slots: the acute incident was hand-repaired (main is level with origin, the identical untracked drafts removed), so the bug is latent until the next untracked-draft collision, and it ranks behind the actively-biting pipeline blockers at 19-30 while staying in the critical band because a stale sequence misdirects every Flywheel pickup. Root cause is verified in the body with a named file, a proposed fix, and three mechanical acceptance criteria.
 
-### PAN-3250 (rank 32)
+### PAN-3250 (rank 33)
 
 New this pass, labelled blocks-main and substrate. Two spawn sites branch from the local HEAD or defaultBranch instead of origin/main, so every new feature branch inherits whatever unpushed commits are sitting on the shared local main. Four branches were already contaminated when it was filed, two of them created after the problem was identified, and their PRs read MERGEABLE/CLEAN. It spreads with each spawn, so the cost of leaving it grows.
 
-### PAN-3946 (rank 33)
+### PAN-3946 (rank 34)
 
 Merge-safety bug seen on PR #3933: an approval on fd3334e6 satisfied the request for head ae9d82f0. Approval must count only when its commit_id is the current head; add --force as the explicit override.
 
-### PAN-2954 (rank 34)
+### PAN-2954 (rank 35)
 
 Dependency cleared: PAN-2882 (the missing GitLab merged-MR oracle this blocked on) closed since the last pass, so postMergeLifecycle's GitLab refusal is now directly workable. Re-ranked up from 67 to sit with the other unblocked critical merge-path fixes.
 
-### PAN-3935 (rank 35)
+### PAN-3935 (rank 36)
 
 The PAN-2858 defect in a new shape: complete-planning promotes to the primary checkout, where nothing commits, and removes the workspace copy the planning commit would have picked up. Evidence: untracked pan-3927.md on main. Also a write-to-main hazard.
 
-### PAN-3657 (rank 36)
+### PAN-3657 (rank 37)
 
 New this pass. The merge-train queues endpoint correctly gathers eligible candidates and then hands them to the monorepo queue builder, which does git rev-parse against a polyrepo project root that is not a git repository — so every polyrepo project's train is permanently empty while monorepo projects populate fine. MYN and Auricle cannot use merge trains at all until this lands.
 
-### PAN-4240 (rank 37)
+### PAN-4240 (rank 38)
 
 New this pass. The deacon closed-issue reaper gates deletion on isBranchMerged, which runs git in the polyrepo project root; that root is not a git repository, so the check silently returns no-branch and the fallback rmSync deletes a workspace holding unmerged, local-only commits, with nothing logged. It destroyed the MIN-489 workspace twice. Silent data loss in the substrate outranks routine work, and the fix is small and well specified (per-sub-repo check, unknown means skip, no rmSync over worktrees, log actions). It sits beside PAN-3657 and PAN-3708 in the same polyrepo-root-is-not-git bug class.
 
-### PAN-3565 (rank 38)
+### PAN-3565 (rank 39)
 
 New this pass. Three review-lifecycle defects, one of them severe: when all four reviewer lanes died at spawn on a record lock, the supervisor wrote a synthesis declaring CHANGES REQUESTED with every lane marked failed — an infrastructure flake recorded as a real code verdict. It was caught only because a human was watching live. Same integrity family as PAN-3283 and PAN-2746.
 
-### PAN-3554 (rank 39)
+### PAN-3554 (rank 40)
 
 New this pass. Main stayed red for about five hours because nothing owns the state 'the latest main-push CI run failed' — no needs-you, no activity entry, no strike recommendation. The failure actively hides itself: the merge gate renders red main as an empty eligible set, so the operator sees a quiet queue rather than an alarm. Detection must not depend on the flywheel being awake, since it frequently is not. Condition changed after the PAN-3917 cut: the merge gate that rendered red main as an empty queue was deleted by the cut; red-main ownership still needs a home — re-scope.
 
-### PAN-3532 (rank 40)
+### PAN-3532 (rank 41)
 
 New this pass. The CI test job runs root npm test, whose frontend leg is a hand-picked list of files, so two frontend test files were red on main for hours while every main CI run reported success. Green CI that does not mean green is worse than no CI, because every downstream gate and every close-out trusts it.
 
-### PAN-4241 (rank 41)
+### PAN-4241 (rank 42)
 
 New this pass. computeWorkspaceRepoRoots builds its fallback candidate by joining the workspace path with an absolute repoPath, so any polyrepo repo whose configured name differs from its directory is never found. That makes pan task done refuse valid Item trailers and also affects head snapshots and merge completeness for MYN. The fix is a one-line candidate change plus a test, and a symlink workaround exists, so it ranks high rather than critical.
 
-### PAN-4396 (rank 42)
+### PAN-4396 (rank 43)
 
 New issue. The test-skip verification gate fails every branch whose diff exceeds 1 MiB before it inspects a test, as PAN-4362 showed; that blocks verification outright for large but legitimate PRs. The fix is one maxBuffer argument, so it ranks in the critical pipeline block.
 
-### PAN-3085 (rank 43)
+### PAN-3085 (rank 44)
 
 New this pass and a one-line class of defect with outsized cost. Review feedback is written to the resolved .overdeck/feedback directory but the path handed to the work agent is a hardcoded .pan/feedback that no longer exists after the rebrand, and the deacon merge gate reads the same dead path. Agents are told to fix findings they cannot find, and the gate counts zero feedback files no matter how many exist. Condition changed after the PAN-3917 cut: the deacon merge gate is gone; only the agent-side .pan/feedback path pointer remains to verify — re-scope.
 
-### PAN-3653 (rank 44)
+### PAN-3653 (rank 45)
 
 New this pass, labelled blocks-main. A strike that correctly stops because its gate is blocked by red main has no owner that wakes it when main goes green: the session stays alive, so liveness calls it healthy and pan recover refuses with 'already has a live harness runtime'. The urgent path exists precisely to unblock the pipeline fast, so a strike that silently idles through the clearing of its own blocker defeats the mechanism.
 
-### PAN-3630 (rank 45)
+### PAN-3630 (rank 46)
 
 New this pass. pan tell reported successful delivery three times to a live, heart-beating agent, moved all three messages into the read mailbox, and the agent's transcript shows it received none of them. The delivery door is the sanctioned way every part of the system talks to a running agent; a door that lies about delivery makes every downstream 'we told it' claim unreliable.
 
-### PAN-3805 (rank 46)
+### PAN-3805 (rank 47)
 
 Idle remediation is now deacon-lite nudge routines; triage asks to verify the Codex app-server delivery bypass against that implementation. The persistent-session invariant still forbids codex exec; rank held.
 
-### PAN-3560 (rank 47)
+### PAN-3560 (rank 48)
 
 New this pass. Under concurrent review convoys the PTY supervisor returns 502 'input echo confirmation failed' fleet-wide, so no agent can be booted or re-booted and pipeline feedback delivery fails while load is high — confirmed across at least six unrelated agents in one hour. Delivery failing exactly when the pipeline is busiest is what turns a load spike into a stall.
 
-### PAN-3520 (rank 48)
+### PAN-3520 (rank 49)
 
 New this pass. The test gate records a real 'test failed' verdict for uniform 5000ms timeout signatures under host load, proven on multiple branches where the same files pass in isolation in about 19 seconds. Every false verdict costs a full rework cycle and another saturated re-test, so this is both a correctness and a cost fix. Retrying timeout-only failures in isolation before writing a verdict is the minimal change.
 
-### PAN-4439 (rank 49)
+### PAN-4439 (rank 50)
 
 New issue. The polling backstop for the CI failure relay was deleted in the Cut, so a check that completes while the dashboard reloads is never relayed and the PR stalls. Reloads are frequent, and its stated dependency PAN-4432 has closed, so it ranks high in the pipeline block.
 
-### PAN-4407 (rank 50)
+### PAN-4407 (rank 51)
 
 New issue. All fifteen pan vault verbs throw from the CLI, and setup leaves a vault the user cannot join because the recovery phrase is never printed. Session Vault is shipped and is the base of the Anywhere hand-off, so this XS fix is high importance.
 
-### PAN-4392 (rank 51)
+### PAN-4392 (rank 52)
 
 New issue. hasTrailerCommit greps all reachable history, so generic item ids such as docs or tests are satisfied by any merged commit and the checklist gate certifies work that was never committed. It is a gate-integrity hole with an XS fix.
 
-### PAN-3500 (rank 52)
+### PAN-3500 (rank 53)
 
 New this pass. A review sub-role that had already written its report was resumed by a later message and edited seven tracked files, and pan start --fresh then auto-committed those reviewer-owned changes into the feature history during sync-main. Review isolation is currently prompt-level only; it has to be mechanical, because a contaminated branch is very hard to detect after the fact.
 
-### PAN-3313 (rank 53)
+### PAN-3313 (rank 54)
 
 New this pass. A transient upstream stream error benches CLIProxy's only auth entry, so every GPT-routed request returns 503 auth_unavailable until an internal cooldown lapses — 35 failures against 14 successes in one hour, with valid credentials throughout. The message reads as 'your credentials are gone' and sends the operator to re-authenticate, which fixes nothing. Every GPT-routed agent on the machine is affected at once.
 
-### PAN-3282 (rank 54)
+### PAN-3282 (rank 55)
 
 New this pass. Review agents terminate before writing their report across five issues and two projects, twice recurring after a successful recovery, leaving a verdict-shaped status with no artifact behind it and a stuck flag that blocks progress until someone restarts the reviewer by hand. This is the upstream condition PAN-3283 then converts into a false passed verdict.
 
-### PAN-4391 (rank 55)
+### PAN-4391 (rank 56)
 
 New issue. Worker delegation is the supported path for sub-tasks, and it fails outright in every polyrepo workspace, so MYN issues cannot delegate without a manual --cwd workaround. Polyrepo correctness bugs sit in the high band in this sequence.
 
-### PAN-4390 (rank 56)
+### PAN-4390 (rank 57)
 
 New issue. Workspace creation for a polyrepo project reports failure and omits the workspace from pan workspace list although it is usable, which misleads every caller. It belongs with the other polyrepo substrate bugs.
 
-### PAN-2695 (rank 57)
+### PAN-2695 (rank 58)
 
 Concurrent review dispatches race fresh-spawn vs resume, second dispatch resumes a still-booting parent and wedges.
 
-### PAN-2742 (rank 58)
+### PAN-2742 (rank 59)
 
 Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as infra-failure, bypassing review.
 
-### PAN-2706 (rank 59)
+### PAN-2706 (rank 60)
 
 Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.
 
-### PAN-4374 (rank 60)
+### PAN-4374 (rank 61)
 
 New issue split out of the now-closed PAN-4370. No memory observation has been extracted on the operator's host since 2026-08-13 because neither provider can authenticate, so the memory substrate is silently dead; it informs PAN-1449.
 
-### PAN-4344 (rank 61)
+### PAN-4344 (rank 62)
 
 New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.
 
-### PAN-4550 (rank 62)
+### PAN-4550 (rank 63)
 
 Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
 
-### PAN-4566 (rank 63)
+### PAN-4566 (rank 64)
 
 Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
 
@@ -1170,10 +1175,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 
 Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
 
-### PAN-3043 (rank 85)
-
-Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1181,10 +1182,10 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T10:56:29Z",
+  "generatedAt": "2026-10-24T11:03:47Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 846,
+  "openCount": 847,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1417,7 +1418,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4572",
-      "rank": 19,
+      "rank": 21,
       "size": "M",
       "importance": "medium",
       "score": 58,
@@ -1430,7 +1431,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4586",
-      "rank": 22,
+      "rank": 23,
       "size": "XS",
       "importance": "critical",
       "score": 90,
@@ -1443,7 +1444,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4217",
-      "rank": 23,
+      "rank": 24,
       "size": "S",
       "importance": "critical",
       "score": 87,
@@ -1456,7 +1457,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4219",
-      "rank": 24,
+      "rank": 25,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1469,7 +1470,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4229",
-      "rank": 25,
+      "rank": 27,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -1497,7 +1498,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3566",
-      "rank": 27,
+      "rank": 28,
       "size": "XS",
       "importance": "critical",
       "score": 92,
@@ -1510,7 +1511,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3952",
-      "rank": 28,
+      "rank": 29,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1523,7 +1524,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3285",
-      "rank": 29,
+      "rank": 30,
       "size": "M",
       "importance": "critical",
       "score": 92,
@@ -1536,7 +1537,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3524",
-      "rank": 30,
+      "rank": 31,
       "size": "M",
       "importance": "critical",
       "score": 90,
@@ -1549,7 +1550,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4166",
-      "rank": 31,
+      "rank": 32,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1562,7 +1563,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3250",
-      "rank": 32,
+      "rank": 33,
       "size": "S",
       "importance": "critical",
       "score": 90,
@@ -1575,7 +1576,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3946",
-      "rank": 33,
+      "rank": 34,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1588,7 +1589,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-2954",
-      "rank": 34,
+      "rank": 35,
       "size": "XS",
       "importance": "critical",
       "score": 90,
@@ -1601,7 +1602,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3935",
-      "rank": 35,
+      "rank": 36,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -1614,7 +1615,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3657",
-      "rank": 36,
+      "rank": 37,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1627,7 +1628,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4240",
-      "rank": 37,
+      "rank": 38,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1640,7 +1641,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3565",
-      "rank": 38,
+      "rank": 39,
       "size": "M",
       "importance": "critical",
       "score": 88,
@@ -1653,7 +1654,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3554",
-      "rank": 39,
+      "rank": 40,
       "size": "M",
       "importance": "critical",
       "score": 88,
@@ -1666,7 +1667,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3532",
-      "rank": 40,
+      "rank": 41,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1679,7 +1680,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4241",
-      "rank": 41,
+      "rank": 42,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -1692,7 +1693,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4396",
-      "rank": 42,
+      "rank": 43,
       "size": "XS",
       "importance": "critical",
       "score": 86,
@@ -1705,7 +1706,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3085",
-      "rank": 43,
+      "rank": 44,
       "size": "XS",
       "importance": "critical",
       "score": 88,
@@ -1718,7 +1719,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3653",
-      "rank": 44,
+      "rank": 45,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1731,7 +1732,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3630",
-      "rank": 45,
+      "rank": 46,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1744,7 +1745,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3805",
-      "rank": 46,
+      "rank": 47,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1757,7 +1758,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3560",
-      "rank": 47,
+      "rank": 48,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1770,7 +1771,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3520",
-      "rank": 48,
+      "rank": 49,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1783,7 +1784,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4439",
-      "rank": 49,
+      "rank": 50,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -1796,7 +1797,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4407",
-      "rank": 50,
+      "rank": 51,
       "size": "XS",
       "importance": "high",
       "score": 84,
@@ -1809,7 +1810,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4392",
-      "rank": 51,
+      "rank": 52,
       "size": "XS",
       "importance": "high",
       "score": 82,
@@ -1822,7 +1823,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3500",
-      "rank": 52,
+      "rank": 53,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1835,7 +1836,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3313",
-      "rank": 53,
+      "rank": 54,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1848,7 +1849,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-3282",
-      "rank": 54,
+      "rank": 55,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1861,7 +1862,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4391",
-      "rank": 55,
+      "rank": 56,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -1874,7 +1875,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4390",
-      "rank": 56,
+      "rank": 57,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -1887,7 +1888,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-2695",
-      "rank": 57,
+      "rank": 58,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -1900,7 +1901,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-2742",
-      "rank": 58,
+      "rank": 59,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -1913,7 +1914,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-2706",
-      "rank": 59,
+      "rank": 60,
       "size": "M",
       "importance": "high",
       "score": 84,
@@ -1926,7 +1927,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4374",
-      "rank": 60,
+      "rank": 61,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -1939,7 +1940,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4344",
-      "rank": 61,
+      "rank": 62,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -1952,7 +1953,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4550",
-      "rank": 62,
+      "rank": 63,
       "size": "XS",
       "importance": "medium",
       "score": 64,
@@ -1965,7 +1966,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4566",
-      "rank": 63,
+      "rank": 64,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -11731,7 +11732,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
     },
     {
       "issue": "PAN-4610",
-      "rank": 21,
+      "rank": 22,
       "size": "S",
       "importance": "critical",
       "score": 87,
@@ -11739,6 +11740,19 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "dependsOn": [],
       "why": "Torn-read poller deletes a half-written CPU-admission ticket, stranding a verification worker forever; land with/before PAN-4546",
       "rationale": "New issue since the prior run. A waiter poll can unlink a ticket between open(wx) and the JSON write, and the waiter never checks its own ticket, so a live worker queues forever (PAN-4532 sat 40+ min while later gates were admitted). This silently stops verification for that issue, so it is pipeline-blocking substrate work; it takes the free slot right after the in-pipeline cluster and must land with or before PAN-4546, which edits the same admission module.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4614",
+      "rank": 19,
+      "size": "XS",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: union-merge the shared concerns.md so concurrent PRs stop conflicting and re-verifying at the merge door",
+      "rationale": "New issue filed 2026-10-24 after concerns.md conflicts blocked PR #4601 (PAN-4595) twice at the merge door, each round costing a re-verification and re-review; 14 merged PRs touched the file this month. The fix is one .gitattributes line plus a rebase test, labeled substrate-improvement, and it is already in pipeline, so it sits with the in-pipeline top tier.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13255,6 +13269,13 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4614",
+      "to": "PAN-4595",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
