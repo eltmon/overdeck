@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4589",
   "created": "2026-10-24T08:19:18.820Z",
-  "updated": "2026-10-24T09:08:40.595Z",
+  "updated": "2026-10-24T09:08:58.461Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "mode-detection-dagger-reason.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T09:08:40.594Z"
+    },
+    "status-webhook-records-pass.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:08:58.461Z"
     }
   }
 }
