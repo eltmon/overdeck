@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4589",
   "created": "2026-10-24T08:19:18.820Z",
-  "updated": "2026-10-24T09:10:55.834Z",
+  "updated": "2026-10-24T09:11:11.403Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "to-checks-state-status-state.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T09:10:55.834Z"
+    },
+    "to-checks-state-status-state.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T09:11:11.403Z"
     }
   }
 }
