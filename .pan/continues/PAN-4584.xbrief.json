@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4584",
   "created": "2026-10-24T07:25:13.534Z",
-  "updated": "2026-10-24T07:53:16.815Z",
+  "updated": "2026-10-24T07:53:35.070Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "row-archive-pending.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T07:53:16.814Z"
+    },
+    "action-menu-archive.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T07:53:35.069Z"
     }
   }
 }
