@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4585",
   "created": "2026-10-24T08:22:26.190Z",
-  "updated": "2026-10-24T08:54:13.627Z",
+  "updated": "2026-10-24T09:07:58.259Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-10-24T08:54:00.427Z"
     },
     "semgrep-install-module": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4585",
-      "claimedAt": "2026-10-24T08:54:13.627Z"
+      "claimedAt": "2026-10-24T08:54:13.627Z",
+      "doneAt": "2026-10-24T09:07:58.258Z"
     }
   }
 }
