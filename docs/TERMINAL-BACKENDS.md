@@ -128,12 +128,14 @@ manifest. That decides how a launch is made, per harness, in `detectionPolicyFor
 | `kimi-code` | the kimi launcher/supervisor | not required | pane-bound |
 | `ohmypi` / `muse` | `omp` / the muse TUI, both under Overdeck's wrapper | not required | pane-bound |
 
-A **pane-bound** launch splits the pane, stamps `pane.report_metadata` (the four tokens plus
-`agentId`, and `title` / `display_agent` so the Herdr UI still names it), sends the launcher, and
-returns the pane reference immediately. Herdr's agent state for that pane stays `unknown`, which is
-the truth. Nothing waits for a detection that cannot happen — waiting for it is what killed
-`agent-pan-3705-review` (codex, gpt-5.6-sol) 61s after launch on 2026-09-19 while its app-server
-host was already connected and writing `appserver-events.jsonl`.
+A **pane-bound** launch opens a new tab for the agent (PAN-4582 — splitting a pane out of the
+workspace's shared tab halved the remaining rows on every launch), sizes its PTY to the tab's
+layout rect, stamps `pane.report_metadata` (the four tokens plus `agentId`, and `title` /
+`display_agent` so the Herdr UI still names it), sends the launcher, and returns the pane reference
+immediately. Herdr's agent state for that pane stays `unknown`, which is the truth. Nothing waits
+for a detection that cannot happen — waiting for it is what killed `agent-pan-3705-review` (codex,
+gpt-5.6-sol) 61s after launch on 2026-09-19 while its app-server host was already connected and
+writing `appserver-events.jsonl`.
 
 Everything downstream follows the pane instead of the agent record:
 
@@ -169,7 +171,7 @@ The primitives live in `src/lib/terminal-backends/launch.ts` and go through the 
 
 | Primitive | Herdr | tmux |
 | --- | --- | --- |
-| `closeAgentPane(agentId)` | `pane.close` on every pane the agent occupies: the live agent's pane, every pane stamped with its `agentId` token, and the pane its `state.json` recorded (`backend: herdr`, `paneId`), per `herdr-agent-terminals.ts` — **with no liveness check**, so a residue pane whose shell is back at `$` closes too. The recorded pane is the fallback once a Herdr restore has dropped every pane's tokens (PAN-3966); it is skipped when another agent's `agentId` token, or a detected harness under another name, sits in it. A workspace the agent owns alone (its label or `issue` token is the agent id: a role run such as `sequencer-runner`) closes whole with `workspace.close`, root shell included. An issue workspace is shared by the issue's agents (`launchAgentPane` splits every role's pane into it), so a stop never closes it. A same-name tmux session left from before the host moved to Herdr is killed as well. | `kill-session` through the tmux adapter, when the session exists. |
+| `closeAgentPane(agentId)` | `pane.close` on every pane the agent occupies: the live agent's pane, every pane stamped with its `agentId` token, and the pane its `state.json` recorded (`backend: herdr`, `paneId`), per `herdr-agent-terminals.ts` — **with no liveness check**, so a residue pane whose shell is back at `$` closes too. The recorded pane is the fallback once a Herdr restore has dropped every pane's tokens (PAN-3966); it is skipped when another agent's `agentId` token, or a detected harness under another name, sits in it. A workspace the agent owns alone (its label or `issue` token is the agent id: a role run such as `sequencer-runner`) closes whole with `workspace.close`, root shell included. An issue workspace is shared by the issue's agents (`launchAgentPane` opens every role its own tab in it, PAN-4582), so closing one agent's pane closes only its tab — never the workspace — and a stop never closes the workspace either. Closing a workspace's last pane closes the workspace itself. A same-name tmux session left from before the host moved to Herdr is killed as well. | `kill-session` through the tmux adapter, when the session exists. |
 | `closeIssuePanes(issueId, { roles? })` | `pane.close` on every inventory pane whose `issue` token matches, optionally filtered by `role` — never an operator conversation pane (`conv-*`). Without `roles` (close-out) the issue's workspaces close whole with `workspace.close`, root shell and untagged residue included. They are found by `issue` token, or by label once a Herdr restore has dropped the token (#4096). A workspace holding a pane that names another owner (another issue's token, or a `conv-*` agent) is not closed whole; only the issue's and untagged panes in it are closed. With `roles`, an untagged pane is left alone. | No-op — the callers' session-name scans already reach every tmux session, and a tmux pane carries no tokens. |
 
 Both never throw; a Herdr socket failure closes nothing and the stop still completes.
@@ -316,6 +318,16 @@ session restore drops every workspace and pane token and keeps the labels (seen 
 token first, then the label of a workspace that carries no `issue` token, and re-stamps the token on
 the workspace it re-adopts (`herdr-workspaces.ts`, #4096). A token-only lookup created a duplicate
 workspace on every launch after a restore.
+
+A restore also strands the panes it dropped tokens from: with no `agentId` token and never
+detected, they come back as plain shells nothing else closes. The hygiene scheduler's residue
+reaper (`herdr-residue-reaper.ts`, PAN-4582) closes them: a candidate (no `agentId` token, not
+detected, process back at its shell prompt) is closed only once it has been seen on two
+consecutive sweeps — a pane mid-launch looks identical to a residue shell for the few seconds
+before Overdeck stamps its tokens, and a single sweep cannot tell them apart. The workspace's last
+pane is never closed even if it is residue, since it is the workspace's root shell and closing it
+would close the workspace. The reaper runs from `hygiene-scheduler.ts` every 10 minutes and honors
+the global Deacon pause/freeze like every other hygiene routine.
 
 `BackendPane.agentId` (PAN-3920) carries the Overdeck agent id into the dashboard's pane
 inventory: on Herdr it is the pane's `agentId` token, else Herdr's live agent name — but only on
@@ -831,6 +843,14 @@ Verified live on 2026-09-18 against the running `overdeck` session.
   frame. Invalid bytes become U+FFFD. Decoding as Latin-1 (`'binary'`) was the PAN-4310 mojibake
   bug. (`TextDecoder` was tried first but `tsconfig.evals.json` restricts `types` to `["node"]`,
   which does not expose it as a type; `StringDecoder` has the same streaming-buffer semantics.)
+- **Only a `control` attach sets the PTY size** (PAN-4582). `observe --cols/--rows` never resizes
+  anything — an observe stream stays at the size it opened with for its whole life, even across a
+  later resize. A `control` attach's `--cols`/`--rows`, or a `terminal.resize` command on its
+  stdin, resizes the PTY; control frames follow it. Herdr allows one controller per terminal: a
+  second `control` attach is refused on stderr with `already has an attached client` and exits 0.
+  A brand-new PTY copies the size of the session's FOCUSED pane (any workspace, not the new pane's
+  own tab), and the headless server never pushes a pane's own layout rect to its PTY — a launch has
+  to size it explicitly.
 - Lifecycle events arrive as `pane_updated` records carrying the pane's `agent_status`: the
   `pane.agent_status_changed` subscription is per-pane (it requires a `pane_id`), so the
   workspace-wide stream reports state transitions through `pane_updated`. Verified live —
@@ -850,9 +870,10 @@ Verified live on 2026-09-18 against the running `overdeck` session.
 `agent.start {kind}` builds the command line itself from Herdr's agent manifest, so it cannot run
 Overdeck's generated launcher script — the script that carries the provider exports, the
 system-prompt files, the session id, and every harness-specific launch field. The adapter therefore
-splits a pane with the launch env, runs the launcher with `pane.send_input` (text plus Enter in one
-ordered submission), waits for Herdr's own agent detection, and binds the Overdeck agent id as the
-live agent name with `agent.rename`. Herdr then treats the pane as a first-class agent: `agent.prompt`,
+opens a tab with the launch env (`openAgentTab`, PAN-4582), sizes its PTY to the tab's layout rect,
+runs the launcher with `pane.send_input` (text plus Enter in one ordered submission), waits for
+Herdr's own agent detection, and binds the Overdeck agent id as the live agent name with
+`agent.rename`. Herdr then treats the pane as a first-class agent: `agent.prompt`,
 `agent.wait` and the `idle|working|blocked|done` states all work, and both backends run the identical
 launcher. This deviates from the PRD sketch for W8 step 2 on purpose.
 
