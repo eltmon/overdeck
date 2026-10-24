@@ -4,17 +4,17 @@
     "created": "2026-10-24T08:24:52Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4596: An ended held handoff shows 'no saved history' and hides its unsent kickoff",
-    "updated": "2026-10-24T08:36:48.062Z"
+    "updated": "2026-10-24T08:37:44.319Z"
   },
   "plan": {
     "id": "pan-4596",
     "title": "An ended held handoff shows 'no saved history' and hides its unsent kickoff",
-    "status": "proposed",
+    "status": "running",
     "uid": "dcdad02b-319c-4d6a-ae29-201e87250310",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-24T08:24:52Z",
-    "updated": "2026-10-24T08:36:48.062Z",
+    "updated": "2026-10-24T08:37:44.319Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4596",
@@ -568,5 +568,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
