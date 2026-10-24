@@ -57,6 +57,7 @@ import type {
   BackendPane,
   DerivedBranchState,
   DerivedIssueState,
+  DerivedPrOutsidePipeline,
   DerivedPrState,
   DerivedWorkStart,
   IssueAttention,
@@ -77,6 +78,7 @@ import { readOpenOperatorDecision } from '../cloister/operator-decision.js';
 import { runGh } from '../github-quota/run-gh.js';
 import { prListingTtlMs, shouldListPullRequests } from './pr-cache-policy.js';
 import { deriveWorkStart, readWorkStartFacts, type WorkStartFacts } from './work-start-state.js';
+import { pipelineBranchFor, readPrOutsidePipeline } from './pr-outside-pipeline.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -145,6 +147,8 @@ export interface IssueStateFacts {
   readonly operatorDecisionOpen?: boolean;
   /** The workspace journal's read on a post-planning auto-start (PAN-4399), when one exists. */
   readonly workStart?: DerivedWorkStart;
+  /** An open PR on the pipeline branch that no pipeline workspace picked up (PAN-4605). */
+  readonly prOutsidePipeline?: DerivedPrOutsidePipeline;
 }
 
 // ─── the pure function ───────────────────────────────────────────────────────
@@ -198,6 +202,7 @@ function deriveAttention(facts: IssueStateFacts): IssueAttention | undefined {
   if (livePanes.some((pane) => pane.state === 'blocked')) return 'needs-you';
 
   if (facts.apiError) return 'api-error';
+  if (facts.prOutsidePipeline && facts.issueOpen !== false) return 'pr-outside-pipeline';
 
   const stuckAfterMs = facts.stuckAfterMs ?? DEFAULT_STUCK_AFTER_MS;
   const unpushedWork = facts.branch !== undefined
@@ -223,6 +228,7 @@ export function deriveIssueState(facts: IssueStateFacts): DerivedIssueState {
   if (facts.issueOpen === null) derived.trackerUnknown = true;
   if (facts.pr) derived.pr = facts.pr;
   if (facts.branch) derived.branch = facts.branch;
+  if (facts.prOutsidePipeline && facts.issueOpen !== false) derived.prOutsidePipeline = facts.prOutsidePipeline;
   // PAN-4399: a post-planning auto-start's journal read only means anything
   // while there is no PR and no live pane already telling the same story,
   // and the issue is still open — a closed issue is never "waiting on you".
@@ -259,6 +265,8 @@ export interface IssueStateLoaderDeps {
   readonly approvalAtHead?: (issueId: string, headSha: string | null | undefined) => boolean | undefined;
   /** The workspace journal read behind `workStart` (PAN-4399); `readWorkStartFacts` by default. */
   readonly readWorkStart?: (issueId: string, projectPath: string) => WorkStartFacts | null;
+  /** The outside-PR read behind `prOutsidePipeline` (PAN-4605); `readPrOutsidePipeline` by default. */
+  readonly readPrOutsidePipeline?: typeof readPrOutsidePipeline;
 }
 
 /** The tracker's answer for one issue. */
@@ -274,6 +282,19 @@ export interface LoadedPr extends DerivedPrState {
   readonly merged: boolean;
   /** The PR's head commit, which the approval answer is keyed by. */
   readonly headSha?: string | null;
+  /** The PR's head branch, exactly as the forge reports it. */
+  readonly headRef?: string;
+  readonly isDraft?: boolean;
+}
+
+/** PAN-4605: an open, non-draft PR on exactly the issue's pipeline branch. */
+function qualifiesForOutsidePrCheck(issueId: string, pr: LoadedPr | null | undefined): pr is LoadedPr {
+  return !!pr && !pr.merged && pr.isDraft !== true && pr.headRef === pipelineBranchFor(issueId);
+}
+
+async function gitWorktreeList(projectPath: string): Promise<string> {
+  const { stdout } = await execFileAsync('git', ['worktree', 'list', '--porcelain'], { cwd: projectPath, encoding: 'utf-8', timeout: 15_000 });
+  return stdout;
 }
 
 function featureBranchFor(issueId: string): string {
@@ -412,6 +433,8 @@ export function prFromGhRow(row: GhPrRow): LoadedPr | null {
     mergeable: row.mergeable === 'MERGEABLE' ? true : row.mergeable === 'CONFLICTING' ? false : null,
     merged,
     headSha: row.headRefOid ?? null,
+    ...(row.headRefName ? { headRef: row.headRefName } : {}),
+    isDraft: row.isDraft === true,
   };
 }
 
@@ -465,6 +488,8 @@ export function mrFromGlabRow(row: GlabMrRow): LoadedPr | null {
       : glabMergeability ? false : null,
     merged,
     headSha: row.sha ?? null,
+    ...(row.source_branch ? { headRef: row.source_branch } : {}),
+    isDraft: row.draft === true,
   };
 }
 
@@ -766,6 +791,11 @@ export async function loadIssueStateFacts(
   const readWorkStart = deps.readWorkStart ?? readWorkStartFacts;
   const workStartFacts = !pr ? readWorkStart(issueId, projectPath) : null;
   const workStart = workStartFacts ? deriveWorkStart(workStartFacts, now) : undefined;
+  const prOutsidePipeline = qualifiesForOutsidePrCheck(issueId, pr)
+    ? await (deps.readPrOutsidePipeline ?? readPrOutsidePipeline)({
+      issueId, projectPath, prNumber: pr.number, listWorktrees: () => gitWorktreeList(projectPath),
+    })
+    : undefined;
 
   const facts: IssueStateFacts = {
     issueId: issueId.toUpperCase(),
@@ -784,6 +814,7 @@ export async function loadIssueStateFacts(
     ...(deps.stuckAfterMs !== undefined ? { stuckAfterMs: deps.stuckAfterMs } : {}),
     ...(project ? { operatorDecisionOpen: operatorDecisionOpenFor(issueId, project.projectPath) } : {}),
     ...(workStart ? { workStart } : {}),
+    ...(prOutsidePipeline ? { prOutsidePipeline } : {}),
   };
   return facts;
 }
@@ -876,6 +907,10 @@ export async function loadIssueStatesForProject(
   const panes = deps.panes ?? await listPanesWithBackend(now);
   const approvalAtHead = deps.approvalAtHead ?? cachedApprovalAtHead;
   const readWorkStart = deps.readWorkStart ?? readWorkStartFacts;
+  const readOutsidePr = deps.readPrOutsidePipeline ?? readPrOutsidePipeline;
+  // PAN-4605: one `git worktree list` per batch, and only if an issue qualifies.
+  let worktreesPromise: Promise<string> | null = null;
+  const listWorktrees = (): Promise<string> => (worktreesPromise ??= gitWorktreeList(projectPath));
   const out = new Map<string, DerivedIssueState>();
 
   // PAN-3969: the default branch read is one batched `for-each-ref` pair for
@@ -899,6 +934,9 @@ export async function loadIssueStatesForProject(
     const issue = deps.issues?.[issueId] ?? null;
     const workStartFacts = !pr ? readWorkStart(issueId, projectPath) : null;
     const workStart = workStartFacts ? deriveWorkStart(workStartFacts, now) : undefined;
+    const prOutsidePipeline = qualifiesForOutsidePrCheck(issueId, pr)
+      ? await readOutsidePr({ issueId, projectPath, prNumber: pr.number, listWorktrees })
+      : undefined;
     const facts: IssueStateFacts = {
       issueId,
       issueOpen: issue ? issue.open : null,
@@ -915,6 +953,7 @@ export async function loadIssueStatesForProject(
       ...(deps.stuckAfterMs !== undefined ? { stuckAfterMs: deps.stuckAfterMs } : {}),
       operatorDecisionOpen: operatorDecisionOpenFor(issueId, projectPath),
       ...(workStart ? { workStart } : {}),
+      ...(prOutsidePipeline ? { prOutsidePipeline } : {}),
     };
     out.set(issueId, deriveIssueState(facts));
   }
