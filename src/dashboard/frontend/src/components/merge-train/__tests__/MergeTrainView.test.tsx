@@ -15,6 +15,7 @@ import {
   SINGLE_FEATURE_READY_LINE,
   mergeTrainSections,
 } from '../MergeTrainView';
+import { formatFailedAt } from '../mergeTrainCopy';
 
 const mocks = vi.hoisted(() => ({
   confirm: vi.fn(async () => true),
@@ -135,7 +136,7 @@ describe('single ready feature (PAN-3965)', () => {
     renderView();
     const line = await screen.findByTestId('merge-train-single-feature-myn');
     expect(line.textContent).toBe(SINGLE_FEATURE_READY_LINE);
-    expect(screen.getByTestId('merge-train-project-myn').textContent).not.toContain('A test batch assembles automatically');
+    expect(screen.getByTestId('merge-train-project-myn').textContent).not.toContain('A test batch assembles');
   });
 
   it('keeps the batch copy for one ready feature in a project that holds merges for UAT', async () => {
@@ -146,7 +147,7 @@ describe('single ready feature (PAN-3965)', () => {
     renderView();
     await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
     expect(screen.queryByTestId('merge-train-single-feature-myn')).toBeNull();
-    expect(screen.getByTestId('merge-train-project-myn').textContent).toContain('A test batch assembles automatically');
+    expect(screen.getByTestId('merge-train-project-myn').textContent).toContain('A test batch assembles at the next merge-train check');
   });
 
   it('keeps the batch copy when two features are ready', async () => {
@@ -157,7 +158,126 @@ describe('single ready feature (PAN-3965)', () => {
     renderView();
     await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
     expect(screen.queryByTestId('merge-train-single-feature-overdeck')).toBeNull();
-    expect(screen.getByTestId('merge-train-project-overdeck').textContent).toContain('A test batch assembles automatically');
+    expect(screen.getByTestId('merge-train-project-overdeck').textContent).toContain('A test batch assembles at the next merge-train check');
+  });
+});
+
+// ── PAN-4598 ──────────────────────────────────────────────────────────────────
+const PAN_FAILED_GEN = {
+  ...PAN_READY_GEN,
+  name: 'uat/pan-onyx-0920-6',
+  status: 'failed',
+  createdAt: '2026-09-20T18:13:32.057Z',
+  // The failure time; cleanup ran an hour later and does not move updatedAt.
+  updatedAt: '2026-09-20T18:20:05.000Z',
+  cleanedAt: '2026-09-20T19:14:23.542Z',
+  members: [],
+  resolutions: [],
+};
+
+function heldSingleFeatureResponses(generations: unknown[], overrides: FetchResponses = {}): FetchResponses {
+  return {
+    '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, holdsForUat: true, queue: [PAN_QUEUE[0]] }],
+    '/api/merge-train/generations': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations }],
+    ...overrides,
+  };
+}
+
+describe('merge without a batch (PAN-4598)', () => {
+  it('gives each ready row its own Merge button when no batch exists, with no escape hatch', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, holdsForUat: false, queue: PAN_QUEUE }],
+      '/api/merge-train/generations': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [] }],
+    });
+    renderView();
+    expect(await screen.findByTestId('merge-train-merge-row-PAN-1')).toBeTruthy();
+    expect(screen.getByTestId('merge-train-merge-row-PAN-2')).toBeTruthy();
+    expect(screen.getByTestId('merge-train-project-overdeck').textContent).not.toContain('Escape hatch');
+  });
+
+  it('the row button merges that row, not the queue head, after a plain confirm', async () => {
+    const fetchMock = mockFetch({
+      '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, holdsForUat: true, queue: PAN_QUEUE }],
+      '/api/merge-train/generations': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [] }],
+      'POST /api/merge-train/merge-next': { projectKey: 'overdeck', outcomes: [{ issueId: 'PAN-2', result: 'merged' }] },
+    });
+    renderView();
+    fireEvent.click(await screen.findByTestId('merge-train-merge-row-PAN-2'));
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+    const arg = mocks.confirm.mock.calls[0]![0] as { title: string; message: string; variant?: string };
+    expect(arg.title).toBe('Merge PAN-2 to main?');
+    expect(arg.message).toContain('feature/pan-2');
+    expect(arg.message).toContain('post-merge flow');
+    expect(arg.message).toContain('skips batch testing');
+    expect(arg.variant).toBeUndefined();
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([u]) => String(u) === '/api/merge-train/merge-next');
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({ n: 1, project: 'overdeck', issueId: 'PAN-2' });
+    });
+  });
+
+  it('keeps Merge batch as the action and hides row buttons once a batch exists', async () => {
+    mockFetch(twoProjectResponses());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    expect(screen.getByTestId('merge-train-project-overdeck').textContent).toContain('Merge batch (2) to main');
+    expect(screen.queryByTestId('merge-train-merge-row-PAN-1')).toBeNull();
+  });
+
+  it('says the last assembly failed instead of promising one, and offers retry and row Merge', async () => {
+    mockFetch(heldSingleFeatureResponses([PAN_FAILED_GEN]));
+    renderView();
+    const line = await screen.findByTestId('merge-train-assembly-failed-overdeck');
+    expect(line.textContent).toContain('The last batch assembly, pan-onyx-0920-6, failed');
+    expect(line.textContent).toContain(formatFailedAt({ updatedAt: '2026-09-20T18:20:05.000Z' }));
+    expect(line.textContent).not.toContain(formatFailedAt({ updatedAt: '2026-09-20T19:14:23.542Z' }));
+    const section = screen.getByTestId('merge-train-project-overdeck');
+    expect(section.textContent).not.toContain('assembles at the next');
+    expect(screen.getByTestId('merge-train-merge-row-PAN-1')).toBeTruthy();
+    expect(screen.getByTestId('merge-train-retry-assembly-overdeck')).toBeTruthy();
+  });
+
+  it('one unheld feature after a failed batch merges directly: no retry that could not build a batch', async () => {
+    mockFetch(heldSingleFeatureResponses([PAN_FAILED_GEN], {
+      '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, holdsForUat: false, queue: [PAN_QUEUE[0]] }],
+    }));
+    renderView();
+    const line = await screen.findByTestId('merge-train-single-feature-overdeck');
+    expect(line.textContent).toBe(SINGLE_FEATURE_READY_LINE);
+    expect(screen.queryByTestId('merge-train-assembly-failed-overdeck')).toBeNull();
+    expect(screen.queryByTestId('merge-train-retry-assembly-overdeck')).toBeNull();
+    expect(screen.getByTestId('merge-train-merge-row-PAN-1')).toBeTruthy();
+  });
+
+  it('retry batch assembly confirms and POSTs a forced assemble for that project', async () => {
+    const fetchMock = mockFetch(heldSingleFeatureResponses([PAN_FAILED_GEN], {
+      'POST /api/merge-train/assemble': { projects: [{ projectKey: 'overdeck', result: { action: 'assembled' } }] },
+    }));
+    renderView();
+    fireEvent.click(await screen.findByTestId('merge-train-retry-assembly-overdeck'));
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+    const arg = mocks.confirm.mock.calls[0]![0] as { title: string; message: string };
+    expect(arg.title).toBe('Retry batch assembly for Overdeck?');
+    expect(arg.message).toContain('pan-onyx-0920-6');
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([u]) => String(u) === '/api/merge-train/assemble');
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({ project: 'overdeck' });
+    });
+  });
+
+  it('a newer non-failed generation means the failure is history: no failure copy, no retry', async () => {
+    mockFetch(heldSingleFeatureResponses([{ ...PAN_FAILED_GEN, name: 'uat/pan-onyx-1024', status: 'invalidated' }, PAN_FAILED_GEN]));
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    expect(screen.queryByTestId('merge-train-assembly-failed-overdeck')).toBeNull();
+    expect(screen.queryByTestId('merge-train-retry-assembly-overdeck')).toBeNull();
+    expect(screen.getByTestId('merge-train-project-overdeck').textContent).toContain('assembles at the next merge-train check');
   });
 });
 

@@ -9,8 +9,10 @@
  * Layout per project section — unchanged in substance from the old card:
  * plain-language intro · batches newest-first (ready / assembling /
  * superseded, with live frontend + promote actions) · per-member "What to UAT"
- * checklist · ready-features reference rows (branch + PR) · a single-feature
- * escape hatch. Project filter chips sit above the sections and persist.
+ * checklist · ready-features rows (branch + PR). PAN-4598: while no tested
+ * batch exists, each ready row carries its own Merge button; once a batch
+ * exists, "Merge batch to main" is the primary action and a single-feature
+ * escape hatch remains. Project filter chips sit above the sections and persist.
  *
  * Honest-language contract: every action names its exact effect and confirms
  * via useConfirm() before anything fires. Merging a batch lands exactly the
@@ -22,6 +24,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { useConfirm } from '../DialogProvider';
+import { ASSEMBLING_LINE, NO_BATCH_YET_LINE, assemblyFailedLine, canRetryAssembly, formatFailedAt, mergeRowConfirmCopy, retryAssemblyConfirmCopy } from './mergeTrainCopy';
 
 /** localStorage key holding the operator's project-filter selection. */
 export const MERGE_TRAIN_PROJECT_FILTER_KEY = 'merge-train.projectFilter';
@@ -396,10 +399,11 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
   });
 
   const mergeOneMutation = useMutation({
-    mutationFn: (projectKey: string) =>
+    // PAN-4598: `issueId` merges that ready row; without it, the queue head.
+    mutationFn: ({ projectKey, issueId }: { projectKey: string; issueId?: string }) =>
       postJson<{ outcomes: Array<{ issueId: string; result: string; reason?: string }> }>(
         '/api/merge-train/merge-next',
-        { n: 1, project: projectKey },
+        { n: 1, project: projectKey, ...(issueId ? { issueId } : {}) },
       ),
     onSuccess: (data) => {
       const first = data.outcomes[0];
@@ -486,7 +490,19 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
       confirmLabel: `Merge ${head.issueId} to main`,
       variant: 'destructive',
     });
-    if (ok) mergeOneMutation.mutate(section.projectKey);
+    if (ok) mergeOneMutation.mutate({ projectKey: section.projectKey });
+  };
+
+  /** PAN-4598: the per-row Merge button, shown while no tested batch exists. */
+  const onMergeRow = async (section: MergeTrainProjectSection, item: MergeTrainQueueItem, assembling: boolean) => {
+    const copy = mergeRowConfirmCopy({ ...item, projectName: section.projectName, holdsForUat: section.holdsForUat, assembling });
+    if (await confirm(copy)) mergeOneMutation.mutate({ projectKey: section.projectKey, issueId: item.issueId });
+  };
+
+  /** PAN-4598: the force lever when the last assembly failed and no batch exists. */
+  const onRetryAssembly = async (section: MergeTrainProjectSection, failed: UatGenerationPayload) => {
+    const copy = retryAssemblyConfirmCopy({ projectName: section.projectName, failedName: shortName(failed.name), readyCount: section.queue.length });
+    if (await confirm(copy)) rebuildMutation.mutate(section.projectKey);
   };
 
   const IdLink = ({ issueId }: { issueId: string }) => (
@@ -610,7 +626,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
           {loading
             ? 'Loading the merge train…'
             : visibleSections.length === sections.length
-              ? 'No features are ready to merge in any project. When work passes review and tests, it lines up here and a test batch assembles automatically.'
+              ? 'No features are ready to merge in any project. When work passes review and tests, it lines up here to merge or to batch for testing.'
               : 'No features are ready to merge in the selected projects. Other projects may still have ready work.'}
         </p>
       ) : (
@@ -625,6 +641,14 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
             const batchCount = visibleGenerations.filter((g) => g.status !== 'assembling').length;
             const promotedPendingCount = visibleGenerations.filter((g) => g.status === 'promoted').length;
             const uatOpen = expandedUat[section.projectKey] ?? true;
+            // PAN-4598: generations arrive newest-first, so a failed head with no
+            // testable batch means the last assembly attempt failed.
+            const assemblingNow = visibleGenerations.some((g) => g.status === 'assembling');
+            const newestGeneration = section.generations[0];
+            const lastAssemblyFailed = !currentBatch && !assemblingNow && newestGeneration?.status === 'failed'
+              ? newestGeneration
+              : undefined;
+            const mergeRowsDirectly = !currentBatch;
 
             return (
               <section key={section.projectKey} data-testid={`merge-train-project-${section.projectKey}`}>
@@ -650,15 +674,36 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                     <p className="px-1 pb-1 text-[11px] leading-snug text-muted-foreground">
                       {featureCount === 0 && promotedPendingCount > 0 ? (
                         <><span className="font-semibold text-foreground">{promotedPendingCount} promoted batch{promotedPendingCount === 1 ? '' : 'es'}</span> await{promotedPendingCount === 1 ? 's' : ''} version ship. Supply the version below to satisfy each member&apos;s ship row.</>
-                      ) : featureCount === 1 && batchCount === 0 && section.holdsForUat === false ? (
+                      ) : featureCount === 1 && !currentBatch && !assemblingNow && section.holdsForUat === false ? (
                         <span data-testid={`merge-train-single-feature-${section.projectKey}`}>{SINGLE_FEATURE_READY_LINE}</span>
                       ) : (
                         <><span className="font-semibold text-foreground">{featureCount} feature{featureCount === 1 ? '' : 's'}</span> passed review &amp; tests.
-                          {batchCount > 0
+                          {currentBatch
                             ? ' They’re assembled into the test batches below — open a batch’s frontend, run its checklist, then merge that batch to main.'
-                            : ' A test batch assembles automatically when the merge train is on.'}</>
+                            : assemblingNow
+                              ? ASSEMBLING_LINE
+                              : lastAssemblyFailed
+                                ? (
+                                  <span data-testid={`merge-train-assembly-failed-${section.projectKey}`}>
+                                    {assemblyFailedLine(shortName(lastAssemblyFailed.name), formatFailedAt(lastAssemblyFailed))}
+                                  </span>
+                                )
+                                : NO_BATCH_YET_LINE}</>
                       )}
                     </p>
+                    {lastAssemblyFailed && canRetryAssembly({ featureCount, holdsForUat: section.holdsForUat }) && (
+                      <div className="px-1 pb-1">
+                        <button
+                          type="button"
+                          disabled={rebuildMutation.isPending}
+                          onClick={() => void onRetryAssembly(section, lastAssemblyFailed)}
+                          data-testid={`merge-train-retry-assembly-${section.projectKey}`}
+                          className="rounded border border-border px-2 py-0.5 text-[10.5px] text-foreground hover:bg-accent disabled:opacity-50"
+                        >
+                          {rebuildMutation.isPending && rebuildMutation.variables === section.projectKey ? 'Retrying…' : 'Retry batch assembly'}
+                        </button>
+                      </div>
+                    )}
 
                     {visibleGenerations.length > 0 && (
                       <>
@@ -886,6 +931,18 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                                     ⚠ held out
                                   </span>
                                 )}
+                                {mergeRowsDirectly && (
+                                  <button
+                                    type="button"
+                                    disabled={mergeOneMutation.isPending}
+                                    onClick={() => void onMergeRow(section, item, assemblingNow)}
+                                    data-testid={`merge-train-merge-row-${item.issueId}`}
+                                    title={`Merge ${item.issueId} to main through the merge gate`}
+                                    className="rounded border border-border px-2 py-0.5 text-[10.5px] font-medium text-foreground hover:bg-accent disabled:opacity-50"
+                                  >
+                                    {mergeOneMutation.isPending && mergeOneMutation.variables?.issueId === item.issueId ? 'Merging…' : 'Merge'}
+                                  </button>
+                                )}
                               </div>
                               <div className="ml-6 mt-0.5 flex items-center gap-2.5">
                                 <span className="rounded bg-accent px-1.5 py-px font-mono text-[10px] text-muted-foreground">{item.branchName}</span>
@@ -901,20 +958,24 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                           );
                         })}
 
-                        <div className="mt-1 flex items-center gap-2 border-t border-dashed border-border pt-2 text-[11px] text-muted-foreground">
-                          <span>Escape hatch:</span>
-                          <button
-                            type="button"
-                            disabled={mergeOneMutation.isPending}
-                            onClick={() => void onMergeOne(section)}
-                            className="rounded border border-border px-2 py-0.5 text-[10.5px] text-foreground hover:bg-accent disabled:opacity-50"
-                          >
-                            {mergeOneMutation.isPending && mergeOneMutation.variables === section.projectKey ? 'Merging…' : 'Merge one feature to main…'}
-                          </button>
-                        </div>
-                        <p className="px-1 text-[9.5px] leading-snug text-muted-foreground">
-                          Merging a single feature invalidates the live batches — a fresh batch reassembles automatically. Prefer merging a tested batch.
-                        </p>
+                        {!mergeRowsDirectly && (
+                          <>
+                            <div className="mt-1 flex items-center gap-2 border-t border-dashed border-border pt-2 text-[11px] text-muted-foreground">
+                              <span>Escape hatch:</span>
+                              <button
+                                type="button"
+                                disabled={mergeOneMutation.isPending}
+                                onClick={() => void onMergeOne(section)}
+                                className="rounded border border-border px-2 py-0.5 text-[10.5px] text-foreground hover:bg-accent disabled:opacity-50"
+                              >
+                                {mergeOneMutation.isPending && mergeOneMutation.variables?.projectKey === section.projectKey && !mergeOneMutation.variables.issueId ? 'Merging…' : 'Merge one feature to main…'}
+                              </button>
+                            </div>
+                            <p className="px-1 text-[9.5px] leading-snug text-muted-foreground">
+                              Merging a single feature invalidates the live batches — a fresh batch reassembles automatically. Prefer merging a tested batch.
+                            </p>
+                          </>
+                        )}
                       </>
                     )}
                   </div>
