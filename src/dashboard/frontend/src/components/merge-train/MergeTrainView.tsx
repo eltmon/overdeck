@@ -24,7 +24,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { useConfirm } from '../DialogProvider';
-import { ASSEMBLING_LINE, NO_BATCH_YET_LINE, assemblyFailedLine, formatFailedAt, mergeRowConfirmCopy, retryAssemblyConfirmCopy } from './mergeTrainCopy';
+import { ASSEMBLING_LINE, NO_BATCH_YET_LINE, assemblyFailedLine, canRetryAssembly, formatFailedAt, mergeRowConfirmCopy, retryAssemblyConfirmCopy } from './mergeTrainCopy';
 
 /** localStorage key holding the operator's project-filter selection. */
 export const MERGE_TRAIN_PROJECT_FILTER_KEY = 'merge-train.projectFilter';
@@ -691,7 +691,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                                 : NO_BATCH_YET_LINE}</>
                       )}
                     </p>
-                    {lastAssemblyFailed && featureCount > 0 && (
+                    {lastAssemblyFailed && canRetryAssembly({ featureCount, holdsForUat: section.holdsForUat }) && (
                       <div className="px-1 pb-1">
                         <button
                           type="button"

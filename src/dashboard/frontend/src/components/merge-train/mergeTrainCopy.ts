@@ -47,6 +47,15 @@ export function mergeRowConfirmCopy(input: {
   };
 }
 
+/**
+ * Whether a forced reassembly can build a batch from this ready set. One
+ * unheld feature merges directly — the reconciler returns `single-feature`
+ * even when forced — so Retry is offered only for 2+ features or a held one.
+ */
+export function canRetryAssembly(input: { featureCount: number; holdsForUat?: boolean }): boolean {
+  return input.featureCount >= 2 || (input.featureCount === 1 && input.holdsForUat !== false);
+}
+
 export function retryAssemblyConfirmCopy(input: { projectName: string; failedName: string; readyCount: number }): ConfirmCopy {
   const { projectName, failedName, readyCount } = input;
   return {

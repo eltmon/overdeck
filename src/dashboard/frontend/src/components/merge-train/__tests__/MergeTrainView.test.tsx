@@ -15,6 +15,7 @@ import {
   SINGLE_FEATURE_READY_LINE,
   mergeTrainSections,
 } from '../MergeTrainView';
+import { formatFailedAt } from '../mergeTrainCopy';
 
 const mocks = vi.hoisted(() => ({
   confirm: vi.fn(async () => true),
@@ -167,7 +168,9 @@ const PAN_FAILED_GEN = {
   name: 'uat/pan-onyx-0920-6',
   status: 'failed',
   createdAt: '2026-09-20T18:13:32.057Z',
-  updatedAt: '2026-09-20T19:14:23.542Z',
+  // The failure time; cleanup ran an hour later and does not move updatedAt.
+  updatedAt: '2026-09-20T18:20:05.000Z',
+  cleanedAt: '2026-09-20T19:14:23.542Z',
   members: [],
   resolutions: [],
 };
@@ -229,10 +232,24 @@ describe('merge without a batch (PAN-4598)', () => {
     renderView();
     const line = await screen.findByTestId('merge-train-assembly-failed-overdeck');
     expect(line.textContent).toContain('The last batch assembly, pan-onyx-0920-6, failed');
+    expect(line.textContent).toContain(formatFailedAt({ updatedAt: '2026-09-20T18:20:05.000Z' }));
+    expect(line.textContent).not.toContain(formatFailedAt({ updatedAt: '2026-09-20T19:14:23.542Z' }));
     const section = screen.getByTestId('merge-train-project-overdeck');
     expect(section.textContent).not.toContain('assembles at the next');
     expect(screen.getByTestId('merge-train-merge-row-PAN-1')).toBeTruthy();
     expect(screen.getByTestId('merge-train-retry-assembly-overdeck')).toBeTruthy();
+  });
+
+  it('one unheld feature after a failed batch merges directly: no retry that could not build a batch', async () => {
+    mockFetch(heldSingleFeatureResponses([PAN_FAILED_GEN], {
+      '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, holdsForUat: false, queue: [PAN_QUEUE[0]] }],
+    }));
+    renderView();
+    const line = await screen.findByTestId('merge-train-single-feature-overdeck');
+    expect(line.textContent).toBe(SINGLE_FEATURE_READY_LINE);
+    expect(screen.queryByTestId('merge-train-assembly-failed-overdeck')).toBeNull();
+    expect(screen.queryByTestId('merge-train-retry-assembly-overdeck')).toBeNull();
+    expect(screen.getByTestId('merge-train-merge-row-PAN-1')).toBeTruthy();
   });
 
   it('retry batch assembly confirms and POSTs a forced assemble for that project', async () => {
