@@ -116,8 +116,10 @@ its last two days: those are its status reports.
 
 Then **verify each commitment against live state** before you adopt it. A
 conversation's last report can be hours old. Use `pan show <issue>`, `gh pr view`,
-`gh run list --branch main`, and `/api/health` (`buildCommit`) rather than
-repeating what the transcript said.
+the newest decisive CI run on `main` (`gh run list --branch main --workflow CI
+--limit 20`, skipping queued, in-progress and cancelled runs; its `headSha` may
+be older than HEAD), and `/api/health` (`buildCommit`) rather than repeating
+what the transcript said.
 
 ### 5. Archive
 

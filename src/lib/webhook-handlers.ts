@@ -23,7 +23,7 @@ import {
   observationFromCheckSuite,
   resolveProjectForRepo,
 } from './ci/project-ci-observation.js';
-import { resolveDefaultBranchHead } from './ci/project-ci-github.js';
+import { resolveCiHead } from './ci/project-ci-github.js';
 
 export { ADVISORY_CHECK_NAMES, isAdvisoryCheckName };
 
@@ -169,7 +169,10 @@ async function resolvePullRequestsForHead(
 export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
   // PAN-3537: a push to the default branch produces a check suite with an empty
   // pull_requests array. Record it for the Command Deck CI chip, then fall
-  // through to the existing PR-scoped merge-gate logic.
+  // through to the existing PR-scoped merge-gate logic. PAN-4618: a
+  // default-branch suite is recorded only when it belongs to the CI head (the
+  // newest push run of the CI workflow), so a bookkeeping head's guard suite
+  // never replaces the CI head's suites.
   const project = resolveProjectForRepo(payload.repository?.full_name);
   const projectSuite = payload.check_suite;
   if (
@@ -180,7 +183,7 @@ export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
     && projectSuite.id != null
   ) {
     try {
-      const authoritativeHead = await resolveDefaultBranchHead(
+      const authoritativeHead = await resolveCiHead(
         project.repo,
         project.branch,
       );
@@ -298,7 +301,7 @@ export async function handlePullRequest(payload: WebhookPayload): Promise<void> 
 
   const repo = payload.repository!.full_name;
 
-  if (['opened', 'closed', 'reopened'].includes(payload.action ?? '')) {
+  if (['opened', 'closed', 'reopened', 'ready_for_review'].includes(payload.action ?? '')) {
     try {
       const { listProjectsSync, resolveProjectFromIssueSync } = await import('./projects.js');
       const resolved = resolveProjectFromIssueSync(issueId);
@@ -311,6 +314,10 @@ export async function handlePullRequest(payload: WebhookPayload): Promise<void> 
         );
         enqueueProjectResourceRefresh(project, `pull_request:${payload.action}`);
       }
+      // PAN-4605: drop the cached repo PR listing so a just-opened outside PR's
+      // derived attention is not hidden by a 5-minute idle cache.
+      const { refreshIssuePullRequestStateNow } = await import('../dashboard/server/services/issue-pr-refresh.js');
+      refreshIssuePullRequestStateNow(issueId);
     } catch (err: any) {
       console.warn(`[webhook] Failed to enqueue membership refresh for ${issueId}: ${err?.message ?? err}`);
     }
@@ -341,7 +348,17 @@ export async function handlePullRequest(payload: WebhookPayload): Promise<void> 
           note: `PR ${payload.action} on ${repo}#${pr.number} — starting verification`,
           source: 'webhook',
         });
-        if (!outcome.started) {
+        if (!outcome.started && outcome.reason === 'no-workspace' && pr.number != null) {
+          // PAN-4605: a PR opened outside a pipeline workspace (a handoff
+          // worktree). Adopt its branch into a workspace, then start review;
+          // a refusal is announced and shows under Needs you.
+          const { adoptPrAndStartReview } = await import('./cloister/pr-adoption-review.js');
+          const adopted = await adoptPrAndStartReview(
+            { issueId, number: pr.number, headRef: pr.head.ref, headSha: pr.head.sha, repo },
+            { source: 'webhook', startReview },
+          );
+          console.log(`[webhook] PR #${pr.number} for ${issueId} had no workspace: ${adopted.kind}`);
+        } else if (!outcome.started) {
           console.log(`[webhook] Review not started for ${issueId}: ${outcome.reason}`);
         }
       }

@@ -767,6 +767,15 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
     const derived = yield* Effect.promise(() => getDerivedIssueState(canonicalIssueId));
 
+    // PAN-4605: no workspace ⇒ adopt the open pipeline-branch PR before the
+    // approved-head, nudge and circuit-breaker shortcuts below can answer.
+    const { answerMissingWorkspace } = yield* Effect.promise(() => import('../../../../lib/cloister/pr-adoption-review.js'));
+    const missingWorkspace = yield* Effect.promise(() => answerMissingWorkspace(canonicalIssueId, requestSource, {
+      derivedState: derived.state,
+      workspaceExists: getWorkspaceInfoForIssue(canonicalIssueId).exists,
+    }));
+    if (missingWorkspace) return jsonResponse(missingWorkspace.body, { status: missingWorkspace.status });
+
     // The operator overrides of an approved head (`force`, `nudge`); every
     // other request goes through the guard below.
     if (derived.state !== 'merged' && derived.pr?.reviewState === 'approved') {

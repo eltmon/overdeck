@@ -1,0 +1,76 @@
+{
+  "version": "1",
+  "issueId": "PAN-4527",
+  "created": "2026-10-24T10:10:19.162Z",
+  "updated": "2026-10-24T13:44:44.121Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-24T10:10Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-10-24T10:10:19.164Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-10-24T10:10:19Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4527 (attempt 1/3):\n\nFailed check: incomplete-plan-items\n\nChecklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required xBRIEF checklist is missing or unreadable; return the issue to planning before completion.\n\nComplete each listed item with `pan task done PAN-4527 <item>` after committing and pushing its implementation, then resubmit the review request."
+    }
+  ],
+  "items": {
+    "head-rule": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:41:00.171Z"
+    },
+    "supervisor-join": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:41:28.277Z"
+    },
+    "runner-ci-head": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:41:59.470Z"
+    },
+    "docs": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:42:28.434Z"
+    },
+    "head-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:42:57.068Z"
+    },
+    "head-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:43:12.095Z"
+    },
+    "supervisor-join.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:43:27.024Z"
+    },
+    "supervisor-join.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:43:42.746Z"
+    },
+    "runner-ci-head.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:43:58.239Z"
+    },
+    "runner-ci-head.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:44:13.624Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:44:28.542Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T13:44:44.121Z"
+    }
+  }
+}

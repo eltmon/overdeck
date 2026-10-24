@@ -123,6 +123,15 @@ export async function createWorktree(
       baseRef = defaultBranch;
     }
 
+    // PAN-4605: an existing remote branch (a PR opened from another worktree)
+    // must be checked out, not re-cut from the default branch. A branch that
+    // does not exist on origin yet makes this fetch fail — the normal case.
+    await execFileAsync(
+      'git',
+      ['fetch', 'origin', `+refs/heads/${branchName}:refs/remotes/origin/${branchName}`],
+      { cwd: repoPath },
+    ).catch(() => {});
+
     // Prune stale worktree entries (e.g., from deleted workspaces)
     await execAsync('git worktree prune', { cwd: repoPath });
 

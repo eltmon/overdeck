@@ -61,7 +61,8 @@ export function resolveProjectForRepo(
 }
 
 /** Map a check_suite webhook payload only when its SHA was independently
- * verified as the current default-branch head. */
+ * verified as the current CI head (the newest push run of the CI workflow,
+ * PAN-4618). */
 export function observationFromCheckSuite(
   payload: ProjectCiCheckSuitePayload,
   now: string,

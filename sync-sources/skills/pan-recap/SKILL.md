@@ -200,8 +200,8 @@ print('last snapshot age:', d.get('elapsedMs',0)//60000, 'min into run')
 " 2>/dev/null
 
 echo "=== main CI conclusion (red main = silent merge-gate killer) ==="
-gh run list --branch main --workflow CI --limit 1 \
-  --json conclusion,headSha,createdAt --jq '.[] | "\(.conclusion)  \(.headSha[0:9])  \(.createdAt)"'
+gh run list --branch main --workflow CI --limit 20 --json conclusion,headSha,createdAt \
+  --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][0] | "\(.conclusion)  \(.headSha[0:9])  \(.createdAt)"'
 
 echo "=== orchestrator alive & progressing? ==="
 tmux -L overdeck capture-pane -t flywheel-orchestrator -p -S -15 2>/dev/null \

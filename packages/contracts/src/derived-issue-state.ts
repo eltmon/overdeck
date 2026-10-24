@@ -35,6 +35,7 @@ export const IssueAttention = Schema.Literals([
   /** Idle for N minutes with unpushed commits. */ "stuck",
   /** 429 or provider-failure text in a pane. */ "api-error",
   /** Auto-start was attempted but no work agent came up. */ "work-not-started",
+  /** An open PR on the pipeline branch with no pipeline workspace: never verified or reviewed (PAN-4605). */ "pr-outside-pipeline",
 ])
 export type IssueAttention = typeof IssueAttention.Type
 
@@ -85,6 +86,16 @@ export const DerivedWorkStart = Schema.Struct({
 })
 export type DerivedWorkStart = typeof DerivedWorkStart.Type
 
+/** An open pull request the pipeline never picked up (PAN-4605). */
+export const DerivedPrOutsidePipeline = Schema.Struct({
+  prNumber: Schema.Number,
+  /** One operator-facing paragraph naming the PR, the reason and the exact commands. */
+  fix: Schema.String,
+  /** The other worktree that has the branch checked out, when that is the reason. */
+  worktreePath: Schema.optional(Schema.String),
+})
+export type DerivedPrOutsidePipeline = typeof DerivedPrOutsidePipeline.Type
+
 /** Everything the dashboard needs to render an issue's pipeline position. */
 export const DerivedIssueState = Schema.Struct({
   issueId: Schema.String,
@@ -100,6 +111,8 @@ export const DerivedIssueState = Schema.Struct({
   trackerUnknown: Schema.optional(Schema.Literal(true)),
   /** A deferred or gave-up post-planning auto-start read from the workspace journal (PAN-4399). */
   workStart: Schema.optional(DerivedWorkStart),
+  /** An outside PR the pipeline never picked up (PAN-4605). */
+  prOutsidePipeline: Schema.optional(DerivedPrOutsidePipeline),
 })
 export type DerivedIssueState = typeof DerivedIssueState.Type
 
@@ -128,7 +141,7 @@ export const ISSUE_STATE_PRECEDENCE: readonly IssueState[] = [
   "backlog",
 ]
 
-export const ISSUE_ATTENTIONS: readonly IssueAttention[] = ["needs-you", "stuck", "api-error", "work-not-started"]
+export const ISSUE_ATTENTIONS: readonly IssueAttention[] = ["needs-you", "stuck", "api-error", "work-not-started", "pr-outside-pipeline"]
 
 export function isIssueState(value: unknown): value is IssueState {
   return typeof value === "string" && (ISSUE_STATES as readonly string[]).includes(value)

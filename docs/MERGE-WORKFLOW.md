@@ -90,7 +90,15 @@ bypasses it.
    [`src/lib/cloister/request-review-pipeline.ts`](../src/lib/cloister/request-review-pipeline.ts),
    never by importing a route, and `requestReviewPipeline.isInFlight` coalesces
    it with the request `pan done` just made. The webhook path logs and returns
-   on every failure — it never throws.
+   on every failure — it never throws. When the issue has no pipeline
+   workspace (the PR was pushed from a handoff worktree), the webhook adopts
+   the PR branch into one through
+   [`src/lib/cloister/pr-adoption-review.ts`](../src/lib/cloister/pr-adoption-review.ts)
+   and then starts the pipeline. When adoption is refused (the branch is
+   checked out in another worktree, the head moved, or the local branch
+   diverged), the issue shows "Review never started" under Needs you with the
+   exact fix. See
+   [A PR opened outside a pipeline workspace](PIPELINE-GATES.md#a-pr-opened-outside-a-pipeline-workspace-pan-4605).
 3. **Review and test.** The four reviewer roles (correctness, security,
    performance, requirements) post PR reviews — approve or request changes.
    Verification (typecheck, lint, tests) runs as check runs on the PR.
@@ -456,6 +464,11 @@ owning project's Command Deck row shows a deploy chip next to the CI chip
 once it waits on the restart gate, `Deploy: restarting` after approval, and
 `Deploy ✗` for 15 minutes after a failure. The chip's tooltip carries the
 error, the reload's log path and its last lines.
+
+`pan reload` builds `origin/main` HEAD whatever its CI state. When HEAD is a
+bookkeeping commit it has no CI run (PAN-4618); it holds the same code as the
+newest commit CI ran on, so the build is the same. The CI chip next to the
+deploy chip shows the CI head — the newest commit CI was started for.
 
 Nothing is stored. [`deploy-progress.ts`](../src/dashboard/server/services/deploy-progress.ts)
 re-derives the projection on a 3-second server tick from runtime files that

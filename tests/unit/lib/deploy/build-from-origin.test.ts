@@ -161,6 +161,54 @@ describe('buildDashboardFromOriginMain', () => {
     await removeDashboardDeployment(repoRoot, deployRoot, { runGit });
   });
 
+  // PAN-4618: most default-branch commits are bookkeeping pushes, so origin/main's
+  // HEAD is usually a .pan/** commit sitting on top of the last real code commit.
+  it('builds origin/main when its HEAD is a bookkeeping-only commit', async () => {
+    const root = await fs.mkdtemp(join(tmpdir(), 'overdeck-bookkeeping-head-'));
+    temporaryRoots.push(root);
+    const repoRoot = join(root, 'repo');
+    const processId = 999;
+    const deployRoot = join(root, `.pan-reload-build-${processId}`);
+    await fs.mkdir(repoRoot);
+    await execFileAsync('git', ['init'], { cwd: repoRoot });
+    await execFileAsync('git', ['config', 'user.name', 'Overdeck Test'], { cwd: repoRoot });
+    await execFileAsync('git', ['config', 'user.email', 'test@overdeck.local'], { cwd: repoRoot });
+
+    await fs.mkdir(join(repoRoot, 'src'), { recursive: true });
+    await fs.writeFile(join(repoRoot, 'src', 'app.ts'), 'export const app = true;\n');
+    await execFileAsync('git', ['add', 'src/app.ts'], { cwd: repoRoot });
+    await execFileAsync('git', ['commit', '-m', 'add src/app.ts'], { cwd: repoRoot });
+
+    await fs.mkdir(join(repoRoot, '.pan', 'backlog'), { recursive: true });
+    await fs.writeFile(join(repoRoot, '.pan', 'backlog', 'sequence.md'), 'queue\n');
+    await execFileAsync('git', ['add', '.pan/backlog/sequence.md'], { cwd: repoRoot });
+    await execFileAsync('git', ['commit', '-m', 'chore(workspace): backlog sequence'], { cwd: repoRoot });
+    const bookkeepingSha = String((await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot })).stdout).trim();
+    await execFileAsync('git', ['update-ref', 'refs/remotes/origin/main', 'HEAD'], { cwd: repoRoot });
+
+    const runGit = async (args: string[], cwd: string) => {
+      if (args[0] === 'fetch') return { stdout: '', stderr: '' };
+      const result = await execFileAsync('git', args, { cwd, encoding: 'utf8' });
+      return { stdout: String(result.stdout), stderr: String(result.stderr) };
+    };
+    const installAndBuild = vi.fn(async () => undefined);
+
+    const deployment = await buildDashboardFromOriginMain(repoRoot, {
+      runGit,
+      installAndBuild,
+      deploymentRoot: () => deployRoot,
+      note: vi.fn(),
+      success: vi.fn(),
+      processId,
+    });
+
+    expect(deployment.builtSha).toBe(bookkeepingSha);
+    expect(installAndBuild).toHaveBeenCalledWith(deployRoot);
+    await expect(fs.access(join(deployRoot, 'src', 'app.ts'))).resolves.toBeUndefined();
+
+    await removeDashboardDeployment(repoRoot, deployRoot, { runGit });
+  });
+
   it('resolves canonical dependencies without changing the primary dependency environment', async () => {
     const root = await fs.mkdtemp(join(tmpdir(), 'overdeck-build-from-origin-'));
     temporaryRoots.push(root);

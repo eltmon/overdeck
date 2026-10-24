@@ -258,8 +258,9 @@ the **CI test job on the PR head is the test gate**:
   branch too (inherited from a red `main`); and a failure while the default
   branch's test verdict is unknown. The default branch's verdict is its newest
   commit (of the last 10) whose test checks all finished decisively: main's CI
-  is often still running on HEAD, and a cancelled run says nothing
-  (`cloister/ci-default-branch-tests.ts`). It reads both check runs and commit
+  is often still running on HEAD, a bookkeeping commit carries no test checks
+  at all, and a cancelled run says nothing (PAN-4618,
+  `cloister/ci-default-branch-tests.ts`). It reads both check runs and commit
   statuses (PAN-4589) — a Dagger Cloud status is mapped to a check run
   (`commitStatusAsCheckRun`) before the verdict is judged. When no such commit exists, or the
   forge cannot be read, the failure is not counted; the plain CI FAILED
@@ -287,6 +288,52 @@ the **CI test job on the PR head is the test gate**:
 verification:
   tests: ci      # or: local
 ```
+
+### Bookkeeping commits skip CI and superseded runs are cancelled (PAN-4618)
+
+Most commits on `main` are bookkeeping pushes that touch only `.pan/**`
+(plan/task/continue state) or `.overdeck/memory/**` (curated facts), with no
+code to verify. CI's `push` trigger (`.github/workflows/ci.yml`) carries
+`paths-ignore: ['.pan/**', '.overdeck/memory/**']`, so a pure bookkeeping push
+starts no `CI` workflow run at all. GitHub evaluates path filters against the
+*whole push*, not per commit: a push that mixes a bookkeeping commit with a
+code commit still runs CI once, at the pushed tip. The `no-planning-on-main`
+guard workflow has no path filter and always runs, so every push to `main`
+still gets at least one check.
+
+`ci.yml` also carries a workflow-level `concurrency` group
+(`ci-${{ github.event.pull_request.number || github.ref }}`,
+`cancel-in-progress: true`): a newer push's run cancels whatever run was still
+in flight for the same ref or PR, so a burst of merges leaves only the last
+push's run to finish.
+
+Both changes mean a commit — including the newest one — commonly has no CI
+run, or a `cancelled` one, and that is expected, not a signal the forge is
+unreachable. Readers of main's CI now treat the newest commit without a
+decisive run as "keep looking," not "unknown":
+
+- **The default-branch test verdict**
+  (`cloister/ci-default-branch-tests.ts`) scans up to 100 commits, skipping a
+  commit with no test checks (`no-tests`) or an indecisive one (`cancelled`,
+  `stale`, …) for free, and gives up only after 10 commits whose test checks
+  are genuinely still running. A full 100-commit page with no test checks at
+  all returns `null` (unknown); fewer than 100 with no test checks returns an
+  empty set (the branch runs no test checks).
+- **DoD row 6's later-green fallback**
+  (`lifecycle/dod-later-green.ts`, `findLaterGreenDefaultBranchRun`) scans up
+  to 50 default-branch commits containing the merge, skipping a candidate
+  missing any required check (no CI run at all) for free, and spends its
+  5-candidate probe budget only on commits that actually carry a CI run.
+- **The Command Deck CI chip** reads `resolveCiHead`
+  (`ci/project-ci-github.ts`): the `head_sha` of the newest `push` run of
+  `.github/workflows/ci.yml` from the Actions workflow-runs endpoint, not the
+  branch head. It falls back to the branch head when the project has no such
+  workflow. Both the REST fill (`overdeck/project-ci-fill.ts`) and the
+  `check_suite` webhook (`webhook-handlers.ts`) verify against this CI head.
+- **The Flywheel** reads main's CI by the same rule: the red-main verdict is
+  the newest run that concluded `success` or `failure` (skipping queued,
+  in-progress and `cancelled` runs), and the deploy rule requires the newest
+  run to be `completed`/`success` before `pan reload`.
 
 #### Dagger Cloud checks (PAN-4589)
 
@@ -376,7 +423,8 @@ head the worker launched on:
   `origin/<target>`, or a fast-forward of the launch head onto it. This still
   counts as the launch head.
 - **moved** — anything else, such as an agent commit since launch. An
-  unreadable head counts as moved.
+  unreadable head counts as moved, and so does a polyrepo anchor that is
+  missing a member repo whose HEAD could not be read.
 
 When a review request arrives while a worker for the issue is alive and has
 no result yet, the supervisor **joins** it (waits for its result) only when
@@ -1462,6 +1510,8 @@ One piece of stored pipeline state came back, and it is not a status.
 | `operator.decision-requested` | `pan ask` (`src/cli/commands/ask.ts`), when a work agent needs an operator decision |
 | `operator.decision-answered` | the dashboard answer route, a delivered dashboard message, or a delivered `pan tell` to the asking agent |
 | `operator.decision-withdrawn` | `pan ask --withdraw` |
+| `workspace.adopted` | `cloister/pr-workspace-adoption.ts` `adoptPrWorkspace`, after it creates the pipeline workspace on an outside PR's head (`data.prNumber`, `headSha`, `repo`) |
+| `workspace.adoption-failed` | the same function, when a failure leaves a workspace behind; also `cloister/pr-adoption-review.ts` when the review does not start after a successful adoption (`data.reason`, `detail`, `fix`) |
 
 `pan show <id>` prints the last six entries under the derived state; `--json`
 carries the whole journal.
@@ -1502,6 +1552,74 @@ subline naming the recorded error. The Needs-you strip's "Start work" card
 (`NeedsYouStrip.tsx`) shows the same "Work agent not started" label and error
 text in place of the generic "Plan ready" card, with its existing Start work
 button (`POST /api/agents`) unchanged.
+
+### A PR opened outside a pipeline workspace (PAN-4605)
+
+The review pipeline runs in the issue's `workspaces/feature-<issue>` worktree.
+A PR pushed from anywhere else, usually a supervised `pan handoff --cwd`
+worktree, used to get `no-workspace` from the review starter and nothing
+else: it was never verified or reviewed, and nobody was told. Now the
+webhook (`handlePullRequest` in `src/lib/webhook-handlers.ts`) hands that PR
+to `adoptPrAndStartReview` (`cloister/pr-adoption-review.ts`), which adopts
+the branch into a pipeline workspace and then starts the review.
+
+Adoption (`cloister/pr-workspace-adoption.ts`) takes only the exact branch
+`feature/<issue>` (case-sensitive) and only at the head the PR reports. A
+PR with no head commit in the payload is refused (`head-unknown`). Every
+check runs in git before `createWorkspace`, in this order:
+
+1. Fetch `+refs/heads/<branch>:refs/remotes/origin/<branch>` and compare the
+   fetched ref to the PR head. A mismatch refuses (`head-moved`).
+2. Run `git worktree prune`, then refuse when another worktree has the branch
+   checked out (`checked-out-elsewhere`).
+3. Reconcile the local branch. When it is absent, create it at the verified
+   remote ref with tracking. When it equals the PR head, use it. When it is a
+   strict ancestor, fast-forward it with a compare-and-swap `git update-ref`.
+   Otherwise refuse (`local-branch-diverged`), because it may hold unpushed
+   work.
+4. Create the workspace, then assert that its HEAD and current branch match
+   the PR (`workspace-head-mismatch`).
+
+Adoption never pushes, forces, deletes a branch or removes a worktree, and it
+removes nothing after a mismatch: `removeWorktree` and `removeWorkspace` run
+`git branch -D`, which would destroy unpushed commits. Polyrepo projects are
+refused (`polyrepo`); the fix tells the operator to run
+`pan workspace create <ID>` by hand. Adoption is coalesced per issue, so an
+`opened` and `ready_for_review` pair, a redelivery, or `pan review request`
+racing the webhook share one attempt. `createWorktree` also fetches the
+feature branch before it decides whether the branch exists, so
+`pan workspace create` checks out an existing remote branch instead of
+cutting a same-named branch from `main`.
+
+The derived attention `pr-outside-pipeline` makes a refusal visible. It holds
+while an open, non-draft PR on the exact pipeline branch exists for an open
+issue and either no pipeline workspace exists or the workspace journal's last
+entry is `workspace.adoption-failed`. It carries
+`prOutsidePipeline: { prNumber, fix, worktreePath? }`
+(`overdeck/pr-outside-pipeline.ts`). It outranks `stuck` and `work-not-started`;
+`needs-you` and `api-error` still outrank it. Once a workspace exists, a
+later `review.requested` in its journal clears it. The fix has two forms. When another worktree holds the branch:
+"PR #<n> (<branch>) is checked out in <path>, so Overdeck cannot create the
+pipeline workspace … run `git -C <project> worktree remove <path>`, then
+`pan review request <ID>`." Otherwise: "PR #<n> (<branch>) was opened outside
+a pipeline workspace … Run `pan review request <ID>` to adopt the branch into
+a workspace and start verification." Each refusal is also announced once on
+the activity stream. The webhook calls `refreshIssuePullRequestStateNow` on
+`opened`, `reopened`, `ready_for_review` and `closed`, so the cached PR
+listing does not hide a just-opened PR for five minutes.
+
+`pan review request` adopts too. The `/api/review/:issueId/request` route
+asks `answerMissingWorkspace` right after it reads the derived state, before
+the approved-head force and nudge shortcuts and `requestReviewGuarded`. With
+no workspace and an open pipeline-branch PR it starts adoption in the
+background and answers 202. A forge failure answers 503, never "no PR". With
+no PR it answers 400 with a hint to run `pan start` or
+`pan workspace create`. A merged issue skips the check.
+
+Command Deck groups the attention into Needs you with the subline
+"review never started — <fix>" and the state badge "Review never started",
+whose tooltip is the fix. `pan show <id>` prints the fix on a `fix` line, and
+`--json` carries `prOutsidePipeline`.
 
 ## Operator decisions (PAN-4383)
 

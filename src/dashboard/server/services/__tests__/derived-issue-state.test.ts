@@ -327,7 +327,7 @@ describe('forge shape translation — GitLab', () => {
       detailed_merge_status: 'mergeable', approved: true, head_pipeline: { status: 'success' },
     })).toEqual({
       url: 'https://gitlab.com/g/r/-/merge_requests/7', number: 7,
-      reviewState: 'approved', checks: 'green', mergeable: true, merged: false, headSha: null,
+      reviewState: 'approved', checks: 'green', mergeable: true, merged: false, headSha: null, isDraft: false,
     });
     expect(mrFromGlabRow({ iid: 7, state: 'opened', has_conflicts: true })?.mergeable).toBe(false);
     expect(mrFromGlabRow({ iid: 7, state: 'merged' })?.merged).toBe(true);

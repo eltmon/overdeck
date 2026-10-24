@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T12:58:15Z · model: claude-opus-5-5 · open: 848_
+_Last sequenced: 2026-10-24T13:46:21Z · model: claude-opus-5-5 · open: 841_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -13,18 +13,12 @@ _Last sequenced: 2026-10-24T12:58:15Z · model: claude-opus-5-5 · open: 848_
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 9 | PAN-4605 | M | critical | ok |  |  | In pipeline: feature/ PRs opened from handoff worktrees get no workspace, so review never starts and only a console.log records it |
-| 10 | PAN-4546 | S | high | ok |  |  | Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
-| 16 | PAN-4595 | S | critical | ok |  |  | CLI health never registers the transcript heartbeat, so Herdr agents read STUCK after 30 min and invite recovery on healthy agents. |
-| 17 | PAN-4597 | S | high | ok |  |  | Awaiting Merge hides approved green PRs: ready needs a 5-min gate answer only auto-merge refreshes. Merge machinery: supervised handoff |
 | 18 | PAN-4598 | M | critical | ok |  |  | No UAT batch has assembled since the cut (newest 2026-09-20, failed); Flywheel card offers only an escape-hatch merge link |
-| 19 | PAN-4614 | XS | high | ok |  |  | In pipeline: union-merge the shared concerns.md so concurrent PRs stop conflicting and re-verifying at the merge door |
-| 20 | PAN-4609 | S | medium | ok |  |  | In pipeline: docs for what verification runs, why it is slow (CPU admission queue), and how to pick local gates |
 | 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
-| 22 | PAN-4610 | S | critical | ok |  |  | Torn-read poller deletes a half-written CPU-admission ticket, stranding a verification worker forever; land with/before PAN-4546 |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 24 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 25 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
@@ -71,6 +65,7 @@ _Last sequenced: 2026-10-24T12:58:15Z · model: claude-opus-5-5 · open: 848_
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
+| 70 | PAN-4624 | S | high | ok |  |  | Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed. |
 | 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -218,8 +213,7 @@ _Last sequenced: 2026-10-24T12:58:15Z · model: claude-opus-5-5 · open: 848_
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 223 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 224 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 225 | PAN-4596 | S | high | ok |  |  | Ended held handoff shows generic "no saved history"; hides kickoff focus/brief and offers no Start. Sat 20 days as "waiting on operator". |
-| 226 | PAN-4616 | S | medium | ok |  | PAN-4614 | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
+| 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -847,12 +841,11 @@ _Last sequenced: 2026-10-24T12:58:15Z · model: claude-opus-5-5 · open: 848_
 | 871 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
 | 872 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
 | 873 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
-| 874 | PAN-4585 | XL | medium | needs-refinement | ✓ |  | New opt-in Semgrep SAST epic; no children filed yet and 4 operator decisions open (gate default, Guardian, opengrep). |
-| 875 | PAN-4590 | L | medium | ok |  | PAN-4585 | Semgrep sast verification gate + review-context findings; first buildable child of PAN-4585, needs its config block. |
-| 876 | PAN-4591 | L | medium | ok |  | PAN-4585 | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; blocked by PAN-4585. |
-| 877 | PAN-4592 | M | low | ok |  | PAN-4585, PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs PAN-4585 and gate mode from PAN-4590. |
-| 878 | PAN-4594 | M | low | ok |  | PAN-4585, PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
-| 879 | PAN-4593 | L | low | needs-refinement |  | PAN-4585, PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 875 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
+| 876 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
+| 877 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
+| 878 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
+| 879 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 
 ## Rationale detail
 
@@ -888,10 +881,6 @@ New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan
 
 New since the prior run and already in the pipeline. Supervised handoffs (the TENET-10 path for pipeline-machinery fixes) open PRs from plain worktrees, and handlePullRequest silently drops them when startReview finds no workspace; PRs #4599/#4602/#4603 sat unreviewed on 2026-10-24. Placed in the open rank 9 slot of the critical top tier because it gates review for every handoff-produced PR, including PAN-4527 and PAN-4532.
 
-### PAN-4546 (rank 10)
-
-Operator decision 2026-10-04: the single admission slot, not agent count, bounded overnight throughput (5-7 PRs waiting 1-2 h at near-zero PSI). Doubling slots under low pressure is the largest throughput lever on the board. Ranks after the bundle because PAN-4531/4532 remove wasted slot time first.
-
 ### PAN-4547 (rank 11)
 
 Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by hand. With false DoD refusals fixed by PAN-4543, auto close-out only needs a patrol on the existing verify-on-main path and live settings. High because unclosed issues distort every pipeline view.
@@ -908,33 +897,13 @@ Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls th
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.
 
-### PAN-4595 (rank 16)
-
-New since the prior run. pan show --health is what the Flywheel reads to decide whether to resume or nudge an agent, and on Herdr the CLI path has only the spawn timestamp as an activity signal, so every working agent older than 30 minutes is classified stuck. A false stuck verdict drives recovery actions against healthy agents, which is a pipeline-integrity problem. The root cause and fix are precise (register the heartbeat lookup on the CLI path, guard against an import cycle, add one test), so it is small and ranks into the top tier beside the other Herdr substrate fixes.
-
-### PAN-4597 (rank 17)
-
-New issue filed 2026-10-24 after PR #4587 was approved, green and clean yet absent from Awaiting Merge. deriveState needs a cached approved-at-head gate answer that only the auto-merge scheduler, merge doors and sibling walks write, and it expires after 5 minutes, so non-opted-in ready PRs vanish from the operator's merge view. Root cause and fix options are already in the body with file and line references, so it is well-scoped. Ranked just behind the in-pipeline pins and next to the auto-merge re-arm fix (PAN-4540) because it touches the same approval-at-head and merge-gate code.
-
 ### PAN-4598 (rank 18)
 
 New since the prior run and labeled substrate-improvement: the merge train reconciler has built no UAT batch for any project since the PAN-3917 cut, so approved green PRs reach main only through a hidden escape-hatch link. It ranks into the open slot beside PAN-4597 (Awaiting Merge hides ready PRs) because both block the operator's last step from approved PR to main; the ACs are concrete (reconciler decision tests, per-row Merge button, honest copy, MERGE-WORKFLOW.md).
 
-### PAN-4614 (rank 19)
-
-New issue filed 2026-10-24 after concerns.md conflicts blocked PR #4601 (PAN-4595) twice at the merge door, each round costing a re-verification and re-review; 14 merged PRs touched the file this month. The fix is one .gitattributes line plus a rebase test, labeled substrate-improvement, and it is already in pipeline, so it sits with the in-pipeline top tier.
-
-### PAN-4609 (rank 20)
-
-New in-pipeline docs issue filed after the 2026-10-24 local-gate trim; pinned at free rank 20 next to the other in-pipeline verification work it documents (PAN-4546, PAN-4531).
-
 ### PAN-4572 (rank 21)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
-
-### PAN-4610 (rank 22)
-
-New issue since the prior run. A waiter poll can unlink a ticket between open(wx) and the JSON write, and the waiter never checks its own ticket, so a live worker queues forever (PAN-4532 sat 40+ min while later gates were admitted). This silently stops verification for that issue, so it is pipeline-blocking substrate work; it takes the free slot right after the in-pipeline cluster and must land with or before PAN-4546, which edits the same admission module.
 
 ### PAN-4586 (rank 23)
 
@@ -1120,6 +1089,10 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
+### PAN-4624 (rank 70)
+
+New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.
+
 ### PAN-3557 (rank 71)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
@@ -1176,6 +1149,26 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 
 Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
 
+### PAN-3043 (rank 85)
+
+Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
+
+### PAN-1824 (rank 86)
+
+Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass — PAN-3243, PAN-3492, PAN-3520 and PAN-2421 — all trace red or flaky main to real-timer tests under load. This is the shared fix for that family and it is now marked ready, so it should sit with the other CI-integrity work rather than behind it.
+
+### PAN-2932 (rank 87)
+
+Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (502) after pan reload.
+
+### PAN-2935 (rank 88)
+
+Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.
+
+### PAN-2337 (rank 89)
+
+Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1183,10 +1176,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T12:58:15Z",
+  "generatedAt": "2026-10-24T13:46:21Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 848,
+  "openCount": 841,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1282,19 +1275,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "planning": "auto"
     },
     {
-      "issue": "PAN-4546",
-      "rank": 10,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff",
-      "rationale": "Operator decision 2026-10-04: the single admission slot, not agent count, bounded overnight throughput (5-7 PRs waiting 1-2 h at near-zero PSI). Doubling slots under low pressure is the largest throughput lever on the board. Ranks after the bundle because PAN-4531/4532 remove wasted slot time first.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4547",
       "rank": 11,
       "size": "M",
@@ -1349,32 +1329,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       ],
       "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
       "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4595",
-      "rank": 16,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CLI health never registers the transcript heartbeat, so Herdr agents read STUCK after 30 min and invite recovery on healthy agents.",
-      "rationale": "New since the prior run. pan show --health is what the Flywheel reads to decide whether to resume or nudge an agent, and on Herdr the CLI path has only the spawn timestamp as an activity signal, so every working agent older than 30 minutes is classified stuck. A false stuck verdict drives recovery actions against healthy agents, which is a pipeline-integrity problem. The root cause and fix are precise (register the heartbeat lookup on the CLI path, guard against an import cycle, add one test), so it is small and ranks into the top tier beside the other Herdr substrate fixes.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4597",
-      "rank": 17,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Awaiting Merge hides approved green PRs: ready needs a 5-min gate answer only auto-merge refreshes. Merge machinery: supervised handoff",
-      "rationale": "New issue filed 2026-10-24 after PR #4587 was approved, green and clean yet absent from Awaiting Merge. deriveState needs a cached approved-at-head gate answer that only the auto-merge scheduler, merge doors and sibling walks write, and it expires after 5 minutes, so non-opted-in ready PRs vanish from the operator's merge view. Root cause and fix options are already in the body with file and line references, so it is well-scoped. Ranked just behind the in-pipeline pins and next to the auto-merge re-arm fix (PAN-4540) because it touches the same approval-at-head and merge-gate code.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3828,19 +3782,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "dependsOn": [],
       "why": "Kimi ACP cancel is sent with id:\"\" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked.",
       "rationale": "Source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. Its prerequisite PAN-4563 (replay fixture and pinned host-replay test) merged in #4576, so the dependency is cleared; the rank stays at 224 because it already sat in the high tier with peers of equal score and nothing else about the issue changed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4596",
-      "rank": 225,
-      "size": "S",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Ended held handoff shows generic \"no saved history\"; hides kickoff focus/brief and offers no Start. Sat 20 days as \"waiting on operator\".",
-      "rationale": "New since the prior run. ConversationPanel treats every ended conversation without a timeline as orphaned and never reads forkRequest.hold, so a held handoff loses its kickoff text, brief path and Start action. The substrate-improvement label sets a high floor; impact is operator visibility rather than pipeline correctness, so it ranks with other Needs-you visibility gaps such as PAN-3276.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11575,31 +11516,15 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "planning": "skip"
     },
     {
-      "issue": "PAN-4585",
-      "rank": 874,
-      "size": "XL",
-      "importance": "medium",
-      "score": 40,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "New opt-in Semgrep SAST epic; no children filed yet and 4 operator decisions open (gate default, Guardian, opengrep).",
-      "rationale": "New since the prior run. Epic container with a detailed 9-item plan but no child issues filed and four operator decisions unresolved, so it is not workable; ranked by aggregate value as a medium-impact opt-in feature, appended to avoid shifting existing ranks.",
-      "gate": "auto",
-      "planning": "auto",
-      "isEpic": true
-    },
-    {
       "issue": "PAN-4590",
       "rank": 875,
       "size": "L",
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4585"
-      ],
-      "why": "Semgrep sast verification gate + review-context findings; first buildable child of PAN-4585, needs its config block.",
-      "rationale": "New since the prior run. Phase-2 child of the Semgrep epic with a detailed scope and probe results; blocked by PAN-4585 and unblocks PAN-4592/4593/4594, so it leads the appended Semgrep group.",
+      "dependsOn": [],
+      "why": "Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11610,11 +11535,9 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "importance": "medium",
       "score": 45,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4585"
-      ],
-      "why": "Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; blocked by PAN-4585.",
-      "rationale": "New since the prior run. Independent of the gate child, blocked only by PAN-4585; appended after PAN-4590 to avoid shifting existing ranks.",
+      "dependsOn": [],
+      "why": "Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11626,11 +11549,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 38,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4585",
         "PAN-4590"
       ],
-      "why": "pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs PAN-4585 and gate mode from PAN-4590.",
-      "rationale": "New since the prior run. Opt-in CI workflow child; depends on the epic config block and PAN-4590 gate mode, so it follows the gate child.",
+      "why": "pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11642,11 +11564,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 36,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4585",
         "PAN-4590"
       ],
       "why": "Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590.",
-      "rationale": "New since the prior run. UI child that needs findings and the verification.sast override from PAN-4590 to exist first.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11658,11 +11579,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 30,
       "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-4585",
         "PAN-4590"
       ],
       "why": "Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work.",
-      "rationale": "New since the prior run. Two operator decisions from PAN-4585 are unresolved and Guardian provisioning touches liveness and pan done, so it is needs-refinement and last in the group.",
+      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11680,54 +11600,13 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "planning": "auto"
     },
     {
-      "issue": "PAN-4609",
-      "rank": 20,
-      "size": "S",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: docs for what verification runs, why it is slow (CPU admission queue), and how to pick local gates",
-      "rationale": "New in-pipeline docs issue filed after the 2026-10-24 local-gate trim; pinned at free rank 20 next to the other in-pipeline verification work it documents (PAN-4546, PAN-4531).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4610",
-      "rank": 22,
-      "size": "S",
-      "importance": "critical",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Torn-read poller deletes a half-written CPU-admission ticket, stranding a verification worker forever; land with/before PAN-4546",
-      "rationale": "New issue since the prior run. A waiter poll can unlink a ticket between open(wx) and the JSON write, and the waiter never checks its own ticket, so a live worker queues forever (PAN-4532 sat 40+ min while later gates were admitted). This silently stops verification for that issue, so it is pipeline-blocking substrate work; it takes the free slot right after the in-pipeline cluster and must land with or before PAN-4546, which edits the same admission module.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4614",
-      "rank": 19,
-      "size": "XS",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: union-merge the shared concerns.md so concurrent PRs stop conflicting and re-verifying at the merge door",
-      "rationale": "New issue filed 2026-10-24 after concerns.md conflicts blocked PR #4601 (PAN-4595) twice at the merge door, each round costing a re-verification and re-review; 14 merged PRs touched the file this month. The fix is one .gitattributes line plus a rebase test, labeled substrate-improvement, and it is already in pipeline, so it sits with the in-pipeline top tier.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4616",
       "rank": 226,
       "size": "S",
       "importance": "medium",
       "score": 58,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4614"
-      ],
+      "dependsOn": [],
       "why": "After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback",
       "rationale": "New issue: an observation follow-up to in-pipeline PAN-4614; ranked mid-tier because it only matters if GitHub ignores union, and any fallback touches the merge gate's trust boundary and needs its own plan.",
       "gate": "auto",
@@ -11771,6 +11650,19 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "dependsOn": [],
       "why": "deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10",
       "rationale": "New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4624",
+      "rank": 70,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed.",
+      "rationale": "New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13051,20 +12943,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 0.8
     },
     {
-      "from": "PAN-4531",
-      "to": "PAN-4546",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4532",
-      "to": "PAN-4546",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-4552",
       "to": "PAN-2416",
       "type": "informs",
@@ -13114,76 +12992,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 1
     },
     {
-      "from": "PAN-4585",
-      "to": "PAN-4590",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4590",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4591",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4591",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4592",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4592",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4593",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4593",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4594",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4585",
-      "to": "PAN-4594",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4590",
       "to": "PAN-4592",
       "type": "unblocks",
@@ -13203,34 +13011,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4595",
-      "to": "PAN-3297",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4596",
-      "to": "PAN-2193",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-4540",
-      "to": "PAN-4597",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4597",
-      "to": "PAN-4598",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-4605",
@@ -13247,48 +13027,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 0.6
     },
     {
-      "from": "PAN-4546",
-      "to": "PAN-4609",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4531",
-      "to": "PAN-4609",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4610",
-      "to": "PAN-4546",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-4610",
-      "to": "PAN-4532",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-4614",
-      "to": "PAN-4595",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4614",
-      "to": "PAN-4616",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
       "from": "PAN-4532",
       "to": "PAN-4622",
       "type": "unblocks",
@@ -13298,6 +13036,13 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     {
       "from": "PAN-4532",
       "to": "PAN-4623",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4527",
+      "to": "PAN-4624",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
