@@ -38,6 +38,8 @@ vi.mock('../../../lib/wsTransport', () => ({
   }),
 }));
 
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
 // Mock DialogProvider hooks so ConversationPanel can mount without the full provider tree
 vi.mock('../../DialogProvider', () => ({
   DialogProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -112,6 +114,7 @@ vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
 
 // Import the mock so we can assert on it
 import { updateConversationTitle } from '../../CommandDeck/ConversationList';
+import { toast } from 'sonner';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1246,5 +1249,79 @@ describe('ConversationPanel HTTP /messages fallback (PAN-4312)', () => {
       URL.createObjectURL = originalCreate;
       URL.revokeObjectURL = originalRevoke;
     }
+  });
+});
+
+describe('ConversationPanel archive (PAN-4584)', () => {
+  beforeEach(() => {
+    queryClients = [];
+    fetchControl = installStrictFetchMock(({ method, url }) => defaultConversationResponse(method, url));
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  function openArchiveMenu() {
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archive conversation' }));
+  }
+
+  it('a 500 error response toasts the server message and does not call onArchived', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'POST' && url === '/api/conversations/test-conv/archive') {
+        return new Response(JSON.stringify({ error: 'boom' }), { status: 500 });
+      }
+      return defaultConversationResponse(method, url);
+    });
+    const onArchived = vi.fn();
+    renderPanel(mockConversation, { onArchived });
+
+    openArchiveMenu();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('boom', { duration: 6000 }));
+    expect(onArchived).not.toHaveBeenCalled();
+  });
+
+  it('a 200 response calls onArchived once and toasts success with the title', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'POST' && url === '/api/conversations/test-conv/archive') {
+        return Response.json({ success: true });
+      }
+      return defaultConversationResponse(method, url);
+    });
+    const onArchived = vi.fn();
+    const { client } = renderPanel(mockConversation, { onArchived });
+    client.setQueryData(['conversations'], [{ name: 'test-conv', title: 'My Panel Title' }]);
+
+    openArchiveMenu();
+
+    await waitFor(() => expect(onArchived).toHaveBeenCalledTimes(1));
+    expect(toast.success).toHaveBeenCalledWith('Archived "My Panel Title"', { duration: 4000 });
+  });
+
+  it('shows an Archiving… status in the header while the request is unresolved', async () => {
+    let resolveArchive: ((response: Response) => void) | null = null;
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'POST' && url === '/api/conversations/test-conv/archive') {
+        return new Promise<Response>((resolve) => { resolveArchive = resolve; });
+      }
+      return defaultConversationResponse(method, url);
+    });
+    renderPanel();
+
+    openArchiveMenu();
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Archiving…');
+
+    resolveArchive?.(Response.json({ success: true }));
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
   });
 });
