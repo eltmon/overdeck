@@ -284,3 +284,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   4531, 4540, 4534 at 12:00; all of it belongs in PAN-4605's fix.
 - Cancel queued `chore(workspace)` runs on main while PAN-4618 is pending;
   the sequencer commits every few minutes.
+- Release step for this run (operator, 12:55 UTC): before `pan release
+  stable --version 0.70.0`, add an `<Update label="v0.70.0">` block to
+  `changelog.mdx` with the user-facing changes since v0.69.0 (and move the
+  matching `CHANGELOG.md` "Unreleased" items), commit
+  `docs(infra): changelog for v0.70.0`, push main; see docs/RELEASING.md
+  "Update the public changelog" and the pan-release skill.
