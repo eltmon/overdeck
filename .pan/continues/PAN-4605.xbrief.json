@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4605",
   "created": "2026-10-24T09:55:25.836Z",
-  "updated": "2026-10-24T11:47:11.688Z",
+  "updated": "2026-10-24T11:47:27.221Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -210,6 +210,10 @@
     "pan-show-prints-fix.ac1": {
       "status": "completed",
       "doneAt": "2026-10-24T11:47:11.688Z"
+    },
+    "pan-show-prints-fix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:47:27.220Z"
     }
   }
 }
