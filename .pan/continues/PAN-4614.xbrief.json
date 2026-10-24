@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4614",
   "created": "2026-10-24T11:11:53.918Z",
-  "updated": "2026-10-24T11:38:44.008Z",
+  "updated": "2026-10-24T11:38:59.002Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "merge-workflow-docs.ac3": {
       "status": "completed",
       "doneAt": "2026-10-24T11:38:44.008Z"
+    },
+    "footer-dedupe-guidance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-24T11:38:59.002Z"
     }
   }
 }
