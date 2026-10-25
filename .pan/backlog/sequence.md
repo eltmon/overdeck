@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-25T18:59:29Z · model: claude-opus-5-5 · open: 839_
+_Last sequenced: 2026-10-25T20:23:36Z · model: claude-opus-5-5 · open: 840_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
+| 2 | PAN-4630 | XS | critical | ok |  |  | In pipeline: herdr streams spawn bare 'herdr' on a PATH without ~/.local/bin, so dashboard terminals loop on Connection lost. |
 | 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -851,6 +852,10 @@ _Last sequenced: 2026-10-25T18:59:29Z · model: claude-opus-5-5 · open: 839_
 
 New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.
 
+### PAN-4630 (rank 2)
+
+New in-pipeline issue with a verified root cause and a one-function fix; it breaks the terminal view for every Herdr-backed agent and conversation, so it is pinned in a free top slot (rank 2) per the in-pipeline rule.
+
 ### PAN-4534 (rank 5)
 
 Both CI failures observed on 2026-10-04 reached agents as 'no failing workflow runs were found', so agents re-run tests locally through the serialized queue to rediscover failures. Building failures from check runs puts the failing test in the feedback and removes that queue load. Fourth member of the verification bundle.
@@ -1163,10 +1168,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 
 npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
 
-### PAN-2758 (rank 94)
-
-Triage: verify whether a provider-capacity zombie can still read as running under the current liveness definition. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1174,10 +1175,10 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-25T18:59:29Z",
+  "generatedAt": "2026-10-25T20:23:36Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 839,
+  "openCount": 840,
   "nodes": [
     {
       "issue": "PAN-4534",
@@ -11629,6 +11630,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "dependsOn": [],
       "why": "Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs.",
       "rationale": "New issue: a convenience fix for the PAN-4359 upgrade banner on Homebrew installs plus automatic upgrades; useful but not blocking, so it sits with medium-tier dashboard polish next to PAN-4360.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4630",
+      "rank": 2,
+      "size": "XS",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: herdr streams spawn bare 'herdr' on a PATH without ~/.local/bin, so dashboard terminals loop on Connection lost.",
+      "rationale": "New in-pipeline issue with a verified root cause and a one-function fix; it breaks the terminal view for every Herdr-backed agent and conversation, so it is pinned in a free top slot (rank 2) per the in-pipeline rule.",
       "gate": "auto",
       "planning": "auto"
     }
