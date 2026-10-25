@@ -173,9 +173,10 @@ describe('SettingsPage role model routing panels', () => {
   it('surfaces conversation search controls', () => {
     expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Conversation Search');
     expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('aria-label="Toggle conversation search"');
-    // cee57d395: conversation search uses the standard API Keys section now.
-    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Using OpenAI key from API Keys section');
-    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('No OpenAI key set — configure in API Keys above');
+    // cee57d395: conversation search uses the OpenAI key from Providers, and
+    // the missing-key hint deep-links to that row.
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Using the OpenAI key from Providers');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain("requestSettingsSection('provider-openai')");
     expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Last indexed:');
     expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Estimated reindex cost:');
     expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Estimate & reindex all conversations');

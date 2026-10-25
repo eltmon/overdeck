@@ -67,7 +67,7 @@ describe('conversation embedding provider', () => {
     const provider = createConversationEmbeddingProvider({ config: config({ apiKeyRef: secret }), env: {} });
     expect(provider.enabled).toBe(false);
     expect(provider.unavailableReason).not.toContain(secret);
-    expect(provider.unavailableReason).toMatch(/Settings → API Keys/);
+    expect(provider.unavailableReason).toMatch(/Settings → Providers → OpenAI/);
   });
 
   it('falls back to the central apiKeys.openai when the env var is absent', async () => {

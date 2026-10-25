@@ -16,7 +16,7 @@ import { RolesPanel } from './RolesPanel';
 import { VoiceSettingsSection } from './sections/VoiceSettingsSection';
 import { ConversationSearchSection } from './sections/ConversationSearchSection';
 import { ConversationSettingsSection } from './sections/ConversationSettingsSection';
-import { ProviderManagementSection } from './sections/ProviderManagementSection';
+import { PROVIDER_ROW_ID_PREFIX, ProviderManagementSection, type ProviderFocusRequest } from './sections/ProviderManagementSection';
 import { PermissionsSection } from './sections/PermissionsSection';
 import { TieredExecutionSection } from './sections/TieredExecutionSection';
 import { SwarmSettingsSection } from './sections/SwarmSettingsSection';
@@ -254,6 +254,7 @@ export function SettingsPage() {
     hasAnthropicApiKey: boolean;
   } | null>(null);
   const [activeSection, setActiveSection] = useState('model-routing');
+  const [providerFocusRequest, setProviderFocusRequest] = useState<ProviderFocusRequest | null>(null);
   const {
     cloisterSaveDebounceRef,
     flushAutosave,
@@ -316,7 +317,11 @@ export function SettingsPage() {
   }, [queryClient]);
 
   const scrollToSection = useCallback((id: string) => {
-    setActiveSection(id);
+    // A provider row (`provider-<id>`) sits inside the Providers section: keep
+    // Providers highlighted in the nav and ask the row to open its key field.
+    const provider = id.startsWith(PROVIDER_ROW_ID_PREFIX) ? id.slice(PROVIDER_ROW_ID_PREFIX.length) : null;
+    setActiveSection(provider ? 'providers' : id);
+    if (provider) setProviderFocusRequest({ provider, at: Date.now() });
     // Two problems to handle: (1) on a fresh navigation the section may not be
     // mounted on the first frame; (2) sections above the target (model lists,
     // TTS voice library, memory) load async and reflow the page for ~1.5s AFTER
@@ -521,6 +526,7 @@ export function SettingsPage() {
           } : prev);
         }}
         onSettingsChange={applySettings}
+        focusRequest={providerFocusRequest}
       />
 
       <PermissionsSection

@@ -103,7 +103,7 @@ export function AppChrome({
 
         {/* Conversation Search Banner — shown when transcript indexing/palette
             search cannot run (no API key, out of credits, quota, network) */}
-        <ConversationSearchBanner />
+        <ConversationSearchBanner onOpenSettings={onOpenSettings} />
 
         {/* inotify file-watcher budget nearly exhausted — new dev servers
             would fail with ENOSPC (PAN-3063) */}

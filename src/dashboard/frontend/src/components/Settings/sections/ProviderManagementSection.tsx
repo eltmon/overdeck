@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   AlertTriangle,
@@ -45,6 +45,17 @@ interface ProviderManagementSectionProps {
   onHarnessModelPermutationsToggle: (enabled: boolean) => void;
   onOpenRouterApiKeySaved: (savedKey: string) => void;
   onSettingsChange: (next: SettingsConfig, opts?: { debounce?: boolean }) => void;
+  /** Deep-link request (e.g. from the conversation-search banner) to open a provider's key field. */
+  focusRequest?: ProviderFocusRequest | null;
+}
+
+/** Settings deep-link ids for provider rows are `provider-<id>`, e.g. `provider-openai`. */
+export const PROVIDER_ROW_ID_PREFIX = 'provider-';
+
+export interface ProviderFocusRequest {
+  provider: string;
+  /** Request timestamp, so asking for the same provider twice still re-runs. */
+  at: number;
 }
 
 const HARNESS_LABELS: Record<Harness, string> = {
@@ -134,6 +145,7 @@ export function ProviderManagementSection({
   onHarnessModelPermutationsToggle,
   onOpenRouterApiKeySaved,
   onSettingsChange,
+  focusRequest,
 }: ProviderManagementSectionProps) {
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
@@ -142,6 +154,19 @@ export function ProviderManagementSection({
   const [testingModel, setTestingModel] = useState<string | null>(null);
   const [modelTestResults, setModelTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
+  const handledFocusAt = useRef<number | null>(null);
+
+  // Expand the requested row, then focus its key input once it has mounted.
+  // preventScroll leaves positioning to the Settings page's scroll-into-view.
+  useEffect(() => {
+    if (!focusRequest || handledFocusAt.current === focusRequest.at) return;
+    if (!expandedProviders[focusRequest.provider]) {
+      setExpandedProviders(prev => ({ ...prev, [focusRequest.provider]: true }));
+      return;
+    }
+    handledFocusAt.current = focusRequest.at;
+    document.getElementById(`${PROVIDER_ROW_ID_PREFIX}${focusRequest.provider}-api-key`)?.focus({ preventScroll: true });
+  }, [focusRequest, expandedProviders]);
 
   const handleProviderToggle = (provider: Provider) => {
     onSettingsChange({
@@ -284,7 +309,7 @@ export function ProviderManagementSection({
             const authSummary = getAuthSummary();
 
             return (
-              <div key={provider.id} className="border border-transparent rounded-lg hover:border-border transition-colors">
+              <div key={provider.id} id={`${PROVIDER_ROW_ID_PREFIX}${provider.id}`} className="scroll-mt-4 border border-transparent rounded-lg hover:border-border transition-colors">
                 <div className="flex items-center gap-3 px-3 py-2.5">
                   <ProviderLogo provider={provider.id} label={provider.name} className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="text-sm font-medium text-foreground flex-1 min-w-0">{provider.name}</span>
@@ -404,6 +429,7 @@ export function ProviderManagementSection({
                           <input
                             type={showApiKey[provider.id] ? 'text' : 'password'}
                             value={apiKey}
+                            id={`${PROVIDER_ROW_ID_PREFIX}${provider.id}-api-key`}
                             onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
                             placeholder={provider.placeholder}
                             autoComplete="off"
@@ -440,6 +466,7 @@ export function ProviderManagementSection({
                             <input
                               type="text"
                               placeholder={provider.placeholder}
+                              id={`${PROVIDER_ROW_ID_PREFIX}${provider.id}-api-key`}
                               onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
                               autoComplete="off"
                               className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs font-mono mt-1.5 focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
@@ -450,6 +477,7 @@ export function ProviderManagementSection({
                             <input
                               type={showApiKey[provider.id] ? 'text' : 'password'}
                               value={apiKey}
+                              id={`${PROVIDER_ROW_ID_PREFIX}${provider.id}-api-key`}
                               onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
                               placeholder={provider.placeholder}
                               autoComplete="off"
