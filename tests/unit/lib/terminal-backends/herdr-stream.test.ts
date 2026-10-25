@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import type { ChildProcessWithoutNullStreams } from 'child_process';
+import { homedir } from 'os';
+import { delimiter, join } from 'path';
 
 import {
   controlTerminal,
@@ -84,18 +86,20 @@ class FakeChild extends EventEmitter {
   }
 }
 
+type SpawnOptions = { env: NodeJS.ProcessEnv };
+
 function fakeSpawn(): {
-  spawn: (command: string, args: readonly string[]) => ChildProcessWithoutNullStreams;
+  spawn: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcessWithoutNullStreams;
   children: FakeChild[];
-  calls: Array<{ command: string; args: readonly string[] }>;
+  calls: Array<{ command: string; args: readonly string[]; options: SpawnOptions }>;
 } {
   const children: FakeChild[] = [];
-  const calls: Array<{ command: string; args: readonly string[] }> = [];
+  const calls: Array<{ command: string; args: readonly string[]; options: SpawnOptions }> = [];
   return {
     children,
     calls,
-    spawn: (command: string, args: readonly string[]) => {
-      calls.push({ command, args });
+    spawn: (command: string, args: readonly string[], options: SpawnOptions) => {
+      calls.push({ command, args, options });
       const child = new FakeChild();
       children.push(child);
       return child as unknown as ChildProcessWithoutNullStreams;
@@ -246,6 +250,22 @@ describe('controlTerminal', () => {
     expect(children).toHaveLength(1);
     control.close();
     expect(children[0].killed).toBe(true);
+  });
+
+  it('spawns herdr with ~/.local/bin on PATH when the dashboard PATH omits it', () => {
+    vi.stubEnv('PATH', '/usr/bin:/bin');
+    try {
+      const { spawn, calls } = fakeSpawn();
+      controlTerminal('term_l', { spawn }).close();
+      observeTerminal('term_l', { spawn }).close();
+      for (const call of calls) {
+        expect(call.command).toBe('herdr');
+        expect(call.options.env.PATH).toBe(['/usr/bin', '/bin', join(homedir(), '.local', 'bin')].join(delimiter));
+      }
+      expect(calls).toHaveLength(2);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('exposes the control stream as frames', async () => {
