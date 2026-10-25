@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-24T17:34:07Z · model: claude-opus-5-5 · open: 835_
+_Last sequenced: 2026-10-25T09:57:54Z · model: claude-opus-5-5 · open: 836_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
 | 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -843,6 +844,10 @@ _Last sequenced: 2026-10-24T17:34:07Z · model: claude-opus-5-5 · open: 835_
 
 ## Rationale detail
 
+### PAN-4626 (rank 1)
+
+New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.
+
 ### PAN-4534 (rank 5)
 
 Both CI failures observed on 2026-10-04 reached agents as 'no failing workflow runs were found', so agents re-run tests locally through the serialized queue to rediscover failures. Building failures from check runs puts the failing test in the feedback and removes that queue load. Fourth member of the verification bundle.
@@ -1159,10 +1164,6 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 
 Triage: verify whether a provider-capacity zombie can still read as running under the current liveness definition. Rank held.
 
-### PAN-2817 (rank 95)
-
-Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; verify the composer-freeze detection gap against it. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1170,10 +1171,10 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-24T17:34:07Z",
+  "generatedAt": "2026-10-25T09:57:54Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 835,
+  "openCount": 836,
   "nodes": [
     {
       "issue": "PAN-4534",
@@ -11573,6 +11574,19 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
       ],
       "why": "CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file)",
       "rationale": "New issue since the prior run. The same-head debounce in ci-failure-feedback.ts drops a second failed check (e.g. a test shard after lint), so the work agent fixes lint and never learns which test failed, which costs a full extra CI and verification cycle per occurrence. It is a small, well-specified fix with clear ACs, but it edits the same relay code that in-pipeline PAN-4534 is rewriting, so it is sequenced right behind that work rather than ahead of it; it sits beside PAN-4439 (the missed-webhook backstop) as the second gap in CI failure delivery.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4626",
+      "rank": 1,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending.",
+      "rationale": "New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.",
       "gate": "auto",
       "planning": "auto"
     }
