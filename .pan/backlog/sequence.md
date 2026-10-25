@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-25T17:38:06Z · model: claude-opus-5-5 · open: 836_
+_Last sequenced: 2026-10-25T18:52:12Z · model: claude-opus-5-5 · open: 839_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -157,8 +157,10 @@ _Last sequenced: 2026-10-25T17:38:06Z · model: claude-opus-5-5 · open: 836_
 | 164 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
 | 165 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
 | 166 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
+| 167 | PAN-4628 | S | high | ok |  |  | npx pan serve mints a per-run token never written to disk; Herdr panes keep a stale one, so pane CLI calls to the dashboard get 401. |
 | 168 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
 | 169 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
+| 170 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
@@ -401,6 +403,7 @@ _Last sequenced: 2026-10-25T17:38:06Z · model: claude-opus-5-5 · open: 836_
 | 427 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
 | 428 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
 | 429 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
+| 430 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
 | 431 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
 | 432 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
 | 433 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
@@ -1171,10 +1174,10 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-25T17:38:06Z",
+  "generatedAt": "2026-10-25T18:52:12Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 836,
+  "openCount": 839,
   "nodes": [
     {
       "issue": "PAN-4534",
@@ -11589,6 +11592,45 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "rationale": "New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4628",
+      "rank": 167,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "npx pan serve mints a per-run token never written to disk; Herdr panes keep a stale one, so pane CLI calls to the dashboard get 401.",
+      "rationale": "New issue with a verified cause: pan serve never persists the internal token, and long-lived Herdr panes inherit an old one, so every CLI-to-dashboard call from an npx-launched pane is rejected. It breaks pan pair today and threatens any pane-side pipeline call on npx machines; the fix (reuse ensureInternalToken) is small.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4629",
+      "rank": 170,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix.",
+      "rationale": "New issue: on a fresh npx install with gh logged in, pan start fails with Tracker not configured, and project registration picked OVERDECK instead of PAN. Both block first-run onboarding outright; causes are verified and the acceptance tests are concrete.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4627",
+      "rank": 430,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs.",
+      "rationale": "New issue: a convenience fix for the PAN-4359 upgrade banner on Homebrew installs plus automatic upgrades; useful but not blocking, so it sits with medium-tier dashboard polish next to PAN-4360.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12904,6 +12946,13 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     {
       "from": "PAN-4439",
       "to": "PAN-4625",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4360",
+      "to": "PAN-4627",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
