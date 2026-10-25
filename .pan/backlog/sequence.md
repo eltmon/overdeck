@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-25T18:52:12Z · model: claude-opus-5-5 · open: 839_
+_Last sequenced: 2026-10-25T18:59:29Z · model: claude-opus-5-5 · open: 839_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -162,6 +162,7 @@ _Last sequenced: 2026-10-25T18:52:12Z · model: claude-opus-5-5 · open: 839_
 | 169 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 170 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
+| 172 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
@@ -640,7 +641,6 @@ _Last sequenced: 2026-10-25T18:52:12Z · model: claude-opus-5-5 · open: 839_
 | 664 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 665 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 666 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 668 | PAN-4577 | M | medium | ok |  |  | PAN-3957 phase 2: Claude auto-memory import + native-memory gate; machine store from PAN-4578 now merged, so W9 is unblocked. |
 | 670 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 671 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 672 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
@@ -1174,7 +1174,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-25T18:52:12Z",
+  "generatedAt": "2026-10-25T18:59:29Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 839,
@@ -8999,14 +8999,14 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-4577",
-      "rank": 668,
+      "rank": 172,
       "size": "M",
-      "importance": "medium",
-      "score": 28,
+      "importance": "high",
+      "score": 70,
       "condition": "ok",
       "dependsOn": [],
-      "why": "PAN-3957 phase 2: Claude auto-memory import + native-memory gate; machine store from PAN-4578 now merged, so W9 is unblocked.",
-      "rationale": "Its only dependency PAN-4578 (machine memory store) closed as completed, so the dependency is dropped and the issue is unblocked; rank kept because importance and scope are unchanged.",
+      "why": "Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked.",
+      "rationale": "A 2026-10-25 field report shows the operator's Claude auto-memory facts stayed on the original machine when they set up a new Mac with npx, because this importer does not exist yet. That is live operator pain on the multi-machine onboarding path, next to PAN-4629 and PAN-4628, so it moves from 668 to 172 and from medium to high. Its blocker PAN-3957 closed as completed, so the work is unblocked.",
       "gate": "auto",
       "planning": "auto"
     },
