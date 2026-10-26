@@ -477,4 +477,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   tmux `window_activity`, activity then reads as the spawn time. PAN-4595 adds the import
   to `src/lib/health.ts`; `pan worker wait`/`pan lane wait` (`agents/worker/wait.ts`)
   still lack it. Verify with a Node `indexOf` scan of `dist/*.js`, not grep.
-<!-- last-verified: 2026-10-24 -->
+- **Herdr streams resolve `herdr` through the child's PATH** (PAN-4630) — the
+  probe (`findHerdrBinary`) falls back to `~/.local/bin`, but `startStream` in
+  `herdr-stream.ts` spawns the bare `herdr`. Under an `npx` dashboard PATH
+  (no `~/.local/bin`) that spawn hit `ENOENT`, which reads as "controlled by
+  another client; serving it read-only", then "Connection lost", plus
+  `sizing attach refused` at launch. Streams now spawn with
+  `herdrSearchDirs()` (exported from `select.ts`) as `PATH`. Any new `herdr`
+  spawn must do the same or use the probe's resolved absolute path.
+<!-- last-verified: 2026-10-26 -->

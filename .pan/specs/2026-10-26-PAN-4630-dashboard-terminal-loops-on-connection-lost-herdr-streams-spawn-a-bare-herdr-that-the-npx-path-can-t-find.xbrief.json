@@ -4,17 +4,17 @@
     "created": "2026-10-26T20:30:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4630: Dashboard terminal loops on 'Connection lost': herdr streams spawn a bare 'herdr' that the npx PATH can't find",
-    "updated": "2026-10-26T20:07:12.243Z"
+    "updated": "2026-10-26T20:07:47.533Z"
   },
   "plan": {
     "id": "pan-4630",
     "title": "Dashboard terminal loops on 'Connection lost': herdr streams spawn a bare 'herdr' that the npx PATH can't find",
-    "status": "proposed",
+    "status": "running",
     "uid": "76f18d29-926f-44eb-9239-c35a83f458f6",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-26T20:30:00.000Z",
-    "updated": "2026-10-26T20:07:12.243Z",
+    "updated": "2026-10-26T20:07:47.533Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4630",
@@ -246,5 +246,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
