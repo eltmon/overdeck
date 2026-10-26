@@ -28,9 +28,10 @@
 
 import { spawn as nodeSpawn } from 'child_process';
 import type { ChildProcessWithoutNullStreams } from 'child_process';
+import { delimiter } from 'path';
 import { StringDecoder } from 'string_decoder';
 
-import { herdrSessionName, HERDR_BINARY } from './select.js';
+import { herdrSearchDirs, herdrSessionName, HERDR_BINARY } from './select.js';
 import type { TerminalControl, TerminalFrame, TerminalObservation } from './types.js';
 
 /** One decoded NDJSON record from a terminal stream. */
@@ -107,7 +108,11 @@ export function decodeTerminalRecord(
 }
 
 /** Minimal spawn shape so tests can drive the decoder without a real process. */
-export type HerdrSpawn = (command: string, args: readonly string[]) => ChildProcessWithoutNullStreams;
+export type HerdrSpawn = (
+  command: string,
+  args: readonly string[],
+  options: { env: NodeJS.ProcessEnv },
+) => ChildProcessWithoutNullStreams;
 
 export interface HerdrStreamDeps {
   readonly spawn?: HerdrSpawn;
@@ -173,8 +178,11 @@ function startStream(
   deps: HerdrStreamDeps,
 ): StreamChild {
   const { command, args } = streamArgs(mode, terminalId, deps);
-  const spawnFn = deps.spawn ?? ((cmd, argv) => nodeSpawn(cmd, [...argv]) as ChildProcessWithoutNullStreams);
-  const child = spawnFn(command, args);
+  const spawnFn = deps.spawn ?? ((cmd, argv, options) => nodeSpawn(cmd, [...argv], options) as ChildProcessWithoutNullStreams);
+  // Node resolves a bare command through the child's PATH. Use the probe's
+  // search dirs so a dashboard whose PATH omits ~/.local/bin still finds herdr;
+  // otherwise every attach dies with ENOENT and reads as a refused control.
+  const child = spawnFn(command, args, { env: { ...process.env, PATH: herdrSearchDirs().join(delimiter) } });
   const frames = new FrameQueue();
   const state: TerminalDecodeState = { cols: deps.cols ?? 80, rows: deps.rows ?? 24 };
   let buffer = '';

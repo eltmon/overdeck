@@ -48,6 +48,10 @@ precedence order, and never touches the filesystem:
 `probeHerdrAvailability()` answers whether Herdr can serve **right now**: the `herdr` binary on
 `PATH` or in `~/.local/bin`, **and** *this instance's* session socket. No subprocess — `fs.access`
 only — and never memoized, so a session server started after dashboard boot is usable at once.
+The directory list is `herdrSearchDirs()`, and the terminal streams (`observe`, `control`, and
+the launch-time sizing attach) spawn `herdr` with that list as the child's `PATH`, so a dashboard
+whose `PATH` omits `~/.local/bin` (an `npx` start) still finds the binary the probe found
+(PAN-4630).
 
 What an unavailable Herdr does:
 
@@ -847,6 +851,10 @@ Verified live on 2026-09-18 against the running `overdeck` session.
   frame. Invalid bytes become U+FFFD. Decoding as Latin-1 (`'binary'`) was the PAN-4310 mojibake
   bug. (`TextDecoder` was tried first but `tsconfig.evals.json` restricts `types` to `["node"]`,
   which does not expose it as a type; `StringDecoder` has the same streaming-buffer semantics.)
+- A stream that cannot spawn `herdr` (`ENOENT`) ends before its first frame, which the dashboard
+  reads as a refused `control` attach and serves read-only; the `observe` fallback then fails too
+  and the viewer loops on "Connection lost". `startStream` prevents this by spawning with
+  `herdrSearchDirs()` as `PATH` (PAN-4630).
 - **Only a `control` attach sets the PTY size** (PAN-4582). `observe --cols/--rows` never resizes
   anything — an observe stream stays at the size it opened with for its whole life, even across a
   later resize. A `control` attach's `--cols`/`--rows`, or a `terminal.resize` command on its
