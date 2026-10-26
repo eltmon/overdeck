@@ -1,0 +1,187 @@
+{
+  "version": "1",
+  "issueId": "PAN-4633",
+  "created": "2026-10-26T19:15:40.115Z",
+  "updated": "2026-10-26T19:54:27.453Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "catalog-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4633",
+      "claimedAt": "2026-10-26T19:15:40.115Z",
+      "doneAt": "2026-10-26T19:28:06.142Z"
+    },
+    "cost-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4633",
+      "claimedAt": "2026-10-26T19:28:12.623Z",
+      "doneAt": "2026-10-26T19:29:21.303Z"
+    },
+    "codex-floor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4633",
+      "claimedAt": "2026-10-26T19:29:25.429Z",
+      "doneAt": "2026-10-26T19:31:09.285Z"
+    },
+    "codex-context-pin": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4633",
+      "claimedAt": "2026-10-26T19:31:13.397Z",
+      "doneAt": "2026-10-26T19:31:53.058Z"
+    },
+    "cliproxy-exclusion-note": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4633",
+      "claimedAt": "2026-10-26T19:31:57.281Z",
+      "doneAt": "2026-10-26T19:32:44.363Z"
+    },
+    "settings-api-id": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4633",
+      "claimedAt": "2026-10-26T19:32:48.083Z",
+      "doneAt": "2026-10-26T19:33:29.872Z"
+    },
+    "settings-catalog-order": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4633",
+      "claimedAt": "2026-10-26T19:33:34.020Z",
+      "doneAt": "2026-10-26T19:34:34.685Z"
+    },
+    "frontend-pickers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4633",
+      "claimedAt": "2026-10-26T19:34:38.460Z",
+      "doneAt": "2026-10-26T19:36:34.727Z"
+    },
+    "friendly-name": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4633",
+      "claimedAt": "2026-10-26T19:36:46.179Z",
+      "doneAt": "2026-10-26T19:37:37.109Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4633",
+      "claimedAt": "2026-10-26T19:37:40.834Z",
+      "doneAt": "2026-10-26T19:38:55.208Z"
+    },
+    "changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4633",
+      "claimedAt": "2026-10-26T19:38:59.303Z",
+      "doneAt": "2026-10-26T19:39:36.090Z"
+    },
+    "catalog-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:46:16.622Z"
+    },
+    "catalog-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:47:15.200Z"
+    },
+    "catalog-entry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:47:31.083Z"
+    },
+    "catalog-entry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:47:43.883Z"
+    },
+    "cost-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:47:56.456Z"
+    },
+    "cost-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:48:09.141Z"
+    },
+    "codex-floor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:48:21.407Z"
+    },
+    "codex-floor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:48:35.611Z"
+    },
+    "codex-floor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:48:47.695Z"
+    },
+    "codex-context-pin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:48:59.481Z"
+    },
+    "codex-context-pin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:49:11.248Z"
+    },
+    "cliproxy-exclusion-note.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:49:59.655Z"
+    },
+    "cliproxy-exclusion-note.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:50:17.583Z"
+    },
+    "settings-api-id.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:50:52.931Z"
+    },
+    "settings-api-id.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:51:08.379Z"
+    },
+    "settings-catalog-order.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:51:22.944Z"
+    },
+    "settings-catalog-order.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:51:37.341Z"
+    },
+    "frontend-pickers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:51:52.314Z"
+    },
+    "frontend-pickers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:52:07.165Z"
+    },
+    "frontend-pickers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:52:38.932Z"
+    },
+    "friendly-name.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:52:58.455Z"
+    },
+    "friendly-name.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:53:13.086Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:53:27.373Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:53:42.650Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:53:57.587Z"
+    },
+    "changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:54:13.054Z"
+    },
+    "changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:54:27.452Z"
+    }
+  }
+}

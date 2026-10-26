@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
 import type { EditorId } from '@overdeck/contracts';
 
@@ -10,6 +10,7 @@ const mockExecAsync = vi.fn();
 vi.mock('node:child_process', () => ({
   spawn: (...args: unknown[]) => mockSpawn(...args),
   exec: vi.fn(),
+  execFile: vi.fn(),
 }));
 
 vi.mock('node:util', () => ({
@@ -166,6 +167,86 @@ describe('PanOpen service', () => {
         ['/tmp/workspace'],
         { detached: true, stdio: 'ignore' },
       );
+    });
+
+    describe('reveal', () => {
+      const originalPlatform = process.platform;
+      const setPlatform = (platform: NodeJS.Platform) => {
+        Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+      };
+
+      afterEach(() => {
+        setPlatform(originalPlatform);
+      });
+
+      // Every `which`/`where` lookup succeeds, so the platform opener is
+      // detected; the D-Bus call (Linux only) succeeds or fails as asked.
+      function mockOpenerAvailable({ dbusOk }: { dbusOk: boolean }) {
+        mockExecAsync.mockImplementation(async (cmd: string) => {
+          if (cmd === 'dbus-send' && !dbusOk) throw new Error('no FileManager1');
+          return { stdout: '' };
+        });
+      }
+
+      async function reveal(path: string) {
+        const { PanOpen, PanOpenLive } = await import('../open.js');
+        const program = Effect.gen(function* () {
+          const svc = yield* PanOpen;
+          return yield* svc.openInEditor({ cwd: path, editor: 'file-manager', reveal: true });
+        }).pipe(Effect.provide(PanOpenLive));
+        return Effect.runPromise(Effect.exit(program));
+      }
+
+      it('selects the file through the FileManager1 D-Bus interface on Linux', async () => {
+        setPlatform('linux');
+        mockOpenerAvailable({ dbusOk: true });
+
+        await reveal('/tmp/a,b/My File.md');
+
+        expect(mockExecAsync).toHaveBeenCalledWith('dbus-send', expect.arrayContaining([
+          'org.freedesktop.FileManager1.ShowItems',
+          'array:string:file:///tmp/a%2Cb/My%20File.md',
+          'string:',
+        ]), expect.anything());
+        expect(mockSpawn).not.toHaveBeenCalled();
+      });
+
+      it('opens the parent folder on Linux when the D-Bus call fails', async () => {
+        setPlatform('linux');
+        mockOpenerAvailable({ dbusOk: false });
+
+        await reveal('/tmp/workspace/notes.md');
+
+        expect(mockSpawn).toHaveBeenCalledWith('xdg-open', ['/tmp/workspace'], { detached: true, stdio: 'ignore' });
+      });
+
+      it('fails without spawning when no file manager command was detected', async () => {
+        setPlatform('linux');
+        mockExecAsync.mockRejectedValue(new Error('not found'));
+
+        const exit = await reveal('/tmp/workspace/notes.md');
+
+        expect(exit._tag).toBe('Failure');
+        expect(mockSpawn).not.toHaveBeenCalled();
+      });
+
+      it('uses open -R on macOS', async () => {
+        setPlatform('darwin');
+        mockOpenerAvailable({ dbusOk: false });
+
+        await reveal('/tmp/workspace/notes.md');
+
+        expect(mockSpawn).toHaveBeenCalledWith('open', ['-R', '/tmp/workspace/notes.md'], { detached: true, stdio: 'ignore' });
+      });
+
+      it('uses explorer /select on Windows', async () => {
+        setPlatform('win32');
+        mockOpenerAvailable({ dbusOk: false });
+
+        await reveal('C:\\work\\notes.md');
+
+        expect(mockSpawn).toHaveBeenCalledWith('explorer', ['/select,C:\\work\\notes.md'], { detached: true, stdio: 'ignore' });
+      });
     });
 
     it('returns error for unsupported editor', async () => {

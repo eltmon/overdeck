@@ -1,20 +1,22 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-25T18:59:29Z · model: claude-opus-5-5 · open: 839_
+_Last sequenced: 2026-10-26T20:20:47Z · model: claude-opus-5-5 · open: 843_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
-| 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
+| 2 | PAN-4630 | XS | critical | ok |  |  | In pipeline: herdr streams spawn bare 'herdr' on a PATH without ~/.local/bin, so dashboard terminals loop on Connection lost. |
+| 3 | PAN-4633 | S | high | ok |  |  | In pipeline: add gpt-6.1-terra (launched 2026-10-26) to catalog, pricing, Codex floor and CLIProxy route, mirroring PAN-4422. |
+| 5 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
-| 14 | PAN-4551 | L | high | ok |  | PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
+| 14 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
-| 22 | PAN-4625 | S | high | ok |  | PAN-4534 | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
+| 22 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 24 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 25 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
@@ -164,6 +166,7 @@ _Last sequenced: 2026-10-25T18:59:29Z · model: claude-opus-5-5 · open: 839_
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 172 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
+| 174 | PAN-4634 | M | medium | needs-refinement |  | PAN-4633 | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
 | 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 179 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
@@ -249,6 +252,7 @@ _Last sequenced: 2026-10-25T18:59:29Z · model: claude-opus-5-5 · open: 839_
 | 264 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
 | 265 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
 | 266 | PAN-2186 | S | high | ok |  |  | Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557. |
+| 267 | PAN-4632 | S | medium | ok |  |  | Markdown chip 'Open in File Manager' xdg-opens the file in its MIME app and sticks as the left-click default; drop it, repair stored pref. |
 | 269 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 270 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 271 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
@@ -851,9 +855,17 @@ _Last sequenced: 2026-10-25T18:59:29Z · model: claude-opus-5-5 · open: 839_
 
 New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.
 
-### PAN-4534 (rank 5)
+### PAN-4630 (rank 2)
 
-Both CI failures observed on 2026-10-04 reached agents as 'no failing workflow runs were found', so agents re-run tests locally through the serialized queue to rediscover failures. Building failures from check runs puts the failing test in the feedback and removes that queue load. Fourth member of the verification bundle.
+New in-pipeline issue with a verified root cause and a one-function fix; it breaks the terminal view for every Herdr-backed agent and conversation, so it is pinned in a free top slot (rank 2) per the in-pipeline rule.
+
+### PAN-4633 (rank 3)
+
+New since the prior run and already in the pipeline, so it is pinned in the free top-tier slot (rank 3) rather than ranked. The operator marked it urgent: the model launched today and the body carries verified facts and pre-made decisions (D1-D10) with two measured checkpoints and fallbacks, so it is well-defined and small.
+
+### PAN-4636 (rank 5)
+
+New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
 ### PAN-4553 (rank 6)
 
@@ -1159,14 +1171,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 
 npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
 
-### PAN-2850 (rank 93)
-
-npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
-
-### PAN-2758 (rank 94)
-
-Triage: verify whether a provider-capacity zombie can still read as running under the current liveness definition. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1174,21 +1178,47 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-25T18:59:29Z",
+  "generatedAt": "2026-10-26T20:20:47Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 839,
+  "openCount": 843,
   "nodes": [
     {
-      "issue": "PAN-4534",
-      "rank": 5,
+      "issue": "PAN-4626",
+      "rank": 1,
       "size": "S",
-      "importance": "critical",
-      "score": 84,
+      "importance": "medium",
+      "score": 55,
       "condition": "ok",
       "dependsOn": [],
-      "why": "CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10",
-      "rationale": "Both CI failures observed on 2026-10-04 reached agents as 'no failing workflow runs were found', so agents re-run tests locally through the serialized queue to rediscover failures. Building failures from check runs puts the failing test in the feedback and removes that queue load. Fourth member of the verification bundle.",
+      "why": "In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending.",
+      "rationale": "New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4630",
+      "rank": 2,
+      "size": "XS",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: herdr streams spawn bare 'herdr' on a PATH without ~/.local/bin, so dashboard terminals loop on Connection lost.",
+      "rationale": "New in-pipeline issue with a verified root cause and a one-function fix; it breaks the terminal view for every Herdr-backed agent and conversation, so it is pinned in a free top slot (rank 2) per the in-pipeline rule.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4633",
+      "rank": 3,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: add gpt-6.1-terra (launched 2026-10-26) to catalog, pricing, Codex floor and CLIProxy route, mirroring PAN-4422.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned in the free top-tier slot (rank 3) rather than ranked. The operator marked it urgent: the model launched today and the body carries verified facts and pre-made decisions (D1-D10) with two measured checkpoints and fallbacks, so it is well-defined and small.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1264,9 +1294,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "importance": "high",
       "score": 74,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4534"
-      ],
+      "dependsOn": [],
       "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
       "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.",
       "gate": "auto",
@@ -1282,6 +1310,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "dependsOn": [],
       "why": "Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs.",
       "rationale": "PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4625",
+      "rank": 22,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file)",
+      "rationale": "New issue since the prior run. The same-head debounce in ci-failure-feedback.ts drops a second failed check (e.g. a test shard after lint), so the work agent fixes lint and never learns which test failed, which costs a full extra CI and verification cycle per occurrence. It is a small, well-specified fix with clear ACs, but it edits the same relay code that in-pipeline PAN-4534 is rewriting, so it is sequenced right behind that work rather than ahead of it; it sits beside PAN-4439 (the missed-webhook backstop) as the second gap in CI failure delivery.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1821,6 +1862,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "planning": "auto"
     },
     {
+      "issue": "PAN-4622",
+      "rank": 66,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. PAN-4532 merged",
+      "rationale": "Rank held: its only dependency, PAN-4532, closed 2026-10-24, so this follow-up is now unblocked and workable; the residual cases still recover via deacon-lite, so it stays below the active verification bundle.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2940",
       "rank": 67,
       "size": "M",
@@ -1856,6 +1910,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "dependsOn": [],
       "why": "Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin.",
       "rationale": "New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4624",
+      "rank": 70,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed.",
+      "rationale": "New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1921,6 +1988,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "dependsOn": [],
       "why": "A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts.",
       "rationale": "Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4623",
+      "rank": 76,
+      "size": "XS",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10",
+      "rationale": "New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3077,6 +3157,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "planning": "auto"
     },
     {
+      "issue": "PAN-4628",
+      "rank": 167,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "npx pan serve mints a per-run token never written to disk; Herdr panes keep a stale one, so pane CLI calls to the dashboard get 401.",
+      "rationale": "New issue with a verified cause: pan serve never persists the internal token, and long-lived Herdr panes inherit an old one, so every CLI-to-dashboard call from an npx-launched pane is rejected. It breaks pan pair today and threatens any pane-side pipeline call on npx machines; the fix (reuse ensureInternalToken) is small.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3833",
       "rank": 168,
       "size": "S",
@@ -3103,6 +3196,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "planning": "auto"
     },
     {
+      "issue": "PAN-4629",
+      "rank": 170,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix.",
+      "rationale": "New issue: on a fresh npx install with gh logged in, pan start fails with Tracker not configured, and project registration picked OVERDECK instead of PAN. Both block first-run onboarding outright; causes are verified and the acceptance tests are concrete.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3854",
       "rank": 171,
       "size": "S",
@@ -3112,6 +3218,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "dependsOn": [],
       "why": "Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT",
       "rationale": "The test role's browser UAT runs against the workspace stack; without session bootstrap every mutation AC is unprovable. Likely missing trusted-origin/Traefik env in the feature stack.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4577",
+      "rank": 172,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked.",
+      "rationale": "A 2026-10-25 field report shows the operator's Claude auto-memory facts stayed on the original machine when they set up a new Mac with npx, because this importer does not exist yet. That is live operator pain on the multi-machine onboarding path, next to PAN-4629 and PAN-4628, so it moves from 668 to 172 and from medium to high. Its blocker PAN-3957 closed as completed, so the work is unblocked.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3713,6 +3832,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "planning": "auto"
     },
     {
+      "issue": "PAN-4616",
+      "rank": 226,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback",
+      "rationale": "New issue: an observation follow-up to in-pipeline PAN-4614; ranked mid-tier because it only matters if GitHub ignores union, and any fallback touches the merge gate's trust boundary and needs its own plan.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3510",
       "rank": 230,
       "size": "S",
@@ -4168,6 +4300,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "dependsOn": [],
       "why": "Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557.",
       "rationale": "Rank changed from 400 to 266: the 2026-09-26 rescope comment relocates both halves to the merge-train cooldown queue (auto-merge-scheduler.ts) and postMergeLifecycle in merge-agent.ts, which gives a concrete goal, so condition moves to ok; the substrate-improvement label sets a high-importance floor.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4632",
+      "rank": 267,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Markdown chip 'Open in File Manager' xdg-opens the file in its MIME app and sticks as the left-click default; drop it, repair stored pref.",
+      "rationale": "New issue with a concrete fix and checkable acceptance criteria; it repairs a dashboard default that silently breaks every later markdown-chip click, and the replacement 'Open containing folder' item already landed, so it ranks with peer medium-sized UX bugs.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6077,6 +6222,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "dependsOn": [],
       "why": "Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first",
       "rationale": "Rank, size, score and importance unchanged; only the condition moves. The 2026-09-24 touch is metadata (no new comment, no body edit), but verifying the prior pass's claim showed it was wrong: `resolvePermissionModeSync` does not exist and no code emits `--dangerously-skip-permissions` any more — every remaining hit in src/ is a comment or a docstring. The hazard the issue describes is still live in renamed form: `config.claude.permissionMode` still defaults to 'bypass' (settings-api.ts:793) and `getClaudePermissionFlags` (claude-permissions.ts:79) still emits `--permission-mode bypassPermissions` for it, so Settings can still disagree with the resolved mode and all three asks stand. The body needs a rewrite to the current flag and symbol names before anyone works it, which is what needs-refinement records.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4627",
+      "rank": 430,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs.",
+      "rationale": "New issue: a convenience fix for the PAN-4359 upgrade banner on Homebrew installs plus automatic upgrades; useful but not blocking, so it sits with medium-tier dashboard polish next to PAN-4360.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8998,19 +9156,6 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "planning": "auto"
     },
     {
-      "issue": "PAN-4577",
-      "rank": 172,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked.",
-      "rationale": "A 2026-10-25 field report shows the operator's Claude auto-memory facts stayed on the original machine when they set up a new Mac with npx, because this importer does not exist yet. That is live operator pain on the multi-machine onboarding path, next to PAN-4629 and PAN-4628, so it moves from 668 to 172 and from medium to high. Its blocker PAN-3957 closed as completed, so the work is unblocked.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2282",
       "rank": 670,
       "size": "M",
@@ -11514,121 +11659,30 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "planning": "auto"
     },
     {
-      "issue": "PAN-4616",
-      "rank": 226,
-      "size": "S",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback",
-      "rationale": "New issue: an observation follow-up to in-pipeline PAN-4614; ranked mid-tier because it only matters if GitHub ignores union, and any fallback touches the merge gate's trust boundary and needs its own plan.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4622",
-      "rank": 66,
+      "issue": "PAN-4634",
+      "rank": 174,
       "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. PAN-4532 merged",
-      "rationale": "Rank held: its only dependency, PAN-4532, closed 2026-10-24, so this follow-up is now unblocked and workable; the residual cases still recover via deacon-lite, so it stays below the active verification bundle.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4623",
-      "rank": 76,
-      "size": "XS",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10",
-      "rationale": "New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4624",
-      "rank": 70,
-      "size": "S",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed.",
-      "rationale": "New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4625",
-      "rank": 22,
-      "size": "S",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
+      "importance": "medium",
+      "score": 66,
+      "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-4534"
+        "PAN-4633"
       ],
-      "why": "CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file)",
-      "rationale": "New issue since the prior run. The same-head debounce in ci-failure-feedback.ts drops a second failed check (e.g. a test shard after lint), so the work agent fixes lint and never learns which test failed, which costs a full extra CI and verification cycle per occurrence. It is a small, well-specified fix with clear ACs, but it edits the same relay code that in-pipeline PAN-4534 is rewriting, so it is sequenced right behind that work rather than ahead of it; it sits beside PAN-4439 (the missed-webhook backstop) as the second gap in CI failure delivery.",
+      "why": "Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken.",
+      "rationale": "New follow-up to in-pipeline PAN-4633 (Terra on codex); it only widens Terra to the claude-code route, which Codex already covers, so it ranks mid-tier in a free slot. Condition is needs-refinement because no known CLIProxy release serves gpt-6.1-terra yet and the 7.x to 8.x jump is unscoped; the noted broken sonnet/opus oauth-model-alias targets may merit their own issue.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4626",
-      "rank": 1,
+      "issue": "PAN-4636",
+      "rank": 5,
       "size": "S",
-      "importance": "medium",
-      "score": 55,
+      "importance": "critical",
+      "score": 86,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending.",
-      "rationale": "New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4628",
-      "rank": 167,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "npx pan serve mints a per-run token never written to disk; Herdr panes keep a stale one, so pane CLI calls to the dashboard get 401.",
-      "rationale": "New issue with a verified cause: pan serve never persists the internal token, and long-lived Herdr panes inherit an old one, so every CLI-to-dashboard call from an npx-launched pane is rejected. It breaks pan pair today and threatens any pane-side pipeline call on npx machines; the fix (reuse ensureInternalToken) is small.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4629",
-      "rank": 170,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix.",
-      "rationale": "New issue: on a fresh npx install with gh logged in, pan start fails with Tracker not configured, and project registration picked OVERDECK instead of PAN. Both block first-run onboarding outright; causes are verified and the acceptance tests are concrete.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4627",
-      "rank": 430,
-      "size": "S",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs.",
-      "rationale": "New issue: a convenience fix for the PAN-4359 upgrade banner on Homebrew installs plus automatic upgrades; useful but not blocking, so it sits with medium-tier dashboard polish next to PAN-4360.",
+      "why": "Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently.",
+      "rationale": "New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -12860,13 +12914,6 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "confidence": 0.5
     },
     {
-      "from": "PAN-4534",
-      "to": "PAN-4551",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-4552",
       "to": "PAN-2416",
       "type": "informs",
@@ -12937,13 +12984,6 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "confidence": 1
     },
     {
-      "from": "PAN-4534",
-      "to": "PAN-4625",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-4439",
       "to": "PAN-4625",
       "type": "informs",
@@ -12956,6 +12996,20 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4633",
+      "to": "PAN-4634",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4636",
+      "to": "PAN-4630",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }

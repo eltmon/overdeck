@@ -30,4 +30,9 @@ describe('getFriendlyModelName', () => {
     expect(getFriendlyModelName('gpt-6.1-sol')).toBe('GPT-6.1 Sol');
     expect(getFriendlyModelName('gpt-6-sol')).toBe('GPT-6 Sol');
   });
+
+  it('keeps GPT-6.1 Terra and GPT-5.6 Terra distinct (PAN-4633)', () => {
+    expect(getFriendlyModelName('gpt-6.1-terra')).toBe('GPT-6.1 Terra');
+    expect(getFriendlyModelName('gpt-5.6-terra')).toBe('GPT-5.6 Terra');
+  });
 });

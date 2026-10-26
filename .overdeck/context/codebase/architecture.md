@@ -49,6 +49,8 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   New models land in `model-capability-additions.ts` (spread first into the matrix);
   `model-capabilities.ts` is at its file-size cap. Adding a `ModelId` also needs rows in
   `model-fallback.ts` `MODEL_PROVIDERS`, `providers.ts`, `cost.ts` and the dashboard pickers.
+  OpenAI ids may also need a ChatGPT-sign-in Codex floor (`codex/model-floors.ts`), and they
+  join `GPT_56_MODELS` (`agents/provider-env.ts`) only when the pinned CLIProxy serves them.
 - `config-yaml.ts` — `~/.overdeck/*.yaml` settings: `RoleConfig` (model/harness/effort
   per role), `providerHarnesses`, workhorses, normalization + defaults.
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
@@ -222,4 +224,4 @@ from `DerivedIssueState.pr`, not from links; the conversation list's badge
 
 No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.
 
-<!-- last-verified: 2026-10-24 -->
+<!-- last-verified: 2026-10-26 -->

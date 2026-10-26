@@ -129,6 +129,7 @@ describe('initCodexHome', () => {
     ['gpt-6-astra', 'high', 272000, 'high'],
     ['gpt-6-sol', 'high', 272000, 'high'],
     ['gpt-6.1-sol', 'high', 272000, 'high'],
+    ['gpt-6.1-terra', 'high', 272000, 'high'],
     ['gpt-6-luna', 'low', 272000, 'low'],
     ['gpt-5.6-sol', 'low', 272000, 'low'],
     ['gpt-5.6-terra[372k]', 'high', 372000, 'high'],
