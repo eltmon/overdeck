@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4633",
   "created": "2026-10-26T19:15:40.115Z",
-  "updated": "2026-10-26T19:52:58.455Z",
+  "updated": "2026-10-26T19:53:13.086Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "friendly-name.ac1": {
       "status": "completed",
       "doneAt": "2026-10-26T19:52:58.455Z"
+    },
+    "friendly-name.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:53:13.086Z"
     }
   }
 }
