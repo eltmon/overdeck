@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4633",
   "created": "2026-10-26T19:15:40.115Z",
-  "updated": "2026-10-26T19:54:13.054Z",
+  "updated": "2026-10-26T19:54:27.453Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,10 @@
     "changelog.ac1": {
       "status": "completed",
       "doneAt": "2026-10-26T19:54:13.054Z"
+    },
+    "changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:54:27.452Z"
     }
   }
 }
