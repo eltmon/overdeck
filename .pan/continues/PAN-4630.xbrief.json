@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4630",
   "created": "2026-10-25T20:22:55.230Z",
-  "updated": "2026-10-26T20:19:02.949Z",
+  "updated": "2026-10-26T20:19:13.866Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "search-dirs-test.ac1": {
       "status": "completed",
       "doneAt": "2026-10-26T20:19:02.949Z"
+    },
+    "search-dirs-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T20:19:13.866Z"
     }
   }
 }
