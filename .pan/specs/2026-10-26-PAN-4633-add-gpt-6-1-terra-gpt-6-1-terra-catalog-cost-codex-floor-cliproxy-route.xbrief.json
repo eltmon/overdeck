@@ -4,17 +4,17 @@
     "created": "2026-10-26T19:12:03Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4633: Add GPT-6.1 Terra (gpt-6.1-terra): catalog, cost, Codex floor, CLIProxy route",
-    "updated": "2026-10-26T19:13:42.726Z"
+    "updated": "2026-10-26T19:14:16.887Z"
   },
   "plan": {
     "id": "pan-4633",
     "title": "Add GPT-6.1 Terra (gpt-6.1-terra): catalog, cost, Codex floor, CLIProxy route",
-    "status": "proposed",
+    "status": "running",
     "uid": "85c87762-04d2-4d67-ae7f-94c58032fade",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-26T19:12:03Z",
-    "updated": "2026-10-26T19:13:42.726Z",
+    "updated": "2026-10-26T19:14:16.887Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4633",
@@ -707,5 +707,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
