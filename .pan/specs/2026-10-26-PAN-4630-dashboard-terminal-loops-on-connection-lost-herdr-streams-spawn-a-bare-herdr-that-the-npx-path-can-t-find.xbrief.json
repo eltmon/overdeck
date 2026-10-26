@@ -1,0 +1,250 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-26T20:30:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4630: Dashboard terminal loops on 'Connection lost': herdr streams spawn a bare 'herdr' that the npx PATH can't find",
+    "updated": "2026-10-26T20:07:12.243Z"
+  },
+  "plan": {
+    "id": "pan-4630",
+    "title": "Dashboard terminal loops on 'Connection lost': herdr streams spawn a bare 'herdr' that the npx PATH can't find",
+    "status": "proposed",
+    "uid": "76f18d29-926f-44eb-9239-c35a83f458f6",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-26T20:30:00.000Z",
+    "updated": "2026-10-26T20:07:12.243Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4630",
+        "label": "PAN-4630",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/4631",
+        "label": "PR #4631",
+        "type": "pull-request"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4630.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "herdr",
+      "terminal",
+      "dashboard",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "herdr-stream.ts spawned the bare 'herdr' with the dashboard's PATH. A dashboard started via npx has no ~/.local/bin on PATH, so every observe/control/sizing stream died with ENOENT. The dashboard read that as 'controlled by another client; serving it read-only', the observe fallback failed too, and the terminal view looped on 'Connection lost'. The probe still selected Herdr because findHerdrBinary already falls back to ~/.local/bin.",
+      "Proposal": "Accept the fix already committed on the branch (38b2252f94d): export herdrSearchDirs() from select.ts (PATH then ~/.local/bin, empty entries dropped), use it for the probe and as the stream child's PATH. Remaining work: assert the sizeHerdrTerminal spawn PATH and env preservation, unit-test herdrSearchDirs directly, and document the shared lookup in docs/TERMINAL-BACKENDS.md and configuration/terminal-backend.mdx. Each item is claimed by a new commit carrying its Item: trailer.",
+      "NonGoals": "- Do not amend, rebase-rewrite or revert commit 38b2252f94d; the branch is pushed with PR #4631 open\n- Do not change the misleading 'controlled by another client; serving it read-only' log for an ENOENT spawn (separate follow-up)\n- Do not change probe order, the bare spawned command name, or the deps.binary override\n- Do not change PATH in pan up, the dashboard systemd unit, or src/lib/herdr-setup/* (those already spawn a resolved binary path)\n- Do not change frontend reconnect/backoff behavior"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Treat the fix already committed on feature/pan-4630 (38b2252f94d) as the implementation; the plan lowers it into a claimable checklist plus the missing tests and docs",
+        "rationale": "The commit matches the issue's prescribed Fix exactly, PR #4631 CI is all green, and the verification gate failed only because no xBRIEF checklist existed"
+      },
+      {
+        "summary": "Claim items with new trailer-bearing commits instead of amending 38b2252f94d",
+        "rationale": "pan task done accepts any pushed commit carrying 'Item: <id>'; rewriting a pushed PR branch is riskier and unnecessary"
+      },
+      {
+        "summary": "Leave the ENOENT-reads-as-refused-control diagnostic out of scope",
+        "rationale": "The issue's Fix section asks only for the PATH change; improving the log is a separate behavior change"
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "docsJustification": "docs-stream-path updates docs/TERMINAL-BACKENDS.md and configuration/terminal-backend.mdx",
+      "canonicalFilename": "2026-10-26-PAN-4630-dashboard-terminal-loops-on-connection-lost-herdr-streams-spawn-a-bare-herdr-that-the-npx-path-can-t-find.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "stream-path-fix",
+        "title": "Claim the landed herdr stream PATH fix and assert the sizing attach's PATH",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-26T20:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4630",
+          "requiresInspection": false,
+          "files_scope": [
+            "tests/unit/lib/terminal-backends/herdr-stream.test.ts",
+            "src/lib/terminal-backends/herdr-stream.ts",
+            "src/lib/terminal-backends/select.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-stream.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "herdr-stream.test.ts passes including the new sizeHerdrTerminal PATH test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "The fix is already committed as 38b2252f94d (do not amend it). Verify startStream in src/lib/terminal-backends/herdr-stream.ts spawns with { env: { ...process.env, PATH: herdrSearchDirs().join(delimiter) } } and command deps.binary ?? HERDR_BINARY. Then edit ONLY tests/unit/lib/terminal-backends/herdr-stream.test.ts: inside describe('sizeHerdrTerminal') add test 'sizes with ~/.local/bin on PATH when the dashboard PATH omits it'. In a try/finally, vi.stubEnv('PATH','/usr/bin:/bin') and vi.stubEnv('OVERDECK_PAN4630_PROBE','kept'); const { spawn, children, calls } = fakeSpawn(); const pending = sizeHerdrTerminal('term_p', 100, 30, { spawn }); children[0].emitRecord(FULL_FRAME); children[0].emit('close', 0); await expect(pending).resolves.toBe('sized'); assert calls[0].command === 'herdr', calls[0].options.env.PATH === ['/usr/bin','/bin',join(homedir(),'.local','bin')].join(delimiter), and calls[0].options.env.OVERDECK_PAN4630_PROBE === 'kept'; finally vi.unstubAllEnvs(). Commit with body lines 'Item: stream-path-fix' and 'Item: stream-path-fix.acN' for each AC, push, then pan task done each AC id and the parent."
+        },
+        "items": [
+          {
+            "id": "stream-path-fix.ac1",
+            "title": "herdr-stream.test.ts contains a sizeHerdrTerminal test that, under vi.stubEnv PATH=/usr/bin:/bin, asserts the spawn's options.env.PATH equals /usr/bin, /bin, then join(homedir(), '.local', 'bin') joined by path.delimiter, and npx vitest run on that file passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stream-path-fix.ac2",
+            "title": "src/lib/terminal-backends/herdr-stream.ts startStream passes PATH: herdrSearchDirs().join(delimiter) in the spawn env and the spawned command remains deps.binary ?? HERDR_BINARY (the new test asserts command 'herdr')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stream-path-fix.ac3",
+            "title": "When OVERDECK_PAN4630_PROBE=kept is stubbed, the new test asserts the spawned child's options.env contains that key, so startStream preserves the rest of process.env",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "search-dirs-test",
+        "title": "Unit-test herdrSearchDirs ordering and empty-entry filtering",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-26T20:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4630",
+          "requiresInspection": false,
+          "files_scope": [
+            "tests/unit/lib/terminal-backends/herdr-search-dirs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-search-dirs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "herdr-search-dirs.test.ts passes with 3 tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/lib/terminal-backends/herdr-search-dirs.test.ts. Import herdrSearchDirs from '../../../../src/lib/terminal-backends/select.js' and { delimiter, join } from 'path'. Pass deps explicitly (no env mutation). Cases: (1) { pathEnv: ['/a','/b'].join(delimiter), homeDir: '/h' } -> ['/a','/b', join('/h','.local','bin')]; (2) pathEnv ['', '/a', '', '/b', ''].join(delimiter) with homeDir '/h' -> ['/a','/b', join('/h','.local','bin')]; (3) pathEnv '' with homeDir '/h' -> [join('/h','.local','bin')]. No source-reading assertions, no skipIf/.only. Commit with 'Item: search-dirs-test' plus one 'Item: search-dirs-test.acN' line per AC; push; pan task done each."
+        },
+        "items": [
+          {
+            "id": "search-dirs-test.ac1",
+            "title": "A test asserts herdrSearchDirs returns PATH entries in order followed by join(homeDir, '.local', 'bin') last",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-dirs-test.ac2",
+            "title": "A test asserts herdrSearchDirs drops empty PATH segments, and when PATH is empty it returns only join(homeDir, '.local', 'bin')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-dirs-test.ac3",
+            "title": "npx vitest run tests/unit/lib/terminal-backends/herdr-search-dirs.test.ts passes with 3 tests and 0 failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-stream-path",
+        "title": "Document that Herdr terminal streams spawn with the probe's search dirs as PATH",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-26T20:30:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4630",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "configuration/terminal-backend.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n herdrSearchDirs docs/TERMINAL-BACKENDS.md",
+            "grep -n npx configuration/terminal-backend.mdx"
+          ],
+          "expected_outputs": [
+            "at least two herdrSearchDirs lines in docs/TERMINAL-BACKENDS.md",
+            "the new npx sentence in configuration/terminal-backend.mdx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the exact text in PRD WI-3 (.pan/drafts/PAN-4630.md): (1) docs/TERMINAL-BACKENDS.md, append the herdrSearchDirs sentence to the paragraph starting '`probeHerdrAvailability()` answers whether Herdr can serve **right now**' (~line 47); (2) docs/TERMINAL-BACKENDS.md, add the ENOENT/read-only bullet after the bullet starting '- Terminal streams are NDJSON' (~line 839); (3) configuration/terminal-backend.mdx, add the npx sentence after the paragraph containing '`herdr` binary on `PATH` or in `~/.local/bin`' (~line 33). Commit with 'Item: docs-stream-path' plus one 'Item: docs-stream-path.acN' line per AC; push; pan task done each."
+        },
+        "items": [
+          {
+            "id": "docs-stream-path.ac1",
+            "title": "docs/TERMINAL-BACKENDS.md's probeHerdrAvailability paragraph names herdrSearchDirs() and states the observe, control and sizing streams spawn herdr with it as the child's PATH (grep -n herdrSearchDirs returns that line)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-stream-path.ac2",
+            "title": "docs/TERMINAL-BACKENDS.md contains a new bullet after '- Terminal streams are NDJSON' stating that an ENOENT spawn reads as a refused control attach served read-only and loops on Connection lost, prevented by herdrSearchDirs() as PATH (PAN-4630)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-stream-path.ac3",
+            "title": "configuration/terminal-backend.mdx contains a sentence stating that the dashboard terminal view uses the same lookup, so when a dashboard is started with npx without ~/.local/bin on PATH it still streams Herdr terminals",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "status": "proposed"
+}
