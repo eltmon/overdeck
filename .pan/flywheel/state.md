@@ -290,3 +290,14 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   matching `CHANGELOG.md` "Unreleased" items), commit
   `docs(infra): changelog for v0.70.0`, push main; see docs/RELEASING.md
   "Update the public changelog" and the pan-release skill.
+- 2026-10-26 20:10 UTC (conv 3341): PAN-4630 (PR #4631, critical herdr PATH
+  fix, CI green, CLEAN) stalled since 2026-10-25 20:22. Cause: PAN-4605's
+  adoption path starts review (`pr-adoption-review.ts` line 133) but
+  verification still runs `checkIncompletePlanItems`
+  (`verification-runner.ts` line 816); only strikes pass `skipPlanChecklist`
+  (`merge-strike.ts` line 50). No xBRIEF → `incomplete-plan-items`, and the
+  feedback has no work agent to reach. Filed PAN-4636 (needs-handoff).
+  Instance recovery: `pan start PAN-4630 --plan auto` so a planner writes the
+  plan and a work agent records items on the existing PR head.
+- PAN-4626's planner ran via `pan plan --auto` (plan-only), so it waits for
+  the operator's `released` label; it is not a PAN-4554 instance.
