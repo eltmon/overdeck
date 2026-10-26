@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-26T20:00:40Z · model: claude-opus-5-5 · open: 843_
+_Last sequenced: 2026-10-26T20:04:42Z · model: claude-opus-5-5 · open: 843_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,15 +8,15 @@ _Last sequenced: 2026-10-26T20:00:40Z · model: claude-opus-5-5 · open: 843_
 | 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
 | 2 | PAN-4630 | XS | critical | ok |  |  | In pipeline: herdr streams spawn bare 'herdr' on a PATH without ~/.local/bin, so dashboard terminals loop on Connection lost. |
 | 3 | PAN-4633 | S | high | ok |  |  | In pipeline: add gpt-6.1-terra (launched 2026-10-26) to catalog, pricing, Codex floor and CLIProxy route, mirroring PAN-4422. |
-| 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
+| 5 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
-| 14 | PAN-4551 | L | high | ok |  | PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
+| 14 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
-| 22 | PAN-4625 | S | high | ok |  | PAN-4534 | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
+| 22 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 24 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 25 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
@@ -863,9 +863,9 @@ New in-pipeline issue with a verified root cause and a one-function fix; it brea
 
 New since the prior run and already in the pipeline, so it is pinned in the free top-tier slot (rank 3) rather than ranked. The operator marked it urgent: the model launched today and the body carries verified facts and pre-made decisions (D1-D10) with two measured checkpoints and fallbacks, so it is well-defined and small.
 
-### PAN-4534 (rank 5)
+### PAN-4636 (rank 5)
 
-Both CI failures observed on 2026-10-04 reached agents as 'no failing workflow runs were found', so agents re-run tests locally through the serialized queue to rediscover failures. Building failures from check runs puts the failing test in the feedback and removes that queue load. Fourth member of the verification bundle.
+New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
 ### PAN-4553 (rank 6)
 
@@ -1178,7 +1178,7 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-26T20:00:40Z",
+  "generatedAt": "2026-10-26T20:04:42Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 843,
@@ -1219,19 +1219,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "dependsOn": [],
       "why": "In pipeline: add gpt-6.1-terra (launched 2026-10-26) to catalog, pricing, Codex floor and CLIProxy route, mirroring PAN-4422.",
       "rationale": "New since the prior run and already in the pipeline, so it is pinned in the free top-tier slot (rank 3) rather than ranked. The operator marked it urgent: the model launched today and the body carries verified facts and pre-made decisions (D1-D10) with two measured checkpoints and fallbacks, so it is well-defined and small.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4534",
-      "rank": 5,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10",
-      "rationale": "Both CI failures observed on 2026-10-04 reached agents as 'no failing workflow runs were found', so agents re-run tests locally through the serialized queue to rediscover failures. Building failures from check runs puts the failing test in the feedback and removes that queue load. Fourth member of the verification bundle.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1307,9 +1294,7 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "importance": "high",
       "score": 74,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4534"
-      ],
+      "dependsOn": [],
       "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
       "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.",
       "gate": "auto",
@@ -1335,9 +1320,7 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "importance": "high",
       "score": 78,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4534"
-      ],
+      "dependsOn": [],
       "why": "CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file)",
       "rationale": "New issue since the prior run. The same-head debounce in ci-failure-feedback.ts drops a second failed check (e.g. a test shard after lint), so the work agent fixes lint and never learns which test failed, which costs a full extra CI and verification cycle per occurrence. It is a small, well-specified fix with clear ACs, but it edits the same relay code that in-pipeline PAN-4534 is rewriting, so it is sequenced right behind that work rather than ahead of it; it sits beside PAN-4439 (the missed-webhook backstop) as the second gap in CI failure delivery.",
       "gate": "auto",
@@ -11689,6 +11672,19 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "rationale": "New follow-up to in-pipeline PAN-4633 (Terra on codex); it only widens Terra to the claude-code route, which Codex already covers, so it ranks mid-tier in a free slot. Condition is needs-refinement because no known CLIProxy release serves gpt-6.1-terra yet and the 7.x to 8.x jump is unscoped; the noted broken sonnet/opus oauth-model-alias targets may merit their own issue.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4636",
+      "rank": 5,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently.",
+      "rationale": "New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12918,13 +12914,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "confidence": 0.5
     },
     {
-      "from": "PAN-4534",
-      "to": "PAN-4551",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-4552",
       "to": "PAN-2416",
       "type": "informs",
@@ -12995,13 +12984,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "confidence": 1
     },
     {
-      "from": "PAN-4534",
-      "to": "PAN-4625",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-4439",
       "to": "PAN-4625",
       "type": "informs",
@@ -13021,6 +13003,13 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4636",
+      "to": "PAN-4630",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }
