@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-26T14:55:18Z · model: claude-opus-5-5 · open: 840_
+_Last sequenced: 2026-10-26T17:54:28Z · model: claude-opus-5-5 · open: 841_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -250,6 +250,7 @@ _Last sequenced: 2026-10-26T14:55:18Z · model: claude-opus-5-5 · open: 840_
 | 264 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
 | 265 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
 | 266 | PAN-2186 | S | high | ok |  |  | Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557. |
+| 267 | PAN-4632 | S | medium | ok |  |  | Markdown chip 'Open in File Manager' xdg-opens the file in its MIME app and sticks as the left-click default; drop it, repair stored pref. |
 | 269 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 270 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 271 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
@@ -1175,10 +1176,10 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-26T14:55:18Z",
+  "generatedAt": "2026-10-26T17:54:28Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 840,
+  "openCount": 841,
   "nodes": [
     {
       "issue": "PAN-4534",
@@ -11643,6 +11644,19 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "dependsOn": [],
       "why": "In pipeline: herdr streams spawn bare 'herdr' on a PATH without ~/.local/bin, so dashboard terminals loop on Connection lost.",
       "rationale": "New in-pipeline issue with a verified root cause and a one-function fix; it breaks the terminal view for every Herdr-backed agent and conversation, so it is pinned in a free top slot (rank 2) per the in-pipeline rule.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4632",
+      "rank": 267,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Markdown chip 'Open in File Manager' xdg-opens the file in its MIME app and sticks as the left-click default; drop it, repair stored pref.",
+      "rationale": "New issue with a concrete fix and checkable acceptance criteria; it repairs a dashboard default that silently breaks every later markdown-chip click, and the replacement 'Open containing folder' item already landed, so it ranks with peer medium-sized UX bugs.",
       "gate": "auto",
       "planning": "auto"
     }
