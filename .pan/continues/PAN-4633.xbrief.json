@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4633",
   "created": "2026-10-26T19:15:40.115Z",
-  "updated": "2026-10-26T19:31:57.281Z",
+  "updated": "2026-10-26T19:32:44.364Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-10-26T19:31:53.058Z"
     },
     "cliproxy-exclusion-note": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4633",
-      "claimedAt": "2026-10-26T19:31:57.281Z"
+      "claimedAt": "2026-10-26T19:31:57.281Z",
+      "doneAt": "2026-10-26T19:32:44.363Z"
     }
   }
 }
