@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4630",
   "created": "2026-10-25T20:22:55.230Z",
-  "updated": "2026-10-26T20:19:25.129Z",
+  "updated": "2026-10-26T20:19:36.512Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -43,9 +43,10 @@
       "doneAt": "2026-10-26T20:16:42.478Z"
     },
     "search-dirs-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4630",
-      "claimedAt": "2026-10-26T20:17:02.584Z"
+      "claimedAt": "2026-10-26T20:17:02.584Z",
+      "doneAt": "2026-10-26T20:19:36.512Z"
     },
     "search-dirs-test.ac1": {
       "status": "completed",
