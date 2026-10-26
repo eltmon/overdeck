@@ -145,6 +145,11 @@ export const PanOpenLive = Layer.effect(
         Effect.tryPromise({
           try: async () => {
             if (input.editor === 'file-manager' && input.reveal) {
+              // The reveal fallbacks spawn the platform opener, which must
+              // exist: a spawn of a missing binary throws uncaught.
+              if (!cachedEditors.includes('file-manager')) {
+                throw new Error('No file manager command found on this machine');
+              }
               await revealInFileManager(input.cwd);
               return;
             }

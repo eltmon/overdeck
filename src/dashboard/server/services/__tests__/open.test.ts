@@ -179,18 +179,27 @@ describe('PanOpen service', () => {
         setPlatform(originalPlatform);
       });
 
+      // Every `which`/`where` lookup succeeds, so the platform opener is
+      // detected; the D-Bus call (Linux only) succeeds or fails as asked.
+      function mockOpenerAvailable({ dbusOk }: { dbusOk: boolean }) {
+        mockExecAsync.mockImplementation(async (cmd: string) => {
+          if (cmd === 'dbus-send' && !dbusOk) throw new Error('no FileManager1');
+          return { stdout: '' };
+        });
+      }
+
       async function reveal(path: string) {
         const { PanOpen, PanOpenLive } = await import('../open.js');
         const program = Effect.gen(function* () {
           const svc = yield* PanOpen;
           return yield* svc.openInEditor({ cwd: path, editor: 'file-manager', reveal: true });
         }).pipe(Effect.provide(PanOpenLive));
-        await Effect.runPromise(program);
+        return Effect.runPromise(Effect.exit(program));
       }
 
       it('selects the file through the FileManager1 D-Bus interface on Linux', async () => {
         setPlatform('linux');
-        mockExecAsync.mockResolvedValue({ stdout: '' });
+        mockOpenerAvailable({ dbusOk: true });
 
         await reveal('/tmp/a,b/My File.md');
 
@@ -204,16 +213,26 @@ describe('PanOpen service', () => {
 
       it('opens the parent folder on Linux when the D-Bus call fails', async () => {
         setPlatform('linux');
-        mockExecAsync.mockRejectedValue(new Error('no FileManager1'));
+        mockOpenerAvailable({ dbusOk: false });
 
         await reveal('/tmp/workspace/notes.md');
 
         expect(mockSpawn).toHaveBeenCalledWith('xdg-open', ['/tmp/workspace'], { detached: true, stdio: 'ignore' });
       });
 
+      it('fails without spawning when no file manager command was detected', async () => {
+        setPlatform('linux');
+        mockExecAsync.mockRejectedValue(new Error('not found'));
+
+        const exit = await reveal('/tmp/workspace/notes.md');
+
+        expect(exit._tag).toBe('Failure');
+        expect(mockSpawn).not.toHaveBeenCalled();
+      });
+
       it('uses open -R on macOS', async () => {
         setPlatform('darwin');
-        mockExecAsync.mockRejectedValue(new Error('not found'));
+        mockOpenerAvailable({ dbusOk: false });
 
         await reveal('/tmp/workspace/notes.md');
 
@@ -222,7 +241,7 @@ describe('PanOpen service', () => {
 
       it('uses explorer /select on Windows', async () => {
         setPlatform('win32');
-        mockExecAsync.mockRejectedValue(new Error('not found'));
+        mockOpenerAvailable({ dbusOk: false });
 
         await reveal('C:\\work\\notes.md');
 
