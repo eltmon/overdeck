@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4633",
   "created": "2026-10-26T19:15:40.115Z",
-  "updated": "2026-10-26T19:47:56.456Z",
+  "updated": "2026-10-26T19:48:09.142Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "cost-row.ac1": {
       "status": "completed",
       "doneAt": "2026-10-26T19:47:56.456Z"
+    },
+    "cost-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:48:09.141Z"
     }
   }
 }
