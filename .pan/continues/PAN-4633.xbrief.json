@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4633",
   "created": "2026-10-26T19:15:40.115Z",
-  "updated": "2026-10-26T19:49:11.248Z",
+  "updated": "2026-10-26T19:49:59.655Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "codex-context-pin.ac2": {
       "status": "completed",
       "doneAt": "2026-10-26T19:49:11.248Z"
+    },
+    "cliproxy-exclusion-note.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:49:59.655Z"
     }
   }
 }
