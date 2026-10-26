@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4633",
   "created": "2026-10-26T19:15:40.115Z",
-  "updated": "2026-10-26T19:50:17.583Z",
+  "updated": "2026-10-26T19:50:52.931Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "cliproxy-exclusion-note.ac2": {
       "status": "completed",
       "doneAt": "2026-10-26T19:50:17.583Z"
+    },
+    "settings-api-id.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-26T19:50:52.931Z"
     }
   }
 }
