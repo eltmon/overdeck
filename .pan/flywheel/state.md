@@ -301,3 +301,13 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   plan and a work agent records items on the existing PR head.
 - PAN-4626's planner ran via `pan plan --auto` (plan-only), so it waits for
   the operator's `released` label; it is not a PAN-4554 instance.
+- 2026-10-26 20:24 UTC: `pan start <id> --plan auto` on an adopted outside PR
+  works as the instance recovery for PAN-4636. The planner finalized, the work
+  agent recorded the items on the existing PR head, and verification passed
+  in 17 minutes (PAN-4630). The first try failed with a transient
+  "Tracker API error (github): fetch failed"; one retry succeeded.
+- The merge door counts the "Non-blocking flake lane" CI job as a pending
+  check (`summarizeStatusCheckRollup`, `src/lib/cloister/pr-facts.ts`
+  line 242). The job usually takes about 5 min, but it can hold an approved
+  PR for up to its 30-minute timeout. Seen once (PAN-4633); file it if it
+  happens again.
