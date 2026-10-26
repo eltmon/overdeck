@@ -324,6 +324,26 @@ describe('sizeHerdrTerminal', () => {
     await expect(pending).resolves.toBe('timeout');
   });
 
+  it('sizes with ~/.local/bin on PATH when the dashboard PATH omits it', async () => {
+    try {
+      vi.stubEnv('PATH', '/usr/bin:/bin');
+      vi.stubEnv('OVERDECK_PAN4630_PROBE', 'kept');
+      const { spawn, children, calls } = fakeSpawn();
+      const pending = sizeHerdrTerminal('term_p', 100, 30, { spawn });
+      children[0].emitRecord(FULL_FRAME);
+      children[0].emit('close', 0);
+
+      await expect(pending).resolves.toBe('sized');
+      expect(calls[0].command).toBe('herdr');
+      expect(calls[0].options.env.PATH).toBe(
+        ['/usr/bin', '/bin', join(homedir(), '.local', 'bin')].join(delimiter),
+      );
+      expect(calls[0].options.env.OVERDECK_PAN4630_PROBE).toBe('kept');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('stays pending after a frame arrives until the child actually closes', async () => {
     const { spawn, children } = fakeSpawn();
     const pending = sizeHerdrTerminal('term_k', 120, 40, { spawn });
