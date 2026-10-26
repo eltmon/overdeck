@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-26T19:06:21Z · model: claude-opus-5-5 · open: 842_
+_Last sequenced: 2026-10-26T19:14:27Z · model: claude-opus-5-5 · open: 843_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -166,6 +166,7 @@ _Last sequenced: 2026-10-26T19:06:21Z · model: claude-opus-5-5 · open: 842_
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 172 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
+| 174 | PAN-4634 | M | medium | needs-refinement |  | PAN-4633 | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
 | 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 179 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
@@ -1177,10 +1178,10 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-26T19:06:21Z",
+  "generatedAt": "2026-10-26T19:14:27Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 842,
+  "openCount": 843,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -11673,6 +11674,21 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4634",
+      "rank": 174,
+      "size": "M",
+      "importance": "medium",
+      "score": 66,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4633"
+      ],
+      "why": "Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken.",
+      "rationale": "New follow-up to in-pipeline PAN-4633 (Terra on codex); it only widens Terra to the claude-code route, which Codex already covers, so it ranks mid-tier in a free slot. Condition is needs-refinement because no known CLIProxy release serves gpt-6.1-terra yet and the 7.x to 8.x jump is unscoped; the noted broken sonnet/opus oauth-model-alias targets may merit their own issue.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12998,6 +13014,13 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4633",
+      "to": "PAN-4634",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
     }
   ]
 }
