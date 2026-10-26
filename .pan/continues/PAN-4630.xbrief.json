@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4630",
   "created": "2026-10-25T20:22:55.230Z",
-  "updated": "2026-10-26T20:16:56.240Z",
+  "updated": "2026-10-26T20:17:02.584Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -41,6 +41,11 @@
     "stream-path-fix.ac3": {
       "status": "completed",
       "doneAt": "2026-10-26T20:16:42.478Z"
+    },
+    "search-dirs-test": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4630",
+      "claimedAt": "2026-10-26T20:17:02.584Z"
     }
   }
 }
