@@ -1,13 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-26T20:36:57Z · model: claude-opus-5-5 · open: 843_
+_Last sequenced: 2026-10-26T20:41:37Z · model: claude-opus-5-5 · open: 842_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
 | 2 | PAN-4630 | XS | critical | ok |  |  | In pipeline: herdr streams spawn bare 'herdr' on a PATH without ~/.local/bin, so dashboard terminals loop on Connection lost. |
-| 3 | PAN-4633 | S | high | ok |  |  | In pipeline: add gpt-6.1-terra (launched 2026-10-26) to catalog, pricing, Codex floor and CLIProxy route, mirroring PAN-4422. |
 | 5 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -166,7 +165,7 @@ _Last sequenced: 2026-10-26T20:36:57Z · model: claude-opus-5-5 · open: 843_
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 172 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
-| 174 | PAN-4634 | M | medium | needs-refinement |  | PAN-4633 | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
+| 174 | PAN-4634 | M | medium | needs-refinement |  |  | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
 | 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 179 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
@@ -859,10 +858,6 @@ New in-pipeline follow-up to the merged #4584 with a decided design, so it is pi
 
 New in-pipeline issue with a verified root cause and a one-function fix; it breaks the terminal view for every Herdr-backed agent and conversation, so it is pinned in a free top slot (rank 2) per the in-pipeline rule.
 
-### PAN-4633 (rank 3)
-
-New since the prior run and already in the pipeline, so it is pinned in the free top-tier slot (rank 3) rather than ranked. The operator marked it urgent: the model launched today and the body carries verified facts and pre-made decisions (D1-D10) with two measured checkpoints and fallbacks, so it is well-defined and small.
-
 ### PAN-4636 (rank 5)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1171,6 +1166,10 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 
 npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
 
+### PAN-2850 (rank 93)
+
+npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1178,10 +1177,10 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-26T20:36:57Z",
+  "generatedAt": "2026-10-26T20:41:37Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 843,
+  "openCount": 842,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -1206,19 +1205,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "dependsOn": [],
       "why": "In pipeline: herdr streams spawn bare 'herdr' on a PATH without ~/.local/bin, so dashboard terminals loop on Connection lost.",
       "rationale": "New in-pipeline issue with a verified root cause and a one-function fix; it breaks the terminal view for every Herdr-backed agent and conversation, so it is pinned in a free top slot (rank 2) per the in-pipeline rule.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4633",
-      "rank": 3,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: add gpt-6.1-terra (launched 2026-10-26) to catalog, pricing, Codex floor and CLIProxy route, mirroring PAN-4422.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned in the free top-tier slot (rank 3) rather than ranked. The operator marked it urgent: the model launched today and the body carries verified facts and pre-made decisions (D1-D10) with two measured checkpoints and fallbacks, so it is well-defined and small.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11665,11 +11651,9 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "importance": "medium",
       "score": 66,
       "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4633"
-      ],
+      "dependsOn": [],
       "why": "Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken.",
-      "rationale": "New follow-up to in-pipeline PAN-4633 (Terra on codex); it only widens Terra to the claude-code route, which Codex already covers, so it ranks mid-tier in a free slot. Condition is needs-refinement because no known CLIProxy release serves gpt-6.1-terra yet and the 7.x to 8.x jump is unscoped; the noted broken sonnet/opus oauth-model-alias targets may merit their own issue.",
+      "rationale": "Prerequisite PAN-4633 (Terra on codex) merged and closed, so the dependency is dropped; rank holds because no known CLIProxy release serves gpt-6.1-terra yet and the 7.x to 8.x jump is still unscoped.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12996,13 +12980,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-4633",
-      "to": "PAN-4634",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4636",
