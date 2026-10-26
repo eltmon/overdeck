@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-26T07:39:50Z · model: claude-opus-5-5 · open: 840_
+_Last sequenced: 2026-10-26T09:18:24Z · model: claude-opus-5-5 · open: 840_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1175,7 +1175,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-26T07:39:50Z",
+  "generatedAt": "2026-10-26T09:18:24Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 840,
