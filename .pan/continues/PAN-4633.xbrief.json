@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4633",
   "created": "2026-10-26T19:15:40.115Z",
-  "updated": "2026-10-26T19:34:38.461Z",
+  "updated": "2026-10-26T19:36:34.727Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-10-26T19:34:34.685Z"
     },
     "frontend-pickers": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4633",
-      "claimedAt": "2026-10-26T19:34:38.460Z"
+      "claimedAt": "2026-10-26T19:34:38.460Z",
+      "doneAt": "2026-10-26T19:36:34.727Z"
     }
   }
 }
