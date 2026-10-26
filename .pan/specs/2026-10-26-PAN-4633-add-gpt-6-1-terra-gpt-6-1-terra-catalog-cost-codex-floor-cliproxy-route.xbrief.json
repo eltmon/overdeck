@@ -1,0 +1,711 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-26T19:12:03Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4633: Add GPT-6.1 Terra (gpt-6.1-terra): catalog, cost, Codex floor, CLIProxy route",
+    "updated": "2026-10-26T19:13:42.726Z"
+  },
+  "plan": {
+    "id": "pan-4633",
+    "title": "Add GPT-6.1 Terra (gpt-6.1-terra): catalog, cost, Codex floor, CLIProxy route",
+    "status": "proposed",
+    "uid": "85c87762-04d2-4d67-ae7f-94c58032fade",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-26T19:12:03Z",
+    "updated": "2026-10-26T19:13:42.726Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4633",
+        "label": "PAN-4633",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4422",
+        "label": "PAN-4422 (template)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4634",
+        "label": "PAN-4634 (CLIProxy follow-up)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "models",
+      "openai",
+      "codex",
+      "cost",
+      "catalog"
+    ],
+    "metadata": {
+      "sizeJustification": "One new model id propagated across every model surface (capabilities, providers, fallback, cost, Codex floor, Codex context pin test, CLIProxy exclusion note, server API map, Settings catalog, two pickers, display name, docs, changelog). This is the same file set as #4423 (GPT-6.1 Sol) minus codex.ts; each item is a one-to-few-line edit, and splitting into sibling issues would ship a model that is selectable but unpriced or unfloored.",
+      "canonicalFilename": "2026-10-26-PAN-4633-add-gpt-6-1-terra-gpt-6-1-terra-catalog-cost-codex-floor-cliproxy-route.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "OpenAI released gpt-6.1-terra on 2026-10-26, the GPT-6.1 workhorse tier below gpt-6.1-sol. Overdeck does not know the id: it is absent from the model catalog, pickers, cost tables and Codex floor table, so it cannot be picked, is unpriced, and a launch under ChatGPT sign-in on Codex below 0.159.0 would fail with HTTP 400 instead of being refused up front.",
+      "Proposal": "Repeat the PAN-4422 (gpt-6.1-sol) change for gpt-6.1-terra with the issue's decisions: workhorse class, efforts low..max, 272K pin, $1/$0.05/$5 pricing ($3/1M blended), Sonnet 5.5 fallback, ordering right after gpt-6.1-sol. Both implementation checkpoints were resolved during planning: the Codex floor was measured at 0.159.0 (0.158.0 answers 400 model_not_found), and CLIProxy 7.3.16 does not serve the model, so per the D8 fallback Terra stays out of GPT_56_MODELS, gets a negative-probe note, and the pin bump is follow-up PAN-4634. See .pan/drafts/PAN-4633.md.",
+      "NonGoals": "- Releasing to npm (post-merge pan release stable --version 0.72.0 from main)\n- Changing any default, tierModels, preset or role model\n- Adding gpt-6.1-terra to GPT_56_MODELS or bumping the CLIProxy version (PAN-4634)\n- Adding a harness-policy gate that refuses claude-code + gpt-6.1-terra\n- Changing any gpt-6.1-sol, gpt-6-sol or gpt-5.6-terra row, including the stale GPT-6.1 Sol '272,000 default' wording in MODEL-CONTEXT-AUDIT.md\n- Editing src/lib/runtimes/codex.ts, src/lib/model-capabilities.ts or SUBSCRIPTION_ONLY_OPENAI_MODELS\n- Rebuilding sync-sources/hooks/record-cost-event.js\n- Editing evals/ or tests/unit/evals/\n- Adding a [372k] or other context variant, or surfacing the none or ultra effort levels"
+    },
+    "autoDecisions": [
+      {
+        "summary": "D7 Codex floor is 0.159.0, measured rather than assumed",
+        "rationale": "During planning, codex exec -m gpt-6.1-terra under ChatGPT auth returned 400 model_not_found on 0.158.0 and a completion on 0.159.0; npm has no stable release in between."
+      },
+      {
+        "summary": "D8 takes its fallback: gpt-6.1-terra is not added to GPT_56_MODELS; follow-up PAN-4634 filed",
+        "rationale": "CLIProxy 7.3.16 omits the id from GET /v1/models and answers 'unknown provider for model gpt-6.1-terra' to POST /v1/messages; the issue's D8 rule prescribes this fallback. getClaudeCodeContextPolicyForModel still returns 272K through the capability fallthrough, so no observable policy changes."
+      },
+      {
+        "summary": "No harness gate for claude-code + gpt-6.1-terra",
+        "rationale": "D8's fallback names only the membership and the follow-up issue; a new gate is new behavior outside the issue's scope. The limitation is documented in harnesses.mdx and the changelog."
+      },
+      {
+        "summary": "Settings modelCatalog row uses icon Sparkles and tier 'balanced'",
+        "rationale": "Terra is the balanced/workhorse tier; the existing gpt-5.6-terra row uses that style, while Sol rows use Gem/premium."
+      },
+      {
+        "summary": "Capability skills copy gpt-5.6-terra verbatim",
+        "rationale": "No measured Terra skill data exists; PAN-4422 copied the same-slot predecessor (gpt-6-sol) for gpt-6.1-sol."
+      },
+      {
+        "summary": "Changelog creates a v0.72.0 Unreleased block",
+        "rationale": "No Unreleased block exists on main and v0.71.0 is the current release, as the issue's D11 directs."
+      }
+    ],
+    "items": [
+      {
+        "id": "catalog-entry",
+        "title": "Register gpt-6.1-terra as an OpenAI ModelId with capability, class, provider and fallback rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-26T19:12:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/providers.ts",
+            "src/lib/__tests__/model-capabilities.test.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "tests/lib/model-fallback.test.ts",
+            "tests/lib/settings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts src/lib/__tests__/model-catalog-audit.test.ts tests/lib/model-fallback.test.ts tests/lib/settings.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the four named test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4633.md work item 1. Add 'gpt-6.1-terra' to the OpenAIModel union (after | 'gpt-6.1-sol') and the settings.ts:213 openai list (after 'gpt-6.1-sol'). Insert the MODEL_CAPABILITIES entry in model-capability-additions.ts directly after the 'gpt-6.1-sol' entry, exactly as the PRD snippet shows (displayName 'GPT-6.1 Terra', costPer1MTokens 3, contextWindow CLIPROXY_GPT56_CONTEXT_WINDOW, maxOutputTokens 128_000, minTier 'plus', effortLevels low..max, skills copied verbatim from gpt-5.6-terra in model-capabilities.ts, notes per PRD; the comment says Codex catalog context_window 500000 pinned to 272K). Add 'gpt-6.1-terra': 'workhorse' after 'gpt-5.6-terra[372k]' in model-capability-class.ts. In model-fallback.ts add MODEL_PROVIDERS 'openai', FALLBACK_MAP 'claude-sonnet-5-5' (comment 'GPT-6.1 workhorse tier → Sonnet'), MODEL_TIER_RANK 2, each directly after the gpt-6.1-sol row. Append to providers.ts:135 openai models and insert after 'gpt-6.1-sol' in the providers.ts:462 list. Do NOT touch tierModels, any default, or src/lib/model-capabilities.ts. Tests: model-capabilities.test.ts window-parity it.each (:53) and no-[372k] it.each (:127) gain 'gpt-6.1-terra'; model-catalog-audit.test.ts gains ['gpt-6.1-terra','openai',272000]; model-fallback.test.ts adds two toContain('gpt-6.1-terra') and changes counts 20→21, 35→36, 22→23 (comments 10→11 OpenAI); settings.test.ts:279 exact list adds 'gpt-6.1-terra' after 'gpt-6.1-sol'."
+        },
+        "items": [
+          {
+            "id": "catalog-entry.ac1",
+            "title": "Given the capability table, when MODEL_CAPABILITIES['gpt-6.1-terra'] is read, then it returns displayName 'GPT-6.1 Terra', contextWindow 272000, maxOutputTokens 128000, costPer1MTokens 3 and effortLevels ['low','medium','high','xhigh','max']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-entry.ac2",
+            "title": "Given the new id, when capabilityClassOf('gpt-6.1-terra') and getProviderForModel('gpt-6.1-terra').name are called, then they return 'workhorse' and 'openai'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-entry.ac3",
+            "title": "Given the provider registry, when PROVIDERS.openai.tierModels is read, then it still returns { opus: 'gpt-5.6-sol', sonnet: 'gpt-5.6-terra', haiku: 'gpt-5.6-luna' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-entry.ac4",
+            "title": "Given the catalog audit test, when getClaudeCodeContextPolicyForModel('gpt-6.1-terra') runs, then it returns { autoCompactWindow: 272000, maxContextTokens: 272000 } and the four touched test files pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-row",
+        "title": "Add the gpt-6.1-terra pricing row",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-26T19:12:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "src/lib/__tests__/model-capabilities.test.ts",
+            "tests/lib/cost.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts tests/lib/cost.test.ts"
+          ],
+          "expected_outputs": [
+            "both named test files pass, including 'prices gpt-6.1-terra distinctly from gpt-5.6-terra'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4633.md work item 2. Insert the gpt-6.1-terra DEFAULT_PRICING row (inputPer1k 0.001, outputPer1k 0.005, cacheReadPer1k 0.00005) with its source comment directly below the gpt-6.1-sol row in src/lib/cost.ts. Add ['gpt-6.1-terra','GPT-6.1 Terra',0.001,0.00005,0.005] to the pricing it.each in model-capabilities.test.ts (:106). Add the test 'prices gpt-6.1-terra distinctly from gpt-5.6-terra' to tests/lib/cost.test.ts exactly as the PRD shows. Do not change any other row."
+        },
+        "items": [
+          {
+            "id": "cost-row.ac1",
+            "title": "Given the pricing table, when getPricing('openai','gpt-6.1-terra') is called, then it returns model 'gpt-6.1-terra' with inputPer1k 0.001, cacheReadPer1k 0.00005 and outputPer1k 0.005",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-row.ac2",
+            "title": "Given the existing rows, when getPricing('openai','gpt-5.6-terra') and getPricing('openai','gpt-6.1-sol') are called, then they still return 0.0025/0.00025/0.015 and 0.002/0.0001/0.010",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-floor",
+        "title": "Add the measured Codex 0.159.0 ChatGPT-sign-in floor for gpt-6.1-terra",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-26T19:12:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/model-floors.ts",
+            "src/lib/__tests__/harness-policy.test.ts",
+            "src/lib/codex/__tests__/app-server-manager.test.ts",
+            "tests/unit/cli/doctor-codex-models.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/harness-policy.test.ts src/lib/codex/__tests__/app-server-manager.test.ts tests/unit/cli/doctor-codex-models.test.ts"
+          ],
+          "expected_outputs": [
+            "the three named test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4633.md work item 3. Add 'gpt-6.1-terra': '0.159.0' to CODEX_MODEL_MINIMUM_VERSIONS and extend the doc comment with the 2026-10-26 measurement (0.158.0 with a ChatGPT login answers 400 model_not_found, 0.159.0 succeeds). No gate or doctor code change. Tests: harness-policy.test.ts api-key it.each (:180) gains 'gpt-6.1-terra'; add the two new tests from the PRD after 'allows gpt-6.1-sol at 0.159.0' (no semicolons in that file); app-server-manager.test.ts adds expect(codexModelMinimumVersion('gpt-6.1-terra')).toBe('0.159.0'); doctor-codex-models.test.ts changes every toHaveLength(3) to toHaveLength(4), asserts the below-floor messages contain 'gpt-6.1-terra', and names it in the header comment."
+        },
+        "items": [
+          {
+            "id": "codex-floor.ac1",
+            "title": "Given ChatGPT sign-in and Codex 0.158.0, when canUseHarness('codex','gpt-6.1-terra','subscription',{codexCliVersion:'0.158.0'}) runs, then it rejects with a reason containing '0.159.0' and 'npm install -g @openai/codex'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-floor.ac2",
+            "title": "Given Codex 0.159.0 under subscription, or api-key auth at 0.153.4, when canUseHarness runs for gpt-6.1-terra, then it returns { allowed: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-floor.ac3",
+            "title": "Given a Codex CLI at 0.153.4 under subscription, when checkCodexModelFloors runs, then it returns 4 warn rows and the joined messages contain 'gpt-6.1-terra'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-context-pin",
+        "title": "Prove the managed Codex config pins gpt-6.1-terra to 272K",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-26T19:12:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/__tests__/codex.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/runtimes/__tests__/codex.test.ts"
+          ],
+          "expected_outputs": [
+            "codex.test.ts passes, including the 'pins gpt-6.1-terra context and effort' case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4633.md work item 4. Add ['gpt-6.1-terra','high',272000,'high'] to the initCodexHome it.each after the gpt-6.1-sol row. Do NOT edit src/lib/runtimes/codex.ts: its existing startsWith('gpt-6.') branch already matches the id."
+        },
+        "items": [
+          {
+            "id": "codex-context-pin.ac1",
+            "title": "Given initCodexHome(dir, { model: 'gpt-6.1-terra', effort: 'high' }), when config.toml is read, then it contains 'model_context_window = 272000' and 'model_reasoning_effort = \"high\"'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-context-pin.ac2",
+            "title": "Given the branch diff, when git diff origin/main -- src/lib/runtimes/codex.ts runs, then it produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cliproxy-exclusion-note",
+        "title": "Record the D8 CLIProxy fallback: Terra stays out of GPT_56_MODELS",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-26T19:12:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy.ts",
+            "src/lib/agents/provider-env.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "rg -n 'gpt-6.1-terra' src/lib/cliproxy.ts src/lib/agents/provider-env.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "rg prints the new comment lines in both files and no GPT_56_MODELS member"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4633.md work item 5. Comment-only change. In src/lib/cliproxy.ts add the three-line PAN-4633 negative-probe note after the PAN-4422 note (probed 2026-10-26; absent from GET /v1/models; POST /v1/messages answers 'unknown provider for model gpt-6.1-terra'; codex-harness only until PAN-4634). In src/lib/agents/provider-env.ts add the one-line comment above GPT_56_MODELS saying gpt-6.1-terra is deliberately absent (PAN-4633 D8, follow-up PAN-4634) and that its claude-code policy still resolves to 272K through the capability fallthrough. Do NOT add 'gpt-6.1-terra' to the GPT_56_MODELS set and do NOT change CLIPROXY_RELEASE_VERSION."
+        },
+        "items": [
+          {
+            "id": "cliproxy-exclusion-note.ac1",
+            "title": "Given provider-env.ts, when the GPT_56_MODELS Set literal is read, then it does not contain 'gpt-6.1-terra' and a comment above it names PAN-4634",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cliproxy-exclusion-note.ac2",
+            "title": "Given cliproxy.ts, when the comments above CLIPROXY_RELEASE_VERSION are read, then one names gpt-6.1-terra, 2026-10-26 and PAN-4634, and CLIPROXY_RELEASE_VERSION still returns 'v7.3.16'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-api-id",
+        "title": "Map gpt-6.1-terra to its API id in the settings route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-26T19:12:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "api",
+          "issueLabel": "pan-4633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/settings.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint:file-size passes with routes/settings.ts at no more than 1104 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4633.md work item 6. Append \"'gpt-6.1-terra': { apiModel: 'gpt-6.1-terra' },\" to the end of the existing line 109 (the gpt-6-sol / gpt-6-luna / gpt-6.1-sol line). Add no new lines: the file is at its 1104-line allowlist cap."
+        },
+        "items": [
+          {
+            "id": "settings-api-id.ac1",
+            "title": "Given the settings route module, when MODEL_API_IDS['gpt-6.1-terra'] is read, then it returns { apiModel: 'gpt-6.1-terra' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-id.ac2",
+            "title": "Given the branch, when wc -l src/dashboard/server/routes/settings.ts runs, then it prints 1104 or fewer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-catalog-order",
+        "title": "Order gpt-6.1-terra third in the Settings catalog API",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-26T19:12:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-model-catalog.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/settings-model-catalog.test.ts"
+          ],
+          "expected_outputs": [
+            "settings-model-catalog.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4633.md work item 7. Rewrite openaiOrder to gpt-6-astra 0, gpt-6.1-sol 1, gpt-6.1-terra 2, gpt-6-sol 3, gpt-6-luna 4, gpt-5.6-sol 5, gpt-5.6-terra 6, gpt-5.6-luna 7 (leave 10+ unchanged) and update its comment. In the test, update the additions comment, insert the gpt-6.1-terra object (name 'GPT-6.1 Terra (272K context)', contextWindow 272000, D2 efforts, costPer1MTokens 3) as the SECOND element of gpt6Additions, and change the slice(0, 4) assertion to slice(0, 5) equal to ['gpt-6-astra','gpt-6.1-sol','gpt-6.1-terra','gpt-6-sol','gpt-6-luna']."
+        },
+        "items": [
+          {
+            "id": "settings-catalog-order.ac1",
+            "title": "Given getAvailableModelsApi(), when its openai list is read, then the first five ids are gpt-6-astra, gpt-6.1-sol, gpt-6.1-terra, gpt-6-sol, gpt-6-luna",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-catalog-order.ac2",
+            "title": "Given getAvailableModelsApi(), when the gpt-6.1-terra row is read, then it returns name 'GPT-6.1 Terra (272K context)', contextWindow 272000 and costPer1MTokens 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-pickers",
+        "title": "Add gpt-6.1-terra rows to the chat ModelPicker and Settings modelCatalog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-26T19:12:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:effort",
+            "npx eslint src/dashboard/frontend/src/components/chat/ModelPicker.tsx src/dashboard/frontend/src/components/Settings/modelCatalog.ts"
+          ],
+          "expected_outputs": [
+            "lint:effort passes",
+            "eslint reports no errors for the two files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4633.md work item 8. Insert the PRD's gpt-6.1-terra row directly after the gpt-6.1-sol row in each file. ModelPicker.tsx: label 'GPT-6.1 Terra (272K context)', costDisplay '$3/1M', costPer1MTokens 3, effortLevels EFFORT_LEVELS (never a literal array; lint:effort fails otherwise). modelCatalog.ts: name 'GPT-6.1 Terra (272K context)', icon Sparkles, tier 'balanced', costPer1MTokens 3, the PRD's capabilities and description."
+        },
+        "items": [
+          {
+            "id": "frontend-pickers.ac1",
+            "title": "Given ModelPicker.tsx, when the openai models array is read, then the row after gpt-6.1-sol has id 'gpt-6.1-terra', label 'GPT-6.1 Terra (272K context)', costDisplay '$3/1M' and effortLevels EFFORT_LEVELS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-pickers.ac2",
+            "title": "Given modelCatalog.ts, when the openai models array is read, then the row after gpt-6.1-sol has id 'gpt-6.1-terra', name 'GPT-6.1 Terra (272K context)', icon Sparkles, tier 'balanced' and costPer1MTokens 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-pickers.ac3",
+            "title": "Given the branch, when npm run lint:effort runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "friendly-name",
+        "title": "Give gpt-6.1-terra its own friendly display name",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-26T19:12:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-4633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/dashboard-utils.ts",
+            "src/dashboard/frontend/src/lib/__tests__/dashboard-utils.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/dashboard-utils.test.ts"
+          ],
+          "expected_outputs": [
+            "dashboard-utils.test.ts passes, including 'keeps GPT-6.1 Terra and GPT-5.6 Terra distinct (PAN-4633)'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4633.md work item 9. Insert \"if (backingModel.includes('gpt-6.1-terra')) return 'GPT-6.1 Terra';\" directly after the gpt-6.1-sol line in getFriendlyModelName, before every terra line. Add the PRD's test."
+        },
+        "items": [
+          {
+            "id": "friendly-name.ac1",
+            "title": "Given getFriendlyModelName, when called with 'gpt-6.1-terra', then it returns 'GPT-6.1 Terra'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "friendly-name.ac2",
+            "title": "Given getFriendlyModelName, when called with 'gpt-5.6-terra', then it still returns 'GPT-5.6 Terra'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document gpt-6.1-terra in harnesses.mdx and MODEL-CONTEXT-AUDIT.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-26T19:12:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "rg -n 'gpt-6.1-terra|GPT-6.1 Terra|GPT-6.1 Sol/Terra' configuration/harnesses.mdx docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "rg prints the new harnesses.mdx and MODEL-CONTEXT-AUDIT.md lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4633.md work item 10. harnesses.mdx: add `gpt-6.1-terra` to the no-[372k] list (:110); change the Codex family list to 'GPT-6.1 Sol/Terra'; add the Terra sentence (price with &#36;, opt-in, Codex 0.159.0 floor) after the gpt-6.1-sol floor sentence; replace 'serve all three models' (:243) with the PRD text naming the three served models and saying gpt-6.1-terra is not served (probed 2026-10-26) with a PAN-4634 link. Do NOT add Terra to the claude-code 272000-pin sentence at :101-102. MODEL-CONTEXT-AUDIT.md: add 'GPT-6.1 Sol, Terra' to the table row with the Terra catalog note (500,000 default / 872,000 max, pinned to 272,000), and add the GPT-6.1 Terra Sources line after GPT-6.1 Sol. Leave the GPT-6.1 Sol wording unchanged."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given configuration/harnesses.mdx, when the OpenAI Codex CLI section is read, then it names `gpt-6.1-terra`, its &#36;1/&#36;0.05/&#36;5 price and the `0.159.0` floor, and says CLIProxy does not serve it with a link to PAN-4634",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given configuration/harnesses.mdx, when the no-[372k] sentence and the claude-code 272000-pin sentence are read, then the first lists `gpt-6.1-terra` and the second does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given docs/MODEL-CONTEXT-AUDIT.md, when the table and Sources are read, then the table row lists 'GPT-6.1 Sol, Terra' and a Sources line for gpt-6.1-terra shows '$0.05/M cached input'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog",
+        "title": "Add a v0.72.0 Unreleased changelog entry for GPT-6.1 Terra",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-26T19:12:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "rg -c 'description=\"Unreleased\"' changelog.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "rg prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4633.md work item 11. Create <Update label=\"v0.72.0\" description=\"Unreleased\" tags={[\"Upcoming\"]}> with the '## Upcoming release' heading, the 'Drafted from the changes merged to `main` since v0.71.0...' line and a '#### New' GPT-6.1 Terra bullet (text in the PRD, dollars as &#36;), directly below the RELEASE STEP comment and above the v0.71.0 block. If a rebase brings an Unreleased block first, add only the bullet to it. Never create a second Unreleased block."
+        },
+        "items": [
+          {
+            "id": "changelog.ac1",
+            "title": "Given changelog.mdx, when Unreleased blocks are counted, then exactly one exists, labeled v0.72.0, above the v0.71.0 block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog.ac2",
+            "title": "Given that block, when its New section is read, then it contains a GPT-6.1 Terra entry naming the &#36;1/&#36;0.05/&#36;5 price, the Codex 0.159.0 floor and PAN-4634",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "catalog-entry",
+        "to": "cost-row",
+        "type": "blocks"
+      },
+      {
+        "from": "catalog-entry",
+        "to": "codex-floor",
+        "type": "blocks"
+      },
+      {
+        "from": "catalog-entry",
+        "to": "settings-catalog-order",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
