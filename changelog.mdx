@@ -10,6 +10,19 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.71.0" description="2026-10-26">
+  #### New
+
+  - **Open containing folder:** right-click a file chip in a conversation and choose **Open containing folder** to open the file's folder with the file selected. macOS uses `open -R`, Windows uses `explorer /select,`, and Linux asks the file manager to select the file over D-Bus (Nautilus, Dolphin, Nemo, Caja and Thunar support this). On Linux, when no file manager answers, the parent folder opens instead. The item appears on markdown and non-markdown chips.
+
+  #### Improved
+
+  - **CI failure feedback names the failing test:** when a PR's CI test job fails, the feedback sent to the work agent now comes from the failing check runs, so it can name the failing shard while the rest of the workflow is still running. It includes an excerpt of the job log from the first Vitest `FAIL` line to the test summary. Aggregate jobs that only repeat a shard's failure are left out. When no job log becomes available within about two minutes, the feedback still lists each failing check with its log command and URL. (PAN-4534, [#4613](https://github.com/eltmon/overdeck/pull/4613))
+  - **Conversation search banner sets up the OpenAI key in one click:** the banner shown when conversation search has no OpenAI key now has a short title, an explanation, and an **Add OpenAI key** button. The button opens Settings → Providers with the OpenAI row expanded and its key field focused. The banner used to point at a Settings section that does not exist.
+
+  [Compare v0.70.0...v0.71.0](https://github.com/eltmon/overdeck/compare/v0.70.0...v0.71.0)
+</Update>
+
 <Update label="v0.70.0" description="2026-10-24">
   #### New
 
