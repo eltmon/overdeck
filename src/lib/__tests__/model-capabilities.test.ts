@@ -104,6 +104,7 @@ describe('model capabilities', () => {
     ['gpt-6-sol', 'GPT-6 Sol', 0.002, 0.0002, 0.01],
     ['gpt-6-luna', 'GPT-6 Luna', 0.0001, 0.00001, 0.0005],
     ['gpt-6.1-sol', 'GPT-6.1 Sol', 0.002, 0.0001, 0.01],
+    ['gpt-6.1-terra', 'GPT-6.1 Terra', 0.001, 0.00005, 0.005],
   ] as const)('registers %s against the openai provider with the 272K billing-tier pin', async (model, displayName, input, cached, output) => {
     const { getProviderForModel } = await import('../providers.js');
     const { getPricing } = await import('../cost.js');
