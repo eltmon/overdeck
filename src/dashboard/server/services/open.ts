@@ -1,12 +1,15 @@
 import { spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
+import { dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { Effect, Layer, Context } from 'effect';
 import { EDITORS, type EditorId, type OpenInEditorInput } from '@overdeck/contracts';
 import { PanRpcError } from '@overdeck/contracts';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ─── Editor launch resolution ────────────────────────────────────────────────
 
@@ -47,6 +50,43 @@ function launchDetached(launch: EditorLaunch): void {
     stdio: 'ignore',
   });
   child.unref();
+}
+
+// ─── Reveal in file manager ──────────────────────────────────────────────────
+
+// Opens the folder that contains `path` with `path` selected. macOS and
+// Windows have native flags for this. On Linux, the freedesktop
+// FileManager1.ShowItems D-Bus call selects the item (Nautilus, Dolphin,
+// Nemo, Caja and Thunar implement it); without it, open the parent folder.
+async function revealInFileManager(path: string): Promise<void> {
+  switch (process.platform) {
+    case 'darwin':
+      launchDetached({ command: 'open', args: ['-R', path] });
+      return;
+    case 'win32':
+      launchDetached({ command: 'explorer', args: [`/select,${path}`] });
+      return;
+    case 'linux':
+      try {
+        // dbus-send splits array items on commas, so escape them in the URI.
+        const uri = pathToFileURL(path).href.replace(/,/g, '%2C');
+        await execFileAsync('dbus-send', [
+          '--session',
+          '--print-reply',
+          '--dest=org.freedesktop.FileManager1',
+          '--type=method_call',
+          '/org/freedesktop/FileManager1',
+          'org.freedesktop.FileManager1.ShowItems',
+          `array:string:${uri}`,
+          'string:',
+        ], { timeout: 10_000 });
+      } catch {
+        launchDetached({ command: 'xdg-open', args: [dirname(path)] });
+      }
+      return;
+    default:
+      throw new Error(`Revealing files is not supported on ${process.platform}`);
+  }
 }
 
 // ─── Available editors detection (async, cached) ─────────────────────────────
@@ -102,8 +142,12 @@ export const PanOpenLive = Layer.effect(
 
     return PanOpen.of({
       openInEditor: (input) =>
-        Effect.try({
-          try: () => {
+        Effect.tryPromise({
+          try: async () => {
+            if (input.editor === 'file-manager' && input.reveal) {
+              await revealInFileManager(input.cwd);
+              return;
+            }
             const launch = resolveEditorLaunch(input.editor, input.cwd);
             if (!launch) {
               throw new Error(`Editor "${input.editor}" not supported`);
