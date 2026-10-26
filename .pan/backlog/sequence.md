@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-26T21:14:06Z · model: claude-opus-5-5 · open: 842_
+_Last sequenced: 2026-10-26T21:18:31Z · model: claude-opus-5-5 · open: 841_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
-| 2 | PAN-4630 | XS | critical | ok |  |  | In pipeline: herdr streams spawn bare 'herdr' on a PATH without ~/.local/bin, so dashboard terminals loop on Connection lost. |
 | 5 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -854,10 +853,6 @@ _Last sequenced: 2026-10-26T21:14:06Z · model: claude-opus-5-5 · open: 842_
 
 New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.
 
-### PAN-4630 (rank 2)
-
-New in-pipeline issue with a verified root cause and a one-function fix; it breaks the terminal view for every Herdr-backed agent and conversation, so it is pinned in a free top slot (rank 2) per the in-pipeline rule.
-
 ### PAN-4636 (rank 5)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1170,6 +1165,10 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 
 npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
 
+### PAN-2758 (rank 94)
+
+Triage: verify whether a provider-capacity zombie can still read as running under the current liveness definition. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1177,10 +1176,10 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-26T21:14:06Z",
+  "generatedAt": "2026-10-26T21:18:31Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 842,
+  "openCount": 841,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -1192,19 +1191,6 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "dependsOn": [],
       "why": "In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending.",
       "rationale": "New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4630",
-      "rank": 2,
-      "size": "XS",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: herdr streams spawn bare 'herdr' on a PATH without ~/.local/bin, so dashboard terminals loop on Connection lost.",
-      "rationale": "New in-pipeline issue with a verified root cause and a one-function fix; it breaks the terminal view for every Herdr-backed agent and conversation, so it is pinned in a free top slot (rank 2) per the in-pipeline rule.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12980,13 +12966,6 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-4636",
-      "to": "PAN-4630",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
     }
   ]
 }
