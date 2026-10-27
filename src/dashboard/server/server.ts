@@ -106,7 +106,7 @@ import { internalEventsRouteLayer } from './routes/internal-events.js';
 import { restartGateRouteLayer } from './routes/restart-gate.js';
 import { dashboardSessionPreflightRouteLayer, dashboardSessionRouteLayer } from './routes/dashboard-session.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
-import { retryDashboardBind } from './server-bind.js';
+import { holdRequestsUntilServed, retryDashboardBind } from './server-bind.js';
 import { buildDashboardHealthResponse } from './health-response.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
@@ -125,6 +125,7 @@ const HttpServerLive = Layer.unwrap(
     ]);
     const bind = retryDashboardBind(NodeHttpServer.make(() => {
       const nodeServer = NodeHttp.createServer();
+      holdRequestsUntilServed(nodeServer);
       setupTerminalWebSocket(nodeServer);
       setupKnowledgeViewerProxy(nodeServer);
       setupVoiceWebSocket(nodeServer);
