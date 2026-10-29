@@ -948,6 +948,38 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
     await act(async () => { await pendingSearch; });
   });
 
+  it('keeps the loading row, not No results, when a superseded search aborts while the newer one is in flight', async () => {
+    const pending: Array<{ url: string; resolve: (response: Response) => void }> = [];
+    fetchControl = installStrictFetchMock(({ method, url, init }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return new Promise<Response>((resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+          pending.push({ url, resolve });
+        });
+      }
+      return undefined;
+    });
+
+    renderCommandPalette();
+    fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
+    const input = screen.getByPlaceholderText('Search commands, issues, conversations, memory…');
+    fireEvent.change(input, { target: { value: 'anywher' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(120); });
+    fireEvent.change(input, { target: { value: 'anywhere' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(120); });
+
+    // The "anywher" request was aborted; the "anywhere" request is still pending.
+    expect(pending.at(-1)?.url).toContain('q=anywhere&');
+    expect(screen.getByText('Searching conversations…')).toBeInTheDocument();
+    expect(screen.queryByText('No results for "anywhere"')).toBeNull();
+
+    pending.at(-1)?.resolve(Response.json({ observations: [], conversations: [], memory: [], summaries: [] }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.getByText('No results for "anywhere"')).toBeInTheDocument();
+  });
+
   it('shows a search-unavailable error instead of No results on a 500 and keeps the Conversations scope active (AC3, PAN-3975)', async () => {
     fetchControl = installStrictFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });

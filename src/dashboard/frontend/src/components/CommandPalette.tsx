@@ -396,19 +396,25 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     }
     const controller = new AbortController();
     setIsSearchLoading(true);
+    // A superseded request settles after the next effect has started its own
+    // request; letting it write state cleared the loading flag and showed
+    // "No results" while the live request was still in flight.
     void fetchPaletteSearch(trimmed, controller.signal)
       .then((data) => {
+        if (controller.signal.aborted) return;
         setSearchResults(data);
         setSearchError(null);
       })
       .catch((err: unknown) => {
-        // Aborted superseded requests resolve with EMPTY_SEARCH above and land
-        // in .then; anything reaching here is a real failure (non-OK status,
-        // network error) and must not read as "zero results" (PAN-3975).
+        if (controller.signal.aborted) return;
+        // Anything reaching here is a real failure (non-OK status, network
+        // error) and must not read as "zero results" (PAN-3975).
         setSearchResults(EMPTY_SEARCH);
         setSearchError(err instanceof Error ? err.message : 'request failed');
       })
-      .finally(() => setIsSearchLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setIsSearchLoading(false);
+      });
     return () => controller.abort();
   }, [isOpen, debouncedQuery]);
 
