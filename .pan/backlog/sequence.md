@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-29T06:00:53Z · model: claude-opus-5-5 · open: 841_
+_Last sequenced: 2026-10-29T17:12:15Z · model: claude-opus-5-5 · open: 842_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -643,6 +643,7 @@ _Last sequenced: 2026-10-29T06:00:53Z · model: claude-opus-5-5 · open: 841_
 | 664 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 665 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 666 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
+| 667 | PAN-4638 | L | medium | needs-refinement |  |  | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 670 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 671 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 672 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
@@ -1176,10 +1177,10 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-29T06:00:53Z",
+  "generatedAt": "2026-10-29T17:12:15Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 841,
+  "openCount": 842,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -11655,6 +11656,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "rationale": "New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4638",
+      "rank": 667,
+      "size": "L",
+      "importance": "medium",
+      "score": 38,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
+      "rationale": "New PAN-2350 child; placed in the free slot beside the Anywhere set because it depends on machine links, delegation and Fly-as-machine plan items that have no issues yet, and planning questions remain open.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12966,6 +12980,20 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4638",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4296",
+      "to": "PAN-4638",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
