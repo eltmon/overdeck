@@ -10,7 +10,12 @@ defend, and what they do not. User-facing guide:
 - **Internal token** — the root secret at `~/.overdeck/internal-token` (mode
   `0600`), read by `getInternalToken()` (`src/lib/internal-token.ts`). Sent as
   the header `x-overdeck-internal-token` or `Authorization: Bearer <token>`.
-  Generated once, on first server start, and never rotated automatically.
+  Resolution order: the file first; `OVERDECK_INTERNAL_TOKEN` only when no
+  file exists, and the first `ensureInternalToken()` (dashboard boot,
+  `pan serve`, or a CLI sender) writes that value, or a random one, to the
+  file. A pane can inherit a stale `OVERDECK_INTERNAL_TOKEN` from a
+  long-lived Herdr or tmux server, so the env value never overrides the
+  file (PAN-4628). Never rotated automatically.
 - **Session cookie** — `overdeck_session`
   (`DASHBOARD_SESSION_COOKIE`, `src/dashboard/server/routes/dashboard-auth.ts`).
   Its value is an HMAC of the internal token (context
@@ -120,8 +125,16 @@ Otherwise the mint passes when any of these is true:
   (`rejectUnauthorizedDashboardRequest`), so a mint from an already-trusted
   caller just refreshes the cookie's rolling `Max-Age`.
 
-Peer trust reads only the real TCP peer (`request.remoteAddress`), never
-`X-Forwarded-For`, which a caller could spoof. With
+Peer trust reads the real TCP peer (`request.remoteAddress`). A
+Docker-bridge peer is the one exception (PAN-4299): Traefik connects from a
+bridge IP for every client it forwards, LAN clients included, so a bridge peer
+is trusted only when its rightmost `X-Forwarded-For` entry is loopback or a
+host Docker-bridge IP, or the header is absent (`forwardedClientIsLocal`).
+Traefik appends that rightmost entry itself, so a caller can prepend fake
+entries but cannot replace it. A local browser shows up there as the bridge
+gateway (for example `172.23.0.1`), because it reaches Traefik through
+docker-proxy. Literal-loopback and in-container peers do not read the header.
+With
 `dashboard.require_token_mint: true` (see "Remote request gate"), the loopback
 bullet no longer applies: only the internal token or an existing credential
 mints.
@@ -361,15 +374,25 @@ a Settings save calls `invalidateRemoteAccessConfig()`, so the Settings toggle
 - A leaked access token: it reaches only the routes its scopes name, can never
   mint a session, a pairing credential or another token, and revoking it ends
   its access and open connections at once.
+- LAN clients reaching the dashboard through Traefik with a forged `Host`
+  header (PAN-4299). Traefik publishes 80/443/8080 on `127.0.0.1` by default
+  (`traefik.bind` in `~/.overdeck/config.toml`), so other machines cannot
+  connect. Even with `bind = "all"`, a Docker-bridge peer whose rightmost
+  `X-Forwarded-For` entry is not loopback or a host Docker-bridge IP gets
+  **401** from the session mint and from the remote request gate. With
+  `bind = "all"`, Overdeck writes the 80, 443 and 8080 port lines with the
+  explicit IPv4 host address `0.0.0.0`, which requests no IPv6 `[::]` listener
+  for those ports. A port line you add without a host address
+  publishes on IPv6 as well, and IPv6 clients on it reach Traefik through
+  docker-proxy as the bridge gateway. A container created from a compose file
+  older than PAN-4299 still publishes the managed ports on `[::]` until
+  `pan restart --traefik` recreates it; `pan doctor` reports that as
+  **Traefik port binding**.
 
 **Does NOT defend:**
 - Any process running on this machine. It can mint a session as a loopback
   peer with zero credentials, then use that cookie on every upgrade — this
   gate closes the LAN hole, not the local-machine trust boundary.
-- LAN clients reaching the dashboard through Traefik with a forged `Host`
-  header, because the shipped Traefik template publishes ports 80/443/8080 on
-  all interfaces (`sync-sources/templates/traefik/docker-compose.yml`), not
-  `127.0.0.1` — tracked as [PAN-4299](https://github.com/eltmon/overdeck/issues/4299).
 - Exposure through a local reverse proxy or tunnel while
   `dashboard.require_token_mint` is `false` (the default): the proxy connects
   from loopback, so every visitor is a trusted local caller. Turn the switch on

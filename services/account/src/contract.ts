@@ -11,5 +11,5 @@ export type { AccountDataHolder } from './env.ts';
 export type VerifyError = 'invalid_token' | 'device_revoked' | 'grant_expired' | 'account_deleted';
 
 export type VerifyResult =
-  | { ok: true; userId: string; githubId: number; deviceId: string; entitlement: Entitlement }
+  | { ok: true; userId: string; githubId: number; githubLogin: string; deviceId: string; entitlement: Entitlement }
   | { ok: false; error: VerifyError };

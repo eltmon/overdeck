@@ -24,6 +24,7 @@ import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
 import { checkSyncSourceCheckout } from './doctor-sync-source-freshness.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
+import { checkTraefikPortBinding } from './doctor-traefik.js';
 import { checkProjectTrackerConfig } from './doctor-project-config.js';
 import { checkHerdr } from './doctor-herdr.js';
 import { checkPrimeAgent } from './doctor-prime-agent.js';
@@ -49,6 +50,7 @@ import {
   readDockerDaemonPools,
 } from '../../lib/docker-bridge-pool.js';
 import { isXBriefFilename } from '../../lib/xbrief/lifecycle.js';
+import { buildDoctorJsonReport, printDoctorTextReport, withStdoutReserved } from './doctor-report.js';
 export { checkKimi };
 // Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
 export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
@@ -314,25 +316,6 @@ function countItems(path: string): number {
     return readdirSync(path).length;
   } catch {
     return 0;
-  }
-}
-
-/**
- * PAN-3850 (W39, FR-26): print each patrol's action tally for the current UTC
- * day against its budget. A suspended patrol is a needs-you the operator
- * already got; this table is where they see the whole picture.
- */
-export function printPatrolBudgetTable(): void {
-  console.log(chalk.bold('Patrol firing budgets (current UTC day):'));
-  const rows = listPatrolBudgetRows();
-  if (rows.length === 0) {
-    console.log(chalk.dim('  (no patrol actions recorded today)'));
-    return;
-  }
-  for (const row of rows) {
-    const budgetText = row.budget === 'exempt' ? '(exempt)' : `of ${row.budget}`;
-    const line = `  ${row.patrol}: ${row.actions} ${budgetText}${row.suspended ? ` — SUSPENDED (${row.suspendedReason ?? 'budget exceeded'})` : ''}`;
-    console.log(row.suspended ? chalk.red(line) : line);
   }
 }
 
@@ -700,12 +683,10 @@ export async function checkMainDivergence(
 
 export interface DoctorOptions {
   strict?: boolean;
+  json?: boolean;
 }
 
-export async function doctorCommand(options: DoctorOptions = {}): Promise<void> {
-  console.log(chalk.bold('\nOverdeck Doctor\n'));
-  console.log(chalk.dim('Checking system health...\n'));
-
+export async function collectDoctorChecks(options: DoctorOptions = {}): Promise<CheckResult[]> {
   const checks: CheckResult[] = [];
 
   // Check required commands (git, tmux, Node.js, Claude CLI). tmux warns
@@ -920,6 +901,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Check inotify watch budget and persistence (PAN-3063)
   for (const c of await checkInotify()) checks.push(c);
+  for (const c of await checkTraefikPortBinding()) checks.push(c); // PAN-4299
 
   // Check for legacy command invocations in shell rc files (PAN-705)
   const legacyPatterns = [
@@ -966,52 +948,19 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     });
   }
 
-  // Print results
-  const icons = {
-    ok: chalk.green('\u2713'),
-    warn: chalk.yellow('\u26a0'),
-    error: chalk.red('\u2717'),
-  };
+  return checks;
+}
 
-  let hasErrors = false;
-  let hasWarnings = false;
-
-  for (const check of checks) {
-    const icon = icons[check.status];
-    const message = check.status === 'error' ? chalk.red(check.message) :
-                    check.status === 'warn' ? chalk.yellow(check.message) :
-                    chalk.dim(check.message);
-
-    console.log(`${icon} ${check.name}: ${message}`);
-
-    if (check.fix && check.status !== 'ok') {
-      console.log(chalk.dim(`  Fix: ${check.fix}`));
-    }
-
-    if (check.status === 'error') hasErrors = true;
-    if (check.status === 'warn') hasWarnings = true;
+export async function doctorCommand(options: DoctorOptions = {}): Promise<void> {
+  if (options.json) {
+    const checks = await withStdoutReserved(() => collectDoctorChecks(options));
+    const report = buildDoctorJsonReport(checks, { strict: options.strict ?? false, patrolBudgets: listPatrolBudgetRows(), now: new Date() });
+    await new Promise<void>((r) => process.stdout.write(`${JSON.stringify(report, null, 2)}\n`, () => r()));
+    if (report.exitCode !== 0) return exitCli(report.exitCode);
+    return;
   }
-
-  // PAN-3850 (W39): the per-patrol firing-budget table — today's action tally
-  // against each patrol's budget, with suspended patrols named in red.
-  printPatrolBudgetTable();
-
-  console.log('');
-
-  if (hasErrors) {
-    console.log(chalk.red('Some required components are missing.'));
-    console.log(chalk.dim('Fix the errors above before using Overdeck.'));
-  } else if (hasWarnings) {
-    console.log(chalk.yellow('System is functional with some optional features missing.'));
-  } else {
-    console.log(chalk.green('All systems operational!'));
-  }
-  console.log('');
-
-  if (hasErrors) {
-    return exitCli(1);
-  }
-  if (options.strict && hasWarnings) {
-    return exitCli(1);
-  }
+  console.log(chalk.bold('\nOverdeck Doctor\n'));
+  console.log(chalk.dim('Checking system health...\n'));
+  const code = printDoctorTextReport(await collectDoctorChecks(options), { strict: options.strict ?? false });
+  if (code !== 0) return exitCli(code);
 }

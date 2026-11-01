@@ -11,7 +11,7 @@
  */
 
 import { memo, useState, useRef, useCallback, useEffect } from 'react';
-import { AlertCircle, FileText, Mic, MicOff, Paperclip, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
+import { AlertCircle, Mic, MicOff, Paperclip, Scissors, SendHorizontal, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import { getHarnessBehavior } from '@overdeck/contracts';
@@ -33,6 +33,10 @@ import { VaultContinuityNotice } from './VaultContinuityNotice';
 import { HandoffNotice } from './HandoffNotice';
 import { HeldKickoffConflictError, HeldKickoffNotice, kickoffUnchanged, startHeldKickoff, useHeldKickoff, useSeedHeldKickoff } from './heldKickoff';
 import { openImageLightbox, useImageLightboxStore } from './ImageLightbox';
+import { ComposerAttachmentStrip } from './ComposerAttachmentStrip';
+import { CitationChips } from './citations/CitationChips';
+import { consumeCitations, getConversationCitations, useConversationCitations } from '../../lib/composerCitations';
+import { composePromptWithCitations } from '../../lib/citationFormat';
 import { useHandoffNotice } from './continueOnDevice/handoffNoticeStore';
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -107,14 +111,6 @@ function openComposerUi(
   }));
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.min(Math.floor(Math.log10(bytes) / 3), units.length - 1);
-  const value = bytes / Math.pow(1000, i);
-  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 function ComposerFooterInput({
@@ -148,6 +144,7 @@ function ComposerFooterInput({
   // attachments follow their conversation and survive a switch away and back.
   const sending = useConversationSending(conversation.name);
   const pendingAttachments = useConversationAttachments(conversation.name);
+  const citationCount = useConversationCitations(conversation.name).length;
   const setSendingFor = useComposerStore((s) => s.setSending);
   const enqueueAttachmentsForConversation = useComposerStore((s) => s.enqueueAttachments);
   const removeAttachmentForConversation = useComposerStore((s) => s.removeAttachment);
@@ -485,13 +482,15 @@ function ComposerFooterInput({
     }
 
     const uploadedAttachments = currentPendingAttachments.filter((attachment) => attachment.serverPath);
-    if (!messageText && uploadedAttachments.length === 0) return;
+    // PAN-4642 D5: slash text (commands) never carries citations; they stay pending.
+    const citations = messageText.startsWith('/') ? [] : getConversationCitations(submitConversationName);
+    if (!messageText && uploadedAttachments.length === 0 && citations.length === 0) return;
 
     setSendingFor(submitConversationName, true);
     const attachmentPrefix = uploadedAttachments
       .map((attachment) => `@${attachment.serverPath}`)
       .join('\n');
-    const composedMessage = [attachmentPrefix, messageText].filter(Boolean).join('\n');
+    const composedMessage = [attachmentPrefix, composePromptWithCitations(messageText, citations)].filter(Boolean).join('\n');
     const isPortableCommand = /^\/pan(?:\s|$)/i.test(messageText);
     // Attachments belong to the prompt lane. Portable commands stay in the
     // control-plane lane and leave any uploaded attachments pending.
@@ -516,6 +515,10 @@ function ComposerFooterInput({
       if (submitConversationName !== currentConversationNameRef.current) {
         return;
       }
+
+      // PAN-4642 D6: the composed text now carries the citations into whichever
+      // store takes it (bubble, hold, offline hold, or outbox), so the chips go.
+      if (citations.length > 0) consumeCitations(submitConversationName);
 
       // Degraded mode (PAN-4279): while the server is unreachable a prompt is
       // held and sent on reconnect; a command needs a live round trip, so it
@@ -703,57 +706,15 @@ function ComposerFooterInput({
       {heldKickoff.held && <HeldKickoffNotice />}
       {/* Single unified container — T3Chat style */}
       <div className={styles.composerBox} onDrop={handleDrop} onDragOver={handleDragOver}>
-        {pendingAttachments.length > 0 && (
-          <div className={styles.composerImageStrip}>
-            {pendingAttachments.map((attachment) => {
-              const isUploading = !attachment.serverPath && !attachment.error;
-              const statusLabel = attachment.error
-                ? attachment.error
-                : attachment.serverPath
-                  ? 'Uploaded'
-                  : 'Uploading…';
-              return (
-                <div key={attachment.id} className={styles.composerImageCard}>
-                  {attachment.previewUrl ? (
-                    <button
-                      type="button"
-                      className={styles.composerImageThumbButton}
-                      onClick={() => {
-                        lightboxOwnerRef.current = { id: attachment.id, src: attachment.previewUrl! };
-                        openImageLightbox(attachment.previewUrl!, attachment.file.name);
-                      }}
-                      title={`View ${attachment.file.name}`}
-                    >
-                      <img src={attachment.previewUrl} alt={attachment.file.name} className={styles.composerImageThumb} />
-                    </button>
-                  ) : (
-                    <div className={`${styles.composerImageThumb} ${styles.composerFileThumb}`} title={attachment.file.name}>
-                      <FileText size={16} />
-                    </div>
-                  )}
-                  <div className={styles.composerImageMeta}>
-                    <span className={styles.composerImageName}>{attachment.file.name}</span>
-                    <span className={attachment.error ? styles.composerImageError : styles.composerImageStatus}>
-                      {isUploading ? <Loader2 size={12} className={styles.spinner} /> : null}
-                      {statusLabel}
-                      {attachment.kind === 'file' && !attachment.error && (
-                        <span className={styles.composerFileSize}>· {formatFileSize(attachment.file.size)}</span>
-                      )}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.composerImageRemoveButton}
-                    onClick={() => removePendingAttachment(attachment.id)}
-                    title={`Remove ${attachment.file.name}`}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <CitationChips conversationName={conversation.name} />
+        <ComposerAttachmentStrip
+          attachments={pendingAttachments}
+          onOpenImage={(attachment) => {
+            lightboxOwnerRef.current = { id: attachment.id, src: attachment.previewUrl! };
+            openImageLightbox(attachment.previewUrl!, attachment.file.name);
+          }}
+          onRemove={removePendingAttachment}
+        />
 
         {subagentNotice && (
           <div
@@ -775,7 +736,7 @@ function ComposerFooterInput({
                 <button
                   type="button"
                   onClick={() => void handleSubmit()}
-                  disabled={(isEmpty && pendingAttachments.filter((attachment) => !!attachment.serverPath).length === 0) || isDisabled}
+                  disabled={(isEmpty && pendingAttachments.filter((attachment) => !!attachment.serverPath).length === 0 && citationCount === 0) || isDisabled}
                   title="Switches Claude Code back to the main agent, then sends your draft"
                 >
                   Send to main
@@ -885,7 +846,7 @@ function ComposerFooterInput({
           <button
             className={styles.sendButton}
             onClick={() => void handleSubmit()}
-            disabled={(isEmpty && pendingAttachments.filter((attachment) => !!attachment.serverPath).length === 0) || isDisabled}
+            disabled={(isEmpty && pendingAttachments.filter((attachment) => !!attachment.serverPath).length === 0 && citationCount === 0) || isDisabled}
             type="button"
             title="Send message (Enter)"
           >

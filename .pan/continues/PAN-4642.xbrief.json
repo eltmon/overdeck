@@ -1,0 +1,232 @@
+{
+  "version": "1",
+  "issueId": "PAN-4642",
+  "created": "2026-11-01T04:49:54.715Z",
+  "updated": "2026-11-01T06:11:24.116Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T06:10Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T06:10:38.711Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T06:11Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-01T06:11:24.115Z"
+    }
+  ],
+  "items": {
+    "extract-attachment-strip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4642",
+      "claimedAt": "2026-11-01T04:49:54.715Z",
+      "doneAt": "2026-11-01T04:56:21.312Z"
+    },
+    "citation-format": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4642",
+      "claimedAt": "2026-11-01T04:56:57.499Z",
+      "doneAt": "2026-11-01T04:58:59.247Z"
+    },
+    "citation-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4642",
+      "claimedAt": "2026-11-01T04:59:09.516Z",
+      "doneAt": "2026-11-01T05:03:25.034Z"
+    },
+    "cite-row-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4642",
+      "claimedAt": "2026-11-01T05:03:36.763Z",
+      "doneAt": "2026-11-01T05:11:39.365Z"
+    },
+    "cite-toolbar": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4642",
+      "claimedAt": "2026-11-01T05:11:46.860Z",
+      "doneAt": "2026-11-01T05:15:56.590Z"
+    },
+    "citation-chips": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4642",
+      "claimedAt": "2026-11-01T05:16:04.379Z",
+      "doneAt": "2026-11-01T05:18:51.351Z"
+    },
+    "citation-send": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4642",
+      "claimedAt": "2026-11-01T05:18:59.139Z",
+      "doneAt": "2026-11-01T05:29:35.284Z"
+    },
+    "citation-highlight": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4642",
+      "claimedAt": "2026-11-01T05:29:42.741Z",
+      "doneAt": "2026-11-01T05:34:53.215Z"
+    },
+    "citation-ci-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4642",
+      "claimedAt": "2026-11-01T05:35:00.810Z",
+      "doneAt": "2026-11-01T05:35:51.559Z"
+    },
+    "citation-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4642",
+      "claimedAt": "2026-11-01T05:35:59.703Z",
+      "doneAt": "2026-11-01T05:37:18.958Z"
+    },
+    "extract-attachment-strip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:41:49.759Z"
+    },
+    "extract-attachment-strip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:42:59.029Z"
+    },
+    "extract-attachment-strip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:43:27.026Z"
+    },
+    "citation-format.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:43:48.957Z"
+    },
+    "citation-format.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:44:05.978Z"
+    },
+    "citation-format.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:44:26.027Z"
+    },
+    "citation-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:44:47.999Z"
+    },
+    "citation-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:45:16.692Z"
+    },
+    "citation-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:45:39.310Z"
+    },
+    "citation-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:46:00.720Z"
+    },
+    "cite-row-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:46:22.988Z"
+    },
+    "cite-row-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:46:42.246Z"
+    },
+    "cite-row-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:47:00.240Z"
+    },
+    "cite-toolbar.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:47:22.077Z"
+    },
+    "cite-toolbar.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:47:45.756Z"
+    },
+    "cite-toolbar.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:48:05.246Z"
+    },
+    "cite-toolbar.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:48:25.741Z"
+    },
+    "citation-chips.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:48:44.071Z"
+    },
+    "citation-chips.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:49:02.106Z"
+    },
+    "citation-chips.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:49:21.626Z"
+    },
+    "citation-chips.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:49:42.012Z"
+    },
+    "citation-send.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:50:01.400Z"
+    },
+    "citation-send.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:50:21.567Z"
+    },
+    "citation-send.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:50:40.026Z"
+    },
+    "citation-send.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:51:01.499Z"
+    },
+    "citation-send.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:51:21.793Z"
+    },
+    "citation-highlight.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:51:43.206Z"
+    },
+    "citation-highlight.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:52:01.620Z"
+    },
+    "citation-highlight.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:52:20.836Z"
+    },
+    "citation-ci-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:52:45.590Z"
+    },
+    "citation-ci-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:53:09.981Z"
+    },
+    "citation-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:53:28.811Z"
+    },
+    "citation-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:53:48.446Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T06:10:38Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4642\n\nPull request: https://github.com/eltmon/overdeck/pull/4667 (head `e27734ab`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124767688104/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41279280927/job/124767688104  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on Pipeline, Board, Command Deck, and Agents routes\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on Pipeline, Board, Command Deck, and Agents routes\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 45000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/e2e/styleguide-conformance.spec.ts:\u001b[2m416:3\u001b[22m\u001b[39m\n    \u001b[90m414|\u001b[39m\n    \u001b[90m415|\u001b[39m \u001b[34mdescribe\u001b[39m(\u001b[32m'styleguide rendered surface conformance'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n\n    \u001b[90m416|\u001b[39m   it('renders shared primitives on Pipeline, Board, Command Deck, and …\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m417|\u001b[39m     \u001b[35mconst\u001b[39m pipeline \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mopenRoute\u001b[39m(\u001b[32m'/pipeline'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m418|\u001b[39m     await expect.poll(() => pipeline.page.locator('[data-component=\"to…\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m486 passed\u001b[39m\u001b[22m\u001b[90m (487)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-01T06:11:24Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4642\n\n# Review — PAN-4642\n## Verdict: CHANGES REQUESTED — the Cite comment box unmounts as soon as it opens (any selection change or timeline scroll), so a citation cannot be saved through the real UI\n\n## Context\n- Run ID: agent-pan-4642-review-e27734ab\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4642/.pan/review/agent-pan-4642-review-e27734ab/context.json\n- Branch / workspace: feature/pan-4642 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4642\n- PR: https://github.com/eltmon/overdeck/pull/4667\n- HEAD reviewed: e27734ab49aec2ff9577cb3775abc61820f50e21\n- Base / prior cycle SHA: b739c3329c7 (merge-base with origin/main); no prior review cycle\n\n## Blocking Findings\n\n### [correctness] Open comment box is torn down by the live selection snapshot — `src/dashboard/frontend/src/components/chat/citations/CiteSelectionToolbar.tsx:179`\n- Severity: ! MUST\n- Classification / requirement scope: implementation defect; in_pr_scope (FR-1, FR-2, AC-11). The PRD (WI-5 step 5) says \"Click or the D13 `C` key opens the box and **freezes the snapshot**\"; the implementation freezes it in the child but lets the parent unmount the child.\n- Trigger and changed-code connection: `CiteSelectionLayer` renders `CiteSelectionToolbar` only while `useCiteSelection`'s live `snapshot` is non-null (`if (!snapshot) return null;`). The `frozen` state that represents the open box lives inside `CiteSelectionToolbar`, so it is destroyed whenever the live snapshot is cleared. The live snapshot is cleared by (a) every document `selectionchange`/`mouseup` whose selection no longer resolves to a cite row (`updateFromSelection` → `setSnapshot(null)`), and (b) every `scroll` of the timeline root (`handleScroll` → `setSnapshot(null)`).\n- Expected / observed / impact: Expected: after clicking Cite (or pressing `C`), the comment box stays open until Save/Cancel/Escape. Observed: the box opens, its `useEffect` autofocuses the textarea, focusing the textarea moves the document selection out of the cite row, the next `selectionchange` resolves to `null`, the layer returns `null`, and the box disappears. Clicking into the textarea or typing does the same. A timeline scroll (including stick-to-bottom auto-scroll while an agent streams) also closes the box and drops the typed comment. In Chromium the operator therefore cannot reach Save, so no citation can be created through the UI and the whole feature (chips, send, highlight) is unreachable.\n- Evidence:\n  1. Chromium probe (Playwright, chromium-1200, isolated scratch page reproducing `useCiteSelection`'s document listener and `resolveSelectionCitation`'s logic verbatim): after a range is selected inside `[data-cite-message-id]` the listener resolves `\"wide world\"`; after a fixed-position textarea is appended and `.focus()`ed, Chromium fires `selectionchange` with `anchorNode=DIV`, `isCollapsed=true`, `activeElement=TEXTAREA`, which resolves to `null`; typing fires it again with the same null result. Output: `[[\"selectionchange\",\"wide world\",\"#text\",false,\"BODY\"],\"--- open box + focus textarea\",[\"selectionchange\",null,\"DIV\",true,\"TEXTAREA\"],\"--- type\",[\"selectionchange\",null,\"DIV\",true,\"TEXTAREA\"]]`.\n  2. Component probe (scratch vitest + happy-dom rendering the real `CiteSelectionLayer` from this branch with a `[data-cite-message-id]` row): select text → click **Cite** → the `Citation comment` textarea is present → dispatch a `selectionchange` whose selection is outside the row → textarea is gone (`expected null not to be null`). A second probe dispatching `scroll` on the timeline root after typing a comment fails the same way.\n  3. Why tests pass: `CiteSelectionToolbar.test.tsx` imports only `CiteSelectionToolbar` and `CiteSnapshot` (verified by grep, line 3). It renders the presentational `CiteSelectionToolbar` with a hand-built `snapshot` prop and never mounts `CiteSelectionLayer`/`useCiteSelection`, so the parent's unmount path is untested.\n  - Limitation: I did not drive the full dashboard in a browser; the conclusion combines the real-browser selection behavior (probe 1) with the real component's unmount behavior (probe 2).\n- Fix: Keep the open box alive independently of the live selection. For example, lift the frozen snapshot into `CiteSelectionLayer` (or `useCiteSelection`): once the box opens, render from the frozen snapshot and ignore `selectionchange`/`mouseup`/`scroll` clears until Save, Cancel, Escape or a conversation change; only the closed \"Cite\" button should follow the live selection. Add a test that mounts `CiteSelectionLayer`, opens the box, then dispatches `selectionchange` (selection outside the row) and `scroll`, and asserts the textarea and its typed value survive and Save still adds the citation.\n\n## Non-blocking Findings\n\n### [ux] Cite button and comment box are unstyled — `CiteSelectionToolbar.tsx:136-168`\n- Severity: ~ SHOULD\n- Classification: implementation defect (style guide / usability); in_pr_scope.\n- The floating `<button>`, `<blockquote>` and `<textarea>` carry no classes or background. With Tailwind preflight (`index.css:1 @tailwind base`) the button and textarea render with a transparent background and no border, so the \"Cite\" label and the comment box overlay message text with nothing behind them. The box is positioned at `rect.top - 4`, i.e. on top of the selected text it quotes. Give the button and box an opaque surface, border and padding from existing tokens (the composer/attachment-card family the PRD references) and place the box below the selection. Not blocking on its own, but it should be fixed in the same pass as the blocker.\n\n### [correctness] Pressing `C` will likely type a \"c\" into the new comment box — `CiteSelectionToolbar.tsx:87-95`\n- Severity: ? MAY (unconfirmed hypothesis; currently masked by the blocker)\n- The document `keydown` handler calls `open()` without `event.preventDefault()`. React 18 flushes a discrete native-event update and its passive effects in a microtask, so the textarea is focused before the browser dispatches the key's character input. A Chromium probe that focuses a textarea from a microtask inside a `c` keydown listener ends with textarea value `\"c\"`. I did not reproduce it with the real component in a browser. Calling `event.preventDefault()` in the handler removes the risk.\n\n### [correctness] Highlight registry key is shared by duplicate mounts — `citationHighlight.ts:62-73`\n- Severity: ? MAY\n- `rowRanges` is keyed by `${conversationName}:${messageId}`. If the same conversation is mounted in two panes, one pane's unmount `clearRowCitationRanges` removes the other pane's ranges until it re-renders. Highlighting is declared best-effort (D12), so this is advisory only.\n\n### Stub-UI scanner hit — `CitationChips.tsx:15`\n- `const [expanded, setExpanded] = useState(false)` has a writer: the toggle button's `onClick={() => setExpanded((v) => !v)}` (line 24). False positive; not a stub.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| `src/dashboard/frontend/src/lib/citationFormat.ts` | Reviewed — matches WI-2 rules exactly (header, prefix/indent, `>` blank lines, comment indentation, no trailing newline, prompt-less compose). |\n| `src/dashboard/frontend/src/lib/composerCitations.ts` | Reviewed — module-time hydration, `v===1` + shape validation, try/catch on every storage access, stable empty array, trim on add/update. |\n| `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` | Reviewed — slash gate before reading citations, citations-only send allowed, `consumeCitations` after the conversation-switch abort and before holdSend/onSend/hold/onSendFailed; `/pan` portable lane gets no citations; both `disabled` expressions updated. Attachment-only behavior is byte-identical when no citations are pending. 943 lines. |\n| `src/dashboard/frontend/src/components/chat/ComposerAttachmentStrip.tsx` | Reviewed — verbatim move of JSX + `formatFileSize`; lightbox owner ref stays in ComposerFooter. |\n| `src/dashboard/frontend/src/components/chat/ConversationPanel.tsx` | Reviewed — exactly one line, `citationsEnabled={!hideComposer}`. |\n| `src/dashboard/frontend/src/components/chat/citations/CiteSelectionToolbar.tsx` | Reviewed — blocker + two advisories above. |\n| `src/dashboard/frontend/src/components/chat/citations/resolveSelectionCitation.ts` | Reviewed — matches WI-4 step 4. |\n| `src/dashboard/frontend/src/components/chat/citations/CitationChips.tsx` | Reviewed — order, expand/edit/remove, reuses composer card classes. |\n| `src/dashboard/frontend/src/components/chat/citations/citationHighlight.ts` | Reviewed — whitespace-insensitive cross-node match, guarded `CSS.highlights`, cleanup on unmount. |\n| `src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx` | Reviewed — `CitableText` wrapper only on settled user rows (non-optimistic) and non-streaming assistant rows; slash/fork/held branches untouched; wrapper div adds no layout change (`.assistantMessageContent` is `flex:1; min-width:0`, no child selectors). |\n| `src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx` | Reviewed — prop threaded to both row kinds. |\n| `src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx` | Reviewed — prop on both renderer mounts; layer mounted once, gated on `citationsEnabled && conversationName`. Other timeline mounts (SessionTranscript, DirectoryTranscript, SubagentTranscript, TerminalPanel) default to `false`. |\n| `src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts` | Reviewed. |\n| `src/dashboard/frontend/src/index.css` | Reviewed — one `::highlight(overdeck-citation)` rule using `--primary`. |\n| Test files (7 new + `messageRows.test.tsx`) | Reviewed — cover WI-2/3/4/6/7/8 as specified, including retryFailed carry; WI-5 test covers only the presentational component (gap behind the blocker). |\n| `package.json` | Reviewed — all seven new test files appended to `test:frontend-subset`; `messageRows.test.tsx` was already listed. |\n| `features/conversations.mdx`, `docs/DASHBOARD-ARCHITECTURE.md` | Reviewed — Citations row + section with the fixture; architecture bullet. Accurate for the intended behavior. |\n| `.pan/drafts/PAN-4642.md`, `.pan/specs/…xbrief.json`, `.pan/continues/PAN-4642.xbrief.json` | Not applicable — planning artifacts. |\n\n### Dimensions\n- **Correctness:** one blocker (box unmount), one unconfirmed keystroke-leak hypothesis, one advisory on the highlight registry. Send composition, consume ordering (D6), slash rule (D5), citations-only send (D4) and outbox/Retry carry are correct.\n- **Security:** quoted text and comments render as React text and travel only inside the existing `message` string; `localStorage` input is shape-validated. No server, contracts or delivery change (NFR-3). No findings.\n- **Performance:** `selectionchange` handler does a constant-time resolve plus one `getBoundingClientRect`; null→null updates bail out. Highlight index is linear in a cited row's text and only for rows with pending citations. No findings.\n- **Requirements/UX:** FR-1/FR-2 fail in a real browser (blocker). FR-3–FR-9 are implemented and unit-tested, but are only reachable once FR-2 works.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 (WI-1) | Unmet by 3 lines — advisory | `wc -l` reports 943 against the AC's ≤ 940. NFR-1 (the ≤ 1000 file-size ratchet) holds, so this is not blocking. The strip is extracted and the existing test file is unchanged. |\n| AC-2 (WI-2) | Met | `citationFormat.test.ts` asserts the exact fixture. |\n| AC-3 (WI-3) | Met | `composerCitations.test.ts`: reset reload, isolation, throwing `setItem`. |\n| AC-4 (WI-4) | Met | `resolveSelectionCitation.test.ts` + `messageRows.test.tsx` cite-attribute cases. |\n| AC-5 (WI-5) | Met as written, but the real layer is broken | Presentational tests pass; the mounted `CiteSelectionLayer` closes the box (blocker). |\n| AC-6 (WI-6) | Met | `CitationChips.test.tsx`. |\n| AC-7 (WI-7) | Met | `ComposerFooter.citations.test.tsx` incl. retryFailed carry and slash pending. |\n| AC-8 (WI-8) | Met | `citationHighlight.test.ts` + `data-cited` render tests. |\n| AC-9 (WI-9) | Met | `package.json` diff lists all seven files. |\n| AC-10 (WI-10) | Met | Both doc changes present. |\n| AC-11 (browser UAT) | Unmet (predicted) | Click Cite → type comment → Save cannot complete in Chromium (blocker evidence 1 + 2). |\n\n## Verification\n- CI on PR #4667 at e27734ab: build, lint-group core/skills/state, test-e2e, clean install smoke, prompt trailer gate — pass. `test-shard (1-4/4)`, `lint-group (effect)` and the flake lane were still **pending** at review time, so the frontend unit tests (including the new subset files) are **unverified** by CI here.\n- `npm run lint:effect-diagnostics`: not applicable — frontend React/zustand only, no Effect code or compiler config touched; CI `lint-group (effect)` pending.\n- Isolated probes (scratchpad only, no tracked files touched): Chromium selection/focus probe; vitest + happy-dom probe mounting the real `CiteSelectionLayer` (2 failing assertions demonstrating the unmount); Chromium keydown→microtask-focus probe (`\"c\"` inserted).\n- Note: the workspace's `src/dashboard/frontend/node_modules` symlinks point at hashed `.bun` directories that do not exist (e.g. `vitest@4.1.11+1d5fd…`), so the frontend test command cannot run locally in this workspace as-is; probes resolved packages from the root `.bun` store directly.\n- Full test suite not run (per role rules).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4642/.pan/review/agent-pan-4642-review-e27734ab/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4642 -m \"Fixed review issues\"`"
+    }
+  ]
+}

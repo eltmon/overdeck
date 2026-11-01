@@ -2719,6 +2719,40 @@
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+/* PAN-4626: a row being stopped or archived — dimmed, inert, labelled. */
+.conversationRowLeaving {
+  opacity: 0.45;
+  transition: opacity 150ms ease-out;
+  pointer-events: none;
+}
+
+/* The stop button is hover-only; pointer-events: none ends hover, so keep it shown. */
+.conversationRowLeaving .conversationStopBtn {
+  opacity: 1;
+}
+
+.conversationLeavingStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.conversationLeavingSpinner {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  animation: spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversationRowLeaving {
+    transition: none;
+  }
+}
+
 .conversationName {
   flex: 1;
   overflow: hidden;

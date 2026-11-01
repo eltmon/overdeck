@@ -176,8 +176,8 @@ export async function verifyDeviceToken(rc: DeviceContext, token: string): Promi
   const found = await lookupDevice(rc, token);
   if (!found.ok) return found;
   if (found.auth.grantExpired) return { ok: false, error: 'grant_expired' };
-  const { userId, githubId, deviceId, entitlement } = found.auth;
-  return { ok: true, userId, githubId, deviceId, entitlement };
+  const { userId, githubId, githubLogin, deviceId, entitlement } = found.auth;
+  return { ok: true, userId, githubId, githubLogin, deviceId, entitlement };
 }
 
 export type AuthenticateResult = { ok: true; auth: DeviceAuth } | { ok: false; response: Response };

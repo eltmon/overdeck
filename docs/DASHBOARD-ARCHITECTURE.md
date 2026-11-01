@@ -9,6 +9,7 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Server structure** (split from old 15K-line monolith in PAN-428):
 - `src/dashboard/server/main.ts` — entry point, dual-runtime (Bun dev, Node prod)
 - `src/dashboard/server/server.ts` — Effect HTTP server, route composition, layers
+- `src/dashboard/server/server-bind.ts` — bind retry on `EADDRINUSE`, and the startup request hold: Effect's server listens before `HttpRouter.serve` attaches its handler, so `holdRequestsUntilServed` queues requests that arrive in that gap and replays them to the first real handler. If none attaches within 120 s, held and new requests get `503` with `Retry-After: 5` until one does.
 - `src/dashboard/server/ws-rpc.ts` — Effect RPC over WebSocket at `/ws/rpc`
 - `src/dashboard/server/ws-terminal.ts` — raw WebSocket terminal at `/ws/terminal`
 - `src/dashboard/server/routes/` — ~60 route modules plus domain subdirs (agents/, misc/, resources/, specialists/, workspaces/)
@@ -420,6 +421,28 @@ door that does not exist; a real record read door would be a separate change.
   and `pullRequest` + `pullRequests` on `GET /api/conversations/:id`. A new table
   goes in the init migration AND a `runSchemaTopUp` in `ensureRuntimeIndexesSync`,
   and bumps `OVERDECK_TABLE_COUNT`.
+- Conversation schedules (PAN-4640): the `conversation_schedules` table holds one
+  prompt, a 5-field cron, an IANA `time_zone`, `enabled`, `next_run_at`, and the
+  last run's time, status (`delivered`, `failed`, `skipped`) and error, deleted with
+  its conversation. The door is `src/lib/overdeck/conversation-schedules.ts`;
+  recurrence rules (5 fields only, a valid zone, at least one future run, runs at
+  least 15 minutes apart, DST-correct next run via croner, always `paused: true`)
+  live in `conversation-schedule-recurrence.ts`. The routes
+  (`GET/POST /api/conversations/:name/schedules`,
+  `PATCH/DELETE /api/conversations/:name/schedules/:id`, in
+  `routes/conversation-schedules.ts`) and `pan conv schedule` both call the door.
+  The sweep (`services/conversation-schedule-service.ts`, primary dashboard only,
+  boot +30 s then every 60 s, non-overlapping) claims each due row with a
+  compare-and-set `UPDATE` that advances `next_run_at` to the first run after the
+  current wall clock, then fires: it resumes a stopped session with resume cause
+  `message`, then delivers through `handleConversationMessage` (`follow_up` on Pi).
+  Claim-then-fire makes a fire at most once and collapses runs missed during
+  downtime into one. A failed fire is recorded and never retried; an archived
+  conversation's schedule is advanced and recorded `skipped`. The sweep is not a
+  deacon-lite patrol: resume and delivery are in-process dashboard calls (the
+  deacon child would need two internal HTTP hops and could not pass a resume
+  cause), and a scheduled prompt follows the operator-message rule, so the
+  deacon pause toggle does not apply.
 - `GET /api/conversations/:name/messages` and `/message-locator` resolve registered
   rows first. A name that is a bare Claude session UUID with no row (a Cmd-K hit on an
   indexed transcript Overdeck never registered) falls back to an exact `<uuid>.jsonl`
@@ -515,6 +538,21 @@ door that does not exist; a real record read door would be a separate change.
   composer thumbnail and the sent-message thumbnails open one shared lightbox
   (`components/chat/ImageLightbox.tsx`, host mounted in `main.tsx`); sent-message
   thumbnails come from `extractAttachmentImageRefs()` in `messagesTimeline/helpers.ts`.
+- Composer citations (PAN-4642): `lib/citationFormat.ts` is the exact serializer
+  (`formatCitationBlock`/`composePromptWithCitations`) — client-side only, identical
+  for every harness, no server route changed. `lib/composerCitations.ts` persists
+  each conversation's pending list to `localStorage` under `conv-citations:<name>`;
+  `PendingCitation.source` is a discriminated union (`{ kind: 'message'; messageId;
+  role }` today) shared with #2685's future preview-element kind. `components/chat/
+  citations/` holds the selection toolbar (`CiteSelectionToolbar.tsx`), the chips
+  strip (`CitationChips.tsx`), and the best-effort quote highlight
+  (`citationHighlight.ts`, the CSS Custom Highlight API). Rows opt in via
+  `data-cite-message-id`/`data-cite-role` (set only on settled, non-streaming rows in
+  `messagesTimeline/messageRows.tsx`), and `resolveSelectionCitation()` maps a DOM
+  selection back to one when both ends land in the same tagged row. On send the
+  pending list is consumed only after the message has committed to a delivery lane
+  (bubble, hold, offline hold, or outbox) — so a failed send keeps the citation block
+  in the retry outbox instead of losing it.
 - Conversation timeline layout (PAN-4497): `MessagesTimeline.tsx` virtualizes all but
   the last 8 rows with `@tanstack/react-virtual`. Visible virtual rows render in normal
   flow inside one wrapper translated to the first visible row's offset, so rows cannot
@@ -606,7 +644,7 @@ The dashboard store is a Zustand 4 store, so a `useDashboardStore(selector)` cal
 - **A selector that builds an array or object keeps identity.** Use `memoizeArraySelector`, `deriveMemo`, a per-key cache like the one in `selectBackendPanes` (the last result per issue, returned while that issue's panes are the same objects in the same order), or `useShallow`. Never write `?? []` inline in a selector; use a module-level empty constant.
 - **Reducers change only the slice and entry an event is about.** Runtime events (`agent.activity_changed`, `agent.thinking_*`, `agent.message_received` and the rest) write `agentRuntimeById` only and leave `agentsById` untouched.
 - **Click handlers read the store at call time.** A component that needs a slice only to look something up when the operator clicks reads `useDashboardStore.getState()` inside the handler instead of subscribing.
-- **Streamed deltas reach only the open conversation.** A delta is a `setQueryData` on `['conversation-messages', name]`; it re-renders `ConversationPanel` and its timeline. `ComposerFooter` and `ConversationListItem` are memoized, so their props must stay identity-stable: `useStableComposerProps` gives the composer a send callback that reads the latest messages from a ref, and `useConversationMutations` returns one memoized object built from the mutations' stable `.mutate` functions. Archive-pending state is not per instance: the archive mutation carries `mutationKey: ['conversation-archive']`, every hook instance reads the pending names from the MutationCache with `useMutationState`, and the returned object changes identity only when that list changes (PAN-4584).
+- **Streamed deltas reach only the open conversation.** A delta is a `setQueryData` on `['conversation-messages', name]`; it re-renders `ConversationPanel` and its timeline. `ComposerFooter` and `ConversationListItem` are memoized, so their props must stay identity-stable: `useStableComposerProps` gives the composer a send callback that reads the latest messages from a ref, and `useConversationMutations` returns one memoized object built from the mutations' stable `.mutate` functions. Archive- and stop-pending state are not per instance: the archive and stop mutations carry `mutationKey: ['conversation-archive']` and `mutationKey: ['conversation-stop']`, every hook instance reads the pending names from the MutationCache with `useMutationState`, and the returned object changes identity only when one of those lists changes (PAN-4584). Both mutations' `onSuccess` await the `['conversations']` invalidate promise before their side effects, so pending lasts until the refetch lands, not just until the POST resolves (PAN-4626).
 - **Live-store consumers of the shell live in `AppLiveStoreHost`.** The pending-input dialogs, desktop activity notifications and the "Rebuild stack for" workspace invalidation follow agent, issue and activity changes. They render in `App/AppLiveStoreHost.tsx`, a sibling of the routed tree, so those changes do not re-render `App` and everything below it.
 - **Aggregate chrome is the exception.** `RunningAgentsPill`, `StoppedAgentsBanner`, `SystemHealthPill`, `DecisionsIndicator`, `NeedsYouIndicator`, the nav `Sidebar` and `ConversationDock` show cross-issue totals, so they may re-render when any agent or issue entry changes.
 - **The 5 s health poll still re-renders `App`.** `App` reads `dataUpdatedAt` from the `backend-health` query, and several relative-time labels advance only because of that re-render. It stays until those labels move onto a shared clock (the PAN-4560 follow-up issue).
@@ -1144,3 +1182,87 @@ Everything above is a selector over existing rows and events; nothing is stored.
 `activity.entry` is meant for news (something shipped, failed, finished or needs
 the operator); progress telemetry belongs in `activity.detailed`. Moving the
 remaining telemetry emit sites is tracked in PAN-4306.
+
+## Needs-you push (PAN-2354)
+
+The primary dashboard pushes a notification to the operator's phone when an
+agent or conversation needs them. The machine sends Web Push itself: the
+payload is encrypted to the phone (RFC 8291 `aes128gcm`) and signed with the
+machine's own VAPID key, so neither the push service nor overdeck.ai can read
+it. ntfy is an optional second provider that gets titles only. Operator docs:
+`configuration/push-notifications.mdx`.
+
+**Detection.** `src/dashboard/server/services/needs-you-push-service.ts` feeds
+one dispatcher from four sources:
+
+1. `agent.enrichment_changed` events: agent questions (including `pan ask`
+   decisions, whose `toolUseId` starts with `operator-decision:`), plan
+   approvals and permission prompts.
+2. The conversation pending-input feed (`getConversationsPendingInputFeed`),
+   scanned every 5 s, but only while a push target exists (a Web Push
+   subscription or a ready ntfy topic). With no target nothing is scanned.
+3. The wake path. The AskUserQuestion PreToolUse hook's
+   `ask_user_question_blocked` heartbeat (`routes/agents/runtime-events.ts`)
+   and a waiting `conversation.permission_changed` event call
+   `wakeNeedsYouPush()`. After a 500 ms debounce it scans conversations and
+   calls `pollEnrichmentNow()` (agent-enrichment-service), so a Claude Code
+   question reaches the phone in about a second.
+4. Edge events: `agent.heartbeat_dead`, and `pipeline.journal` entries of type
+   `verification.started`, `merge.completed` (finished), `merge.failed`,
+   `review.stall-escalated` and `conflict.repair-escalated` (failed).
+
+It runs only when `isPeerDashboardProcess()` is false; a peer would send every
+push twice.
+
+**Keys and priming** (`src/lib/push/dispatcher.ts`). Each subject
+(`agent:<id>`, `conv:<name>`) keeps a set of pending keys: `auq:<toolUseId>`,
+`plan:<toolUseId>`, `perm:<signature>` (`perm:pending` without a signature). A
+key notifies on its rising edge and is forgotten when it disappears, so the
+next prompt notifies again. `auq:` and `plan:` keys are globally unique, so a
+key already active under another subject (a conversation seen both as an
+enrichment agent and as a feed row) is not sent twice. Items asked more than
+60 s before the service started are recorded silently, so a restart never
+replays old questions. Edge notifications dedup by tag for 24 h. At most 6
+notifications go out per rolling minute; the rest are counted into one
+`<N> more items need you` summary.
+
+**Closed trigger list** (`src/lib/push/classify.ts`): question
+(`pendingAskUserQuestion`), approval (`pendingProposedPlan`, a permission
+prompt), finished and failed (the edge events above). Pane choices, held
+kickoffs, rate limits, session-resume gates, `verification.failed` and plain
+`agent.stopped` never notify.
+
+**Providers for PAN-2080.** `src/lib/push/types.ts` defines `PushProvider`
+(`name`, `hasTargets()`, `send(notification)`) and `NeedsYouNotification`
+(`title` for Web Push, `publicTitle` that carries only the kind plus an issue id
+or "a conversation", `body`, `url`, `tag`). `webpush-provider.ts` and
+`ntfy-provider.ts` implement it; Slack, email and TTS plug in the same way.
+Both use a 5 s timeout and one retry after 5 s for network errors, 429 and 5xx.
+A Web Push 404/410 deletes the subscription, and a subscription whose paired
+device is revoked is deleted before sending.
+
+**Files under `<OVERDECK_HOME>/push/`** (directory 0700):
+
+- `vapid.json` (0600): `{ publicKey, privateKey, createdAt }`. Created once with
+  temp file plus `link()`, never overwritten: a new key would orphan every
+  subscription.
+- `subscriptions.json` (0600): at most 20 records `{ id, endpoint, keys, label,
+  credentialId, createdAt, lastSuccessAt, lastFailureAt, failureCount }`,
+  written atomically through one in-process queue. Endpoints must be `https:`
+  on Google, Mozilla, Apple or Microsoft push hosts (SSRF guard).
+
+**Routes** (`routes/push.ts`, admin scope): `GET /api/push/vapid-public-key`,
+`GET /api/push/status` (hosts and a masked ntfy topic only), `POST` and
+`DELETE /api/push/subscriptions`, `POST /api/push/test`.
+
+**The seam with PAN-2355.** There is exactly one service worker,
+`src/dashboard/frontend/public/sw.js`, always registered with
+`navigator.serviceWorker.register('/sw.js', { scope: '/' })`. PAN-2355 owns the
+manifest, the worker, registration and the `/m` phone shell; PAN-2354 owns the
+keys, the subscription store and routes, the send path and the **Turn on
+notifications** control. Second-lander rule: whichever issue lands second
+extends the existing `sw.js` and manifest, never adds a second worker or script
+URL. The payload contract is `{ title, body, url, tag }`, where `url` is a
+same-origin path: `/m?subject=<encodeURIComponent(id)>` for questions and
+approvals, `/m` for everything else. A click focuses an open window and
+navigates it to `url`, else opens one; a cross-origin `url` becomes `/m`.

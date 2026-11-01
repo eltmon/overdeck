@@ -260,13 +260,18 @@ export type QueuedSettleOutcome =
  * both call it. `readBack` reads the settled record inside the same queue slot.
  * Throws whatever `settle()` throws; callers decide whether to log or report.
  */
-export function settleOnQueue(path: string, harness: string, wip: WipMode, options: { readBack?: boolean } = {}): Promise<QueuedSettleOutcome> {
+export function settleOnQueue(
+  path: string,
+  harness: string,
+  wip: WipMode,
+  options: { readBack?: boolean; recordTitle?: string } = {},
+): Promise<QueuedSettleOutcome> {
   return enqueueVaultOperation('settle', async () => {
     const opened = await deps.openVaultContext();
     if (opened.status !== 'open') return { status: 'unavailable' as const, opened };
     const config = await deps.readVaultConfig();
     const { store, keys } = opened.vault;
-    const result = await deps.settle({ nativePath: path, harness, store, keys, config, wip });
+    const result = await deps.settle({ nativePath: path, harness, store, keys, config, wip, ...(options.recordTitle ? { recordTitle: options.recordTitle } : {}) });
     const record = options.readBack && result.vaultId ? await readRecordOrNull(store, keys, result.vaultId) : null;
     return { status: 'settled' as const, result, record };
   });
@@ -282,9 +287,9 @@ async function readRecordOrNull(store: VaultStore, keys: VaultSubkeys, vaultId: 
 }
 
 /** A failing settle logs once per distinct message and never throws out of the poller's timers (NFR-6). */
-async function queuedSettle(path: string, harness: string, wip: WipMode): Promise<void> {
+async function queuedSettle(path: string, harness: string, wip: WipMode, options?: { recordTitle?: string }): Promise<void> {
   try {
-    await settleOnQueue(path, harness, wip);
+    await settleOnQueue(path, harness, wip, options);
   } catch (error) {
     console.warn(`[vault] settle failed for ${path}:`, error);
   }

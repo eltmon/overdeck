@@ -90,7 +90,7 @@ Bearer failures: `invalid_token`, `device_revoked` and `account_deleted` → 401
 
 ```ts
 type VerifyResult =
-  | { ok: true; userId: string; githubId: number; deviceId: string; entitlement: Entitlement }
+  | { ok: true; userId: string; githubId: number; githubLogin: string; deviceId: string; entitlement: Entitlement }
   | { ok: false; error: 'invalid_token' | 'device_revoked' | 'grant_expired' | 'account_deleted' };
 interface AccountDataHolder { deleteAccountData(userId: string): Promise<{ deleted: true }> }
 ```
@@ -172,4 +172,12 @@ Operator-only. No agent runs any of the commands below; the custom-domain route 
 7. Smoke test: `curl -s https://account.overdeck.ai/healthz` shows `"configured":true`; open `https://account.overdeck.ai/admin`, sign in with GitHub as the owner, add one tester by username, and have them sign in.
 8. Rollback: `npx wrangler rollback` returns to the previous Worker version (the D1 schema is additive and stays).
 
-After deploying, the local client (PAN-4330) needs the base URL `https://account.overdeck.ai`; it reads `verification_uri` from the device-code response and never hardcodes the host.
+## Client
+
+`pan account login | status | logout` (PAN-4330) is the machine-side client, in `src/lib/account/` (`client.ts` for the HTTP calls, `store.ts` for the token file) plus `src/cli/commands/account/`. Sign-in is optional: nothing else in the CLI reads the token file.
+
+- `login` runs the device flow, prints `verification_uri` from the device-code response (never a hardcoded host) and the user code, polls for the token, calls `GET /v1/me`, and writes `${OVERDECK_HOME}/account.json` (mode `0600`).
+- `status` reports the signed-in GitHub login, this device, and access status from a fresh `GET /v1/me`; `--json` omits the token.
+- `logout` calls `DELETE /v1/devices/<deviceId>` and deletes the token file whether or not the revoke succeeded.
+
+The base URL resolves in order: `--base-url`, then `OVERDECK_ACCOUNT_URL`, then `https://account.overdeck.ai`; it is stored in the token file so `status` and `logout` always target the machine's own signed-in service. See [`/cli/account`](/cli/account) for the full command reference.

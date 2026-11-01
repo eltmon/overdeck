@@ -13,6 +13,9 @@ import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
+import { startNeedsYouPushService, stopNeedsYouPushService } from './services/needs-you-push-service.js';
+import { conversationReadDependencies } from './routes/conversations.js';
+import { getConversationsPendingInputFeed } from '../../lib/overdeck/conversation-reads.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
 import {
   enqueueProjectsResourceRefreshStaggered,
@@ -70,6 +73,7 @@ import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { startConversationRescanScheduler, stopConversationRescanScheduler } from './services/conversation-rescan-scheduler.js';
 import { startPullRequestSyncService, stopPullRequestSyncService } from './services/pull-request-sync-service.js';
+import { startConversationScheduleService, stopConversationScheduleService } from './services/conversation-schedule-service.js';
 import { startVaultService, stopVaultService } from './services/vault-service.js';
 import { startVaultBrowseService } from './services/vault-browse-service.js';
 import { startGitHubQuotaSampler } from '../../lib/github-quota/sampler.js';
@@ -257,6 +261,11 @@ if (isPeerDashboard) {
 // PAN-3931: in a peer dashboard those events stay in memory (emitOnly).
 startAgentEnrichmentService();
 console.log(`[overdeck] AgentEnrichmentService started${isPeerDashboard ? ' (peer: in-memory events only)' : ''}`);
+// PAN-2354: needs-you push to phones (Web Push, optional ntfy). Primary only —
+// a peer dashboard would send every notification twice.
+if (!isPeerDashboard) {
+  startNeedsYouPushService({ readConversationFeed: () => getConversationsPendingInputFeed(conversationReadDependencies) });
+}
 
 // Enable demand-driven agent output capture. The poller starts only while an
 // RPC or public SSE subscriber has expressed output interest.
@@ -581,6 +590,12 @@ if (!isPeerDashboard) {
   startPullRequestSyncService();
   console.log('[pr-sync] started (boot +30s, 60s sweep)');
 }
+// PAN-4640: fire due conversation schedules. Writes overdeck.db and resumes
+// sessions, so a peer dashboard never runs it.
+if (!isPeerDashboard) {
+  startConversationScheduleService();
+  console.log('[schedules] started (boot +30s, 60s sweep)');
+}
 // PAN-4436 D-12: OVERDECK_VAULT_IN_PEER=1 is for isolated UAT fixtures that own a throwaway home.
 if (!isPeerDashboard || process.env.OVERDECK_VAULT_IN_PEER === '1') {
   startVaultBrowseService();
@@ -754,6 +769,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   clearInterval(attachmentCleanupTimer);
   stopResourceRefreshServices();
   stopAgentEnrichmentService();
+  stopNeedsYouPushService();
   stopAgentOutputService();
   stopConversationLifecycleService();
   stopCodexPluginImporter();
@@ -785,6 +801,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   await stopConversationRescanScheduler();
   await stopVaultService().catch((err) => console.warn('[vault] shutdown failed:', err));
   stopPullRequestSyncService();
+  stopConversationScheduleService();
   stopGitHubQuotaSampler();
   stopGitHubQuotaPublisher();
   stopGitHubQuotaTelemetry();

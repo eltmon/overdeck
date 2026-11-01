@@ -57,6 +57,7 @@ import { remoteRouteLayer } from './routes/remote.js'
 import { environmentRouteLayer } from './routes/environment.js'
 import { pairingRouteLayer } from './routes/pairing.js'
 import { anywhereRouteLayer } from './routes/anywhere.js'
+import { pushRouteLayer } from './routes/push.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { settingsRouteLayer } from './routes/settings.js'
@@ -72,6 +73,7 @@ import { conversationsRouteLayer } from './routes/conversations.js';
 import { conversationKickoffRouteLayer } from './routes/conversation-kickoff.js';
 import { conversationBookmarksRouteLayer } from './routes/conversation-bookmarks.js';
 import { conversationTriageRouteLayer } from './routes/conversation-triage.js';
+import { conversationSchedulesRouteLayer } from './routes/conversation-schedules.js';
 import { conversationsRetrospectiveRouteLayer } from './routes/conversations-retrospective.js';
 import { conversationCompanionTerminalRouteLayer } from './routes/conversation-companion-terminal.js';
 import { conversationPullRequestRoutes } from './routes/conversation-pull-requests.js';
@@ -107,7 +109,7 @@ import { internalEventsRouteLayer } from './routes/internal-events.js';
 import { restartGateRouteLayer } from './routes/restart-gate.js';
 import { dashboardSessionPreflightRouteLayer, dashboardSessionRouteLayer } from './routes/dashboard-session.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
-import { retryDashboardBind } from './server-bind.js';
+import { holdRequestsUntilServed, retryDashboardBind } from './server-bind.js';
 import { buildDashboardHealthResponse } from './health-response.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
@@ -126,6 +128,7 @@ const HttpServerLive = Layer.unwrap(
     ]);
     const bind = retryDashboardBind(NodeHttpServer.make(() => {
       const nodeServer = NodeHttp.createServer();
+      holdRequestsUntilServed(nodeServer);
       setupTerminalWebSocket(nodeServer);
       setupKnowledgeViewerProxy(nodeServer);
       setupVoiceWebSocket(nodeServer);
@@ -316,6 +319,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   conversationKickoffRouteLayer,
   conversationBookmarksRouteLayer,
   conversationTriageRouteLayer,
+  conversationSchedulesRouteLayer,
   conversationsRetrospectiveRouteLayer,
   conversationCompanionTerminalRouteLayer,
   conversationPullRequestRoutes,
@@ -353,6 +357,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   environmentRouteLayer,
   pairingRouteLayer,
   anywhereRouteLayer,
+  pushRouteLayer,
   accessTokensRouteLayer,
   staticRouteLayer,
 );

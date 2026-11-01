@@ -34,6 +34,7 @@ function baseMutations(overrides: Partial<ConversationMutations> = {}): Conversa
     archive: vi.fn(),
     isArchivePending: vi.fn(() => false),
     stop: vi.fn(),
+    isStopPending: vi.fn(() => false),
     rename: vi.fn(),
     retitle: vi.fn(),
     isRetitlePending: vi.fn(() => false),

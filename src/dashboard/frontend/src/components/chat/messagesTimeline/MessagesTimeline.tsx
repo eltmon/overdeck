@@ -40,6 +40,7 @@ import styles from '../../CommandDeck/styles/command-deck.module.css';
 import type { MessagesTimelineProps, RoundMarker } from './types';
 import { RoundDivider } from './dividers';
 import { TimelineRowRenderer } from './TimelineRowRenderer';
+import { CiteSelectionLayer } from '../citations/CiteSelectionToolbar';
 import { useConnectionPhase } from '../../../lib/connectionState';
 import { useConversationBookmarks } from '../bookmarks/ConversationBookmarks';
 import {
@@ -88,6 +89,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   targetMessageNonce,
   onTargetMessageHandled,
   bookmarksEnabled = false,
+  citationsEnabled = false,
   history,
   onLoadOlder,
   onLoadOlderUntil,
@@ -607,6 +609,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                       onOpenTerminal={onOpenTerminal}
                       onPaneChoiceAnswered={onPaneChoiceAnswered}
                       bookmarkable={bookmarksEnabled}
+                      citeConversationName={citationsEnabled ? conversationName : undefined}
                     />
                     {markersForRow?.map((marker) => (
                       <RoundDivider
@@ -651,6 +654,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 onOpenTerminal={onOpenTerminal}
                 onPaneChoiceAnswered={onPaneChoiceAnswered}
                 bookmarkable={bookmarksEnabled}
+                citeConversationName={citationsEnabled ? conversationName : undefined}
               />
               {markersForRow?.map((marker) => (
                 <RoundDivider
@@ -663,6 +667,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         })}
       </div>
     </div>
+
+    {citationsEnabled && conversationName && (
+      <CiteSelectionLayer conversationName={conversationName} rootRef={scrollContainerRef} />
+    )}
 
     {searchOpen && (
       <div

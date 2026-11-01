@@ -106,6 +106,25 @@ describe('vault settle', () => {
     expect(after.settlements[1]!.turn).toBe(3);
   });
 
+  it('recordTitle names a newly minted record', async () => {
+    const first = await settle({ nativePath, harness: 'claude-code', store, keys, config, recordTitle: 'PAN-1 work agent (agent-pan-1)' });
+    expect(first.verdict).toBe('append');
+    if (first.verdict !== 'append') return;
+    const record = await readRecord(first.vaultId);
+    expect(record.title).toBe('PAN-1 work agent (agent-pan-1)');
+  });
+
+  it('recordTitle never renames an existing record', async () => {
+    const first = await settle({ nativePath, harness: 'claude-code', store, keys, config });
+    expect(first.verdict).toBe('append');
+    if (first.verdict !== 'append') return;
+    appendFileSync(nativePath, user('now add tests', cwd) + '\n');
+    const second = await settle({ nativePath, harness: 'claude-code', store, keys, config, recordTitle: 'other' });
+    expect(second.verdict).toBe('append');
+    const record = await readRecord(first.vaultId);
+    expect(record.title).toBe('fix the parser bug');
+  });
+
   it('ac2: a changed saved line is diverged and touches neither objects nor refs', async () => {
     const first = await settle({ nativePath, harness: 'claude-code', store, keys, config });
     expect(first.verdict).toBe('append');

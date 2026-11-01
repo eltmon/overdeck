@@ -10,6 +10,7 @@ import { _resetInternalTokenCacheForTests } from '../../../lib/internal-token.js
 import { _resetDashboardSessionTokenForTests, dashboardSessionCookieHeader } from '../routes/dashboard-auth.js';
 import { _resetTrustedOriginsForTests } from '../routes/origin-validation.js';
 import { rejectUnauthorizedRpcUpgrade } from '../ws-rpc.js';
+import { getOverdeckHome } from '../../../lib/paths.js';
 
 const TRUSTED_ORIGIN = 'http://localhost:3011';
 
@@ -27,6 +28,7 @@ describe('rejectUnauthorizedRpcUpgrade', () => {
   beforeEach(() => {
     delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
     process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
     _resetTrustedOriginsForTests();
