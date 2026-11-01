@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:41:12.411Z",
+  "updated": "2026-11-01T21:41:26.562Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -502,6 +502,10 @@
     "wi22-which-machine.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T21:41:12.411Z"
+    },
+    "wi22-which-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:41:26.562Z"
     }
   }
 }
