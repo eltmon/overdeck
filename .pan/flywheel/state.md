@@ -311,3 +311,16 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   line 242). The job usually takes about 5 min, but it can hold an approved
   PR for up to its 30-minute timeout. Seen once (PAN-4633); file it if it
   happens again.
+- 2026-11-01 05:45 UTC (conv 3399): PAN-4645, 4648, 4649 and 4295 were
+  refused with `stack-unhealthy` ("No Docker containers found"). The spawn
+  self-heal rebuild (`spawn-prep.ts` near line 1101) failed with "all
+  predefined address pools have been fully subnetted" (dashboard.log, not the
+  systemd journal). Cause: the `init-perms` service in
+  `infra/.devcontainer-template/docker-compose.devcontainer.yml.template`
+  (PAN-2777) has no `networks:`, so every Overdeck stack adds an empty
+  `<project>_default` network: two subnets per workspace, about 13 stacks per
+  host. Filed PAN-4663 (`network_mode: none`), started with `--plan auto`.
+  Instance recovery: `docker network rm` on the 11 empty
+  `overdeck-feature-pan-*_default` networks (32 → 21). Distinct from PAN-3900
+  (orphaned networks from removed worktrees). Check `docker network ls | wc -l`
+  against ~31 whenever a stack rebuild fails.
