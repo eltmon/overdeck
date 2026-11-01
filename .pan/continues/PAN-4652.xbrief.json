@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T19:09:49.500Z",
+  "updated": "2026-11-01T19:09:59.437Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-4652",
       "claimedAt": "2026-11-01T19:02:27.915Z",
       "doneAt": "2026-11-01T19:09:49.500Z"
+    },
+    "wi9-project-and-conversation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:09:59.437Z"
     }
   }
 }
