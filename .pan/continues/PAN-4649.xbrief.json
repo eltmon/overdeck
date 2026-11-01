@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T07:37:26.317Z",
+  "updated": "2026-11-01T07:37:47.895Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "approve-scope.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T07:37:26.316Z"
+    },
+    "approve-route-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:37:47.894Z"
     }
   }
 }
