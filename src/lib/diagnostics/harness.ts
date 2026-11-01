@@ -24,6 +24,8 @@ interface HarnessDefinition {
   command: string;
   notInstalledFix: string;
   notSignedInFix: string;
+  /** Per-harness capability: how to decide this harness is signed in. */
+  checkAuthenticated: (deps: HarnessEligibilityDeps) => Promise<boolean>;
 }
 
 export const DIAGNOSE_HARNESSES: readonly HarnessDefinition[] = [
@@ -33,6 +35,7 @@ export const DIAGNOSE_HARNESSES: readonly HarnessDefinition[] = [
     command: 'claude',
     notInstalledFix: 'Install: npm install -g @anthropic-ai/claude-code',
     notSignedInFix: 'Run: claude, then /login (or set ANTHROPIC_API_KEY)',
+    checkAuthenticated: async (deps) => (await deps.claudeLogin()).ok,
   },
   {
     harness: 'codex',
@@ -40,6 +43,7 @@ export const DIAGNOSE_HARNESSES: readonly HarnessDefinition[] = [
     command: 'codex',
     notInstalledFix: 'Install: npm install -g @openai/codex',
     notSignedInFix: 'Run: codex login',
+    checkAuthenticated: async (deps) => classifyNativeCodexAuth(await deps.readCodexAuth()).status === 'valid',
   },
 ];
 
@@ -90,15 +94,6 @@ export interface HarnessEligibility {
   fix: string | null;
 }
 
-async function isAuthenticated(harness: DiagnoseHarness, deps: HarnessEligibilityDeps): Promise<boolean> {
-  if (harness === 'claude-code') {
-    const result = await deps.claudeLogin();
-    return result.ok;
-  }
-  const raw = await deps.readCodexAuth();
-  return classifyNativeCodexAuth(raw).status === 'valid';
-}
-
 export async function checkHarnessEligibility(
   harness: DiagnoseHarness,
   deps: Partial<HarnessEligibilityDeps> = {},
@@ -119,7 +114,7 @@ export async function checkHarnessEligibility(
     };
   }
 
-  const authenticated = await isAuthenticated(harness, resolved);
+  const authenticated = await definition.checkAuthenticated(resolved);
   if (!authenticated) {
     return {
       harness,
