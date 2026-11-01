@@ -802,9 +802,9 @@ export function ConversationPanel({
                 </button>
               )}
 
-              {archivePending && (
-                <span className={styles.conversationAboutToggle} role="status" aria-live="polite">
-                  <Loader2 size={14} className={styles.spinnerIcon} /><span>Archiving…</span>
+              {(archivePending || convMutations.isStopPending(conversation.name)) && (
+                <span className={styles.conversationAboutToggle} role="status" aria-live="polite" aria-label={archivePending ? 'Archiving conversation' : 'Stopping conversation'}>
+                  <Loader2 size={14} className={styles.spinnerIcon} /><span>{archivePending ? 'Archiving…' : 'Stopping…'}</span>
                 </span>
               )}
               {/* Copy link */}
@@ -1468,6 +1468,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           targetMessageNonce={targetMessageNonce}
           onTargetMessageHandled={onTargetMessageHandled}
           bookmarksEnabled
+          citationsEnabled={!hideComposer}
           history={olderHistory}
           onLoadOlder={olderHistory.loadOlder}
           onLoadOlderUntil={olderHistory.loadOlderUntil}

@@ -60,9 +60,11 @@
               "configuration/session-vault",
               "configuration/remote-access",
               "configuration/tailscale",
+              "configuration/push-notifications",
               "cli/vault",
               "cli/pair",
               "cli/tailscale",
+              "cli/account",
               "cli/devices",
               "cli/token"
             ]

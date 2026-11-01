@@ -100,6 +100,27 @@ works on this machine, and `pan pair` says so.
 machine's internal token. A paired device cannot create more pairing
 credentials.
 
+### From the desktop app
+
+The desktop app can show one other machine's dashboard instead of running its
+own, for example your desktop's dashboard from a laptop over Tailscale.
+
+1. On the machine, create a pairing link from **Settings → Anywhere → Pair a
+   device**, or with `pan pair --url <its Tailscale address>`.
+2. In the desktop app, choose **Connect to a Machine…** from the Overdeck menu
+   or the tray, paste the whole link, and click **Connect**.
+
+The app stores the machine's address and a revocable device credential in
+`remote-machine.json` in its user-data folder, with the credential encrypted by
+the operating system's credential store (Keychain, Windows credential
+protection, GNOME Keyring or KWallet). It refuses to pair when no such store is
+available. While it shows the other machine, the desktop app runs no local
+server; **Use This Computer** switches back. It sends the credential only over
+HTTPS, a Tailscale address, or this computer's loopback, and refuses any other
+`http:` address. See
+[Open another machine](https://github.com/eltmon/overdeck/blob/main/docs/DESKTOP-APP.md#open-another-machine)
+for the launch checks, **Forget**, and the error messages.
+
 ### Open one conversation on another screen
 
 To look at one conversation on your phone or another computer while this
@@ -329,8 +350,8 @@ dashboard, a Settings save that turns it off keeps it on; turn Serve off first
 
 ## What comes next
 
-- A desktop connection list, environment switcher and version gating:
-  [PAN-4402](https://github.com/eltmon/overdeck/issues/4402).
+- Linking machines to each other, with one machine list and version checks:
+  [PAN-4645](https://github.com/eltmon/overdeck/issues/4645).
 - Discovered HTTPS and Tailscale endpoints and advertised origins:
   [PAN-4403](https://github.com/eltmon/overdeck/issues/4403).
 - Launching Overdeck on an SSH host from the desktop app:

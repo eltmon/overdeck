@@ -6,7 +6,7 @@
  * Also generates TLS certificate configuration from discovered certs.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, readdirSync, renameSync, rmSync, statSync, chmodSync } from 'fs';
 import { join, basename } from 'path';
 import { execSync } from 'child_process';
 import { TRAEFIK_DYNAMIC_DIR, TRAEFIK_CERTS_DIR, TRAEFIK_DIR, SYNC_SOURCES } from './paths.js';
@@ -235,4 +235,55 @@ export function cleanupStaleTlsSections(): void {
       writeFileSync(dynamicConfig, cleaned, 'utf-8');
     }
   }
+}
+
+/** Host IP for Traefik's published ports (PAN-4299 D-3). Anything but 'all' is loopback. */
+export function resolveTraefikBindAddress(bind: unknown): '127.0.0.1' | '0.0.0.0' {
+  return bind === 'all' ? '0.0.0.0' : '127.0.0.1';
+}
+
+// Longest alternative first and no digit after the container port, so "8080:8080" is not read as 8080:80.
+const TRAEFIK_PORT_LINE = /^(\s*-\s*["']?)(?:(?:\d{1,3}\.){3}\d{1,3}:|\[[0-9a-fA-F:]*\]:)?(8080|443|80):(8080|443|80)(?!\d)(["']?.*)$/;
+
+/** Rewrite only the 80:80 / 443:443 / 8080:8080 lines to `<address>:<port>:<port>`. Pure. */
+export function rewriteTraefikComposePorts(content: string, address: string): string {
+  return content.split('\n').map((line) => {
+    const m = TRAEFIK_PORT_LINE.exec(line);
+    if (!m || m[2] !== m[3]) return line;
+    return `${m[1]}${address}:${m[2]}:${m[3]}${m[4]}`;
+  }).join('\n');
+}
+
+/** The pre-external-network upgrade, moved verbatim from install.ts / cli/index.ts. Pure. */
+export function rewriteTraefikComposeNetwork(content: string): string {
+  if (!content.includes('overdeck:') || content.includes('external: true')) return content;
+  return content.replace(
+    /networks:\s*\n\s*overdeck:\s*\n\s*name: overdeck\s*\n\s*driver: bridge/,
+    'networks:\n  overdeck:\n    name: overdeck\n    external: true  # Network created by \'pan install\'',
+  );
+}
+
+/**
+ * Bring ~/.overdeck/traefik/docker-compose.yml up to date: external network and
+ * ports on the configured bind address. Returns true when the file changed —
+ * the caller must recreate a running container for new ports to apply.
+ */
+export function migrateTraefikCompose(composePath = join(TRAEFIK_DIR, 'docker-compose.yml')): boolean {
+  if (!existsSync(composePath)) return false;
+  const before = readFileSync(composePath, 'utf-8');
+  const address = resolveTraefikBindAddress(loadConfigSync().traefik?.bind);
+  const after = rewriteTraefikComposePorts(rewriteTraefikComposeNetwork(before), address);
+  if (after === before) return false;
+  // Write to a temp file and rename into place so a crash mid-write can never truncate the compose file.
+  const mode = statSync(composePath).mode & 0o777;
+  const tmpPath = `${composePath}.${process.pid}.tmp`;
+  try {
+    writeFileSync(tmpPath, after, 'utf-8');
+    chmodSync(tmpPath, mode); // writeFileSync's mode option is masked by the umask
+    renameSync(tmpPath, composePath);
+  } catch (err) {
+    rmSync(tmpPath, { force: true });
+    throw err;
+  }
+  return true;
 }

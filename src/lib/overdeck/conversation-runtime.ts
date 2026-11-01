@@ -69,7 +69,7 @@ import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
 import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
-import { buildResumeContract } from '../resume-contract.js';
+import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
 import { readLatestIndexedSessionId } from '../session-history.js';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
@@ -1074,7 +1074,7 @@ export async function handleConversationClearForkState(
 export async function handleConversationResume(
   name: string,
   body: Record<string, unknown>,
-  deps: { resolveSessionFile: (conv: Conversation) => Promise<string | null> },
+  deps: { resolveSessionFile: (conv: Conversation) => Promise<string | null>; resumeCause?: ResumeCause },
 ): Promise<ReturnType<typeof jsonResponse>> {
   try {
     let conv = getConversationByName(name);
@@ -1094,7 +1094,7 @@ export async function handleConversationResume(
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', reattached: true, ...(requestedName !== name ? { redirectedFrom: requestedName } : {}) });
     }
-    const oldSessionId = conv.claudeSessionId, resumeCause = conv.status === 'ended' ? 'operator' : 'system', sendResumeContract = body['sendResumeContract'] !== false && !conv.bareContext;
+    const oldSessionId = conv.claudeSessionId, resumeCause = deps.resumeCause ?? (conv.status === 'ended' ? 'operator' : 'system'), sendResumeContract = body['sendResumeContract'] !== false && !conv.bareContext;
     const harness: RuntimeName = conv.harness ?? 'claude-code';
     const modelChanged = !!model && model !== conv.model;
     if (!(await validateCwdContainment(conv.cwd))) return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });

@@ -1,0 +1,1356 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T05:09:13Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2354: Needs-you push to the phone: Web Push sent from the machine with RFC 8291 encryption, optional ntfy",
+    "updated": "2026-11-01T05:46:37.988Z"
+  },
+  "plan": {
+    "id": "pan-2354",
+    "title": "Needs-you push to the phone: Web Push sent from the machine with RFC 8291 encryption, optional ntfy",
+    "status": "running",
+    "uid": "b89a6e91-cada-49d3-9dbc-5cf9c4164de8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T05:09:13Z",
+    "updated": "2026-11-01T05:46:37.988Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2354",
+        "label": "PAN-2354",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2354/.pan/drafts/pan-2354.md",
+        "label": "PRD draft (.pan/drafts/pan-2354.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2350",
+        "label": "PAN-2350 epic (W-PHONE1, FR-15, D-16)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "push",
+      "web-push",
+      "notifications",
+      "pwa",
+      "dashboard-server"
+    ],
+    "narratives": {
+      "Problem": "When an agent or conversation asks a question, waits for approval, finishes or fails, nothing reaches the operator away from the screen. Desktop notifications need an open tab, there is no push code, and conversation AskUserQuestions have no server-side event at all.",
+      "Proposal": "The dashboard server sends Web Push itself: a VAPID key created once, subscriptions bound to device credentials with an endpoint allowlist, payloads encrypted with RFC 8291 aes128gcm via web-push@3.6.7. A needs-you push service in the primary dashboard reads enrichment events, journal and heartbeat_dead events, a 5 s conversation feed scan that runs only when targets exist, and an instant wake from the AskUserQuestion hook. A pure classifier and dispatcher apply rising-edge dedup, startup priming and a 6-per-minute limit, then fan out to the webpush provider and an optional title-only ntfy provider behind a PushProvider interface that PAN-2080 reuses. Phones subscribe through a Turn on notifications control (Settings → Anywhere, and the PAN-2355 /m header) using the single /sw.js agreed with PAN-2355.",
+      "NonGoals": "- Slack, email and TTS providers (PAN-2080)\n- vite-plugin-pwa, precache, offline support, extra icons, the /m phone shell and its ?subject= handling, the 3-tap answer flow (PAN-2355)\n- A second service worker or any registration script URL other than '/sw.js'; replacing an existing sw.js or manifest\n- Answering from the notification itself, or closing a notification after the item is answered elsewhere\n- Quiet hours, digests, per-project routing\n- Relay-delivered push or any overdeck.ai involvement\n- VAPID key rotation\n- Pushes from peer dashboards or for other linked machines' items\n- Automatic Tailscale Serve setup (PAN-1254)\n- Pricing copy in anywhere.mdx (W-DOC owner)\n- Push for pendingPaneChoice, held kickoffs, rate limits, session-resume gates, verification.failed or plain agent.stopped\n- Changes to settings-api.ts or ROUTE_SCOPES"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use web-push@3.6.7 for VAPID signing and RFC 8291 aes128gcm, sending with fetch",
+        "rationale": "Audited library; the PAN-2355 draft's D-5 forbids custom crypto; generateRequestDetails keeps timeouts and tests in our hands."
+      },
+      {
+        "summary": "Detect conversation questions with a 5 s feed scan plus an instant wake from the AskUserQuestion hook heartbeat",
+        "rationale": "Conversations have no server-side AUQ event; the hook already POSTs ask_user_question_blocked, which the server dropped. The wake gives about 1 s latency for Claude Code, and the scan covers other harnesses within the 10 s done criterion."
+      },
+      {
+        "summary": "Closed trigger list: AUQ and pan ask questions, plan and permission approvals, verification.started and merge.completed as finished, heartbeat_dead, merge.failed, review.stall-escalated and conflict.repair-escalated as failed",
+        "rationale": "Maps FR-15's four kinds onto events that reach the server today; pan done's activity events never reach the server process."
+      },
+      {
+        "summary": "Payload is metadata-only by default; includePreview opts in to 140 characters of question text",
+        "rationale": "End-to-end encryption hides content from the push service, but the lock screen still shows it (old D-6, epic NFR-7)."
+      },
+      {
+        "summary": "push.enabled defaults to true; subscribing a phone or configuring ntfy is the opt-in, and with no targets nothing is scanned",
+        "rationale": "An extra enable switch adds a step without protecting anything."
+      },
+      {
+        "summary": "VAPID subject defaults to https://overdeck.ai, configurable via push.webpush.subject",
+        "rationale": "Apple's push service rejects VAPID JWTs without a valid https: or mailto: subject; using the operator's email would leak it to push services."
+      },
+      {
+        "summary": "Push config is edited in config.yaml and through /api/push routes; settings-api.ts is not touched",
+        "rationale": "settings-api.ts is at 1485 of a 1508-line cap; a dedicated config module and routes keep god files from growing."
+      },
+      {
+        "summary": "Adopt the PAN-2355 planner's ownership split, payload contract {title, body, url, tag} and the /m?subject=<id> deep link",
+        "rationale": "The operator relayed both messages during planning; one service worker with a second-lander rule avoids duplicate workers and merge conflicts."
+      },
+      {
+        "summary": "Endpoint allowlist of the four browser push services; subscriptions bound to the subscribing device credential",
+        "rationale": "Prevents SSRF through stored endpoints and honors the epic threat model: revoking a device stops its push."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The issue's single done criterion (an AskUserQuestion reaches the installed phone within 10 s) needs server-side detection, RFC 8291 sending, subscription storage and routes, the service worker and the subscribe control together; none of these ships observable value alone. The work is decomposed into 16 small items with tight files_scope, and most files are new modules plus their tests.",
+      "canonicalFilename": "2026-11-01-PAN-2354-needs-you-push-to-the-phone-web-push-sent-from-the-machine-with-rfc-8291-encryption-optional-ntfy.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "deps",
+        "title": "Add web-push 3.6.7 runtime dependency and test-only decrypt dependencies",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bun install",
+            "node -e \"console.log(Object.keys(require('web-push').generateVAPIDKeys()))\"",
+            "npm run build:dashboard:server"
+          ],
+          "expected_outputs": [
+            "node prints [ 'publicKey', 'privateKey' ]",
+            "build:dashboard:server exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. Root package.json: add \"web-push\": \"3.6.7\" to dependencies; add \"@types/web-push\": \"3.6.4\" and \"http_ece\": \"1.2.0\" to devDependencies. Run bun install so bun.lock updates. Do not add web-push to src/dashboard/server/package.json (server deps resolve from the root). The dashboard server bundle leaves web-push external, so it resolves from node_modules at runtime."
+        },
+        "items": [
+          {
+            "id": "deps.ac1",
+            "title": "Given a fresh bun install, when `node -e \"require('web-push').generateVAPIDKeys()\"` runs from the repo root, then it exits 0 and returns an object with publicKey and privateKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deps.ac2",
+            "title": "Given the dependency change, when `npm run build:dashboard:server` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deps.ac3",
+            "title": "Given the diff, then package.json pins web-push to exactly 3.6.7 and bun.lock contains a web-push entry and an http_ece entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config",
+        "title": "Add the push config block in a new push-config.ts with tts-style wiring",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/push-config.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "tests/unit/lib/config-yaml/push-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/config-yaml/push-config.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "push-config.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passes with schema.ts <= 1114 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2 and D-16. Create src/lib/config-yaml/push-config.ts exporting PushEventKind, PUSH_EVENT_KINDS, PushYamlConfig, NormalizedPushConfig, NormalizedNtfyConfig (off | misconfigured{reason} | ready{url,topic,token,clickBaseUrl}), defaultPushConfig(), mergePushConfig(result, config). Wire: schema.ts `push?: PushYamlConfig;` beside `tts?:` and `push: NormalizedPushConfig;` beside `tts: NormalizedTtsDaemonConfig;`; defaults.ts `push: defaultPushConfig(),`; merge.ts `mergePushConfig(result.push, config);` right after `mergeTtsConfig(result.tts, config);` (initialize result.push the same way result.tts is initialized so merges never share an object). Validation never throws."
+        },
+        "items": [
+          {
+            "id": "config.ac1",
+            "title": "Given no push block, when config loads, then push is {enabled:true, events:[question,approval,finished,failed], includePreview:false, webpush.subject:'https://overdeck.ai', ntfy.state:'off'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config.ac2",
+            "title": "Given events: ['question','bogus'], when merged, then events equals ['question']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config.ac3",
+            "title": "Given ntfy with url but no topic, when merged, then ntfy.state is 'misconfigured' with reason 'topic missing'; given an ftp: url or a topic containing a space, then state is 'misconfigured'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config.ac4",
+            "title": "Given ntfy url and a valid topic without token or clickBaseUrl, when merged, then state is 'ready' with token null and clickBaseUrl null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config.ac5",
+            "title": "Given the diff, then settings-api.ts is unchanged and schema.ts has at most 1114 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "types",
+        "title": "Define the PushProvider interface and NeedsYouNotification types",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/types.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "foundationFor": [
+            "webpush",
+            "ntfy",
+            "classify",
+            "dispatcher"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. Create src/lib/push/types.ts with types only (no runtime imports): NeedsYouKind ('question'|'approval'|'finished'|'failed'|'summary'|'test'), NeedsYouNotification {kind, tag, title, publicTitle, body, url, issueId, ts}, ProviderSendOutcome (ok, or failure reasons gone|rejected|transient|revoked|skipped with optional status/detail), PushProvider {name, hasTargets(), send(n)}. PAN-2080 implements Slack/email/TTS against this interface."
+        },
+        "items": [
+          {
+            "id": "types.ac1",
+            "title": "Given the new module, when `npm run typecheck` runs, then it completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "types.ac2",
+            "title": "Given src/lib/push/types.ts, then it exports PushProvider, NeedsYouNotification, NeedsYouKind and ProviderSendOutcome and contains no runtime import statement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "types.ac3",
+            "title": "Given NeedsYouNotification, then it carries both title and publicTitle fields so third-party providers can use the safe title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vapid",
+        "title": "Create the VAPID key pair once under OVERDECK_HOME/push with mode 0600",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/vapid-keys.ts",
+            "tests/unit/lib/push/vapid-keys.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/vapid-keys.test.ts"
+          ],
+          "expected_outputs": [
+            "vapid-keys.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4 and D-12. src/lib/push/vapid-keys.ts: pushDir() = join(getOverdeckHome(),'push'); vapidKeysPath(); readVapidKeys(); ensureVapidKeys() creates the dir 0o700, generates keys with webpush.generateVAPIDKeys(), writes vapid.json.<pid>.<uuid>.tmp at 0o600, link()s it to vapid.json, unlinks the temp, and on EEXIST re-reads and returns the existing keys. A malformed existing file throws VapidKeysUnreadableError and is never replaced. Use node:fs/promises only."
+        },
+        "items": [
+          {
+            "id": "vapid.ac1",
+            "title": "Given an empty OVERDECK_HOME, when ensureVapidKeys() runs, then push/vapid.json exists with file mode 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vapid.ac2",
+            "title": "Given an existing key file, when ensureVapidKeys() runs again, then it returns byte-identical keys and the file is not rewritten",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vapid.ac3",
+            "title": "Given two concurrent ensureVapidKeys() calls, when both resolve, then they return the same publicKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vapid.ac4",
+            "title": "Given a malformed vapid.json, when ensureVapidKeys() runs, then it rejects with VapidKeysUnreadableError and the file content is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "subscriptions",
+        "title": "Persist push subscriptions with an endpoint allowlist, 20-record cap and credential binding",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/push/subscription-store.ts",
+            "tests/unit/lib/push/subscription-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/subscription-store.test.ts"
+          ],
+          "expected_outputs": [
+            "subscription-store.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "webpush",
+            "routes"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5, D-13, D-14. src/lib/push/subscription-store.ts: validatePushEndpoint(url, extraHosts?) allows only https, port 443 or none, no userinfo, host fcm.googleapis.com | updates.push.services.mozilla.com | web.push.apple.com | *.push.apple.com | *.notify.windows.com. addPushSubscription({endpoint, keys{p256dh,auth}, label, credentialId}) validates p256dh (65 bytes, 0x04 prefix) and auth (16 bytes), upserts by id = sha256(endpoint) first 16 hex, caps at 20 distinct endpoints (subscription-limit). removePushSubscription, listPushSubscriptions, recordPushDelivery, subscriptionsPath. File <pushDir>/subscriptions.json written temp+rename at 0o600 behind a module-level promise chain."
+        },
+        "items": [
+          {
+            "id": "subscriptions.ac1",
+            "title": "Given endpoints https://fcm.googleapis.com/fcm/send/abc and https://web.push.apple.com/x, when validated, then both are allowed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subscriptions.ac2",
+            "title": "Given http://fcm.googleapis.com/x, https://evil.example/x, https://fcm.googleapis.com:8443/x or https://user@fcm.googleapis.com/x, when added, then addPushSubscription returns endpoint-not-allowed or endpoint-invalid and nothing is persisted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subscriptions.ac3",
+            "title": "Given the same endpoint added twice, when listed, then exactly one record exists with the same id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subscriptions.ac4",
+            "title": "Given 20 stored endpoints, when a 21st distinct endpoint is added, then it returns subscription-limit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subscriptions.ac5",
+            "title": "Given any write, when the file is stat'ed, then its mode is 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "webpush",
+        "title": "Send RFC 8291 aes128gcm Web Push signed with VAPID to every live subscription",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/push/webpush-provider.ts",
+            "tests/unit/lib/push/webpush-provider.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/webpush-provider.test.ts"
+          ],
+          "expected_outputs": [
+            "webpush-provider.test.ts passes under fake timers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "service",
+            "routes"
+          ],
+          "parallelSafeReason": "Touches only its own new module and test; its inputs (types, vapid, subscriptions, config) are DAG predecessors."
+        },
+        "narrative": {
+          "Action": "PRD W6, D-10, D-11, D-15. createWebPushProvider(deps?) -> PushProvider. For each subscription (Promise.allSettled): (1) if credentialId is set and listAccessTokens() has no such record or it has revokedAt, remove it and report revoked; (2) webpush.generateRequestDetails({endpoint,keys}, JSON.stringify({title:n.title, body:n.body, url:n.url, tag:n.tag}), {vapidDetails:{subject, publicKey, privateKey}, TTL:3600, urgency (high for question/approval/failed, else normal), topic (first 32 chars of base64url sha256(tag)), contentEncoding:'aes128gcm'}); (3) fetch with a 5 s AbortController timeout; (4) 2xx success; 404/410 remove the subscription; 429/5xx/network retry once after 5 s then transient; other 4xx rejected. Log only the endpoint host and id."
+        },
+        "items": [
+          {
+            "id": "webpush.ac1",
+            "title": "Given a subscriber ECDH key pair, when send() runs, then the captured body decrypted with http_ece (aes128gcm, subscriber private key, auth secret) deep-equals {title, body, url, tag} with exactly those four keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webpush.ac2",
+            "title": "Given the captured body, then it does not contain the title bytes in plaintext and decrypting it with a different ECDH key throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webpush.ac3",
+            "title": "Given a question notification, then the request headers include Content-Encoding aes128gcm, TTL 3600, Urgency high, and an Authorization header starting with 'vapid t='",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webpush.ac4",
+            "title": "Given a 410 response, then the subscription is removed; given 503 then 201, then fetch is called exactly twice and the second call happens only after advanceTimersByTimeAsync(5000)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webpush.ac5",
+            "title": "Given a subscription whose device credential is revoked, when send() runs, then fetch is not called and the subscription is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ntfy",
+        "title": "Publish title-only needs-you messages to an optional ntfy topic",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/ntfy-provider.ts",
+            "tests/unit/lib/push/ntfy-provider.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/ntfy-provider.test.ts"
+          ],
+          "expected_outputs": [
+            "ntfy-provider.test.ts passes under fake timers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7, D-8, D-10. createNtfyProvider(deps?) -> PushProvider. hasTargets() true only when ntfy.state === 'ready'. send(n) POSTs to `${url without trailing slash}/${encodeURIComponent(topic)}` with body n.publicTitle and headers Title: n.publicTitle, Priority '4' (question/approval/failed) or '3', Tags: kind, Click: clickBaseUrl + n.url only when clickBaseUrl is set, Authorization: Bearer token only when a token is set. 5 s timeout, one retry after 5 s on 429/5xx/network."
+        },
+        "items": [
+          {
+            "id": "ntfy.ac1",
+            "title": "Given a notification whose title differs from publicTitle, when sent, then neither the request body nor any header contains n.title or n.body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ntfy.ac2",
+            "title": "Given no clickBaseUrl, then the request has no Click header; given no token, then it has no Authorization header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ntfy.ac3",
+            "title": "Given ntfy.state 'off', then hasTargets() resolves false and send() makes zero fetch calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ntfy.ac4",
+            "title": "Given a 500 then 200 response, then fetch is called twice and the retry happens only after advanceTimersByTimeAsync(5000)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "classify",
+        "title": "Classify enrichment payloads, conversation rows and journal events into needs-you items",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/classify.ts",
+            "tests/unit/lib/push/classify.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/classify.test.ts"
+          ],
+          "expected_outputs": [
+            "classify.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8, D-4, D-5, D-6, D-7, D-8. Pure module: pendingItemsFromEnrichment(payload) (subject agent:<id>), pendingItemsFromConversationRow(row) (subject conv:<name>), edgeNotificationFromEvent(event) (closed D-5 list: pipeline.journal verification.started|merge.completed -> finished; merge.failed|review.stall-escalated|conflict.repair-escalated and agent.heartbeat_dead -> failed; everything else null), toNotification(item, {includePreview, now}). Keys auq:<toolUseId>, plan:<toolUseId>, perm:<signature|'pending'>. URLs: question/approval /m?subject=<encodeURIComponent(agentId or conversation name)>; edge notifications /m. publicTitle has only the kind plus issueId or 'a conversation'. Default bodies per D-8 contain no question text; includePreview adds at most 140 chars."
+        },
+        "items": [
+          {
+            "id": "classify.ac1",
+            "title": "Given an enrichment for agent agent-pan-1 with pendingAskUserQuestion toolUseId t1, then it yields one question with key auq:t1 and url /m?subject=agent-pan-1; given a toolUseId starting with operator-decision:, then it yields a question",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classify.ac2",
+            "title": "Given a conversation row named 'a.b' with pendingPermission.signature 'sig', then it yields perm:sig with url /m?subject=a.b; given a row with only pendingPaneChoice, then it yields no items",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classify.ac3",
+            "title": "Given pipeline.journal events of each D-5 type, then each maps to the listed kind with url /m; given verification.failed or agent.stopped, then the result is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classify.ac4",
+            "title": "Given includePreview false, then no notification body contains the question text and publicTitle never contains the conversation title; given includePreview true, then the body is at most 140 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dispatcher",
+        "title": "Dispatch needs-you items with rising-edge dedup, startup priming and a 6-per-minute limit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/dispatcher.ts",
+            "tests/unit/lib/push/dispatcher.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/dispatcher.test.ts"
+          ],
+          "expected_outputs": [
+            "dispatcher.test.ts passes under fake timers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W9, D-4, D-9. createNeedsYouDispatcher({providers, readConfig, now?, startedAt?}) -> {observeSubject(subject, items), observeEdge(notification), hasTargets(), stats(), dispose()}. Per-subject key sets: a key notifies when it first appears and is forgotten when it disappears; a key already active under any other subject is not sent again (a conversation can appear both as an enrichment agent and as a feed row). hasTargets() is false when cfg.enabled is false. Startup priming: items whose askedAt is more than 60 s before startedAt are recorded silently. Edge tags dedup for 24 h (max 500). Drop silently when !cfg.enabled or kind not in cfg.events. Rate limit 6 per rolling 60 s; over-limit items are counted and one summary '<N> more items need you' (url /m, tag summary) is sent when the window closes. Fan-out with Promise.allSettled; provider errors never propagate."
+        },
+        "items": [
+          {
+            "id": "dispatcher.ac1",
+            "title": "Given the same key observed twice, or observed under agent:conv-x and conv:x, then providers receive exactly one send; given the key removed everywhere and re-added, then they receive a second send",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatcher.ac2",
+            "title": "Given an item asked 5 minutes before startedAt, then nothing is sent; given an item asked after startedAt, then it is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatcher.ac3",
+            "title": "Given events ['question'], then an approval item is not sent; given enabled false, then nothing is sent and hasTargets() resolves false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatcher.ac4",
+            "title": "Given 8 new items within 10 s, then 6 are sent immediately and after advanceTimersByTimeAsync(60000) exactly one summary '2 more items need you' is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatcher.ac5",
+            "title": "Given a provider whose send rejects, then observeSubject does not throw and stats().lastError is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "service",
+        "title": "Run the needs-you push service in the primary dashboard with event, scan and wake sources",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/needs-you-push-service.ts",
+            "src/dashboard/server/services/agent-enrichment-service.ts",
+            "src/dashboard/server/main.ts",
+            "src/dashboard/server/services/__tests__/needs-you-push-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/needs-you-push-service.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "npm run build:dashboard:server"
+          ],
+          "expected_outputs": [
+            "needs-you-push-service.test.ts passes under fake timers",
+            "typecheck completes without errors",
+            "file-size guard passes with main.ts <= 1000 lines",
+            "build:dashboard:server exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Its own new service module plus small, isolated edits to main.ts and agent-enrichment-service.ts that no other item touches; hook-wake and routes wait on it via edges."
+        },
+        "narrative": {
+          "Action": "PRD W10, D-3. New needs-you-push-service.ts: startNeedsYouPushService({readConversationFeed, store?, providers?}), stopNeedsYouPushService(), wakeNeedsYouPush(reason), getNeedsYouPushStatus(), sendTestPush() (title 'Overdeck test notification', body 'Push works on this device.', url /m, tag test; bypasses dedup and rate limit). Subscribe to the event store: agent.enrichment_changed -> observeSubject; agent.heartbeat_dead and pipeline.journal -> observeEdge; conversation.permission_changed with waiting true -> wake. A 5 s interval scans the conversation feed only when dispatcher.hasTargets() is true (success = status undefined and body is an array), clears vanished conv: subjects, and never overlaps. wake debounces 500 ms then scans and calls pollEnrichmentNow(). agent-enrichment-service.ts exports pollEnrichmentNow() guarded by an inFlight flag shared with the interval. main.ts starts it after startAgentEnrichmentService() only when !isPeerDashboard (passing getConversationsPendingInputFeed(conversationReadDependencies)) and stops it after stopAgentEnrichmentService()."
+        },
+        "items": [
+          {
+            "id": "service.ac1",
+            "title": "Given no push targets, when advanceTimersByTimeAsync(20000) runs, then readConversationFeed is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service.ac2",
+            "title": "Given a target and a feed row with a new AskUserQuestion asked now, then the provider receives one send within advanceTimersByTimeAsync(5000)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service.ac3",
+            "title": "Given wakeNeedsYouPush('auq') with a pending feed row, then the provider receives the send after advanceTimersByTimeAsync(500), before the 5 s interval fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service.ac4",
+            "title": "Given a pipeline.journal merge.failed event, then the provider receives a failed notification; given stopNeedsYouPushService(), then no further feed calls occur",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service.ac5",
+            "title": "Given main.ts, then the service starts only inside `if (!isPeerDashboard)` and the file has at most 1000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hook-wake",
+        "title": "Wake the push service from the AskUserQuestion hook heartbeat",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/runtime-events.ts",
+            "src/dashboard/server/routes/__tests__/runtime-events-auq-wake.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/runtime-events-auq-wake.test.ts"
+          ],
+          "expected_outputs": [
+            "runtime-events-auq-wake.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W11. In emitAgentRuntimeEvent, before bodyToEvent: when body.kind === 'ask_user_question_blocked', dynamically import ../../services/needs-you-push-service.js, call wakeNeedsYouPush(`auq-hook:${id}`) and return {ok: true, emitted: false}. No new domain event and no contract change."
+        },
+        "items": [
+          {
+            "id": "hook-wake.ac1",
+            "title": "Given body {kind:'ask_user_question_blocked'} for id conv-x, when emitAgentRuntimeEvent runs, then wakeNeedsYouPush is called once with 'auq-hook:conv-x' and the result is {ok:true, emitted:false}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-wake.ac2",
+            "title": "Given body {kind:'activity', activity:'idle'}, when emitAgentRuntimeEvent runs, then wakeNeedsYouPush is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routes",
+        "title": "Expose /api/push routes for the public key, status, subscriptions and a test send",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/push.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/push-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/push-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "push-routes.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W12, D-18. routes/push.ts exports pushRouteLayer: GET /api/push/vapid-public-key -> {publicKey}; GET /api/push/status -> {enabled, events, includePreview, webpush:{subscriptions:[{id,label,host,createdAt,lastSuccessAt,failureCount,thisDevice}]}, ntfy:{state,reason?,host?,topicHint?}, stats}; POST /api/push/subscriptions {subscription:{endpoint,keys}, label?} -> 201 {id} or 400 {error}, credentialId from resolveDashboardCredential (deviceId for device, else null); DELETE /api/push/subscriptions/:id -> 200 {removed:true} or 404; POST /api/push/test -> 200 {outcomes}. Register in server.ts makeRoutesLayer after anywhereRouteLayer. Add five no-loss-matrix rows under a push.ts header. No ROUTE_SCOPES rows (default admin)."
+        },
+        "items": [
+          {
+            "id": "routes.ac1",
+            "title": "Given POST /api/push/subscriptions with endpoint https://evil.example/x, then the response is 400 with error endpoint-not-allowed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes.ac2",
+            "title": "Given a valid POST, then the response is 201 {id} and GET /api/push/status lists one subscription with host fcm.googleapis.com, and the status body never contains the full endpoint, p256dh or auth values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes.ac3",
+            "title": "Given DELETE /api/push/subscriptions/unknown, then the response is 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes.ac4",
+            "title": "Given an ntfy token in config, then GET /api/push/status never contains the token string and shows the topic only as a 4-character hint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes.ac5",
+            "title": "Given the no-loss matrix, then it contains five push.ts rows and `npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sw",
+        "title": "Ensure one /sw.js meets the push payload contract under the second-lander rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/public/sw.js",
+            "src/dashboard/frontend/public/manifest.webmanifest",
+            "src/dashboard/frontend/index.html",
+            "tests/unit/dashboard/push-service-worker.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/push-service-worker.test.ts",
+            "grep -rn \"serviceWorker.register(\" src/dashboard/frontend/src"
+          ],
+          "expected_outputs": [
+            "push-service-worker.test.ts passes",
+            "every serviceWorker.register match uses '/sw.js'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W13 and D-17. Run `pan sync-main pan-2354`, then check `git ls-tree --name-only origin/main src/dashboard/frontend/public/`. Case A (sw.js absent): create public/sw.js (plain JS, skipWaiting/claim, no fetch listener; push parses {title, body, url, tag} with a fallback 'Overdeck'/'Something needs you.'/'/m'; notificationclick closes, resolves the url against self.location.origin replacing cross-origin with /m, focuses and navigates an open same-origin client else openWindow); if manifest.webmanifest is absent also create the minimal manifest (start_url /m, display standalone, favicon.svg icon) and add the manifest link plus apple-mobile-web-app-capable and mobile-web-app-capable meta tags to index.html. Case B (sw.js present, PAN-2355 landed first): never create, rename or replace it, and leave manifest and index.html alone; only add a missing contract piece to the existing handlers, never a second push listener. Test loads sw.js with node:vm and a fake self."
+        },
+        "items": [
+          {
+            "id": "sw.ac1",
+            "title": "Given a push event with {title:'Question · x', body:'Tap to answer.', url:'/m?subject=x', tag:'auq:1'}, when the push handler runs, then showNotification is called with 'Question · x', tag 'auq:1' and data.url '/m?subject=x'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sw.ac2",
+            "title": "Given a notificationclick whose url is https://evil.example/x, when handled, then the opened or navigated url is https://desk.example/m",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sw.ac3",
+            "title": "Given one open same-origin window client, when a notification is clicked, then that client's focus() and navigate('https://desk.example/m?subject=x') are called; given none, then openWindow is called with that url",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sw.ac4",
+            "title": "Given the repository after this item, then exactly one file src/dashboard/frontend/public/sw.js exists, the script registers exactly one push listener, and every serviceWorker.register call uses '/sw.js'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "panel",
+        "title": "Add the Turn on notifications control and the Settings → Anywhere Phone notifications panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/push/pushApi.ts",
+            "src/dashboard/frontend/src/components/push/TurnOnNotificationsButton.tsx",
+            "src/dashboard/frontend/src/components/push/__tests__/TurnOnNotificationsButton.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/PushPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/PushPanel.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/push/__tests__/TurnOnNotificationsButton.test.tsx src/components/Settings/anywhere/__tests__/PushPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W14. pushApi.ts (loadPushStatus, loadVapidPublicKey, savePushSubscription, deletePushSubscription, sendTestPush, PUSH_STATUS_QUERY_KEY, urlBase64ToUint8Array; mutations use dashboardMutationJsonHeaders). TurnOnNotificationsButton({compact?}) with pushSupport() checks in PRD order (iOS not installed, no push support, not a secure context, permission denied) and the exact messages; when supported and no thisDevice subscription it shows a 'Turn on notifications' button whose click requests permission, registers '/sw.js' with scope '/', awaits ready, reuses or creates the subscription with the VAPID key and saves it with a UA-derived label; 'Notifications on' when this device is subscribed. PushPanel (data-component anywhere-push-panel, heading 'Phone notifications'): the button, device list with Remove (useConfirm; unsubscribes locally when thisDevice), Send test, ntfy line with topic hint. Mount <PushPanel /> after <DevicesPanel /> in AnywhereSection. Add both test paths to test:frontend-subset in root package.json. Follow pan-style-guide."
+        },
+        "items": [
+          {
+            "id": "panel.ac1",
+            "title": "Given window.isSecureContext false, when TurnOnNotificationsButton renders, then it shows 'Open this dashboard over HTTPS (for example through Tailscale Serve) to turn on notifications.' and no button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel.ac2",
+            "title": "Given permission 'granted' and stubbed register/subscribe, when the button is clicked, then serviceWorker.register is called with ('/sw.js', {scope:'/'}) and savePushSubscription receives the subscription JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel.ac3",
+            "title": "Given a status subscription with thisDevice true, when the button renders, then it shows 'Notifications on'; given a listed subscription, when Remove is confirmed, then deletePushSubscription(id) is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel.ac4",
+            "title": "Given ntfy state ready with topic 'deck-abcdef', when PushPanel renders, then the ntfy line shows the hint 'deck…' and never the full topic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel.ac5",
+            "title": "Given root package.json, then test:frontend-subset lists both new test files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-mount",
+        "title": "Mount the Turn on notifications control in the MobileApp header when it exists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileApp.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.push.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "git ls-tree --name-only origin/main src/dashboard/frontend/src/components/mobile/MobileApp.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "either MobileApp.tsx exists and its header renders TurnOnNotificationsButton (test passes), or it is absent and the commit body records that",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W14b and D-17 second-lander rule. After `pan sync-main pan-2354`: if src/dashboard/frontend/src/components/mobile/MobileApp.tsx exists on origin/main, import TurnOnNotificationsButton from '../push/TurnOnNotificationsButton' and render <TurnOnNotificationsButton compact /> at the end of its header element, changing nothing else; extend PAN-2355's existing MobileApp test if present, else add MobileApp.push.test.tsx and list it in test:frontend-subset. If MobileApp.tsx is absent, make no file change and write 'MobileApp.tsx absent on origin/main at <sha>; PAN-2355 mounts TurnOnNotificationsButton when it lands (D-17)' in the item commit body (an empty commit with the Item trailer is acceptable)."
+        },
+        "items": [
+          {
+            "id": "mobile-mount.ac1",
+            "title": "Given MobileApp.tsx exists on origin/main, when MobileApp renders with pushApi mocked, then its header contains the Turn on notifications control",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-mount.ac2",
+            "title": "Given MobileApp.tsx is absent on origin/main, then the item commit changes no frontend file and its body contains 'MobileApp.tsx absent on origin/main'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-mount.ac3",
+            "title": "Given either case, then no second service worker or alternative register script URL is introduced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document push notifications for operators and the push architecture for developers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:09:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2354",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/push-notifications.mdx",
+            "docs.json",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c \"configuration/push-notifications\" docs.json",
+            "grep -n \"## Needs-you push (PAN-2354)\" docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "docs.json grep prints 1",
+            "DASHBOARD-ARCHITECTURE.md grep matches one heading"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W15. New configuration/push-notifications.mdx with seven sections: What you get; How it works (machine-sent Web Push, VAPID, RFC 8291, no relay, push service cannot read it); Set up your phone (Tailscale Serve HTTPS, pan pair, iOS Add to Home Screen 16.4+, Turn on notifications, Send test); Configuration (the full push: YAML block with defaults); Optional: ntfy (titles only, unguessable topic, publish token, self-host); Privacy (lock screen, includePreview, revoking a device stops its push); Troubleshooting. Add it to the Overdeck Anywhere group in docs.json after configuration/remote-access. Append '## Needs-you push (PAN-2354)' to docs/DASHBOARD-ARCHITECTURE.md: sources and wake path, D-4 keys and priming, D-5 list, provider interface for PAN-2080, files under OVERDECK_HOME/push, the D-17 seam with PAN-2355 and the {title, body, url, tag} contract."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given configuration/push-notifications.mdx, then it contains the push: YAML block with includePreview: false and states that the push service cannot read the payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given docs.json, then 'configuration/push-notifications' appears exactly once, inside the Overdeck Anywhere group after 'configuration/remote-access'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, then it has a '## Needs-you push (PAN-2354)' section naming needs-you-push-service.ts, the /m?subject= url contract and the second-lander rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "deps",
+        "to": "vapid",
+        "type": "blocks"
+      },
+      {
+        "from": "deps",
+        "to": "webpush",
+        "type": "blocks"
+      },
+      {
+        "from": "deps",
+        "to": "panel",
+        "type": "blocks"
+      },
+      {
+        "from": "config",
+        "to": "ntfy",
+        "type": "blocks"
+      },
+      {
+        "from": "config",
+        "to": "webpush",
+        "type": "blocks"
+      },
+      {
+        "from": "config",
+        "to": "dispatcher",
+        "type": "blocks"
+      },
+      {
+        "from": "types",
+        "to": "webpush",
+        "type": "blocks"
+      },
+      {
+        "from": "types",
+        "to": "ntfy",
+        "type": "blocks"
+      },
+      {
+        "from": "types",
+        "to": "classify",
+        "type": "blocks"
+      },
+      {
+        "from": "types",
+        "to": "dispatcher",
+        "type": "blocks"
+      },
+      {
+        "from": "vapid",
+        "to": "webpush",
+        "type": "blocks"
+      },
+      {
+        "from": "vapid",
+        "to": "routes",
+        "type": "blocks"
+      },
+      {
+        "from": "subscriptions",
+        "to": "webpush",
+        "type": "blocks"
+      },
+      {
+        "from": "subscriptions",
+        "to": "routes",
+        "type": "blocks"
+      },
+      {
+        "from": "classify",
+        "to": "dispatcher",
+        "type": "blocks"
+      },
+      {
+        "from": "dispatcher",
+        "to": "service",
+        "type": "blocks"
+      },
+      {
+        "from": "webpush",
+        "to": "service",
+        "type": "blocks"
+      },
+      {
+        "from": "ntfy",
+        "to": "service",
+        "type": "blocks"
+      },
+      {
+        "from": "service",
+        "to": "hook-wake",
+        "type": "blocks"
+      },
+      {
+        "from": "service",
+        "to": "routes",
+        "type": "blocks"
+      },
+      {
+        "from": "routes",
+        "to": "panel",
+        "type": "blocks"
+      },
+      {
+        "from": "panel",
+        "to": "mobile-mount",
+        "type": "blocks"
+      },
+      {
+        "from": "panel",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-wake",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "sw",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "deps",
+        "to": "mobile-mount",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

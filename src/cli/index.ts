@@ -35,7 +35,7 @@ if (existsSync(OVERDECK_ENV_FILE)) {
   }
 }
 
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import chalk from 'chalk';
 import { lazyAction } from './lazy-action.js';
 import type { RoleEffort } from '../lib/config-yaml.js';
@@ -507,6 +507,7 @@ await groups.register('knowledge');
 await groups.register('swarm'); await groups.register('task');
 await groups.register('workspace');
 await groups.register('vault');
+await groups.register('account');
 await groups.register('test');
 await groups.register('tts');
 
@@ -569,9 +570,7 @@ defineUpCommand(program)
     const { Effect } = await import('effect');
     const noResume = isNoResumeCliOptionEnabled(options);
     const bootGates = resolveBootGates(options);
-    const { spawn, execSync, exec } = await import('child_process');
-    const { promisify } = await import('util');
-    const execAsync = promisify(exec);
+    const { spawn, execSync } = await import('child_process');
     const { join, dirname } = await import('path');
     const { fileURLToPath } = await import('url');
     const { readFileSync, existsSync } = await import('fs');
@@ -722,39 +721,17 @@ defineUpCommand(program)
     if (traefikEnabled && !options.skipTraefik) {
       const traefikDir = join(process.env.HOME || '', '.overdeck', 'traefik');
       if (existsSync(traefikDir)) {
-        try {
-          // Ensure network is marked as external (migration for older installs)
-          const composeFile = join(traefikDir, 'docker-compose.yml');
-          if (existsSync(composeFile)) {
-            const content = readFileSync(composeFile, 'utf-8');
-            if (!content.includes('external: true') && content.includes('overdeck:')) {
-              const patched = content.replace(
-                /networks:\s*\n\s*overdeck:\s*\n\s*name: overdeck\s*\n\s*driver: bridge/,
-                'networks:\n  overdeck:\n    name: overdeck\n    external: true  # Network created by \'pan install\''
-              );
-              const { writeFileSync } = await import('fs');
-              writeFileSync(composeFile, patched);
-              console.log(chalk.dim('  (migrated network config)'));
-            }
-          }
-
-          console.log(chalk.dim('Starting Traefik...'));
-          const { stdout } = await execAsync(
-            'docker ps --filter "name=overdeck-traefik" --format "{{.Names}}" 2>/dev/null',
-          );
-          if (stdout.trim().includes('overdeck-traefik')) {
-            console.log(chalk.dim('Traefik already running'));
-          } else {
-            execSync('docker compose up -d', {
-              cwd: traefikDir,
-              stdio: 'pipe',
-            });
-          }
-          console.log(chalk.green('✓ Traefik started'));
-          console.log(chalk.dim(`  Dashboard: https://traefik.${traefikDomain}:8080\n`));
-        } catch (error) {
+        console.log(chalk.dim('Starting Traefik...'));
+        // PAN-4299: external network + ports on the configured bind address; a changed file needs `up -d` to recreate.
+        const { startTraefikContainer } = await import('./commands/traefik-start.js');
+        const result = await startTraefikContainer(traefikDir, { skipWhenRunning: true });
+        if (result === 'failed') {
           console.log(chalk.yellow('⚠ Failed to start Traefik (continuing anyway)'));
           console.log(chalk.dim('  Run with --skip-traefik to suppress this message\n'));
+        } else {
+          if (result === 'already-running') console.log(chalk.dim('Traefik already running'));
+          console.log(chalk.green('✓ Traefik started'));
+          console.log(chalk.dim(`  Dashboard: https://traefik.${traefikDomain}:8080\n`));
         }
       }
     }
@@ -1189,12 +1166,29 @@ const doctorCmd = program
   .command('doctor')
   .description('Check system health and dependencies')
   .option('--strict', 'Exit non-zero if any optional dependency is missing (e.g. Pi binary)')
+  .option('--json', 'Print every check as JSON (name, status, message, fix); same exit code as text mode')
   .action(lazyAction(() => import('./commands/doctor.js'), 'doctorCommand'));
 doctorCmd
   .command('github-quota')
   .description('Show GitHub API quota use per caller, active pauses, and skipped projects')
   .option('--json', 'Print JSON')
   .action(lazyAction(() => import('./commands/doctor-github-quota.js'), 'doctorGithubQuotaCommand'));
+
+program
+  .command('diagnose')
+  .description('Collect a redacted diagnostic bundle and start Claude Code or Codex to fix the problem')
+  .addOption(new Option('--harness <harness>', 'Harness to start').choices(['claude-code', 'codex']))
+  .option('--describe <text>', 'What went wrong, in your words (saved in the bundle)')
+  .option('--bundle-only', 'Write the bundle and print its path; do not start a harness')
+  .option('--no-issue', 'Do not let the session draft or create an upstream issue')
+  .option('--yes', 'Start the harness without asking to confirm the bundle')
+  .action(async (options) => {
+    // Not `lazyAction`: that forwards every argument Commander passes,
+    // including the trailing Command instance, which would land in
+    // diagnoseCommand's injectable `deps` parameter and shadow its default.
+    const { diagnoseCommand } = await import('./commands/diagnose.js');
+    await diagnoseCommand(options);
+  });
 
 await groups.register('resources');
 

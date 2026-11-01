@@ -232,6 +232,10 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/conversations/:name/bookmarks',                   kind: 'http', disposition: 'READ',        door: 'conversation-bookmarks.listConversationBookmarks (PAN-4498)' },
   { surface: 'PUT /api/conversations/:name/bookmarks/:messageId',        kind: 'http', disposition: 'WRITE',       door: 'conversation-bookmarks.upsertConversationBookmark (PAN-4498)' },
   { surface: 'DELETE /api/conversations/:name/bookmarks/:messageId',     kind: 'http', disposition: 'WRITE',       door: 'conversation-bookmarks.removeConversationBookmark (PAN-4498)' },
+  { surface: 'GET /api/conversations/:name/schedules',                   kind: 'http', disposition: 'READ',        door: 'conversation-schedules.listConversationSchedules (PAN-4640)' },
+  { surface: 'POST /api/conversations/:name/schedules',                  kind: 'http', disposition: 'WRITE',       door: 'conversation-schedules.createConversationSchedule (PAN-4640)' },
+  { surface: 'PATCH /api/conversations/:name/schedules/:id',             kind: 'http', disposition: 'WRITE',       door: 'conversation-schedules.updateConversationSchedule (PAN-4640)' },
+  { surface: 'DELETE /api/conversations/:name/schedules/:id',            kind: 'http', disposition: 'WRITE',       door: 'conversation-schedules.removeConversationSchedule (PAN-4640)' },
   { surface: 'POST /api/conversations/:name/plan-action',                kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.planAction' },
   { surface: 'POST /api/conversations/:name/companion-terminal/open',    kind: 'http', disposition: 'RELOCATE',    door: 'CompanionTerminalLifecycle.open (tmux companion session; generation stamped on the session, nothing stored; PAN-3974)' },
   { surface: 'POST /api/conversations/:name/companion-terminal/close',   kind: 'http', disposition: 'RELOCATE',    door: 'CompanionTerminalLifecycle.close (kills only the companion session; stale generation refused; PAN-3974)' },
@@ -632,6 +636,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/terminals',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Terminal management; outside 8 remodel domains' },
   { surface: 'DELETE /api/terminals/:name',               kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Terminal management; outside 8 remodel domains' },
 
+  // ── push.ts ───────────────────────────────────────────────────────────────
+  { surface: 'GET /api/push/vapid-public-key',          kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
+  { surface: 'GET /api/push/status',                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
+  { surface: 'POST /api/push/subscriptions',            kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
+  { surface: 'DELETE /api/push/subscriptions/:id',      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
+  { surface: 'POST /api/push/test',                     kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
   // ── tts.ts ────────────────────────────────────────────────────────────────
   { surface: 'GET /api/tts/status',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TTS service; outside 8 remodel domains' },
   { surface: 'POST /api/tts/speak',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TTS service; outside 8 remodel domains' },
