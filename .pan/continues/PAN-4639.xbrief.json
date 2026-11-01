@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T09:39:12.208Z",
+  "updated": "2026-11-01T09:39:28.942Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,10 @@
     "settle-controls.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T09:39:12.207Z"
+    },
+    "settle-controls.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:39:28.941Z"
     }
   }
 }
