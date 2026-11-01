@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:27:03.742Z",
+  "updated": "2026-11-01T21:27:18.365Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -274,6 +274,10 @@
     "wi6-work-door-issue-start.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T21:27:03.742Z"
+    },
+    "wi6-work-door-issue-start.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:27:18.365Z"
     }
   }
 }
