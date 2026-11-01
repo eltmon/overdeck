@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4714",
+  "created": "2026-11-01T12:30:39.191Z",
+  "updated": "2026-11-01T12:30:39.191Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contracts-tracker-issue-ref": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4714",
+      "claimedAt": "2026-11-01T12:30:39.190Z"
+    }
+  }
+}
