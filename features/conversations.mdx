@@ -654,6 +654,18 @@ The other direction works too: an issue's **Code** card lists every conversation
 linked to the issue's PR, with why it's linked (opened by the pipeline, linked
 by hand, linked by an agent, or on the same branch). Click one to open it.
 
+### Issue links
+
+Clicking an issue link in a conversation transcript — a GitHub issue of a
+registered project, or a Linear issue whose prefix belongs to a registered
+project — opens that issue's drawer in the dashboard instead of leaving the
+page. Ctrl/Cmd-click, middle-click or the browser's right-click menu still open
+the tracker in a new tab. Links to issues Overdeck doesn't track stay plain
+links. This only applies to the main dashboard layout, which is the only place
+that mounts the issue drawer; in a pop-out window (`/popout/conversation/<id>`,
+`/popout/flywheel-conversation`) or the mobile app (`/m`), an issue link always
+opens the tracker in a new tab.
+
 ### On issue and workspace rows
 
 The issue's row in Command Deck's project tree, and its row in the sidebar
