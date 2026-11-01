@@ -465,3 +465,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   the ask, rather than leave it blocked for the absent operator. `pan answer`
   only answers pane menus; `pan ask` decisions are answered in the dashboard
   Needs-you, or the asking agent withdraws them.
+- A second `pan reload` started while one waits for approval exits at once
+  with "restart in progress (held by PID …)"; the waiting one keeps its older
+  staged build. Always stop the waiting reload first (find it with
+  `ps -eo pid,args | grep "[n]ode .*bin/pan reload"`), then start the new one,
+  and read the new log's first lines to confirm it started (2026-11-01 tick 98
+  missed PAN-4727 this way until tick 102).
