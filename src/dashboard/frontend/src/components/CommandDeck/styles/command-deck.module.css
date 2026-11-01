@@ -6630,3 +6630,10 @@
   cursor: pointer;
   font-size: inherit;
 }
+
+/* PAN-4650 WI-14: Pull here leaves the title bar for the ⋮ menu when the header is narrow. */
+@container (max-width: 520px) {
+  .conversationHeaderContainer .pullHereHeaderButton {
+    display: none;
+  }
+}

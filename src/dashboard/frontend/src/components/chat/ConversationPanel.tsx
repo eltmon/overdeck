@@ -32,7 +32,7 @@ import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
 import { PanOpenInPicker } from '../PanOpenInPicker';
-import { acceptsInput, ConversationMachineBanner, ConversationMachineChip, conversationHeaderStatus, conversationMachineState, isLiveMachineState, runsHere } from './ConversationMachineBanner';
+import { acceptsInput, ConversationMachineBanner, ConversationMachineChip, conversationHeaderStatus, conversationMachineState, isLiveMachineState, PullHereButton, runsHere } from './ConversationMachineBanner';
 import { ConversationBranchMeta } from './ConversationBranchMeta';
 import { ConversationPullRequestProvider } from './TranscriptPullRequestLink';
 import { ConversationBookmarksProvider } from './bookmarks/ConversationBookmarks';
@@ -759,6 +759,7 @@ export function ConversationPanel({
                 />
               )}
 
+              <PullHereButton conversation={conversation} />
               <button
                 className={`${styles.conversationAboutToggle} ${aboutOpen ? styles.conversationAboutToggleActive : ''}`}
                 onClick={() => setAboutOpen(v => !v)}
@@ -905,6 +906,7 @@ export function ConversationPanel({
                         <Download size={14} />
                         Export transcript
                       </MenuItemButton>
+                      <PullHereButton conversation={conversation} menu onDone={() => setMenuOpen(false)} />
                       {runsHere(conversation) && (
                         <MenuItemButton onClick={() => { openContinueOnDevice(continueTargetOf(conversation, viewMode === 'terminal' ? 'terminal' : 'conversation')); setMenuOpen(false); }}>
                           <MonitorSmartphone size={14} />

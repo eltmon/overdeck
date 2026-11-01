@@ -11,8 +11,9 @@ import { ArrowDownToLine, ArrowUpRight, CloudOff, ExternalLink, FileText, Loader
 import type { Conversation } from '../CommandDeck/ConversationList';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 import { reconnectMachine } from '../Settings/anywhere/machinesApi';
+import { MenuItemButton } from '../shared/ContextMenu';
 import { conversationMachineState, lastSeenText } from './conversationMachineState';
-import { VaultContinueDialog } from './VaultContinueDialog';
+import { openPullHereDialog } from './PullHereDialog';
 
 export { acceptsInput, conversationHeaderStatus, conversationMachineState, isLiveMachineState, runsHere } from './conversationMachineState';
 
@@ -20,10 +21,6 @@ export { acceptsInput, conversationHeaderStatus, conversationMachineState, isLiv
 export function openConversationRoute(key: string): void {
   window.history.pushState(null, '', `/conv/${key.startsWith('@') ? key : encodeURIComponent(key)}`);
   window.dispatchEvent(new PopStateEvent('popstate'));
-}
-
-function vaultIdOf(copyName: string): string {
-  return copyName.startsWith('vault-') ? copyName.slice('vault-'.length) : copyName;
 }
 
 /** The linked row the released copy became on the machine it went to, and that machine's label. */
@@ -67,8 +64,17 @@ function ReleasedBanner({ conversation }: { conversation: Conversation }) {
   );
 }
 
+function pullTarget(conversation: Conversation, offline: boolean) {
+  return {
+    name: conversation.name,
+    title: conversation.title ?? conversation.remoteName ?? conversation.name,
+    machineLabel: conversation.machineLabel ?? 'the other machine',
+    isWorking: conversation.isWorking === true,
+    offline,
+  };
+}
+
 function OfflineBanner({ conversation, saved }: { conversation: Conversation; saved: boolean }) {
-  const [continuing, setContinuing] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const label = conversation.machineLabel ?? 'The other machine';
   const reconnect = async () => {
@@ -87,7 +93,8 @@ function OfflineBanner({ conversation, saved }: { conversation: Conversation; sa
         {saved && conversation.savedCopyName ? (
           <>
             <BannerButton icon={<FileText size={13} />} label="Read saved copy" onClick={() => openConversationRoute(conversation.savedCopyName!)} />
-            <BannerButton icon={<ArrowDownToLine size={13} />} label="Continue here" primary onClick={() => setContinuing(true)} />
+            {/* PAN-4650 WI-14: the pull job's offline path continues the saved copy through the vault. */}
+            <BannerButton icon={<ArrowDownToLine size={13} />} label="Continue here" primary onClick={() => openPullHereDialog(pullTarget(conversation, true))} />
           </>
         ) : (
           <BannerButton
@@ -98,9 +105,6 @@ function OfflineBanner({ conversation, saved }: { conversation: Conversation; sa
           />
         )}
       </span>
-      {continuing && conversation.savedCopyName && (
-        <VaultContinueDialog vaultId={vaultIdOf(conversation.savedCopyName)} onClose={() => setContinuing(false)} onContinued={openConversationRoute} />
-      )}
     </div>
   );
 }
@@ -111,6 +115,27 @@ export function ConversationMachineBanner({ conversation }: { conversation: Conv
   if (state === 'released') return <ReleasedBanner conversation={conversation} />;
   if (state === 'offline-saved' || state === 'offline-none') return <OfflineBanner conversation={conversation} saved={state === 'offline-saved'} />;
   return null;
+}
+
+/**
+ * **Pull here** in the title bar of a conversation an online linked machine
+ * runs and can hand over (`pullable`; the UI never compares harness names).
+ * `menu` renders the ⋮ item, the fallback when the header is narrow.
+ */
+export function PullHereButton({ conversation, menu = false, onDone }: { conversation: Conversation; menu?: boolean; onDone?: () => void }) {
+  if (conversationMachineState(conversation) !== 'remote' || conversation.pullable === false) return null;
+  const open = () => { openPullHereDialog(pullTarget(conversation, false)); onDone?.(); };
+  return menu ? (
+    <MenuItemButton onClick={open}>
+      <ArrowDownToLine size={14} />
+      Pull here
+    </MenuItemButton>
+  ) : (
+    <button type="button" className={`${styles.conversationAboutToggle} ${styles.pullHereHeaderButton}`} title="Make this machine the owner" onClick={open}>
+      <ArrowDownToLine size={14} />
+      <span>Pull here</span>
+    </button>
+  );
 }
 
 /** "on <machine>" in the header metadata row of a linked conversation. */

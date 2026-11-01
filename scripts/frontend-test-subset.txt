@@ -82,6 +82,7 @@ src/components/chat/__tests__/HandoffNotice.test.tsx
 src/components/chat/__tests__/HeldHandoffView.test.tsx
 src/components/chat/__tests__/ImageLightbox.test.tsx
 src/components/chat/__tests__/ModelPicker.test.tsx
+src/components/chat/__tests__/PullHereDialog.test.tsx
 src/components/chat/__tests__/ScheduledMessageRow.test.tsx
 src/components/chat/__tests__/VaultBrowseCopy.test.tsx
 src/components/chat/__tests__/VaultContinueDialog.test.tsx
