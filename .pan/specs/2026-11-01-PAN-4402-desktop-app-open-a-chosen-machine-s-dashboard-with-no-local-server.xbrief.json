@@ -4,17 +4,17 @@
     "created": "2026-11-01T04:59:50Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4402: Desktop app: open a chosen machine's dashboard with no local server",
-    "updated": "2026-11-01T05:01:37.957Z"
+    "updated": "2026-11-01T05:03:00.032Z"
   },
   "plan": {
     "id": "pan-4402",
     "title": "Desktop app: open a chosen machine's dashboard with no local server",
-    "status": "proposed",
+    "status": "running",
     "uid": "966e6be1-1dfd-45f4-b70c-2cc37a5572aa",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T04:59:50Z",
-    "updated": "2026-11-01T05:01:37.957Z",
+    "updated": "2026-11-01T05:03:00.032Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4402",
@@ -783,5 +783,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
