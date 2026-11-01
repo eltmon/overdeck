@@ -1,12 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T06:46:38Z · model: claude-opus-5-5 · open: 868_
+_Last sequenced: 2026-11-01T06:49:40Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
 | 2 | PAN-4639 | L | medium | ok |  |  | In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions. |
+| 3 | PAN-4677 | XS | low | ok |  |  | In pipeline: throwaway one-line task for the PAN-4295 live Fly smoke test; PR closed unmerged, never merge. |
 | 4 | PAN-4663 | XS | critical | ok |  |  | In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts |
 | 5 | PAN-4670 | S | high | ok |  |  | In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs. |
 | 6 | PAN-4672 | S | high | ok |  |  | In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout. |
@@ -884,6 +885,10 @@ New in-pipeline follow-up to the merged #4584 with a decided design, so it is pi
 
 New in-pipeline issue with a live workspace, so it is pinned near the top beside PAN-4626 per the in-pipeline rule; it also offers a non-destructive path for the idle cleanup asked in PAN-1485.
 
+### PAN-4677 (rank 3)
+
+New in-pipeline issue pinned at the free rank 3; it exists only to exercise PAN-4295 Fly remote execution end to end.
+
 ### PAN-4663 (rank 4)
 
 New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.
@@ -1192,10 +1197,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 
 Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
 
-### PAN-3043 (rank 85)
-
-Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1203,10 +1204,10 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T06:46:38Z",
+  "generatedAt": "2026-11-01T06:49:40Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 868,
+  "openCount": 869,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -1231,6 +1232,19 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "dependsOn": [],
       "why": "In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions.",
       "rationale": "New in-pipeline issue with a live workspace, so it is pinned near the top beside PAN-4626 per the in-pipeline rule; it also offers a non-destructive path for the idle cleanup asked in PAN-1485.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4677",
+      "rank": 3,
+      "size": "XS",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: throwaway one-line task for the PAN-4295 live Fly smoke test; PR closed unmerged, never merge.",
+      "rationale": "New in-pipeline issue pinned at the free rank 3; it exists only to exercise PAN-4295 Fly remote execution end to end.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1426,6 +1440,19 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "dependsOn": [],
       "why": "Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text",
       "rationale": "New operator-reported settings UI bug (substrate-improvement label sets a high floor): truncated model names make the operator misread which model is routed. Cause and fix are already identified in WorkhorsePanel.tsx, so it is a small, self-contained change; ranked just below the crew-removal bug because it misleads but does not block configuration.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4675",
+      "rank": 19,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close.",
+      "rationale": "New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network timeout becomes a defect that skips pausing agents and stopping the stack, and the merge door then refuses re-runs with Already merged. PAN-4299 is stuck half-closed right now, and pan close refuses on DoD row 5. Substrate bug with clear AC, so it slots into the free rank 19 beside the other merge and close-out fixes; it overlaps PAN-3557 (label retry), and fixing either should consult the other.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12061,19 +12088,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4675",
-      "rank": 19,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close.",
-      "rationale": "New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network timeout becomes a defect that skips pausing agents and stopping the stack, and the merge door then refuses re-runs with Already merged. PAN-4299 is stuck half-closed right now, and pan close refuses on DoD row 5. Substrate bug with clear AC, so it slots into the free rank 19 beside the other merge and close-out fixes; it overlaps PAN-3557 (label retry), and fixing either should consult the other.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13756,6 +13770,13 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4677",
+      "to": "PAN-4295",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
