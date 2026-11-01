@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4641",
   "created": "2026-11-01T05:00:29.700Z",
-  "updated": "2026-11-01T06:54:04.596Z",
+  "updated": "2026-11-01T06:54:25.411Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "reset-text-parser.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T06:54:04.595Z"
+    },
+    "provider-error-usage-limit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:54:25.410Z"
     }
   }
 }
