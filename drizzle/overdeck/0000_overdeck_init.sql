@@ -260,6 +260,18 @@ CREATE TABLE `issues` (
 );
 --> statement-breakpoint
 CREATE INDEX `issues_stage_idx` ON `issues` (`stage`);--> statement-breakpoint
+CREATE TABLE `linked_conversations` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`environment_id` text NOT NULL,
+	`name` text NOT NULL,
+	`row_json` text NOT NULL,
+	`native_session_id` text,
+	`cached_at` text NOT NULL,
+	`list_hash` text NOT NULL,
+	UNIQUE(`environment_id`, `name`)
+);
+--> statement-breakpoint
+CREATE INDEX `linked_conversations_session_idx` ON `linked_conversations` (`native_session_id`);--> statement-breakpoint
 CREATE TABLE `merge_queue` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`project_key` text NOT NULL,
