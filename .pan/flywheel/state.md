@@ -400,3 +400,7 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   always bumps `updated`). Hit 4643, 4626, 2354, 4330. The commit-and-rerequest
   recovery only works when the stack is healthy at dispatch; until PAN-4669 and
   PAN-4690 land, every review is at risk.
+- 2026-11-01 08:10 UTC: operator approved the machinery fixes for PAN-4669 and
+  PAN-4690. Launched as strikes (`pan strike`), not `pan start`: the normal
+  review path is what they fix, and strike PRs go to the operator to merge,
+  which keeps the supervision TENET-10 asks for.

@@ -1,0 +1,640 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-25T10:02:57Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4626: Stop and archive still show no visible pending state on the conversation row: dim the row and label it",
+    "updated": "2026-11-01T05:57:36.226Z"
+  },
+  "plan": {
+    "id": "pan-4626",
+    "title": "Stop and archive still show no visible pending state on the conversation row: dim the row and label it",
+    "status": "running",
+    "uid": "cc1ec287-a974-493a-ac4e-d07a67fe3262",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-10-25T10:02:57Z",
+    "updated": "2026-11-01T05:57:36.226Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4626",
+        "label": "PAN-4626",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "conversations",
+      "ux",
+      "react-query"
+    ],
+    "narratives": {
+      "Problem": "PAN-4584 shipped an archive-pending indicator that looks exactly like a busy agent (the green Loader2 with styles.conversationWorkingSpinner in the status-dot slot) plus an easy-to-miss title shimmer. Stop has no pending state at all: stopMutation has no mutationKey and no onError, and stop() is gated on the hook-wide stopMutation.isPending, so stopping a second conversation while one stop is in flight is silently dropped. Both onSuccess handlers fire invalidateQueries without returning it, so pending ends before the refetched list changes the row and the row snaps back to normal for a moment. The operator saw no difference on the live dashboard.",
+      "Proposal": "One shared 'leaving' treatment for stop and archive, as decided in the issue: dim the row (.conversationRowLeaving: opacity 0.45, 150ms transition, pointer-events none; no transition under prefers-reduced-motion), make it inert, and say in words what is happening (flat rows replace the meta line with a muted size-10 Loader2 + 'Archiving…'/'Stopping…'; nested rows append the label after the title). Revert the dot-slot spinner and the archive title shimmer. The stop X becomes an inert spinner. Give stopMutation mutationKey ['conversation-stop'], expose isStopPending(name) via useMutationState, dedupe per name, toast server errors. Both mutations' onSuccess handlers become async and await the ['conversations'] invalidate promise before their side effects, so pending lasts until the refetch lands. The ConversationPanel header shows 'Stopping…' like it shows 'Archiving…'. Docs and live Playwright screenshots complete the slice. Full step-by-step detail lives in the PRD .pan/drafts/PAN-4626.md (WI-1..WI-8, D1..D9).",
+      "NonGoals": "- No flash, color pulse, or new animation beyond the opacity transition and the existing spin keyframe.\n- No success toast for stop.\n- No change to the server stop or archive routes.\n- Do not disable or relabel the 'Stop agent' items in ConversationActionMenu.tsx or the ConversationPanel header menu; the per-name dedupe in stop() covers repeat clicks.\n- Do not change retitle pending behavior: isRetitlePending still applies titleRegenerating.\n- Do not raise any file-size allowlist cap; ConversationPanel.tsx must not grow past 1520 lines.\n- Never let a Playwright verification request reach the live server's /archive or /stop endpoints (no route.continue())."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Archive wins when both archive and stop are pending: leavingKind = archive ? 'archive' : stop ? 'stop' : null.",
+        "rationale": "Archiving also ends the session, so 'Archiving…' is the truer label; the issue does not cover the overlap."
+      },
+      {
+        "summary": "The label and stop-button spinner use a new muted .conversationLeavingSpinner class, not .conversationWorkingSpinner.",
+        "rationale": ".conversationWorkingSpinner is color var(--success) green, the exact signal the issue removes as confusable."
+      },
+      {
+        "summary": "Add .conversationRowLeaving .conversationStopBtn { opacity: 1 }.",
+        "rationale": "The stop button is hover-only (opacity 0); pointer-events none ends hover, so without this the issue's stop spinner would be invisible."
+      },
+      {
+        "summary": "Inert means no handlers: the pending stop span has no onClick/onKeyDown/tabIndex, and the row root's onClick/onContextMenu return early while leaving.",
+        "rationale": "pointer-events none does not stop keyboard activation in a browser or fireEvent.click in jsdom, and the issue requires the X to do nothing when clicked."
+      },
+      {
+        "summary": "The panel's status span gets aria-label 'Archiving conversation' / 'Stopping conversation' and tests query by role+name.",
+        "rationale": "The panel already renders 'Stopping…' for the turn-abort button, so text alone is ambiguous."
+      },
+      {
+        "summary": "Register useConversationMutations.archive.test.tsx and the new useConversationMutations.stop.test.tsx in root package.json test:frontend-subset.",
+        "rationale": "CI runs only listed frontend files; the archive suite from PAN-4584 is not listed, so neither suite would ever run on CI."
+      },
+      {
+        "summary": "stopConversation parses the JSON error body like archiveConversation.",
+        "rationale": "The issue asks for the server message in the error toast; handleConversationStop returns { error } on 404 and 500."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One UI behavior across a hook, one row component, one stylesheet, one panel, their tests and two docs; 13 files in one subsystem (dashboard frontend conversations).",
+      "canonicalFilename": "2026-10-25-PAN-4626-stop-and-archive-still-show-no-visible-pending-state-on-the-conversation-row-dim-the-row-and-label-it.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "hook-stop-pending",
+        "title": "Per-conversation stop pending, dedupe and error toast in useConversationMutations",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-25T10:02:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/useConversationMutations.stop.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationActionMenu.archive.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/VaultBrowseCopy.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/useConversationMutations.stop.test.tsx src/components/CommandDeck/__tests__/useConversationMutations.archive.test.tsx src/components/CommandDeck/__tests__/ConversationRow.test.tsx src/components/CommandDeck/__tests__/ConversationActionMenu.archive.test.tsx src/components/chat/__tests__/VaultBrowseCopy.test.tsx src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx",
+            "grep -c 'useConversationMutations.stop.test.tsx\\|useConversationMutations.archive.test.tsx' package.json"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all listed vitest files pass, including the new useConversationMutations.stop.test.tsx with 5 cases",
+            "grep prints 1 (both paths on the test:frontend-subset line)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly. In useConversationMutations.ts: add STOP_MUTATION_KEY = ['conversation-stop'] as const; make stopConversation parse res.json().catch(() => null) and throw data?.error || 'Failed to stop conversation'; add isStopPending to the ConversationMutations interface; give stopMutation mutationKey: STOP_MUTATION_KEY and onError toast.error(err.message, { duration: 6000 }); add pendingStopNames via useMutationState({ filters: { mutationKey: STOP_MUTATION_KEY, status: 'pending' }, select: (m) => m.state.variables as string }); delete stopIsPending; stop() returns early only when queryClient.isMutating({ mutationKey: STOP_MUTATION_KEY, predicate: (m) => m.state.variables === name }) > 0; add isStopPending: (name) => pendingStopNames.includes(name); swap stopIsPending for pendingStopNames in the useMemo deps. Do NOT change stopMutation.onSuccess here (hook-hold-until-refetch does). Add isStopPending: vi.fn(() => false) to the hand-built fixtures in ConversationRow.test.tsx, ConversationActionMenu.archive.test.tsx and VaultBrowseCopy.test.tsx (typecheck excludes tests, so only vitest catches it). Create useConversationMutations.stop.test.tsx cloning the archive suite's scaffolding with the five cases in PRD WI-1 step 8. Add both hook suites to root package.json test:frontend-subset."
+        },
+        "items": [
+          {
+            "id": "hook-stop-pending.ac1",
+            "title": "Given stop('a') is pending with a never-resolving fetch, when stop('b') is called, then fetch is called a second time with /api/conversations/b/stop (stop pending is per conversation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-stop-pending.ac2",
+            "title": "Given two hook instances on one QueryClient, when instance A calls stop('a'), then instance B's isStopPending('a') returns true and B's stop('a') sends no second request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-stop-pending.ac3",
+            "title": "Given the stop POST returns 500 { error: 'Stop exploded' }, then toast.error is called with ('Stop exploded', { duration: 6000 }), toast.success is not called, and isStopPending('a') returns false; a non-JSON 500 body toasts 'Failed to stop conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-stop-pending.ac4",
+            "title": "Root package.json test:frontend-subset contains both src/components/CommandDeck/__tests__/useConversationMutations.stop.test.tsx and src/components/CommandDeck/__tests__/useConversationMutations.archive.test.tsx, and vitest reports zero failures for ConversationList.render-count.test.tsx and CommandDeck.render-count.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hook-hold-until-refetch",
+        "title": "Await the conversations refetch in archive and stop onSuccess before their side effects",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-25T10:02:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/useConversationMutations.archive.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/useConversationMutations.stop.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/useConversationMutations.stop.test.tsx src/components/CommandDeck/__tests__/useConversationMutations.archive.test.tsx src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both hook suites pass including the new 'stays pending until the conversations refetch resolves' cases; ConversationPanel.test.tsx still passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 and decision D6. Make archiveMutation.onSuccess async: FIRST `await queryClient.invalidateQueries({ queryKey: ['conversations'] });` (comment: awaited so the mutation stays pending — row dimmed — until the refetched list drops the row, PAN-4626), THEN closeConversationPanes(name), the deselect, and the success toast. Make stopMutation.onSuccess async the same way: await the invalidate, then deselect. Side effects go after the await because closing a pane during the refetch would unmount a pane-hosted ConversationPanel and TanStack drops mutate-level callbacks (onArchived) of unmounted callers. Add one test per suite that mounts an ACTIVE observer — renderHook(() => { useQuery({ queryKey: ['conversations'], queryFn, staleTime: Infinity }); return useConversationMutations(null, vi.fn()); }) with a deferred queryFn — because the existing setup() has no observer and invalidateQueries would resolve at once (a vacuous pass). Assert pending is true after queryFn has been called once (POST already resolved) and false after resolving the deferred refetch; in the archive case also assert toast.success, closeConversationPanes and the per-call onSuccess are not called before the refetch resolves and are called after. Use the exact shape in PRD WI-2 step 3; no real setTimeout waits. In the stop case render useConversationMutations('a', onSelect) with onSelect = vi.fn() and assert onSelect is not called before the refetch resolves and is called once with null after."
+        },
+        "items": [
+          {
+            "id": "hook-hold-until-refetch.ac1",
+            "title": "Given an active ['conversations'] observer with a deferred queryFn and an archive POST that resolves 200, when the refetch has started but not resolved, then isArchivePending('a') returns true and toast.success, closeConversationPanes and the per-call onSuccess have not been called; after the refetch resolves pending returns false and all three have been called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-hold-until-refetch.ac2",
+            "title": "Given the same deferred refetch setup and a stop POST that resolves 200, then isStopPending('a') stays true until the refetch resolves and returns false afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-hold-until-refetch.ac3",
+            "title": "Given a stop POST that resolves 200 with an active deferred ['conversations'] refetch, when the refetch has not resolved, then onSelectConversation has not been called with null for the selected conversation; after it resolves, onSelectConversation(null) is called once, and the existing archive success test still renders the 'Archived \"Alpha\"' toast",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-leaving-css",
+        "title": "Add the leaving-state CSS classes to command-deck.module.css",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-25T10:02:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n -A4 '^\\.conversationRowLeaving {' src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "grep -n -B1 -A3 'conversationRowLeaving {' src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css | grep -c 'transition: none'",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the .conversationRowLeaving block shows opacity: 0.45, transition: opacity 150ms ease-out, pointer-events: none",
+            "count >= 1: a prefers-reduced-motion block sets transition: none on .conversationRowLeaving",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Paste the CSS block from PRD WI-3 after the .conversationWorkingPulse rule (~line 2716): .conversationRowLeaving { opacity: 0.45; transition: opacity 150ms ease-out; pointer-events: none; }, .conversationRowLeaving .conversationStopBtn { opacity: 1; } (the stop button is hover-only and pointer-events none ends hover), .conversationLeavingStatus (inline-flex, gap 4px, 10px, var(--muted-foreground), nowrap), .conversationLeavingSpinner (flex-shrink 0, var(--muted-foreground), animation: spin 1s linear infinite), and @media (prefers-reduced-motion: reduce) { .conversationRowLeaving { transition: none; } }. Reuse the existing @keyframes spin; do not add a keyframe and do not touch .conversationWorkingSpinner."
+        },
+        "items": [
+          {
+            "id": "row-leaving-css.ac1",
+            "title": "The stylesheet applies opacity: 0.45, transition: opacity 150ms ease-out and pointer-events: none to .conversationRowLeaving",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-leaving-css.ac2",
+            "title": "Under @media (prefers-reduced-motion: reduce) the stylesheet applies transition: none to .conversationRowLeaving and leaves its opacity unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-leaving-css.ac3",
+            "title": "The stylesheet applies color var(--muted-foreground) (not var(--success)) to .conversationLeavingSpinner and opacity: 1 to .conversationRowLeaving .conversationStopBtn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-leaving-state",
+        "title": "Dim and disable the leaving row, remove the dot-slot archive spinner, swap the stop X for an inert spinner",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-25T10:02:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/ConversationRow.test.tsx src/components/CommandDeck/__tests__/ConversationList.test.tsx",
+            "wc -l src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ConversationRow.test.tsx passes including the 'ConversationRow leaving state (PAN-4626)' cases; ConversationList.test.tsx passes",
+            "line count below 1000"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4. Add stopPending = mutations.isStopPending(conv.name) and leavingKind ('archive' wins) next to archivePending. Append styles.conversationRowLeaving to both itemClass branches when leavingKind is set. Row root: onClick returns early when leaving; onContextMenu keeps preventDefault/stopPropagation then returns early when leaving; aria-busy={leavingKind ? true : undefined}. Stop button: when stopPending render the span with className styles.conversationStopBtn, aria-disabled=\"true\", aria-label `Stopping agent for ${conv.name}`, title 'Stopping…', NO onClick/onKeyDown/tabIndex, child <Loader2 size={iconSize} className={styles.conversationLeavingSpinner} />; otherwise keep today's X button. Delete the `archivePending ? (<Loader2 … aria-label={`Archiving ${conv.name}`} />) :` branch from the status indicator chain. Change `archivePending || mutations.isRetitlePending(conv.name)` to `mutations.isRetitlePending(conv.name)` on both title spans. Rewrite the 'ConversationRow archive pending (PAN-4584)' describe as 'ConversationRow leaving state (PAN-4626)', importing styles from '../styles/command-deck.module.css' for toHaveClass (Vitest resolves module class names to stable strings like _conversationItem_10de07). Replace (do not just delete) the old getByLabelText('Archiving test-conversation') assertion. Keep the two existing menu cases."
+        },
+        "items": [
+          {
+            "id": "row-leaving-state.ac1",
+            "title": "Given isArchivePending returns true, the row root button has class styles.conversationRowLeaving and aria-busy=\"true\", contains no element with class styles.conversationWorkingSpinner, and its title span lacks styles.titleRegenerating",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-leaving-state.ac2",
+            "title": "Given sessionAlive is true and isStopPending returns true, the row root has the leaving class, the element labelled 'Stopping agent for test-conversation' has aria-disabled=\"true\", the 'Stop agent for test-conversation' X is not rendered, and fireEvent.click plus keyDown Enter on the spinner leave mutations.stop uncalled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-leaving-state.ac3",
+            "title": "Given a leaving row, clicking the row root does not call onSelect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-leaving-state.ac4",
+            "title": "Given isArchivePending returns true, the menu still renders a disabled 'Archiving…' item, and confirming Archive on a non-pending row still calls mutations.archive once with the name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-leaving-label",
+        "title": "Show the Archiving…/Stopping… label on the row's second line (flat) or after the title (nested)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-25T10:02:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ConversationRow.test.tsx passes including the flat archive, flat stop and nested archive label cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5. Build leavingLabel once: <span className={styles.conversationLeavingStatus}><Loader2 size={10} className={styles.conversationLeavingSpinner} aria-hidden=\"true\" /><span>{leavingKind === 'archive' ? 'Archiving…' : 'Stopping…'}</span></span> (U+2026 ellipsis), null when not leaving. Flat branch: the conversationMetaLine span renders leavingLabel instead of ALL its current children (verdict badge, branch chip, owner, PR badge, time, cost, tokens, harness, model, fork badges) while leaving. Nested branch: render {leavingLabel} immediately after the title span. Add tests: flat archive pending → getByText('Archiving…') present and screen.queryByTitle(/^Harness:/) null; flat stop pending → getByText('Stopping…'); variant=\"nested\" archive pending → getByText('Archiving…') and the title still rendered."
+        },
+        "items": [
+          {
+            "id": "row-leaving-label.ac1",
+            "title": "Given a flat row with archive pending, the row renders the text 'Archiving…' and no element titled 'Harness: …' (the meta line contents are replaced)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-leaving-label.ac2",
+            "title": "Given a flat row with stop pending and archive not pending, the row renders the text 'Stopping…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-leaving-label.ac3",
+            "title": "Given variant=\"nested\" with archive pending, the row renders both the conversation title and the text 'Archiving…' on its single line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "panel-stopping-status",
+        "title": "Show a Stopping… status in the ConversationPanel header while that conversation's stop is pending",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-25T10:02:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "wc -l src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ConversationPanel.test.tsx passes including the new 'shows a Stopping… status' case and the updated archive status case",
+            "line count is 1520 or fewer"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6. Replace the `{archivePending && (…Archiving…)}` header span (~line 805) with the same span rendered when archivePending || convMutations.isStopPending(conversation.name), with aria-label archivePending ? 'Archiving conversation' : 'Stopping conversation' and text archivePending ? 'Archiving…' : 'Stopping…'. No net line growth (the file is 1520 lines; never raise its allowlist cap). The existing turn-abort button also reads 'Stopping…', so tests query by role+name. Update the existing archive status test to findByRole('status', { name: 'Archiving conversation' }). Add a stop test: sessionAlive true, installStrictFetchMock routes POST /api/conversations/test-conv/stop to a deferred promise, open 'More conversation actions', click the 'Stop agent' menuitem, assert findByRole('status', { name: 'Stopping conversation' }) has text 'Stopping…', resolve with Response.json({ success: true }), assert the status disappears."
+        },
+        "items": [
+          {
+            "id": "panel-stopping-status.ac1",
+            "title": "Given an unresolved stop request from the header menu, the panel renders a role=status element named 'Stopping conversation' whose text is 'Stopping…', and it disappears after the request resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel-stopping-status.ac2",
+            "title": "Given an unresolved archive request, the panel renders a role=status element named 'Archiving conversation' with text 'Archiving…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel-stopping-status.ac3",
+            "title": "Given the change is applied, when running wc -l on ConversationPanel.tsx, then it returns 1520 or fewer lines, and git diff origin/main -- scripts/file-size-allowlist.txt produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-leaving-state",
+        "title": "Document the stop/archive leaving state in conversations.mdx and DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-25T10:02:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Stopping or archiving a conversation' features/conversations.mdx",
+            "grep -n \"conversation-stop\" docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -c 'the row shows a spinner' features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "one match for the renamed section heading",
+            "one match on the render-identity bullet naming ['conversation-stop'] and PAN-4626",
+            "0 (the old spinner sentence is gone)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7. In features/conversations.mdx rename '## Archiving a conversation' (~line 655) to '## Stopping or archiving a conversation' and rewrite its paragraph to say: after you stop (the X on the row, or Stop agent in a menu) or confirm archive, the row dims, stops responding to clicks, and its second line reads 'Stopping…' or 'Archiving…' (nested rows show the label after the title); the X becomes a spinner; the conversation header shows the same status; the row stays dimmed until the list has refreshed; a stopped row then shows its stopped (gray) dot; an archived row leaves the list with an 'Archived \"<title>\"' toast and its tab closes; a failure shows an error toast with the server's message and the row returns to normal. Remove 'the row shows a spinner'. In docs/DASHBOARD-ARCHITECTURE.md line ~609 extend the PAN-4584 sentence so it names both ['conversation-archive'] and ['conversation-stop'] and says both mutations return the ['conversations'] invalidate promise from onSuccess so pending lasts until the refetch lands (PAN-4626)."
+        },
+        "items": [
+          {
+            "id": "docs-leaving-state.ac1",
+            "title": "features/conversations.mdx contains a '## Stopping or archiving a conversation' section that names the 'Stopping…' and 'Archiving…' labels, the dimmed row, the X spinner, and the error toast with the server message, and no longer contains 'the row shows a spinner'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-leaving-state.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md's render-identity bullet names both mutation keys ['conversation-archive'] and ['conversation-stop'] and states that onSuccess returns the ['conversations'] invalidate promise (PAN-4626)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-screenshots",
+        "title": "Capture live Playwright screenshots of a row mid-archive and mid-stop and attach them to the PR",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-25T10:02:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/screenshots/pan-4626/mid-archive.png",
+            "docs/screenshots/pan-4626/mid-stop.png",
+            "docs/screenshots/pan-4626/mid-archive-reduced-motion.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "ls docs/screenshots/pan-4626/*.png",
+            "gh pr view --json body -q .body | grep -c 'docs/screenshots/pan-4626/'"
+          ],
+          "expected_outputs": [
+            "mid-archive.png, mid-stop.png and mid-archive-reduced-motion.png are listed",
+            "count >= 2: the PR body embeds the mid-archive and mid-stop screenshots"
+          ],
+          "readiness": "sequential",
+          "acJustification": "Verification-only item; its two ACs are the screenshot evidence the issue requires.",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8 after all code items land. Start the workspace's own Vite frontend on a free port (not 3010): `cd src/dashboard/frontend && VITE_PROXY_TARGET=http://127.0.0.1:3011 npx vite --port <port>` — :3011 itself serves the deployed dist, not this branch. Use an isolated Playwright browser context (no shared profile). Register page.route for '**/api/conversations/*/archive' and '**/api/conversations/*/stop' that wait ~5 s and then route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'UAT intercept' }) }). NEVER call route.continue(): a continued request really archives or kills the operator's live conversation. Trigger archive (row menu → Archive → confirm) on one row and stop (hover X) on a live row; screenshot each mid-request to docs/screenshots/pan-4626/mid-archive.png and docs/screenshots/pan-4626/mid-stop.png, and one under page.emulateMedia({ reducedMotion: 'reduce' }) to docs/screenshots/pan-4626/mid-archive-reduced-motion.png (repo convention: docs/screenshots/pan-<n>/). Inspect the PNGs yourself. After the fulfil, confirm the error toast and the restored row. Commit the three PNGs with the trailer 'Item: uat-screenshots' and push. Once the PR exists, embed mid-archive.png and mid-stop.png in its body as ![…](https://raw.githubusercontent.com/eltmon/overdeck/feature/pan-4626/docs/screenshots/pan-4626/<file>.png) via gh pr edit --body-file. Stop the Vite server."
+        },
+        "items": [
+          {
+            "id": "uat-screenshots.ac1",
+            "title": "docs/screenshots/pan-4626/mid-archive.png renders a dimmed row whose second line reads 'Archiving…' with a gray status dot (no green spinner), mid-stop.png renders a dimmed row reading 'Stopping…' with a spinner in place of the X, and the PR body embeds both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-screenshots.ac2",
+            "title": "Given the intercepted /stop and /archive return 500 after the delay, the live page shows an error toast with 'UAT intercept' and the row returns to full opacity with its normal second line; no intercepted request reaches :3011",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "hook-stop-pending",
+        "to": "hook-hold-until-refetch",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-stop-pending",
+        "to": "row-leaving-state",
+        "type": "blocks"
+      },
+      {
+        "from": "row-leaving-css",
+        "to": "row-leaving-state",
+        "type": "blocks"
+      },
+      {
+        "from": "row-leaving-state",
+        "to": "row-leaving-label",
+        "type": "blocks"
+      },
+      {
+        "from": "row-leaving-css",
+        "to": "row-leaving-label",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-stop-pending",
+        "to": "panel-stopping-status",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-hold-until-refetch",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "row-leaving-label",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "panel-stopping-status",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-stop-pending",
+        "to": "row-leaving-label",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

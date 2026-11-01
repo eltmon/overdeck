@@ -1330,10 +1330,29 @@ describe('ConversationPanel archive (PAN-4584)', () => {
 
     openArchiveMenu();
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Archiving…');
+    expect(await screen.findByRole('status', { name: 'Archiving conversation' })).toHaveTextContent('Archiving…');
 
     resolveArchive?.(Response.json({ success: true }));
-    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('status', { name: 'Archiving conversation' })).not.toBeInTheDocument());
+  });
+
+  it('shows a Stopping… status in the header while the stop request is unresolved', async () => {
+    let resolveStop: ((response: Response) => void) | null = null;
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'POST' && url === '/api/conversations/test-conv/stop') {
+        return new Promise<Response>((resolve) => { resolveStop = resolve; });
+      }
+      return defaultConversationResponse(method, url);
+    });
+    renderPanel({ ...mockConversation, sessionAlive: true });
+
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stop agent' }));
+
+    expect(await screen.findByRole('status', { name: 'Stopping conversation' })).toHaveTextContent('Stopping…');
+
+    resolveStop?.(Response.json({ success: true }));
+    await waitFor(() => expect(screen.queryByRole('status', { name: 'Stopping conversation' })).not.toBeInTheDocument());
   });
 });
 
