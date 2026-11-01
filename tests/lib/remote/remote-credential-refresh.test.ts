@@ -200,4 +200,70 @@ describe('remote Claude credential proactive refresh', () => {
     expect(actions).toEqual(['Remote credentials refreshed for PAN-1778 on vm-one']);
     expect(syncClaudeCredentials).toHaveBeenCalledTimes(2);
   });
+
+  describe('Fly machines (PAN-4652 FR-15)', () => {
+    it('syncs a Fly machine by name with no remote agents, through an ephemeral provider', async () => {
+      const syncClaudeCredentials = vi.fn().mockResolvedValue(true);
+      const createFlyProvider = vi.fn(() => ({ syncClaudeCredentials }));
+      const remote = { provider: 'fly' };
+      const actions = await refreshClaudeCredentialsForActiveRemoteAgents({
+        listActiveRemoteAgentStates: () => [],
+        listFlyMachineNames: async () => ['overdeck-machine-1a2b3c4d'],
+        credentialFingerprint: () => '100:12',
+        loadConfig: () => ({ remote }) as any,
+        createFlyProvider: createFlyProvider as any,
+      });
+
+      expect(syncClaudeCredentials).toHaveBeenCalledTimes(1);
+      expect(syncClaudeCredentials).toHaveBeenCalledWith('overdeck-machine-1a2b3c4d');
+      expect(createFlyProvider).toHaveBeenCalledWith(remote, 'ephemeral');
+      expect(actions).toEqual(['Remote credentials refreshed for Fly machine on overdeck-machine-1a2b3c4d']);
+    });
+
+    it('re-syncs on a changed fingerprint and retries a failed sync on the next tick', async () => {
+      const syncClaudeCredentials = vi.fn().mockResolvedValueOnce(true).mockRejectedValueOnce(new Error('exec 503')).mockResolvedValue(true);
+      let fingerprint = '100:12';
+      const deps = {
+        listActiveRemoteAgentStates: () => [],
+        listFlyMachineNames: async () => ['overdeck-machine-1a2b3c4d'],
+        credentialFingerprint: () => fingerprint,
+        loadConfig: () => ({ remote: { provider: 'fly' } }) as any,
+        createFlyProvider: (() => ({ syncClaudeCredentials })) as any,
+      };
+
+      await refreshClaudeCredentialsForActiveRemoteAgents(deps);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(await refreshClaudeCredentialsForActiveRemoteAgents(deps)).toEqual([]);
+
+      fingerprint = '200:12';
+      expect((await refreshClaudeCredentialsForActiveRemoteAgents(deps))[0]).toMatch(/^Remote credentials refresh failed for Fly machine on overdeck-machine-1a2b3c4d: exec 503/);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(await refreshClaudeCredentialsForActiveRemoteAgents(deps)).toEqual(['Remote credentials refreshed for Fly machine on overdeck-machine-1a2b3c4d']);
+      expect(syncClaudeCredentials).toHaveBeenCalledTimes(3);
+    });
+
+    it('constructs no provider with zero agents and zero Fly machines', async () => {
+      const createFlyProvider = vi.fn();
+      const actions = await refreshClaudeCredentialsForActiveRemoteAgents({
+        listActiveRemoteAgentStates: () => [],
+        listFlyMachineNames: async () => [],
+        createFlyProvider: createFlyProvider as any,
+      });
+      expect(actions).toEqual([]);
+      expect(createFlyProvider).not.toHaveBeenCalled();
+    });
+
+    it('still refreshes remote agents when the Fly machine store is unreadable', async () => {
+      const syncClaudeCredentials = vi.fn().mockResolvedValue(true);
+      const actions = await refreshClaudeCredentialsForActiveRemoteAgents({
+        listActiveRemoteAgentStates: () => [activeRemoteState('PAN-1778', 'vm-one')],
+        listFlyMachineNames: async () => { throw new Error('Fly machine store /x/fly-machines.json has an unexpected shape'); },
+        credentialFingerprint: () => '100:12',
+        loadConfig: () => ({ remote: { provider: 'fly' } }) as any,
+        createFlyProvider: (() => ({ syncClaudeCredentials })) as any,
+      });
+      expect(actions[0]).toMatch(/^Fly machine credentials refresh skipped: .*unexpected shape/);
+      expect(actions[1]).toBe('Remote credentials refreshed for PAN-1778 on vm-one');
+    });
+  });
 });
