@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T23:40:59.397020Z · model: claude-opus-5-5 · open: 862_
+_Last sequenced: 2026-11-01T23:48:57.009624Z · model: claude-opus-5-5 · open: 861_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -279,7 +279,6 @@ _Last sequenced: 2026-11-01T23:40:59.397020Z · model: claude-opus-5-5 · open: 
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
 | 276 | PAN-4743 | M | medium | ok |  |  | Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; PAN-4651 merged, so this is now unblocked. |
 | 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
-| 278 | PAN-4730 | L | medium | ok |  |  | Opt-in gstack browser/design/PDF runtime so 21 needs-binary skills (qa, browse) mount; blocked on PAN-4727; scope open for PRD |
 | 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
@@ -1197,10 +1196,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T23:40:59.397020Z",
+  "generatedAt": "2026-11-01T23:48:57.009624Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 862,
+  "openCount": 861,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -4652,19 +4651,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "dependsOn": [],
       "why": "Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md.",
       "rationale": "New one-line config/doc fix found in the PAN-4295 Fly smoke test; every unconfigured createVm points at a missing image, so it sits just after PAN-4295.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4730",
-      "rank": 278,
-      "size": "L",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Opt-in gstack browser/design/PDF runtime so 21 needs-binary skills (qa, browse) mount; blocked on PAN-4727; scope open for PRD",
-      "rationale": "New issue: follow-up to in-pipeline PAN-4727 (blocked by it), slotted into a free rank among comparable medium features.",
       "gate": "auto",
       "planning": "auto"
     },
