@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:37:15.076Z",
+  "updated": "2026-11-01T14:37:27.299Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -306,6 +306,10 @@
       "claimedBy": "agent-pan-2356",
       "claimedAt": "2026-11-01T14:36:59.098Z",
       "doneAt": "2026-11-01T14:37:15.076Z"
+    },
+    "wi17-relay-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:37:27.298Z"
     }
   }
 }
