@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T15:07:48.912Z",
+  "updated": "2026-11-01T15:07:57.097Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,11 @@
       "claimedBy": "agent-pan-4650",
       "claimedAt": "2026-11-01T14:57:59.329Z",
       "doneAt": "2026-11-01T15:07:48.912Z"
+    },
+    "wi14-pull-ui": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T15:07:57.097Z"
     }
   }
 }
