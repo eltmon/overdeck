@@ -5,6 +5,7 @@ import { loadConfigSync, saveConfig, OverdeckConfig } from '../../lib/config.js'
 import { getShadowModeFromEnv } from '../../lib/env-loader.js';
 import { listShadowedIssues, getPendingSyncCount } from '../../lib/shadow-state.js';
 import { configTiersCommand } from './config-tiers.js';
+import { registerConfigSetCommand } from './config-set.js';
 
 export function registerConfigCommand(program: Command): void {
   const config = program
@@ -25,6 +26,8 @@ export function registerConfigCommand(program: Command): void {
     .command('tiers')
     .description('Show the effective model per tiered_execution tier and whether it overrides roles.work')
     .action(configTiersCommand);
+
+  registerConfigSetCommand(config);
 }
 
 interface ShadowOptions {
