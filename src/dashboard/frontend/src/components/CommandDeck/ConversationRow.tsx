@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getRuntimeBehavior, normalizeHarnessName } from '@overdeck/contracts';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone, CheckSquare, Square } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { continueTargetOf, openContinueOnDevice } from '../chat/continueOnDevice/continueOnDeviceStore';
@@ -18,6 +18,7 @@ import { resolveEffectiveProjectKey } from './projectsData';
 import { fallbackBadgeTone } from './fallbackBadge';
 import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import { PullRequestMenuItems } from './PullRequestMenuItems';
+import { TriageMenuItems } from './TriageMenuItems';
 import { PullRequestBadge } from '../primitives/PullRequestBadge';
 import styles from './styles/command-deck.module.css';
 
@@ -249,6 +250,15 @@ export function ConversationRow({
     ? `waiting on agent — no activity since ${formatStalledTime(conv.stalledSince)}`
     : null;
 
+  // PAN-4639 WI-7: settling never calls stop or archive — the session keeps running.
+  const toggleSettle = useCallback(() => {
+    const settled = Boolean(conv.settledAt);
+    mutations.triage({
+      updates: [{ name: conv.name, settled: !settled }],
+      label: settled ? `Moved "${conv.title ?? conv.name}" to Inbox` : `Settled "${conv.title ?? conv.name}"`,
+    });
+  }, [conv.settledAt, conv.name, conv.title, mutations]);
+
   const beginRename = useCallback(() => {
     committingRef.current = false;
     const initial = conv.title ?? conv.name;
@@ -452,6 +462,23 @@ export function ConversationRow({
           aria-label={`Stop agent for ${conv.name}`}
         >
           <X size={iconSize} />
+        </span>
+      )}
+
+      {/* Settle checkbox (PAN-4639 WI-7): top-level rows only. The session is not stopped. */}
+      {!isNested && (
+        <span
+          role="checkbox"
+          aria-checked={Boolean(conv.settledAt)}
+          tabIndex={0}
+          className={styles.conversationSettleBox}
+          aria-label={conv.settledAt ? `Unsettle ${conv.title ?? conv.name}` : `Settle ${conv.title ?? conv.name}`}
+          onClick={(e) => { e.stopPropagation(); toggleSettle(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleSettle(); }
+          }}
+        >
+          {conv.settledAt ? <CheckSquare size={iconSize} /> : <Square size={iconSize} />}
         </span>
       )}
 
@@ -733,6 +760,7 @@ export function ConversationRow({
               )}
             </span>
           )}
+          {!isNested && <TriageMenuItems conversation={conv} mutations={mutations} onClose={() => setMenuOpen(false)} />}
           <PullRequestMenuItems conversation={conv} mutations={mutations} onClose={() => setMenuOpen(false)} />
           {conv.claudeSessionId && !conv.forkStatus && (
             <MenuItemButton
