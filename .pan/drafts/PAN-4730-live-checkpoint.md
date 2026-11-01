@@ -46,3 +46,22 @@ $ bun test test/pack-browser-guards.test.ts test/setup-help.test.ts test/gstack-
  2954 expect() calls
 Ran 189 tests across 10 files. [31.14s]
 ```
+
+## Fork: render gstack paths
+
+Fork commit: `e746e65edf637a771d36c02cfab577d69f6111c3` — `feat(pack-mode): point literal ~/.gstack paths in skill docs at the state root`.
+
+Files: `scripts/pack-render.sh`, `test/pack-mode.test.ts`, `docs/pack-mode.md` (one sentence in "What it writes" step 2; not in the plan's file list, added so the contract doc matches the render).
+
+Notes on the plan:
+
+- The rewrite uses `sed … "$f" > "$f.pack-tmp"; mv "$f.pack-tmp" "$f"` instead of `sed -i.bak`, so no `.bak` cleanup (`rm`) is needed and it behaves the same on GNU and BSD. Only files that contain a token are rewritten. 76 source `*/SKILL.md` and `*/sections/*.md` files contain one of the three tokens.
+- Only the trailing-slash forms are rewritten, as the plan specifies; a bare `~/.gstack` with no slash (prose such as "writes ~/.gstack") is left as is.
+
+```
+$ bun test test/pack-mode.test.ts test/state-root-ratchet.test.ts test/pack-browser-guards.test.ts
+ 13 pass
+ 0 fail
+ 63 expect() calls
+Ran 13 tests across 3 files. [2.46s]
+```
