@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T09:36:55.449Z",
+  "updated": "2026-11-01T09:37:10.271Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "triage-helpers.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T09:36:55.449Z"
+    },
+    "list-sections.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:37:10.270Z"
     }
   }
 }
