@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T18:24:34.254924Z · model: claude-opus-5-5 · open: 858_
+_Last sequenced: 2026-11-01T18:32:48.648294Z · model: claude-opus-5-5 · open: 860_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,6 +8,7 @@ _Last sequenced: 2026-11-01T18:24:34.254924Z · model: claude-opus-5-5 · open: 
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 2 | PAN-4732 | S | critical | ok |  |  | Browser+Vite e2e spec in default unit shards timed out and turned main red; move heavy e2e to slow lane, keep fast component test. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
+| 7 | PAN-4733 | M | high | ok |  | PAN-4732 | Follow-up to PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -147,7 +148,7 @@ _Last sequenced: 2026-11-01T18:24:34.254924Z · model: claude-opus-5-5 · open: 
 | 143 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
 | 144 | PAN-4302 | M | high | ok |  |  | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
 | 145 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
-| 146 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
+| 146 | PAN-4734 | L | high | ok |  | PAN-4652 | pan start --remote work agents launch as linked conversations on the Fly VM, live at home; closes PAN-1775. After PAN-4652. |
 | 147 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
 | 148 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
 | 149 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
@@ -169,6 +170,7 @@ _Last sequenced: 2026-11-01T18:24:34.254924Z · model: claude-opus-5-5 · open: 
 | 165 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
 | 166 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 167 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
+| 168 | PAN-1775 | M | medium | ok |  | PAN-4734 | Superseded: PAN-4734's PR closes this. Pick PAN-4734 (Fly work agents as linked conversations), not this issue. |
 | 169 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 170 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
 | 171 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
@@ -878,6 +880,10 @@ New substrate bug with a verified root cause: vitest.config.ts includes tests/e2
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
+### PAN-4733 (rank 7)
+
+New issue split from in-pipeline PAN-4732 (rank 2). The quarantine turns main green but hides a deterministic browser-spec failure and leaves Vite/Chromium specs in the loaded unit shards; this restores the coverage behind a gating lane. Slotted at the free rank just after its parent so it is picked as soon as PAN-4732 merges.
+
 ### PAN-4690 (rank 8)
 
 New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).
@@ -1182,10 +1188,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 
 New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
 
-### PAN-3084 (rank 83)
-
-Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1193,10 +1195,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T18:24:34.254924Z",
+  "generatedAt": "2026-11-01T18:32:48.648294Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 858,
+  "openCount": 860,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -2980,14 +2982,16 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     },
     {
       "issue": "PAN-1775",
-      "rank": 146,
+      "rank": 168,
       "size": "M",
-      "importance": "high",
-      "score": 78,
+      "importance": "medium",
+      "score": 45,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Remote (Fly.io) work agents appear as real session rows in the issue tree",
-      "rationale": "Remote Fly.io work agents appear as real session rows — prerequisite visibility before reconciliation can include them.",
+      "dependsOn": [
+        "PAN-4734"
+      ],
+      "why": "Superseded: PAN-4734's PR closes this. Pick PAN-4734 (Fly work agents as linked conversations), not this issue.",
+      "rationale": "Re-ranked: new issue PAN-4734 carries this outcome on the Overdeck Anywhere link path and its PR closes this one, so this issue now only tracks the result.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -11891,6 +11895,36 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "rationale": "New substrate bug with a verified root cause: vitest.config.ts includes tests/e2e/*.spec.ts in the default shards, so PAN-4650's linked-conversation-title-bar spec cold-compiles the app under shard load and timed out on main (run 41335061342). A red main empties the merge gate for every approved PR, and this is the third flaky turn-red today, so it takes the free rank-2 slot ahead of routine work. It is already in the pipeline with a live workspace.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4733",
+      "rank": 7,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4732"
+      ],
+      "why": "Follow-up to PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it.",
+      "rationale": "New issue split from in-pipeline PAN-4732 (rank 2). The quarantine turns main green but hides a deterministic browser-spec failure and leaves Vite/Chromium specs in the loaded unit shards; this restores the coverage behind a gating lane. Slotted at the free rank just after its parent so it is picked as soon as PAN-4732 merges.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4734",
+      "rank": 146,
+      "size": "L",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4652"
+      ],
+      "why": "pan start --remote work agents launch as linked conversations on the Fly VM, live at home; closes PAN-1775. After PAN-4652.",
+      "rationale": "New issue split from in-pipeline PAN-4652 that takes over PAN-1775's outcome (remote work agents visible live in the issue tree), so it inherits PAN-1775's rank slot. Blocked on PAN-4652, which is being worked now.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13230,6 +13264,27 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4732",
+      "to": "PAN-4733",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4652",
+      "to": "PAN-4734",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4734",
+      "to": "PAN-1775",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
