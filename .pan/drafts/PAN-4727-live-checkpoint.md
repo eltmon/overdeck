@@ -114,3 +114,16 @@ Ran 4 tests across 1 file. [643.00ms]
 ```
 
 Registry ratchets for new test files also pass: `test/free-seed-ratchet.test.ts`, `test/test-free-shards.test.ts`, `test/free-fixtures.test.ts` (98 pass).
+
+## Fork: publish
+
+Branch `overdeck/pack-mode` pushed to `https://github.com/eltmon/gstack`. PR opened inside the fork with `gh pr create --repo eltmon/gstack --base main --head overdeck/pack-mode`; not merged (operator's call). No upstream contact.
+
+PR: https://github.com/eltmon/gstack/pull/1
+
+**Pack-mode SHA** (used by the live acceptance): `541f9683409d7fd21e55beeb310c5bae7f0bdad1`
+
+```
+$ gh pr view --repo eltmon/gstack overdeck/pack-mode --json baseRefName,headRefName,state,isCrossRepository,url
+{"baseRefName":"main","headRefName":"overdeck/pack-mode","isCrossRepository":false,"state":"OPEN","url":"https://github.com/eltmon/gstack/pull/1"}
+```
