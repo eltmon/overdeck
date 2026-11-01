@@ -46,6 +46,7 @@ import { registerPairCommands } from './commands/pair.js';
 import { registerTailscaleCommands } from './commands/tailscale.js';
 import { registerTokenCommands } from './commands/token.js';
 import { registerMcpCommands } from './commands/mcp.js';
+import { registerTriggersCommands } from './commands/triggers.js';
 import { CommandGroupLoader, resolveGroupDemand } from './command-group-loader.js';
 import { COMMAND_GROUPS } from './command-groups.js';
 import { exitCli, runCliWithTelemetry } from './telemetry.js';
@@ -229,6 +230,7 @@ registerPairCommands(program);
 registerTailscaleCommands(program);
 registerTokenCommands(program);
 registerMcpCommands(program);
+registerTriggersCommands(program);
 
 // pan issues — list and triage work
 program

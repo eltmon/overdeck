@@ -1,7 +1,8 @@
 /**
  * Client for the Overdeck Anywhere routes (PAN-4445): paired devices, pairing
  * links, trusted addresses and the Anywhere status. These call the same server
- * routes as `pan pair` and `pan devices`.
+ * routes as `pan pair` and `pan devices`. Webhook triggers (PAN-4648) use
+ * `/api/triggers`, the routes behind `pan triggers`.
  *
  * Every fetcher returns `{ status, body }` so a caller can branch on 403 (a
  * paired device's session cannot create pairing links or add addresses).
@@ -72,6 +73,7 @@ export const ANYWHERE_DEVICES_QUERY_KEY = ['anywhere-devices'] as const;
 export const ANYWHERE_STATUS_QUERY_KEY = ['anywhere-status'] as const;
 /** Shared with `sections/AccessTokensSection` so a revoke or mint refreshes both surfaces. */
 export const ANYWHERE_ACCESS_TOKENS_QUERY_KEY = ['access-tokens'] as const;
+export const ANYWHERE_TRIGGERS_QUERY_KEY = ['anywhere-triggers'] as const;
 
 /** The default scopes of an MCP token (PAN-4649 D-4649-3); mirrors MCP_DEFAULT_SCOPES in src/lib/mcp/server.ts. */
 export const MCP_DEFAULT_SCOPES = ['read:state', 'read:conversations', 'operate'] as const;
@@ -79,6 +81,24 @@ export const MCP_DEFAULT_SCOPES = ['read:state', 'read:conversations', 'operate'
 export interface CreatedAccessToken {
   token: string;
   record: { id: string; name: string; scopes: string[] };
+}
+
+/** Mirrors `PublicTrigger` in src/lib/triggers/store.ts. No secret ever reaches the client in a list. */
+export interface TriggerRow {
+  id: string;
+  name: string;
+  target:
+    | { kind: 'conversation'; conversation: string }
+    | { kind: 'project'; projectKey: string; model?: string; harness?: string; effort?: string };
+  template: string | null;
+  verify: 'none' | 'github' | 'stripe';
+  signingSecretSet: boolean;
+  createdAt: string;
+}
+
+export interface TriggersList {
+  triggers: TriggerRow[];
+  funnel: { port: number; baseUrl: string | null; command: string };
 }
 
 async function readResult<T>(response: Response): Promise<ApiResult<T>> {
@@ -168,4 +188,55 @@ export async function revokeAccessToken(id: string): Promise<ApiResult<{ ok: tru
     method: 'DELETE',
     headers: await dashboardMutationJsonHeaders(),
   }));
+}
+
+export async function fetchTriggers(): Promise<ApiResult<TriggersList>> {
+  return readResult(await fetch('/api/triggers'));
+}
+
+export async function removeTrigger(id: string): Promise<ApiResult<{ removed: true }>> {
+  return readResult(await fetch(`/api/triggers/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: await dashboardMutationJsonHeaders(),
+  }));
+}
+
+export interface CreateTriggerInput {
+  name: string;
+  target: { kind: 'conversation'; conversation: string } | { kind: 'project'; projectKey: string };
+  template: string | null;
+  verify: TriggerRow['verify'];
+  signingSecret: string | null;
+}
+
+/** The create response: the only time the URL secret and a generated signing secret are shown. */
+export interface CreatedTriggerBody {
+  trigger: TriggerRow;
+  hookPath: string;
+  url: string | null;
+  urlSecretShownOnce: true;
+  generatedSigningSecret: string | null;
+}
+
+export async function createTrigger(input: CreateTriggerInput): Promise<ApiResult<CreatedTriggerBody>> {
+  return readResult(await fetch('/api/triggers', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(input),
+  }));
+}
+
+export async function setTriggerSigningSecret(id: string, secret: string): Promise<ApiResult<{ trigger: TriggerRow }>> {
+  return readResult(await fetch(`/api/triggers/${encodeURIComponent(id)}/signing-secret`, {
+    method: 'PUT',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ secret }),
+  }));
+}
+
+/** Query function for `['anywhere-triggers']`: the triggers and Funnel facts, or a thrown error. */
+export async function loadTriggers(): Promise<TriggersList> {
+  const result = await fetchTriggers();
+  if (!isOk(result)) throw new Error(apiError(result));
+  return { ...result.body, triggers: result.body.triggers ?? [] };
 }

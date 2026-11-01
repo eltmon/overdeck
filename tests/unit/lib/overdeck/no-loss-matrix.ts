@@ -677,6 +677,15 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // ── webhooks.ts ───────────────────────────────────────────────────────────
   { surface: 'POST /api/webhooks/github',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.setPr + IssueWriter.setBlockers' },
 
+  // ── trigger-hooks.ts ──────────────────────────────────────────────────────
+  { surface: 'POST /hooks/:id/:secret',                   kind: 'http', disposition: 'WRITE',       door: 'deliverTriggerEvent → handleConversationMessage | handleConversationCreate' },
+
+  // ── triggers.ts ───────────────────────────────────────────────────────────
+  { surface: 'GET /api/triggers',                         kind: 'http', disposition: 'READ',        door: 'src/lib/triggers/store.ts' },
+  { surface: 'POST /api/triggers',                        kind: 'http', disposition: 'WRITE',       door: 'src/lib/triggers/store.ts' },
+  { surface: 'DELETE /api/triggers/:id',                  kind: 'http', disposition: 'WRITE',       door: 'src/lib/triggers/store.ts' },
+  { surface: 'PUT /api/triggers/:id/signing-secret',      kind: 'http', disposition: 'WRITE',       door: 'src/lib/triggers/store.ts' },
+
   // ── workspaces.ts ─────────────────────────────────────────────────────────
   { surface: 'GET /api/workspace-stack-health',                      kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + stack health' },
   { surface: 'GET /api/workspaces/:issueId',                         kind: 'http', disposition: 'AGGREGATE',   door: 'IssuesResolver.get + AgentsResolver + workspace details' },

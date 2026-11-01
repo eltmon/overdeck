@@ -59,6 +59,7 @@
               "anywhere",
               "configuration/session-vault",
               "configuration/remote-access",
+              "configuration/triggers",
               "configuration/tailscale",
               "configuration/mcp",
               "configuration/phone",
@@ -68,7 +69,8 @@
               "cli/tailscale",
               "cli/account",
               "cli/devices",
-              "cli/token"
+              "cli/token",
+              "cli/triggers"
             ]
           }
         ]

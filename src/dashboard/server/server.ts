@@ -96,6 +96,8 @@ import { cliproxyRouteLayer } from './routes/cliproxy.js';
 import { githubQuotaRouteLayer } from './routes/github-quota.js';
 import { ttsRouteLayer } from './routes/tts.js';
 import { webhooksRouteLayer } from './routes/webhooks.js';
+import { triggerHooksRouteLayer } from './routes/trigger-hooks.js';
+import { triggersRouteLayer } from './routes/triggers.js';
 import { hooksRouteLayer } from './routes/hooks.js';
 import { diffsRouteLayer } from './routes/diffs.js';
 import { diffCompareRouteLayer } from './routes/diff-compare.js';
@@ -344,6 +346,8 @@ export const makeRoutesLayer = Layer.mergeAll(
   githubQuotaRouteLayer,
   ttsRouteLayer,
   webhooksRouteLayer,
+  triggerHooksRouteLayer,
+  triggersRouteLayer,
   hooksRouteLayer,
   diffsRouteLayer,
   diffCompareRouteLayer,

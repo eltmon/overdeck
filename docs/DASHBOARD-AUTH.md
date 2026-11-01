@@ -354,6 +354,8 @@ The server binds `0.0.0.0`, and many routes check only `Origin`.
 middleware, merged into `makeRoutesLayer`, that decides whether a request may
 reach any route at all:
 
+0. A Tailscale Funnel request may reach only `POST /hooks/*`; anything else is
+   **404** (see "Webhook triggers and Tailscale Funnel").
 1. The path is not under `/api/` or `/events/` (the static SPA): pass.
 2. `METHOD path` is on `REMOTE_GATE_ALLOWLIST`: pass. The list is
    `GET /api/health`, `GET /api/environment`, `OPTIONS` and
@@ -379,6 +381,39 @@ internal-token-only routes); the gate adds a floor, it does not replace them.
 a Settings save calls `invalidateRemoteAccessConfig()`, so the Settings toggle
 (Access Tokens section) applies at once; a hand edit needs a restart.
 `GET /api/settings` reports the enforced value.
+
+## Webhook triggers and Tailscale Funnel
+
+PAN-4648 adds webhook triggers (`src/lib/triggers/`, user docs
+`configuration/triggers.mdx`). Two auth rules come with them.
+
+**The hook route is outside the gate by path.** `POST /hooks/:id/:secret`
+(`routes/trigger-hooks.ts`) is not under `/api/` or `/events/`, so rule 1 of the
+remote request gate passes it with no credential and `REMOTE_GATE_ALLOWLIST`
+does not change. The URL secret is the authorization: the route hashes it with
+SHA-256 and compares it to the stored hash with `timingSafeEqual`, and an
+unknown id and a wrong secret get the same `404`. The management routes
+(`/api/triggers`, `routes/triggers.ts`) stay behind the gate at the default
+`admin` scope.
+
+**A Funnel request reaches only `POST /hooks/*`.** Tailscale Funnel proxies
+public traffic to `127.0.0.1`, so with the default `require_token_mint: false` a
+funneled request would look like the local operator. Every funneled request
+carries `Tailscale-Funnel-Request: ?1`: tailscaled deletes any client-sent copy
+and sets it (`ipn/ipnlocal/serve.go` `addTailscaleIdentityHeaders`), so the
+header cannot be forged through Funnel. `isTailscaleFunnelRequest` in
+`routes/dashboard-auth.ts` detects it, and:
+
+- the remote request gate answers **404** `{ "error": "not found" }` to a Funnel
+  request for any method or (normalized) path other than `POST /hooks/*`, before
+  any credential check, and `isTrustedLocalRequest` is never true for one;
+- the session mint (`rejectUnauthorizedDashboardSessionMintRequest`) never
+  treats a Funnel request as a trusted peer;
+- `authorizeDashboardUpgrade` answers **403** to a Funnel request before any
+  other check, so no `/ws/*` socket opens.
+
+The gate keys on the Funnel marker, never on `X-Forwarded-*`, because Traefik
+and Tailscale Serve add those for legitimate local and tailnet visitors too.
 
 ## Threat model
 

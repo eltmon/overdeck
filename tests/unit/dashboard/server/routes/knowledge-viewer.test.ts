@@ -277,6 +277,32 @@ describe('origin-isolated knowledge viewer proxy', () => {
     }
   });
 
+  it('never serves a Tailscale Funnel request from a viewer host (PAN-4648)', async () => {
+    const upstream = http.createServer((_request, response) => response.end('viewer'));
+    const upstreamPort = await listen(upstream);
+    const handlers = createKnowledgeViewerRouteHandlers({
+      getStatus: async (projectKey) => runningStatus(projectKey, { url: `http://127.0.0.1:${upstreamPort}` }),
+    });
+    const proxy = http.createServer();
+    setupKnowledgeViewerProxy(proxy, handlers);
+    proxy.on('request', (_request, response) => {
+      response.writeHead(404);
+      response.end('dashboard');
+    });
+    const proxyPort = await listen(proxy);
+
+    try {
+      const viewer = new URL(`http:${knowledgeViewerProxyUrl('alpha', `localhost:${proxyPort}`)}`);
+      const funneled = await hostRequest(proxyPort, viewer.host, `/api/config${viewer.search}`, { 'tailscale-funnel-request': '?1' });
+      expect(funneled).toMatchObject({ status: 404, body: 'dashboard' });
+      // Without the marker the same host reaches the viewer, which asks for its own access.
+      const direct = await hostRequest(proxyPort, viewer.host, '/api/config');
+      expect(direct.status).toBe(401);
+    } finally {
+      await Promise.all([close(proxy), close(upstream)]);
+    }
+  });
+
   it('rewrites OpenKnowledge config URLs through the isolated viewer origin', async () => {
     const upstream = http.createServer((_request, response) => {
       response.setHeader('content-type', 'application/json');

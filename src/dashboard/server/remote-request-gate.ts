@@ -7,6 +7,11 @@
  * comes from a trusted local caller or is on the unauthenticated allowlist.
  * Rules, in order:
  *
+ *   0. A Tailscale Funnel request (header `Tailscale-Funnel-Request`, which
+ *      tailscaled always overwrites) reaches only `POST /hooks/*`, the trigger
+ *      delivery route; every other method and path gets 404, credential or
+ *      not (PAN-4648 FR-9). Funnel proxies to 127.0.0.1, so without this rule
+ *      a public request would look like the local operator.
  *   1. The path is not under `/api/` or `/events/` (the static SPA): pass.
  *   2. `METHOD path` is on REMOTE_GATE_ALLOWLIST: pass.
  *   3. The request carries a dashboard credential: pass when its scopes satisfy
@@ -17,7 +22,7 @@
  *   4. The request is a trusted local caller: pass. A loopback peer (the local
  *      browser, or the host-local Traefik) is local, except that with
  *      `dashboard.require_token_mint` a loopback peer carrying a proxy
- *      forwarding header is remote.
+ *      forwarding header is remote, and a Funnel request is never local.
  *   5. Otherwise: 401 `{ "error": "unauthorized" }`.
  *
  * `GET /events/stream` also accepts its own `OVERDECK_EVENTS_TOKEN` bearer
@@ -36,7 +41,13 @@ import { scopeSatisfies, type AccessTokenScope } from '../../lib/access-tokens.j
 import { readRemoteAccessConfig } from '../../lib/remote-access/config.js';
 import { jsonResponse } from './http-helpers.js';
 import { gatePathname, requiredScopeFor } from './route-scopes.js';
-import { credentialScopes, hasProxyForwardingHeader, isLoopbackPeer, resolveDashboardCredential } from './routes/dashboard-auth.js';
+import {
+  credentialScopes,
+  hasProxyForwardingHeader,
+  isLoopbackPeer,
+  isTailscaleFunnelRequest,
+  resolveDashboardCredential,
+} from './routes/dashboard-auth.js';
 import { getHeaderFromMap, type HeaderMap } from './routes/origin-validation.js';
 
 export { gatePathname } from './route-scopes.js';
@@ -69,15 +80,20 @@ function hasEventsStreamToken(headers: HeaderMap): boolean {
 /** True when the request is a trusted local caller under the current config. */
 export function isTrustedLocalRequest(request: HttpServerRequest.HttpServerRequest): boolean {
   if (!isLoopbackPeer(request)) return false;
-  return !(readRemoteAccessConfig().requireTokenMint && hasProxyForwardingHeader(request.headers as HeaderMap));
+  const headers = request.headers as HeaderMap;
+  if (isTailscaleFunnelRequest(headers)) return false;
+  return !(readRemoteAccessConfig().requireTokenMint && hasProxyForwardingHeader(headers));
 }
 
-export type RemoteGateRejection = { status: 401 } | { status: 403; missingScope: AccessTokenScope };
+export type RemoteGateRejection = { status: 401 } | { status: 403; missingScope: AccessTokenScope } | { status: 404 };
 
 /** The gate decision for one request: `null` lets it through. */
 export function remoteGateRejection(request: HttpServerRequest.HttpServerRequest): RemoteGateRejection | null {
   const pathname = gatePathname(request.url);
   if (pathname === null) return { status: 401 };
+  if (isTailscaleFunnelRequest(request.headers as HeaderMap)) {
+    return request.method === 'POST' && pathname.startsWith('/hooks/') ? null : { status: 404 };
+  }
   if (!isGatedPath(pathname)) return null;
   if (REMOTE_GATE_ALLOWLIST.has(`${request.method} ${pathname}`)) return null;
   const headers = request.headers as HeaderMap;
@@ -100,6 +116,7 @@ export const remoteRequestGateLayer = HttpRouter.middleware(
       if (rejection?.status === 403) {
         return jsonResponse({ error: 'insufficient_scope', missingScope: rejection.missingScope }, { status: 403 });
       }
+      if (rejection?.status === 404) return jsonResponse({ error: 'not found' }, { status: 404 });
       if (rejection) return jsonResponse({ error: 'unauthorized' }, { status: 401 });
       return yield* httpEffect;
     }),

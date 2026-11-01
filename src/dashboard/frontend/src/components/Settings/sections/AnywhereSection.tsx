@@ -9,6 +9,7 @@ import { ANYWHERE_STATUS_QUERY_KEY, loadAnywhereStatus, type AnywhereAction } fr
 import { DevicesPanel } from '../anywhere/DevicesPanel';
 import { McpUrlDialog } from '../anywhere/McpUrlDialog';
 import { PairDeviceDialog } from '../anywhere/PairDeviceDialog';
+import { TriggersPanel } from '../anywhere/TriggersPanel';
 import { SetUpPhoneDialog } from '../anywhere/SetUpPhoneDialog';
 import { PushPanel } from '../anywhere/PushPanel';
 import { TailscalePeersPanel } from '../anywhere/TailscalePeersPanel';
@@ -84,6 +85,7 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
         <AnywhereStatusCard onAction={handleAction} />
         <DevicesPanel />
         {status?.tailscale?.nextStep === 'ready' && <TailscalePeersPanel />}
+        <TriggersPanel />
         <AccessTokensPanel />
         <PushPanel />
       </div>

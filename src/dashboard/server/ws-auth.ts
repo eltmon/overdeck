@@ -10,14 +10,16 @@
  * Peer-based trust (the loopback and Docker-bridge check the session mint
  * uses) is deliberately NOT consulted here (FR-3) — it lives only in the mint,
  * so `require_token_mint` can close peer trust everywhere at once by changing
- * the mint alone. See docs/DASHBOARD-AUTH.md.
+ * the mint alone. A Tailscale Funnel request (a public visitor) gets 403
+ * before any other check, credential or not (PAN-4648 FR-9). See
+ * docs/DASHBOARD-AUTH.md.
  */
 import type { Socket } from 'node:net';
 
 import { scopeSatisfies, type AccessTokenScope } from '../../lib/access-tokens.js';
 import { getInternalToken } from '../../lib/internal-token.js';
 import { registerDeviceConnection, revocableCredentialId } from './device-connections.js';
-import { credentialScopes, resolveDashboardCredential, type DashboardCredential } from './routes/dashboard-auth.js';
+import { credentialScopes, isTailscaleFunnelRequest, resolveDashboardCredential, type DashboardCredential } from './routes/dashboard-auth.js';
 import { validateOriginHeaders, type HeaderMap } from './routes/origin-validation.js';
 
 /**
@@ -35,6 +37,7 @@ export function authorizeDashboardUpgrade(
   method: string,
   requiredScope: AccessTokenScope = 'admin',
 ): UpgradeAuthResult {
+  if (isTailscaleFunnelRequest(headers)) return { ok: false, status: 403, message: 'Forbidden: public requests cannot open sockets' };
   const origin = validateOriginHeaders(headers, method);
   if (!origin.ok) return { ok: false, status: 403, message: origin.error };
   if (!getInternalToken()) return { ok: false, status: 503, message: 'dashboard session token not configured' };
