@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4672",
   "created": "2026-11-01T06:29:18.701Z",
-  "updated": "2026-11-01T07:49:23.173Z",
+  "updated": "2026-11-01T07:58:49.150Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,10 @@
       "claimedBy": "agent-pan-4672",
       "claimedAt": "2026-11-01T07:48:14.993Z",
       "doneAt": "2026-11-01T07:49:23.172Z"
+    },
+    "atomic-compose-write.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:58:49.149Z"
     }
   }
 }
