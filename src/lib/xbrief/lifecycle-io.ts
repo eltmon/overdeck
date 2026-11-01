@@ -383,24 +383,3 @@ export function appendFeedbackEntryForIssue(
   });
   return true;
 }
-
-/**
- * True when the clear landed; false (writing nothing) when `issueId` has no
- * workspace worktree, or that workspace has no continue file yet.
- */
-export function clearFeedbackForIssue(
-  projectRoot: string,
-  issueId: string,
-): boolean {
-  const planHome = resolveIssueWorkspacePlanHome(projectRoot, issueId);
-  if (!planHome) {
-    console.log(`[lifecycle-io] no workspace for ${issueId} under ${projectRoot}; skipping feedback clear`);
-    return false;
-  }
-  if (!existsSync(continueStatePath(planHome, issueId))) return false;
-  updateContinueState(planHome, issueId, (current) => ({
-    ...current,
-    feedback: [],
-  }));
-  return true;
-}

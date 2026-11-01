@@ -5,7 +5,6 @@ const mocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
   appendContinueSessionEntryForIssue: vi.fn(),
   appendFeedbackEntryForIssue: vi.fn(),
-  clearFeedbackForIssue: vi.fn(),
   readContinueStateForIssue: vi.fn(),
   clearFeedback: vi.fn(),
   getWorkspacePanPaths: vi.fn(),
@@ -20,7 +19,6 @@ vi.mock('../../projects.js', () => ({
 vi.mock('../../xbrief/lifecycle-io.js', () => ({
   appendContinueSessionEntryForIssue: mocks.appendContinueSessionEntryForIssue,
   appendFeedbackEntryForIssue: mocks.appendFeedbackEntryForIssue,
-  clearFeedbackForIssue: mocks.clearFeedbackForIssue,
   readContinueStateForIssue: mocks.readContinueStateForIssue,
 }));
 

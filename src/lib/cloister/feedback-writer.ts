@@ -14,7 +14,7 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { clearFeedback, getWorkspacePanPaths, readFeedback, writeFeedback } from '../pan-dir/index.js';
-import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearFeedbackForIssue, readContinueStateForIssue } from '../xbrief/lifecycle-io.js';
+import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, readContinueStateForIssue } from '../xbrief/lifecycle-io.js';
 
 export interface WriteFeedbackOptions {
   issueId: string;
@@ -55,25 +55,18 @@ async function getNextSequenceNumber(feedbackDir: string): Promise<number> {
 }
 
 /**
- * Clear the previous cycle's feedback: the scope continue file's feedback[]
- * and the workspace `.pan/feedback/` mirror.
+ * Clear the previous cycle's feedback from the workspace `.pan/feedback/`
+ * mirror — the only feedback the work agent's prompt injects.
+ *
+ * PAN-4690: the continue file's feedback[] is NOT cleared here. It is a
+ * tracked file, and this runs during review dispatch after the work agent has
+ * committed and stopped, so rewriting it left the workspace dirty and the
+ * dirty-tree gate then refused the very review being dispatched (and every
+ * deacon-lite re-request). feedback[] is the full history; the gitignored
+ * mirror is the current cycle.
  */
 export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
   const { feedbackDir } = getWorkspacePanPaths(workspacePath);
-
-  // Also clear the continue file's feedback[] (Layer 1+).
-  // Infer issueId from the workspace directory name (feature-<issue-id>).
-  const base = workspacePath.split('/').pop() ?? '';
-  const issueMatch = base.match(/^feature-([a-z]+-\d+)$/i);
-  if (issueMatch) {
-    const issueId = issueMatch[1].toUpperCase();
-    const projectRoot = join(workspacePath, '..', '..');
-    try {
-      clearFeedbackForIssue(projectRoot, issueId);
-    } catch (err: any) {
-      console.error(`[feedback-writer] Failed to clear continue-file feedback[] for ${issueId}:`, err.message);
-    }
-  }
 
   let clearedCount = 0;
   if (existsSync(feedbackDir)) {
@@ -86,7 +79,6 @@ export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
       console.error(`[feedback-writer] Failed to clear .pan/feedback for ${workspacePath}:`, err.message);
     }
   }
-
 
   if (clearedCount > 0) {
     console.log(`[feedback-writer] Cleared ${clearedCount} feedback file(s) from previous cycle`);

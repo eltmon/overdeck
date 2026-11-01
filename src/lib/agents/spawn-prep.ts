@@ -987,6 +987,13 @@ export async function assertWorkspaceStackHealthyForSpawn(
     );
   }
 
+  // PAN-4690: review only reads the committed diff, so it never needs the
+  // workspace docker stack. Gating it on stack health made review dispatch
+  // tear down and rebuild the stack (`up -d --build`) before spawning; a
+  // dashboard restart in that window killed the rebuild and the spawn
+  // together, and the review was never dispatched. Run on the host at once.
+  if (role === 'review') return;
+
   const health = await Effect.runPromise(getWorkspaceStackHealth(issueId, { workspacePath }));
   if (health.healthy) {
     spawnStackRebuildState.delete(normalizedIssue);

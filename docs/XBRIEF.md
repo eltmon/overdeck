@@ -428,6 +428,8 @@ Canonical continue files live at `.pan/continues/<issue-lowercase>.xbrief.json` 
 
 Server-side writers into `.pan/continues/` — specialist feedback (verification, review, test, CI, UAT), and session-history appends on resume/reopen/plan-restart — always target the issue's base workspace copy via `resolveIssueWorkspacePlanHome`, never the primary checkout, and write nothing once that workspace no longer exists. These writers take no lock and never commit their own write, so a server-dirtied continue file sitting uncommitted in the workspace is expected, not a bug — `commitPendingIssueArtifacts` (`overdeck/plan-artifact-commit.ts`) commits it at the two points that would otherwise hit `git rebase`'s refusal on a dirty tree: `pan done`'s rebase-and-push step, and the merge pipeline's in-place feature-branch rebase. Readers (`readContinueStateForIssue`) check the workspace copy first, then fall back to the primary checkout (PAN-4225).
 
+Review dispatch writes nothing tracked (PAN-4690). It clears only the gitignored workspace feedback mirror (`.overdeck/feedback/`), which is what the work agent's prompt injects as current-cycle feedback; the continue file's `feedback[]` is kept as the full history. A server-side write that runs after the agent has committed and stopped would otherwise leave the tree dirty, and the dirty-tree gate would refuse the review being dispatched. For the same reason `updateContinueState` writes nothing when a mutation changes no field, so a no-op update never bumps `updated`.
+
 ---
 
 ## Common Mistakes
