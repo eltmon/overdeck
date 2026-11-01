@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4295",
   "created": "2026-11-01T05:48:47.966Z",
-  "updated": "2026-11-01T11:29:34.320Z",
+  "updated": "2026-11-01T11:29:47.455Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,6 +190,10 @@
     "fly-live-smoke.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T11:29:34.319Z"
+    },
+    "fly-live-smoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:29:47.454Z"
     }
   }
 }
