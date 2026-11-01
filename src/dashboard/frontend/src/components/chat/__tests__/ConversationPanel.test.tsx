@@ -729,6 +729,61 @@ describe('ConversationPanel resume message control', () => {
   });
 });
 
+describe('ConversationPanel citation gate (PAN-4681)', () => {
+  // workLog-only fixture keeps the pane off the isOrphaned/isFirstMessage empty
+  // states so MessagesTimeline (and its citationsEnabled prop) actually renders.
+  const gateWorkLog = [{
+    id: 'call_1',
+    createdAt: '2024-01-01T00:30:00Z',
+    label: 'Bash',
+    tone: 'tool' as const,
+    toolTitle: 'Bash',
+    detail: 'git status',
+  }];
+  const gateMessagesData = { messages: [], workLog: gateWorkLog, streaming: false };
+
+  beforeEach(() => {
+    queryClients = [];
+    fetchControl = installStrictFetchMock(({ method, url }) => defaultConversationResponse(method, url));
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it('disables citations while the resume bar is shown for an ended conversation', async () => {
+    const dead = { ...mockConversation, status: 'ended' as const, sessionAlive: false, endedAt: '2024-01-01T01:00:01Z' };
+    renderPanel(dead, {}, gateMessagesData);
+
+    await screen.findByRole('button', { name: 'Resume Session' });
+    expect(timelineMock.props.mock.calls.at(-1)?.[0]).toMatchObject({ citationsEnabled: false });
+  });
+
+  it('disables citations for a read-only vault copy', async () => {
+    const vaultCopy = { ...mockConversation, origin: 'vault' as const };
+    renderPanel(vaultCopy, {}, gateMessagesData);
+
+    await screen.findByTestId('composer-footer');
+    expect(timelineMock.props.mock.calls.at(-1)?.[0]).toMatchObject({ citationsEnabled: false });
+  });
+
+  it('enables citations for a live conversation with a mounted composer', async () => {
+    const active = { ...mockConversation, sessionAlive: true, status: 'active' as const, endedAt: null };
+    renderPanel(active, {}, gateMessagesData);
+
+    await screen.findByTestId('composer-footer');
+    expect(screen.queryByRole('button', { name: 'Resume Session' })).toBeNull();
+    expect(timelineMock.props.mock.calls.at(-1)?.[0]).toMatchObject({ citationsEnabled: true });
+  });
+});
+
 describe('ConversationPanel empty-state gating (workLog-only agent sessions)', () => {
   const workOnlyData = {
     messages: [],
