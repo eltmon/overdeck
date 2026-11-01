@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T11:25:23.543Z",
+  "updated": "2026-11-01T11:25:38.306Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -474,6 +474,10 @@
       "claimedBy": "agent-pan-4645",
       "claimedAt": "2026-11-01T11:19:46.466Z",
       "doneAt": "2026-11-01T11:25:23.542Z"
+    },
+    "wi22-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:25:38.306Z"
     }
   }
 }
