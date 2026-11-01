@@ -41,6 +41,8 @@ export interface StartWorkerOptions {
   /** Optional label, stored in worker.json. */
   name?: string;
   effort?: string;
+  /** PAN-4651 D-4651-3: the linked machine (and its parent) that asked for this worker through the work door. */
+  startedBy?: { environmentId: string; parentId: string | null } | null;
 }
 
 export interface StartedWorker {
@@ -169,6 +171,7 @@ export async function startWorker(options: StartWorkerOptions, deps: StartWorker
     branch,
     name: options.name?.trim() || null,
     startedAt: (deps.now ?? (() => new Date()))().toISOString(),
+    ...(options.startedBy ? { startedBy: options.startedBy } : {}),
   });
 
   let cwd = workspace;

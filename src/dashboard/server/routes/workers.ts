@@ -10,16 +10,30 @@
  * `parentId: null` (D-4649-11). 200 `{ id, cwd, branch }`; an invalid body or
  * a `startWorker` error answers 400 with the error text `pan worker run`
  * prints.
+ *
+ * PAN-4651 D-4651-4: two owner routes let a linked machine follow a worker it
+ * delegated here. `GET /api/workers/:id/status?after=<seq>` (`read:state`)
+ * answers liveness, idle age, the reports newer than `after` (at most 20) and,
+ * once the worker is confirmed dead, its last assistant message.
+ * `POST /api/workers/:id/stop` (`operate`) stops it; an agent actor on a
+ * machine credential may stop only a worker its own machine started
+ * (`worker.json` `startedBy`), else 403 `agent-fenced`. Both answer 404
+ * `unknown-worker` for an id without a `worker.json`.
  */
 import { isEffortLevel } from '@overdeck/contracts';
-import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { Effect, Layer, Option } from 'effect';
+import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
 
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
+import { stopAgent } from '../../../lib/agents/termination.js';
+import { idleAgeMs, isAlive, isConfirmedDead, type LivenessVerdict } from '../../../lib/agents/liveness.js';
+import { readWorkerFacts, type WorkerFacts } from '../../../lib/agents/worker/facts.js';
+import { listWorkerReports, type WorkerReport } from '../../../lib/agents/worker/report.js';
 import { startWorker, type StartWorkerOptions } from '../../../lib/agents/worker/start.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { jsonResponse } from '../http-helpers.js';
-import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { AGENT_FENCED } from '../link-fence.js';
+import { type DashboardCredential, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
 
 /** The `pan worker run --harness` set (`src/cli/commands/worker.ts`). */
@@ -100,4 +114,96 @@ const postWorkersRoute = HttpRouter.add(
   })),
 );
 
-export const workersRouteLayer = Layer.mergeAll(postWorkersRoute);
+/** Reports per status answer; a follower asks again with the last `seq` it mirrored. */
+export const WORKER_STATUS_REPORT_LIMIT = 20;
+
+export interface WorkerFollowDeps {
+  readFacts: (id: string) => Promise<WorkerFacts | null>;
+  isAlive: (id: string) => Promise<LivenessVerdict>;
+  idleAgeMs: (id: string) => number | null;
+  listReports: (id: string) => Promise<WorkerReport[]>;
+  lastAssistantMessage: (id: string) => Promise<string | null>;
+  stop: (id: string) => Promise<void>;
+}
+
+async function lastAssistantMessageOf(id: string): Promise<string | null> {
+  const { buildAgentConversationWindowResult } = await import('./agents/conversation.js');
+  const result = await buildAgentConversationWindowResult(id, new URLSearchParams());
+  const messages = (result.body as { messages?: Array<{ role?: string; text?: unknown }> } | null)?.messages ?? [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]!;
+    if (message.role === 'assistant' && typeof message.text === 'string' && message.text.trim()) return message.text;
+  }
+  return null;
+}
+
+const defaultFollowDeps: WorkerFollowDeps = {
+  readFacts: readWorkerFacts,
+  isAlive: (id) => isAlive(id),
+  idleAgeMs: (id) => idleAgeMs(id),
+  listReports: listWorkerReports,
+  lastAssistantMessage: lastAssistantMessageOf,
+  stop: async (id) => { await Effect.runPromise(stopAgent(id, 'operator')); },
+};
+
+const unknownWorker = (): HttpServerResponse.HttpServerResponse => jsonResponse({ code: 'unknown-worker', error: 'no such worker' }, { status: 404 });
+
+/** `GET /api/workers/:id/status?after=<seq>`. */
+export async function handleWorkerStatus(id: string, after: number, deps: WorkerFollowDeps = defaultFollowDeps): Promise<HttpServerResponse.HttpServerResponse> {
+  if (!(await deps.readFacts(id))) return unknownWorker();
+  const [verdict, reports] = await Promise.all([deps.isAlive(id), deps.listReports(id)]);
+  const confirmedDead = isConfirmedDead(verdict);
+  return jsonResponse({
+    id,
+    liveness: { alive: verdict.alive, confirmedDead },
+    idleAgeMs: deps.idleAgeMs(id),
+    reports: reports.filter((report) => report.seq > after).slice(0, WORKER_STATUS_REPORT_LIMIT),
+    lastAssistantMessage: confirmedDead ? await deps.lastAssistantMessage(id).catch(() => null) : null,
+  });
+}
+
+/** `POST /api/workers/:id/stop`; an agent actor stops only what its own machine started. */
+export async function handleWorkerStop(
+  id: string,
+  credential: DashboardCredential | null,
+  deps: WorkerFollowDeps = defaultFollowDeps,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  const facts = await deps.readFacts(id);
+  if (!facts) return unknownWorker();
+  if (credential?.kind === 'machine' && credential.actor !== 'operator' && facts.startedBy?.environmentId !== credential.environmentId) {
+    return jsonResponse({ code: AGENT_FENCED, error: 'An agent on a linked machine can stop only workers its machine started' }, { status: 403 });
+  }
+  await deps.stop(id);
+  emitActivityEntry({ source: 'dashboard', level: 'info', message: `Stopped worker ${id}`, details: JSON.stringify({ workerId: id }) });
+  return jsonResponse({ stopped: true });
+}
+
+const getWorkerStatusRoute = HttpRouter.add(
+  'GET',
+  '/api/workers/:id/status',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const params = yield* HttpRouter.params;
+    const url = HttpServerRequest.toURL(request);
+    const after = Number.parseInt((Option.isSome(url) ? url.value.searchParams.get('after') : null) ?? '0', 10);
+    return yield* Effect.promise(() => handleWorkerStatus(params['id'] ?? '', Number.isFinite(after) ? after : 0));
+  })),
+);
+
+const postWorkerStopRoute = HttpRouter.add(
+  'POST',
+  '/api/workers/:id/stop',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const credential = resolveRequestCredential(request);
+    // A machine credential arrives as a Bearer header inside a channel: no form can send it, so no CSRF check.
+    if (credential?.kind !== 'machine') {
+      const authError = rejectUnsafeDashboardMutationRequest(request);
+      if (authError) return authError;
+    }
+    const params = yield* HttpRouter.params;
+    return yield* Effect.promise(() => handleWorkerStop(params['id'] ?? '', credential));
+  })),
+);
+
+export const workersRouteLayer = Layer.mergeAll(postWorkersRoute, getWorkerStatusRoute, postWorkerStopRoute);

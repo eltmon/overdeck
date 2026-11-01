@@ -14,19 +14,25 @@
  * - `POST /api/machines/work/conversations { gitOrigin, message, model?, harness?, effort?, issueId? }`
  *   → `handleConversationCreate` in the matched project (or the home directory
  *   when `gitOrigin` is null) → `markConversationStartedBy`. Answers 201 `{ name }`.
+ * - `POST /api/machines/work/workers { gitOrigin, issueId, prompt, model?, harness?, effort?, readOnly?, name?, parentId? }`
+ *   → project from the issue prefix, origin check → `startWorker` with
+ *   `parentId: null` and `startedBy: { environmentId, parentId }` (the caller's
+ *   parent lives on the caller's machine). Answers `{ id, cwd, branch }`.
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
 
+import { PARENT_ID_RE, startWorker, type StartWorkerOptions } from '../../../lib/agents/worker/start.js';
 import { gitOriginOf, sameGitOrigin } from '../../../lib/anywhere/project-origin.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { markConversationStartedBy } from '../../../lib/overdeck/conversation-provenance.js';
 import { generateAiTitle } from '../../../lib/overdeck/conversation-reads.js';
 import { handleConversationCreate } from '../../../lib/overdeck/conversation-runtime.js';
-import { listProjectsAsync, type ProjectConfig } from '../../../lib/projects.js';
+import { listProjectsAsync, type ProjectConfig, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { jsonResponse } from '../http-helpers.js';
 import { conversationReadDependencies } from './conversations.js';
 import { type DashboardCredential, resolveRequestCredential } from './dashboard-auth.js';
+import { parseStartWorkerBody } from './workers.js';
 
 export type MachineCredential = Extract<DashboardCredential, { kind: 'machine' }>;
 
@@ -141,6 +147,50 @@ export async function handleWorkConversation(
   return jsonResponse({ name }, { status: 201 });
 }
 
+export interface WorkerDoorDeps extends WorkDoorDeps {
+  projectKeyForIssue: (issueId: string) => Promise<string | null>;
+  start: (options: StartWorkerOptions) => Promise<{ id: string; cwd: string; branch: string | null }>;
+}
+
+const defaultWorkerDoorDeps: WorkerDoorDeps = {
+  ...defaultWorkDoorDeps,
+  projectKeyForIssue: async (issueId) => (await Effect.runPromise(resolveProjectFromIssue(issueId)))?.projectKey ?? null,
+  start: startWorker,
+};
+
+/** `POST /api/machines/work/workers`. */
+export async function handleWorkWorker(
+  credential: DashboardCredential | null,
+  raw: unknown,
+  deps: WorkerDoorDeps = defaultWorkerDoorDeps,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'machine') return machineOnly();
+  const body = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+  if (!body) return jsonResponse({ error: 'body must be an object' }, { status: 400 });
+  const gitOrigin = parseGitOrigin(body);
+  if (gitOrigin === undefined) return jsonResponse({ error: 'gitOrigin must be a repository slug or null' }, { status: 400 });
+  const parentId = body['parentId'] ?? null;
+  if (parentId !== null && (typeof parentId !== 'string' || !PARENT_ID_RE.test(parentId))) {
+    return jsonResponse({ error: 'parentId must be an agent id or conversation' }, { status: 400 });
+  }
+  const { gitOrigin: _origin, parentId: _parent, ...workerBody } = body;
+  const parsed = parseStartWorkerBody(workerBody);
+  if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+  const projectKey = await deps.projectKeyForIssue(parsed.value.issueId).catch(() => null);
+  const preflight = await workDoorPreflight(credential, { gitOrigin, projectKey }, deps);
+  if (!preflight.ok) return preflight.response;
+  try {
+    const { id, cwd, branch } = await deps.start({
+      ...parsed.value,
+      parentId: null,
+      startedBy: { environmentId: preflight.credential.environmentId, parentId },
+    });
+    return jsonResponse({ id, cwd, branch });
+  } catch (error) {
+    return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+  }
+}
+
 export const readWorkDoorBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
@@ -161,4 +211,14 @@ const workConversationRoute = HttpRouter.add(
   }),
 );
 
-export const machinesWorkRouteLayer = Layer.mergeAll(workConversationRoute);
+const workWorkerRoute = HttpRouter.add(
+  'POST',
+  '/api/machines/work/workers',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const body = yield* readWorkDoorBody;
+    return yield* Effect.promise(() => handleWorkWorker(resolveRequestCredential(request), body));
+  }),
+);
+
+export const machinesWorkRouteLayer = Layer.mergeAll(workConversationRoute, workWorkerRoute);

@@ -76,6 +76,10 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/machines/projects', scope: 'read:state' },
   // PAN-4651 WI-4: work doors — a linked machine starts work here (machine credential only, checked by the routes).
   { method: 'POST', path: '/api/machines/work/conversations', scope: 'operate' },
+  { method: 'POST', path: '/api/machines/work/workers', scope: 'operate' },
+  // PAN-4651 WI-5: a linked machine follows (and stops) a worker it delegated here.
+  { method: 'GET', path: '/api/workers/:id/status', scope: 'read:state' },
+  { method: 'POST', path: '/api/workers/:id/stop', scope: 'operate' },
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },
