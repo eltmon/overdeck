@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T06:21:19Z · model: claude-opus-5-5 · open: 868_
+_Last sequenced: 2026-11-01T06:29:38Z · model: claude-opus-5-5 · open: 867_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -19,7 +19,6 @@ _Last sequenced: 2026-11-01T06:21:19Z · model: claude-opus-5-5 · open: 868_
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 14 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
-| 15 | PAN-4672 | S | high | ok |  |  | In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout. |
 | 16 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
 | 17 | PAN-4674 | S | high | ok |  |  | Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist |
 | 18 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
@@ -932,10 +931,6 @@ Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls th
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.
 
-### PAN-4672 (rank 15)
-
-New in-pipeline substrate bug with four concrete, test-backed fixes; the hold-timeout gap reopens the original dashboard request hang, so it sits in the first free slot below the pinned tier.
-
 ### PAN-4671 (rank 16)
 
 New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
@@ -1196,6 +1191,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 
 Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
 
+### PAN-1824 (rank 86)
+
+Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass — PAN-3243, PAN-3492, PAN-3520 and PAN-2421 — all trace red or flaky main to real-timer tests under load. This is the shared fix for that family and it is now marked ready, so it should sit with the other CI-integrity work rather than behind it.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1203,10 +1202,10 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T06:21:19Z",
+  "generatedAt": "2026-11-01T06:29:38Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 868,
+  "openCount": 867,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -1389,19 +1388,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "dependsOn": [],
       "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
       "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4672",
-      "rank": 15,
-      "size": "S",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout.",
-      "rationale": "New in-pipeline substrate bug with four concrete, test-backed fixes; the hold-timeout gap reopens the original dashboard request hang, so it sits in the first free slot below the pinned tier.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13759,13 +13745,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4671",
-      "to": "PAN-4672",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
     }
   ]
 }
