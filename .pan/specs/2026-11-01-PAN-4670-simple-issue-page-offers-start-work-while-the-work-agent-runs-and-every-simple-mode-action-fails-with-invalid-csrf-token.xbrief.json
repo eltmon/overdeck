@@ -4,17 +4,17 @@
     "created": "2026-11-01T06:10:32Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4670: Simple issue page offers Start work while the work agent runs, and every simple-mode action fails with 'Invalid CSRF token'",
-    "updated": "2026-11-01T06:19:10.989Z"
+    "updated": "2026-11-01T11:01:49.314Z"
   },
   "plan": {
     "id": "pan-4670",
     "title": "Simple issue page offers Start work while the work agent runs, and every simple-mode action fails with 'Invalid CSRF token'",
-    "status": "proposed",
+    "status": "running",
     "uid": "73be4ba3-c417-46ce-9b4f-560f092e0d97",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-01T06:10:32Z",
-    "updated": "2026-11-01T06:19:10.989Z",
+    "updated": "2026-11-01T11:01:49.314Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4670",
@@ -360,5 +360,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
