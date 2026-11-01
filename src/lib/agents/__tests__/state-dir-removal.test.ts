@@ -17,6 +17,7 @@ import {
   listAgentStateFilesForRemoval,
   pruneAgentStateDir,
   removeAgentStateDir,
+  removeCodexPluginCaches,
 } from '../state-dir-removal.js';
 
 let tempRoot: string;
@@ -213,5 +214,39 @@ describe('pruneAgentStateDir', () => {
 
     await expect(pruneAgentStateDir(agentDir)).rejects.toThrow('refusing symbolic-link child');
     expect(readFileSync(outsideFile, 'utf8')).toBe('keep');
+  });
+});
+
+describe('removeCodexPluginCaches (PAN-4727)', () => {
+  const cache = (home: string, plugin: string) => join(agentDir, home, 'plugins', 'cache', 'overdeck-packs', plugin);
+
+  it('removes only the named plugin cache in every codex-home and keeps sessions and transcripts', async () => {
+    for (const dir of [cache('codex-home', 'gstack'), cache('codex-home-v2', 'gstack'), cache('codex-home', 'mattpocock')]) {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'SKILL.md'), 'x');
+    }
+    mkdirSync(join(agentDir, 'codex-home', 'sessions'), { recursive: true });
+    writeFileSync(join(agentDir, 'codex-home', 'sessions', 'rollout.jsonl'), '{}\n');
+    writeFileSync(join(agentDir, 'session.jsonl'), '{}\n');
+
+    const removed = await removeCodexPluginCaches('overdeck-packs', 'gstack', tempRoot);
+    expect(removed.sort()).toEqual([cache('codex-home', 'gstack'), cache('codex-home-v2', 'gstack')].sort());
+    expect(existsSync(cache('codex-home', 'gstack'))).toBe(false);
+    expect(existsSync(cache('codex-home', 'mattpocock'))).toBe(true);
+    expect(readFileSync(join(agentDir, 'codex-home', 'sessions', 'rollout.jsonl'), 'utf8')).toBe('{}\n');
+    expect(existsSync(join(agentDir, 'session.jsonl'))).toBe(true);
+  });
+
+  it('never follows or removes a symlinked cache, and leaves its target alone', async () => {
+    mkdirSync(join(agentDir, 'codex-home', 'plugins', 'cache', 'overdeck-packs'), { recursive: true });
+    writeFileSync(join(outsideDir, 'keep.txt'), 'x');
+    symlinkSync(outsideDir, cache('codex-home', 'gstack'));
+    expect(await removeCodexPluginCaches('overdeck-packs', 'gstack', tempRoot)).toEqual([]);
+    expect(existsSync(join(outsideDir, 'keep.txt'))).toBe(true);
+  });
+
+  it('returns nothing when the agents root is missing and rejects path-like names', async () => {
+    expect(await removeCodexPluginCaches('overdeck-packs', 'gstack', join(tempRoot, 'missing'))).toEqual([]);
+    await expect(removeCodexPluginCaches('overdeck-packs', '../x', tempRoot)).rejects.toThrow(/invalid name/);
   });
 });

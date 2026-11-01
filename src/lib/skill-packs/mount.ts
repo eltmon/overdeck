@@ -17,6 +17,7 @@
 import { createHash } from 'node:crypto';
 import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, posix } from 'node:path';
+import { removeCodexPluginCaches } from '../agents/state-dir-removal.js';
 import { getOverdeckHome } from '../paths.js';
 import { applyDeftHostNotice, DEFT_HOST_NOTICE_VERSION } from './deft.js';
 import { GSTACK_RENDER_VERSION } from './gstack.js';
@@ -365,16 +366,7 @@ export async function removePackFromMounts(
   }
   const { removedLinks } = await sweepLaunchLinks();
 
-  const removedCodexCaches: string[] = [];
-  const agentsRoot = join(getOverdeckHome(), 'agents');
-  for (const agent of await listDirNames(agentsRoot)) {
-    for (const child of await listDirNames(join(agentsRoot, agent))) {
-      if (!child.startsWith('codex-home')) continue;
-      const cache = join(agentsRoot, agent, child, 'plugins', 'cache', CODEX_PACK_MARKETPLACE, id);
-      if (!(await exists(cache))) continue;
-      await rm(cache, { recursive: true, force: true });
-      removedCodexCaches.push(cache);
-    }
-  }
+  // Agent dirs have one deletion door (PAN-3357), which also refuses symlinks and escapes.
+  const removedCodexCaches = await removeCodexPluginCaches(CODEX_PACK_MARKETPLACE, id, join(getOverdeckHome(), 'agents'));
   return { removedMounts, removedLinks, removedCodexCaches };
 }
