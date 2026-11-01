@@ -1,0 +1,118 @@
+{
+  "version": "1",
+  "issueId": "PAN-4714",
+  "created": "2026-11-01T12:30:39.191Z",
+  "updated": "2026-11-01T13:09:07.205Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T13:09Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-01T13:09:07.204Z"
+    }
+  ],
+  "items": {
+    "contracts-tracker-issue-ref": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4714",
+      "claimedAt": "2026-11-01T12:30:39.190Z",
+      "doneAt": "2026-11-01T12:32:08.333Z"
+    },
+    "registered-projects-tracker-field": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4714",
+      "claimedAt": "2026-11-01T12:32:22.250Z",
+      "doneAt": "2026-11-01T12:38:08.914Z"
+    },
+    "transcript-issue-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4714",
+      "claimedAt": "2026-11-01T12:38:13.174Z",
+      "doneAt": "2026-11-01T12:47:50.854Z"
+    },
+    "docs-issue-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4714",
+      "claimedAt": "2026-11-01T12:47:58.616Z",
+      "doneAt": "2026-11-01T12:49:00.673Z"
+    },
+    "uat-issue-drawer-screenshot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4714",
+      "claimedAt": "2026-11-01T12:49:07.375Z",
+      "doneAt": "2026-11-01T12:55:33.584Z"
+    },
+    "contracts-tracker-issue-ref.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T12:58:15.237Z"
+    },
+    "contracts-tracker-issue-ref.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T12:58:29.057Z"
+    },
+    "contracts-tracker-issue-ref.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T12:58:42.517Z"
+    },
+    "contracts-tracker-issue-ref.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T12:58:56.428Z"
+    },
+    "registered-projects-tracker-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T12:59:09.480Z"
+    },
+    "registered-projects-tracker-field.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T12:59:22.796Z"
+    },
+    "transcript-issue-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T12:59:36.268Z"
+    },
+    "transcript-issue-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T12:59:49.422Z"
+    },
+    "transcript-issue-link.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:00:03.217Z"
+    },
+    "transcript-issue-link.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:00:18.289Z"
+    },
+    "transcript-issue-link.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:00:33.521Z"
+    },
+    "uat-issue-drawer-screenshot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:00:49.214Z"
+    },
+    "uat-issue-drawer-screenshot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:01:04.225Z"
+    },
+    "docs-issue-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:01:17.432Z"
+    },
+    "docs-issue-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:01:31.183Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-01T13:09:07Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4714\n\n# Review — PAN-4714\n## Verdict: CHANGES REQUESTED — a plain click on a resolvable issue link does nothing in the conversation pop-out, Flywheel pop-out and mobile `/m` views, because no IssueDrawer is mounted there\n\n## Context\n- Run ID: agent-pan-4714-review-d554bb75\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4714/.pan/review/agent-pan-4714-review-d554bb75/context.json\n- Branch / workspace: feature/pan-4714 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4714\n- PR: https://github.com/eltmon/overdeck/pull/4716\n- HEAD reviewed: d554bb75a083a693aa031347f305dcd1812501da\n- Base / prior cycle SHA: merge-base 3e7edf2a2d2f44061cbf3bf4263fb57b4ba70fd9; no prior review cycle\n\n## Blocking Findings\n\n### [requirements/correctness] Issue-link click is swallowed in the conversation hosts that have no IssueDrawer — `src/dashboard/frontend/src/components/chat/TranscriptIssueLink.tsx:31`\n- Severity: `!` MUST\n- Classification / requirement scope: specification defect with a user-visible regression; in_pr_scope. The PRD's Decision 1 says: \"The drawer-open behaviour applies only when the conversation context is present — the same gate PAN-3822 uses for the PR menu.\" That gate assumes every host of `ConversationPanel` also mounts the issue drawer. That assumption is false. The implementation follows the spec, and the spec needs correcting.\n- Trigger and changed-code connection: `ConversationPanel` always wraps its content in `ConversationPullRequestProvider` (`components/chat/ConversationPanel.tsx:689`), so `TranscriptLink` routes every resolvable issue URL to `TranscriptIssueLink`. That component calls `event.preventDefault()` and `openIssue(issueId, 'overview')` on a plain click. `<IssueDrawer />` is mounted in exactly one place: the main layout at `App.tsx:886`. These routes return before that line, but still render `ConversationPanel` under the root `QueryClientProvider` (`main.tsx:75`), so `['registered-projects']` resolves and the link becomes interceptable:\n  - `/popout/conversation/<id>` → `StandaloneConversationPopoutRoute` (`App.tsx:128-131`, `App/StandaloneRoutes.tsx` mounts `<ConversationPanel>` directly).\n  - `/popout/flywheel-conversation` → `StandaloneFlywheelPopoutRoute` → `FlywheelConversationPane` → `<ConversationPanel>` (`components/flywheel/FlywheelConversationPane.tsx:232`).\n  - `/m` → `MobileApp` → `MobileConversations` → `<ConversationPanel>` (`components/mobile/MobileConversations.tsx:95`). Nothing under `components/mobile/` reads `drawer` state.\n- Expected / observed / impact: Expected, from FR-1, FR-5 and FR-7 together: a click either opens the drawer or keeps today's new-tab behaviour. Observed, by static trace: the click is default-prevented, `openIssue` sets `drawer` in the store, and `replaceDrawerUrl` (`lib/store.ts:152-164`) rewrites the window URL to add `?issue=…&tab=overview`. Nothing renders, so the link looks dead. Before this PR, the same click opened the tracker in a new tab. On the phone view (`/m`), a tap is the only practical way to follow a link, so the user loses the ability to open the issue. A pop-out user can still Ctrl/Cmd-click, but a plain click silently does nothing and changes the URL.\n- Evidence: static trace (grep for `<IssueDrawer` finds only `App.tsx:886` outside tests; the early returns are at `App.tsx:128-141`). No runtime reproduction. The PR's Playwright check ran only in the main dashboard layout, where the drawer is mounted. The new component tests mock `openIssue`, so they cannot detect a host without a drawer.\n- Fix: intercept the click only where the drawer can open. One way: the main layout in `App.tsx` provides a flag, either a small context such as `IssueDrawerAvailableContext` placed around the area that renders `<IssueDrawer />`, or a store field set while `IssueDrawer` is mounted. `TranscriptIssueLink` (or `TranscriptLink`) then falls back to the plain new-tab anchor when the flag is absent. Correct the spec to match. Decision 1 / FR-7 should read: \"only inside a conversation transcript rendered in a layout that mounts the IssueDrawer; the standalone pop-outs and `/m` keep today's new-tab behaviour.\" Add a component test that renders a transcript inside `ConversationPullRequestProvider` without the drawer-available flag, and asserts that `fireEvent.click` returns `true` and `openIssue` is not called.\n\n## Non-blocking Findings\n\n### [docs] The new `### Issue links` heading splits the PR-linking section — `features/conversations.mdx:618`\n- Severity: `~` SHOULD\n- Classification: implementation defect (docs), in_pr_scope.\n- The heading is inserted between the PR right-click paragraph and \"Agents and scripts use the CLI…\", so the `pan conv link-pr/unlink-pr/prs` CLI block and the \"Rules:\" list about linkable repositories now appear under \"Issue links\". A reader will think those verbs and rules are about issue links. Fix: move the `### Issue links` section after the end of the PR-linking material (after its Rules list), or drop the heading and keep the paragraph in place. (The `docs/DASHBOARD-ARCHITECTURE.md` bullet is placed correctly. It follows the tail of the PAN-3822 bullet that starts at line 393.)\n\n### [tests] FR-4 and FR-5 test gaps — `src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx`\n- Severity: `?` MAY\n- The code covers Shift, Alt and middle-click (`button !== 0`, plus `shiftKey`/`altKey`), but the tests exercise only Ctrl and Cmd. The \"unregistered repo / tracker mismatch\" test waits only for `fetch` to be *called*, not for the query to resolve. So its \"no `data-issue-id`\" assertions could pass before the data arrives. Waiting for a resolved sibling link, or adding a resolvable control link in the same render, would make it meaningful. No frontend click test covers a Linear URL. The resolver itself is covered in the contracts tests, and the click path is identical.\n- The new tests print React `act(...)` warnings on CI (an update to `TranscriptIssueLink` that is not wrapped in act). This is noise only.\n\n### [correctness] Linear and issue prefixes that contain digits never resolve — `packages/contracts/src/tracker-issue-ref.ts:21`\n- Severity: `?` MAY\n- `LINEAR_ISSUE` captures `[A-Za-z]+-\\d+`, so a team key such as `K3` or `ENG2` would not parse. Such a link falls back to a plain new-tab link, so nothing breaks. Widen the pattern to `[A-Za-z][A-Za-z0-9]*` only if such a prefix is registered.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| src/dashboard/server/routes/misc/meta.ts | Reviewed. `tracker: tryResolveProjectTrackerType(p.config)` is pure and sync (reads only config fields; no I/O), and no existing field is removed or renamed. FR-8 met. |\n| packages/contracts/src/tracker-issue-ref.ts | Reviewed. The regexes are anchored, the host is restricted to `github.com` / `linear.app` (no `www.`, GHE or GitLab, matching non-goal 2), `n > 0` is a safe integer, and repo/identifier case is normalized. The resolver requires a non-empty prefix and a matching tracker, tolerates null rows, and has no prefix table (NFR-1). The issue-ID rule matches `issueIdFromTrackerIssue` (`src/lib/tracker/issue-id.ts:12-17`). |\n| packages/contracts/src/index.ts | Reviewed. One re-export line. |\n| packages/contracts/src/__tests__/tracker-issue-ref.test.ts | Reviewed. Has the 7 named cases. It is picked up by the root vitest include `packages/**/src/__tests__/**/*.test.ts`. |\n| src/dashboard/frontend/src/components/chat/TranscriptIssueLink.tsx | Reviewed. Blocking finding above. Otherwise correct: plain-click detection is right, and the anchor keeps `href`, `target` and `rel`. `['registered-projects']` shares its cache with ~15 callers, and every callers' `queryFn` stores the raw array (`fetchRegisteredProjects` in `UnknownProjectState.tsx` passes it through), so the `tracker` field survives in the shared cache. Non-array data is treated as no projects (NFR-2). |\n| src/dashboard/frontend/src/components/chat/TranscriptPullRequestLink.tsx | Reviewed. The PR ref is checked first, so the PR menu is unchanged (FR-6). Issue URLs are delegated only with context present. Hooks stay unconditional (`useContext` only; the query lives in the child). |\n| src/dashboard/frontend/src/components/chat/ChatMarkdown.tsx | Reviewed. Comment-only change. The `safeHref` sanitizer is unchanged. |\n| src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx | Reviewed. 5 cases pass on CI. See the advisory above. |\n| scripts/frontend-test-subset.txt | Reviewed. Both files are listed in sorted position, and CI consumed them (test-e2e job, \"Frontend test subset\" step, for this HEAD). NFR-3 met. |\n| tests/unit/dashboard/routes/registered-projects-route.test.ts | Reviewed. Adds `tracker` for github/null/linear, including the fixture that is linear-tracked and also has a github_repo. |\n| docs/DASHBOARD-ARCHITECTURE.md | Reviewed. Accurate and correctly placed. |\n| features/conversations.mdx | Reviewed. See the advisory on heading placement. |\n| .pan/continues/PAN-4714.xbrief.json, .pan/drafts/PAN-4714.md, .pan/specs/…PAN-4714….xbrief.json | Not applicable (planning artifacts). Read for the requirements and acceptance criteria. |\n\n### Dimensions\n- **Correctness:** One blocker (hosts without a drawer). The parser, resolver, click gating and PR-path precedence are correct. The drawer accepts any issue ID (`IssueDrawer.tsx:81-116` renders from `drawer.issueId` and offers a link to the tracker), so an issue the dashboard does not know still opens.\n- **Security:** `href` still passes through ChatMarkdown's `javascript:`/`data:`/`vbscript:` filter. The issue ID that reaches `openIssue` and the URL params is built from `[A-Za-z]+-\\d+` or `<prefix>-<digits>`, with the prefix taken from the operator's `projects.yaml`. No new trust boundary is crossed.\n- **Performance:** There is one `useQuery` subscription per issue link on a shared, cached key, and the resolver runs in O(projects) per render. Both are negligible at transcript scale. The server field is a pure in-memory computation.\n- **Requirements/UX:** See the AC matrix. The behaviour regression in hosts without a drawer violates FR-5/FR-7's intent: \"renders and behaves exactly as today\" whenever the feature cannot apply.\n\n### Acceptance criteria\n| AC / item | Status | Evidence |\n| --- | --- | --- |\n| contracts-tracker-issue-ref (FR-2, FR-3, NFR-1) | Met | Code review, plus the contracts test run locally: pass. |\n| registered-projects-tracker-field (FR-8) | Met | meta.ts diff, plus the route test run locally: pass. |\n| transcript-issue-link (FR-1, FR-4–FR-7, NFR-2, NFR-3) | Unmet (partially) | Works in the main dashboard layout (CI tests pass, plus the screenshot). It regresses to a dead click in `/popout/conversation/<id>`, `/popout/flywheel-conversation` and `/m`. |\n| uat-issue-drawer-screenshot | Met (local evidence) | `.tmp/pan-4714-issue-drawer.png` shows the PAN-4645 \"Issue details\" drawer on the Overview tab. The PR body describes it, but the image is not attached to the PR. The check covered only the main layout. |\n| docs-issue-links | Met, with an advisory | Both docs updated. The mdx heading placement is off. |\n\n## Verification\n- `npx vitest run packages/contracts/src/__tests__/tracker-issue-ref.test.ts tests/unit/dashboard/routes/registered-projects-route.test.ts` (local): 2 files, 9 tests, all passed.\n- Frontend tests: the local run could not start. The frontend `vitest.config.ts` `ensureFrontendNodeModules()` hit `EEXIST` on a broken `@dnd-kit/core` symlink in this workspace's `node_modules`. That is an environment issue, not the PR. CI evidence for exact HEAD d554bb75 (run 41309286806, job `test-e2e`, step \"Frontend test subset\"): `ChatMarkdown.issue-links.test.tsx` passed 5 tests, and `ChatMarkdown.pull-request-links.test.tsx` passed 3.\n- `gh pr checks 4716` at review time: every check passed (build (22), lint, lint-group core/effect/skills/state, test, test-shard 1-4, test-e2e, non-blocking flake lane, clean install smoke, prompt-change trailer, overdeck/test). Mintlify was skipped.\n- `lint:effect-diagnostics`: covered by the passing CI `lint` job (`npm run lint` chains `lint:effect-diagnostics`). The meta.ts change adds no Effect usage.\n- I did not run the full suite, per the role contract.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4714/.pan/review/agent-pan-4714-review-d554bb75/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4714 -m \"Fixed review issues\"`"
+    }
+  ]
+}

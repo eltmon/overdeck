@@ -12,6 +12,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import type { IssueDataService } from '../../services/issue-data-service.js';
 import { extractPrefix } from '../../../../lib/issue-id.js';
 import { getIssuePrefix, listProjectsSync } from '../../../../lib/projects.js';
+import { tryResolveProjectTrackerType } from '../../../../lib/project-tracker-type.js';
 import { sendKeys } from '../../../../lib/tmux.js';
 import { restartDashboardDetached } from '../../services/dashboard-restart.js';
 import { getSyncStatus, runSyncNow } from '../../services/sync-auto-service.js';
@@ -134,6 +135,7 @@ const getRegisteredProjectsRoute = HttpRouter.add(
           linearTeam: getIssuePrefix(p.config) || null,
           membershipQueryable: Boolean(getIssuePrefix(p.config)),
           githubRepo: p.config.github_repo || null,
+          tracker: tryResolveProjectTrackerType(p.config),
           linearProject: (p.config as { linear_project?: string }).linear_project || null,
         })),
       );

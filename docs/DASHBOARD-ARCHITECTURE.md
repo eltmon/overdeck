@@ -437,6 +437,24 @@ door that does not exist; a real record read door would be a separate change.
   and `pullRequest` + `pullRequests` on `GET /api/conversations/:id`. A new table
   goes in the init migration AND a `runSchemaTopUp` in `ensureRuntimeIndexesSync`,
   and bumps `OVERDECK_TABLE_COUNT`.
+- Issue links in conversations (PAN-4714): `TranscriptLink` passes tracker issue
+  URLs inside a conversation to `TranscriptIssueLink`, which resolves them with
+  `parseTrackerIssueUrl` / `resolveTrackerIssueId` (`@overdeck/contracts`)
+  against `/api/registered-projects` (`linearTeam` prefix, `githubRepo`, and the
+  `tracker` field from `tryResolveProjectTrackerType`). A plain click calls
+  `openIssue(id, 'overview')`; links outside a conversation are unchanged.
+  `TranscriptIssueLink` only intercepts the click when
+  `IssueDrawerAvailableContext` (`components/drawer/issueDrawerAvailableContext.ts`,
+  a leaf module with no component imports, to avoid a circular dependency
+  back through `IssueDetail` → `DrawerAgentSession` → `ConversationPanel` →
+  `ChatMarkdown`) is
+  `true` — provided only by the main `App.tsx` layout, which is the only host
+  that mounts `<IssueDrawer />`. The standalone pop-outs
+  (`/popout/conversation/<id>`, `/popout/flywheel-conversation`) and the
+  mobile app (`/m`) also render `ConversationPanel` but don't mount the
+  drawer, so the context defaults to `false` there and issue links keep their
+  plain new-tab behaviour (review fix after the first PAN-4714 review cycle
+  found the click otherwise went to a nonexistent drawer).
 - Conversation schedules (PAN-4640): the `conversation_schedules` table holds one
   prompt, a 5-field cron, an IANA `time_zone`, `enabled`, `next_run_at`, and the
   last run's time, status (`delivered`, `failed`, `skipped`) and error, deleted with
