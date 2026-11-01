@@ -37,6 +37,17 @@ export function isPeerDashboardProcess(env: NodeJS.ProcessEnv = process.env): bo
   return isTruthyGateValue(env.OVERDECK_DISABLE_DEACON);
 }
 
+/**
+ * Whether this dashboard hosts machine links (PAN-4645 D-4645-21): the channel
+ * listener accepts peers and the link supervisor runs. True on the primary
+ * dashboard; a peer-mode process (OVERDECK_DISABLE_DEACON=1) opts in with
+ * OVERDECK_ANYWHERE_SUPERVISOR=1, which scripts/anywhere/two-machine-smoke.mjs
+ * sets for its two isolated dashboards.
+ */
+export function hostsMachineLinks(env: NodeJS.ProcessEnv = process.env): boolean {
+  return !isPeerDashboardProcess(env) || isTruthyGateValue(env.OVERDECK_ANYWHERE_SUPERVISOR);
+}
+
 function gateSourceFromEnv(value: string | undefined): BootGateSource | null {
   const normalized = value?.trim().toLowerCase();
   if (normalized === 'flag' || normalized === 'env' || normalized === 'default') return normalized;

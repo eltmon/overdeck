@@ -171,6 +171,29 @@ describe('link supervisor routes (PAN-4645 WI-19)', () => {
     expect(h.supervisor.status('link-1').currentRoute).toBe(LAN);
   });
 
+  it('a route that closes before proving its key counts as unreachable while another route refuses outright', async () => {
+    h = harness([PAIRING, { url: LAN, kind: 'lan', source: 'advertised', addedAt: '2026-11-01T00:00:00.000Z' }], [], []);
+    (h.deps.openChannel as ReturnType<typeof vi.fn>).mockImplementation(async (url: string) => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      if (url === TAILNET) throw new ChannelOpenError('identity-refused', 'Responder closed the connection before proving the pinned machine key');
+      throw new ChannelOpenError('unreachable', `${url}: ECONNREFUSED`);
+    });
+    h.supervisor.start();
+    await vi.advanceTimersByTimeAsync(50);
+    const status = h.supervisor.status('link-1');
+    expect(status.state).toBe('offline');
+    expect(status.stateDetail).toContain('ECONNREFUSED');
+    expect(status.stateDetail).not.toContain('another machine key');
+    // Both routes closing silently is the key-mismatch case.
+    (h.deps.openChannel as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      throw new ChannelOpenError('identity-refused', 'closed');
+    });
+    expect(h.supervisor.reconnect('link-1')).toBe(true);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(h.supervisor.status('link-1').stateDetail).toContain('closed the connection before proving the pinned machine key');
+  });
+
   it('updateRoutes (Add route) re-ranks and probes the new route at once', async () => {
     h = harness([PAIRING], [], [TAILNET, LAN]);
     h.supervisor.start();

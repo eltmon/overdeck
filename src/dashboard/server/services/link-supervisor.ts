@@ -425,8 +425,11 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       const detail = (unsupported.error as ChannelOpenError).detail;
       return { ok: false, failure: 'unsupported', detail: `Install Overdeck ${detail.serverVersion ?? this.deps.serverVersion} on ${detail.linkProtocol !== undefined && detail.linkProtocol > LINK_PROTOCOL_VERSION ? 'this machine' : entry.link.label}` };
     }
-    if (failures.some((failure) => codeOf(failure.error) === 'identity-refused')) {
-      return { ok: false, failure: 'identity-refused', detail: 'a route answered with another machine key' };
+    // A responder that cannot decrypt our pinned-key handshake drops the connection
+    // without a word; so does a proxy or port forward whose peer is dead. Only when
+    // every route behaves that way is it treated as a key mismatch (300 s back-off).
+    if (failures.length > 0 && failures.every((failure) => codeOf(failure.error) === 'identity-refused')) {
+      return { ok: false, failure: 'identity-refused', detail: `${failures.map((failure) => failure.route.url).join(', ')} closed the connection before proving the pinned machine key` };
     }
     return { ok: false, failure: 'unreachable', detail: failures.map((failure) => `${failure.route.url}: ${failure.error.message}`).join('; ') || 'no route answered' };
   }
@@ -587,15 +590,32 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     this.armWatchdog(entry);
     if (entry.lastEndpointsHash !== null && entry.lastEndpointsHash !== payload.endpointsHash) {
       // The peer's advertised endpoints changed: refetch the descriptor and re-merge (WI-19).
-      void this.deps.channelRequest(channel, 'GET', '/api/environment').then((response) => {
-        const decoded = decodeDescriptor(response.json);
-        if (response.status === 200 && decoded._tag === 'Some' && entry.channel === channel) {
-          void this.applyDescriptor(entry, decoded.value);
-          void this.deps.onDescriptor?.(entry.link, decoded.value);
-        }
-      }).catch(() => undefined);
+      // The heartbeat channel is busy with its stream, so the read goes over a short-lived channel.
+      void this.refetchDescriptor(entry, channel);
     }
     entry.lastEndpointsHash = payload.endpointsHash;
+  }
+
+  private async refetchDescriptor(entry: Entry, heartbeatChannel: ChannelSocket): Promise<void> {
+    const url = entry.currentRoute;
+    if (!url) return;
+    let channel: ChannelSocket | null = null;
+    try {
+      const localKey = await this.deps.localKey();
+      channel = await this.deps.openChannel(url as TransportUrl, {
+        mode: 'link', localKey, remoteKeyHex: entry.link.machineKey, timeoutMs: PROBE_TIMEOUT_MS,
+      });
+      const response = await this.deps.channelRequest(channel, 'GET', '/api/environment');
+      const decoded = decodeDescriptor(response.json);
+      if (response.status === 200 && decoded._tag === 'Some' && entry.channel === heartbeatChannel) {
+        await this.applyDescriptor(entry, decoded.value);
+        void this.deps.onDescriptor?.(entry.link, decoded.value);
+      }
+    } catch (error) {
+      this.deps.log(`could not refetch ${entry.link.label}'s descriptor: ${(error as Error).message}`);
+    } finally {
+      channel?.destroy();
+    }
   }
 
   private onHeartbeatEnd(entry: Entry, channel: ChannelSocket, end: { status?: number; error?: Error }): void {

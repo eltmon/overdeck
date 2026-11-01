@@ -35,6 +35,7 @@ import {
 } from '@overdeck/contracts';
 
 import { createAccessToken, MACHINE_TOKEN_SCOPES, revokeAccessToken } from '../../../lib/access-tokens.js';
+import { channelAgent } from '../../../lib/anywhere/channel/channel-agent.js';
 import type { ChannelSocket } from '../../../lib/anywhere/channel/channel-socket.js';
 import { currentAdvertisedEndpoints } from '../../../lib/anywhere/endpoints.js';
 import { ChannelOpenError, openChannel, type TransportUrl } from '../../../lib/anywhere/channel/open.js';
@@ -87,7 +88,7 @@ export interface ChannelJsonResponse {
   json: unknown;
 }
 
-/** One JSON request through an open channel: `http.request` with the channel as its connection. */
+/** One JSON request through an open channel: `http.request` over the channel's keep-alive agent, bounded by a hard deadline. */
 export function channelRequest(
   channel: ChannelSocket,
   method: 'GET' | 'POST',
@@ -96,17 +97,24 @@ export function channelRequest(
 ): Promise<ChannelJsonResponse> {
   return new Promise((resolve, reject) => {
     const payload = body === undefined ? null : Buffer.from(JSON.stringify(body), 'utf8');
+    let settled = false;
+    const finish = (outcome: { ok: true; value: ChannelJsonResponse } | { ok: false; error: Error }): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      if (outcome.ok) resolve(outcome.value);
+      else reject(outcome.error);
+    };
     const req = httpRequest(
       {
         method,
         path,
         host: 'link.invalid',
-        createConnection: () => channel as unknown as Socket,
+        agent: channelAgent(channel),
         headers: {
           accept: 'application/json',
           ...(payload ? { 'content-type': 'application/json', 'content-length': String(payload.length) } : {}),
         },
-        timeout: CHANNEL_REQUEST_TIMEOUT_MS,
       },
       (res) => {
         let text = '';
@@ -119,13 +127,15 @@ export function channelRequest(
           } catch {
             json = { error: 'invalid-json', text };
           }
-          resolve({ status: res.statusCode ?? 0, json });
+          finish({ ok: true, value: { status: res.statusCode ?? 0, json } });
         });
-        res.on('error', reject);
+        res.on('error', (error) => finish({ ok: false, error }));
       },
     );
-    req.on('timeout', () => req.destroy(new Error(`${method} ${path} over the channel timed out`)));
-    req.on('error', reject);
+    // A wall-clock deadline: socket idle timeouts do not cover a request that never leaves.
+    const deadline = setTimeout(() => req.destroy(new Error(`${method} ${path} over the channel timed out after ${CHANNEL_REQUEST_TIMEOUT_MS} ms`)), CHANNEL_REQUEST_TIMEOUT_MS);
+    deadline.unref?.();
+    req.on('error', (error) => finish({ ok: false, error }));
     if (payload) req.write(payload);
     req.end();
   });

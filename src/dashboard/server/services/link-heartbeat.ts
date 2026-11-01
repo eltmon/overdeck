@@ -10,8 +10,8 @@
  * the payload shape and the pure SSE parser here.
  */
 import { request as httpRequest } from 'node:http';
-import type { Socket } from 'node:net';
 
+import { channelAgent } from '../../../lib/anywhere/channel/channel-agent.js';
 import type { ChannelSocket } from '../../../lib/anywhere/channel/channel-socket.js';
 import { getLastEventLoopStall, onEventLoopStall } from './event-loop-monitor.js';
 
@@ -129,7 +129,7 @@ export function openHeartbeatOverChannel(channel: ChannelSocket, token: string, 
         method: 'GET',
         path: HEARTBEAT_PATH,
         host: 'link.invalid',
-        createConnection: () => channel as unknown as Socket,
+        agent: channelAgent(channel),
         headers: { accept: 'text/event-stream', authorization: `Bearer ${token}` },
       },
       (res) => {

@@ -40,7 +40,7 @@ import { installChannelListener } from './channel-listener.js';
 import { plainHttpNavigationGuard } from './plain-http-guard.js';
 import { recordPairingExchangeFailure, takePairingById } from './pairing-credentials.js';
 import { getOverdeckVersion } from './routes/misc/shared.js';
-import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
+import { hostsMachineLinks } from '../../lib/boot-gates.js';
 import { ensureMachineKey } from '../../lib/anywhere/machine-key.js';
 import { findActiveMachineTokenByKey } from '../../lib/access-tokens.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
@@ -138,11 +138,12 @@ const HttpServerLive = Layer.unwrap(
       setupKnowledgeViewerProxy(nodeServer);
       setupVoiceWebSocket(nodeServer);
       setupAutoPresoWebSocket(nodeServer);
-      // PAN-4645: secure machine channels on the dashboard port (primary only).
-      // An IK initiator is pinned when an active machine token is bound to its
-      // key; a pairing initiator must name a live `pan pair` credential.
+      // PAN-4645: secure machine channels on the dashboard port (the primary, or a
+      // peer-mode dashboard that opted in; see hostsMachineLinks). An IK initiator is
+      // pinned when an active machine token is bound to its key; a pairing initiator
+      // must name a live `pan pair` credential.
       installChannelListener(nodeServer, {
-        primary: !isPeerDashboardProcess(),
+        primary: hostsMachineLinks(),
         localKey: ensureMachineKey,
         isPinnedPeer: (remoteKeyHex) => findActiveMachineTokenByKey(remoteKeyHex) !== null,
         takePairing: (pairingId) => {

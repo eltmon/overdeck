@@ -15,6 +15,7 @@ import type { MachineKeyPair } from '../../../lib/anywhere/machine-key.js';
 import type { ChannelSocket } from '../../../lib/anywhere/channel/channel-socket.js';
 import { openChannel, openChannelOverTransport } from '../../../lib/anywhere/channel/open.js';
 import { FrameReader } from '../../../lib/anywhere/channel/wire.js';
+import { channelRequest } from '../services/machine-link-service.js';
 import {
   _resetChannelListenerForTests,
   type ChannelListenerDeps,
@@ -226,5 +227,35 @@ describe('channel listener (PAN-4645 WI-3)', () => {
       .rejects.toMatchObject({ code: expect.stringMatching(/^(protocol|identity-refused|timeout)$/) });
     expect(liveChannelCount()).toBe(0);
     expect((await get('/still-http')).text).toBe('ok /still-http');
+  });
+});
+
+// PAN-4645 WI-21 regression: a plain http.request with only createConnection has no
+// agent and sends `Connection: close`, so the peer ended the channel after the first
+// answer and the pairing exchange's second request hung. channelRequest now rides a
+// per-channel keep-alive agent.
+describe('channelRequest keeps the channel alive across requests', () => {
+  it('serves two consecutive requests over one channel and leaves it open', async () => {
+    await start(deps());
+    const channel = await openChannel(`tcp://127.0.0.1:${port}`, { mode: 'link', localKey: peerKey, remoteKeyHex: hex(serverKey) });
+    cleanups.push(() => channel.destroy());
+
+    const first = await channelRequest(channel, 'GET', '/api/environment');
+    const second = await channelRequest(channel, 'POST', '/api/machines/exchange', { v: 1 });
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect((second.json as { text: string }).text).toBe('ok /api/machines/exchange 7');
+    expect(seen.map((entry) => entry.url)).toEqual(['/api/environment', '/api/machines/exchange']);
+    expect(seen[0]!.socket).toBe(seen[1]!.socket); // the same channel carried both
+    expect(channel.destroyed).toBe(false);
+  });
+
+  it('rejects at once when the channel is already closed', async () => {
+    await start(deps());
+    const channel = await openChannel(`tcp://127.0.0.1:${port}`, { mode: 'link', localKey: peerKey, remoteKeyHex: hex(serverKey) });
+    await channelRequest(channel, 'GET', '/api/environment');
+    channel.destroy();
+    await new Promise((resolve) => channel.once('close', resolve));
+    await expect(channelRequest(channel, 'GET', '/api/environment')).rejects.toThrow(/closed|destroyed|hang up/);
   });
 });
