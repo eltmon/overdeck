@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4296",
   "created": "2026-11-01T21:43:56.125Z",
-  "updated": "2026-11-01T22:03:41.428Z",
+  "updated": "2026-11-01T23:10:00.336Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-4296",
       "claimedAt": "2026-11-01T22:02:10.941Z",
       "doneAt": "2026-11-01T22:03:41.428Z"
+    },
+    "wi9-live-checkpoint": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4296",
+      "claimedAt": "2026-11-01T23:10:00.336Z"
     }
   }
 }
