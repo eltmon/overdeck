@@ -65,6 +65,16 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   `ws.ping()` because proxies such as Cloudflare close an idle WebSocket after ~100s and treat a data
   frame as traffic more reliably than a ping frame. See `ws-terminal-heartbeat.ts` and
   `components/terminal/terminalControlFrames.ts`.
+- Color themes (PAN-4644): `XTerminal.tsx`'s xterm palette comes from the active color
+  theme — `useColorTheme((s) => s.terminalPalette(mode))`, recoloring a live terminal
+  without remounting it when the selection changes. A new tmux session's `window-style`
+  background is stamped from `resolveTerminalBackground()`
+  (`src/lib/color-themes/terminal-background.ts`), which falls back to `TERMINAL_BG`
+  on any error. Four routes under `src/dashboard/server/routes/color-themes.ts` serve
+  the feature: `GET /api/color-themes`, `PUT /api/color-themes/selection`,
+  `POST /api/color-themes/import/preview`, and `POST /api/color-themes`. See
+  [appearance.mdx](../configuration/appearance.mdx) "Color themes" for the operator-facing
+  picture.
 - Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
   streams a separate `companion-<ownerSession>` tmux session running `opencode attach` or
   `codex resume --remote` against the conversation's own runtime, opened through
