@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4714",
   "created": "2026-11-01T12:30:39.191Z",
-  "updated": "2026-11-01T12:58:56.428Z",
+  "updated": "2026-11-01T12:59:09.481Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,6 +54,10 @@
     "contracts-tracker-issue-ref.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T12:58:56.428Z"
+    },
+    "registered-projects-tracker-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T12:59:09.480Z"
     }
   }
 }
