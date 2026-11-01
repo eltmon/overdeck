@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T09:41:16.202Z",
+  "updated": "2026-11-01T09:41:41.405Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,6 +190,10 @@
     "keyboard-undo.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T09:41:16.202Z"
+    },
+    "bulk-select.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:41:41.404Z"
     }
   }
 }
