@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4626",
   "created": "2026-11-01T05:58:08.711Z",
-  "updated": "2026-11-01T06:12:44.233Z",
+  "updated": "2026-11-01T06:12:51.678Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4626",
       "claimedAt": "2026-11-01T06:11:57.497Z",
       "doneAt": "2026-11-01T06:12:44.233Z"
+    },
+    "row-leaving-state": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4626",
+      "claimedAt": "2026-11-01T06:12:51.678Z"
     }
   }
 }
