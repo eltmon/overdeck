@@ -425,3 +425,7 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Verification-stuck cap: after 3/3 failed verification attempts the pipeline
   pauses the work agent as an operator signal (PAN-4628). When the failure is
   concrete, `pan unpause agent-<id>` resumes it and delivers queued mail.
+- GitHub timestamp skew (2026-11-01) also scrambles CI `created_at`. Read
+  main's verdict by run number:
+  `gh api "repos/eltmon/overdeck/actions/workflows/ci.yml/runs?branch=main&per_page=6" --jq '.workflow_runs | sort_by(-.run_number)'`.
+  Note the skill's `gh run list` query can time out; this endpoint has not.
