@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T13:49:27.859Z",
+  "updated": "2026-11-01T13:50:08.075Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4404",
       "claimedAt": "2026-11-01T13:48:12.374Z",
       "doneAt": "2026-11-01T13:49:27.859Z"
+    },
+    "wi7-ssh-machine-service": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:50:08.075Z"
     }
   }
 }
