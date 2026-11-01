@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T20:28:06.630812Z · model: claude-opus-5-5 · open: 857_
+_Last sequenced: 2026-11-01T20:29:34.359998Z · model: claude-opus-5-5 · open: 861_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -271,6 +271,7 @@ _Last sequenced: 2026-11-01T20:28:06.630812Z · model: claude-opus-5-5 · open: 
 | 269 | PAN-4696 | XS | medium | ok |  |  | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 272 | PAN-4739 | M | high | ok |  |  | Fly VM lifecycle patrol marks a live conversation ended each tick, so home's idle sweep can destroy a VM that is in use. |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
@@ -292,6 +293,7 @@ _Last sequenced: 2026-11-01T20:28:06.630812Z · model: claude-opus-5-5 · open: 
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
 | 292 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
 | 293 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
+| 294 | PAN-4738 | S | medium | ok |  |  | First message to a Fly-machine conversation is pasted into Claude Code's auto-mode dialog and lost; pre-answer it in configureClaudeCode. |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
 | 296 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
 | 297 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
@@ -309,6 +311,7 @@ _Last sequenced: 2026-11-01T20:28:06.630812Z · model: claude-opus-5-5 · open: 
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
 | 311 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
+| 312 | PAN-4740 | S | medium | ok |  |  | Pooled link channel reused after the Fly proxy closes the idle socket: first request fails with 'socket hang up', retry works. |
 | 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
@@ -491,6 +494,7 @@ _Last sequenced: 2026-11-01T20:28:06.630812Z · model: claude-opus-5-5 · open: 
 | 493 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
 | 494 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
 | 495 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
+| 496 | PAN-4741 | S | low | ok |  |  | Fly machine advertises unreachable private 172.19.x lan routes ranked before its public route; every reconnect probes dead routes first. |
 | 497 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
 | 498 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
 | 499 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
@@ -1192,10 +1196,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T20:28:06.630812Z",
+  "generatedAt": "2026-11-01T20:29:34.359998Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 857,
+  "openCount": 861,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -11876,6 +11880,57 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "rationale": "New issue split from in-pipeline PAN-4652 that takes over PAN-1775's outcome (remote work agents visible live in the issue tree), so it inherits PAN-1775's rank slot. Blocked on PAN-4652, which is being worked now.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4739",
+      "rank": 272,
+      "size": "M",
+      "importance": "high",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fly VM lifecycle patrol marks a live conversation ended each tick, so home's idle sweep can destroy a VM that is in use.",
+      "rationale": "New bug from the PAN-4652 live check: the VM's conversation-lifecycle patrol disagrees with the live tmux session, and sweepFlyMachines reads that status, so an active Fly machine can be reaped. Ranked beside the other Fly remote correctness bugs (PAN-4682, PAN-4685) because it can destroy live work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4738",
+      "rank": 294,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "First message to a Fly-machine conversation is pasted into Claude Code's auto-mode dialog and lost; pre-answer it in configureClaudeCode.",
+      "rationale": "New bug from the PAN-4652 live check with a located fix site (FlyProvider.configureClaudeCode); every conversation started with --message loses its opening turn, so it sits just behind PAN-4739.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4740",
+      "rank": 312,
+      "size": "S",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pooled link channel reused after the Fly proxy closes the idle socket: first request fails with 'socket hang up', retry works.",
+      "rationale": "New bug from the PAN-4652 live check; a retry succeeds, so impact is a flaky first request after idle rather than lost work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4741",
+      "rank": 496,
+      "size": "S",
+      "importance": "low",
+      "score": 35,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fly machine advertises unreachable private 172.19.x lan routes ranked before its public route; every reconnect probes dead routes first.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13194,6 +13249,41 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4652",
+      "to": "PAN-4739",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4652",
+      "to": "PAN-4738",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4652",
+      "to": "PAN-4740",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4652",
+      "to": "PAN-4741",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4740",
+      "to": "PAN-4741",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
