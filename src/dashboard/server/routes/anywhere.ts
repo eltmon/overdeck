@@ -36,9 +36,9 @@ import { jsonResponse } from '../http-helpers.js';
 import {
   rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
-  resolveDashboardCredential,
+  resolveRequestCredential,
 } from './dashboard-auth.js';
-import { getTrustedOrigins, invalidateTrustedOriginsCache, type HeaderMap } from './origin-validation.js';
+import { getTrustedOrigins, invalidateTrustedOriginsCache } from './origin-validation.js';
 
 function noStore(response: HttpServerResponse.HttpServerResponse): HttpServerResponse.HttpServerResponse {
   return HttpServerResponse.setHeader(response, 'Cache-Control', 'no-store');
@@ -61,7 +61,7 @@ const addTrustedOriginRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return noStore(authError);
     // PAN-4445 D-5: only the operator's browser on this machine widens origin trust.
-    if (resolveDashboardCredential(request.headers as HeaderMap)?.kind !== 'root-session') {
+    if (resolveRequestCredential(request)?.kind !== 'root-session') {
       return noStore(jsonResponse({ error: 'Only a browser session on this machine can add a trusted address.' }, { status: 403 }));
     }
 
@@ -126,7 +126,7 @@ const anywhereStatusRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnauthorizedDashboardRequest(request);
     if (authError) return noStore(authError);
-    const viewerKind = resolveDashboardCredential(request.headers as HeaderMap)?.kind ?? null;
+    const viewerKind = resolveRequestCredential(request)?.kind ?? null;
     return noStore(jsonResponse(yield* Effect.promise(() => buildAnywhereStatus(viewerKind))));
   }),
 );

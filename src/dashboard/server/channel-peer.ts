@@ -22,7 +22,7 @@ export function channelOfIncoming(req: Pick<IncomingMessage, 'socket'>): Channel
  * The marker of an Effect request, or `null` when the request is not backed
  * by a Node `IncomingMessage` (for example one built with `fromWeb` in tests).
  */
-export function channelOfRequest(request: HttpServerRequest): ChannelMarker | null {
+export function channelOfRequest(request: HttpServerRequest.HttpServerRequest): ChannelMarker | null {
   const source = (request as { source?: unknown }).source;
   if (typeof source !== 'object' || source === null || !('socket' in source)) return null;
   return channelOfIncoming(source as Pick<IncomingMessage, 'socket'>);

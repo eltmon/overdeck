@@ -41,6 +41,7 @@ import { recordPairingExchangeFailure } from './pairing-credentials.js';
 import { getOverdeckVersion } from './routes/misc/shared.js';
 import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { ensureMachineKey } from '../../lib/anywhere/machine-key.js';
+import { findActiveMachineTokenByKey } from '../../lib/access-tokens.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
 import { testRemovalWaiverRouteLayer } from './routes/test-removal-waiver.js'
@@ -135,12 +136,12 @@ const HttpServerLive = Layer.unwrap(
       setupVoiceWebSocket(nodeServer);
       setupAutoPresoWebSocket(nodeServer);
       // PAN-4645: secure machine channels on the dashboard port (primary only).
-      // Peer pinning (WI-4) and pairing credentials (WI-12) plug in here; until
-      // they land every handshake is refused, which is the fail-closed default.
+      // An IK initiator is pinned when an active machine token is bound to its
+      // key; pairing credentials (WI-12) plug in here, refused until they land.
       installChannelListener(nodeServer, {
         primary: !isPeerDashboardProcess(),
         localKey: ensureMachineKey,
-        isPinnedPeer: () => false,
+        isPinnedPeer: (remoteKeyHex) => findActiveMachineTokenByKey(remoteKeyHex) !== null,
         takePairing: () => 'unknown',
         onPairingFailure: recordPairingExchangeFailure,
         serverVersion: getOverdeckVersion,

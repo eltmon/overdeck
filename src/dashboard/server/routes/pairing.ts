@@ -37,10 +37,10 @@ import {
   dashboardDeviceCookieHeader,
   rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
-  resolveDashboardCredential,
+  resolveRequestCredential,
 } from './dashboard-auth.js';
 import { isHttpsRequest } from './dashboard-session.js';
-import { validateOrigin, type HeaderMap } from './origin-validation.js';
+import { validateOrigin } from './origin-validation.js';
 
 const MAX_LABEL_LENGTH = 200;
 
@@ -71,7 +71,7 @@ const issuePairingCredentialRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return noStore(authError);
     // PAN-2351 D-11: only root credentials mint new devices.
-    const issuer = resolveDashboardCredential(request.headers as HeaderMap)?.kind;
+    const issuer = resolveRequestCredential(request)?.kind;
     if (issuer !== 'internal-token' && issuer !== 'root-session') {
       return noStore(jsonResponse({ error: 'only the internal token or the root session can issue pairing credentials' }, { status: 403 }));
     }
@@ -170,7 +170,7 @@ const revokeDeviceRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return noStore(authError);
     const id = (yield* HttpRouter.params)['id'] ?? '';
-    const credential = resolveDashboardCredential(request.headers as HeaderMap);
+    const credential = resolveRequestCredential(request);
     // PAN-2351 D-11: checked before the lookup, so a token cannot probe device ids.
     if (credential?.kind === 'token') {
       return noStore(jsonResponse({ error: 'an access token cannot revoke devices' }, { status: 403 }));

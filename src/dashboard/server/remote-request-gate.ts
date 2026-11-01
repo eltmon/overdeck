@@ -20,6 +20,13 @@
  *      forwarding header is remote.
  *   5. Otherwise: 401 `{ "error": "unauthorized" }`.
  *
+ * Secure channels (PAN-4645 WI-4): a request whose socket is a `ChannelSocket`
+ * never counts as a trusted local caller. A pairing-mode channel may reach
+ * exactly `GET /api/environment` and `POST /api/machines/exchange` and nothing
+ * else; `POST /api/machines/exchange` is reachable only that way, so a plain
+ * socket gets 401 there whatever it presents. A link-mode channel is judged by
+ * its `machine` credential alone.
+ *
  * `GET /events/stream` also accepts its own `OVERDECK_EVENTS_TOKEN` bearer
  * (when that variable is set), so remote SSE consumers such as an external
  * TTS sidecar keep working (PAN-2351 D-3: existing schemes keep working).
@@ -34,6 +41,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { scopeSatisfies, type AccessTokenScope } from '../../lib/access-tokens.js';
 import { readRemoteAccessConfig } from '../../lib/remote-access/config.js';
+import { type ChannelMarker, channelOfRequest } from './channel-peer.js';
 import { jsonResponse } from './http-helpers.js';
 import { gatePathname, requiredScopeFor } from './route-scopes.js';
 import { credentialScopes, hasProxyForwardingHeader, isLoopbackPeer, resolveDashboardCredential } from './routes/dashboard-auth.js';
@@ -74,19 +82,31 @@ export function isTrustedLocalRequest(request: HttpServerRequest.HttpServerReque
 
 export type RemoteGateRejection = { status: 401 } | { status: 403; missingScope: AccessTokenScope };
 
+/** `METHOD path` pairs a pairing-mode channel may reach without a credential (PAN-4645). */
+export const PAIRING_CHANNEL_ALLOWLIST: ReadonlySet<string> = new Set(['GET /api/environment', 'POST /api/machines/exchange']);
+const MACHINES_EXCHANGE = 'POST /api/machines/exchange';
+
 /** The gate decision for one request: `null` lets it through. */
-export function remoteGateRejection(request: HttpServerRequest.HttpServerRequest): RemoteGateRejection | null {
+export function remoteGateRejection(
+  request: HttpServerRequest.HttpServerRequest,
+  channel: ChannelMarker | null = channelOfRequest(request),
+): RemoteGateRejection | null {
   const pathname = gatePathname(request.url);
   if (pathname === null) return { status: 401 };
   if (!isGatedPath(pathname)) return null;
-  if (REMOTE_GATE_ALLOWLIST.has(`${request.method} ${pathname}`)) return null;
+  const surface = `${request.method} ${pathname}`;
+  if (channel?.mode === 'pairing') return PAIRING_CHANNEL_ALLOWLIST.has(surface) ? null : { status: 401 };
+  if (surface === MACHINES_EXCHANGE) return { status: 401 };
+  if (REMOTE_GATE_ALLOWLIST.has(surface)) return null;
   const headers = request.headers as HeaderMap;
-  const credential = resolveDashboardCredential(headers);
+  const credential = resolveDashboardCredential(headers, channel);
   if (credential !== null) {
     // PAN-2351 D-7: a registry credential is judged by its scopes, never by the peer.
     const required = requiredScopeFor(request.method, pathname);
     return scopeSatisfies(credentialScopes(credential), required) ? null : { status: 403, missingScope: required };
   }
+  // A channel request is never a trusted local caller (D-4645-10).
+  if (channel !== null) return { status: 401 };
   if (pathname === '/events/stream' && hasEventsStreamToken(headers)) return null;
   if (isTrustedLocalRequest(request)) return null;
   return { status: 401 };

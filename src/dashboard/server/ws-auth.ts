@@ -16,6 +16,7 @@ import type { Socket } from 'node:net';
 
 import { scopeSatisfies, type AccessTokenScope } from '../../lib/access-tokens.js';
 import { getInternalToken } from '../../lib/internal-token.js';
+import type { ChannelMarker } from './channel-peer.js';
 import { registerDeviceConnection, revocableCredentialId } from './device-connections.js';
 import { credentialScopes, resolveDashboardCredential, type DashboardCredential } from './routes/dashboard-auth.js';
 import { validateOriginHeaders, type HeaderMap } from './routes/origin-validation.js';
@@ -30,16 +31,24 @@ export type UpgradeAuthResult =
   | { ok: true; credential: DashboardCredential }
   | { ok: false; status: 401 | 403 | 503; message: string };
 
+/** Channel markers for upgrade callers, re-exported so `ws-rpc.ts` needs no extra import line. */
+export { channelOfIncoming, channelOfRequest } from './channel-peer.js';
+
+/**
+ * `channel` is the secure-channel marker of the upgrading socket (PAN-4645):
+ * inside a channel only its `machine` credential resolves (D-4645-9).
+ */
 export function authorizeDashboardUpgrade(
   headers: HeaderMap,
   method: string,
   requiredScope: AccessTokenScope = 'admin',
+  channel: ChannelMarker | null = null,
 ): UpgradeAuthResult {
   const origin = validateOriginHeaders(headers, method);
   if (!origin.ok) return { ok: false, status: 403, message: origin.error };
   if (!getInternalToken()) return { ok: false, status: 503, message: 'dashboard session token not configured' };
   // PAN-2351 D-10: access tokens arrive only in the Authorization header, never in the URL.
-  const credential = resolveDashboardCredential(headers);
+  const credential = resolveDashboardCredential(headers, channel);
   if (!credential) return { ok: false, status: 401, message: 'Unauthorized' };
   if (!scopeSatisfies(credentialScopes(credential), requiredScope)) {
     return { ok: false, status: 403, message: `Forbidden: missing scope ${requiredScope}` };

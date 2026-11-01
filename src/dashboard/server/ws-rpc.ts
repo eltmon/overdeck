@@ -46,7 +46,7 @@ import { getConversationsConfig } from '../../lib/config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
 import type { ConversationFilter, DiscoveredSession } from '../../lib/overdeck/discovered-sessions.js';
 import type { SessionsFeedRow } from '../../lib/overdeck/sessions-feed.js';
-import { authorizeDashboardUpgrade } from './ws-auth.js';
+import { authorizeDashboardUpgrade, channelOfRequest } from './ws-auth.js';
 import { registerDeviceConnection, revocableCredentialId } from './device-connections.js';
 import type { HeaderMap } from './routes/origin-validation.js';
 import { jsonResponse } from './http-helpers.js';
@@ -1120,7 +1120,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 export function rejectUnauthorizedRpcUpgrade(
   request: HttpServerRequest.HttpServerRequest,
 ): HttpServerResponse.HttpServerResponse | null {
-  const auth = authorizeDashboardUpgrade(request.headers as HeaderMap, request.method);
+  const auth = authorizeDashboardUpgrade(request.headers as HeaderMap, request.method, 'admin', channelOfRequest(request));
   return auth.ok ? null : jsonResponse({ error: auth.message }, { status: auth.status });
 }
 
@@ -1137,7 +1137,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
 
     return HttpRouter.add('GET', '/ws/rpc', Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
-      const auth = authorizeDashboardUpgrade(request.headers as HeaderMap, request.method);
+      const auth = authorizeDashboardUpgrade(request.headers as HeaderMap, request.method, 'admin', channelOfRequest(request));
       if (!auth.ok) return jsonResponse({ error: auth.message }, { status: auth.status });
       const revocableId = revocableCredentialId(auth.credential);
       if (revocableId === null) return yield* rpcWebSocketHttp;
