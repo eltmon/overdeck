@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:26:18.054Z",
+  "updated": "2026-11-01T21:26:34.264Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -262,6 +262,10 @@
     "wi5-work-door-workers.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T21:26:18.053Z"
+    },
+    "wi5-work-door-workers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:26:34.264Z"
     }
   }
 }
