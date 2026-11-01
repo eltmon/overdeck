@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T12:26:22Z · model: claude-opus-5-5 · open: 860_
+_Last sequenced: 2026-11-01T12:28:22Z · model: claude-opus-5-5 · open: 859_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -269,13 +269,12 @@ _Last sequenced: 2026-11-01T12:26:22Z · model: claude-opus-5-5 · open: 860_
 | 266 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 267 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 268 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 268 | PAN-4295 | M | medium | ok |  | PAN-1775 | Anywhere W-FLY1: restore Fly auto-reap, heartbeat, credential refresh; start-now item that PAN-4652 (Fly VMs as machines) waits for |
+| 269 | PAN-4696 | XS | medium | ok |  |  | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
 | 272 | PAN-4654 | M | medium | needs-refinement |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 275 | PAN-4696 | XS | medium | ok |  | PAN-4295 | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 276 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
 | 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
 | 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
@@ -563,14 +562,14 @@ _Last sequenced: 2026-11-01T12:26:22Z · model: claude-opus-5-5 · open: 860_
 | 564 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
 | 565 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
 | 566 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 567 | PAN-4652 | L | medium | needs-refinement |  | PAN-4645, PAN-4295 | Fly VMs as machines: pan serve on the VM, linked at spawn; W-FLY1 can start day one, W-FLY2 needs links. Body pending. |
+| 567 | PAN-4652 | L | medium | needs-refinement |  | PAN-4645 | Fly VMs as machines: pan serve on the VM, linked at spawn; W-FLY1 can start day one, W-FLY2 needs links. Body pending. |
 | 568 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 569 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
 | 570 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
 | 571 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
 | 572 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
 | 573 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 574 | PAN-1676 | M | medium | ok |  | PAN-4295 | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
+| 574 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
 | 575 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
 | 576 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
 | 577 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
@@ -606,7 +605,7 @@ _Last sequenced: 2026-11-01T12:26:22Z · model: claude-opus-5-5 · open: 860_
 | 607 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
 | 608 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
 | 609 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 610 | PAN-4308 | S | medium | ok |  | PAN-4295 | Settle reaped Fly remote transcripts into the Session Vault; blocked by PAN-2609 (engine) and PAN-4295 (restored Fly auto-reap). |
+| 610 | PAN-4308 | S | medium | ok |  |  | Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine). |
 | 611 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
 | 612 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
 | 613 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
@@ -699,7 +698,7 @@ _Last sequenced: 2026-11-01T12:26:22Z · model: claude-opus-5-5 · open: 860_
 | 704 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
 | 705 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
 | 706 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 707 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-4295, PAN-1676 | Anywhere paid tier: run users' agents on hosted Fly capacity; tenant isolation, credentials, metering all open; four deps unbuilt |
+| 707 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-1676 | Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt |
 | 708 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
 | 709 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
 | 710 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
@@ -1195,10 +1194,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T12:26:22Z",
+  "generatedAt": "2026-11-01T12:28:22Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 860,
+  "openCount": 859,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -4505,21 +4504,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "planning": "auto"
     },
     {
-      "issue": "PAN-4295",
-      "rank": 268,
-      "size": "M",
-      "importance": "medium",
-      "score": 42,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-1775"
-      ],
-      "why": "Anywhere W-FLY1: restore Fly auto-reap, heartbeat, credential refresh; start-now item that PAN-4652 (Fly VMs as machines) waits for",
-      "rationale": "Rank 568->268 (swap with PAN-4652): the revision 5 child list makes it a start-now item that PAN-4652 waits for.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2243",
       "rank": 270,
       "size": "S",
@@ -4584,16 +4568,14 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     },
     {
       "issue": "PAN-4696",
-      "rank": 275,
+      "rank": 269,
       "size": "XS",
       "importance": "medium",
       "score": 40,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4295"
-      ],
+      "dependsOn": [],
       "why": "Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build.",
-      "rationale": "Rank kept: the body is unchanged and it still waits on PAN-4295 deploying; PAN-4682 and PAN-4683 are workarounds, not blockers.",
+      "rationale": "Rank 275->269: PAN-4295 merged, so this post-merge smoke on the deployed build is unblocked and actionable now.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8152,11 +8134,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 50,
       "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-4645",
-        "PAN-4295"
+        "PAN-4645"
       ],
       "why": "Fly VMs as machines: pan serve on the VM, linked at spawn; W-FLY1 can start day one, W-FLY2 needs links. Body pending.",
-      "rationale": "Rank 268->568 (swap with PAN-4295): the revision 5 child list says it waits for PAN-4295, so it now ranks after it.",
+      "rationale": "Dependency PAN-4295 closed; still waits on in-pipeline PAN-4645, so rank unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8239,11 +8220,9 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "importance": "medium",
       "score": 39,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4295"
-      ],
+      "dependsOn": [],
       "why": "harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots)",
-      "rationale": "Rank held; gained dependsOn PAN-4295 from the build order in PAN-2350's 2026-09-28 rebaseline.",
+      "rationale": "Dependency PAN-4295 closed (Fly auto-reap restored); rank unchanged pending its own refinement.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8681,11 +8660,9 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "importance": "medium",
       "score": 38,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4295"
-      ],
-      "why": "Settle reaped Fly remote transcripts into the Session Vault; blocked by PAN-2609 (engine) and PAN-4295 (restored Fly auto-reap).",
-      "rationale": "New node split from PAN-2609; placed after both blockers (PAN-2609 at 506, PAN-4295 at 566) in a free slot so no other rank moves.",
+      "dependsOn": [],
+      "why": "Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine).",
+      "rationale": "Dependency PAN-4295 closed; PAN-2609 remains, so rank unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9830,11 +9807,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "condition": "needs-refinement",
       "dependsOn": [
         "PAN-4294",
-        "PAN-4295",
         "PAN-1676"
       ],
-      "why": "Anywhere paid tier: run users' agents on hosted Fly capacity; tenant isolation, credentials, metering all open; four deps unbuilt",
-      "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
+      "why": "Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt",
+      "rationale": "Dependency PAN-4295 closed; PAN-4294 and PAN-1676 remain, so rank unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12672,13 +12648,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     },
     {
       "from": "PAN-2350",
-      "to": "PAN-4295",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
       "to": "PAN-4296",
       "type": "contains",
       "source": "github-ref",
@@ -12695,13 +12664,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "from": "PAN-2350",
       "to": "PAN-4298",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4295",
-      "to": "PAN-4298",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -12762,20 +12724,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 1
     },
     {
-      "from": "PAN-1775",
-      "to": "PAN-4295",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4295",
-      "to": "PAN-1676",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
       "from": "PAN-1676",
       "to": "PAN-4296",
       "type": "unblocks",
@@ -12807,13 +12755,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "from": "PAN-2350",
       "to": "PAN-4308",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4295",
-      "to": "PAN-4308",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13294,13 +13235,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 1
     },
     {
-      "from": "PAN-4295",
-      "to": "PAN-4652",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4652",
       "to": "PAN-4296",
       "type": "unblocks",
@@ -13337,31 +13271,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     },
     {
       "from": "PAN-4682",
-      "to": "PAN-4295",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4683",
-      "to": "PAN-4295",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4682",
       "to": "PAN-4683",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4685",
-      "to": "PAN-4295",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-4685",
@@ -13376,13 +13289,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4295",
-      "to": "PAN-4696",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-4682",
