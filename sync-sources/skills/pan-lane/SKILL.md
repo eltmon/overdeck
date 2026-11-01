@@ -69,10 +69,21 @@ pan lane reap conv-<name> --keep                        # leaves the conversatio
 With no `--model`, the role's model comes from `projects.<key>.gauntlet.roles.<role>.model`; with
 none there, the launch is refused. `--effort` takes `low`, `medium` or `high`.
 
-`--machine <label|auto>` (with `--needs <tags>` for auto) picks where the lane runs: Auto placement
-by load, or a machine label. When it picks this machine the lane launches as usual; another machine
-is refused with `Lanes on other machines arrive with PAN-4638 (chosen: <label>)` until PAN-4638 runs
-lanes there. With nothing that fits, the command prints `No machine fits: …` and exits 1.
+`--machine <label|environment-id|auto>` (with `--needs <tags>` for auto) runs the lane on a linked
+machine: a desktop, a laptop or a linked Fly machine. Auto places it by load; this machine's own
+label launches here as usual. With nothing that fits, the command prints `No machine fits: …` and
+exits 1. A remote lane prints `Lane <run>/<key> <role> i<n>: <name> on <label> in <cwd>`.
+
+- The run's rules (parent, run, iteration, one live lane per run/key/role, `--replace`) span every
+  machine. Orchestrator lanes stay on this machine. `--reuse` continues on the newest lane's machine,
+  so it takes no `--machine`.
+- A critic on another machine judges a commit that is on `origin`: the builder must push first.
+- A Fly machine runs Claude Code lanes only.
+- `pan lane list` and `show` show remote lanes with the conversation name in `ID` and the machine in
+  `MACHINE` (`(offline)` while it cannot be reached). `wait`, `stop` and `reap` work on them from
+  here; an unreachable machine delays a report and never fails the wait.
+- Steer a remote lane with `pan tell @<label>/<name> "<steer>"`; `pan tell conv-<name>` reaches only
+  lanes on this machine.
 
 ## Rules the door enforces
 
