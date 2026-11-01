@@ -367,3 +367,92 @@ describe('pack lifecycle', () => {
     expect(await removePack('demo')).toEqual({ removed: false });
   });
 });
+
+describe('gstack runtime pack lifecycle', () => {
+  // A fake fork: pack-mode.json, one skill, and a `setup` that does what pack mode's contract says (or fails).
+  const GOOD_SETUP = [
+    '#!/usr/bin/env bash',
+    'set -e',
+    'mkdir -p "$2" "$4"',
+    'printf \'{"packMode":1,"stateRoot":"%s","version":"0.0.0"}\\n\' "$4" > "$2/.gstack-pack.json"',
+    'printf \'%s\\n\' "$4" > "$2/.gstack-pack-state-root"',
+  ].join('\n');
+  const FAILING_SETUP = '#!/usr/bin/env bash\necho "pack mode: boom" >&2\nexit 1\n';
+
+  let up: Upstream;
+  let good = '';
+  let failing = '';
+  let noPackMode = '';
+  const accept = vi.fn(async () => true);
+  const decline = vi.fn(async () => false);
+
+  beforeAll(() => {
+    up = createUpstream();
+    up.commitFile('pack-mode.json', '{"packMode": 1}\n', 'pack mode');
+    up.commitFile('review/SKILL.md', skillMd('review'), 'review');
+    good = up.commitFile('setup', GOOD_SETUP, 'good setup');
+    failing = up.commitFile('setup', FAILING_SETUP, 'failing setup');
+    up.commitFile('setup', GOOD_SETUP, 'good setup again');
+    noPackMode = up.commitFile('pack-mode.json', '{"packMode": 2}\n', 'other pack mode');
+  });
+
+  afterAll(() => {
+    rmSync(up.scratch, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    rmSync(packsHome(), { recursive: true, force: true });
+    accept.mockClear();
+    decline.mockClear();
+  });
+
+  it('previews the render command and writes and renders nothing when declined', async () => {
+    const result = await addPack({ id: 'gstack', url: up.url, ref: good }, decline);
+    expect(result.written).toBe(false);
+    expect(result.preview.adapter).toBe('gstack-runtime');
+    expect(result.preview.runtime).toEqual({
+      command: ['bash', 'setup', '--pack-root', packRenderDir('gstack', good), '--pack-state-root', packStateDir('gstack')],
+    });
+    expect(await getPack('gstack')).toBeNull();
+    expect(existsSync(packRenderDir('gstack', good))).toBe(false);
+  });
+
+  it('renders after consent, then registers the commit', async () => {
+    const result = await addPack({ id: 'gstack', url: up.url, ref: good }, accept);
+    expect(result.written).toBe(true);
+    expect(existsSync(join(packRenderDir('gstack', good), '.gstack-pack.json'))).toBe(true);
+    expect(existsSync(packStateDir('gstack'))).toBe(true);
+    expect(await getPack('gstack')).toEqual({ id: 'gstack', url: up.url, ref: good, commit: good });
+  });
+
+  it('writes no registry entry and no render when the render fails', async () => {
+    const error = await addPack({ id: 'gstack', url: up.url, ref: failing }, accept).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'render', message: 'pack gstack: render failed: pack mode: boom' });
+    expect(accept).toHaveBeenCalledOnce();
+    expect(await getPack('gstack')).toBeNull();
+    expect(existsSync(packRenderDir('gstack', failing))).toBe(false);
+  });
+
+  it('rejects a commit without pack mode before asking', async () => {
+    await expect(addPack({ id: 'gstack', url: up.url, ref: noPackMode }, accept)).rejects.toMatchObject({
+      code: 'render',
+      message: `pack gstack: ${noPackMode.slice(0, 7)} has no pack mode (pack-mode.json); use https://github.com/eltmon/gstack at a commit with pack mode`,
+    });
+    expect(accept).not.toHaveBeenCalled();
+    expect(await getPack('gstack')).toBeNull();
+  });
+
+  it('keeps the trusted commit when the new commit fails to render on update', async () => {
+    await writePackEntry({ id: 'gstack', url: up.url, ref: good, commit: good });
+    await expect(updatePack('gstack', { ref: failing }, accept)).rejects.toMatchObject({ code: 'render' });
+    expect((await getPack('gstack'))?.commit).toBe(good);
+    expect(existsSync(packRenderDir('gstack', failing))).toBe(false);
+  });
+
+  it('re-renders the trusted commit on sync when its render is missing', async () => {
+    await addPack({ id: 'gstack', url: up.url, ref: good }, accept);
+    rmSync(packRenderDir('gstack', good), { recursive: true, force: true });
+    await syncPack('gstack');
+    expect(existsSync(join(packRenderDir('gstack', good), '.gstack-pack.json'))).toBe(true);
+  });
+});
