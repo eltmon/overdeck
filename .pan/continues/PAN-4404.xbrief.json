@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:38:05.949Z",
+  "updated": "2026-11-01T14:38:19.896Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -246,6 +246,10 @@
     "wi10-cli-ssh.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:38:05.949Z"
+    },
+    "wi11-ssh-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:38:19.895Z"
     }
   }
 }
