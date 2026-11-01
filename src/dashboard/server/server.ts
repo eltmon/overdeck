@@ -58,6 +58,7 @@ import { environmentRouteLayer } from './routes/environment.js'
 import { pairingRouteLayer } from './routes/pairing.js'
 import { anywhereRouteLayer } from './routes/anywhere.js'
 import { pushRouteLayer } from './routes/push.js'
+import { tailscaleRouteLayer } from './routes/tailscale.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { settingsRouteLayer } from './routes/settings.js'
@@ -356,6 +357,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   pairingRouteLayer,
   anywhereRouteLayer,
   pushRouteLayer,
+  tailscaleRouteLayer,
   accessTokensRouteLayer,
   staticRouteLayer,
 );

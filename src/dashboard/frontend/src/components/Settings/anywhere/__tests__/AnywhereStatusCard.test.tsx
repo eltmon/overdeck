@@ -17,6 +17,7 @@ function baseStatus(overrides: Partial<AnywhereStatus> = {}): AnywhereStatus {
     devices: { active: 2 },
     vault: { state: 'ready', backend: 'git@example.com:me/vault.git' },
     problems: [],
+    tailscale: { nextStep: 'not-installed', serveUrl: null, magicDnsName: null },
     viewer: { kind: 'root-session' },
     ...overrides,
   };
@@ -106,5 +107,36 @@ describe('AnywhereStatusCard (PAN-4445)', () => {
   it('shows an unreadable identity', async () => {
     renderCard(baseStatus({ machine: null }));
     expect(await screen.findByText('Identity unreadable')).toBeInTheDocument();
+  });
+
+  it('shows a ready Tailscale row with the Serve URL (PAN-1254)', async () => {
+    renderCard(baseStatus({ tailscale: { nextStep: 'ready', serveUrl: 'https://desk.tailnet.ts.net', magicDnsName: 'desk.tailnet.ts.net' } }));
+    expect(await screen.findByTestId('anywhere-tailscale')).toHaveTextContent('Ready (https://desk.tailnet.ts.net)');
+  });
+
+  it('shows Not installed, Signed out and Needs HTTPS for the earlier steps', async () => {
+    const { unmount } = renderCard(baseStatus());
+    expect(await screen.findByTestId('anywhere-tailscale')).toHaveTextContent('Not installed');
+    unmount();
+    const second = renderCard(baseStatus({ tailscale: { nextStep: 'login', serveUrl: null, magicDnsName: null } }));
+    expect(await screen.findByTestId('anywhere-tailscale')).toHaveTextContent('Signed out');
+    second.unmount();
+    renderCard(baseStatus({ tailscale: { nextStep: 'enable-https', serveUrl: null, magicDnsName: 'desk.tailnet.ts.net' } }));
+    expect(await screen.findByTestId('anywhere-tailscale')).toHaveTextContent('Needs HTTPS');
+  });
+
+  it('renders Protect the dashboard for unprotected Tailscale Serve', async () => {
+    const user = userEvent.setup();
+    const { onAction } = renderCard(baseStatus({
+      tailscale: { nextStep: 'protect', serveUrl: 'https://desk.tailnet.ts.net', magicDnsName: 'desk.tailnet.ts.net' },
+      problems: [{
+        code: 'tailscale-serve-unprotected',
+        message: 'Tailscale Serve sends tailnet visitors to this dashboard, but a token is not required to sign in.',
+        action: { kind: 'tailscale-setup' },
+      }],
+    }));
+    expect(await screen.findByTestId('anywhere-tailscale')).toHaveTextContent('Set up unfinished');
+    await user.click(screen.getByRole('button', { name: 'Protect the dashboard' }));
+    expect(onAction).toHaveBeenCalledWith({ kind: 'tailscale-setup' });
   });
 });
