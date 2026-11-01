@@ -404,3 +404,14 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   PAN-4690. Launched as strikes (`pan strike`), not `pan start`: the normal
   review path is what they fix, and strike PRs go to the operator to merge,
   which keeps the supervision TENET-10 asks for.
+- 2026-11-01 09:10 UTC: PAN-4697 planner waited 40+ min on its plan critic
+  (`agent-pan-4697-worker-1`, codex gpt-6-sol) that never started: state.json
+  `status: starting`, appserver-events.jsonl held only remoteControl/account
+  notifications and one `foreign-thread` thread/started, no turn. Hypothesis:
+  the Codex app-server host never delivered the first prompt. Single instance;
+  file it if a second worker sticks in `starting`. Recovery: `pan kill
+  <worker>`, `pan tell planning-<id>` to re-run the critic and finalize.
+- Conflict cascade: every merge re-conflicts all approved PRs on the
+  package.json test:frontend-subset line, each costing a re-review. PAN-4697
+  fixes it; land it first. (Use `git pull --rebase origin main` here: a
+  multi-branch `git fetch` makes a bare `git pull --rebase` fail.)
