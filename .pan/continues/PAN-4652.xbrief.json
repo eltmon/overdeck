@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T18:53:00.504Z",
+  "updated": "2026-11-01T18:54:28.069Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-01T18:52:55.401Z"
     },
     "wi6-fly-machine-store": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4652",
-      "claimedAt": "2026-11-01T18:53:00.504Z"
+      "claimedAt": "2026-11-01T18:53:00.504Z",
+      "doneAt": "2026-11-01T18:54:28.069Z"
     }
   }
 }
