@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T07:52:47.701Z",
+  "updated": "2026-11-01T07:53:05.498Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -288,6 +288,10 @@
     "docs-mcp-page.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T07:52:47.700Z"
+    },
+    "docs-scopes-auth.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:53:05.498Z"
     }
   }
 }
