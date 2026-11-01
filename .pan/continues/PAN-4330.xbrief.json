@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4330",
   "created": "2026-11-01T04:59:32.820Z",
-  "updated": "2026-11-01T07:44:38.601Z",
+  "updated": "2026-11-01T07:44:55.280Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "account-deploy-handoff.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:44:38.601Z"
+    },
+    "account-deploy-handoff.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:44:55.279Z"
     }
   }
 }
