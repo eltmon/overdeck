@@ -496,6 +496,8 @@ export async function skillsPackRemoveCommand(id: string): Promise<void> {
     for (const dir of await projectGstackDirs()) {
       console.log(`Project files gstack skills wrote (not removed): ${dir}  — remove with: rm -rf ${dir}`);
     }
+    // PAN-4730 D14: live browse daemons are reported, never killed.
+    for (const line of await (await import('./skills-pack-browser.js')).daemonLines()) console.log(line);
   }
   const below = (await listLowerLevelPackOverrides())[id];
   const remaining = below ? below.projects.length + below.issues.length : 0;

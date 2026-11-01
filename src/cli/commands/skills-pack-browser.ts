@@ -23,7 +23,39 @@ export function printBrowserPreview(browser: NonNullable<PackPreview['browser']>
   console.log(`  ${'Size'.padEnd(12)} about 1 GB on disk`);
 }
 
-/** PAN-4730 D14: one line per live browse daemon in a registered project; never signals one. */
+/** Signal 0 only checks that the pid exists and is ours; it never stops anything. */
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * PAN-4730 D14: one line per live browse daemon in a registered project, read
+ * from the `pid` gstack's browse writes to `<project>/.gstack/browse.json`. It
+ * reports and never signals: the daemon also exits after 30 idle minutes.
+ */
 export async function daemonLines(): Promise<string[]> {
-  return [];
+  const [{ listProjectsAsync }, { readFile }, { join }] = await Promise.all([
+    import('../../lib/projects.js'),
+    import('node:fs/promises'),
+    import('node:path'),
+  ]);
+  const lines: string[] = [];
+  for (const { config } of await listProjectsAsync()) {
+    if (!config.path) continue;
+    let pid: unknown;
+    try {
+      pid = (JSON.parse(await readFile(join(config.path, '.gstack', 'browse.json'), 'utf8')) as { pid?: unknown } | null)?.pid;
+    } catch {
+      continue;
+    }
+    // pid 0 and negative pids name process groups; never probe those.
+    if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 1 || !isAlive(pid)) continue;
+    lines.push(`Browse daemon still running in ${config.path}: pid ${pid} — stop with: kill ${pid}`);
+  }
+  return lines;
 }

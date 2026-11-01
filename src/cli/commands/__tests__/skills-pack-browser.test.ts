@@ -4,6 +4,10 @@
  * through Commander. The pack library is mocked; its own tests cover the flows.
  */
 import { Command } from 'commander';
+import { spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
@@ -21,6 +25,10 @@ const mocks = vi.hoisted(() => {
     buildRan: vi.fn(),
     listProjectsAsync: vi.fn(),
     question: vi.fn(),
+    getPack: vi.fn(),
+    removePack: vi.fn(),
+    removePackFromMounts: vi.fn(),
+    listLowerLevelPackOverrides: vi.fn(),
   };
 });
 
@@ -30,7 +38,12 @@ vi.mock('../../../lib/skill-packs/sources.js', () => ({
   updatePack: mocks.updatePack,
   enablePackBrowser: mocks.enablePackBrowser,
   disablePackBrowser: mocks.disablePackBrowser,
+  getPack: mocks.getPack,
+  removePack: mocks.removePack,
 }));
+
+vi.mock('../../../lib/skill-packs/mount.js', () => ({ removePackFromMounts: mocks.removePackFromMounts }));
+vi.mock('../../../lib/skill-overrides/store.js', () => ({ listLowerLevelPackOverrides: mocks.listLowerLevelPackOverrides }));
 
 vi.mock('../../../lib/projects.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../lib/projects.js')>()),
@@ -41,6 +54,7 @@ vi.mock('node:readline/promises', () => ({
   createInterface: () => ({ question: mocks.question, close: () => undefined }),
 }));
 
+import { daemonLines } from '../skills-pack-browser.js';
 import { registerSkillsCommands } from '../skills.js';
 
 const COMMIT = '1b778f78'.padEnd(40, '0');
@@ -184,5 +198,64 @@ describe('pan skills pack add --browser and update', () => {
     await run('pack', 'update', 'gstack', '--yes');
     expect(logs).toContain(`${' '.repeat(16)}playwright@^1.62.1`);
     expect(logs).toContain('Trusted gstack @ 1b778f7.');
+  });
+});
+
+describe('live browse daemons (WI-O9)', () => {
+  const dirs: string[] = [];
+
+  /** A registered project whose .gstack/browse.json names `pid`. */
+  function project(pid: number): string {
+    const dir = mkdtempSync(join(tmpdir(), 'skills-pack-browser-project-'));
+    dirs.push(dir);
+    mkdirSync(join(dir, '.gstack'));
+    writeFileSync(join(dir, '.gstack', 'browse.json'), JSON.stringify({ pid, port: 34567, token: 't' }));
+    return dir;
+  }
+
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports a live daemon with a kill command and never signals it', async () => {
+    const dir = project(process.pid);
+    mocks.listProjectsAsync.mockResolvedValue([{ key: 'p', config: { path: dir } }]);
+    expect(await daemonLines()).toEqual([`Browse daemon still running in ${dir}: pid ${process.pid} — stop with: kill ${process.pid}`]);
+    // Still alive: only signal 0 was sent.
+    expect(() => process.kill(process.pid, 0)).not.toThrow();
+  });
+
+  it('skips a dead pid, a missing or unreadable state file, and a project without a path', async () => {
+    const child = spawn(process.execPath, ['-e', '']);
+    const deadPid = child.pid!;
+    await new Promise((resolve) => child.on('exit', resolve));
+    const dead = project(deadPid);
+    const noFile = mkdtempSync(join(tmpdir(), 'skills-pack-browser-project-'));
+    dirs.push(noFile);
+    const groupPid = project(0);
+    mocks.listProjectsAsync.mockResolvedValue([
+      { key: 'a', config: { path: dead } },
+      { key: 'b', config: { path: noFile } },
+      { key: 'c', config: { path: groupPid } },
+      { key: 'd', config: {} },
+    ]);
+    expect(await daemonLines()).toEqual([]);
+  });
+
+  it('browser off and remove print the live daemons', async () => {
+    const dir = project(process.pid);
+    mocks.listProjectsAsync.mockResolvedValue([{ key: 'p', config: { path: dir } }]);
+    const line = `Browse daemon still running in ${dir}: pid ${process.pid} — stop with: kill ${process.pid}`;
+
+    await run('pack', 'browser', 'gstack', 'off');
+    expect(logs).toContain(line);
+
+    logs.length = 0;
+    mocks.getPack.mockResolvedValue({ id: 'gstack', url: 'u', ref: 'main', commit: COMMIT, adapter: 'gstack-runtime' });
+    mocks.removePack.mockResolvedValue({ removed: true });
+    mocks.removePackFromMounts.mockResolvedValue({ removedMounts: [], removedCodexCaches: [], failures: [] });
+    mocks.listLowerLevelPackOverrides.mockResolvedValue({});
+    await run('pack', 'remove', 'gstack');
+    expect(logs).toContain(line);
   });
 });
