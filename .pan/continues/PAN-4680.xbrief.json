@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4680",
   "created": "2026-11-01T07:24:32.678Z",
-  "updated": "2026-11-01T09:28:20.373Z",
+  "updated": "2026-11-01T09:28:35.421Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "queue-order-test.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T09:28:20.372Z"
+    },
+    "queue-order-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:28:35.421Z"
     }
   }
 }
