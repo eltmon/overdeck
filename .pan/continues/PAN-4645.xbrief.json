@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T09:17:20.367Z",
+  "updated": "2026-11-01T09:17:41.790Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -222,6 +222,10 @@
       "claimedBy": "agent-pan-4645",
       "claimedAt": "2026-11-01T09:11:12.507Z",
       "doneAt": "2026-11-01T09:17:20.367Z"
+    },
+    "wi11-link-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:17:41.790Z"
     }
   }
 }
