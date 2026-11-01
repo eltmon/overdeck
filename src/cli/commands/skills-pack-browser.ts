@@ -10,11 +10,11 @@ import type { PackPreview } from '../../lib/skill-packs/sources.js';
 
 const INDENT = ' '.repeat(16);
 
-/** The browser rows: the exact command, every download and every write, one per line, never truncated. */
+/** The browser rows: the exact command, the download lines (direct dependencies, then summaries) and every write, one per line, never truncated. */
 export function printBrowserPreview(browser: NonNullable<PackPreview['browser']>): void {
   const rows: Array<[string, string]> = [
     ['Runs', browser.command.join(' ')],
-    ['Downloads', `${browser.downloads.length} lines, every package and file the build fetches:`],
+    ['Downloads', 'direct npm dependencies, then summaries of their locked dependencies and the Playwright browsers:'],
   ];
   for (const [label, value] of rows) console.log(`  ${label.padEnd(12)} ${value}`);
   for (const line of browser.downloads) console.log(`${INDENT}${line}`);

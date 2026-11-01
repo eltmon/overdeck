@@ -573,11 +573,11 @@ pan skills pack browser gstack            # or: pan skills pack browser gstack o
 pan skills pack add gstack https://github.com/eltmon/gstack --ref main --browser   # add, then the browser step, asking twice
 ```
 
-Before it asks, Overdeck checks that the trusted commit is rendered, that its `pack-mode.json` has `packBrowser`, and that bun runs. The preview lists the exact command, every package and file the build downloads, and every path it writes (never shortened). Shortened here with `…`:
+Before it asks, Overdeck checks that the trusted commit is rendered, that its `pack-mode.json` has `packBrowser`, and that bun runs. The preview lists the exact command, each direct npm dependency, a summary line for their locked dependencies (`bun.lock`, from registry.npmjs.org) and one for the Playwright browsers, and every path it writes (never shortened). Shortened here with `…`:
 
 ```
   Runs         bash setup --pack-browser /home/you/.overdeck/packs/gstack/render/<commit> --pack-browser-cache /home/you/.overdeck/packs/gstack/browser
-  Downloads    15 lines, every package and file the build fetches:
+  Downloads    direct npm dependencies, then summaries of their locked dependencies and the Playwright browsers:
                 @anthropic-ai/sdk@^0.78.0
                 …
                 playwright@^1.62.1

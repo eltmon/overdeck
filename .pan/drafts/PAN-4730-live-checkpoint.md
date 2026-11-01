@@ -240,7 +240,7 @@ qa.jsonl: 138 calls of /tmp/pan-4730-live/overdeck-home/packs/gstack/render/fb78
 init: 31 gstack:* slash commands, including gstack:qa, gstack:qa-only, gstack:browse, gstack:make-pdf (no ship, no pair-agent)
 $ find $OVERDECK_HOME/packs/gstack/state/projects -type f
 …/state/projects/project/timeline.jsonl
-…/state/projects/project/Edward-Becker-master-test-outcome-20261101T213608Z.md      (the report copy under S)
+…/state/projects/project/<user>-master-test-outcome-20261101T213608Z.md      (the report copy under S)
 $ ls /tmp/pan-4730-live/project/.gstack
 browse-audit.jsonl browse-daemon.log browse-network.log browse.json claude-available.json qa-reports terminal-agent-pid terminal-internal-token terminal-port
 ```
