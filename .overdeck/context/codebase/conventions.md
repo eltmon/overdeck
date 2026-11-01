@@ -47,10 +47,11 @@
 ## Testing
 - Vitest, unit tests under `tests/unit/**` mirroring `src/`, plus co-located
   `__tests__/` in some lib dirs (e.g. `src/lib/cloister/__tests__/`).
-- Frontend tests co-located under `components/**/__tests__/`. CI runs only the frontend files
+- Frontend tests co-located under `components/**/__tests__/` or beside the source file
+  (e.g. `chat/messagesTimeline/messageRows.test.tsx`). CI runs only the frontend files
   listed in root `package.json` `test:frontend-subset` (ci.yml); add new must-run frontend tests there.
 - Issue actions: every menu/overflow surface renders from `ISSUE_ACTIONS`
   (`src/dashboard/frontend/src/lib/issueActions.ts`) via `useIssueActions`; removing a key needs a
   `RETIREMENT_AUDIT` row in `issueActions.parity.test.tsx`.
 
-<!-- last-verified: 2026-10-02 -->
+<!-- last-verified: 2026-11-01 -->

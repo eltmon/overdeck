@@ -4,17 +4,17 @@
     "created": "2026-11-01T07:19:11Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4681: Address CodeRabbit findings on merged PR #4667: register messageRows test in CI subset, gate citations on a mounted composer",
-    "updated": "2026-11-01T07:23:24.143Z"
+    "updated": "2026-11-01T07:24:47.361Z"
   },
   "plan": {
     "id": "pan-4681",
     "title": "Address CodeRabbit findings on merged PR #4667: register messageRows test in CI subset, gate citations on a mounted composer",
-    "status": "proposed",
+    "status": "running",
     "uid": "882dcbbc-3ec9-4139-a422-4e1281d1e292",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T07:19:11Z",
-    "updated": "2026-11-01T07:23:24.143Z",
+    "updated": "2026-11-01T07:24:47.361Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4681",
@@ -239,5 +239,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
