@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4628",
   "created": "2026-11-01T05:04:21.139Z",
-  "updated": "2026-11-01T07:31:18.113Z",
+  "updated": "2026-11-01T07:31:48.437Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "caveman-reader-file-first.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T07:31:18.113Z"
+    },
+    "hook-readers-file-first.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:31:48.437Z"
     }
   }
 }
