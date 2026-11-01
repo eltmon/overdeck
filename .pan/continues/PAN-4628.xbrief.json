@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4628",
   "created": "2026-11-01T05:04:21.139Z",
-  "updated": "2026-11-01T05:32:29.289Z",
+  "updated": "2026-11-01T05:32:36.505Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4628",
       "claimedAt": "2026-11-01T05:30:05.994Z",
       "doneAt": "2026-11-01T05:32:29.289Z"
+    },
+    "serve-file-token": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4628",
+      "claimedAt": "2026-11-01T05:32:36.505Z"
     }
   }
 }
