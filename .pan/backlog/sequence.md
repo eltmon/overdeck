@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T04:45:43Z · model: claude-opus-5-5 · open: 857_
+_Last sequenced: 2026-11-01T05:45:49Z · model: claude-opus-5-5 · open: 862_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,6 +8,7 @@ _Last sequenced: 2026-11-01T04:45:43Z · model: claude-opus-5-5 · open: 857_
 | 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
 | 2 | PAN-4639 | L | medium | ok |  |  | In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions. |
 | 3 | PAN-4640 | L | medium | ok |  | PAN-4639 | In pipeline: Overdeck-owned conversation schedules fired by a deacon-lite tick; resurfaces settled/snoozed rows (needs #4639). |
+| 4 | PAN-4663 | XS | critical | ok |  |  | In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts |
 | 5 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -268,9 +269,9 @@ _Last sequenced: 2026-11-01T04:45:43Z · model: claude-opus-5-5 · open: 857_
 | 274 | PAN-4654 | M | medium | needs-refinement |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
 | 275 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 276 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 277 | PAN-4649 | M | medium | needs-refinement |  |  | Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending. |
+| 277 | PAN-4649 | M | medium | ok |  |  | Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending. |
 | 278 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650, PAN-4649 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
-| 279 | PAN-4647 | M | medium | needs-refinement |  | PAN-4645 | Auto-save pipeline agent transcripts to the Session Vault so linked machines can read them. Body pending. |
+| 279 | PAN-4647 | M | medium | ok |  |  | Auto-save pipeline agent transcripts to the Session Vault so linked machines can read them. Body pending. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
 | 282 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
@@ -283,7 +284,7 @@ _Last sequenced: 2026-11-01T04:45:43Z · model: claude-opus-5-5 · open: 857_
 | 289 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
 | 290 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
-| 292 | PAN-4648 | M | medium | needs-refinement |  | PAN-4645 | Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending. |
+| 292 | PAN-4648 | M | medium | ok |  | PAN-4645 | Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending. |
 | 293 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
 | 294 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
@@ -643,7 +644,7 @@ _Last sequenced: 2026-11-01T04:45:43Z · model: claude-opus-5-5 · open: 857_
 | 650 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
 | 651 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
 | 652 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 653 | PAN-2354 | M | low | needs-refinement |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
+| 653 | PAN-2354 | M | low | ok |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
 | 654 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
 | 655 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
 | 656 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
@@ -652,216 +653,220 @@ _Last sequenced: 2026-11-01T04:45:43Z · model: claude-opus-5-5 · open: 857_
 | 659 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 660 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
 | 662 | PAN-2355 | M | low | needs-refinement |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
-| 663 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 664 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
-| 665 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 666 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 667 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651, PAN-4652 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
+| 663 | PAN-4661 | S | low | ok |  | PAN-2355 | Phone PWA third tab: read-only phase-grouped pipeline list at /m/pipeline; waits on the PAN-2355 /m shell |
+| 664 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 665 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
+| 666 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
+| 667 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 668 | PAN-4643 | M | medium | ok |  |  | pan diagnose: redacted diagnostics bundle (needs doctor --json) handed to a Claude Code or Codex session; works with dashboard down. |
 | 669 | PAN-4641 | M | medium | ok |  |  | Server-held 'send when limits reset' composer message; needs a parsed reset time; usage-window data would come from #2065. |
-| 670 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 671 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 672 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 673 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 674 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 675 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 676 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 677 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
-| 678 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 679 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
-| 680 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
-| 681 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 682 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 683 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 684 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 685 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
-| 686 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 687 | PAN-2356 | M | low | needs-refinement |  | PAN-4297, PAN-4645, PAN-4330, PAN-4648 | Overdeck Anywhere P3: relay service |
-| 688 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
-| 689 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
-| 690 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 691 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
-| 692 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 693 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 694 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 695 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
-| 696 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 697 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
-| 698 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
-| 699 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 700 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
-| 701 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
-| 702 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 703 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
-| 704 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 705 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 706 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
-| 707 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 708 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-4295, PAN-1676 | Anywhere paid tier: run users' agents on hosted Fly capacity; tenant isolation, credentials, metering all open; four deps unbuilt |
-| 709 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
-| 710 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
-| 711 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
-| 712 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 713 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 714 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
-| 715 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 716 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
-| 717 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 718 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
-| 719 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 720 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
-| 721 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
-| 722 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
-| 723 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
-| 724 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
-| 725 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
-| 726 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
-| 727 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
-| 728 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 729 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 730 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
-| 731 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
-| 732 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
-| 733 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
-| 734 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
-| 735 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 736 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
-| 737 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 738 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
-| 739 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
-| 740 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
-| 741 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
-| 742 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
-| 743 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
-| 744 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
-| 745 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
-| 746 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
-| 747 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
-| 748 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
-| 749 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
-| 750 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
-| 751 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
-| 752 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
-| 753 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
-| 754 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
-| 755 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
-| 756 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
-| 757 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
-| 758 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
-| 759 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
-| 760 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
-| 761 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
-| 762 | PAN-702 | M | low | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
-| 763 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
-| 764 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
-| 765 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 766 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
-| 767 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
-| 768 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
-| 769 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
-| 770 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
-| 771 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
-| 772 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
-| 773 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
-| 774 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
-| 775 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
-| 776 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
-| 777 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
-| 778 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
-| 779 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
-| 780 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
-| 781 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
-| 782 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
-| 783 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
-| 784 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
-| 785 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
-| 786 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
-| 787 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
-| 788 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
-| 789 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
-| 790 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
-| 791 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
-| 792 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
-| 793 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
-| 794 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
-| 795 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
-| 796 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
-| 797 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
-| 798 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
-| 799 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
-| 800 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
-| 801 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
-| 802 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
-| 803 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
-| 804 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
-| 805 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
-| 806 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
-| 807 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
-| 808 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
-| 809 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
-| 810 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
-| 811 | PAN-4332 | M | low | ok |  |  | Interop: continue t3code sessions in Overdeck and back via native transcripts; PAN-2609 Phase A has closed |
-| 812 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
-| 813 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
-| 814 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
-| 815 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
-| 816 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
-| 817 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
-| 818 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
-| 819 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
-| 820 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
-| 821 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 822 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
-| 823 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
-| 824 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
+| 670 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651, PAN-4652 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
+| 671 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 672 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 673 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 674 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 675 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 676 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 677 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 678 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
+| 679 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 680 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
+| 681 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
+| 682 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 683 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 684 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 685 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 686 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
+| 687 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 688 | PAN-2356 | M | low | needs-refinement |  | PAN-4297, PAN-4645, PAN-4330, PAN-4648 | Overdeck Anywhere P3: relay service |
+| 689 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
+| 690 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
+| 691 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 692 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
+| 693 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 694 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 695 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 696 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
+| 697 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 698 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
+| 699 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
+| 700 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 701 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
+| 702 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
+| 703 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 704 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
+| 705 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 706 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 707 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
+| 708 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
+| 709 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-4295, PAN-1676 | Anywhere paid tier: run users' agents on hosted Fly capacity; tenant isolation, credentials, metering all open; four deps unbuilt |
+| 710 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
+| 711 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
+| 712 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
+| 713 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 714 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 715 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
+| 716 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 717 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
+| 718 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 719 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 720 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
+| 721 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
+| 722 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
+| 723 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
+| 724 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
+| 725 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
+| 726 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
+| 727 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
+| 728 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 729 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
+| 730 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
+| 731 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
+| 732 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
+| 733 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
+| 734 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
+| 735 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
+| 736 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
+| 737 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
+| 738 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 739 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
+| 740 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
+| 741 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
+| 742 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
+| 743 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
+| 744 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
+| 745 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
+| 746 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
+| 747 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
+| 748 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
+| 749 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
+| 750 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
+| 751 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
+| 752 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
+| 753 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
+| 754 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
+| 755 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
+| 756 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
+| 757 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
+| 758 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
+| 759 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
+| 760 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
+| 761 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
+| 762 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
+| 763 | PAN-702 | M | low | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
+| 764 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
+| 765 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
+| 766 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
+| 767 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
+| 768 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
+| 769 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
+| 770 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
+| 771 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
+| 772 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
+| 773 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
+| 774 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
+| 775 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
+| 776 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
+| 777 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
+| 778 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
+| 779 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
+| 780 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
+| 781 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
+| 782 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
+| 783 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
+| 784 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
+| 785 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
+| 786 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
+| 787 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
+| 788 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
+| 789 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
+| 790 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
+| 791 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
+| 792 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
+| 793 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
+| 794 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
+| 795 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
+| 796 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
+| 797 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
+| 798 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
+| 799 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
+| 800 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
+| 801 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
+| 802 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
+| 803 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
+| 804 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
+| 805 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
+| 806 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
+| 807 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
+| 808 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
+| 809 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
+| 810 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
+| 811 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
+| 812 | PAN-4332 | M | low | ok |  |  | Interop: continue t3code sessions in Overdeck and back via native transcripts; PAN-2609 Phase A has closed |
+| 813 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
+| 814 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
+| 815 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
+| 816 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
+| 817 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
+| 818 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
+| 819 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
+| 820 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
+| 821 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
+| 822 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 823 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
+| 824 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
 | 825 | PAN-4642 | M | medium | ok |  |  | Cite selected reply text with a comment as composer chips sent with the next prompt; share pending list with #2685 annotations. |
-| 826 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 827 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 826 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
+| 827 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 828 | PAN-4644 | L | low | ok |  |  | Import VS Code themes and custom color themes for UI tokens, terminal palette and syntax highlighting; cosmetic, large surface. |
-| 829 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 832 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 834 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 835 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
-| 836 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
-| 837 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
-| 838 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
-| 839 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
-| 840 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
-| 841 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
-| 842 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
-| 843 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
-| 845 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
-| 846 | PAN-227 | M | low | stale |  |  | Phase gate validation |
-| 847 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
-| 848 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
-| 849 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
-| 850 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
-| 851 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
-| 852 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
-| 853 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
-| 854 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
-| 855 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
-| 856 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
-| 858 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 860 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
-| 861 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
-| 862 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
-| 863 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
-| 864 | PAN-2034 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): end-to-end test for ohmypi tool-call rendering |
-| 865 | PAN-2033 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi message-delivery latency benchmark |
-| 866 | PAN-2032 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): local Ollama review role via omp |
-| 867 | PAN-2030 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): version-pin the ohmypi extension |
-| 868 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
-| 869 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
-| 870 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
-| 871 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
-| 872 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
-| 873 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
-| 875 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
-| 876 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
-| 877 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
-| 878 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
-| 879 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 829 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 830 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 831 | PAN-4658 | S | low | needs-refinement |  | PAN-4642 | Cite text from the EditorPane markdown preview; needs a decision on how the preview picks its target conversation. Builds on #4642. |
+| 832 | PAN-4659 | M | low | ok |  | PAN-4644 | Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, waits for #4644 to merge. |
+| 833 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 834 | PAN-4660 | M | low | ok |  | PAN-4644 | Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, waits for #4644 to merge. |
+| 835 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 836 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
+| 837 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
+| 838 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
+| 839 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
+| 840 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
+| 841 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
+| 842 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
+| 843 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
+| 844 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
+| 846 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
+| 847 | PAN-227 | M | low | stale |  |  | Phase gate validation |
+| 848 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
+| 849 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
+| 850 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
+| 851 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
+| 852 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
+| 853 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
+| 854 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
+| 855 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
+| 856 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
+| 857 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
+| 859 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
+| 861 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
+| 862 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
+| 863 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
+| 864 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
+| 865 | PAN-2034 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): end-to-end test for ohmypi tool-call rendering |
+| 866 | PAN-2033 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi message-delivery latency benchmark |
+| 867 | PAN-2032 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): local Ollama review role via omp |
+| 868 | PAN-2030 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): version-pin the ohmypi extension |
+| 869 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
+| 870 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
+| 871 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
+| 872 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
+| 873 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
+| 874 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
+| 876 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
+| 877 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
+| 878 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
+| 879 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
+| 880 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 
 ## Rationale detail
 
@@ -876,6 +881,10 @@ New in-pipeline issue with a live workspace, so it is pinned near the top beside
 ### PAN-4640 (rank 3)
 
 New in-pipeline issue with a live workspace, pinned just below PAN-4639 because its resurfacing rule clears the snooze and settle states that PAN-4639 adds.
+
+### PAN-4663 (rank 4)
+
+New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.
 
 ### PAN-4636 (rank 5)
 
@@ -1181,10 +1190,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 
 npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
 
-### PAN-2850 (rank 93)
-
-npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1192,10 +1197,10 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T04:45:43Z",
+  "generatedAt": "2026-11-01T05:45:49Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 857,
+  "openCount": 862,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -4569,7 +4574,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "size": "M",
       "importance": "medium",
       "score": 44,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
       "why": "Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending.",
       "rationale": "Rank 278->277 (swap with PAN-4651): revision 5 lists it as a start-now item that PAN-4651 waits for; dropped the inferred PAN-4650 dependency.",
@@ -4599,10 +4604,8 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "size": "M",
       "importance": "medium",
       "score": 46,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4645"
-      ],
+      "condition": "ok",
+      "dependsOn": [],
       "why": "Auto-save pipeline agent transcripts to the Session Vault so linked machines can read them. Body pending.",
       "rationale": "New Anywhere child; it builds on the existing Session Vault Phase A and the owner column from PAN-4645 (advisory). Body is still a placeholder.",
       "gate": "auto",
@@ -4760,7 +4763,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "size": "M",
       "importance": "medium",
       "score": 42,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4645"
       ],
@@ -9205,7 +9208,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "size": "M",
       "importance": "low",
       "score": 26,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
       "why": "Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later)",
       "rationale": "Rank 661->651 (slot swap within the Anywhere set) to follow PAN-2350's 2026-09-28 recommended order; no other node moved.",
@@ -9316,7 +9319,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2353",
-      "rank": 663,
+      "rank": 664,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9329,7 +9332,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4294",
-      "rank": 664,
+      "rank": 665,
       "size": "L",
       "importance": "low",
       "score": 22,
@@ -9342,7 +9345,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3133",
-      "rank": 665,
+      "rank": 666,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9354,7 +9357,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3011",
-      "rank": 666,
+      "rank": 667,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9369,7 +9372,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4638",
-      "rank": 667,
+      "rank": 670,
       "size": "L",
       "importance": "medium",
       "score": 38,
@@ -9379,7 +9382,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
         "PAN-4652"
       ],
       "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
-      "rationale": "New PAN-2350 child; placed in the free slot beside the Anywhere set because it depends on machine links, delegation and Fly-as-machine plan items that have no issues yet, and planning questions remain open.",
+      "rationale": "Rank 668->670: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9411,7 +9414,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2282",
-      "rank": 670,
+      "rank": 671,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9423,7 +9426,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2091",
-      "rank": 671,
+      "rank": 672,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9435,7 +9438,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2085",
-      "rank": 672,
+      "rank": 673,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9447,7 +9450,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2084",
-      "rank": 673,
+      "rank": 674,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9459,7 +9462,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2083",
-      "rank": 674,
+      "rank": 675,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9474,7 +9477,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2082",
-      "rank": 675,
+      "rank": 676,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9486,7 +9489,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2074",
-      "rank": 676,
+      "rank": 677,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9498,7 +9501,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2046",
-      "rank": 677,
+      "rank": 678,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9511,7 +9514,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2006",
-      "rank": 678,
+      "rank": 679,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9523,7 +9526,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3919",
-      "rank": 679,
+      "rank": 680,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9536,7 +9539,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2005",
-      "rank": 680,
+      "rank": 681,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9548,7 +9551,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2002",
-      "rank": 681,
+      "rank": 682,
       "size": "XS",
       "importance": "low",
       "score": 24,
@@ -9560,7 +9563,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1999",
-      "rank": 682,
+      "rank": 683,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9572,7 +9575,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1986",
-      "rank": 683,
+      "rank": 684,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9584,7 +9587,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1983",
-      "rank": 684,
+      "rank": 685,
       "size": "L",
       "importance": "low",
       "score": 24,
@@ -9596,7 +9599,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2672",
-      "rank": 685,
+      "rank": 686,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9609,7 +9612,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1958",
-      "rank": 686,
+      "rank": 687,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9621,7 +9624,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2356",
-      "rank": 687,
+      "rank": 688,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9639,7 +9642,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1907",
-      "rank": 688,
+      "rank": 689,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9651,7 +9654,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1895",
-      "rank": 689,
+      "rank": 690,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9663,7 +9666,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1878",
-      "rank": 690,
+      "rank": 691,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9675,7 +9678,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1782",
-      "rank": 691,
+      "rank": 692,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9687,7 +9690,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1773",
-      "rank": 692,
+      "rank": 693,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9699,7 +9702,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1646",
-      "rank": 693,
+      "rank": 694,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9711,7 +9714,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1643",
-      "rank": 694,
+      "rank": 695,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9723,7 +9726,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1592",
-      "rank": 695,
+      "rank": 696,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9735,7 +9738,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1581",
-      "rank": 696,
+      "rank": 697,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9747,7 +9750,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1552",
-      "rank": 697,
+      "rank": 698,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9759,7 +9762,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1533",
-      "rank": 698,
+      "rank": 699,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9771,7 +9774,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1483",
-      "rank": 699,
+      "rank": 700,
       "size": "XS",
       "importance": "low",
       "score": 22,
@@ -9783,7 +9786,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1482",
-      "rank": 700,
+      "rank": 701,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9795,7 +9798,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1481",
-      "rank": 701,
+      "rank": 702,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9807,7 +9810,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1356",
-      "rank": 702,
+      "rank": 703,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9819,7 +9822,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1242",
-      "rank": 703,
+      "rank": 704,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9831,7 +9834,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1222",
-      "rank": 704,
+      "rank": 705,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9843,7 +9846,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1208",
-      "rank": 705,
+      "rank": 706,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9855,7 +9858,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4352",
-      "rank": 706,
+      "rank": 707,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9867,7 +9870,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1153",
-      "rank": 707,
+      "rank": 708,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9879,7 +9882,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4298",
-      "rank": 708,
+      "rank": 709,
       "size": "XL",
       "importance": "low",
       "score": 20,
@@ -9896,7 +9899,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1152",
-      "rank": 709,
+      "rank": 710,
       "size": "XS",
       "importance": "low",
       "score": 21,
@@ -9908,7 +9911,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1135",
-      "rank": 710,
+      "rank": 711,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9920,7 +9923,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1133",
-      "rank": 711,
+      "rank": 712,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9933,7 +9936,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1123",
-      "rank": 712,
+      "rank": 713,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -9945,7 +9948,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1121",
-      "rank": 713,
+      "rank": 714,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9957,7 +9960,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4248",
-      "rank": 714,
+      "rank": 715,
       "size": "L",
       "importance": "medium",
       "score": 24,
@@ -9970,7 +9973,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1117",
-      "rank": 715,
+      "rank": 716,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9982,7 +9985,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1116",
-      "rank": 716,
+      "rank": 717,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9994,7 +9997,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1065",
-      "rank": 717,
+      "rank": 718,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10006,7 +10009,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1064",
-      "rank": 718,
+      "rank": 719,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10018,7 +10021,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1063",
-      "rank": 719,
+      "rank": 720,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10031,7 +10034,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3971",
-      "rank": 720,
+      "rank": 721,
       "size": "L",
       "importance": "low",
       "score": 20,
@@ -10043,7 +10046,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3768",
-      "rank": 721,
+      "rank": 722,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10055,7 +10058,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3034",
-      "rank": 722,
+      "rank": 723,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10067,7 +10070,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2983",
-      "rank": 723,
+      "rank": 724,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10080,7 +10083,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3824",
-      "rank": 724,
+      "rank": 725,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10093,7 +10096,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3823",
-      "rank": 725,
+      "rank": 726,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10106,7 +10109,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1049",
-      "rank": 726,
+      "rank": 727,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10118,7 +10121,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-984",
-      "rank": 727,
+      "rank": 728,
       "size": "XS",
       "importance": "low",
       "score": 19,
@@ -10130,7 +10133,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-962",
-      "rank": 728,
+      "rank": 729,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10143,7 +10146,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-961",
-      "rank": 729,
+      "rank": 730,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10155,7 +10158,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-943",
-      "rank": 730,
+      "rank": 731,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10167,7 +10170,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-908",
-      "rank": 731,
+      "rank": 732,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10179,7 +10182,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-898",
-      "rank": 732,
+      "rank": 733,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10191,7 +10194,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-853",
-      "rank": 733,
+      "rank": 734,
       "size": "L",
       "importance": "low",
       "score": 19,
@@ -10203,7 +10206,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-833",
-      "rank": 734,
+      "rank": 735,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10215,7 +10218,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-832",
-      "rank": 735,
+      "rank": 736,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10228,7 +10231,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4347",
-      "rank": 736,
+      "rank": 737,
       "size": "S",
       "importance": "low",
       "score": 30,
@@ -10240,7 +10243,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-797",
-      "rank": 737,
+      "rank": 738,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10252,7 +10255,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4275",
-      "rank": 738,
+      "rank": 739,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -10265,7 +10268,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2836",
-      "rank": 739,
+      "rank": 740,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10278,7 +10281,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-790",
-      "rank": 740,
+      "rank": 741,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10290,7 +10293,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-786",
-      "rank": 741,
+      "rank": 742,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10302,7 +10305,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-777",
-      "rank": 742,
+      "rank": 743,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10314,7 +10317,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-775",
-      "rank": 743,
+      "rank": 744,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10326,7 +10329,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3456",
-      "rank": 744,
+      "rank": 745,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10338,7 +10341,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-774",
-      "rank": 745,
+      "rank": 746,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10350,7 +10353,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-773",
-      "rank": 746,
+      "rank": 747,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10362,7 +10365,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-772",
-      "rank": 747,
+      "rank": 748,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10375,7 +10378,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-771",
-      "rank": 748,
+      "rank": 749,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10387,7 +10390,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-769",
-      "rank": 749,
+      "rank": 750,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10402,7 +10405,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-765",
-      "rank": 750,
+      "rank": 751,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10414,7 +10417,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-764",
-      "rank": 751,
+      "rank": 752,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10426,7 +10429,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4425",
-      "rank": 752,
+      "rank": 753,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -10438,7 +10441,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-752",
-      "rank": 753,
+      "rank": 754,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10450,7 +10453,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-751",
-      "rank": 754,
+      "rank": 755,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10462,7 +10465,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-750",
-      "rank": 755,
+      "rank": 756,
       "size": "L",
       "importance": "low",
       "score": 16,
@@ -10474,7 +10477,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-749",
-      "rank": 756,
+      "rank": 757,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10486,7 +10489,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-747",
-      "rank": 757,
+      "rank": 758,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10498,7 +10501,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-743",
-      "rank": 758,
+      "rank": 759,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10510,7 +10513,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-738",
-      "rank": 759,
+      "rank": 760,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10522,7 +10525,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-735",
-      "rank": 760,
+      "rank": 761,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10534,7 +10537,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-730",
-      "rank": 761,
+      "rank": 762,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10546,7 +10549,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-702",
-      "rank": 762,
+      "rank": 763,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10558,7 +10561,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-701",
-      "rank": 763,
+      "rank": 764,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10570,7 +10573,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-663",
-      "rank": 764,
+      "rank": 765,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10582,7 +10585,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-660",
-      "rank": 765,
+      "rank": 766,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10594,7 +10597,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-624",
-      "rank": 766,
+      "rank": 767,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10606,7 +10609,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-623",
-      "rank": 767,
+      "rank": 768,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10618,7 +10621,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-622",
-      "rank": 768,
+      "rank": 769,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10630,7 +10633,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-604",
-      "rank": 769,
+      "rank": 770,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10642,7 +10645,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-603",
-      "rank": 770,
+      "rank": 771,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10654,7 +10657,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-591",
-      "rank": 771,
+      "rank": 772,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10666,7 +10669,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-589",
-      "rank": 772,
+      "rank": 773,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10678,7 +10681,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-576",
-      "rank": 773,
+      "rank": 774,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10690,7 +10693,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-571",
-      "rank": 774,
+      "rank": 775,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10702,7 +10705,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-568",
-      "rank": 775,
+      "rank": 776,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10714,7 +10717,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-565",
-      "rank": 776,
+      "rank": 777,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10726,7 +10729,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-564",
-      "rank": 777,
+      "rank": 778,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10738,7 +10741,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-554",
-      "rank": 778,
+      "rank": 779,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10750,7 +10753,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-543",
-      "rank": 779,
+      "rank": 780,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10762,7 +10765,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-483",
-      "rank": 780,
+      "rank": 781,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10774,7 +10777,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-480",
-      "rank": 781,
+      "rank": 782,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10787,7 +10790,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-476",
-      "rank": 782,
+      "rank": 783,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10799,7 +10802,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-468",
-      "rank": 783,
+      "rank": 784,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10811,7 +10814,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-461",
-      "rank": 784,
+      "rank": 785,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10823,7 +10826,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-459",
-      "rank": 785,
+      "rank": 786,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10835,7 +10838,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-407",
-      "rank": 786,
+      "rank": 787,
       "size": "XS",
       "importance": "low",
       "score": 13,
@@ -10847,7 +10850,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2348",
-      "rank": 787,
+      "rank": 788,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10859,7 +10862,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2346",
-      "rank": 788,
+      "rank": 789,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10872,7 +10875,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2345",
-      "rank": 789,
+      "rank": 790,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10885,7 +10888,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2344",
-      "rank": 790,
+      "rank": 791,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10898,7 +10901,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2343",
-      "rank": 791,
+      "rank": 792,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10911,7 +10914,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2073",
-      "rank": 792,
+      "rank": 793,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10923,7 +10926,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2071",
-      "rank": 793,
+      "rank": 794,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10935,7 +10938,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2068",
-      "rank": 794,
+      "rank": 795,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10947,7 +10950,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2067",
-      "rank": 795,
+      "rank": 796,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10959,7 +10962,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1684",
-      "rank": 796,
+      "rank": 797,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10971,7 +10974,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1683",
-      "rank": 797,
+      "rank": 798,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10983,7 +10986,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1474",
-      "rank": 798,
+      "rank": 799,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -10995,7 +10998,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-1469",
-      "rank": 799,
+      "rank": 800,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11007,7 +11010,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-674",
-      "rank": 800,
+      "rank": 801,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11019,7 +11022,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-634",
-      "rank": 801,
+      "rank": 802,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11031,7 +11034,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2908",
-      "rank": 802,
+      "rank": 803,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11043,7 +11046,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-106",
-      "rank": 803,
+      "rank": 804,
       "size": "M",
       "importance": "high",
       "score": 77,
@@ -11056,7 +11059,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-262",
-      "rank": 804,
+      "rank": 805,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11068,7 +11071,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-176",
-      "rank": 805,
+      "rank": 806,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11080,7 +11083,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-334",
-      "rank": 806,
+      "rank": 807,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11092,7 +11095,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-324",
-      "rank": 807,
+      "rank": 808,
       "size": "XS",
       "importance": "medium",
       "score": 49,
@@ -11105,7 +11108,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-304",
-      "rank": 808,
+      "rank": 809,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11117,7 +11120,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-245",
-      "rank": 809,
+      "rank": 810,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11129,7 +11132,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-244",
-      "rank": 810,
+      "rank": 811,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11141,7 +11144,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4332",
-      "rank": 811,
+      "rank": 812,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -11153,7 +11156,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-113",
-      "rank": 812,
+      "rank": 813,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -11165,7 +11168,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-49",
-      "rank": 813,
+      "rank": 814,
       "size": "XS",
       "importance": "medium",
       "score": 48,
@@ -11177,7 +11180,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-294",
-      "rank": 814,
+      "rank": 815,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -11189,7 +11192,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-293",
-      "rank": 815,
+      "rank": 816,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11201,7 +11204,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-277",
-      "rank": 816,
+      "rank": 817,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11213,7 +11216,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-258",
-      "rank": 817,
+      "rank": 818,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11225,7 +11228,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-255",
-      "rank": 818,
+      "rank": 819,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11237,7 +11240,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-252",
-      "rank": 819,
+      "rank": 820,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11249,7 +11252,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-243",
-      "rank": 820,
+      "rank": 821,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11261,7 +11264,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-77",
-      "rank": 821,
+      "rank": 822,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11273,7 +11276,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-54",
-      "rank": 822,
+      "rank": 823,
       "size": "L",
       "importance": "medium",
       "score": 31,
@@ -11285,7 +11288,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-38",
-      "rank": 823,
+      "rank": 824,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11297,13 +11300,14 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-37",
-      "rank": 824,
+      "rank": 826,
       "size": "M",
       "importance": "medium",
       "score": 30,
       "condition": "stale",
       "dependsOn": [],
       "why": "Support external PR selection for merge-agent",
+      "rationale": "Rank 825->826: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11322,7 +11326,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3248",
-      "rank": 826,
+      "rank": 827,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11335,14 +11339,14 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3244",
-      "rank": 827,
+      "rank": 829,
       "size": "S",
       "importance": "low",
       "score": 20,
       "condition": "stale",
       "dependsOn": [],
       "why": "Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close",
-      "rationale": "Demoted from rank 67: the component this issue targets (the deploy-patrol deploy window) was deleted by the PAN-3917 cut on main; the issue needs re-triage against the new tree or closure.",
+      "rationale": "Rank 828->829: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11361,7 +11365,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2775",
-      "rank": 829,
+      "rank": 830,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11373,8 +11377,38 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "planning": "auto"
     },
     {
-      "issue": "PAN-3505",
+      "issue": "PAN-4658",
+      "rank": 831,
+      "size": "S",
+      "importance": "low",
+      "score": 22,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4642"
+      ],
+      "why": "Cite text from the EditorPane markdown preview; needs a decision on how the preview picks its target conversation. Builds on #4642.",
+      "rationale": "New issue split from #4642; ranked just after it because it reuses its citation store and has an open design decision.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4659",
       "rank": 832,
+      "size": "M",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4644"
+      ],
+      "why": "Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, waits for #4644 to merge.",
+      "rationale": "New issue split from #4644 with clear AC; cosmetic and blocked on #4644, so it sits right after that issue.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3505",
+      "rank": 833,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11386,8 +11420,23 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "planning": "auto"
     },
     {
-      "issue": "PAN-3321",
+      "issue": "PAN-4660",
       "rank": 834,
+      "size": "M",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4644"
+      ],
+      "why": "Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, waits for #4644 to merge.",
+      "rationale": "New issue split from #4644 with clear AC; cosmetic and blocked on #4644, so it sits right after that issue.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3321",
+      "rank": 835,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11400,7 +11449,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-736",
-      "rank": 835,
+      "rank": 836,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11413,7 +11462,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-762",
-      "rank": 836,
+      "rank": 837,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11426,7 +11475,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-299",
-      "rank": 837,
+      "rank": 838,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11438,7 +11487,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-298",
-      "rank": 838,
+      "rank": 839,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11450,7 +11499,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-297",
-      "rank": 839,
+      "rank": 840,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11462,7 +11511,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-283",
-      "rank": 840,
+      "rank": 841,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11474,7 +11523,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-271",
-      "rank": 841,
+      "rank": 842,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11486,7 +11535,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-265",
-      "rank": 842,
+      "rank": 843,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11498,7 +11547,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-249",
-      "rank": 843,
+      "rank": 844,
       "size": "XS",
       "importance": "low",
       "score": 12,
@@ -11510,7 +11559,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-228",
-      "rank": 845,
+      "rank": 846,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11522,7 +11571,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-227",
-      "rank": 846,
+      "rank": 847,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11534,7 +11583,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-198",
-      "rank": 847,
+      "rank": 848,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11546,7 +11595,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-190",
-      "rank": 848,
+      "rank": 849,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11558,7 +11607,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-180",
-      "rank": 849,
+      "rank": 850,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11570,7 +11619,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-177",
-      "rank": 850,
+      "rank": 851,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11582,7 +11631,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-175",
-      "rank": 851,
+      "rank": 852,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11594,7 +11643,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-155",
-      "rank": 852,
+      "rank": 853,
       "size": "L",
       "importance": "low",
       "score": 11,
@@ -11606,7 +11655,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-146",
-      "rank": 853,
+      "rank": 854,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11618,7 +11667,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-55",
-      "rank": 854,
+      "rank": 855,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11630,7 +11679,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-52",
-      "rank": 855,
+      "rank": 856,
       "size": "XS",
       "importance": "low",
       "score": 11,
@@ -11642,7 +11691,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-51",
-      "rank": 856,
+      "rank": 857,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11654,7 +11703,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-44",
-      "rank": 858,
+      "rank": 859,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -11666,7 +11715,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2070",
-      "rank": 860,
+      "rank": 861,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11679,7 +11728,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3536",
-      "rank": 861,
+      "rank": 862,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -11692,7 +11741,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2027",
-      "rank": 862,
+      "rank": 863,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11705,7 +11754,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2035",
-      "rank": 863,
+      "rank": 864,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11718,7 +11767,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2034",
-      "rank": 864,
+      "rank": 865,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11731,7 +11780,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2033",
-      "rank": 865,
+      "rank": 866,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11744,7 +11793,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2032",
-      "rank": 866,
+      "rank": 867,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11757,7 +11806,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2030",
-      "rank": 867,
+      "rank": 868,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11770,7 +11819,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2029",
-      "rank": 868,
+      "rank": 869,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11783,7 +11832,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2028",
-      "rank": 869,
+      "rank": 870,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11796,7 +11845,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2024",
-      "rank": 870,
+      "rank": 871,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -11809,7 +11858,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2883",
-      "rank": 871,
+      "rank": 872,
       "size": "M",
       "importance": "high",
       "score": 20,
@@ -11822,7 +11871,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-2995",
-      "rank": 872,
+      "rank": 873,
       "size": "XS",
       "importance": "high",
       "score": 20,
@@ -11835,7 +11884,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4555",
-      "rank": 873,
+      "rank": 874,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11848,7 +11897,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4590",
-      "rank": 875,
+      "rank": 876,
       "size": "L",
       "importance": "medium",
       "score": 50,
@@ -11861,7 +11910,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4591",
-      "rank": 876,
+      "rank": 877,
       "size": "L",
       "importance": "medium",
       "score": 45,
@@ -11874,7 +11923,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4592",
-      "rank": 877,
+      "rank": 878,
       "size": "M",
       "importance": "low",
       "score": 38,
@@ -11889,7 +11938,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4594",
-      "rank": 878,
+      "rank": 879,
       "size": "M",
       "importance": "low",
       "score": 36,
@@ -11904,7 +11953,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4593",
-      "rank": 879,
+      "rank": 880,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -11914,6 +11963,34 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       ],
       "why": "Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work.",
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4661",
+      "rank": 663,
+      "size": "S",
+      "importance": "low",
+      "score": 22,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2355"
+      ],
+      "why": "Phone PWA third tab: read-only phase-grouped pipeline list at /m/pipeline; waits on the PAN-2355 /m shell",
+      "rationale": "New since the prior run: split out of PAN-2355 to keep that plan within size limits, so it ranks directly after its parent shell.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4663",
+      "rank": 4,
+      "size": "XS",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts",
+      "rationale": "New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13425,13 +13502,6 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "confidence": 0.6
     },
     {
-      "from": "PAN-4645",
-      "to": "PAN-4647",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-2350",
       "to": "PAN-4628",
       "type": "contains",
@@ -13535,6 +13605,62 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4642",
+      "to": "PAN-4658",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4644",
+      "to": "PAN-4659",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4644",
+      "to": "PAN-4660",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2355",
+      "to": "PAN-4661",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4663",
+      "to": "PAN-4645",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4663",
+      "to": "PAN-4648",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4663",
+      "to": "PAN-4649",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4663",
+      "to": "PAN-4295",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }
