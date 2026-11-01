@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationList, updateConversationTitle } from '../ConversationList';
+import { __resetTriageUndoStackForTests } from '../useConversationMutations';
 import { DialogProvider } from '../../DialogProvider';
 
 vi.mock('../../DialogProvider', () => ({
@@ -749,5 +750,61 @@ describe('ConversationList sections (PAN-4639 WI-5)', () => {
   it('shows the generic empty message when there are no conversations at all', () => {
     renderRows([]);
     expect(screen.getByText('No conversations yet')).toBeInTheDocument();
+  });
+});
+
+describe('Cmd/Ctrl+Z undo (PAN-4639 WI-9)', () => {
+  beforeEach(() => {
+    __resetTriageUndoStackForTests();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    __resetTriageUndoStackForTests();
+  });
+
+  function triageRequestBodies(fetchMock: ReturnType<typeof vi.fn>): unknown[] {
+    return fetchMock.mock.calls
+      .filter(([url]: [string]) => url === '/api/conversations/triage')
+      .map(([, init]: [string, RequestInit]) => JSON.parse(init.body as string));
+  }
+
+  it('keyboard-undo.ac1: Ctrl+Z after settling via the row checkbox sends a second POST with settled: false', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/conversations/triage') {
+        return new Response(JSON.stringify({ conversations: [], notFound: [], rejected: [] }), { status: 200 });
+      }
+      if (url === '/api/conversations') {
+        return new Response(JSON.stringify([mockConversation]), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderList();
+
+    const checkbox = screen.getByRole('checkbox', { name: /Settle/ });
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(triageRequestBodies(fetchMock)).toHaveLength(1));
+
+    fireEvent.keyDown(checkbox, { key: 'z', ctrlKey: true });
+
+    await waitFor(() => expect(triageRequestBodies(fetchMock)).toHaveLength(2));
+    expect(triageRequestBodies(fetchMock)[1]).toEqual({
+      updates: [{ name: 'test-conv', settled: false, snoozedUntil: null }],
+    });
+  });
+
+  it('keyboard-undo.ac2: Ctrl+Z inside the rename input sends no triage request', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ conversations: [], notFound: [], rejected: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderList();
+
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const input = screen.getByRole('textbox', { name: 'Rename test-conv' });
+
+    fireEvent.keyDown(input, { key: 'z', ctrlKey: true });
+
+    expect(triageRequestBodies(fetchMock)).toHaveLength(0);
   });
 });

@@ -533,6 +533,15 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
     });
   }, []);
 
+  // PAN-4639 WI-9 (D11): Cmd/Ctrl+Z undoes the last triage change while the
+  // list has focus, unless the user is typing (rename input, etc.).
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return;
+    const target = e.target as HTMLElement;
+    if (target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    if (mutations.undoLastTriage()) e.preventDefault();
+  }, [mutations]);
+
   if (isLoading) {
     return (
       <div className={styles.skeletonList}>
@@ -555,7 +564,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
   const showInboxClear = needsYouCount === 0 && inboxCount === 0 && (snoozedCount > 0 || settledCount > 0);
 
   return (
-    <div className={styles.conversationListWrapper}>
+    <div className={styles.conversationListWrapper} onKeyDown={handleKeyDown}>
       {/* Controls bar: All/Favorites tabs + sort */}
       <div className={styles.conversationControls}>
         <div className={styles.convTabBar}>
