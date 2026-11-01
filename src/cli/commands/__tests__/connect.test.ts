@@ -2,11 +2,14 @@
  * PAN-4656: `pan connect`. Every side effect is a fake `ConnectDeps` member;
  * nothing live runs and no test waits on real time.
  */
+import { EventEmitter } from 'node:events';
 import type { NetworkInterfaceInfo } from 'node:os';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { runConnect, type ConnectDeps, type ServiceOutcome } from '../connect.js';
+import { waitForLinger } from '../../../lib/systemd-user-session.js';
+import { runConnect, type ConnectDeps, type ServiceContext, type ServiceOutcome } from '../connect.js';
+import { installLinuxService, type LinuxServiceDeps } from '../connect-systemd.js';
 
 const CREDENTIAL = `odp_${'a'.repeat(64)}`;
 const EXPIRES_AT = '2026-11-01T14:10:00.000Z';
@@ -318,5 +321,121 @@ describe('pan connect: service and link', () => {
       runtime: null,
       replacedRepoRoot: '/srv/other',
     });
+  });
+});
+
+describe('pan connect on Linux (WI-9)', () => {
+  function linux(options: { isTTY?: boolean; json?: boolean; lingerOn?: boolean; enableLingerWorks?: boolean } = {}) {
+    const calls: string[] = [];
+    const lines: string[] = [];
+    let lingerOn = options.lingerOn ?? false;
+    const stdin = Object.assign(new EventEmitter(), { pause: vi.fn() });
+    const deps: LinuxServiceDeps = {
+      installSupervisorUnit: vi.fn(async () => { calls.push('unit'); }),
+      enableUserUnit: vi.fn(async (unit: string) => { calls.push(`enable ${unit}`); }),
+      persistUserManagerPath: vi.fn(async (path: string) => { calls.push(`path ${path}`); }),
+      startSupervisorUnit: vi.fn(async () => { calls.push('start'); }),
+      isLingerEnabled: vi.fn(async () => { calls.push('linger?'); return lingerOn; }),
+      tryEnableLinger: vi.fn(async () => {
+        calls.push('enable-linger');
+        if (options.enableLingerWorks) lingerOn = true;
+        return lingerOn;
+      }),
+      // The real poll loop, reading the fake linger state through loginctl show-user.
+      waitForLinger: (user, skip) => waitForLinger(user, skip, {
+        execFile: async () => ({ stdout: lingerOn ? 'yes\n' : 'no\n', stderr: '' }),
+      }),
+      stdin: stdin as unknown as LinuxServiceDeps['stdin'],
+    };
+    const ctx: ServiceContext = {
+      env: { PATH: '/home/alice/.local/bin:/usr/bin' },
+      user: 'alice',
+      isTTY: options.isTTY ?? false,
+      json: options.json ?? false,
+      overdeckHome: '/home/alice/.overdeck',
+      progress: (line) => { lines.push(line); },
+    };
+    return { deps, ctx, calls, lines, stdin, turnLingerOn: () => { lingerOn = true; } };
+  }
+
+  it('installs, enables, saves PATH, starts, then checks lingering, in that order', async () => {
+    const { deps, ctx, calls } = linux({ lingerOn: true });
+
+    await expect(installLinuxService(ctx, deps)).resolves.toEqual({
+      manager: 'systemd',
+      name: 'overdeck-supervisor.service',
+      enabled: true,
+      line: 'user service overdeck-supervisor.service, enabled at boot.',
+      linger: 'on',
+      note: 'Lingering is on for alice, so the server keeps running after you log out and starts at boot.',
+    });
+    expect(calls).toEqual([
+      'unit',
+      'enable overdeck-supervisor.service',
+      'path /home/alice/.local/bin:/usr/bin',
+      'start',
+      'linger?',
+    ]);
+    expect(deps.tryEnableLinger).not.toHaveBeenCalled();
+  });
+
+  it('turns lingering on itself when loginctl allows it', async () => {
+    const { deps, ctx, lines } = linux({ enableLingerWorks: true });
+
+    await expect(installLinuxService(ctx, deps)).resolves.toMatchObject({ linger: 'on' });
+    expect(lines).toEqual([]);
+  });
+
+  it('without a TTY, prints the sudo command and the off line, and does not wait', async () => {
+    const { deps, ctx, stdin } = linux();
+    const { deps: connectDeps, stdout } = fakeDeps({
+      explainSystemdUserUnavailable: vi.fn(async () => null),
+      installLinuxService: (serviceCtx) => installLinuxService({ ...serviceCtx, env: ctx.env }, deps),
+    });
+
+    await expect(runConnect({}, connectDeps)).resolves.toBe(0);
+    const text = plain(stdout);
+    expect(text).toContain('Lingering is off for alice. Run this in another terminal on this machine:\n  sudo loginctl enable-linger alice');
+    expect(text).not.toContain('Waiting for lingering');
+    expect(text).toContain(
+      'Lingering is off for alice, so the server stops when you log out and starts again only when you log in. '
+      + 'Turn it on with: sudo loginctl enable-linger alice',
+    );
+    expect(stdin.listenerCount('data')).toBe(0);
+  });
+
+  it('with --json, never waits even on a TTY', async () => {
+    const { deps, ctx, lines } = linux({ isTTY: true, json: true });
+
+    await expect(installLinuxService(ctx, deps)).resolves.toMatchObject({ linger: 'off' });
+    expect(lines.join('\n')).not.toContain('Waiting for lingering');
+  });
+
+  it('on a TTY, waits until lingering turns on, then detaches from stdin', async () => {
+    const { deps, ctx, lines, stdin, turnLingerOn } = linux({ isTTY: true });
+    let outcome: ServiceOutcome | undefined;
+    void installLinuxService(ctx, deps).then((value) => { outcome = value; });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(lines.at(-1)).toBe('Waiting for lingering to turn on… (press Enter to continue without it)');
+    expect(stdin.listenerCount('data')).toBe(1);
+
+    turnLingerOn();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(outcome?.linger).toBe('on');
+    expect(stdin.listenerCount('data')).toBe(0);
+    expect(stdin.pause).toHaveBeenCalled();
+  });
+
+  it('on a TTY, Enter stops the wait with lingering off', async () => {
+    const { deps, ctx, stdin } = linux({ isTTY: true });
+    const pending = installLinuxService(ctx, deps);
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    stdin.emit('data', Buffer.from('\n'));
+    await expect(pending).resolves.toMatchObject({ linger: 'off' });
+    expect(stdin.listenerCount('data')).toBe(0);
+    expect(stdin.pause).toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

@@ -30,34 +30,14 @@ import type { PlatformConfig } from '../../lib/platform-lifecycle.js';
 import type { RestartLockHandle } from '../../lib/restart-lock.js';
 import type { SystemdUserUnavailableReason } from '../../lib/systemd.js';
 import { exitCli } from '../exit.js';
+import type { ServiceContext, ServiceOutcome } from './connect-service.js';
 import { LOOPBACK_WARNING, requestPairingLink, type PairingLinkResult } from './pairing-link.js';
 
 export interface ConnectOptions { url?: string; label?: string; json?: boolean }
 
+export type { ServiceContext, ServiceOutcome } from './connect-service.js';
+
 type DashboardIdentity = { repoRoot: string; mode: 'primary' };
-
-/** What the platform's service step did, and the lines that say so. */
-export interface ServiceOutcome {
-  manager: 'systemd' | 'launchd' | 'process';
-  name: string | null;
-  enabled: boolean;
-  /** Printed after `Overdeck server: `. */
-  line: string;
-  linger: 'on' | 'off' | 'not-applicable';
-  /** Printed on the line after the service line, when set. */
-  note: string | null;
-}
-
-/** What a platform service installer gets from `pan connect`. */
-export interface ServiceContext {
-  env: NodeJS.ProcessEnv;
-  user: string;
-  isTTY: boolean;
-  json: boolean;
-  overdeckHome: string;
-  /** A progress line: stdout in text mode, stderr with --json. */
-  progress: (line: string) => void;
-}
 
 export interface ConnectDeps {
   platform: NodeJS.Platform;
@@ -352,6 +332,7 @@ async function defaultDeps(): Promise<ConnectDeps> {
     supervisorUnitAllowed: (env) => systemd.supervisorUnitAllowed(env),
     explainSystemdUserUnavailable: systemd.explainSystemdUserUnavailable,
     startSupervisorProcess: supervisor.startSupervisorProcess,
+    installLinuxService: async (ctx) => (await import('./connect-systemd.js')).installLinuxService(ctx),
     requestPairingLink,
   };
 }
