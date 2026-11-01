@@ -40,6 +40,7 @@ import {
   resolveRequestCredential,
 } from './dashboard-auth.js';
 import { isHttpsRequest } from './dashboard-session.js';
+import { isRemotePlainHttpBrowser } from '../plain-http-guard.js';
 import { validateOrigin } from './origin-validation.js';
 
 const MAX_LABEL_LENGTH = 200;
@@ -110,6 +111,12 @@ const exchangePairingCredentialRoute = HttpRouter.add(
     const delivery = body?.delivery;
     if (!body || typeof credential !== 'string' || !label || (delivery !== 'cookie' && delivery !== 'bearer')) {
       return noStore(jsonResponse({ error: `body must be { credential: string, label: string (at most ${MAX_LABEL_LENGTH} characters), delivery: 'cookie' | 'bearer' }` }, { status: 400 }));
+    }
+
+    // PAN-4645 D-4645-13: a cookie over plain LAN HTTP was never safe. Checked
+    // before the credential is consumed, so the code survives for an HTTPS retry.
+    if (delivery === 'cookie' && isRemotePlainHttpBrowser(request)) {
+      return noStore(jsonResponse({ error: 'use-https' }, { status: 403 }));
     }
 
     const outcome = consumePairingCredential(credential);

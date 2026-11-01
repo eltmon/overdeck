@@ -37,6 +37,7 @@ import { knowledgeViewerRouteLayer, setupKnowledgeViewerProxy } from './routes/k
 import { setupVoiceWebSocket } from './ws-voice.js';
 import { setupAutoPresoWebSocket } from './ws-autopreso.js';
 import { installChannelListener } from './channel-listener.js';
+import { plainHttpNavigationGuard } from './plain-http-guard.js';
 import { recordPairingExchangeFailure } from './pairing-credentials.js';
 import { getOverdeckVersion } from './routes/misc/shared.js';
 import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
@@ -196,6 +197,11 @@ const staticRouteLayer = HttpRouter.add(
     if (url.value.pathname === '/api' || url.value.pathname.startsWith('/api/')) {
       return jsonResponse({ error: 'Not Found' }, { status: 404 });
     }
+
+    // PAN-4645 D-4645-13: a remote browser on plain HTTP gets "Use HTTPS"
+    // instead of the SPA shell (both `/` and the SPA fallback); assets are untouched.
+    const useHttps = plainHttpNavigationGuard(request, url.value.pathname);
+    if (useHttps) return useHttps;
 
     const config = yield* ServerConfig;
     const fileSystem = yield* FileSystem.FileSystem;
