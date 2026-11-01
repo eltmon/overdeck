@@ -81,3 +81,26 @@ Unlinked "desk"; the other machine was told and its token here was revoked.
 When the other machine cannot be reached it prints that it will see the link as revoked
 when it next connects. An unknown target prints `No machine link matches "<target>"` and
 exits 1. `--json` prints `{ ok, peerNotified }`.
+
+## forward
+
+```bash
+pan machines forward <label|environment-id|link-id> <port> [--json]
+pan machines forward --list [--json]
+pan machines forward --stop <id>
+```
+
+Forwards a TCP port of a linked machine to `127.0.0.1` on this machine and prints the
+local URL, for previewing a dev server that runs there (PAN-4650).
+
+```
+Forwarding desk:5173 → http://127.0.0.1:52811
+  Stop it with: pan machines forward --stop 3f6c…
+```
+
+The other machine connects only to its own `127.0.0.1`. It refuses (`port-refused`)
+ports below 1024 or above 65535 and Overdeck's own ports: the dashboard and its API, the
+supervisor, 80, 443 and Traefik's dashboard port. A forward needs an operator-level link,
+and closes on `--stop`, when the link goes away, or after 30 minutes with no open
+connection. `--list` shows the open forwards; `--json` prints the forward (or the list)
+as JSON. The dashboard's **Preview** button in a remote conversation does the same.

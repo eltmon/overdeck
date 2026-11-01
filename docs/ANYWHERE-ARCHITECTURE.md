@@ -30,12 +30,23 @@ step, each named in the output:
 | `proxy` | a byte-logging TCP proxy on a free loopback port fronts B |
 | `pair+link` | `pan pair --url http://127.0.0.1:<proxy> --json` on B, `pan machines link <url> --allow-loopback --json` on A; B holds the reverse link |
 | `online` | both `pan machines list --json` show the other online within 15 s, and A's current route is the proxy (the pairing route outranks B's advertised LAN routes by source order) |
+| `seed` | (#4650) B gets a local conversation with a >2 MiB transcript, an image and a vault index entry; A gets a saved copy of it |
+| `list` | A's `GET /api/conversations` lists `@<B>/<name>` once, carrying the saved copy |
+| `open-budget` | opening it through A moves at most 1,114,112 bytes B to A |
+| `image` | its attachment through A matches B's bytes |
+| `tell-once` | a repeated `pan tell … --message-id` gets the same answer; the same id with other text is refused |
+| `released-409` | with `released_to` set on B, a message through A answers 409 `conversation-released` |
+| `forward` | `pan machines forward` reaches a dev server on B; B's dashboard port is refused |
 | `kill B` | after `SIGKILL`, A shows the link offline within 30 s |
 | `restart B` | A shows it online again within 60 s |
 | `no-http` | the proxy capture starts with the channel preamble byte `0x00` and contains no `HTTP/1.1` |
 | `stop` | both servers stopped; nothing outside `.tmp/anywhere-a|b` touched |
 
 Exit 0 on success, exit 1 with `FAILED at step <name>: <why>` otherwise.
+`--live-claude` adds `remote-reply` (a real Claude conversation on B answers a message
+sent from A) and `pull` (`pan conv pull` brings it, with an uncommitted change, to A, and
+B then answers 409 `conversation-released`); its harnesses run on the smoke homes' own
+tmux sockets. Without it, both servers get their own `HOME` under the smoke home.
 `--inject-plain-http` sends one plain request through the proxy so the detector's
 failure path can be checked (it then fails at `no-http`). The work agent runs the
 script before `pan done` and pastes the output into the PR description.
@@ -196,6 +207,79 @@ the raw socket found through the request's `IncomingMessage`, for `net.Socket` a
 Placeholder headings for the decisions that land with the follow-up issues; each adds its
 section here when it ships.
 
-- #4650: D-5, D-8, D-22.
+- #4651: D-19, D-21.
+- #2356: D-3, D-20.
+
+## Conversations across machines (#4650)
+
+### The shared list and its cache (D-5, D-4650-1/2/3)
+
+The owner answers `GET /api/machines/conversations` (machine credential only,
+`read:conversations`) with the FR-1 metadata of every local, unarchived conversation
+(`src/lib/anywhere/shared-conversations.ts`), plus each row's `vaultId` and
+`pulledFrom`, or `sharing: false` and hash `sharing-off` when **Share my conversations**
+is off (`${OVERDECK_HOME}/anywhere.json`). The hash (first 16 hex of SHA-256 over the
+rows sorted by name) rides in the 15 s heartbeat as `conversationsHash`; a beat waits at
+most 1 s for it and otherwise carries the last known hash, so a slow list never reads as
+a network stall.
+
+The viewer keeps the answers in `linked_conversations` (`src/lib/overdeck/linked-conversations.ts`;
+the owner's answer is its only writer). `linked-conversations-sync.ts` fetches on every
+connect and when a heartbeat's hash differs from the cached one; nothing polls. The
+link reconcile prunes environments with no active link. `GET /api/conversations` merges
+the cache on page 1 (`linked-conversations-merge.ts`): one row per conversation, local
+over linked over the vault saved copy (`vault-<vaultId>`); hidden or unlinked machines
+and rows released to this machine are left out; linked rows are named
+`@<environmentId>/<ownerName>` with negative ids. `?linked=0` lists local rows only.
+
+### Remote control: the proxy prefix and the WebSocket pipes (D-4650-4/5/6)
+
+`linked-conversation-proxy.ts` forwards `/api/conversations/@<machine>/<name>[/…]` to the
+owner's `/api/conversations/<name>[/…]` over the link (`linkForward`, bodies up to
+32 MiB), so every existing frontend call works for a linked row. It acts only on requests
+the remote request gate admits; the prefix needs `admin`, so a machine credential
+arriving over a channel cannot hop on. The actor is `operator` for the browser and for
+operator CLIs (`x-overdeck-sender`), else the agent. `/ws/linked/<env>/rpc` and
+`/ws/linked/<env>/terminal` (`ws-linked.ts`) relay the browser's WebSocket handshake to
+the owner's `/ws/rpc` or `/ws/terminal` with the link token and no Origin, then pipe
+bytes. The owner's scope table decides what is allowed; the remote-control routes
+(messages, approvals, stop, abort, switch model, compact, resume, attachments, tool
+bodies, diffs, image upload) carry `read:conversations`, `tell`, `approve` or `operate`.
+
+### The agent fence (D-4650-7)
+
+On the owner, a `machine` credential whose actor is an agent (an `agent-fenced` link's
+operator included) is refused `agent-fenced` on every non-GET `/api/conversations`
+route, on `/ws/terminal` and on `/ws/forward` (`src/dashboard/server/link-fence.ts`).
+Reads stay allowed.
+
+### Release before adopt (D-8, D-4650-8 to D-4650-14)
+
+A released conversation refuses every write door with 409 `conversation-released`
+(`src/lib/overdeck/conversation-release.ts`), in-process callers included. Pull here is a
+viewer job (`services/conversation-pull.ts`): **release** (the owner marks
+`released_to`, settles the transcript with uncommitted code into a fresh `dir:` vault
+store under a fresh key, packs it and stops the harness; any failure clears the mark),
+**transfer** (the pack crosses the channel; the key travels only in the release answer),
+**adopt** (Continue here against the unpacked store) and **finish**. Settling uses an
+empty in-memory vault index (`settle({ index })`), so the transfer carries the whole
+transcript and never moves the owner's real vault tail; after adopting, the viewer drops
+the transfer store's tail from its own index. Once released, any transfer or adopt
+failure posts `release/undo`, and the owner resumes. Nothing undoes a release on a
+timer: `pan conv reclaim` does it by hand, refusing while the other machine runs the
+conversation. Adoption mints a new session id, so the pulled row records `pulled_from`;
+a push back archives the old released copy by it. An unreachable owner falls back to the
+vault saved copy and its compare-and-swap.
+
+### Port forwards (D-22, D-4650-16/17)
+
+`/ws/forward?port=<n>` (`ws-forward.ts`) needs a channel `machine` credential with the
+`forward` scope and the operator actor, connects only to `127.0.0.1:<port>`, and refuses
+(403 `port-refused`, before the upgrade) ports outside 1024-65535 and Overdeck's own
+(dashboard, API, supervisor, 80, 443, Traefik's dashboard port; `forward-ports.ts`). The
+viewer (`services/port-forwards.ts`) probes first, then listens on `127.0.0.1:0` and gives
+each connection its own channel; a forward closes on stop, on unlink or after 30 idle
+minutes. `GET /api/conversations/:name/preview-ports` lists the workspace's assigned
+ports and service ports.
 - #4651: D-19, D-21.
 - #2356: D-3, D-20.
