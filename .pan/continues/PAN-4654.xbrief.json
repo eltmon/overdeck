@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4654",
   "created": "2026-11-01T13:26:56.845Z",
-  "updated": "2026-11-01T14:16:29.827Z",
+  "updated": "2026-11-01T14:16:44.184Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "unsupported-install-detail.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:16:29.827Z"
+    },
+    "harness-update-capabilities.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:16:44.183Z"
     }
   }
 }
