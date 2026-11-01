@@ -6,13 +6,21 @@
  *   pan machines list [--json]
  *   pan machines unlink <label|environment-id|link-id> [--json]
  *
+ * Through the overdeck.ai directory (PAN-2356 WI-16):
+ *
+ *   pan machines directory [--json]
+ *   pan machines join [--to <label|environment-id>] [--json]
+ *   pan machines accept <request-id> | reject <request-id>
+ *   pan machines approve <request-id> [--yes]
+ *   pan machines forget <label|environment-id>
+ *
  * Every verb talks to the running dashboard with the internal token; the
  * dashboard owns the keys, the channel and the link store. Registered from
  * `pair.ts` (`registerPairCommands`) so `src/cli/index.ts` does not grow.
  */
 import chalk from 'chalk';
 import type { Command } from 'commander';
-import type { MachineLinkView, MachinesResponse } from '@overdeck/contracts';
+import type { DirectoryResponse, MachineLinkView, MachinesResponse } from '@overdeck/contracts';
 
 import { callDashboard, errorText, isDashboardUnreachable } from './dashboard-call.js';
 
@@ -141,6 +149,145 @@ export async function runMachinesUnlink(target: string, options: { json?: boolea
     : `Unlinked "${target}"; its token here was revoked. The other machine could not be reached and will see the link as revoked when it next connects.`);
 }
 
+// ── Directory verbs (PAN-2356) ─────────────────────────────────────────────
+
+export const JOIN_POLL_MS = 2_000;
+
+/** Prompting and waiting, injected so tests run without a TTY or a clock. */
+export interface DirectoryCliDeps {
+  isTTY: () => boolean;
+  ask: (question: string) => Promise<boolean>;
+  sleep: (ms: number) => Promise<void>;
+  now: () => number;
+}
+
+async function askYesNo(question: string): Promise<boolean> {
+  const { createInterface } = await import('node:readline/promises');
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return /^y(es)?$/i.test((await rl.question(question)).trim());
+  } finally {
+    rl.close();
+  }
+}
+
+const defaultDirectoryDeps: DirectoryCliDeps = {
+  isTTY: () => process.stdin.isTTY === true && process.stdout.isTTY === true,
+  ask: askYesNo,
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  now: () => Date.now(),
+};
+
+async function loadDirectoryState(verb: string): Promise<DirectoryResponse> {
+  const response = await call(verb, '/api/directory', { method: 'GET' });
+  return await response.json() as DirectoryResponse;
+}
+
+export async function runMachinesDirectory(options: { json?: boolean }): Promise<void> {
+  const directory = await loadDirectoryState('directory');
+  if (options.json) {
+    console.log(JSON.stringify(directory));
+    return;
+  }
+  if (!directory.signedIn) {
+    console.log('Sign in with pan account login to find your machines through overdeck.ai.');
+    return;
+  }
+  if (directory.refusal) console.log(chalk.yellow(directory.refusal));
+  if (directory.machines.length === 0) {
+    console.log('The directory lists no machines yet.');
+  } else {
+    table(['LABEL', 'FINGERPRINT', 'STATE', 'LINKED', 'ENVIRONMENT'], directory.machines.map((m) => [
+      m.label,
+      m.fingerprint,
+      m.online ? 'online' : `last seen ${formatAgo(m.lastSeenAt)}`,
+      m.linked ? 'linked' : '-',
+      m.environmentId,
+    ]));
+  }
+  for (const approval of directory.approvals) {
+    console.log(`\nApproval request ${approval.requestId} from ${approval.label} (${approval.fingerprint}): ${approval.state}${approval.sas ? `, code ${approval.sas}` : ''}${approval.error ? `: ${approval.error}` : ''}`);
+  }
+  for (const join of directory.joins) {
+    console.log(`\nJoin request ${join.requestId}: ${join.state}${join.sas ? `, code ${join.sas}` : ''}`);
+  }
+}
+
+export async function runMachinesJoin(options: { to?: string; json?: boolean }, deps: DirectoryCliDeps = defaultDirectoryDeps): Promise<void> {
+  let to: string | null = null;
+  if (options.to) {
+    const directory = await loadDirectoryState('join');
+    const target = directory.machines.find((m) => m.environmentId === options.to || m.label === options.to);
+    if (!target) return fail(`The directory does not list a machine "${options.to}". \`pan machines directory\` lists them.`);
+    to = target.environmentId;
+  }
+  const self = await (await call('join', '/api/machines', { method: 'GET' })).json() as MachinesResponse;
+  const { requestId } = await (await call('join', '/api/directory/join', { method: 'POST', body: to ? { to } : {} })).json() as { requestId: string };
+  if (!options.json) console.log(`Requested approval (request ${requestId}). This machine's fingerprint: ${self.self.fingerprint}`);
+
+  const deadline = deps.now() + 10 * 60_000;
+  for (;;) {
+    const directory = await loadDirectoryState('join');
+    const join = directory.joins.find((entry) => entry.requestId === requestId);
+    if (!join || join.state === 'rejected') return fail('The approval was rejected or expired.');
+    if (join.sas) {
+      const approver = directory.machines.find((m) => m.fingerprint === join.fingerprint);
+      if (options.json) {
+        console.log(JSON.stringify({ requestId, sas: join.sas, fingerprint: join.fingerprint, approver: approver?.label ?? null }));
+      } else {
+        console.log(`Code: ${join.sas} · approver ${approver?.label ?? 'unknown'} ${join.fingerprint ?? ''}`.trimEnd());
+      }
+      if (!deps.isTTY()) {
+        if (!options.json) console.log(`Confirm with: pan machines accept ${requestId}`);
+        return;
+      }
+      const accepted = await deps.ask('Accept? [y/N] ');
+      await call(accepted ? 'accept' : 'reject', `/api/directory/joins/${encodeURIComponent(requestId)}/${accepted ? 'accept' : 'reject'}`, { method: 'POST' });
+      console.log(accepted ? 'Accepted. The link appears in pan machines list when the approver finishes.' : 'Rejected.');
+      return;
+    }
+    if (deps.now() >= deadline) return fail('No machine opened the approval request within 10 minutes.');
+    await deps.sleep(JOIN_POLL_MS);
+  }
+}
+
+export async function runMachinesAccept(requestId: string): Promise<void> {
+  await call('accept', `/api/directory/joins/${encodeURIComponent(requestId)}/accept`, { method: 'POST' });
+  console.log('Accepted. The link appears in pan machines list when the approver finishes.');
+}
+
+/** Rejects an incoming approval request or this machine's own join request, whichever the id names. */
+export async function runMachinesReject(requestId: string): Promise<void> {
+  const directory = await loadDirectoryState('reject');
+  const path = directory.approvals.some((approval) => approval.requestId === requestId)
+    ? `/api/directory/approvals/${encodeURIComponent(requestId)}/reject`
+    : `/api/directory/joins/${encodeURIComponent(requestId)}/reject`;
+  await call('reject', path, { method: 'POST' });
+  console.log('Rejected.');
+}
+
+export async function runMachinesApprove(requestId: string, options: { yes?: boolean }, deps: DirectoryCliDeps = defaultDirectoryDeps): Promise<void> {
+  const id = encodeURIComponent(requestId);
+  const opened = await (await call('approve', `/api/directory/approvals/${id}/open`, { method: 'POST' })).json() as { sas: string; fingerprint: string };
+  console.log(`Code: ${opened.sas} · fingerprint ${opened.fingerprint}`);
+  console.log('Approve only if the other machine shows the same code.');
+  if (!options.yes) {
+    if (!deps.isTTY()) return fail('Pass --yes to approve without a prompt.');
+    if (!(await deps.ask('Approve? [y/N] '))) {
+      await call('reject', `/api/directory/approvals/${id}/reject`, { method: 'POST' });
+      console.log('Rejected.');
+      return;
+    }
+  }
+  await call('approve', `/api/directory/approvals/${id}/approve`, { method: 'POST' });
+  console.log('Approved. The link appears in pan machines list once the other machine accepts.');
+}
+
+export async function runMachinesForget(target: string): Promise<void> {
+  const result = await (await call('forget', '/api/directory/forget', { method: 'POST', body: { machine: target } })).json() as { label?: string };
+  console.log(`Removed ${result.label ?? target} from the directory.`);
+}
+
 export function registerMachinesCommands(program: Command): void {
   const machines = program
     .command('machines')
@@ -163,4 +310,32 @@ export function registerMachinesCommands(program: Command): void {
     .description('Remove a link by label, environment id or link id, revoking the token the other machine holds')
     .option('--json', 'Print { ok, peerNotified } as JSON')
     .action((target: string, options: { json?: boolean }) => runMachinesUnlink(target, options));
+  machines
+    .command('directory')
+    .description("List this account's machines in the overdeck.ai directory, with pending approvals and joins")
+    .option('--json', 'Print the GET /api/directory response as JSON')
+    .action((options: { json?: boolean }) => runMachinesDirectory(options));
+  machines
+    .command('join')
+    .description('Ask your other machines (or one) to link with this one; confirm the code on both screens')
+    .option('--to <machine>', 'Ask only this machine (label or environment id)')
+    .option('--json', 'Print { requestId, sas, fingerprint, approver } as JSON once a machine opens the request')
+    .action((options: { to?: string; json?: boolean }) => runMachinesJoin(options));
+  machines
+    .command('accept <request-id>')
+    .description('Accept a join request after checking that both screens show the same code')
+    .action((requestId: string) => runMachinesAccept(requestId));
+  machines
+    .command('reject <request-id>')
+    .description('Reject an approval or join request')
+    .action((requestId: string) => runMachinesReject(requestId));
+  machines
+    .command('approve <request-id>')
+    .description('Open an approval request, show its code and approve it')
+    .option('--yes', 'Approve without asking')
+    .action((requestId: string, options: { yes?: boolean }) => runMachinesApprove(requestId, options));
+  machines
+    .command('forget <machine>')
+    .description('Remove a machine from the overdeck.ai directory (label or environment id)')
+    .action((target: string) => runMachinesForget(target));
 }

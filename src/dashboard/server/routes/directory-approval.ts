@@ -156,14 +156,22 @@ const forgetRoute = HttpRouter.add(
   guarded((_service, request) =>
     Effect.gen(function* () {
       const body = parseBody(yield* Effect.orDie(request.text));
-      const environmentId = body?.environmentId;
-      if (typeof environmentId !== 'string' || !UUID_RE.test(environmentId)) {
-        return jsonResponse({ error: 'body must be { environmentId }' }, { status: 400 });
+      // `environmentId` from the panel; `machine` (a label or an environment id) from `pan machines forget`.
+      const target = body?.environmentId ?? body?.machine;
+      if (typeof target !== 'string' || target.trim() === '') {
+        return jsonResponse({ error: 'body must be { environmentId } or { machine }' }, { status: 400 });
       }
       const client = currentDirectoryClient();
-      if (!client?.machine(environmentId)) return jsonResponse({ error: 'unknown', message: 'The directory does not list that machine' }, { status: 404 });
-      if (!client.send({ type: 'forget', environmentId })) return jsonResponse({ error: 'offline', message: 'Not connected to the overdeck.ai directory' }, { status: 503 });
-      return jsonResponse({ ok: true });
+      if (!client?.isOnline()) return jsonResponse({ error: 'offline', message: 'Not connected to the overdeck.ai directory' }, { status: 503 });
+      const machines = client.status().machines;
+      const machine = UUID_RE.test(target)
+        ? machines.find((m) => m.environmentId === target)
+        : machines.find((m) => m.label === target.trim());
+      if (!machine) return jsonResponse({ error: 'unknown', message: `The directory does not list a machine "${target}"` }, { status: 404 });
+      if (!client.send({ type: 'forget', environmentId: machine.environmentId })) {
+        return jsonResponse({ error: 'offline', message: 'Not connected to the overdeck.ai directory' }, { status: 503 });
+      }
+      return jsonResponse({ ok: true, environmentId: machine.environmentId, label: machine.label });
     })),
 );
 
