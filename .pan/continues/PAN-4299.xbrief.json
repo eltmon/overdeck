@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4299",
   "created": "2026-11-01T05:05:33.847Z",
-  "updated": "2026-11-01T05:36:19.844Z",
+  "updated": "2026-11-01T05:36:37.985Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "forwarded-client-check.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T05:36:19.844Z"
+    },
+    "doctor-traefik-binding.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:36:37.984Z"
     }
   }
 }
