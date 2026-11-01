@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T04:56:30Z · model: claude-opus-5-5 · open: 860_
+_Last sequenced: 2026-11-01T04:58:36Z · model: claude-opus-5-5 · open: 860_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -270,7 +270,7 @@ _Last sequenced: 2026-11-01T04:56:30Z · model: claude-opus-5-5 · open: 860_
 | 276 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 277 | PAN-4649 | M | medium | ok |  |  | Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending. |
 | 278 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650, PAN-4649 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
-| 279 | PAN-4647 | M | medium | ok |  | PAN-4645 | Auto-save pipeline agent transcripts to the Session Vault so linked machines can read them. Body pending. |
+| 279 | PAN-4647 | M | medium | ok |  |  | Auto-save pipeline agent transcripts to the Session Vault so linked machines can read them. Body pending. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
 | 282 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
@@ -1195,7 +1195,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T04:56:30Z",
+  "generatedAt": "2026-11-01T04:58:36Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 860,
@@ -4603,9 +4603,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "importance": "medium",
       "score": 46,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4645"
-      ],
+      "dependsOn": [],
       "why": "Auto-save pipeline agent transcripts to the Session Vault so linked machines can read them. Body pending.",
       "rationale": "New Anywhere child; it builds on the existing Session Vault Phase A and the owner column from PAN-4645 (advisory). Body is still a placeholder.",
       "gate": "auto",
@@ -13471,13 +13469,6 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4645",
-      "to": "PAN-4647",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-2350",
