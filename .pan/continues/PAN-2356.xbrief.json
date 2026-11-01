@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T13:35:50.720Z",
+  "updated": "2026-11-01T13:36:05.723Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "wi1-contracts": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2356",
-      "claimedAt": "2026-11-01T13:35:50.720Z"
+      "claimedAt": "2026-11-01T13:35:50.720Z",
+      "doneAt": "2026-11-01T13:36:05.722Z"
     }
   }
 }
