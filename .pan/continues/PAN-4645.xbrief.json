@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T09:28:20.024Z",
+  "updated": "2026-11-01T09:28:35.335Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -265,6 +265,11 @@
     "wi16-use-https-page.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T09:28:20.023Z"
+    },
+    "wi12-pairing-exchange": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:28:35.335Z"
     }
   }
 }
