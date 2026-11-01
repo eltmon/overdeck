@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4628",
   "created": "2026-11-01T05:04:21.139Z",
-  "updated": "2026-11-01T05:50:53.157Z",
+  "updated": "2026-11-01T07:27:49.669Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
       "claimedBy": "agent-pan-4628",
       "claimedAt": "2026-11-01T05:49:53.903Z",
       "doneAt": "2026-11-01T05:50:53.156Z"
+    },
+    "token-file-first.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:27:49.669Z"
     }
   }
 }
