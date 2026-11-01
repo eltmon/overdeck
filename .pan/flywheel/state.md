@@ -374,3 +374,12 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   (stops agent and stack), then `pan close <id> --force` passed with no
   override. `pan close` blocks on a confirmation prompt: always pass
   `--force` and `< /dev/null` from the loop.
+- 2026-11-01 07:15 UTC: sending late CodeRabbit findings to a work agent does
+  not stop the merge train. PR #4667 (PAN-4642) merged at 07:02 while the
+  agent was fixing them, and post-merge stopped the agent with the fix
+  uncommitted; follow-up PAN-4681. Next time hold the PR first with
+  `pan merge` (cancels the actionable auto-merge row), then route findings.
+- Same merge turned main red with an unrelated flake
+  (`run-gh.test.ts`, ledger appends race: PAN-4680, started). Re-ran failed
+  jobs (run 41283191295 attempt 2). `gh run list` timed out on the workflow
+  listing; `gh api repos/eltmon/overdeck/actions/runs?branch=main` works.
