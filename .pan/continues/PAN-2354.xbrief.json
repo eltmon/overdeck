@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2354",
   "created": "2026-11-01T05:46:47.920Z",
-  "updated": "2026-11-01T07:19:43.624Z",
+  "updated": "2026-11-01T07:20:06.167Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "deps.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:19:43.624Z"
+    },
+    "deps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:20:06.167Z"
     }
   }
 }
