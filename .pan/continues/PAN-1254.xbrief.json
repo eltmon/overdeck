@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T08:55:39.277Z",
+  "updated": "2026-11-01T08:55:54.959Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -336,6 +336,10 @@
     "tailscale-setup-dialog.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T08:55:39.277Z"
+    },
+    "tailscale-setup-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:55:54.959Z"
     }
   }
 }
