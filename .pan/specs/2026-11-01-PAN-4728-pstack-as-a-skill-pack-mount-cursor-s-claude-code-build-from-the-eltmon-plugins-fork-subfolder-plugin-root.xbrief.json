@@ -4,17 +4,17 @@
     "created": "2026-11-01T16:15:52Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4728: pstack as a skill pack: mount Cursor's Claude Code build from the eltmon/plugins fork (subfolder plugin root)",
-    "updated": "2026-11-01T16:22:32.483Z"
+    "updated": "2026-11-01T17:45:09.933Z"
   },
   "plan": {
     "id": "pan-4728",
     "title": "pstack as a skill pack: mount Cursor's Claude Code build from the eltmon/plugins fork (subfolder plugin root)",
-    "status": "proposed",
+    "status": "running",
     "uid": "71fc7f02-a054-4f0a-98de-68d8adae7720",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-01T16:15:52Z",
-    "updated": "2026-11-01T16:22:32.483Z",
+    "updated": "2026-11-01T17:45:09.933Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4728",
@@ -676,5 +676,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
