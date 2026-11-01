@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4717",
   "created": "2026-11-01T14:07:20.462Z",
-  "updated": "2026-11-01T14:07:20.462Z",
+  "updated": "2026-11-01T14:15:33.488Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "drawer-tracker-url-fallback": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4717",
-      "claimedAt": "2026-11-01T14:07:20.462Z"
+      "claimedAt": "2026-11-01T14:07:20.462Z",
+      "doneAt": "2026-11-01T14:15:33.487Z"
     }
   }
 }
