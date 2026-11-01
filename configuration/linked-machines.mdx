@@ -39,6 +39,65 @@ tokens, and the new link shows up as **Online** on both sides.
 Both servers on one host (for a test) need `--allow-loopback`, because a `localhost`
 pairing link only works on the machine that printed it.
 
+## SSH machines
+
+A machine that this one reaches only over SSH (a VPS, a lab box behind a bastion) can be
+linked without running anything there by hand. Use **Settings → Anywhere → Machines →
+Add an SSH machine**, or:
+
+```bash
+pan machines add-ssh me@vps.example.com
+```
+
+The dashboard server does all of it with its own OpenSSH client, keys and `~/.ssh/config`,
+so it works from any browser that can open this dashboard:
+
+1. It opens an SSH session to the host.
+2. It checks that the host has the same `pan` version as this machine.
+3. It adopts the Overdeck dashboard already running there, or starts one with `pan up`.
+4. It forwards a loopback port on this machine to the host's dashboard port.
+5. It pairs over that forwarded port and saves a machine link whose route has kind `ssh`.
+
+**Test** in the dialog (or `pan machines test-ssh <host>`) runs only step 2. The host field
+suggests the concrete `Host` aliases of this machine's `~/.ssh/config`.
+
+### Requirements
+
+- OpenSSH (`ssh`) on this machine, on the dashboard's `PATH`.
+- A key or SSH agent the dashboard process can use **without a prompt**. Every call uses
+  `BatchMode=yes`. If your keys live in an agent, start the dashboard (`pan up`) from a
+  shell that has `SSH_AUTH_SOCK` set.
+- The host key already in `~/.ssh/known_hosts`. Overdeck never accepts a new or changed key
+  for you: run `ssh <host>` once in a terminal on this machine and check the key.
+- The same `pan` version on the host. A different version fails with `version-mismatch`,
+  which names both versions and the command to run there,
+  `npm install -g @overdeck/core@<this version>`. Nothing is installed for you. When `pan` is
+  not on the host's login `PATH`, give its absolute path under **Advanced** (`--pan-path`).
+
+### Started by Overdeck, or already running
+
+The row of an SSH machine shows `SSH <host> · forward <state> · <launch>`:
+
+- **Started by Overdeck** (`managed`): this machine ran `pan up` on the host. Removing the
+  machine stops that server, unless you tick **Leave the server running**
+  (`pan machines unlink <machine> --keep-server`).
+- **Already running** (`external`): the host's server was running before. Removing the
+  machine never stops it.
+
+Removal stops only the dashboard process. Sidecars that `pan up` started on the host (the
+supervisor, CLIProxy) keep running. A server is also left running when another machine
+holds an active link to it (`in-use`), or when it was restarted since this machine started
+it.
+
+### The forward
+
+This dashboard keeps the SSH port forward running while it runs: it starts it at boot,
+restarts it with back-off (1 s doubling to 60 s) when it exits, and moves it to another
+local port when its port is taken. When SSH refuses the login or the host key, the forward
+stops retrying and the row shows **forward attention** with the reason. Fix the key or the
+host key, then press **Reconnect**, which restarts the forward and starts or adopts the
+host's server again.
+
 ## Access levels
 
 | Level | What this machine may do on the other | Flag |
@@ -61,15 +120,20 @@ compare it with the other machine's **This machine** line.
 ## Routes
 
 A link keeps a list of ways to reach the other machine, best first: a LAN address, a
-Tailscale address, then public or relayed ones. Where they come from:
+Tailscale address, an SSH forward, then public or relayed ones. Where they come from:
 
 - The **pairing** address is the one in the pairing link.
 - **Advertised** addresses are learned from the other machine itself: its LAN and
   Tailscale addresses, and its Tailscale Serve name when it has one. When a better one
   answers, the link moves to it within a minute. Addresses the other machine stops
   advertising are dropped.
-- **Add route** (in the expanded route list) adds an address you know works, for
-  example an SSH-forwarded port: `tcp://127.0.0.1:3041`.
+- An **`ssh`** route is the forwarded loopback port (`tcp://127.0.0.1:<port>`) that this
+  dashboard keeps open for an [SSH machine](#ssh-machines). When the host also advertises a
+  LAN or Tailscale address that answers from here, the link moves to it, and the forward
+  stays as the fallback.
+- **Add route** (in the expanded route list) adds an address you know works. For a
+  machine you reach over SSH, use **Add an SSH machine** instead of forwarding a port by
+  hand.
 
 Expand a link's **Routes** to see each address, its kind, where it came from and whether
 it answered last time.
