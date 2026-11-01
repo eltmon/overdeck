@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T19:20:00.078Z",
+  "updated": "2026-11-01T19:20:01.495Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-4651",
       "claimedAt": "2026-11-01T19:17:01.834Z",
       "doneAt": "2026-11-01T19:20:00.078Z"
+    },
+    "wi10-fleet-conversations": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:20:01.495Z"
     }
   }
 }
