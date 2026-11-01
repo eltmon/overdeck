@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:53:56.797Z",
+  "updated": "2026-11-01T23:54:16.374Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -244,6 +244,11 @@
     "conversation-list-nesting.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T23:53:56.797Z"
+    },
+    "two-machine-smoke-lanes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4638",
+      "claimedAt": "2026-11-01T23:54:16.373Z"
     }
   }
 }
