@@ -1032,6 +1032,7 @@ name. Every field is required, so a harness cannot leave a decision undeclared.
 | `launchPreflight` | A check run before launch (`claude-code-model-minimum`), or `null`. |
 | `workspaceResolution` | How the conversation scanner finds a transcript's workspace: `claude-project-hash`, `agent-dir`, or `first-message-only`. |
 | `correlatesBySessionId` | The conversation scanner correlates transcripts to agents by session id. |
+| `askAnswerDelivery` | How the dashboard delivers an answer to a conversation's pending question: `message` sends it as a message; `pi-ask-modal` drives the open ask modal with keystrokes. |
 
 The rule for harness-specific code:
 

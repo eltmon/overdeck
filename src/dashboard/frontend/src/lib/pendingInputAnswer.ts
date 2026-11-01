@@ -6,7 +6,8 @@
  *   1. Codex approval (`toolUseId` starts with `codex-approval:`) →
  *      `POST /api/conversations/:id/codex-approval` with `{ optionNumber, toolUseId }`.
  *   2. agent → `POST /api/agents/:id/answer-question` with `{ answers, toolUseId }`.
- *   3. pi / ohmypi conversation → `POST /api/conversations/:id/pi-ask-answer`
+ *   3. a conversation whose harness declares `askAnswerDelivery: 'pi-ask-modal'`
+ *      (ohmypi, and the legacy `pi` alias) → `POST /api/conversations/:id/pi-ask-answer`
  *      with `{ toolUseId, answers }` (PAN-3766 — a pi ask modal holds the
  *      session's input; a queued message is swallowed).
  *   4. any other conversation → `POST /api/conversations/:id/message` with the
@@ -15,6 +16,7 @@
  * The desktop dialog host and the phone Needs-you card both call it, so the
  * endpoints, bodies and headers stay identical across surfaces.
  */
+import { getHarnessBehavior, type HarnessName } from '@overdeck/contracts';
 import { fetchWithTimeout } from './apiFetch';
 
 export type PendingAnswerTarget = {
@@ -54,7 +56,8 @@ export function buildPendingAnswerRequest(target: PendingAnswerTarget): PendingA
       body: { answers, toolUseId },
     };
   }
-  if (harness === 'ohmypi' || harness === 'pi') {
+  // An unknown or missing harness resolves to claude-code, which takes a message.
+  if (getHarnessBehavior(harness as HarnessName | null | undefined).capabilities.askAnswerDelivery === 'pi-ask-modal') {
     return {
       url: `/api/conversations/${encodeURIComponent(id)}/pi-ask-answer`,
       body: { toolUseId, answers },
