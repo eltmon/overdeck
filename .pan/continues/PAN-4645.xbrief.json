@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T09:50:00.058Z",
+  "updated": "2026-11-01T09:50:18.797Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -324,6 +324,10 @@
       "claimedBy": "agent-pan-4645",
       "claimedAt": "2026-11-01T09:44:56.238Z",
       "doneAt": "2026-11-01T09:50:00.058Z"
+    },
+    "wi14-cli-machines.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:50:18.796Z"
     }
   }
 }
