@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4672",
   "created": "2026-11-01T06:29:18.701Z",
-  "updated": "2026-11-01T08:06:23.750Z",
+  "updated": "2026-11-01T08:06:52.267Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "docs-ipv6-claim.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T08:06:23.749Z"
+    },
+    "docs-ipv6-claim.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:06:52.266Z"
     }
   }
 }
