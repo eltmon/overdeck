@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4654",
   "created": "2026-11-01T13:26:56.845Z",
-  "updated": "2026-11-01T14:24:15.012Z",
+  "updated": "2026-11-01T14:24:30.024Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,6 +214,10 @@
     "fleet-versions-panel.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T14:24:15.011Z"
+    },
+    "fleet-versions-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:24:30.023Z"
     }
   }
 }
