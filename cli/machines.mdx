@@ -1,6 +1,6 @@
 ---
 title: pan machines
-description: Link this machine's dashboard to another machine, list the links, or remove one
+description: Link this machine's dashboard to another machine, list the links, remove one, or turn a server into a lasting linked machine
 ---
 
 # `pan machines`
@@ -11,6 +11,8 @@ See [Linked machines](/configuration/linked-machines).
 
 Every verb talks to the running dashboard with this machine's internal token, so the
 dashboard must be up (`pan up`); without one it prints the not-running message and exits 1.
+[`pan connect`](#connect) is the exception: it starts the dashboard itself, on the machine
+you want to link to.
 
 ## link
 
@@ -81,3 +83,159 @@ Unlinked "desk"; the other machine was told and its token here was revoked.
 When the other machine cannot be reached it prints that it will see the link as revoked
 when it next connects. An unknown target prints `No machine link matches "<target>"` and
 exits 1. `--json` prints `{ ok, peerNotified }`.
+
+## connect
+
+```bash
+pan connect [--url <base>] [--label <name>] [--json]
+npx @overdeck/core connect [--url <base>] [--label <name>] [--json]
+```
+
+Turns the machine you run it on (typically a fresh server you reached over SSH) into a
+lasting linked machine. It installs the Overdeck server as a service that survives logout
+and reboot, starts it, and prints one link. You paste that link into
+`pan machines link` on the machine that should reach this one. Run it from your normal
+login shell: it saves that shell's `PATH` for the service, so agents started later find
+`node` and the harness CLIs. Linux and macOS only; on Windows it exits 1 and asks you to
+run it inside WSL.
+
+| Flag | Effect |
+| --- | --- |
+| `--url <base>` | Address the other machine reaches this one at, such as `https://box.example.com`. Default: picked automatically (see below). |
+| `--label <name>` | Name recorded for the pairing in the activity log. |
+| `--json` | Print the result as one JSON object: `url`, `credential`, `expiresAt`, `base`, `service`, `linger`, `runtime`, `replacedRepoRoot`. Never waits for input. |
+
+What it does, in order:
+
+1. **Installs a durable copy under npx.** `npx` runs from a cache that npm may delete at any
+   time, so `npx @overdeck/core connect` first installs the same version into
+   `~/.overdeck/runtime` (`npm install --prefix`, no `sudo`) and runs itself again from there.
+   Every path the service uses points into that copy. A machine that already has that version
+   skips the install.
+2. **Starts the dashboard.** A dashboard already running from this install is left alone.
+   Otherwise it starts one and waits up to two minutes for it. If a dashboard from another
+   checkout held the port, it is replaced and the output says so.
+3. **Installs the service.** On Linux, the systemd user unit `overdeck-supervisor.service`:
+   installed, enabled at boot, and started. On macOS, the launch agent
+   `ai.overdeck.supervisor`. The service runs the supervisor, whose watchdog starts the
+   dashboard again whenever it is down.
+4. **Turns lingering on (Linux).** See below.
+5. **Prints the link.** The link is printed last because it expires 10 minutes after it is
+   created.
+
+```
+Overdeck server: user service overdeck-supervisor.service, enabled at boot.
+Lingering is on for alice, so the server keeps running after you log out and starts at boot.
+
+Link this machine from another machine within 10 minutes, before this machine restarts:
+
+  pan machines link 'http://203.0.113.7:3011/#pair=odp_…'
+
+or paste the link into Settings → Anywhere → Machines → Link a machine.
+Expires: 2026-11-01T14:10:00.000Z (single use)
+The other machine must reach 203.0.113.7:3011. If a firewall blocks it, open that port or set up Tailscale with `pan tailscale setup`, then run pan connect again.
+To run pan on this machine: /home/alice/.overdeck/runtime/node_modules/.bin/pan
+```
+
+The last line appears only after an `npx` run. The link works once and is held in the
+dashboard's memory, so a restart of this machine before you use it drops it; run
+`pan connect` again for a fresh one. Running `pan connect` again on a connected machine is
+safe: it installs nothing twice, leaves the running dashboard alone, and prints a new link.
+
+### Lingering (Linux)
+
+Without lingering, systemd stops every user service when you log out and starts them again
+only when you log in, so the server would not come back after a reboot. `pan connect` turns
+lingering on with `loginctl enable-linger`. When that needs a password, it prints the
+command to run in another terminal:
+
+```
+Lingering is off for alice. Run this in another terminal on this machine:
+  sudo loginctl enable-linger alice
+Waiting for lingering to turn on… (press Enter to continue without it)
+```
+
+It waits (checking every 2 seconds) until lingering is on, then carries on. Press Enter to
+continue without it. Without a terminal, or with `--json`, it does not wait. Continuing
+without lingering is not an error, and the output says what it means: "Lingering is off for
+alice, so the server stops when you log out and starts again only when you log in."
+
+### macOS
+
+The launch agent `~/Library/LaunchAgents/ai.overdeck.supervisor.plist` starts when you log
+in. macOS has no lingering for user agents, so a Mac that must come back after a reboot
+with nobody logged in needs automatic login (**System Settings → Users & Groups**).
+
+### No systemd
+
+In a container, without `XDG_RUNTIME_DIR` (for example after `su` instead of logging in over
+SSH as that user), or wherever `systemctl --user` does not work, `pan connect` runs the
+supervisor as a plain process and says why:
+
+```
+No systemd user manager is available here (this is a container), so the server runs as a plain process: it stops when you log out and does not start after a reboot.
+```
+
+The same fallback applies when `OVERDECK_HOME` is not `~/.overdeck`, unless you set
+`OVERDECK_SUPERVISOR_UNIT=1`.
+
+### Which address the link uses
+
+The first match wins:
+
+1. `--url`, exactly as given.
+2. This machine's Tailscale address (`100.64.0.0/10`).
+3. The address you reached this machine at over SSH (from `SSH_CONNECTION`), unless it is
+   a loopback address.
+4. Another address on a real network interface (container bridges are skipped), public
+   addresses before private ones.
+5. `localhost`, with the `pan pair` warning that the link only works on this machine.
+
+Unless the address is a Tailscale address, the output names the host and port the other
+machine must reach. If a firewall blocks that port, open it or set up Tailscale with
+`pan tailscale setup`, then run `pan connect` again.
+
+### After a reboot
+
+On a Linux machine with lingering on, systemd starts the supervisor at boot. The watchdog
+waits out its 5-minute boot grace and then starts the dashboard, so the dashboard answers
+within about 6 minutes. A linked machine retries with a back-off of up to 5 minutes, so it
+shows this machine **online** again within about 15 minutes. If Traefik is enabled here,
+the output adds that Traefik and CLIProxy wait for `pan up` after a reboot.
+
+### Updating and removing
+
+Update a machine connected with npx by running the newest version:
+
+```bash
+npx @overdeck/core@latest connect
+```
+
+It installs that version into `~/.overdeck/runtime` and rewrites the service. To remove
+the service:
+
+```bash
+# Linux
+systemctl --user disable --now overdeck-supervisor.service
+sudo loginctl disable-linger <user>
+
+# macOS
+launchctl bootout gui/$(id -u)/ai.overdeck.supervisor
+rm ~/Library/LaunchAgents/ai.overdeck.supervisor.plist
+```
+
+`pan connect` installs only the Overdeck server. Agents on that machine still need the
+harness CLIs and Herdr: run `~/.overdeck/runtime/node_modules/.bin/pan install` there.
+
+### Troubleshooting
+
+The watchdog stops restarting the dashboard after three failed restarts in a row, and it
+remembers that across supervisor restarts (and so across reboots). If the dashboard is
+still down after a reboot, start it by hand:
+
+```bash
+~/.overdeck/runtime/node_modules/.bin/pan restart --dashboard --now
+```
+
+Do not use `pan up` for this on a server: it expects the full host setup from `pan install`
+(terminal backend and sidecars), which a fresh server may not have.
