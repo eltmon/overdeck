@@ -52,3 +52,42 @@ rc=2
 ```
 
 Fork tests run: `bun test test/setup-help.test.ts` (12 pass, 0 fail), `bun test test/external-host-carve.test.ts` (29 pass, 0 fail).
+
+## Fork: state-root marker
+
+Fork commit: `ef70d6d0cda6396b808c76c0a06678860dade32e` — `feat(pack-mode): state root from the pack marker`.
+
+Files: `bin/gstack-state-root.sh`, `lib/state-root.ts`, `bin/gstack-paths`, `test/state-root-parity.test.ts`.
+
+Notes on the plan:
+
+- The bash twin resolves the marker path once, when sourced, from `BASH_SOURCE[0]` with parameter expansion (no subshell), because the file's header promises builtins only and the parity test runs it with an empty `PATH`. A twin sourced by a bare name (found through `PATH`) has no usable directory and ignores the marker.
+- `_gstack_sr_var` is `pack_marker` when the marker selects the root; `gstack-paths --explain` prints a `pack marker` row.
+- The TS twin takes the marker path as an optional third argument (default `lib/../.gstack-pack-state-root`), so the parity test can point both twins at one temp pack root. The bash side sources a copy of the twin from `<tmp>/render/bin/`.
+- Plan dir: the marker branch sits directly after `GSTACK_PLAN_DIR`, ahead of `CLAUDE_PLANS_DIR`, as the PRD orders it.
+
+```
+$ bun test test/state-root-parity.test.ts test/state-root-ratchet.test.ts
+ 42 pass
+ 0 fail
+ 116 expect() calls
+Ran 42 tests across 2 files. [492.00ms]
+```
+
+Related fork suites also green: `test/gstack-paths.test.ts` + `test/uninstall.test.ts` (49 pass), `test/gstack-state-root-override.test.ts`, `test/state-root-config-merge.test.ts`, `test/state-root-one-variable.test.ts`, `test/state-root-resolver-failure.test.ts`, `test/gstack-doctor.test.ts` (37 pass).
+
+End-to-end on a fresh render (`$SP` = a scratch dir, `HOME=$SP/home`, no `GSTACK_*` env, cwd `/`):
+
+```
+$ env -i PATH=$HOME/.bun/bin:/usr/bin:/bin HOME=$SP/home bash $SP/r/bin/gstack-paths --explain | head -1
+state root: $SP/s (selected by pack_marker)
+$ env -i PATH=… HOME=$SP/home CLAUDECODE=1 bash $SP/r/bin/gstack-skill-start --skill test-audit --model claude
+SKILL_START_PROTO: 1
+STATE_ROOT: $SP/s durable=yes
+TELEMETRY: off
+UPDATE_CHECK: false
+$ find $SP/home
+$SP/home
+$ ls $SP/s
+analytics  config.yaml  projects  sessions
+```
