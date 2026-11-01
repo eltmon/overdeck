@@ -4,17 +4,17 @@
     "created": "2026-11-01T13:58:23Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4717: Conversation issue links: handle issues the dashboard snapshot does not hold (CodeRabbit finding on merged #4716)",
-    "updated": "2026-11-01T14:06:09.029Z"
+    "updated": "2026-11-01T14:06:55.891Z"
   },
   "plan": {
     "id": "pan-4717",
     "title": "Conversation issue links: handle issues the dashboard snapshot does not hold (CodeRabbit finding on merged #4716)",
-    "status": "proposed",
+    "status": "running",
     "uid": "c149455a-d11c-4b41-ba0f-2e68245274d4",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T13:58:23Z",
-    "updated": "2026-11-01T14:06:09.029Z",
+    "updated": "2026-11-01T14:06:55.891Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4717",
@@ -399,5 +399,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

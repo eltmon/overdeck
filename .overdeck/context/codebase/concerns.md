@@ -510,4 +510,15 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   `infra/.devcontainer-template/` sets `network_mode: none`. The renderer reads the
   template from the primary checkout (`devcontainer-renderer.ts`), so a branch's
   template edit reaches workspace stacks only after merge.
+- **The dashboard snapshot is the `current` cycle, not every issue** (PAN-4717) —
+  the read model feeds `issuesRaw` from `IssueDataService.getIssues()` with
+  default options, and `computeIssues` drops canonical `backlog` and `canceled`
+  rows (Linear Backlog/Triage/Canceled, GitHub `backlog`/`icebox`/`canceled`
+  labels). Closed issues older than `issues.closedWindowDays` are also absent.
+  Opening the drawer fires `backfillIssue` (PAN-3659) through
+  `subscribeIssueEvents`, which hydrates aged-out closed issues via `issues.delta`
+  on the global stream, but it is a no-op for rows the poll holds and the cycle
+  filter drops, and `resolveMissingIssue` memoizes failures for the process
+  lifetime. A drawer for such an issue shows `Issue details` with no title.
+  Never widen the snapshot to fix one view: about 14 frontend views read `issuesRaw`.
 <!-- last-verified: 2026-11-01 -->
