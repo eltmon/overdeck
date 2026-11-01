@@ -18,7 +18,7 @@ import { homedir } from 'os';
 import { parse } from 'yaml';
 import { Effect, Stream } from 'effect';
 import { getIsolatedPlaywrightMcpConfig } from '../claude-mcp.js';
-import { buildClaudeUserSettings } from '../claude-permissions.js';
+import { BYPASS_PERMISSION_MODE, buildClaudeUserSettings } from '../claude-permissions.js';
 import { FlyApiClient, createFlyApiClient, FlyApiError } from './fly-api.js';
 import type { RemoteProvider, VmInfo, VmStatus, ExecResult } from './interface.js';
 import { RemoteError } from './interface.js';
@@ -581,7 +581,7 @@ if os.path.exists(path):
         data = json.load(f)
 data["hasCompletedOnboarding"] = True
 data["lastOnboardingVersion"] = "2.0.50"
-data["bypassPermissionsModeAccepted"] = True
+data["${BYPASS_PERMISSION_MODE}ModeAccepted"] = True
 projects = data.setdefault("projects", {})
 ws = projects.setdefault("/workspace", {})
 ws["hasTrustDialogAccepted"] = True
