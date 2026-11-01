@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4647",
   "created": "2026-11-01T04:58:27.549Z",
-  "updated": "2026-11-01T04:58:27.549Z",
+  "updated": "2026-11-01T05:00:24.002Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "settle-record-title": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4647",
-      "claimedAt": "2026-11-01T04:58:27.549Z"
+      "claimedAt": "2026-11-01T04:58:27.549Z",
+      "doneAt": "2026-11-01T05:00:24.002Z"
     }
   }
 }
