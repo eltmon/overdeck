@@ -135,18 +135,28 @@ describe('gcPackRenders', () => {
   const now = Date.parse('2026-11-01T12:00:00Z');
   const OLD = 'c'.repeat(40);
   const YOUNG = 'd'.repeat(40);
+  const base = { maxAgeMs: 7 * DAY, now, registryReadable: true };
 
   function home() {
     const packsHome = mkdtempSync(join(tmpdir(), 'skill-pack-render-gc-'));
     dirs.push(packsHome);
-    const make = (path: string, ageDays: number) => {
-      const dir = join(packsHome, path);
-      mkdirSync(dir, { recursive: true });
+    const age = (dir: string, ageDays: number) => {
       const when = new Date(now - ageDays * DAY);
       utimesSync(dir, when, when);
       return dir;
     };
-    return { packsHome, make };
+    const make = (path: string, ageDays: number) => {
+      const dir = join(packsHome, path);
+      mkdirSync(dir, { recursive: true });
+      return age(dir, ageDays);
+    };
+    /** An unregistered id's render/ and state/, each holding one child, all aged together. */
+    const orphan = (id: string, ageDays: number) => {
+      make(`${id}/render/${COMMIT}`, ageDays);
+      make(`${id}/state/sessions`, ageDays);
+      return { render: age(join(packsHome, id, 'render'), ageDays), state: age(join(packsHome, id, 'state'), ageDays) };
+    };
+    return { packsHome, make, orphan };
   }
 
   it('keeps the trusted render at any age, removes old non-trusted renders, and keeps young ones', async () => {
@@ -155,7 +165,7 @@ describe('gcPackRenders', () => {
     const old = make(`gstack/render/${OLD}`, 30);
     const young = make(`gstack/render/${YOUNG}`, 1);
     const state = make('gstack/state', 90);
-    const result = await gcPackRenders({ packsHome, registered: new Map([['gstack', COMMIT]]), maxAgeMs: 7 * DAY, now });
+    const result = await gcPackRenders({ ...base, packsHome, registered: new Map([['gstack', COMMIT]]) });
     expect(result).toEqual({ removedRenders: [old], removedStates: [] });
     expect([existsSync(trusted), existsSync(old), existsSync(young), existsSync(state)]).toEqual([true, false, true, true]);
   });
@@ -163,27 +173,48 @@ describe('gcPackRenders', () => {
   it('keeps an old non-trusted render that a linked mount still calls into', async () => {
     const { packsHome, make } = home();
     const inUse = make(`gstack/render/${OLD}`, 30);
-    const result = await gcPackRenders({
-      packsHome, registered: new Map([['gstack', COMMIT]]), maxAgeMs: 7 * DAY, keep: new Set([inUse]), now,
-    });
+    const result = await gcPackRenders({ ...base, packsHome, registered: new Map([['gstack', COMMIT]]), keep: new Set([inUse]) });
     expect(result).toEqual({ removedRenders: [], removedStates: [] });
     expect(existsSync(inUse)).toBe(true);
   });
 
-  it('removes render and state of an unregistered id and leaves its other files and mounts alone', async () => {
-    const { packsHome, make } = home();
-    make(`gstack/render/${COMMIT}`, 0);
-    make('gstack/state/sessions', 0);
-    const extraction = make(`gstack/${COMMIT}`, 0);
+  it('removes old render and state of an unregistered id and leaves its other files and mounts alone', async () => {
+    const { packsHome, make, orphan } = home();
+    const dirsOf = orphan('gstack', 30);
+    const extraction = make(`gstack/${COMMIT}`, 30);
     const mounts = make('mounts/abc', 90);
-    const result = await gcPackRenders({ packsHome, registered: new Map(), maxAgeMs: 7 * DAY, now });
-    expect(result).toEqual({ removedRenders: [join(packsHome, 'gstack', 'render')], removedStates: [join(packsHome, 'gstack', 'state')] });
+    const result = await gcPackRenders({ ...base, packsHome, registered: new Map() });
+    expect(result).toEqual({ removedRenders: [dirsOf.render], removedStates: [dirsOf.state] });
     expect(existsSync(extraction)).toBe(true);
     expect(existsSync(mounts)).toBe(true);
   });
 
+  it('keeps an unregistered id whose render or state is young, as an add still rendering has', async () => {
+    const { packsHome, orphan } = home();
+    const dirsOf = orphan('gstack', 0);
+    expect(await gcPackRenders({ ...base, packsHome, registered: new Map() })).toEqual({ removedRenders: [], removedStates: [] });
+    expect([existsSync(dirsOf.render), existsSync(dirsOf.state)]).toEqual([true, true]);
+  });
+
+  it('removes no orphan when the registry could not be read', async () => {
+    const { packsHome, orphan } = home();
+    const dirsOf = orphan('gstack', 90);
+    const result = await gcPackRenders({ ...base, packsHome, registered: new Map(), registryReadable: false });
+    expect(result).toEqual({ removedRenders: [], removedStates: [] });
+    expect([existsSync(dirsOf.render), existsSync(dirsOf.state)]).toEqual([true, true]);
+  });
+
+  it('touches nothing of a registered id whose entry is malformed', async () => {
+    const { packsHome, make, orphan } = home();
+    const dirsOf = orphan('gstack', 90);
+    const old = make(`gstack/render/${OLD}`, 90);
+    const result = await gcPackRenders({ ...base, packsHome, registered: new Map([['gstack', null]]) });
+    expect(result).toEqual({ removedRenders: [], removedStates: [] });
+    expect([existsSync(dirsOf.state), existsSync(old)]).toEqual([true, true]);
+  });
+
   it('does nothing when the packs home does not exist', async () => {
-    const result = await gcPackRenders({ packsHome: join(tmpdir(), 'no-such-packs-home-pan-4727'), registered: new Map(), maxAgeMs: 0, now });
+    const result = await gcPackRenders({ ...base, packsHome: join(tmpdir(), 'no-such-packs-home-pan-4727'), registered: new Map(), maxAgeMs: 0 });
     expect(result).toEqual({ removedRenders: [], removedStates: [] });
   });
 });

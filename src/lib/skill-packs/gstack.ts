@@ -124,7 +124,7 @@ export const GSTACK_PACK_MODE_FILE = 'pack-mode.json';
 export const GSTACK_RENDER_MARKER = '.gstack-pack.json';
 export const GSTACK_PACK_MODE_VERSION = 1;
 /** Covered by the mount hash; bump when the render contract or the map's mounted set changes meaning. */
-export const GSTACK_RENDER_VERSION = 1;
+export const GSTACK_RENDER_VERSION = 2;
 
 export const GSTACK_DISCLOSURE =
   "Runs gstack's bash and bun scripts from ~/.overdeck/packs/gstack; telemetry and update checks are off. Opt-in skills can send code to OpenAI (codex) or call paid or cloud APIs.";

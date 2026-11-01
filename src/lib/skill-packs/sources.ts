@@ -113,6 +113,30 @@ export async function listPacks(): Promise<PackRegistryEntry[]> {
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
+/**
+ * The registry as gc must read it (PAN-4727): every `skills.packs` key counts as registered, with its
+ * trusted commit, or null when the entry is malformed; `readable` is false when config.yaml cannot be
+ * read or parsed, or `skills.packs` is not a map. Unlike listPacks, nothing is silently dropped, so gc
+ * never mistakes a registered pack for an orphan.
+ */
+export async function readPackRegistry(): Promise<{ readable: boolean; packs: Map<string, string | null> }> {
+  const packs = new Map<string, string | null>();
+  let doc: Document;
+  try {
+    doc = parseDocument(await readTextOrEmpty(getGlobalConfigPath()));
+  } catch {
+    return { readable: false, packs };
+  }
+  if (doc.errors.length > 0) return { readable: false, packs };
+  const raw = (doc.toJS() as { skills?: { packs?: unknown } } | null)?.skills?.packs;
+  if (raw === undefined || raw === null) return { readable: true, packs };
+  if (typeof raw !== 'object' || Array.isArray(raw)) return { readable: false, packs };
+  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+    packs.set(id, toEntry(id, value)?.commit ?? null);
+  }
+  return { readable: true, packs };
+}
+
 export async function getPack(id: string): Promise<PackRegistryEntry | null> {
   return (await listPacks()).find((entry) => entry.id === id) ?? null;
 }

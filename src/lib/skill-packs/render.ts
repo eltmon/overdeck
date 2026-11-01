@@ -103,6 +103,18 @@ async function childNames(dir: string): Promise<string[]> {
   }
 }
 
+/** True when any of `paths` exists with an mtime after `cutoff`. */
+async function newerThan(paths: string[], cutoff: number): Promise<boolean> {
+  for (const path of paths) {
+    try {
+      if ((await lstat(path)).mtimeMs > cutoff) return true;
+    } catch {
+      // Absent.
+    }
+  }
+  return false;
+}
+
 async function isDir(path: string): Promise<boolean> {
   try {
     return (await lstat(path)).isDirectory();
@@ -117,12 +129,18 @@ async function isDir(path: string): Promise<boolean> {
  * (renders a linked mount still calls into), and older than `maxAgeMs`; building
  * or reusing a mount touches its render, so a render ages like its mount. Also
  * remove `render/` and `state/` of ids that are not registered (left by an
- * interrupted remove). Never touches the trusted render or a registered pack's
- * state. `registered` maps id → trusted commit.
+ * interrupted remove) once both are older than `maxAgeMs`, so an `add` that is
+ * still rendering keeps them.
+ *
+ * `registered` maps every registered id to its trusted commit, or null when the
+ * entry is malformed (then nothing of that id is touched). When
+ * `registryReadable` is false nothing counts as an orphan: gc never deletes
+ * state it cannot prove unregistered.
  */
 export async function gcPackRenders(opts: {
   packsHome: string;
-  registered: ReadonlyMap<string, string>;
+  registered: ReadonlyMap<string, string | null>;
+  registryReadable: boolean;
   maxAgeMs: number;
   keep?: ReadonlySet<string>;
   now?: number;
@@ -133,19 +151,22 @@ export async function gcPackRenders(opts: {
   for (const id of await childNames(opts.packsHome)) {
     if (id === 'mounts') continue;
     const renderRoot = join(opts.packsHome, id, 'render');
-    const trusted = opts.registered.get(id);
-    if (trusted === undefined) {
+    const stateDir = join(opts.packsHome, id, 'state');
+    if (!opts.registered.has(id)) {
+      if (!opts.registryReadable) continue;
+      if (await newerThan([renderRoot, stateDir], now - opts.maxAgeMs)) continue;
       if (await isDir(renderRoot)) {
         await rm(renderRoot, { recursive: true, force: true });
         removedRenders.push(renderRoot);
       }
-      const stateDir = join(opts.packsHome, id, 'state');
       if (await isDir(stateDir)) {
         await rm(stateDir, { recursive: true, force: true });
         removedStates.push(stateDir);
       }
       continue;
     }
+    const trusted = opts.registered.get(id);
+    if (trusted === null || trusted === undefined) continue;
     for (const commit of await childNames(renderRoot)) {
       if (commit === trusted) continue;
       const dir = join(renderRoot, commit);

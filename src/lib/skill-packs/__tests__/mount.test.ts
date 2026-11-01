@@ -4,6 +4,7 @@
  * OVERDECK_HOME.
  */
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -212,7 +213,7 @@ describe('buildMount', () => {
     vi.resetModules();
     vi.doMock('../gstack.js', async (importOriginal) => ({
       ...(await importOriginal<typeof import('../gstack.js')>()),
-      GSTACK_RENDER_VERSION: 2,
+      GSTACK_RENDER_VERSION: 99,
     }));
     try {
       const fresh = await import('../mount.js');
@@ -413,6 +414,24 @@ describe('removePackFromMounts (PAN-4727)', () => {
     expect(() => lstatSync(gstackLink)).toThrow();
     expect(readlinkSync(alphaLink)).toBe(join(without.path, 'plugins'));
     expect(existsSync(cache('x', 'codex-home-v2', 'alpha'))).toBe(true);
+  });
+
+  it('keeps sweeping after a mount it cannot remove and reports the failure', async () => {
+    const stuck = await buildMount({ packs: [gstack()] });
+    if (!stuck) throw new Error('expected a mount');
+    const cache = join(agentsRoot, 'x', 'codex-home', 'plugins', 'cache', CODEX_PACK_MARKETPLACE, 'gstack');
+    mkdirSync(cache, { recursive: true });
+    chmodSync(mountsDir(), 0o555);
+    try {
+      const result = await removePackFromMounts('gstack');
+      expect(result.removedMounts).toEqual([]);
+      expect(result.failures).toHaveLength(1);
+      expect(result.failures[0]).toContain(stuck.path);
+      expect(result.removedCodexCaches).toEqual([cache]);
+    } finally {
+      chmodSync(mountsDir(), 0o755);
+    }
+    expect(existsSync(stuck.path)).toBe(true);
   });
 
   it('rejects an invalid pack id', async () => {

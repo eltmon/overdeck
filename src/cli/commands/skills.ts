@@ -443,6 +443,11 @@ export async function skillsPackRemoveCommand(id: string): Promise<void> {
   if (remaining > 0) {
     console.log(`${remaining} project or issue toggle(s) for ${id} remain; they do nothing unless ${id} is added again.`);
   }
+  if (swept.failures.length > 0) {
+    for (const failure of swept.failures) console.error(chalk.red(`Not removed: ${failure}`));
+    console.error(chalk.red(`Run pan skills pack remove ${id} again to retry.`));
+    process.exit(1);
+  }
 }
 
 export async function skillsPackSyncCommand(id: string | undefined): Promise<void> {
@@ -468,17 +473,27 @@ export async function skillsPackGcCommand(options: PackGcOptions): Promise<void>
     console.error(chalk.red('--max-age-days must be a number of days, 0 or more'));
     process.exit(1);
   }
-  const [{ gcMounts, renderRootsUsedBy }, { gcPackRenders }, { listPacks, packsHome }] = await Promise.all([
+  const [{ gcMounts, renderRootsUsedBy }, { gcPackRenders }, { readPackRegistry, packsHome }] = await Promise.all([
     import('../../lib/skill-packs/mount.js'),
     import('../../lib/skill-packs/render.js'),
     import('../../lib/skill-packs/sources.js'),
   ]);
   const maxAgeMs = days * 24 * 60 * 60 * 1000;
   const { removedMounts, removedLinks, referencedMounts } = await gcMounts({ maxAgeMs });
-  const registered = new Map((await listPacks()).map(pack => [pack.id, pack.commit]));
+  // Strict read: a config that does not parse must never make a registered pack look orphaned.
+  const registry = await readPackRegistry();
+  if (!registry.readable) {
+    console.error(chalk.yellow('Skipped orphaned pack state: the global config.yaml could not be read or parsed.'));
+  }
   // A render that a linked mount's skills call into stays, whatever its age.
   const keep = await renderRootsUsedBy(referencedMounts);
-  const { removedRenders, removedStates } = await gcPackRenders({ packsHome: packsHome(), registered, maxAgeMs, keep });
+  const { removedRenders, removedStates } = await gcPackRenders({
+    packsHome: packsHome(),
+    registered: registry.packs,
+    registryReadable: registry.readable,
+    maxAgeMs,
+    keep,
+  });
   console.log(
     `Removed ${removedMounts.length} mount(s), ${removedLinks.length} dangling launch link(s), ` +
       `${removedRenders.length} stale render(s) and ${removedStates.length} orphaned pack state dir(s).`,

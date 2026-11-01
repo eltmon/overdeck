@@ -369,22 +369,40 @@ export async function gcMounts(
  */
 export async function removePackFromMounts(
   id: string,
-): Promise<{ removedMounts: string[]; removedLinks: string[]; removedCodexCaches: string[] }> {
+): Promise<{ removedMounts: string[]; removedLinks: string[]; removedCodexCaches: string[]; failures: string[] }> {
   if (!PACK_ID_PATTERN.test(id)) throw new Error(`invalid pack id: ${JSON.stringify(id)}`);
+  // One failed removal must not stop the rest of the sweep; failures are reported, and rerunning remove retries them.
+  const failures: string[] = [];
+  const describe = (path: string, error: unknown) => `${path}: ${error instanceof Error ? error.message : String(error)}`;
   const removedMounts: string[] = [];
   const root = mountsDir();
   for (const name of await listDirNames(root)) {
     if (name.startsWith('.tmp-')) continue;
     const path = join(root, name);
     if (!(await exists(join(path, 'plugins', id)))) continue;
-    await rm(path, { recursive: true, force: true });
-    removedMounts.push(path);
+    try {
+      await rm(path, { recursive: true, force: true });
+      removedMounts.push(path);
+    } catch (error) {
+      failures.push(describe(path, error));
+    }
   }
-  const { removedLinks } = await sweepLaunchLinks();
+  let removedLinks: string[] = [];
+  try {
+    ({ removedLinks } = await sweepLaunchLinks());
+  } catch (error) {
+    failures.push(describe(join(getOverdeckHome(), 'launch'), error));
+  }
 
   // Agent dirs have one deletion door (PAN-3357), which also refuses symlinks and escapes.
-  const removedCodexCaches = await removeCodexPluginCaches(CODEX_PACK_MARKETPLACE, id, join(getOverdeckHome(), 'agents'));
-  return { removedMounts, removedLinks, removedCodexCaches };
+  const agentsRoot = join(getOverdeckHome(), 'agents');
+  let removedCodexCaches: string[] = [];
+  try {
+    removedCodexCaches = await removeCodexPluginCaches(CODEX_PACK_MARKETPLACE, id, agentsRoot);
+  } catch (error) {
+    failures.push(describe(agentsRoot, error));
+  }
+  return { removedMounts, removedLinks, removedCodexCaches, failures };
 }
 
 /** Render roots that the given mounts' runtime packs call into (read from MOUNT_RENDER_ROOT_FILE). */

@@ -33,6 +33,7 @@ import {
   packRepoDir,
   packsHome,
   packStateDir,
+  readPackRegistry,
   packUpdateAvailable,
   PackSourceError,
   removePack,
@@ -120,6 +121,27 @@ describe('pack registry', () => {
     await expect(writePackEntry({ id: '../x', url: 'u', ref: 'r', commit: COMMIT })).rejects.toThrow(/invalid pack id/);
     await expect(writePackEntry({ id: 'x', url: 'u', ref: 'r', commit: 'main' })).rejects.toThrow(/invalid pack commit/);
     await expect(deletePackEntry('../x')).rejects.toThrow(/invalid pack id/);
+  });
+});
+
+describe('readPackRegistry (gc)', () => {
+  it('reads every pack key, with null for a malformed entry', async () => {
+    writeFileSync(configPath(), `skills:\n  packs:\n    gstack:\n      url: u\n      ref: main\n      commit: ${COMMIT}\n    broken:\n      url: u\n      ref: main\n      commit: not-a-sha\n`);
+    const registry = await readPackRegistry();
+    expect(registry.readable).toBe(true);
+    expect([...registry.packs.entries()]).toEqual([['gstack', COMMIT], ['broken', null]]);
+  });
+
+  it('is unreadable when the config does not parse', async () => {
+    writeFileSync(configPath(), `skills:\n  packs:\n    gstack:\n      url: u\n     ref: main\n`);
+    expect(await readPackRegistry()).toEqual({ readable: false, packs: new Map() });
+    expect(await listPacks()).toEqual([]);
+  });
+
+  it('is readable and empty without a config or packs', async () => {
+    expect(await readPackRegistry()).toEqual({ readable: true, packs: new Map() });
+    writeFileSync(configPath(), 'models:\n  default: sonnet\n');
+    expect(await readPackRegistry()).toEqual({ readable: true, packs: new Map() });
   });
 });
 
