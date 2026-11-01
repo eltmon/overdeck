@@ -53,7 +53,7 @@ export const FLY_MACHINE_ERROR_STATUS: Record<FlyMachineErrorCode, number> = {
   'bad-request': 400,
   'remote-disabled': 409,
   'no-fly-token': 424,
-  'cap-reached': 429,
+  'cap-reached': 409,
   'harness-unsupported': 400,
   'version-mismatch': 409,
   'server-not-ready': 502,
