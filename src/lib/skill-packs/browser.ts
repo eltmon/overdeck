@@ -71,7 +71,7 @@ export async function browserDownloads(extractDir: string): Promise<string[]> {
   return [
     ...entries.map(([name, spec]) => `${name}@${spec}`),
     '+ their locked dependencies from bun.lock (registry.npmjs.org)',
-    `Chromium and Chromium headless shell for playwright ${playwright} (Playwright CDN, ~115 MiB download)`,
+    `Chromium, Chromium headless shell and ffmpeg for playwright ${playwright} (Playwright CDN, ~115 MiB download)`,
   ];
 }
 

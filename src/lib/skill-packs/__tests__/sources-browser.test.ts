@@ -128,7 +128,7 @@ describe('enablePackBrowser', () => {
         'diff@^9.0.0',
         'playwright@^1.62.1',
         '+ their locked dependencies from bun.lock (registry.npmjs.org)',
-        'Chromium and Chromium headless shell for playwright ^1.62.1 (Playwright CDN, ~115 MiB download)',
+        'Chromium, Chromium headless shell and ffmpeg for playwright ^1.62.1 (Playwright CDN, ~115 MiB download)',
       ],
       writes: [
         `${packRenderDir('gstack', good)}/node_modules`,

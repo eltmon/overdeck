@@ -66,7 +66,7 @@ const DOWNLOADS = [
   'playwright@^1.62.1',
   'sharp@^0.35.4',
   '+ their locked dependencies from bun.lock (registry.npmjs.org)',
-  'Chromium and Chromium headless shell for playwright ^1.62.1 (Playwright CDN, ~115 MiB download)',
+  'Chromium, Chromium headless shell and ffmpeg for playwright ^1.62.1 (Playwright CDN, ~115 MiB download)',
 ];
 const WRITES = [`${R}/node_modules`, `${R}/browse/dist`, `${R}/design/dist`, `${R}/make-pdf/dist`, `${C}/bun-cache`, `${C}/playwright`];
 const capabilities = {
