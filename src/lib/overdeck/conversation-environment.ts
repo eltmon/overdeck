@@ -52,3 +52,18 @@ export async function bootConversationEnvironment(
 export function _resetConversationEnvironmentForTests(): void {
   localId = null;
 }
+
+/**
+ * Boot wrapper for main.ts: stamps local rows (`bootConversationEnvironment`)
+ * and reports the outcome; a failure is logged and never stops the dashboard.
+ * Sets the id for inserts on every dashboard; existing rows are backfilled on
+ * the primary.
+ */
+export async function bootConversationEnvironmentOrWarn(): Promise<void> {
+  try {
+    const owner = await bootConversationEnvironment();
+    if (owner.backfilled > 0) console.log(`[overdeck] Stamped ${owner.backfilled} local conversation(s) with environment ${owner.environmentId}`);
+  } catch (err) {
+    console.warn('[overdeck] Conversation owner column boot failed (non-fatal):', err);
+  }
+}
