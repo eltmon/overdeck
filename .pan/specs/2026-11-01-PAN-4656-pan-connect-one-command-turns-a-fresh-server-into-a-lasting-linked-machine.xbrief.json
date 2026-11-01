@@ -4,17 +4,17 @@
     "created": "2026-11-01T13:21:23Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4656: pan connect: one command turns a fresh server into a lasting linked machine",
-    "updated": "2026-11-01T13:29:28.176Z"
+    "updated": "2026-11-01T13:30:18.355Z"
   },
   "plan": {
     "id": "pan-4656",
     "title": "pan connect: one command turns a fresh server into a lasting linked machine",
-    "status": "proposed",
+    "status": "running",
     "uid": "b7141893-681f-4be9-b106-cf0b5ec7a91c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T13:21:23Z",
-    "updated": "2026-11-01T13:29:28.176Z",
+    "updated": "2026-11-01T13:30:18.355Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4656",
@@ -908,5 +908,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
