@@ -471,3 +471,12 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   `ps -eo pid,args | grep "[n]ode .*bin/pan reload"`), then start the new one,
   and read the new log's first lines to confirm it started (2026-11-01 tick 98
   missed PAN-4727 this way until tick 102).
+- 2026-11-01 23:58 UTC: the auto-merge scheduler (`auto-merge-scheduler.ts`,
+  rows in overdeck.db `pending_auto_merges`) already merges approved, green,
+  non-strike PRs after a 5-minute cancel window, and re-schedules when the PR
+  head changes. Flywheel merge-door merges race it (PAN-4296: countdown reset,
+  then "merged" mid-countdown; the row settled as `blocked: PR is already
+  merged`). Going forward: let the scheduler merge; Flywheel only cancels
+  (`pan merge cancel <id>`) to hold for unanswered CodeRabbit findings, and
+  clears blockers. Strike PRs (`strike/<id>`) are excluded on purpose
+  (PAN-3973): the operator merges them.
