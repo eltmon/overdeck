@@ -9,6 +9,7 @@ import {
   ACCOUNT_CHECK_MS,
   DirectoryClient,
   defaultOpenSocket,
+  directoryLabel,
   type DirectoryClientDeps,
   type DirectorySocket,
   PING_INTERVAL_MS,
@@ -155,6 +156,12 @@ describe('DirectoryClient (PAN-2356 WI-9)', () => {
     await vi.advanceTimersByTimeAsync(10 * 60_000);
     expect(h.sockets).toEqual([]);
     h.client.stop();
+  });
+
+  it('sends a label the directory accepts: no control characters, at most 64 characters, never empty', () => {
+    expect(directoryLabel('  desk\u0007\n  ', ENV)).toBe('desk');
+    expect(directoryLabel('\u0001\t ', ENV)).toBe(ENV.slice(0, 8));
+    expect([...directoryLabel('é'.repeat(80), ENV)]).toHaveLength(64);
   });
 
   it('connects with the device token, sends hello and fills status from welcome', async () => {

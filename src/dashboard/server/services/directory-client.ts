@@ -86,6 +86,20 @@ function accountKey(account: AccountRecord | null): string {
   return account ? `${account.baseUrl}\n${account.accessToken}` : '';
 }
 
+/**
+ * The label sent in `hello`: control characters dropped, trimmed, at most 64 characters, and never
+ * empty (the first 8 characters of the environment id instead). The directory refuses any other
+ * label as a bad frame, which the client would report as an unsupported version.
+ */
+export function directoryLabel(label: string, environmentId: string): string {
+  const isControl = (ch: string) => {
+    const code = ch.codePointAt(0) ?? 0;
+    return code <= 0x1f || (code >= 0x7f && code <= 0x9f);
+  };
+  const clean = [...[...label].filter((ch) => !isControl(ch)).join('').trim()].slice(0, 64).join('').trim();
+  return clean.length > 0 ? clean : environmentId.slice(0, 8);
+}
+
 export class DirectoryClient {
   private state: DirectoryClientState = 'off';
   private signedIn = false;
@@ -279,7 +293,7 @@ export class DirectoryClient {
       type: 'hello',
       protocol: CONNECT_PROTOCOL_VERSION,
       environmentId,
-      label: label.slice(0, 64),
+      label: directoryLabel(label, environmentId),
       publicKeyHex: key.publicKey.toString('hex'),
       serverVersion: this.deps.serverVersion,
       linkProtocol: LINK_PROTOCOL_VERSION,
