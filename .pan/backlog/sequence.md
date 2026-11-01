@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T09:47:18Z · model: claude-opus-5-5 · open: 872_
+_Last sequenced: 2026-11-01T09:48:23Z · model: claude-opus-5-5 · open: 873_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -26,6 +26,7 @@ _Last sequenced: 2026-11-01T09:47:18Z · model: claude-opus-5-5 · open: 872_
 | 19 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 20 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 20 | PAN-4680 | S | critical | ok |  |  | In pipeline: run-gh ledger test flaked main red; queueLedgerEntry appends race. Serialize appends with a promise chain. |
+| 21 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 22 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 24 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
@@ -964,6 +965,10 @@ New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network
 
 New in-pipeline fix for a red-main flake (run 41283191295): unserialized ledger appends reorder entries, so main CI fails at random; placed in free slot 20 as critical substrate work.
 
+### PAN-4705 (rank 21)
+
+New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.
+
 ### PAN-4572 (rank 22)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
@@ -1196,10 +1201,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
-### PAN-3100 (rank 80)
-
-New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1207,10 +1208,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T09:47:18Z",
+  "generatedAt": "2026-11-01T09:48:23Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 872,
+  "openCount": 873,
   "nodes": [
     {
       "issue": "PAN-4639",
@@ -12125,6 +12126,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4705",
+      "rank": 21,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards.",
+      "rationale": "New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13870,6 +13884,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-1824",
+      "to": "PAN-4705",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
