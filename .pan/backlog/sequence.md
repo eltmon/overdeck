@@ -1,12 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T13:47:33Z · model: claude-opus-5-5 · open: 859_
+_Last sequenced: 2026-11-01T13:48:59Z · model: claude-opus-5-5 · open: 860_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
+| 5 | PAN-4717 | S | high | ok |  |  | In pipeline: conversation issue links may open an empty drawer for issues absent from the snapshot; CodeRabbit follow-up to #4716. |
 | 6 | PAN-4714 | S | medium | ok |  |  | In pipeline: an issue link in a conversation opens the issue drawer, not a GitHub tab; modifier clicks keep the tracker link. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
@@ -875,6 +876,10 @@ New substrate bug in the merge door: on 2026-11-01 it refused three approved, gr
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
+### PAN-4717 (rank 5)
+
+New in-pipeline follow-up to PAN-4714 (merged as #4716) fixing an unreviewed CodeRabbit finding; pinned into a free top-tier slot next to its parent and not re-ranked.
+
 ### PAN-4714 (rank 6)
 
 New in-pipeline issue with a live workspace, so it is pinned near the top in the slot freed by the closed PAN-4672. It is a small, well-specified frontend change with clear component-test acceptance criteria.
@@ -1183,10 +1188,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 
 New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
 
-### PAN-3084 (rank 83)
-
-Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1194,10 +1195,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T13:47:33Z",
+  "generatedAt": "2026-11-01T13:48:59Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 859,
+  "openCount": 860,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -11915,6 +11916,19 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "rationale": "New in-pipeline issue with a live workspace, so it is pinned near the top in the slot freed by the closed PAN-4672. It is a small, well-specified frontend change with clear component-test acceptance criteria.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4717",
+      "rank": 5,
+      "size": "S",
+      "importance": "high",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: conversation issue links may open an empty drawer for issues absent from the snapshot; CodeRabbit follow-up to #4716.",
+      "rationale": "New in-pipeline follow-up to PAN-4714 (merged as #4716) fixing an unreviewed CodeRabbit finding; pinned into a free top-tier slot next to its parent and not re-ranked.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13337,6 +13351,13 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "to": "PAN-4656",
       "type": "informs",
       "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4714",
+      "to": "PAN-4717",
+      "type": "informs",
+      "source": "ai-inferred",
       "confidence": 0.8
     }
   ]
