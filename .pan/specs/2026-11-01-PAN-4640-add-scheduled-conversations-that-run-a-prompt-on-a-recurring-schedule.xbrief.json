@@ -4,17 +4,17 @@
     "created": "2026-11-01T04:45:04.092Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4640: Add scheduled conversations that run a prompt on a recurring schedule",
-    "updated": "2026-11-01T04:50:11.941Z"
+    "updated": "2026-11-01T04:51:16.338Z"
   },
   "plan": {
     "id": "pan-4640",
     "title": "Add scheduled conversations that run a prompt on a recurring schedule",
-    "status": "proposed",
+    "status": "running",
     "uid": "81180808-1de5-4fd2-be06-85b4352babe2",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T04:45:04.092Z",
-    "updated": "2026-11-01T04:50:11.941Z",
+    "updated": "2026-11-01T04:51:16.338Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4640",
@@ -680,5 +680,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
