@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T10:39:11.627Z",
+  "updated": "2026-11-01T10:39:24.838Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -424,6 +424,10 @@
     "wi19-advertised-endpoints.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T10:39:11.626Z"
+    },
+    "wi19-advertised-endpoints.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:39:24.838Z"
     }
   }
 }
