@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T14:19:00.666Z",
+  "updated": "2026-11-01T14:25:57.383Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-01T14:18:51.420Z"
     },
     "wi8-remote-frontend": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4650",
-      "claimedAt": "2026-11-01T14:19:00.666Z"
+      "claimedAt": "2026-11-01T14:19:00.666Z",
+      "doneAt": "2026-11-01T14:25:57.382Z"
     }
   }
 }
