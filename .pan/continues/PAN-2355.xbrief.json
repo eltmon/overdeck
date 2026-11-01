@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2355",
   "created": "2026-11-01T05:47:25.756Z",
-  "updated": "2026-11-01T07:40:34.373Z",
+  "updated": "2026-11-01T07:40:54.388Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "service-worker.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:40:34.373Z"
+    },
+    "service-worker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:40:54.388Z"
     }
   }
 }
