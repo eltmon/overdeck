@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4672",
   "created": "2026-11-01T06:29:18.701Z",
-  "updated": "2026-11-01T08:05:12.616Z",
+  "updated": "2026-11-01T08:05:52.929Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "hold-503-after-timeout.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T08:05:12.615Z"
+    },
+    "docs-ipv6-claim.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:05:52.929Z"
     }
   }
 }
