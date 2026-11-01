@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:43:51.244Z",
+  "updated": "2026-11-01T21:44:07.680Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -546,6 +546,10 @@
     "wi25-resolved-settings.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T21:43:51.243Z"
+    },
+    "wi25-resolved-settings.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:44:07.680Z"
     }
   }
 }
