@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4727",
   "created": "2026-11-01T17:45:56.667Z",
-  "updated": "2026-11-01T18:37:38.604Z",
+  "updated": "2026-11-01T18:37:52.268Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "fork-pack-render.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T18:37:38.604Z"
+    },
+    "fork-state-root-marker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:37:52.268Z"
     }
   }
 }
