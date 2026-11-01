@@ -170,13 +170,19 @@ There is no per-issue pipeline record since the Cut (PAN-3917).
 ## Remote (Fly.io) work agents
 
 Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
-`fly-provider.ts`). State lives at
+`fly-provider.ts`; the VM is created by `src/lib/remote-workspace.ts`
+`createRemoteWorkspace`). State lives at
 `~/.overdeck/agents/agent-<issue>/remote-state.json` (`location: 'remote'`,
-`vmName`, `status`). The dashboard surfaces them via
-`listActiveRemoteAgentStates()` in `services/resource-discovery.ts` (issue chip
-+ aggregate status, PAN-1676) and session-row synthesis in
-`routes/projects.ts` `collectSessionTreeNodes()` (PAN-1775). Remote agents have
-no local tmux session — never assume tmux discovery covers them.
+`vmName`, `status`), scanned by `listActiveRemoteAgentStates()`
+(`remote-agents.ts`). The dashboard surfaces them only as an issue chip and
+aggregate status through `services/resource-discovery.ts` (PAN-1676). There is
+no remote session-row synthesis in `routes/projects.ts`
+`collectSessionTreeNodes()`: the PAN-1775 commit never merged, and a remote
+agent shows a row only when a `state.json` exists (dashboard spawn or after the
+reap). Remote agents have no local tmux session — never assume tmux discovery
+covers them. PAN-4652 adds **Fly machines**: Fly VMs that run `pan serve` and
+are linked from home (`src/lib/anywhere/fly/`, `services/fly-machine-service.ts`,
+`pan machines add-fly`); PAN-4734 moves work agents onto that path.
 
 ## Dashboard Agents page (`/agents`)
 

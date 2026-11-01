@@ -4,17 +4,17 @@
     "created": "2026-11-01T18:34:37Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4652: Fly VMs as machines: pan serve on the VM, linked at spawn",
-    "updated": "2026-11-01T18:39:02.628Z"
+    "updated": "2026-11-01T18:39:49.540Z"
   },
   "plan": {
     "id": "pan-4652",
     "title": "Fly VMs as machines: pan serve on the VM, linked at spawn",
-    "status": "proposed",
+    "status": "running",
     "uid": "880b756a-cd3e-46cd-9b85-924253f0d34a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T18:34:37Z",
-    "updated": "2026-11-01T18:39:02.628Z",
+    "updated": "2026-11-01T18:39:49.540Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4652",
@@ -1251,5 +1251,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
