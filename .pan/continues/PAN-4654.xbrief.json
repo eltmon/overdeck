@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4654",
   "created": "2026-11-01T13:26:56.845Z",
-  "updated": "2026-11-01T14:26:00.724Z",
+  "updated": "2026-11-01T14:26:16.369Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,6 +242,10 @@
     "smoke-update-all.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:26:00.724Z"
+    },
+    "docs-fleet-versions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:26:16.369Z"
     }
   }
 }
