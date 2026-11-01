@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4728",
   "created": "2026-11-01T17:45:22.507Z",
-  "updated": "2026-11-01T18:53:02.581Z",
+  "updated": "2026-11-01T18:53:17.475Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "sources-plugin-root.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T18:53:02.580Z"
+    },
+    "sources-plugin-root.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:53:17.474Z"
     }
   }
 }
