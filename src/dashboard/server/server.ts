@@ -59,6 +59,7 @@ import { environmentRouteLayer } from './routes/environment.js'
 import { pairingRouteLayer } from './routes/pairing.js'
 import { anywhereRouteLayer } from './routes/anywhere.js'
 import { pushRouteLayer } from './routes/push.js'
+import { tailscaleRouteLayer } from './routes/tailscale.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { mcpRouteLayer } from './routes/mcp.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
@@ -74,6 +75,7 @@ import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { conversationKickoffRouteLayer } from './routes/conversation-kickoff.js';
 import { conversationBookmarksRouteLayer } from './routes/conversation-bookmarks.js';
+import { conversationScheduledMessagesRouteLayer } from './routes/conversation-scheduled-messages.js';
 import { conversationSchedulesRouteLayer } from './routes/conversation-schedules.js';
 import { conversationsRetrospectiveRouteLayer } from './routes/conversations-retrospective.js';
 import { conversationCompanionTerminalRouteLayer } from './routes/conversation-companion-terminal.js';
@@ -320,6 +322,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   conversationsRouteLayer,
   conversationKickoffRouteLayer,
   conversationBookmarksRouteLayer,
+  conversationScheduledMessagesRouteLayer,
   conversationSchedulesRouteLayer,
   conversationsRetrospectiveRouteLayer,
   conversationCompanionTerminalRouteLayer,
@@ -359,6 +362,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   pairingRouteLayer,
   anywhereRouteLayer,
   pushRouteLayer,
+  tailscaleRouteLayer,
   accessTokensRouteLayer,
   mcpRouteLayer,
   staticRouteLayer,

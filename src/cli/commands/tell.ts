@@ -11,6 +11,56 @@ export interface TellOptions {
   force?: boolean;
   /** Interrupt the running turn and send now: Claude Code's send-now chord (PAN-4292). */
   steer?: boolean;
+  /** Queue the message on the server until the conversation's usage limit resets (PAN-4641). */
+  whenLimitResets?: boolean;
+}
+
+function clockLabel(ms: number, now: number): string {
+  const at = new Date(ms);
+  const time = at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (at.toDateString() === new Date(now).toDateString()) return time;
+  return `${at.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+}
+
+function queuedReason(message: { resetSource: string | null; limitWindow: string | null }): string {
+  if (message.resetSource === null) return 'no usage limit is active; sends within a minute';
+  if (message.resetSource === 'fallback') return 'reset time unknown; tries again every 15 minutes';
+  if (message.limitWindow === 'five_hour') return 'when the 5-hour limit resets';
+  if (message.limitWindow === 'seven_day') return 'when the weekly limit resets';
+  return 'when the usage limit resets';
+}
+
+/** PAN-4641: store the message on the server; the dashboard's scheduled-message patrol sends it. */
+async function queueUntilLimitResets(agentId: string, message: string, options: TellOptions): Promise<void> {
+  if (options.steer) {
+    console.error(chalk.red('--steer cannot be combined with --when-limit-resets: a queued message has no running turn to interrupt. Nothing was queued.'));
+    return exitCli(1);
+  }
+  if (!agentId.startsWith('conv-')) {
+    console.error(chalk.red(`--when-limit-resets works only for conversations; ${agentId} is not one.`));
+    return exitCli(1);
+  }
+  const name = agentId.slice('conv-'.length);
+  const { scheduleConversationMessage } = await import('../../lib/overdeck/conversation-scheduled-messages.js');
+  const result = await scheduleConversationMessage(name, message);
+  switch (result.status) {
+    case 'scheduled': {
+      const notBefore = Date.parse(result.message.notBefore);
+      console.log(chalk.green(`Queued for ${agentId}: sends at about ${clockLabel(notBefore, Date.now())} (${queuedReason(result.message)})`));
+      console.log(chalk.dim(`  "${message}"`));
+      console.log(chalk.dim(`  List queued messages with: pan conv pending ${agentId}`));
+      return exitCli(0);
+    }
+    case 'not-found':
+      console.error(chalk.red(`Conversation not found: ${agentId}. Nothing was queued.`));
+      return exitCli(1);
+    case 'queue-full':
+      console.error(chalk.red(`${agentId} already has 20 queued messages (queue-full). Nothing was queued.`));
+      return exitCli(1);
+    case 'invalid':
+      console.error(chalk.red(`Not queued (${result.code}): ${result.error}`));
+      return exitCli(1);
+  }
 }
 
 /**
@@ -42,6 +92,8 @@ export async function tellCommand(id: string, message: string, options: TellOpti
   const agentId = target.agentId;
 
   try {
+    if (options.whenLimitResets) return await queueUntilLimitResets(agentId, message, options);
+
     if (!options.force) {
       const refusal = await laneVerdictRefusal(agentId);
       if (refusal) {

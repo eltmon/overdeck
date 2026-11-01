@@ -23,10 +23,23 @@ export type AnywhereVaultState = 'off' | 'locked' | 'rotation-pending' | 'ready'
 export type AnywhereAction =
   | { kind: 'pair-dialog' }
   | { kind: 'settings-section'; section: 'session-vault' }
+  | { kind: 'tailscale-setup' }
   | { kind: 'none'; docsUrl?: string };
 
+/** Mirrors `TailscaleNextStep` in src/lib/tailscale/state.ts, plus `not-installed`. */
+export type AnywhereTailscaleStep =
+  | 'not-installed'
+  | 'install'
+  | 'start-daemon'
+  | 'operator'
+  | 'login'
+  | 'enable-https'
+  | 'serve'
+  | 'protect'
+  | 'ready';
+
 export interface AnywhereProblem {
-  code: 'identity-unreadable' | 'no-reachable-address' | 'vault-locked' | 'vault-rotation-pending';
+  code: 'identity-unreadable' | 'no-reachable-address' | 'vault-locked' | 'vault-rotation-pending' | 'tailscale-serve-unprotected';
   message: string;
   action: AnywhereAction;
 }
@@ -38,6 +51,8 @@ export interface AnywhereStatus {
   devices: { active: number };
   vault: { state: AnywhereVaultState; backend: string | null };
   problems: AnywhereProblem[];
+  /** Tailscale on this machine (PAN-1254 FR-9). */
+  tailscale: { nextStep: AnywhereTailscaleStep; serveUrl: string | null; magicDnsName: string | null };
   /** Who is asking (PAN-4455 D-3); null when no credential resolves. */
   viewer: { kind: 'root-session' | 'device' | 'token' | 'internal-token' | null };
 }

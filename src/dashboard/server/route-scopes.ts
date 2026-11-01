@@ -41,6 +41,10 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/conversations/:name/kickoff', scope: 'read:conversations' },
   { method: 'POST', path: '/api/conversations/:name/kickoff', scope: 'tell' },
   { method: 'GET', path: '/api/conversations/:name/bookmarks', scope: 'read:conversations' },
+  { method: 'GET', path: '/api/conversations/:name/scheduled-messages', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/conversations/:name/scheduled-messages', scope: 'tell' },
+  { method: 'PATCH', path: '/api/conversations/:name/scheduled-messages/:id', scope: 'tell' },
+  { method: 'DELETE', path: '/api/conversations/:name/scheduled-messages/:id', scope: 'tell' },
   // PAN-4649: approvals need approve.
   { method: 'POST', path: '/api/conversations/:id/permission', scope: 'approve' },
   { method: 'POST', path: '/api/conversations/:id/pane-choice', scope: 'approve' },

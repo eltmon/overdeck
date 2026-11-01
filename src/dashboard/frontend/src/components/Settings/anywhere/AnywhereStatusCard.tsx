@@ -1,7 +1,7 @@
 /**
  * The Anywhere status card (PAN-4445 FR-11): this machine, the addresses other
- * devices can reach, the paired-device count, the Session Vault state, and
- * each problem with a fix button. Problems come from the server
+ * devices can reach, the paired-device count, the Session Vault state, the
+ * Tailscale state (PAN-1254), and each problem with a fix button. Problems come from the server
  * (`GET /api/anywhere/status`); this card maps each `action.kind` to a button
  * and never tells the operator to run a command.
  */
@@ -34,6 +34,21 @@ function vaultText(vault: AnywhereStatus['vault']): string {
   }
 }
 
+function tailscaleText(tailscale: AnywhereStatus['tailscale']): string {
+  switch (tailscale.nextStep) {
+    case 'not-installed':
+      return 'Not installed';
+    case 'login':
+      return 'Signed out';
+    case 'enable-https':
+      return 'Needs HTTPS';
+    case 'ready':
+      return tailscale.serveUrl ? `Ready (${tailscale.serveUrl})` : 'Ready';
+    default:
+      return 'Set up unfinished';
+  }
+}
+
 function ProblemFix({ problem, onAction }: { problem: AnywhereProblem; onAction: (action: AnywhereAction) => void }) {
   const { action } = problem;
   if (action.kind === 'pair-dialog') {
@@ -41,6 +56,9 @@ function ProblemFix({ problem, onAction }: { problem: AnywhereProblem; onAction:
   }
   if (action.kind === 'settings-section') {
     return <button type="button" className={SECONDARY_BUTTON} onClick={() => onAction(action)}>Open Session Vault</button>;
+  }
+  if (action.kind === 'tailscale-setup') {
+    return <button type="button" className={SECONDARY_BUTTON} onClick={() => onAction(action)}>Protect the dashboard</button>;
   }
   if (action.docsUrl) {
     return (
@@ -116,6 +134,11 @@ export function AnywhereStatusCard({ onAction }: AnywhereStatusCardProps) {
                 )}
               </span>
             </Row>
+            {status.tailscale && (
+              <Row label="Tailscale">
+                <span data-testid="anywhere-tailscale" className="break-all">{tailscaleText(status.tailscale)}</span>
+              </Row>
+            )}
           </dl>
           {status.problems.length > 0 && (
             <ul className="mt-3 space-y-2" aria-label="Anywhere problems">
