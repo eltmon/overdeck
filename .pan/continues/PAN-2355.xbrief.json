@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2355",
   "created": "2026-11-01T05:47:25.756Z",
-  "updated": "2026-11-01T06:52:48.558Z",
+  "updated": "2026-11-01T07:07:37.487Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-01T06:52:39.025Z"
     },
     "setup-phone-dialog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2355",
-      "claimedAt": "2026-11-01T06:52:48.558Z"
+      "claimedAt": "2026-11-01T06:52:48.558Z",
+      "doneAt": "2026-11-01T07:07:37.487Z"
     }
   }
 }
