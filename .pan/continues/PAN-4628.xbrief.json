@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4628",
+  "created": "2026-11-01T05:04:21.139Z",
+  "updated": "2026-11-01T05:04:21.139Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "token-file-first": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4628",
+      "claimedAt": "2026-11-01T05:04:21.139Z"
+    }
+  }
+}
