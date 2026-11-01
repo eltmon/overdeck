@@ -38,7 +38,7 @@ export { sendToRemoteAgentKeyed } from './remote-keyed-delivery.js';
 export type { RemoteKeyedDeliveryOutcome, RemoteKeyedExec } from './remote-keyed-delivery.js';
 
 const AGENTS_DIR = join(homedir(), '.overdeck', 'agents');
-const REMOTE_HOST_HEARTBEAT_PATH = `${REMOTE_PAN_DIR}/host-heartbeat`;
+export const REMOTE_HOST_HEARTBEAT_PATH = `${REMOTE_PAN_DIR}/host-heartbeat`;
 
 const PUSH_DAEMON_INTERVAL_SECONDS = 300;
 const EPHEMERAL_WATCHDOG_INTERVAL_SECONDS = 60;
