@@ -4,17 +4,17 @@
     "created": "2026-11-01T04:55:23Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4647: Auto-save pipeline agent transcripts to the Session Vault",
-    "updated": "2026-11-01T04:57:10.460Z"
+    "updated": "2026-11-01T04:58:08.745Z"
   },
   "plan": {
     "id": "pan-4647",
     "title": "Auto-save pipeline agent transcripts to the Session Vault",
-    "status": "proposed",
+    "status": "running",
     "uid": "70ee9b84-e8e9-4036-9fa5-82d5ddbc74a5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T04:55:23Z",
-    "updated": "2026-11-01T04:57:10.460Z",
+    "updated": "2026-11-01T04:58:08.745Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4647",
@@ -455,5 +455,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
