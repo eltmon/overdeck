@@ -40,6 +40,7 @@ src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx
 src/components/Settings/anywhere/__tests__/DevicesPanel.test.tsx
 src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx
 src/components/Settings/anywhere/__tests__/PushPanel.test.tsx
+src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx
 src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx
 src/components/Settings/sections/__tests__/CloseOutSection.test.tsx
 src/components/Settings/sections/__tests__/TelemetrySection.test.tsx
@@ -88,6 +89,9 @@ src/components/home/__tests__/homeComposerIntents.test.ts
 src/components/home/__tests__/pendingTerminal.test.ts
 src/components/home/__tests__/useTypeToFocus.test.tsx
 src/components/merge-train/__tests__/MergeTrainView.test.tsx
+src/components/mobile/__tests__/MobileApp.test.tsx
+src/components/mobile/__tests__/MobileConversations.test.tsx
+src/components/mobile/__tests__/MobileNeedsYou.test.tsx
 src/components/newConversation/__tests__/ConversationSkillsField.test.tsx
 src/components/newConversation/__tests__/IssuePickerField.test.tsx
 src/components/newConversation/__tests__/NewConversationDialog.test.tsx
@@ -121,6 +125,7 @@ src/lib/__tests__/issueActions.no-actions-lost.test.ts
 src/lib/__tests__/issueActions.parity.test.tsx
 src/lib/__tests__/issueActions.test.ts
 src/lib/__tests__/pendingInput.test.ts
+src/lib/__tests__/pendingInputAnswer.test.ts
 src/lib/__tests__/selectBackendPanes.render-count.test.tsx
 src/lib/__tests__/simple-derive.test.ts
 src/lib/__tests__/simple-feed.test.ts
