@@ -273,7 +273,7 @@ describe('gstack-runtime adapter', () => {
       { name: 'newskill', reason: 'unreviewed' },
       { name: 'qa', reason: GSTACK_SKILL_MAP['qa']!.reason },
     ]);
-    expect(GSTACK_SKILL_MAP['qa']!.class).toBe('needs-binary');
+    expect(GSTACK_SKILL_MAP['qa']!.class).toBe('browser');
   });
 
   it('lists every runtime executable outside .git, test and node_modules, and requires bun', async () => {
