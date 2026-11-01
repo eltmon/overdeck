@@ -1174,6 +1174,7 @@ const doctorCmd = program
   .command('doctor')
   .description('Check system health and dependencies')
   .option('--strict', 'Exit non-zero if any optional dependency is missing (e.g. Pi binary)')
+  .option('--json', 'Print every check as JSON (name, status, message, fix); same exit code as text mode')
   .action(lazyAction(() => import('./commands/doctor.js'), 'doctorCommand'));
 doctorCmd
   .command('github-quota')
