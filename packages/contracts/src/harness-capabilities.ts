@@ -64,7 +64,7 @@ export interface HarnessCapabilities {
   readonly answersQuestionByMessage: boolean
   /** How the dashboard delivers an operator's answer to a pending AskUserQuestion in a conversation. */
   readonly askAnswerDelivery: HarnessAskAnswerDelivery
-  /** A conversation may be started on a Fly machine (`pan machines add-fly`, PAN-4652); other harnesses wait on #4296. */
+  /** A conversation may be started on a Fly machine (pan machines add-fly): Claude Code (PAN-4652) and Codex (PAN-4296). */
   readonly runsOnFlyMachine: boolean
 }
 
@@ -161,7 +161,7 @@ export const CODEX_CAPABILITIES: HarnessCapabilities = {
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
   askAnswerDelivery: "message",
-  runsOnFlyMachine: false,
+  runsOnFlyMachine: true,
 }
 
 export const ACP_CAPABILITIES: HarnessCapabilities = {
