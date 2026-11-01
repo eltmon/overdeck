@@ -520,7 +520,7 @@ Each trusted commit is rendered into `~/.overdeck/packs/gstack/render/<commit>/`
 pan skills pack remove gstack
 ```
 
-`remove` deletes `~/.overdeck/packs/gstack/` (renders, state, extractions and the git cache), every mount that contains gstack, the launch links that leaves dangling, and the gstack copy in every Codex agent's plugin cache. A running agent that used gstack loses its gstack skills until its next launch. `remove` does not delete the `.gstack/` or `.gstack-worktrees/` dirs that skills wrote in your projects; it prints each one it finds under a registered project, with the `rm -rf` command. `pan skills pack gc` also removes renders of commits other than the trusted one once they are older than `--max-age-days`, and the `render/` and `state/` dirs of packs that are no longer registered.
+`remove` deletes `~/.overdeck/packs/gstack/` (renders, state, extractions and the git cache), every mount that contains gstack, the launch links that leaves dangling, and the gstack copy in every Codex agent's plugin cache. A running agent that used gstack loses its gstack skills until its next launch. `remove` does not delete the `.gstack/` or `.gstack-worktrees/` dirs that skills wrote in your projects; it prints each one it finds under a registered project, with the `rm -rf` command. `pan skills pack gc` also removes renders of commits other than the trusted one once no linked launch uses them and they are older than `--max-age-days` (using a render resets its age), and the `render/` and `state/` dirs of packs that are no longer registered.
 
 #### Limits
 

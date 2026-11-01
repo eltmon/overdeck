@@ -27,6 +27,11 @@ export const MOUNT_FORMAT_VERSION = 2;
 export const CODEX_PACK_MARKETPLACE = 'overdeck-packs';
 export const CODEX_PACK_BLOCK_BEGIN = '# overdeck:skill-packs:begin';
 export const CODEX_PACK_BLOCK_END = '# overdeck:skill-packs:end';
+/**
+ * Written into `plugins/<pack>/` of a mount built from a `gstack-runtime` render: the render
+ * root its skills call by absolute path, so gc keeps that render while the mount is linked.
+ */
+export const MOUNT_RENDER_ROOT_FILE = '.overdeck-render-root';
 /** Name of the per-launch Claude plugin link under `<OVERDECK_HOME>/launch/<launchKey>/`. */
 export const CLAUDE_PLUGIN_LINK_NAME = 'skill-packs';
 
@@ -150,6 +155,14 @@ async function populateMount(dir: string, packs: MountPack[], hash: string): Pro
         await writeFile(skillMd, applyDeftHostNotice(await readFile(skillMd, 'utf8'), skill.name), 'utf8');
       }
     }
+    if (pack.transform === 'gstack-runtime') await writeFile(join(pluginDir, MOUNT_RENDER_ROOT_FILE), `${pack.root}\n`, 'utf8');
+  }
+}
+
+/** A runtime pack's render ages like its mount: using the mount touches the render too. */
+async function touchRenderRoots(packs: MountPack[]): Promise<void> {
+  for (const pack of packs) {
+    if (pack.transform === 'gstack-runtime') await touch(pack.root).catch(() => undefined);
   }
 }
 
@@ -161,6 +174,7 @@ export async function buildMount(selection: MountSelection): Promise<Mount | nul
   const hash = mountHash({ packs });
   const path = join(mountsDir(), hash);
   const mount: Mount = { path, hash, packIds: packs.map((pack) => pack.id) };
+  await touchRenderRoots(packs);
   if (await exists(path)) {
     await touch(path);
     return mount;
@@ -319,7 +333,9 @@ async function sweepLaunchLinks(): Promise<{ removedLinks: string[]; referenced:
  * `.tmp-*` build dirs of the same age. Reusing a mount touches it, so a mount
  * in active use stays young.
  */
-export async function gcMounts(opts: { maxAgeMs: number; now?: number }): Promise<{ removedMounts: string[]; removedLinks: string[] }> {
+export async function gcMounts(
+  opts: { maxAgeMs: number; now?: number },
+): Promise<{ removedMounts: string[]; removedLinks: string[]; referencedMounts: string[] }> {
   const now = opts.now ?? Date.now();
   const { removedLinks, referenced } = await sweepLaunchLinks();
 
@@ -341,7 +357,7 @@ export async function gcMounts(opts: { maxAgeMs: number; now?: number }): Promis
     await rm(path, { recursive: true, force: true });
     removedMounts.push(path);
   }
-  return { removedMounts, removedLinks };
+  return { removedMounts, removedLinks, referencedMounts: [...referenced] };
 }
 
 /**
@@ -369,4 +385,20 @@ export async function removePackFromMounts(
   // Agent dirs have one deletion door (PAN-3357), which also refuses symlinks and escapes.
   const removedCodexCaches = await removeCodexPluginCaches(CODEX_PACK_MARKETPLACE, id, join(getOverdeckHome(), 'agents'));
   return { removedMounts, removedLinks, removedCodexCaches };
+}
+
+/** Render roots that the given mounts' runtime packs call into (read from MOUNT_RENDER_ROOT_FILE). */
+export async function renderRootsUsedBy(mounts: readonly string[]): Promise<Set<string>> {
+  const roots = new Set<string>();
+  for (const mount of mounts) {
+    for (const id of await listDirNames(join(mount, 'plugins'))) {
+      try {
+        const root = (await readFile(join(mount, 'plugins', id, MOUNT_RENDER_ROOT_FILE), 'utf8')).trim();
+        if (root) roots.add(root);
+      } catch {
+        // Not a runtime pack.
+      }
+    }
+  }
+  return roots;
 }

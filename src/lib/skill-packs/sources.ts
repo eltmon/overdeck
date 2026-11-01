@@ -425,7 +425,6 @@ export async function updatePack(
   const dir = await gitStep(id, () => extractCommit(id, commit));
   const oldDir = await gitStep(id, () => extractCommit(id, entry.commit));
   const adapter = await packAdapter(id, dir, entry.adapter);
-  const runtime = adapter === 'gstack-runtime' ? await runtimePreview(id, dir, commit) : undefined;
   const manifest = await manifestAt(id, dir, adapter);
   const oldManifest = await manifestAt(id, oldDir, adapter);
 
@@ -453,9 +452,11 @@ export async function updatePack(
       changed,
       newCapabilities: notAppliedLabels(manifest.capabilities).filter((label) => !oldLabels.has(label)),
     },
-    ...(runtime ? { runtime } : {}),
   };
   if (commit === entry.commit && ref === entry.ref) return { written: false, preview };
+  // Checked only when there is something to move to, so an up-to-date pack needs no bun.
+  const runtime = adapter === 'gstack-runtime' ? await runtimePreview(id, dir, commit) : undefined;
+  if (runtime) preview.runtime = runtime;
   if (!(await confirm(preview))) return { written: false, preview };
   if (runtime) await renderPack(id, dir, commit);
   await writePackEntry({ ...entry, ref, commit });

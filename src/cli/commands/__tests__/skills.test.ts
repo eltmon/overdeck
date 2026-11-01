@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => {
     gcMounts: vi.fn(),
     removePackFromMounts: vi.fn(),
     gcPackRenders: vi.fn(),
+    renderRootsUsedBy: vi.fn(),
     packsHome: vi.fn(() => '/h/.overdeck/packs'),
     listSkillStates: vi.fn(),
     setSkillOverride: vi.fn(),
@@ -123,6 +124,7 @@ vi.mock('../../../lib/skill-packs/mount.js', () => ({
   writeCodexPackBlock: mocks.writeCodexPackBlock,
   gcMounts: mocks.gcMounts,
   removePackFromMounts: mocks.removePackFromMounts,
+  renderRootsUsedBy: mocks.renderRootsUsedBy,
 }));
 
 import { registerSkillsCommands } from '../skills.js';
@@ -615,6 +617,26 @@ describe('pan skills pack', () => {
     expect(logs.join('\n')).toContain('2 project or issue toggle(s) for mattpocock remain');
   });
 
+  it('names project .gstack dirs for a gstack fork registered under another id, and not for other packs', async () => {
+    const root = fs.mkdtempSync(path.join(tmpdir(), 'gstack-remove-fork-'));
+    try {
+      fs.mkdirSync(path.join(root, '.gstack'), { recursive: true });
+      mocks.listProjectsAsync.mockResolvedValue([{ key: 'tst', config: { name: 'Test', path: root } }]);
+      mocks.removePack.mockResolvedValue({ removed: true });
+      mocks.removePackFromMounts.mockResolvedValue({ removedMounts: [], removedLinks: [], removedCodexCaches: [] });
+      mocks.listLowerLevelPackOverrides.mockResolvedValue({});
+      mocks.getPack.mockResolvedValue({ id: 'mygstack', url: 'u', ref: 'main', commit: 'c'.repeat(40), adapter: 'gstack-runtime' });
+      await run('pack', 'remove', 'mygstack');
+      expect(logs.join('\n')).toContain(`Project files gstack skills wrote (not removed): ${path.join(root, '.gstack')}`);
+      logs.length = 0;
+      mocks.getPack.mockResolvedValue({ id: 'mattpocock', url: 'u', ref: 'v1', commit: 'c'.repeat(40) });
+      await run('pack', 'remove', 'mattpocock');
+      expect(logs.join('\n')).not.toContain('Project files gstack skills wrote');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('removes gstack mounts and Codex caches and names project .gstack dirs without deleting them (PAN-4727)', async () => {
     const root = fs.mkdtempSync(path.join(tmpdir(), 'gstack-remove-'));
     try {
@@ -623,6 +645,7 @@ describe('pan skills pack', () => {
       mocks.removePack.mockResolvedValue({ removed: true });
       mocks.removePackFromMounts.mockResolvedValue({ removedMounts: ['/m/1', '/m/2'], removedLinks: ['/l/1'], removedCodexCaches: ['/c/1'] });
       mocks.listLowerLevelPackOverrides.mockResolvedValue({});
+      mocks.getPack.mockResolvedValue({ id: 'gstack', url: 'https://github.com/eltmon/gstack', ref: 'main', commit: 'c'.repeat(40) });
       await run('pack', 'remove', 'gstack');
       expect(mocks.removePackFromMounts).toHaveBeenCalledWith('gstack');
       const out = logs.join('\n');
@@ -648,7 +671,8 @@ describe('pan skills pack', () => {
   });
 
   it('collects garbage with the default age', async () => {
-    mocks.gcMounts.mockResolvedValue({ removedMounts: ['/m/1'], removedLinks: [] });
+    mocks.gcMounts.mockResolvedValue({ removedMounts: ['/m/1'], removedLinks: [], referencedMounts: ['/m/live'] });
+    mocks.renderRootsUsedBy.mockResolvedValue(new Set(['/h/.overdeck/packs/gstack/render/old']));
     mocks.listPacks.mockResolvedValue([{ id: 'gstack', commit: COMMIT }]);
     mocks.gcPackRenders.mockResolvedValue({ removedRenders: ['/r/1', '/r/2'], removedStates: ['/s/1'] });
     await run('pack', 'gc');
@@ -658,7 +682,9 @@ describe('pan skills pack', () => {
       packsHome: '/h/.overdeck/packs',
       registered: new Map([['gstack', COMMIT]]),
       maxAgeMs,
+      keep: new Set(['/h/.overdeck/packs/gstack/render/old']),
     });
+    expect(mocks.renderRootsUsedBy).toHaveBeenCalledWith(['/m/live']);
     expect(logs.join('\n')).toContain(
       'Removed 1 mount(s), 0 dangling launch link(s), 2 stale render(s) and 1 orphaned pack state dir(s).',
     );

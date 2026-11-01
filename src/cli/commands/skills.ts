@@ -407,13 +407,18 @@ async function projectGstackDirs(): Promise<string[]> {
 }
 
 export async function skillsPackRemoveCommand(id: string): Promise<void> {
-  const [{ removePack }, { removePackFromMounts }, { listLowerLevelPackOverrides }] = await Promise.all([
-    import('../../lib/skill-packs/sources.js'),
-    import('../../lib/skill-packs/mount.js'),
-    import('../../lib/skill-overrides/store.js'),
-  ]);
+  const [{ removePack, getPack }, { removePackFromMounts }, { listLowerLevelPackOverrides }, { KNOWN_PACKS }] =
+    await Promise.all([
+      import('../../lib/skill-packs/sources.js'),
+      import('../../lib/skill-packs/mount.js'),
+      import('../../lib/skill-overrides/store.js'),
+      import('../../lib/skill-packs/adapters.js'),
+    ]);
   let result;
+  let runtimePack = false;
   try {
+    // Read before removal: a gstack fork registered under another id still writes project .gstack dirs.
+    runtimePack = ((await getPack(id))?.adapter ?? KNOWN_PACKS[id]?.adapter) === 'gstack-runtime';
     result = await removePack(id);
   } catch (error) {
     return failOnPackError(error);
@@ -428,7 +433,7 @@ export async function skillsPackRemoveCommand(id: string): Promise<void> {
   console.log(
     `Removed pack ${id}, its cache, ${swept.removedMounts.length} mount(s) and ${swept.removedCodexCaches.length} Codex cache(s).`,
   );
-  if (id === 'gstack') {
+  if (runtimePack) {
     for (const dir of await projectGstackDirs()) {
       console.log(`Project files gstack skills wrote (not removed): ${dir}  — remove with: rm -rf ${dir}`);
     }
@@ -463,15 +468,17 @@ export async function skillsPackGcCommand(options: PackGcOptions): Promise<void>
     console.error(chalk.red('--max-age-days must be a number of days, 0 or more'));
     process.exit(1);
   }
-  const [{ gcMounts }, { gcPackRenders }, { listPacks, packsHome }] = await Promise.all([
+  const [{ gcMounts, renderRootsUsedBy }, { gcPackRenders }, { listPacks, packsHome }] = await Promise.all([
     import('../../lib/skill-packs/mount.js'),
     import('../../lib/skill-packs/render.js'),
     import('../../lib/skill-packs/sources.js'),
   ]);
   const maxAgeMs = days * 24 * 60 * 60 * 1000;
-  const { removedMounts, removedLinks } = await gcMounts({ maxAgeMs });
+  const { removedMounts, removedLinks, referencedMounts } = await gcMounts({ maxAgeMs });
   const registered = new Map((await listPacks()).map(pack => [pack.id, pack.commit]));
-  const { removedRenders, removedStates } = await gcPackRenders({ packsHome: packsHome(), registered, maxAgeMs });
+  // A render that a linked mount's skills call into stays, whatever its age.
+  const keep = await renderRootsUsedBy(referencedMounts);
+  const { removedRenders, removedStates } = await gcPackRenders({ packsHome: packsHome(), registered, maxAgeMs, keep });
   console.log(
     `Removed ${removedMounts.length} mount(s), ${removedLinks.length} dangling launch link(s), ` +
       `${removedRenders.length} stale render(s) and ${removedStates.length} orphaned pack state dir(s).`,

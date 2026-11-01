@@ -113,16 +113,18 @@ async function isDir(path: string): Promise<boolean> {
 
 /**
  * PAN-4727 D10: under `packsHome` (one dir per pack id, plus `mounts`), remove
- * `<id>/render/<commit>` dirs that are not the trusted commit and are older
- * than `maxAgeMs` (a running agent's render survives the same age as its
- * mount), and `render/` and `state/` of ids that are not registered (left by
- * an interrupted remove). Never touches the trusted render or a registered
- * pack's state. `registered` maps id → trusted commit.
+ * `<id>/render/<commit>` dirs that are not the trusted commit, not in `keep`
+ * (renders a linked mount still calls into), and older than `maxAgeMs`; building
+ * or reusing a mount touches its render, so a render ages like its mount. Also
+ * remove `render/` and `state/` of ids that are not registered (left by an
+ * interrupted remove). Never touches the trusted render or a registered pack's
+ * state. `registered` maps id → trusted commit.
  */
 export async function gcPackRenders(opts: {
   packsHome: string;
   registered: ReadonlyMap<string, string>;
   maxAgeMs: number;
+  keep?: ReadonlySet<string>;
   now?: number;
 }): Promise<{ removedRenders: string[]; removedStates: string[] }> {
   const now = opts.now ?? Date.now();
@@ -147,6 +149,7 @@ export async function gcPackRenders(opts: {
     for (const commit of await childNames(renderRoot)) {
       if (commit === trusted) continue;
       const dir = join(renderRoot, commit);
+      if (opts.keep?.has(dir)) continue;
       let mtimeMs: number;
       try {
         mtimeMs = (await lstat(dir)).mtimeMs;

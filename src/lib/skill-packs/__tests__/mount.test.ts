@@ -38,7 +38,9 @@ import {
   linkClaudeMount,
   mountHash,
   mountsDir,
+  MOUNT_RENDER_ROOT_FILE,
   removePackFromMounts,
+  renderRootsUsedBy,
   writeCodexPackBlock,
   type MountPack,
 } from '../mount.js';
@@ -187,6 +189,20 @@ describe('buildMount', () => {
     const mount = await buildMount({ packs: [gstack()] });
     if (!mount) throw new Error('expected a mount');
     expect(readFileSync(join(mount.path, 'plugins', 'gstack', 'skills', 'review', 'SKILL.md'), 'utf8')).toBe(GSTACK_REVIEW_MD);
+  });
+
+  it('records the render root in a gstack mount and touches the render on build and reuse', async () => {
+    const old = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    utimesSync(rootGstack, old, old);
+    const mount = await buildMount({ packs: [gstack(), alpha()] });
+    if (!mount) throw new Error('expected a mount');
+    expect(readFileSync(join(mount.path, 'plugins', 'gstack', MOUNT_RENDER_ROOT_FILE), 'utf8')).toBe(`${rootGstack}\n`);
+    expect(existsSync(join(mount.path, 'plugins', 'alpha', MOUNT_RENDER_ROOT_FILE))).toBe(false);
+    expect(statSync(rootGstack).mtimeMs).toBeGreaterThan(old.getTime() + 1000);
+    expect(await renderRootsUsedBy([mount.path])).toEqual(new Set([rootGstack]));
+    utimesSync(rootGstack, old, old);
+    await buildMount({ packs: [gstack(), alpha()] });
+    expect(statSync(rootGstack).mtimeMs).toBeGreaterThan(old.getTime() + 1000);
   });
 
   it('covers the gstack-runtime transform and its render version in the hash', async () => {
@@ -346,6 +362,7 @@ describe('gcMounts', () => {
 
     const result = await gcMounts({ maxAgeMs: 7 * DAY, now });
     expect(result.removedLinks).toEqual([danglingLink]);
+    expect(result.referencedMounts).toEqual([referenced.path]);
     expect(result.removedMounts.sort()).toEqual([oldUnused.path, staleTmp].sort());
     expect(existsSync(referenced.path)).toBe(true);
     expect(existsSync(freshUnused.path)).toBe(true);

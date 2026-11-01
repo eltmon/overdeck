@@ -449,6 +449,14 @@ describe('gstack runtime pack lifecycle', () => {
     expect(existsSync(packRenderDir('gstack', failing))).toBe(false);
   });
 
+  it('reports an unchanged pack without the pack-mode and bun checks', async () => {
+    await writePackEntry({ id: 'gstack', url: up.url, ref: good, commit: good });
+    const result = await updatePack('gstack', {}, accept);
+    expect(result.written).toBe(false);
+    expect(result.preview.runtime).toBeUndefined();
+    expect(accept).not.toHaveBeenCalled();
+  });
+
   it('re-renders the trusted commit on sync when its render is missing', async () => {
     await addPack({ id: 'gstack', url: up.url, ref: good }, accept);
     rmSync(packRenderDir('gstack', good), { recursive: true, force: true });

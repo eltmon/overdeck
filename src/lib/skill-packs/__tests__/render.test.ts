@@ -160,6 +160,16 @@ describe('gcPackRenders', () => {
     expect([existsSync(trusted), existsSync(old), existsSync(young), existsSync(state)]).toEqual([true, false, true, true]);
   });
 
+  it('keeps an old non-trusted render that a linked mount still calls into', async () => {
+    const { packsHome, make } = home();
+    const inUse = make(`gstack/render/${OLD}`, 30);
+    const result = await gcPackRenders({
+      packsHome, registered: new Map([['gstack', COMMIT]]), maxAgeMs: 7 * DAY, keep: new Set([inUse]), now,
+    });
+    expect(result).toEqual({ removedRenders: [], removedStates: [] });
+    expect(existsSync(inUse)).toBe(true);
+  });
+
   it('removes render and state of an unregistered id and leaves its other files and mounts alone', async () => {
     const { packsHome, make } = home();
     make(`gstack/render/${COMMIT}`, 0);
