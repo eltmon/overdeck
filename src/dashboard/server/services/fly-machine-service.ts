@@ -29,7 +29,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import type { MachineLinkView } from '@overdeck/contracts';
+import { getHarnessBehavior, type MachineLinkView, normalizeHarnessName } from '@overdeck/contracts';
 
 import { linkFetch } from '../../../lib/anywhere/link-client.js';
 import type { MachineLink } from '../../../lib/anywhere/link-store.js';
@@ -135,7 +135,8 @@ async function refuseEarly(input: AddFlyMachineInput, deps: FlyMachineServiceDep
   if (!deps.hasFlyToken(config.remote)) {
     throw new FlyMachineError('no-fly-token', 'No Fly API token: run `fly auth login`, or set FLY_API_TOKEN (or the variable remote.fly.api_token_env names).');
   }
-  if (input.harness !== undefined && input.harness !== 'claude-code') {
+  const harness = input.harness === undefined ? undefined : normalizeHarnessName(input.harness);
+  if (harness === null || (harness !== undefined && !getHarnessBehavior(harness).capabilities.runsOnFlyMachine)) {
     throw new FlyMachineError('harness-unsupported', `Fly machines run Claude Code only; ${input.harness} is not supported yet (#4296).`, { harness: input.harness });
   }
   if (input.message !== undefined && !input.projectKey) {
