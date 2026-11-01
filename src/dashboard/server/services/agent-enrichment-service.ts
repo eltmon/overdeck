@@ -51,6 +51,8 @@ interface EnrichmentServiceState {
   seenAgentIds: Set<string>
   /** Peer dashboard (PAN-3931): emit to live subscribers only, never append or announce. */
   peer: boolean
+  /** PAN-2354: a poll is running; the interval and pollEnrichmentNow() never overlap. */
+  inFlight: boolean
 }
 
 /** Append an enrichment event, or in a peer dashboard fan it out in memory only. */
@@ -400,17 +402,35 @@ const serviceState: EnrichmentServiceState = {
   lastScan: new Map(),
   seenAgentIds: new Set(),
   peer: false,
+  inFlight: false,
+}
+
+/** Run one poll unless one is already in flight. Errors are swallowed: the poller must not crash the server. */
+function runPoll(): void {
+  if (serviceState.inFlight) return
+  serviceState.inFlight = true
+  pollOnce(serviceState)
+    .catch(() => undefined)
+    .finally(() => {
+      serviceState.inFlight = false
+    })
 }
 
 export function startAgentEnrichmentService(): void {
   if (serviceState.timer !== null) return // Already running
   serviceState.peer = isPeerDashboardProcess()
 
-  serviceState.timer = setInterval(() => {
-    pollOnce(serviceState).catch(() => {
-      // Swallow errors — poller must not crash the server
-    })
-  }, POLL_INTERVAL_MS)
+  serviceState.timer = setInterval(runPoll, POLL_INTERVAL_MS)
+}
+
+/**
+ * PAN-2354: poll now instead of waiting up to 10 s, so a needs-you push for a
+ * fresh question goes out quickly. A no-op when the service is not running or
+ * a poll is already in flight.
+ */
+export function pollEnrichmentNow(): void {
+  if (serviceState.timer === null) return
+  runPoll()
 }
 
 export function stopAgentEnrichmentService(): void {
