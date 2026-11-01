@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:39:45.384Z",
+  "updated": "2026-11-01T14:39:59.015Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -274,6 +274,10 @@
     "wi12-docs.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T14:39:45.384Z"
+    },
+    "wi12-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:39:59.015Z"
     }
   }
 }
