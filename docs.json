@@ -59,6 +59,7 @@
               "anywhere",
               "configuration/session-vault",
               "configuration/remote-access",
+              "configuration/tailscale",
               "cli/vault",
               "cli/pair",
               "cli/devices",
