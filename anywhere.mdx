@@ -169,7 +169,8 @@ consists of hosted services.
     An account, the subscription, the hosted Session Vault, then the relay (reach your
     machines from anywhere, with hosted push notifications delivered through it), then shared
     sessions. The account service is built and invite-only: testers are added by the
-    operator, and the hosted vault cap is 5 GB per tester.
+    operator, and the hosted vault cap is 5 GB per tester. A machine signs in with
+    [`pan account login`](/cli/account), which runs once per machine and is optional.
 
     The server code for these services is published in
     [`services/`](https://github.com/eltmon/overdeck/tree/main/services) under the
