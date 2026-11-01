@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4654",
   "created": "2026-11-01T13:26:56.845Z",
-  "updated": "2026-11-01T14:22:20.014Z",
+  "updated": "2026-11-01T14:22:33.455Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "fleet-routes.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T14:22:20.013Z"
+    },
+    "fleet-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:22:33.455Z"
     }
   }
 }
