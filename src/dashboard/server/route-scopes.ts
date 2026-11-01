@@ -50,6 +50,10 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/agents/:id/answer-question', scope: 'approve' },
   { method: 'POST', path: '/api/agents/:id/plan-action', scope: 'approve' },
   { method: 'POST', path: '/api/agents/:id/permissions/:requestId/respond', scope: 'approve' },
+  // PAN-4649: MCP tools.
+  { method: 'GET', path: '/api/palette/search', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/conversations', scope: 'operate' },
+  { method: 'POST', path: '/api/workers', scope: 'operate' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

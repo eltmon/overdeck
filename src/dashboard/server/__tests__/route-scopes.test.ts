@@ -48,4 +48,12 @@ describe('route-scope table (PAN-2351)', () => {
     }
     expect(requiredScopeFor('POST', '/api/conversations/conv-1/archive')).toBe('admin');
   });
+
+  it('maps the routes the MCP tools proxy to (PAN-4649 FR-3)', () => {
+    expect(requiredScopeFor('GET', '/api/palette/search')).toBe('read:conversations');
+    expect(requiredScopeFor('POST', '/api/conversations')).toBe('operate');
+    expect(requiredScopeFor('POST', '/api/workers')).toBe('operate');
+    expect(requiredScopeFor('POST', '/api/workers/register')).toBe('admin');
+    expect(requiredScopeFor('PUT', '/api/settings')).toBe('admin');
+  });
 });
