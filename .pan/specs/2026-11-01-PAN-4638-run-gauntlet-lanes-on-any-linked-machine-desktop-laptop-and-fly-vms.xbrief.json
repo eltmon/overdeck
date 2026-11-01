@@ -4,17 +4,17 @@
     "created": "2026-11-01T22:40:53Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4638: Run gauntlet lanes on any linked machine: desktop, laptop and Fly VMs",
-    "updated": "2026-11-01T22:45:30.909Z"
+    "updated": "2026-11-01T22:46:17.905Z"
   },
   "plan": {
     "id": "pan-4638",
     "title": "Run gauntlet lanes on any linked machine: desktop, laptop and Fly VMs",
-    "status": "proposed",
+    "status": "running",
     "uid": "b7631998-ca74-4b0c-8619-4ae860e39473",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T22:40:53Z",
-    "updated": "2026-11-01T22:45:30.909Z",
+    "updated": "2026-11-01T22:46:17.905Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4638",
@@ -1184,5 +1184,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
