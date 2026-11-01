@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T07:38:29.811Z",
+  "updated": "2026-11-01T07:38:46.913Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "approve-route-rows.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T07:38:29.811Z"
+    },
+    "mcp-route-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:38:46.913Z"
     }
   }
 }
