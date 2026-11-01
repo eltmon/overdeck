@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4732",
   "created": "2026-11-01T18:35:44.841Z",
-  "updated": "2026-11-01T18:35:44.841Z",
+  "updated": "2026-11-01T18:43:54.493Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "quarantine-title-bar-spec": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4732",
-      "claimedAt": "2026-11-01T18:35:44.841Z"
+      "claimedAt": "2026-11-01T18:35:44.841Z",
+      "doneAt": "2026-11-01T18:43:54.493Z"
     }
   }
 }
