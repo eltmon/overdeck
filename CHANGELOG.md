@@ -18,7 +18,8 @@ The public, per-release changelog is [`changelog.mdx`](changelog.mdx). Session V
 
 - `pan skills pack add gstack https://github.com/eltmon/gstack --ref main` adds gstack as a runtime pack. The eltmon fork's pack mode renders the skills and their bash/bun runtime into `~/.overdeck/packs/gstack/render/<commit>/` and keeps gstack's state in `~/.overdeck/packs/gstack/state/`; it never writes `~/.claude` or `~/.gstack` and never calls the network (PAN-4727).
 - The consent preview shows the exact render command, every script the mounted skills can run, and the skills that are not mounted. Trusting renders the commit once; `update` and `sync` render again when needed, and launches never render.
-- gstack skills are classified as default, opt-in (code sent to OpenAI, paid or cloud APIs, pushes, blocking hooks), excluded, or needs-binary. The browser, design and PDF skills wait for PAN-4730.
+- gstack skills are classified as default, opt-in (code sent to OpenAI, paid or cloud APIs, pushes, blocking hooks), browser, browser-opt-in, or excluded.
+- `pan skills pack browser gstack` (or `pan skills pack add gstack … --browser`) builds gstack's browser, design and PDF runtime after a second consent that lists every download; nine browser skills (qa, qa-only, browse, make-pdf and more) then mount with the pack toggle and nine more (ship, land-and-deploy, the design skills) with a per-skill `on`. Everything stays under `~/.overdeck/packs/gstack/`; `pan skills pack browser gstack off` removes it, and `remove` and `off` report live browse daemons without stopping them (PAN-4730).
 - `pan skills pack remove gstack` also removes every mount, launch link and Codex plugin cache that holds gstack, and lists project `.gstack/` dirs without deleting them; `pan skills pack gc` removes stale renders and orphaned pack state.
 
 ### Breaking changes

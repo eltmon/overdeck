@@ -425,6 +425,8 @@ Runtime packs (gstack) are the exception: their scripts are mounted and run when
 | Issue pack toggle | The issue's skill override file, under `packs.<id>` |
 | Single pack skills | The same `skills.overrides`, `skill_overrides`, and issue `skills:` maps, with `pack/skill` keys |
 | gstack runtime and state | `~/.overdeck/packs/gstack/render/<commit>/` and `~/.overdeck/packs/gstack/state/` |
+| gstack browser runtime | `~/.overdeck/packs/gstack/browser/` (bun cache, Chromium), and `node_modules` plus binaries inside the render |
+| gstack browser consent | `~/.overdeck/config.yaml`, under `skills.packs.gstack.browser: true` |
 
 The cache lives in `~/.overdeck/packs/` and can be rebuilt at any time, except the gstack `state/` dir, which holds gstack's own config, sessions and learnings: `pan skills pack sync [id]` re-fetches the cache, and `pan skills pack gc [--max-age-days <n>]` removes mounts no launch uses. `pan skills pack remove <id>` unregisters a pack, clears its global toggle and global skill values, and deletes its cache; project and issue values stay but do nothing until the pack is added again.
 
@@ -509,7 +511,7 @@ When the `sageox` pack is registered, `pan doctor` adds a **SageOx (ox)** row. I
 
 ### gstack
 
-[gstack](https://github.com/garrytan/gstack) is Garry Tan's skill collection. Its skills call gstack's own bash and bun scripts by absolute path and keep state in a directory of their own, so Overdeck cannot mount them like other packs, and a normal gstack install writes `~/.claude` settings, harness skill dirs and `~/.gstack`. Overdeck uses the operator's fork [eltmon/gstack](https://github.com/eltmon/gstack), which adds a **pack mode**: `bash setup --pack-root <render> --pack-state-root <state>` copies the skills and their runtime into a directory Overdeck chooses, rewrites every skill to call scripts there, keeps all gstack state in a second directory, and writes nothing else. It never runs `bun install` or a build, never writes `~/.claude` or `~/.gstack`, and never calls the network. The `gstack-runtime` adapter runs pack mode once per trusted commit and mounts the skills from its output.
+[gstack](https://github.com/garrytan/gstack) is Garry Tan's skill collection. Its skills call gstack's own bash and bun scripts by absolute path and keep state in a directory of their own, so Overdeck cannot mount them like other packs, and a normal gstack install writes `~/.claude` settings, harness skill dirs and `~/.gstack`. Overdeck uses the operator's fork [eltmon/gstack](https://github.com/eltmon/gstack), which adds a **pack mode**: `bash setup --pack-root <render> --pack-state-root <state>` copies the skills and their runtime into a directory Overdeck chooses, rewrites every skill to call scripts there, keeps all gstack state in a second directory, and writes nothing else. It never runs `bun install` or a build, never writes `~/.claude` or `~/.gstack`, and never calls the network. An optional second step builds the browser runtime ([below](#browser-design-and-pdf-skills)). The `gstack-runtime` adapter runs pack mode once per trusted commit and mounts the skills from its output.
 
 #### Adding gstack
 
@@ -527,7 +529,7 @@ Pack gstack
   Adapter      gstack-runtime
   License      MIT
   Skills       36 (14 opt-in: autoplan, benchmark-models, captain, careful, codex, cso, document-generate, document-release, eval-plan, freeze, guard, modernize, ubicloud, unfreeze)
-  Not mounted  27: benchmark (Calls $B, $D or $P, which pack mode does not build (PAN-4730).); …
+  Not mounted  27: benchmark (Needs the browser runtime: pan skills pack browser gstack on); …
   Runs         bash setup --pack-root /home/you/.overdeck/packs/gstack/render/<commit> --pack-state-root /home/you/.overdeck/packs/gstack/state
   Executables  232 files the mounted skills can run:
   Not applied  hooks, agents, project-mutating skills (14), requires CLI (bun)
@@ -543,14 +545,15 @@ After you confirm, Overdeck renders the commit and only then registers it. If th
 
 #### Which skills mount
 
-Each gstack skill is in one of four classes, fixed in Overdeck's skill map (reviewed against fork commit `1cac25cb`). A skill a later gstack commit adds is not mounted until the map is reviewed.
+Each gstack skill is in one of five classes, fixed in Overdeck's skill map (reviewed against fork commit `1b778f78`). A skill a later gstack commit adds is not mounted until the map is reviewed.
 
 | Class | Skills | Mounted |
 |-------|--------|---------|
 | default | context-restore, context-save, deslop-shared-libs, design-motion, diagram, health, investigate, ios-clean, ios-design-review, ios-fix, ios-qa, ios-sync, landing-report, learn, plan-ceo-review, plan-devex-review, plan-eng-review, retro, review, test-audit, verify, write-skill | On with the pack toggle |
 | opt-in | autoplan, benchmark-models, captain, careful, codex, cso, document-generate, document-release, eval-plan, freeze, guard, modernize, ubicloud, unfreeze | Only with a per-skill `on`: they send code to OpenAI (`codex`), call paid or cloud APIs, push, or install hooks that block tool calls |
-| excluded | connect-chrome, gstack-upgrade, plan-tune, setup-deploy, setup-gbrain, sync-gbrain | Never: they upgrade the install in place, need setup's hooks, or edit `CLAUDE.md` |
-| needs-binary | benchmark, browse, canary, design-consultation, design-html, design-review, design-shotgun, devex-review, land-and-deploy, make-pdf, office-hours, open-gstack-browser, pair-agent, plan-design-review, qa, qa-only, scrape, setup-browser-cookies, ship, skillify, spec | Never: they call gstack's browser, design or PDF binaries, which pack mode does not build |
+| browser | benchmark, browse, devex-review, make-pdf, qa, qa-only, scrape, skillify, spec | On with the pack toggle once the browser runtime is built |
+| browser-opt-in | canary, design-consultation, design-html, design-review, design-shotgun, land-and-deploy, office-hours, plan-design-review, ship | Only with the browser runtime and a per-skill `on`: they push, merge, deploy, or call paid image APIs |
+| excluded | connect-chrome, gstack-upgrade, plan-tune, setup-deploy, setup-gbrain, sync-gbrain, open-gstack-browser, pair-agent, setup-browser-cookies | Never: they upgrade the install in place, need setup's hooks, or edit `CLAUDE.md`; `open-gstack-browser` opens a visible browser that writes `~/.gstack/.auth.json`, `pair-agent` exposes the browser through an ngrok tunnel and writes `~/.codex`, and `setup-browser-cookies` reads your real browser cookies and keychain |
 
 ```bash
 pan skills set --pack gstack on                           # every default skill, globally
@@ -561,9 +564,51 @@ pan skills set gstack/codex on --project <key>            # an opt-in skill
 
 The agent sees the skills as `gstack:<skill>`, for example `/gstack:test-audit`.
 
+#### Browser, design and PDF skills
+
+The `browser` and `browser-opt-in` skills call gstack's compiled `browse`, `design` and `make-pdf` binaries and a headless Chromium. Pack mode does not build them, so they need a second, separate consent that downloads them:
+
+```bash
+pan skills pack browser gstack            # or: pan skills pack browser gstack on
+pan skills pack add gstack https://github.com/eltmon/gstack --ref main --browser   # add, then the browser step, asking twice
+```
+
+Before it asks, Overdeck checks that the trusted commit is rendered, that its `pack-mode.json` has `packBrowser`, and that bun runs. The preview lists the exact command, every package and file the build downloads, and every path it writes (never shortened). Shortened here with `…`:
+
+```
+  Runs         bash setup --pack-browser /home/you/.overdeck/packs/gstack/render/<commit> --pack-browser-cache /home/you/.overdeck/packs/gstack/browser
+  Downloads    15 lines, every package and file the build fetches:
+                @anthropic-ai/sdk@^0.78.0
+                …
+                playwright@^1.62.1
+                …
+                + their locked dependencies from bun.lock (registry.npmjs.org)
+                Chromium and Chromium headless shell for playwright ^1.62.1 (Playwright CDN, ~115 MiB download)
+  Writes       6 paths:
+                /home/you/.overdeck/packs/gstack/render/<commit>/node_modules
+                …
+                /home/you/.overdeck/packs/gstack/browser/playwright
+  Size         about 1 GB on disk
+Trusting runs the command above once now and downloads the listed packages and Chromium.
+Trust this browser runtime? [y/N]
+```
+
+After you confirm, gstack's step runs `bun install --production --frozen-lockfile`, compiles the five binaries into the render, and downloads Chromium into `~/.overdeck/packs/gstack/browser/playwright`, with bun's package cache in `~/.overdeck/packs/gstack/browser/bun-cache`. It never runs gstack's full build, which would rewrite the skills for `~/.claude`. Only when the build succeeds does Overdeck record your consent (`browser: true` in the pack's registry entry). If it fails, nothing is recorded and the error shows the last lines of gstack's output.
+
+With consent recorded, `pan skills pack update gstack` adds the browser rows to its one preview and builds the new commit's runtime before it moves the trusted commit, and `pan skills pack sync gstack` builds the runtime again when it is missing. A launch never builds: if consent is recorded but the runtime is not built, the launch mounts no browser skill and prints `gstack browser runtime not built; run pan skills pack sync gstack`.
+
+```bash
+pan skills set gstack/ship on --project <key>   # a browser-opt-in skill
+pan skills pack browser gstack off              # remove the runtime
+```
+
+`off` clears the consent, renders the trusted commit again without `node_modules` or binaries, and deletes `~/.overdeck/packs/gstack/browser/`. Older commits' renders that still hold a runtime are left to `pan skills pack gc`.
+
 #### Where gstack keeps state
 
-Each trusted commit is rendered into `~/.overdeck/packs/gstack/render/<commit>/`. gstack's state (its `config.yaml`, sessions, learnings, project reports and plans) lives in `~/.overdeck/packs/gstack/state/`, shared across commits. The render holds a marker that points gstack's scripts at that state dir, so no environment variable is needed and nothing goes to `~/.gstack`. Pack mode starts the config with `telemetry: off`, `update_check: false` and `auto_upgrade: false`. When you invoke a skill in a project, it may write `.gstack/` (temporary files and reports) in that project.
+Each trusted commit is rendered into `~/.overdeck/packs/gstack/render/<commit>/`. gstack's state (its `config.yaml`, sessions, learnings, project reports and plans) lives in `~/.overdeck/packs/gstack/state/`, shared across commits. The render holds a marker that points gstack's scripts at that state dir, so no environment variable is needed and nothing goes to `~/.gstack`. Pack mode starts the config with `telemetry: off`, `update_check: false` and `auto_upgrade: false`. When you invoke a skill in a project, it may write `.gstack/` (temporary files and reports) in that project. Rendered skill docs name the state dir wherever gstack's prose says `~/.gstack/`.
+
+The browser skills start a browse daemon per project. It keeps its port, token and logs in the project's `.gstack/` (`browse.json`, `browse-*.log`), writes some temporary files as `/tmp/browse-*`, and exits by itself after 30 idle minutes (or on `$B stop`).
 
 #### Removing gstack
 
@@ -571,11 +616,17 @@ Each trusted commit is rendered into `~/.overdeck/packs/gstack/render/<commit>/`
 pan skills pack remove gstack
 ```
 
-`remove` deletes `~/.overdeck/packs/gstack/` (renders, state, extractions and the git cache), every mount that contains gstack, the launch links that leaves dangling, and the gstack copy in every Codex agent's plugin cache. A running agent that used gstack loses its gstack skills until its next launch. `remove` does not delete the `.gstack/` or `.gstack-worktrees/` dirs that skills wrote in your projects; it prints each one it finds under a registered project, with the `rm -rf` command. `pan skills pack gc` also removes renders of commits other than the trusted one once no linked launch uses them and they are older than `--max-age-days` (using a render resets its age), and the `render/` and `state/` dirs of packs that are no longer registered once both are older than `--max-age-days`. If `config.yaml` cannot be read or parsed, gc removes nothing and exits 1, because it cannot tell which packs are registered. If removing a mount or cache fails, `remove` names it and exits 1; run it again to retry.
+`remove` deletes `~/.overdeck/packs/gstack/` (renders, state, extractions and the git cache), every mount that contains gstack, the launch links that leaves dangling, and the gstack copy in every Codex agent's plugin cache. A running agent that used gstack loses its gstack skills until its next launch. `remove` does not delete the `.gstack/` or `.gstack-worktrees/` dirs that skills wrote in your projects; it prints each one it finds under a registered project, with the `rm -rf` command. `remove` and `pan skills pack browser gstack off` also print each live browse daemon in a registered project as `Browse daemon still running in <project>: pid <n> — stop with: kill <n>`; they never stop one. `pan skills pack gc` also removes renders of commits other than the trusted one once no linked launch uses them and they are older than `--max-age-days` (using a render resets its age), and the `render/`, `state/` and `browser/` dirs of packs that are no longer registered once all are older than `--max-age-days`. If `config.yaml` cannot be read or parsed, gc removes nothing and exits 1, because it cannot tell which packs are registered. If removing a mount or cache fails, `remove` names it and exits 1; run it again to retry.
 
 #### Limits
 
-- The browser, design and PDF skills (the `needs-binary` class) are not available until [PAN-4730](https://github.com/eltmon/overdeck/issues/4730) adds an opt-in build of gstack's binaries.
+- The browser step needs an eltmon/gstack commit whose `pack-mode.json` has `packBrowser`; an older commit fails that check before anything is asked.
+- Chromium comes from Playwright with no system packages or fonts (`--with-deps` is not run). On Linux, emoji may render as boxes in PDFs.
+- The design skills need `OPENAI_API_KEY` or `GEMINI_API_KEY`, or a key saved by `$D setup`, which goes to gstack's state dir.
+- Headed mode and the `pair-agent` tunnel are excluded, so their `~/.gstack/.auth.json` and ngrok config paths are never used.
+- The browse daemon writes some temporary files in `/tmp`.
+- On macOS, the binaries are re-signed the way gstack's own setup does it; this was verified on Linux only.
+- Browser skills in Codex launches are unverified: the Codex sandbox may block Chromium or `bun run`.
 - Codex launches mount the same render as Claude Code. Skills that ask Claude-only questions fall back to gstack's plain-text path in Codex.
 - Pack mode does not install setup's settings hooks (question tuning, the timeline Stop hook, auto-update, the verify gate), and gstack skills cannot upgrade themselves; update through `pan skills pack update gstack`.
 - Commits of upstream `garrytan/gstack` fail the pack-mode check until pack mode is merged there; use the eltmon fork.
