@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T09:21:17Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-01T09:35:12Z · model: claude-opus-5-5 · open: 872_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 2 | PAN-4639 | L | medium | ok |  |  | In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4663 | XS | critical | ok |  |  | In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts |
@@ -879,6 +880,10 @@ _Last sequenced: 2026-11-01T09:21:17Z · model: claude-opus-5-5 · open: 871_
 
 ## Rationale detail
 
+### PAN-4702 (rank 1)
+
+New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
+
 ### PAN-4639 (rank 2)
 
 New in-pipeline issue with a live workspace, so it is pinned near the top beside PAN-4626 per the in-pipeline rule; it also offers a non-destructive path for the idle cleanup asked in PAN-1485.
@@ -1195,10 +1200,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
-### PAN-4213 (rank 81)
-
-Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1206,10 +1207,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T09:21:17Z",
+  "generatedAt": "2026-11-01T09:35:12Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 871,
+  "openCount": 872,
   "nodes": [
     {
       "issue": "PAN-4639",
@@ -12111,6 +12112,19 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4702",
+      "rank": 1,
+      "size": "S",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
+      "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13825,6 +13839,34 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     {
       "from": "PAN-4697",
       "to": "PAN-4681",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4702",
+      "to": "PAN-4681",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4702",
+      "to": "PAN-4649",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4702",
+      "to": "PAN-4641",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4702",
+      "to": "PAN-3946",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
