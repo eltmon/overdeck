@@ -119,5 +119,11 @@ describe('route-scope rows for machine credentials (PAN-4645 WI-5)', () => {
       expect(remoteGateRejection(plain(method, path), null), `${method} ${path}`).toBeNull();
     }
     expect(remoteGateRejection(plain('PUT', '/api/settings'), null)).toEqual({ status: 403, missingScope: 'admin' });
+
+    const tellOnly = (await createAccessToken({ name: 'tell', kind: 'token', scopes: ['tell'] })).token;
+    const tellRequest = HttpServerRequest
+      .fromWeb(new Request('http://dashboard.test/api/conversations/conv-1/abort', { method: 'POST', headers: { authorization: `Bearer ${tellOnly}` } }))
+      .modify({ remoteAddress: Option.some('198.51.100.9') });
+    expect(remoteGateRejection(tellRequest, null)).toEqual({ status: 403, missingScope: 'operate' });
   });
 });
