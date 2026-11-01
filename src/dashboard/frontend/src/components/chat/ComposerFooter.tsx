@@ -34,6 +34,7 @@ import { HandoffNotice } from './HandoffNotice';
 import { HeldKickoffConflictError, HeldKickoffNotice, kickoffUnchanged, startHeldKickoff, useHeldKickoff, useSeedHeldKickoff } from './heldKickoff';
 import { openImageLightbox, useImageLightboxStore } from './ImageLightbox';
 import { ComposerAttachmentStrip } from './ComposerAttachmentStrip';
+import { CitationChips } from './citations/CitationChips';
 import { useHandoffNotice } from './continueOnDevice/handoffNoticeStore';
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -696,6 +697,7 @@ function ComposerFooterInput({
       {heldKickoff.held && <HeldKickoffNotice />}
       {/* Single unified container — T3Chat style */}
       <div className={styles.composerBox} onDrop={handleDrop} onDragOver={handleDragOver}>
+        <CitationChips conversationName={conversation.name} />
         <ComposerAttachmentStrip
           attachments={pendingAttachments}
           onOpenImage={(attachment) => {
