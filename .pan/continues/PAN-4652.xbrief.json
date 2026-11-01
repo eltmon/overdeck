@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T19:02:27.915Z",
+  "updated": "2026-11-01T19:09:49.500Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-11-01T19:02:22.720Z"
     },
     "wi8-add-fly-machine-service": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4652",
-      "claimedAt": "2026-11-01T19:02:27.915Z"
+      "claimedAt": "2026-11-01T19:02:27.915Z",
+      "doneAt": "2026-11-01T19:09:49.500Z"
     }
   }
 }
