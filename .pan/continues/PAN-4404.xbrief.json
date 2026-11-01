@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T13:35:54.264Z",
+  "updated": "2026-11-01T13:36:59.452Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-01T13:35:49.004Z"
     },
     "wi3-ssh-machine-store": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4404",
-      "claimedAt": "2026-11-01T13:35:54.264Z"
+      "claimedAt": "2026-11-01T13:35:54.264Z",
+      "doneAt": "2026-11-01T13:36:59.451Z"
     }
   }
 }
