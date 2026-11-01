@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T19:35:00.755Z",
+  "updated": "2026-11-01T19:35:04.514Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
       "claimedBy": "agent-pan-4651",
       "claimedAt": "2026-11-01T19:25:23.694Z",
       "doneAt": "2026-11-01T19:35:00.754Z"
+    },
+    "wi13-worker-cli-machine": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:35:04.513Z"
     }
   }
 }
