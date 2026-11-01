@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T20:40:34.528Z",
+  "updated": "2026-11-01T20:40:49.361Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -276,6 +276,10 @@
     "wi12-credential-refresh-fly.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T20:40:34.528Z"
+    },
+    "wi13-route-and-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:40:49.360Z"
     }
   }
 }
