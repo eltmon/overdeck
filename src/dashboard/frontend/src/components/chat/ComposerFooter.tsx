@@ -27,6 +27,8 @@ import { getDefaultConversationModel } from './defaultConversationModel';
 import { modelSupportsImages, findModelDef } from '../Settings/modelCatalog';
 import { EffortPicker } from './EffortPicker';
 import { DeliveryModeSelect, type DeliverAs } from './DeliveryModeSelect';
+import { LimitResetNotice } from './LimitResetNotice';
+import { useScheduledMessages } from './scheduledMessages';
 import { useComposerEffort, type EffortResolution } from './useComposerEffort';
 import { ContextWindowMeter } from './ContextWindowMeter';
 import { VaultContinueDialog } from './VaultContinueDialog';
@@ -393,7 +395,8 @@ function ComposerFooterInput({
     }
   }, []);
 
-  const handleSubmit = useCallback(async (directMessageText?: string, deliverAsOverride?: 'steer') => {
+  const { schedule: scheduleMessage, supported: scheduleSupported, limit: usageLimit } = useScheduledMessages(conversation.name, !agentId);
+  const handleSubmit = useCallback(async (directMessageText?: string, deliverAsOverride?: 'steer', schedule?: boolean) => {
     const editor = editorRef.current;
     if (!editor) {
       console.warn('[ComposerFooter] handleSubmit: editor ref not ready');
@@ -492,9 +495,25 @@ function ComposerFooterInput({
     // Attachments belong to the prompt lane. Portable commands stay in the
     // control-plane lane and leave any uploaded attachments pending.
     const submissionMessage = isPortableCommand ? messageText : composedMessage;
+    // PAN-4641: queue on the server until the usage limit resets, instead of sending now.
+    if (schedule || (!deliverAsOverride && deliverAs === 'when_limit_resets')) {
+      try {
+        await scheduleMessage(submissionMessage);
+        if (!isPortableCommand) consumeAttachmentsForConversation(submitConversationName);
+        if (submitConversationName === currentConversationNameRef.current) {
+          editor.update(() => { $getRoot().clear(); });
+          setText('');
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to queue the message');
+      } finally {
+        setSendingFor(submitConversationName, false);
+      }
+      return;
+    }
     const clientMessageId = crypto.randomUUID();
-    // Follow-up exists only on the Pi control channel.
-    const selectedDeliverAs = deliverAs === 'follow_up' && steerKind !== 'control-channel' ? undefined : deliverAs;
+    // Follow-up exists only on the Pi control channel; "when limits reset" never reaches the send route.
+    const selectedDeliverAs = deliverAs === 'when_limit_resets' || (deliverAs === 'follow_up' && steerKind !== 'control-channel') ? undefined : deliverAs;
     const sendDeliverAs = deliverAsOverride ?? (showDeliverySelector && selectedDeliverAs !== 'auto' ? selectedDeliverAs : undefined);
     try {
       // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
@@ -605,7 +624,7 @@ function ComposerFooterInput({
       // Refocus editor
       editor.focus();
     }
-  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, heldKickoff, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, sending, setSendingFor, showDeliverySelector, steerKind]);
+  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, heldKickoff, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, scheduleMessage, sending, setSendingFor, showDeliverySelector, steerKind]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -697,6 +716,7 @@ function ComposerFooterInput({
   return (
     <div className={styles.composerFooter}>
       {heldKickoff.held && <HeldKickoffNotice />}
+      {!agentId && scheduleSupported && <LimitResetNotice limit={usageLimit} disabled={isDisabled} onSchedule={() => void handleSubmit(undefined, undefined, true)} />}
       {/* Single unified container — T3Chat style */}
       <div className={styles.composerBox} onDrop={handleDrop} onDragOver={handleDragOver}>
         {pendingAttachments.length > 0 && (
@@ -823,7 +843,7 @@ function ComposerFooterInput({
           <EffortPicker chip={effortChip} pending={effortPending} title={effortTitle} value={effort} onChange={handleEffortChange} disabled={effortPending || !liveChangeEnabled} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
           {showDeliverySelector && (
-            <DeliveryModeSelect value={deliverAs} onChange={setDeliverAs} steerKind={steerKind} agentBusy={agentBusy} sessionAlive={conversation.sessionAlive} steerOptionLabel={steerOptionLabel} />
+            <DeliveryModeSelect value={deliverAs} onChange={setDeliverAs} steerKind={steerKind} agentBusy={agentBusy} sessionAlive={conversation.sessionAlive} steerOptionLabel={steerOptionLabel} scheduleAvailable={scheduleSupported && !agentId} />
           )}
           {piConversation && !agentId && (
             <>
