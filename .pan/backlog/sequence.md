@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
+_Last sequenced: 2026-11-01T04:45:43Z · model: claude-opus-5-5 · open: 857_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -44,7 +44,6 @@ _Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
 | 48 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
 | 49 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
 | 50 | PAN-4439 | S | high | ok |  |  | CI relay has no backstop for webhooks missed during pan reload; red test jobs never reach the agent, PRs stall |
-| 51 | PAN-4407 | XS | high | ok |  |  | Every pan vault verb crashes (Commander passes Command as io); setup saves a key but never shows the recovery phrase |
 | 52 | PAN-4392 | XS | high | ok |  |  | pan task done accepts an Item: trailer from another issue's merged commit (history-wide grep); gate passes with no evidence |
 | 53 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
 | 54 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
@@ -172,6 +171,7 @@ _Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
 | 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 178 | PAN-4655 | M | medium | ok |  | PAN-4639 | Ranked for readiness when #4639 merges: idle auto-settle after N days (default 3); supersedes the #1485 archive part. |
 | 179 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
+| 180 | PAN-4657 | M | medium | ok |  | PAN-4640, PAN-4639 | Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; waits for in-pipeline #4640 and #4639. |
 | 181 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
 | 182 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
 | 183 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
@@ -219,7 +219,7 @@ _Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
 | 225 | PAN-4645 | XL | high | needs-refinement |  |  | Anywhere build step 1: machine keys, Noise channel, machine tokens, owner column, links. Everything else needs it. Body pending. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
 | 227 | PAN-4646 | S | medium | needs-refinement |  |  | Interactive mockup for machine-aware conversation UI (title bar, chips, offline banner); D-6 needs it approved first. Body pending. |
-| 228 | PAN-4656 | M | medium | needs-refinement |  | PAN-4645 | pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending. |
+| 228 | PAN-4656 | M | medium | needs-refinement |  | PAN-4645, PAN-4628 | pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending. |
 | 229 | PAN-4650 | XL | medium | needs-refinement |  | PAN-4645, PAN-4646 | Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
@@ -259,7 +259,7 @@ _Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
 | 265 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
 | 266 | PAN-2186 | S | high | ok |  |  | Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557. |
 | 267 | PAN-4632 | S | medium | ok |  |  | Markdown chip 'Open in File Manager' xdg-opens the file in its MIME app and sticks as the left-click default; drop it, repair stored pref. |
-| 268 | PAN-4652 | L | medium | needs-refinement |  | PAN-4645 | Fly VMs as machines: pan serve on the VM, linked at spawn; W-FLY1 can start day one, W-FLY2 needs links. Body pending. |
+| 268 | PAN-4295 | M | medium | ok |  | PAN-1775 | Anywhere W-FLY1: restore Fly auto-reap, heartbeat, credential refresh; start-now item that PAN-4652 (Fly VMs as machines) waits for |
 | 269 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 270 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 271 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
@@ -268,8 +268,8 @@ _Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
 | 274 | PAN-4654 | M | medium | needs-refinement |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
 | 275 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 276 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 277 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
-| 278 | PAN-4649 | M | medium | needs-refinement |  | PAN-4650 | Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending. |
+| 277 | PAN-4649 | M | medium | needs-refinement |  |  | Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending. |
+| 278 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650, PAN-4649 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
 | 279 | PAN-4647 | M | medium | needs-refinement |  | PAN-4645 | Auto-save pipeline agent transcripts to the Session Vault so linked machines can read them. Body pending. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
@@ -486,7 +486,7 @@ _Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
 | 493 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
 | 494 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
 | 495 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 496 | PAN-4404 | L | medium | ok |  | PAN-4402 | Desktop-managed SSH launch and loopback forward for remote environments; the one SSH stack PAN-3863 builds on |
+| 496 | PAN-4404 | L | medium | ok |  | PAN-4402, PAN-4645 | Desktop-managed SSH launch and loopback forward for remote environments; the one SSH stack PAN-3863 builds on |
 | 497 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
 | 498 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
 | 499 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
@@ -558,7 +558,7 @@ _Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
 | 565 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
 | 566 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
 | 567 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 568 | PAN-4295 | M | medium | ok |  | PAN-1775 | Anywhere Fly track: restore auto-reap of finished remote agents (removed with deacon patrol in the Cut); blocks hosted capacity |
+| 568 | PAN-4652 | L | medium | needs-refinement |  | PAN-4645, PAN-4295 | Fly VMs as machines: pan serve on the VM, linked at spawn; W-FLY1 can start day one, W-FLY2 needs links. Body pending. |
 | 569 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 570 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
 | 571 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
@@ -594,7 +594,7 @@ _Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
 | 601 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 602 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 603 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 604 | PAN-4296 | L | medium | needs-refinement |  | PAN-1676 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
+| 604 | PAN-4296 | L | medium | needs-refinement |  | PAN-1676, PAN-4652 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
 | 605 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 606 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 607 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -651,13 +651,12 @@ _Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
 | 658 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 659 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 660 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 661 | PAN-2352 | M | low | needs-refinement |  | PAN-2354 | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access |
 | 662 | PAN-2355 | M | low | needs-refinement |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
 | 663 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 664 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 665 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 666 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 667 | PAN-4638 | L | medium | needs-refinement |  |  | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
+| 667 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651, PAN-4652 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 668 | PAN-4643 | M | medium | ok |  |  | pan diagnose: redacted diagnostics bundle (needs doctor --json) handed to a Claude Code or Codex session; works with dashboard down. |
 | 669 | PAN-4641 | M | medium | ok |  |  | Server-held 'send when limits reset' composer message; needs a parsed reset time; usage-window data would come from #2065. |
 | 670 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
@@ -677,7 +676,7 @@ _Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
 | 684 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
 | 685 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 686 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 687 | PAN-2356 | M | low | needs-refinement |  | PAN-4297 | Overdeck Anywhere P3: relay service |
+| 687 | PAN-2356 | M | low | needs-refinement |  | PAN-4297, PAN-4645, PAN-4330, PAN-4648 | Overdeck Anywhere P3: relay service |
 | 688 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 689 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 690 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -831,7 +830,6 @@ _Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
 | 841 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
 | 842 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
 | 843 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
-| 844 | PAN-241 | L | low | stale |  |  | Mobile redesign initiative: full UX/UI overhaul + implementation plan |
 | 845 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
 | 846 | PAN-227 | M | low | stale |  |  | Phase gate validation |
 | 847 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
@@ -845,7 +843,6 @@ _Last sequenced: 2026-11-01T04:42:19Z · model: claude-opus-5-5 · open: 860_
 | 855 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
 | 856 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
 | 858 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 859 | PAN-43 | M | low | stale |  |  | Add Slack and email notifications for agent events |
 | 860 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
 | 861 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
 | 862 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
@@ -1024,10 +1021,6 @@ New this pass. The test gate records a real 'test failed' verdict for uniform 50
 
 New issue. The polling backstop for the CI failure relay was deleted in the Cut, so a check that completes while the dashboard reloads is never relayed and the PR stalls. Reloads are frequent, and its stated dependency PAN-4432 has closed, so it ranks high in the pipeline block.
 
-### PAN-4407 (rank 51)
-
-New issue. All fifteen pan vault verbs throw from the CLI, and setup leaves a vault the user cannot join because the recovery phrase is never printed. Session Vault is shipped and is the base of the Anywhere hand-off, so this XS fix is high importance.
-
 ### PAN-4392 (rank 52)
 
 New issue. hasTrailerCommit greps all reachable history, so generic item ids such as docs or tests are satisfied by any merged commit and the checklist gate certifies work that was never committed. It is a gate-integrity hole with an XS fix.
@@ -1188,6 +1181,10 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 
 npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
 
+### PAN-2850 (rank 93)
+
+npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1195,10 +1192,10 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T04:42:19Z",
+  "generatedAt": "2026-11-01T04:45:43Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 860,
+  "openCount": 857,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -1708,19 +1705,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "dependsOn": [],
       "why": "CI relay has no backstop for webhooks missed during pan reload; red test jobs never reach the agent, PRs stall",
       "rationale": "New issue. The polling backstop for the CI failure relay was deleted in the Cut, so a check that completes while the dashboard reloads is never relayed and the PR stalls. Reloads are frequent, and its stated dependency PAN-4432 has closed, so it ranks high in the pipeline block.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4407",
-      "rank": 51,
-      "size": "XS",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Every pan vault verb crashes (Commander passes Command as io); setup saves a key but never shows the recovery phrase",
-      "rationale": "New issue. All fifteen pan vault verbs throw from the CLI, and setup leaves a vault the user cannot join because the recovery phrase is never printed. Session Vault is shipped and is the base of the Anywhere hand-off, so this XS fix is high importance.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3363,6 +3347,22 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "planning": "auto"
     },
     {
+      "issue": "PAN-4657",
+      "rank": 180,
+      "size": "M",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4640",
+        "PAN-4639"
+      ],
+      "why": "Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; waits for in-pipeline #4640 and #4639.",
+      "rationale": "New issue split from in-pipeline PAN-4640 with clear acceptance criteria; it ranks beside PAN-4653 and PAN-4655 because it becomes workable once PAN-4639 and PAN-4640 merge.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-570",
       "rank": 181,
       "size": "XS",
@@ -3953,7 +3953,8 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "score": 50,
       "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-4645"
+        "PAN-4645",
+        "PAN-4628"
       ],
       "why": "pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending.",
       "rationale": "New Anywhere child (W-LINK9), which the build order places after W-SEC2 and W-LINK1, so it depends on PAN-4645. Body is still a placeholder.",
@@ -4449,17 +4450,17 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "planning": "auto"
     },
     {
-      "issue": "PAN-4652",
+      "issue": "PAN-4295",
       "rank": 268,
-      "size": "L",
+      "size": "M",
       "importance": "medium",
-      "score": 50,
-      "condition": "needs-refinement",
+      "score": 42,
+      "condition": "ok",
       "dependsOn": [
-        "PAN-4645"
+        "PAN-1775"
       ],
-      "why": "Fly VMs as machines: pan serve on the VM, linked at spawn; W-FLY1 can start day one, W-FLY2 needs links. Body pending.",
-      "rationale": "New Anywhere child (W-FLY1 to W-FLY3). W-FLY1 restores the reap loops and stops copying the SSH key, and W-FLY2 dissolves PAN-1775; it ranks after the conversation items because W-WORK3 needs it for Fly placement. Body is still a placeholder.",
+      "why": "Anywhere W-FLY1: restore Fly auto-reap, heartbeat, credential refresh; start-now item that PAN-4652 (Fly VMs as machines) waits for",
+      "rationale": "Rank 568->268 (swap with PAN-4652): the revision 5 child list makes it a start-now item that PAN-4652 waits for.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4563,33 +4564,32 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "planning": "auto"
     },
     {
-      "issue": "PAN-4651",
+      "issue": "PAN-4649",
       "rank": 277,
+      "size": "M",
+      "importance": "medium",
+      "score": 44,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending.",
+      "rationale": "Rank 278->277 (swap with PAN-4651): revision 5 lists it as a start-now item that PAN-4651 waits for; dropped the inferred PAN-4650 dependency.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4651",
+      "rank": 278,
       "size": "L",
       "importance": "medium",
       "score": 50,
       "condition": "needs-refinement",
       "dependsOn": [
         "PAN-4645",
-        "PAN-4650"
+        "PAN-4650",
+        "PAN-4649"
       ],
       "why": "Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending.",
-      "rationale": "New Anywhere child (W-WORK1 to W-WORK8), step 3 and later in the build order; it also absorbs PAN-4638 and PAN-4405 per the plan disposition. Body is still a placeholder.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4649",
-      "rank": 278,
-      "size": "M",
-      "importance": "medium",
-      "score": 44,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4650"
-      ],
-      "why": "Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending.",
-      "rationale": "New Anywhere child (W-INT2), which the revision 5 build order places after W-CONV3. Body is still a placeholder.",
+      "rationale": "Rank 277->278 (swap with PAN-4649): revision 5 says it also waits for PAN-4649.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5057,7 +5057,7 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Epic rebaselined 2026-09-28; account service and share-service slice 1 built 2026-10-02. Children carry the order.",
-      "rationale": "Rank held at 317 and the operator gate kept. Revision 5 of the plan adds ten children (PAN-4645 to PAN-4652, PAN-4654, PAN-4656) as contains edges; they rank in a band just ahead of the epic in build order, starting with the PAN-4645 foundation.",
+      "rationale": "Rank and operator gate held. The revision 5 child list (2026-11-01 comment) adds PAN-4628, PAN-4299 and PAN-1254 as children; PAN-4407, PAN-2352, PAN-241 and PAN-43 closed, and the stated waits re-order PAN-4295 ahead of PAN-4652 and PAN-4649 ahead of PAN-4651.",
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
@@ -7279,7 +7279,8 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "score": 48,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4402"
+        "PAN-4402",
+        "PAN-4645"
       ],
       "why": "Desktop-managed SSH launch and loopback forward for remote environments; the one SSH stack PAN-3863 builds on",
       "gate": "auto",
@@ -8159,17 +8160,18 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "planning": "auto"
     },
     {
-      "issue": "PAN-4295",
+      "issue": "PAN-4652",
       "rank": 568,
-      "size": "M",
+      "size": "L",
       "importance": "medium",
-      "score": 42,
-      "condition": "ok",
+      "score": 50,
+      "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-1775"
+        "PAN-4645",
+        "PAN-4295"
       ],
-      "why": "Anywhere Fly track: restore auto-reap of finished remote agents (removed with deacon patrol in the Cut); blocks hosted capacity",
-      "rationale": "Rank held; gained dependsOn PAN-1775 from the build order in PAN-2350's 2026-09-28 rebaseline.",
+      "why": "Fly VMs as machines: pan serve on the VM, linked at spawn; W-FLY1 can start day one, W-FLY2 needs links. Body pending.",
+      "rationale": "Rank 268->568 (swap with PAN-4295): the revision 5 child list says it waits for PAN-4295, so it now ranks after it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8607,7 +8609,8 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "score": 34,
       "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-1676"
+        "PAN-1676",
+        "PAN-4652"
       ],
       "why": "Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time",
       "rationale": "Rank held; gained dependsOn PAN-1676 from the build order in PAN-2350's 2026-09-28 rebaseline.",
@@ -9299,21 +9302,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "planning": "auto"
     },
     {
-      "issue": "PAN-2352",
-      "rank": 661,
-      "size": "M",
-      "importance": "low",
-      "score": 26,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-2354"
-      ],
-      "why": "Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access",
-      "rationale": "Rank 662->659 (slot swap within the Anywhere set) to follow PAN-2350's 2026-09-28 recommended order; no other node moved. Also gained dependsOn PAN-2354 (push bridge before tunnel).",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-2355",
       "rank": 662,
       "size": "M",
@@ -9386,7 +9374,10 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "importance": "medium",
       "score": 38,
       "condition": "needs-refinement",
-      "dependsOn": [],
+      "dependsOn": [
+        "PAN-4651",
+        "PAN-4652"
+      ],
       "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
       "rationale": "New PAN-2350 child; placed in the free slot beside the Anywhere set because it depends on machine links, delegation and Fly-as-machine plan items that have no issues yet, and planning questions remain open.",
       "gate": "auto",
@@ -9636,7 +9627,10 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "score": 26,
       "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-4297"
+        "PAN-4297",
+        "PAN-4645",
+        "PAN-4330",
+        "PAN-4648"
       ],
       "why": "Overdeck Anywhere P3: relay service",
       "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
@@ -11515,18 +11509,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "planning": "auto"
     },
     {
-      "issue": "PAN-241",
-      "rank": 844,
-      "size": "L",
-      "importance": "low",
-      "score": 12,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "Mobile redesign initiative: full UX/UI overhaul + implementation plan",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
       "issue": "PAN-228",
       "rank": 845,
       "size": "M",
@@ -11679,18 +11661,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "condition": "stale",
       "dependsOn": [],
       "why": "Planning should fetch ALL issue context: comments, attachments, linked issues, discussions",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-43",
-      "rank": 859,
-      "size": "M",
-      "importance": "low",
-      "score": 10,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "Add Slack and email notifications for agent events",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12301,13 +12271,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
     },
     {
       "from": "PAN-2350",
-      "to": "PAN-2352",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
       "to": "PAN-2353",
       "type": "contains",
       "source": "github-ref",
@@ -12333,13 +12296,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-2352",
-      "to": "PAN-2355",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
     },
     {
       "from": "PAN-3566",
@@ -12825,13 +12781,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "confidence": 0.9
     },
     {
-      "from": "PAN-2354",
-      "to": "PAN-2352",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
       "from": "PAN-4297",
       "to": "PAN-2356",
       "type": "unblocks",
@@ -12897,13 +12846,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
     {
       "from": "PAN-2350",
       "to": "PAN-4405",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4407",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -13469,13 +13411,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "confidence": 0.6
     },
     {
-      "from": "PAN-4650",
-      "to": "PAN-4649",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.75
-    },
-    {
       "from": "PAN-4645",
       "to": "PAN-4652",
       "type": "unblocks",
@@ -13495,6 +13430,111 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4628",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4299",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-1254",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4649",
+      "to": "PAN-4651",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4651",
+      "to": "PAN-4638",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4652",
+      "to": "PAN-4638",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4645",
+      "to": "PAN-2356",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4330",
+      "to": "PAN-2356",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4648",
+      "to": "PAN-2356",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4295",
+      "to": "PAN-4652",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4652",
+      "to": "PAN-4296",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4628",
+      "to": "PAN-4656",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4645",
+      "to": "PAN-4404",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4640",
+      "to": "PAN-4657",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4639",
+      "to": "PAN-4657",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
