@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:58:43.658Z",
+  "updated": "2026-11-01T23:59:04.848Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -250,6 +250,10 @@
       "claimedBy": "agent-pan-4638",
       "claimedAt": "2026-11-01T23:54:16.373Z",
       "doneAt": "2026-11-01T23:58:43.658Z"
+    },
+    "two-machine-smoke-lanes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T23:59:04.848Z"
     }
   }
 }
