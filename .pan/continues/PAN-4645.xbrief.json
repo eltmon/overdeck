@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T09:37:43.887Z",
+  "updated": "2026-11-01T09:38:27.916Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -291,6 +291,11 @@
     "wi12-pairing-exchange.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T09:37:43.886Z"
+    },
+    "wi13-machines-list-unlink": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:38:27.915Z"
     }
   }
 }
