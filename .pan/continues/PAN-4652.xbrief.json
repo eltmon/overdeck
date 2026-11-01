@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T19:28:40.604Z",
+  "updated": "2026-11-01T19:29:40.062Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,9 +94,10 @@
       "doneAt": "2026-11-01T19:27:36.343Z"
     },
     "wi15-user-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4652",
-      "claimedAt": "2026-11-01T19:28:40.604Z"
+      "claimedAt": "2026-11-01T19:28:40.604Z",
+      "doneAt": "2026-11-01T19:29:40.062Z"
     }
   }
 }
