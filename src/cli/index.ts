@@ -42,6 +42,7 @@ import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { defineUpCommand, registerReloadAndRestartCommands } from './commands/dashboard-lifecycle-commands.js';
 import { registerSkillsCommands } from './commands/skills.js';
+import { registerTellCommand } from './commands/tell-register.js';
 import { registerPairCommands } from './commands/pair.js';
 import { registerTailscaleCommands } from './commands/tailscale.js';
 import { registerTokenCommands } from './commands/token.js';
@@ -347,13 +348,7 @@ planCmd
   .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(lazyAction(() => import('./commands/plan-done.js'), 'planDoneCommand'));
 
-program
-  .command('tell <id> <message>')
-  .description('Send message to running agent')
-  .option('--force', 'Deliver even to a critic or verifier lane that already filed its verdict')
-  .option('--steer', 'Interrupt the running turn and send now (Claude Code send-now; Ctrl+X Ctrl+S)')
-  .option('--when-limit-resets', 'Queue the message on the server; it sends when the conversation\'s usage limit resets (conversations only)')
-  .action(lazyAction(() => import('./commands/tell.js'), 'tellCommand'));
+registerTellCommand(program);
 program
   .command('ask <id> [question]')
   .description('Ask the operator a blocking decision; it appears in the dashboard Needs-you')

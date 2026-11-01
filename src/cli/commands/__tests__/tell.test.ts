@@ -97,6 +97,12 @@ describe('tellCommand agent ID resolution (PAN-1749)', () => {
     expect(agentMocks.messageAgent).toHaveBeenCalledWith('agent-pan-123', 'hello', 'pan-tell', { owesRework: false });
   });
 
+  it('PAN-4650: passes --message-id as the delivery idempotency key', async () => {
+    const { tellCommand } = await import('../tell.js');
+    await tellCommand('PAN-123', 'hello', { messageId: 'm1' });
+    expect(agentMocks.messageAgent).toHaveBeenCalledWith('agent-pan-123', 'hello', 'pan-tell', { owesRework: false, dedupKey: 'm1' });
+  });
+
   it('can resolve an issue ID to its registered strike agent', async () => {
     const { tellCommand } = await import('../tell.js');
     await tellCommand('PAN-1820', 'hello strike');

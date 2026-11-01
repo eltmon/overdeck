@@ -13,6 +13,47 @@ export interface TellOptions {
   steer?: boolean;
   /** Queue the message on the server until the conversation's usage limit resets (PAN-4641). */
   whenLimitResets?: boolean;
+  /** PAN-4650: idempotency key; a repeat with the same id is delivered once. */
+  messageId?: string;
+}
+
+/**
+ * PAN-4650 D-4650-21: `pan tell @<machine>/<conv>` delivers to a conversation a
+ * linked machine runs, through this machine's dashboard and the link. The
+ * owner's receipt store makes a repeated message id land once.
+ */
+export async function tellRemote(target: string, message: string, options: TellOptions): Promise<number> {
+  const { isAgentSessionName, parseLinkedConversationName } = await import('@overdeck/contracts');
+  const parsed = parseLinkedConversationName(target);
+  if (!parsed || isAgentSessionName(parsed.name)) {
+    console.error(chalk.red('pan tell @<label>/… targets conversations only'));
+    return 1;
+  }
+  if (options.whenLimitResets || options.force) {
+    console.error(chalk.red(`${options.whenLimitResets ? '--when-limit-resets' : '--force'} does not work for a conversation on another machine. Nothing was sent.`));
+    return 1;
+  }
+  const { randomUUID } = await import('node:crypto');
+  const { senderFromEnv } = await import('../../lib/terminal-backends/prompt-guard.js');
+  const { callDashboard, errorText } = await import('./dashboard-call.js');
+  const clientMessageId = options.messageId ?? randomUUID().replace(/-/g, '');
+  let response: Response;
+  try {
+    response = await callDashboard(`/api/conversations/@${encodeURIComponent(parsed.target)}/${encodeURIComponent(parsed.name)}/message`, {
+      method: 'POST',
+      body: { message, clientMessageId, ...(options.steer ? { deliverAs: 'steer' } : {}) },
+      headers: { 'x-overdeck-sender': senderFromEnv().id },
+    });
+  } catch (error) {
+    console.error(chalk.red(`Message NOT delivered: the dashboard did not answer (${(error as Error).message})`));
+    return 1;
+  }
+  if (!response.ok) {
+    console.error(chalk.red(`Message NOT delivered to ${parsed.name} on ${parsed.target}: ${await errorText(response)}`));
+    return 1;
+  }
+  console.log(chalk.green(`Delivered to ${parsed.name} on ${parsed.target}`));
+  return 0;
 }
 
 function clockLabel(ms: number, now: number): string {
@@ -81,6 +122,10 @@ async function laneVerdictRefusal(agentId: string): Promise<string | null> {
 }
 
 export async function tellCommand(id: string, message: string, options: TellOptions = {}): Promise<void> {
+  if (id.startsWith('@')) {
+    const code = await tellRemote(id, message, options);
+    return code === 0 ? undefined : exitCli(code);
+  }
   // Resolve through the shared resolver so issue IDs can address non-work
   // agents such as strike-pan-* when that is the registered run, and so
   // conversation numbers/names/URLs work too (PAN-4465).
@@ -128,6 +173,8 @@ export async function tellCommand(id: string, message: string, options: TellOpti
     const outcome = await messageAgent(agentId, message, 'pan-tell', {
       owesRework: await issueOwesRework(issueId),
       ...(options.steer ? { steer: true } : {}),
+      // PAN-4650: --message-id is the delivery door's idempotency key, so a repeat lands once.
+      ...(options.messageId ? { dedupKey: options.messageId } : {}),
     });
     if (outcome.inputTargetRefusal) {
       console.error(chalk.red(`Message NOT delivered to ${agentId}: Claude Code's typed input could not be moved to the main agent.`));
