@@ -9,7 +9,9 @@ import type { LaneRole } from '../overdeck/conversations.js';
 
 /** The critic or verifier verdict a builder iteration answers (FR-38). */
 export interface LaneAnswering {
-  criticId: number;
+  /** Null for a critic on another machine. */
+  criticId: number | null;
+  criticName: string;
   role: 'critic' | 'verifier';
   iteration: number;
   verdict: string;
@@ -40,7 +42,8 @@ function roleBlock(input: LaneContractInput): string {
       const { answering } = input;
       if (!answering) return block;
       const prefix = answering.role === 'verifier' ? 'v' : 'c';
-      return `${block}\nThis iteration answers ${answering.role} ${prefix}${answering.iteration} (conv #${answering.criticId}): ` +
+      const critic = answering.criticId === null ? `conv ${answering.criticName}` : `conv #${answering.criticId}`;
+      return `${block}\nThis iteration answers ${answering.role} ${prefix}${answering.iteration} (${critic}): ` +
         `${answering.verdict}. Verdict file: ${answering.file ?? 'none recorded'}.`;
     }
     case 'critic':

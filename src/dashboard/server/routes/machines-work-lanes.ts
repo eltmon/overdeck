@@ -96,7 +96,8 @@ const unknownLane = (): HttpServerResponse.HttpServerResponse => jsonResponse({ 
 function isAnswering(value: unknown): value is LaneAnswering {
   const answering = value as Partial<LaneAnswering> | null;
   return !!answering && typeof answering === 'object'
-    && typeof answering.criticId === 'number' && (answering.role === 'critic' || answering.role === 'verifier')
+    && (answering.criticId === null || typeof answering.criticId === 'number') && typeof answering.criticName === 'string'
+    && (answering.role === 'critic' || answering.role === 'verifier')
     && typeof answering.iteration === 'number' && typeof answering.verdict === 'string'
     && (answering.file === null || typeof answering.file === 'string');
 }

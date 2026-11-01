@@ -108,7 +108,7 @@ async function laneEnrichment(conversations: readonly LegacyConversation[]): Pro
       role: row.laneRole ?? 'builder',
       iteration: iterations.get(row.name) ?? 1,
       createdAt: row.createdAt,
-      criticOfId: row.criticOfConversationId,
+      criticOfName: row.criticOfConversationName,
       activity: row.status,
       report: report ? { status: report.status, ...(report.verdict ? { verdict: report.verdict } : {}) } : null,
     };

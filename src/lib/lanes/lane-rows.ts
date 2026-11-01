@@ -93,9 +93,13 @@ function remoteLaneRow(facts: RemoteLaneFacts, mirror: RemoteLaneMirror | null, 
   };
 }
 
-/** Every local and remote lane that matches `filter`, archived included, in `createdAt` then name order. */
+/**
+ * Every local and remote lane that matches `filter`, archived included, in
+ * `createdAt` order. The sort is stable: local rows that share a timestamp
+ * keep their rowid order, and remote rows (name order) follow local ones.
+ */
 export async function listAllLaneRows(filter: RemoteLaneFilter = {}): Promise<LaneRow[]> {
   const local = await Promise.all(listLaneConversations(filter).map(localLaneRow));
   const remote = (await listRemoteLanes(filter)).map((lane) => remoteLaneRow(lane.facts, lane.mirror, lane.archivedAt));
-  return [...local, ...remote].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name));
+  return [...local, ...remote].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }

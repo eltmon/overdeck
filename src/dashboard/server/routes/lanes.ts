@@ -10,7 +10,8 @@
  *   (`x-overdeck-sender`); a request that arrived through a secure channel may
  *   not place a lane on another machine (403 `no-chained-hops`).
  * - `GET /api/lanes?run=&parent=&key=&role=` → `{ generatedAt, lanes }`.
- * - `GET /api/lanes/:name` → one LaneView, or 404 when the name is not a lane.
+ * - `GET /api/lanes/:name` → one LaneView (a local lane, or a stand-in for a
+ *   lane on another machine), or 404 when the name is not a lane.
  * - `POST /api/lanes/:name/reap` with `{ park?, keep? }` → `reapLane` with the
  *   archive route's own dependencies (D14), never a second copy of them.
  */
@@ -20,6 +21,7 @@ import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/u
 import { listFlyMachines } from '../../../lib/anywhere/fly/machine-store.js';
 import { launchLane, type LaneLaunchDeps, type RemoteLaneTarget } from '../../../lib/lanes/launch.js';
 import { LaneReapError, reapLane } from '../../../lib/lanes/reap.js';
+import { readRemoteLane } from '../../../lib/lanes/remote-lanes.js';
 import { LaneLaunchError, type LaneLaunchRequest } from '../../../lib/lanes/types.js';
 import { invalidateLaneViews, listLaneViews, type LaneViewFilter } from '../../../lib/lanes/views.js';
 import { getConversationByName, LANE_ROLES, type LaneRole } from '../../../lib/overdeck/conversations.js';
@@ -139,6 +141,15 @@ export async function handleLaneLaunch(
   }
 }
 
+/** A stand-in by name; null for a name the stand-in store does not accept. */
+async function readRemoteLaneIfNamed(name: string): ReturnType<typeof readRemoteLane> {
+  try {
+    return await readRemoteLane(name);
+  } catch {
+    return null;
+  }
+}
+
 function laneFilter(url: URL): LaneViewFilter {
   const filter: LaneViewFilter = {};
   const run = url.searchParams.get('run');
@@ -217,12 +228,15 @@ const getLaneRoute = HttpRouter.add(
     return yield* Effect.promise(async () => {
       try {
         const row = getConversationByName(name);
-        if (!row?.gauntletRun || !row.laneKey || !row.laneRole) {
-          return jsonResponse({ error: `${rawName} is not a lane` }, { status: 404 });
-        }
-        const lanes = await listLaneViews({ run: row.gauntletRun, key: row.laneKey, role: row.laneRole });
-        const lane = lanes.find((view) => view.name === name);
-        return lane ? jsonResponse(lane) : jsonResponse({ error: `${rawName} is not a lane` }, { status: 404 });
+        // PAN-4638 WI-6: a lane on another machine has no local row, only a stand-in.
+        const facts = row?.laneKey ? null : (await readRemoteLaneIfNamed(name))?.facts;
+        const lane = row?.gauntletRun && row.laneKey && row.laneRole
+          ? { run: row.gauntletRun, key: row.laneKey, role: row.laneRole }
+          : facts ? { run: facts.run, key: facts.key, role: facts.role } : null;
+        if (!lane) return jsonResponse({ error: `${rawName} is not a lane` }, { status: 404 });
+        const lanes = await listLaneViews(lane);
+        const view = lanes.find((candidate) => candidate.name === name);
+        return view ? jsonResponse(view) : jsonResponse({ error: `${rawName} is not a lane` }, { status: 404 });
       } catch (error: unknown) {
         return errorResponse(error, 'get');
       }

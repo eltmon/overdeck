@@ -308,28 +308,30 @@ async function answeredVerdict(
   const rows = await listAllLaneRows({ run, key });
   const iterations = laneIterations(rows);
   const pairingRows: PairingRow[] = [];
-  // Pairing still keys on local ids, so only local lanes pair here; remote critics join when pairing keys on names.
-  for (const { local: row } of rows) {
-    if (!row) continue;
+  for (const row of rows) {
     const report = await latestReport(`conv-${row.name}`);
+    const mirror = row.remote?.mirror;
+    const active = row.local ? row.local.status === 'active' : row.archivedAt === null && mirror?.state !== 'gone';
     pairingRows.push({
       id: row.id,
       name: row.name,
       run,
       key,
-      role: row.laneRole ?? 'builder',
+      role: row.role,
       iteration: iterations.get(row.name) ?? 1,
       createdAt: row.createdAt,
-      criticOfId: row.criticOfConversationId,
-      activity: row.status === 'active' ? 'active' : 'stopped',
+      criticOfName: row.criticOfName,
+      activity: active ? 'active' : 'stopped',
       report: report ? { status: report.status, ...(report.verdict ? { verdict: report.verdict } : {}) } : null,
     });
   }
   const provisional: PairingRow = {
-    id: -1, name: '', run, key, role: 'builder', iteration, createdAt: new Date(nowMs).toISOString(), criticOfId: null, activity: 'starting', report: null,
+    id: null, name: '', run, key, role: 'builder', iteration, createdAt: new Date(nowMs).toISOString(), criticOfName: null, activity: 'starting', report: null,
   };
   const answer = pairBuilder(provisional, [...pairingRows, provisional]).answering;
-  return answer ? { criticId: answer.id, role: answer.role, iteration: answer.iteration, verdict: answer.verdict, file: answer.file } : null;
+  return answer
+    ? { criticId: answer.id, criticName: answer.name, role: answer.role, iteration: answer.iteration, verdict: answer.verdict, file: answer.file }
+    : null;
 }
 
 export function gitFailure(error: unknown): LaneLaunchError {

@@ -477,7 +477,7 @@ function pairingRowsOf(lanes: readonly LaneView[]): PairingRow[] {
       role: lane.role,
       iteration: lane.iteration,
       createdAt: lane.createdAt,
-      criticOfId: lane.criticOf?.id ?? null,
+      criticOfName: lane.criticOf?.name ?? null,
       activity: lane.archived ? 'stopped' : lane.activity,
       report: lane.report ? { status: lane.report.status, ...(verdict ? { verdict } : {}) } : null,
     };
