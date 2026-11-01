@@ -551,7 +551,10 @@ door that does not exist; a real record read door would be a separate change.
   selection back to one when both ends land in the same tagged row. On send the
   pending list is consumed only after the message has committed to a delivery lane
   (bubble, hold, offline hold, or outbox) — so a failed send keeps the citation block
-  in the retry outbox instead of losing it.
+  in the retry outbox instead of losing it. `ConversationView` passes
+  `citationsEnabled` only when the composer branch of the footer chain renders
+  (`!hideComposer`, no `onResume`, not forking, no `clearedToConvId`, not a vault
+  copy) (PAN-4681).
 - Conversation timeline layout (PAN-4497): `MessagesTimeline.tsx` virtualizes all but
   the last 8 rows with `@tanstack/react-virtual`. Visible virtual rows render in normal
   flow inside one wrapper translated to the first visible row's offset, so rows cannot
