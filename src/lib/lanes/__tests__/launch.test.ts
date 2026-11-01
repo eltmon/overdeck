@@ -153,8 +153,8 @@ describe('launchLane (PAN-4223 WI-3)', () => {
     const parentRow = getConversationByName(parent)!;
     const byId = await launchLane(request(String(parentRow.id), { key: 'by-id' }), deps);
     const byTmux = await launchLane(request(`conv-${parent}`, { key: 'by-tmux' }), deps);
-    expect(byId.conversation.parentConversationName).toBe(parent);
-    expect(byTmux.conversation.parentConversationName).toBe(parent);
+    expect(getConversationByName(byId.conversation.name)?.parentConversationName).toBe(parent);
+    expect(getConversationByName(byTmux.conversation.name)?.parentConversationName).toBe(parent);
     expect((await rejection(launchLane(request('no-such-parent', { key: 'nope' }), deps))).status).toBe(404);
   });
 
@@ -188,7 +188,7 @@ describe('launchLane (PAN-4223 WI-3)', () => {
     createConversation({ name: successor, tmuxSession: `conv-${successor}`, cwd: PROJECT_PATH, workspaceId: null, projectKey: 'lexerra', parentName: orch.conversation.name });
 
     const builder = await launchLane(request(successor, { run: undefined, key: 'n1' }), deps);
-    expect(builder.conversation).toMatchObject({ gauntletRun: 'succ', parentConversationName: successor });
+    expect(getConversationByName(builder.conversation.name)).toMatchObject({ gauntletRun: 'succ', parentConversationName: successor });
 
     const critic = await rejection(launchLane(request(successor, { run: undefined, role: 'critic', key: 'n1', at: 'abc1234' }), deps));
     expect(critic.status).toBe(400);
@@ -196,7 +196,7 @@ describe('launchLane (PAN-4223 WI-3)', () => {
     const rootSuccessor = 'succ-of-root';
     createConversation({ name: rootSuccessor, tmuxSession: `conv-${rootSuccessor}`, cwd: PROJECT_PATH, workspaceId: null, projectKey: 'lexerra', parentName: parent });
     const rootCritic = await launchLane(request(rootSuccessor, { run: 'succ', role: 'critic', key: 'n1', for: 'n1', at: 'abc1234' }), deps);
-    expect(rootCritic.conversation).toMatchObject({ laneRole: 'critic', parentConversationName: rootSuccessor });
+    expect(getConversationByName(rootCritic.conversation.name)).toMatchObject({ laneRole: 'critic', parentConversationName: rootSuccessor });
   });
 
   it('launches play in a plain directory with bare context and no CLAUDE.md', async () => {
@@ -207,14 +207,14 @@ describe('launchLane (PAN-4223 WI-3)', () => {
     expect(git.fetchBase).not.toHaveBeenCalled();
     expect(git.addBranchWorktree).not.toHaveBeenCalled();
     expect(git.addDetachedWorktree).not.toHaveBeenCalled();
-    expect(result.conversation).toMatchObject({ bareContext: true, skipClaudeMd: true });
+    expect(getConversationByName(result.conversation.name)).toMatchObject({ bareContext: true, skipClaudeMd: true });
   });
 
   it('refuses a second builder while the first is live, and --replace stops it and counts a new iteration', async () => {
     const { deps, live, stop } = harness();
     const parent = root();
     const first = await launchLane(request(parent, { key: 'dup' }), deps);
-    live.add(first.conversation.tmuxSession);
+    live.add(`conv-${first.conversation.name}`);
 
     const refused = await rejection(launchLane(request(parent, { key: 'dup' }), deps));
     expect(refused.status).toBe(409);
@@ -231,7 +231,7 @@ describe('launchLane (PAN-4223 WI-3)', () => {
     const { deps, live } = harness();
     const parent = root();
     const first = await launchLane(request(parent, { key: 'stuck' }), deps);
-    live.add(first.conversation.tmuxSession);
+    live.add(`conv-${first.conversation.name}`);
     deps.stop.mockImplementation(async () => undefined);
 
     const refused = await rejection(launchLane(request(parent, { key: 'stuck', replace: true }), deps));
@@ -267,7 +267,7 @@ describe('launchLane (PAN-4223 WI-3)', () => {
     const target = join(LANES_ROOT, 'hotel-664-i2');
     expect(second).toMatchObject({ cwd: target, branch: 'hotel/664-i2', iteration: 2 });
     expect(git.addBranchWorktree).toHaveBeenLastCalledWith(PROJECT_PATH, target, 'hotel/664-i2', 'hotel/664');
-    expect(second.conversation.title).toBe('hotel 664 · builder i2');
+    expect(getConversationByName(second.conversation.name)?.title).toBe('hotel 664 · builder i2');
   });
 
   it('refuses effort xhigh, a lanes root under /tmp or equal to the project, and a missing model', async () => {

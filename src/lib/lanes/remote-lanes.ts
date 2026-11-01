@@ -189,6 +189,23 @@ export async function markRemoteLaneArchived(name: string, at: string): Promise<
   }
 }
 
+/**
+ * Claim `name` in the store before the owner is called: false when the
+ * directory exists. The reservation holds no `lane.json` until the owner
+ * answers with the lane's real cwd, so listings skip it.
+ */
+export async function reserveRemoteLane(name: string): Promise<boolean> {
+  const dir = laneDir(name);
+  await mkdir(remoteLanesRoot(), { recursive: true, mode: 0o700 });
+  try {
+    await mkdir(dir, { mode: 0o700 });
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+    throw error;
+  }
+}
+
 /** Remove a stand-in. Only for a launch the owner refused: a launched lane's stand-in is kept (D7). */
 export async function removeRemoteLane(name: string): Promise<void> {
   await rm(laneDir(name), { recursive: true, force: true });

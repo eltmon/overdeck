@@ -35,7 +35,7 @@ import {
 } from '../overdeck/conversations.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { resolveLaneConfig } from './config.js';
-import { laneContract, type LaneAnswering } from './contract.js';
+import { laneContract } from './contract.js';
 import {
   gitFailure,
   isWithin,
@@ -50,41 +50,12 @@ import {
   type LaneGit,
   type LaneLaunchDeps,
 } from './launch.js';
-import { LaneLaunchError } from './types.js';
+import { LaneLaunchError, type OwnerLaneResult, type OwnerLaneSpec } from './types.js';
+
+export type { OwnerLaneResult, OwnerLaneSpec };
 import { addBranchWorktree, addDetachedWorktree, applySparse, commitExists, fetchBase, laneDirName, removeWorktree } from './worktree.js';
 
 const NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
-
-export interface OwnerLaneSpec {
-  name: string;
-  run: string;
-  key: string;
-  role: LaneRole;
-  iteration: number;
-  brief: string;
-  briefHeader: string;
-  title: string;
-  model: string;
-  harness: string;
-  effort: string | null;
-  /** Builder only: the lane branch. */
-  branch: string | null;
-  /** Builder only: the ref a new branch is cut from; null = the owner's base ref. */
-  base: string | null;
-  /** Critic and verifier: the commit judged. */
-  at: string | null;
-  /** `--reuse`: continue in this directory on the owner. */
-  reuseCwd: string | null;
-  answering: LaneAnswering | null;
-  force: boolean;
-}
-
-export interface OwnerLaneResult {
-  name: string;
-  cwd: string;
-  branch: string | null;
-  warnings: string[];
-}
 
 export interface OwnerLaneContext {
   /** The owner's own key for the repository, resolved from the git origin by the door. */
