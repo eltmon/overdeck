@@ -19,6 +19,9 @@ export const SUPERVISOR_AGENT_LABEL = 'ai.overdeck.supervisor';
 
 const LAUNCHCTL_TIMEOUT_MS = 10_000;
 const THROTTLE_INTERVAL_SEC = 5;
+/** bootout can return before launchd releases the label: poll up to 20 × 250 ms. */
+const BOOTOUT_SETTLE_POLLS = 20;
+const BOOTOUT_SETTLE_POLL_MS = 250;
 
 export interface RenderSupervisorPlistOptions {
   nodePath: string;
@@ -39,6 +42,7 @@ export interface LaunchdDeps {
   mkdir: (path: string) => Promise<void>;
   homedir: () => string;
   uid: () => number;
+  sleep: (ms: number) => Promise<void>;
 }
 
 const execFileAsync = promisify(execFile);
@@ -61,6 +65,7 @@ const defaultDeps: LaunchdDeps = {
   },
   homedir,
   uid: () => process.getuid?.() ?? 0,
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 };
 
 function resolveDeps(deps: Partial<LaunchdDeps> = {}): LaunchdDeps {
@@ -157,8 +162,9 @@ async function bootstrapAgent(path: string, d: LaunchdDeps): Promise<string> {
 
 /**
  * Writes the plist when it differs, then loads it: loaded and unchanged ⇒
- * nothing; loaded and changed ⇒ bootout, then bootstrap; not loaded ⇒
- * bootstrap. Throws when neither domain accepts the bootstrap.
+ * nothing; loaded and changed ⇒ bootout, wait (at most 5 s) until launchd has
+ * released the job, then bootstrap; not loaded ⇒ bootstrap. Throws when
+ * neither domain accepts the bootstrap.
  */
 export async function installSupervisorAgent(
   o: RenderSupervisorPlistOptions,
@@ -183,6 +189,10 @@ export async function installSupervisorAgent(
       await d.execFile('launchctl', ['bootout', `${current.domain}/${SUPERVISOR_AGENT_LABEL}`], { timeout: LAUNCHCTL_TIMEOUT_MS });
     } catch {
       // Already gone; the bootstrap below reports a real failure.
+    }
+    // A bootstrap while launchd still holds the label fails with "5: Input/output error".
+    for (let poll = 0; poll < BOOTOUT_SETTLE_POLLS && (await isSupervisorAgentLoaded(d)).loaded; poll += 1) {
+      await d.sleep(BOOTOUT_SETTLE_POLL_MS);
     }
   }
   return { path, written, domain: await bootstrapAgent(path, d) };

@@ -227,14 +227,15 @@ async function userDbusSessionExists(): Promise<boolean> {
 }
 
 export type SystemdUserUnavailableReason =
-  | 'not-linux' | 'ci' | 'container' | 'no-runtime-dir' | 'systemctl-unusable' | 'manager-not-running';
+  | 'not-linux' | 'ci' | 'container' | 'no-runtime-dir' | 'no-session-bus' | 'systemctl-unusable' | 'manager-not-running';
 
 /** null when systemdUserAvailable() would return true. Same checks, same order. */
 export async function explainSystemdUserUnavailable(): Promise<SystemdUserUnavailableReason | null> {
   if (process.platform !== 'linux') return 'not-linux';
   if (process.env.CI) return 'ci';
   if (await runningInContainer()) return 'container';
-  if (!(await userDbusSessionExists())) return 'no-runtime-dir';
+  if (!process.env.XDG_RUNTIME_DIR?.trim()) return 'no-runtime-dir';
+  if (!(await userDbusSessionExists())) return 'no-session-bus';
 
   try {
     await execAsync('systemctl --user --version', {

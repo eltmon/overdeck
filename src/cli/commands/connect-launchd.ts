@@ -12,6 +12,7 @@ import {
   type RenderSupervisorPlistOptions,
 } from '../../lib/launchd.js';
 import { getSupervisorPort, resolveSupervisorBundle, resolveSupervisorPrimaryRepoRoot } from '../../lib/supervisor.js';
+import { withoutGitGuard } from '../../lib/systemd-user-session.js';
 import type { ServiceContext, ServiceOutcome } from './connect-service.js';
 
 /** launchd's default PATH, used only when the operator's shell has none. */
@@ -41,7 +42,7 @@ export async function installMacService(ctx: ServiceContext, deps: Partial<MacSe
     workingDirectory: d.workingDirectory(),
     supervisorPort: d.supervisorPort(),
     overdeckHome: ctx.overdeckHome,
-    path: ctx.env.PATH || FALLBACK_PATH,
+    path: withoutGitGuard(ctx.env.PATH ?? '') || FALLBACK_PATH,
     logPath: join(ctx.overdeckHome, 'logs', 'supervisor.log'),
   });
   return {

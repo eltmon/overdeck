@@ -27,19 +27,27 @@ const PLIST = '/Users/alice/Library/LaunchAgents/ai.overdeck.supervisor.plist';
  * Fake launchctl: `loaded` is the domain the agent is loaded in (or null);
  * `refuse` lists domains whose bootstrap fails.
  */
-function fakeDeps(state: { loaded: string | null; refuse?: string[]; files?: Map<string, string> }) {
+function fakeDeps(state: { loaded: string | null; refuse?: string[]; files?: Map<string, string>; bootoutLag?: number }) {
   const files = state.files ?? new Map<string, string>();
   const execFile = vi.fn<ExecFile>(async (_file, args) => {
     const [verb, target] = args;
     if (verb === 'print') {
+      const booted = execFile.mock.calls.some((call) => call[1][0] === 'bootout');
+      if (booted && state.bootoutLag && state.loaded && target === `${state.loaded}/ai.overdeck.supervisor`) {
+        state.bootoutLag -= 1;
+        if (state.bootoutLag === 0) state.loaded = null;
+        return { stdout: 'state = running', stderr: '' };
+      }
       if (state.loaded && target === `${state.loaded}/ai.overdeck.supervisor`) return { stdout: 'state = running', stderr: '' };
       throw new Error('Could not find service');
     }
     if (verb === 'bootout') {
-      state.loaded = null;
+      // bootoutLag: launchd keeps the job for that many more `print` calls.
+      if (!state.bootoutLag) state.loaded = null;
       return { stdout: '', stderr: '' };
     }
     if (verb === 'bootstrap') {
+      if (state.loaded) throw new Error('Bootstrap failed: 5: Input/output error');
       if (state.refuse?.includes(String(target))) throw new Error('Bootstrap failed: 125: Domain does not support specified action');
       state.loaded = String(target);
       return { stdout: '', stderr: '' };
@@ -55,6 +63,7 @@ function fakeDeps(state: { loaded: string | null; refuse?: string[]; files?: Map
     mkdir: vi.fn(async () => undefined),
     homedir: () => '/Users/alice',
     uid: () => 501,
+    sleep: vi.fn(async () => undefined),
   };
   const writes = () => execFile.mock.calls.map((call) => call[1]).filter((args) => args[0] !== 'print');
   return { deps, files, execFile, writes };
@@ -154,6 +163,27 @@ describe('installSupervisorAgent', () => {
       ['bootout', 'gui/501/ai.overdeck.supervisor'],
       ['bootstrap', 'gui/501', PLIST],
     ]);
+  });
+
+  it('waits for launchd to release the job after bootout before bootstrapping', async () => {
+    const files = new Map([[PLIST, 'old plist']]);
+    const { deps, writes } = fakeDeps({ loaded: 'gui/501', files, bootoutLag: 3 });
+
+    await expect(installSupervisorAgent(OPTIONS, deps)).resolves.toEqual({ path: PLIST, written: true, domain: 'gui/501' });
+    expect(deps.sleep).toHaveBeenCalledTimes(3);
+    expect(deps.sleep).toHaveBeenCalledWith(250);
+    expect(writes()).toEqual([
+      ['bootout', 'gui/501/ai.overdeck.supervisor'],
+      ['bootstrap', 'gui/501', PLIST],
+    ]);
+  });
+
+  it('stops waiting after 20 polls and lets the bootstrap report the failure', async () => {
+    const files = new Map([[PLIST, 'old plist']]);
+    const { deps } = fakeDeps({ loaded: 'gui/501', files, bootoutLag: 1_000 });
+
+    await expect(installSupervisorAgent(OPTIONS, deps)).rejects.toThrow(/Bootstrap failed: 5/);
+    expect(deps.sleep).toHaveBeenCalledTimes(20);
   });
 
   it('does nothing to a loaded agent whose plist is unchanged', async () => {

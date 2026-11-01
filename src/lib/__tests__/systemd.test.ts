@@ -209,6 +209,18 @@ describe('explainSystemdUserUnavailable (PAN-4656)', () => {
     expect(execAsyncMock).not.toHaveBeenCalled();
   });
 
+  it("returns 'no-session-bus' when XDG_RUNTIME_DIR is set but no session bus exists", async () => {
+    delete process.env.DBUS_SESSION_BUS_ADDRESS;
+    accessMock.mockImplementation(async (path: string) => {
+      if (path === '/run/user/1000/bus' || path === '/.dockerenv' || path === '/run/.containerenv') throw new Error('missing');
+      return undefined;
+    });
+    const { explainSystemdUserUnavailable } = await import('../systemd.js');
+
+    await expect(explainSystemdUserUnavailable()).resolves.toBe('no-session-bus');
+    expect(execAsyncMock).not.toHaveBeenCalled();
+  });
+
   it("returns 'systemctl-unusable' when systemctl --user --version fails", async () => {
     execAsyncMock.mockRejectedValueOnce(new Error('systemctl not found'));
     const { explainSystemdUserUnavailable } = await import('../systemd.js');

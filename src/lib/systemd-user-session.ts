@@ -141,8 +141,11 @@ export async function waitForLinger(
   }
 }
 
-/** PATH without the per-agent git-guard shim directories (src/lib/launcher-git-guard.ts). */
-function withoutGitGuard(path: string): string {
+/**
+ * PATH without the per-agent git-guard shim directories (src/lib/launcher-git-guard.ts),
+ * so a service set up from an agent shell never keeps a shim. Shared with the macOS agent.
+ */
+export function withoutGitGuard(path: string): string {
   return path.split(':').filter((segment) => !segment.endsWith('/git-guard')).join(':');
 }
 

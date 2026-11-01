@@ -239,6 +239,19 @@ describe('pan connect: service and link', () => {
     );
   });
 
+  it('names the missing session bus apart from a missing XDG_RUNTIME_DIR', async () => {
+    const bus = fakeDeps({ explainSystemdUserUnavailable: vi.fn(async () => 'no-session-bus' as const) });
+    await runConnect({}, bus.deps);
+    expect(plain(bus.stdout)).toContain(
+      '(there is no user D-Bus session bus ($XDG_RUNTIME_DIR/bus is missing) — log in over SSH as alice directly)',
+    );
+    expect(plain(bus.stdout)).not.toContain('XDG_RUNTIME_DIR is not set');
+
+    const dir = fakeDeps({ explainSystemdUserUnavailable: vi.fn(async () => 'no-runtime-dir' as const) });
+    await runConnect({}, dir.deps);
+    expect(plain(dir.stdout)).toContain('(XDG_RUNTIME_DIR is not set — log in over SSH as alice directly)');
+  });
+
   it('names the OVERDECK_HOME opt-in when the unit is not allowed', async () => {
     const { deps, stdout } = fakeDeps({ supervisorUnitAllowed: () => false });
 
@@ -507,6 +520,14 @@ describe('pan connect on macOS (WI-10)', () => {
     });
     expect(deps.explainSystemdUserUnavailable).not.toHaveBeenCalled();
     expect(deps.startSupervisorProcess).not.toHaveBeenCalled();
+  });
+
+  it('drops git-guard shim directories from the PATH it saves in the plist', async () => {
+    const { deps, installSupervisorAgent } = mac();
+    deps.env = { PATH: '/Users/alice/.overdeck/agents/x/git-guard:/opt/homebrew/bin:/usr/bin' };
+
+    await runConnect({}, deps);
+    expect(installSupervisorAgent).toHaveBeenCalledWith(expect.objectContaining({ path: '/opt/homebrew/bin:/usr/bin' }));
   });
 
   it('says the agent starts at login and how to survive a reboot', async () => {

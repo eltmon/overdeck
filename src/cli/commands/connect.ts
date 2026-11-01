@@ -96,6 +96,8 @@ function unavailableReasonText(reason: SystemdUserUnavailableReason | 'home', us
       return 'this is a container';
     case 'no-runtime-dir':
       return `XDG_RUNTIME_DIR is not set — log in over SSH as ${user} directly`;
+    case 'no-session-bus':
+      return `there is no user D-Bus session bus ($XDG_RUNTIME_DIR/bus is missing) — log in over SSH as ${user} directly`;
     case 'ci':
       return 'this is a CI run';
     case 'not-linux':
