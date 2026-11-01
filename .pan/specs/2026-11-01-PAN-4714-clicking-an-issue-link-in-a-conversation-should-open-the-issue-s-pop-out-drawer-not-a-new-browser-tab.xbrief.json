@@ -4,17 +4,17 @@
     "created": "2026-11-01T12:23:52Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4714: Clicking an issue link in a conversation should open the issue's pop-out drawer, not a new browser tab",
-    "updated": "2026-11-01T12:29:40.621Z"
+    "updated": "2026-11-01T12:30:26.065Z"
   },
   "plan": {
     "id": "pan-4714",
     "title": "Clicking an issue link in a conversation should open the issue's pop-out drawer, not a new browser tab",
-    "status": "proposed",
+    "status": "running",
     "uid": "268fc80d-5691-4591-a7a1-44b57720fb67",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T12:23:52Z",
-    "updated": "2026-11-01T12:29:40.621Z",
+    "updated": "2026-11-01T12:30:26.065Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4714",
@@ -425,5 +425,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
