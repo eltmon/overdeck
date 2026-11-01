@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T20:46:20.062Z",
+  "updated": "2026-11-01T20:46:25.209Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,11 @@
       "claimedBy": "agent-pan-4651",
       "claimedAt": "2026-11-01T20:43:30.197Z",
       "doneAt": "2026-11-01T20:46:20.061Z"
+    },
+    "wi28-proxy-token-ceiling": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:46:25.209Z"
     }
   }
 }
