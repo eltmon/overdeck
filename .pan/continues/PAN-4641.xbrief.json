@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4641",
   "created": "2026-11-01T05:00:29.700Z",
-  "updated": "2026-11-01T06:10:08.719Z",
+  "updated": "2026-11-01T06:10:10.764Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
       "claimedBy": "agent-pan-4641",
       "claimedAt": "2026-11-01T05:47:34.428Z",
       "doneAt": "2026-11-01T06:10:08.719Z"
+    },
+    "composer-schedule": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T06:10:10.764Z"
     }
   }
 }
