@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4296",
   "created": "2026-11-01T21:43:56.125Z",
-  "updated": "2026-11-01T21:58:19.107Z",
+  "updated": "2026-11-01T21:58:36.271Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4296",
       "claimedAt": "2026-11-01T21:54:23.737Z",
       "doneAt": "2026-11-01T21:58:19.107Z"
+    },
+    "wi6-cli-harness": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4296",
+      "claimedAt": "2026-11-01T21:58:36.271Z"
     }
   }
 }
