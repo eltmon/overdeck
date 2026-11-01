@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T06:24:53.213Z",
+  "updated": "2026-11-01T06:25:19.999Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,11 @@
     "ts-login.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T06:24:53.212Z"
+    },
+    "ts-serve": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1254",
+      "claimedAt": "2026-11-01T06:25:19.998Z"
     }
   }
 }
