@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4641",
   "created": "2026-11-01T05:00:29.700Z",
-  "updated": "2026-11-01T07:11:40.199Z",
+  "updated": "2026-11-01T07:12:12.738Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -278,6 +278,10 @@
     "timeline-scheduled-rows.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T07:11:40.198Z"
+    },
+    "composer-schedule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:12:12.737Z"
     }
   }
 }
