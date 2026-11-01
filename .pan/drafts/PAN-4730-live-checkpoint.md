@@ -65,3 +65,30 @@ $ bun test test/pack-mode.test.ts test/state-root-ratchet.test.ts test/pack-brow
  63 expect() calls
 Ran 13 tests across 3 files. [2.46s]
 ```
+
+## Fork: pack browser step
+
+Fork commit: `4de69f3f998d1a71b9294313f7531e3661920043` — `feat(pack-browser): build the browser runtime into a pack render`.
+
+Files: `setup` (parser flags `--pack-browser`/`--pack-browser-cache` and their `=` forms, typo-suggestion list, `-h` text, dispatch, the `--pack-root`+`--pack-browser` refusal), `scripts/pack-browser.sh` (new, executable), `pack-mode.json`, `docs/pack-mode.md` (`## Pack browser`, with `### Markers instead of environment` and `### Renders never install themselves`).
+
+```
+$ bash setup --help | grep -c pack-browser
+2
+$ cat pack-mode.json
+{"packMode": 1, "packBrowser": 1}
+$ bash setup --pack-browser rel --pack-browser-cache /x      # exit 2
+pack browser: --pack-browser and --pack-browser-cache must be plain absolute paths
+$ bash setup --pack-browser <tmp>/none --pack-browser-cache <tmp>/c   # exit 2, <tmp> stays empty
+pack browser: <tmp>/none is not a ready pack render
+$ bash setup --pack-root <tmp>/r --pack-browser <tmp>/r2   # exit 2
+setup: run --pack-root and --pack-browser separately
+```
+
+Notes on the plan:
+
+- The `-h` text avoids the literal words "bun install": `test/setup-help.test.ts` treats them in `--help` output as a sign the installer ran. It reads "locked production dependencies, the compiled binaries, and Playwright Chromium".
+- The bun check sources `R/bin/gstack-bun-version.sh` and accepts `gstack_bun_status` results `ok` and `untested`. `too-old` exits 1 with the D3 message; `malformed` also exits 1 (`cannot compare bun version …`).
+- The Chromium step reuses `bin/gstack-browser-ensure`'s background-and-poll timeout loop instead of the `timeout` command, which macOS lacks.
+- On failure the cleanup also removes the three `dist/.version` files (not in FR-2's list; they are written by this step).
+- A manual smoke run before the commit (stub `bun` and `node`, real render) passed the success path and the failure cleanup; WI-F5 turns it into `test/pack-browser.test.ts`.
