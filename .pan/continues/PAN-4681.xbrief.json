@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4681",
   "created": "2026-11-01T07:25:21.124Z",
-  "updated": "2026-11-01T07:47:47.654Z",
+  "updated": "2026-11-01T07:48:12.218Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-01T07:47:47.654Z"
     },
     "gate-citations-on-composer.ac2": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4681",
-      "claimedAt": "2026-11-01T07:47:22.561Z"
+      "claimedAt": "2026-11-01T07:47:22.561Z",
+      "doneAt": "2026-11-01T07:48:12.217Z"
     },
     "gate-citations-on-composer.ac3": {
       "status": "in_progress",
