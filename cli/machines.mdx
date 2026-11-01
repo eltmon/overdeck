@@ -1,0 +1,83 @@
+---
+title: pan machines
+description: Link this machine's dashboard to another machine, list the links, or remove one
+---
+
+# `pan machines`
+
+Link this machine's dashboard to another machine over an encrypted channel and manage
+the links. Released in v0.73.0. **Settings → Anywhere → Machines** has the same actions.
+See [Linked machines](/configuration/linked-machines).
+
+Every verb talks to the running dashboard with this machine's internal token, so the
+dashboard must be up (`pan up`); without one it prints the not-running message and exits 1.
+
+## link
+
+```bash
+pan machines link <pairing-url> [--one-way] [--agent-fenced] [--allow-loopback] [--json]
+```
+
+Links this machine to the one that printed `<pairing-url>` (`pan pair` or **Pair a
+device** there). By default the link goes both ways at operator level.
+
+| Flag | Effect |
+| --- | --- |
+| `--one-way` | Only this machine reaches the other; the other gets no link back. |
+| `--agent-fenced` | Agent-fenced access: forwarded requests are never operator-level. |
+| `--allow-loopback` | Accept a `localhost` pairing link (both servers on this host). |
+| `--json` | Print the new link as JSON. |
+
+```
+Linked desk (0a71-b2da-d646-3485-3ce1) over tailnet tcp://100.101.1.2:3011, both ways, operator-level
+See configuration/linked-machines.mdx for routes and access levels; `pan machines list` shows its state.
+```
+
+Failures name the cause and exit 1: not a pairing link, the other machine unreachable,
+the pairing link expired or already used, the other machine running an Overdeck without
+machine links, or a machine answering with a key other than the one the link names.
+
+## list
+
+```bash
+pan machines list [--json]
+```
+
+Shows this machine, every link with its state, and the machines that hold access here.
+
+```
+This machine: studio (1111-2222-3333-4444-5555)
+
+LABEL  STATE                            ROUTE                     ACCESS    FINGERPRINT
+desk   online                           tcp://192.168.1.5:3011    operator  0a71-b2da-d646-3485-3ce1
+laptop offline (network 12.0 s, 1 h ago)  tcp://10.0.0.9:3011       operator  7c0d-11aa-9b3e-4d2f-88e1
+
+Inbound
+LABEL  ACCESS    FINGERPRINT               LAST USED  TOKEN ID
+desk   operator  0a71-b2da-d646-3485-3ce1  just now   tok_…
+```
+
+The STATE cell carries the last incident (`froze` when the other dashboard stalled,
+`network` otherwise) and, for `unsupported`, `revoked` and `offline`, the detail.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Print `{ self, links, inbound }` as JSON. |
+
+With no links: `` No linked machines. Link one with `pan machines link <pairing-url>` using a `pan pair` link from the other machine. ``
+
+## unlink
+
+```bash
+pan machines unlink <label|environment-id|link-id> [--json]
+```
+
+Removes the link and tells the other machine to revoke this machine's access.
+
+```
+Unlinked "desk"; the other machine was told and its token here was revoked.
+```
+
+When the other machine cannot be reached it prints that it will see the link as revoked
+when it next connects. An unknown target prints `No machine link matches "<target>"` and
+exits 1. `--json` prints `{ ok, peerNotified }`.
