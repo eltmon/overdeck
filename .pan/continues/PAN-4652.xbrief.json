@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T20:36:26.680Z",
+  "updated": "2026-11-01T20:36:39.367Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -204,6 +204,10 @@
     "wi8-add-fly-machine-service.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T20:36:26.679Z"
+    },
+    "wi8-add-fly-machine-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:36:39.367Z"
     }
   }
 }
