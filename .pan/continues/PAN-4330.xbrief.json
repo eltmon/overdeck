@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4330",
   "created": "2026-11-01T04:59:32.820Z",
-  "updated": "2026-11-01T05:12:10.353Z",
+  "updated": "2026-11-01T05:25:54.626Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,10 @@
       "claimedBy": "agent-pan-4330",
       "claimedAt": "2026-11-01T05:07:44.720Z",
       "doneAt": "2026-11-01T05:12:10.352Z"
+    },
+    "account-client": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:25:54.625Z"
     }
   }
 }
