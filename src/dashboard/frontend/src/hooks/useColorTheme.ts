@@ -100,6 +100,13 @@ function applyUiTokens(theme: ColorTheme): void {
   }
 }
 
+// Memoizes effectiveTerminalPalette per theme object reference, so
+// `terminalPalette(mode)` is referentially stable across re-renders until
+// the active theme for that mode actually changes — required for
+// `useColorTheme((s) => s.terminalPalette(mode))` to behave as a well-formed
+// React selector (xterm-palette item, PAN-4644).
+const terminalPaletteCache = new WeakMap<ColorTheme, TerminalPalette>();
+
 async function fileToBase64(file: File): Promise<string> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = '';
@@ -198,7 +205,15 @@ export const useColorTheme = create<ColorThemeState>((set, get) => ({
   },
 
   activeTheme: (mode) => get().active[mode],
-  terminalPalette: (mode) => effectiveTerminalPalette(get().active[mode]),
+  terminalPalette: (mode) => {
+    const theme = get().active[mode];
+    let palette = terminalPaletteCache.get(theme);
+    if (palette === undefined) {
+      palette = effectiveTerminalPalette(theme);
+      terminalPaletteCache.set(theme, palette);
+    }
+    return palette;
+  },
 }));
 
 // A mode toggle must re-apply UI tokens for the newly active slot without a
