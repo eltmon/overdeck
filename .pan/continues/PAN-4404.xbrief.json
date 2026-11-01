@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:05:16.920Z",
+  "updated": "2026-11-01T14:05:25.149Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
       "claimedBy": "agent-pan-4404",
       "claimedAt": "2026-11-01T14:01:16.027Z",
       "doneAt": "2026-11-01T14:05:16.920Z"
+    },
+    "wi13-ssh-smoke": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T14:05:25.149Z"
     }
   }
 }
