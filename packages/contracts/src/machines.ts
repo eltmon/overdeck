@@ -102,6 +102,29 @@ export type LoadSample = typeof LoadSample.Type
 export const MachinePlacementMode = Schema.Literals(["auto", "on-request"])
 export type MachinePlacementMode = typeof MachinePlacementMode.Type
 
+/** PAN-4651 D-4651-9: why Auto placement skipped one machine. */
+export const PlacementRejection = Schema.Struct({
+  environmentId: Schema.String,
+  label: Schema.String,
+  /** `offline`, `unsupported`, `no project`, `no <tag>`, `CPU saturated` or `reserved`. */
+  reason: Schema.String,
+})
+export type PlacementRejection = typeof PlacementRejection.Type
+
+/** PAN-4651 D-4651-9: the machine Auto chose (with the one-line reason), or why none fits. */
+export const PlacementAnswer = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    environmentId: Schema.String,
+    label: Schema.String,
+    self: Schema.Boolean,
+    reason: Schema.String,
+    rejections: Schema.Array(PlacementRejection),
+  }),
+  Schema.Struct({ ok: Schema.Literal(false), rejections: Schema.Array(PlacementRejection) }),
+])
+export type PlacementAnswer = typeof PlacementAnswer.Type
+
 /** PAN-4651 D-4651-11: one project a machine has registered, as linked machines see it (never a path). */
 export const MachineProject = Schema.Struct({
   key: Schema.String,
