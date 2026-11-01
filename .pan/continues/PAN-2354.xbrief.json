@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2354",
   "created": "2026-11-01T05:46:47.920Z",
-  "updated": "2026-11-01T06:52:29.578Z",
+  "updated": "2026-11-01T06:55:17.462Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,9 +88,10 @@
       "doneAt": "2026-11-01T06:52:25.745Z"
     },
     "panel": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2354",
-      "claimedAt": "2026-11-01T06:52:29.578Z"
+      "claimedAt": "2026-11-01T06:52:29.578Z",
+      "doneAt": "2026-11-01T06:55:17.462Z"
     }
   }
 }
