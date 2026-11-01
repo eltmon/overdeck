@@ -61,6 +61,7 @@
               "configuration/remote-access",
               "configuration/triggers",
               "configuration/tailscale",
+              "configuration/mcp",
               "configuration/phone",
               "configuration/push-notifications",
               "cli/vault",

@@ -1,0 +1,323 @@
+{
+  "version": "1",
+  "issueId": "PAN-4649",
+  "created": "2026-11-01T05:49:52.049Z",
+  "updated": "2026-11-01T10:14:53.325Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T09:20:32.755Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T09:55:35.835Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T10:14:53.325Z"
+    }
+  ],
+  "items": {
+    "approve-scope": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T05:49:52.049Z",
+      "doneAt": "2026-11-01T05:57:05.818Z"
+    },
+    "approve-route-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T05:57:19.457Z",
+      "doneAt": "2026-11-01T06:00:54.432Z"
+    },
+    "workers-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T06:01:15.206Z",
+      "doneAt": "2026-11-01T06:04:23.003Z"
+    },
+    "mcp-route-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T06:04:25.321Z",
+      "doneAt": "2026-11-01T06:07:23.485Z"
+    },
+    "mcp-core-read": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T06:07:26.360Z",
+      "doneAt": "2026-11-01T06:13:11.277Z"
+    },
+    "mcp-write-tools": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T06:13:18.524Z",
+      "doneAt": "2026-11-01T06:18:02.909Z"
+    },
+    "mcp-approve-tools": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T06:18:10.191Z",
+      "doneAt": "2026-11-01T06:21:55.104Z"
+    },
+    "mcp-http-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T06:22:02.702Z",
+      "doneAt": "2026-11-01T06:37:10.662Z"
+    },
+    "mcp-stdio-command": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T06:37:17.883Z",
+      "doneAt": "2026-11-01T06:52:37.068Z"
+    },
+    "mcp-acceptance": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T06:52:46.661Z",
+      "doneAt": "2026-11-01T07:03:56.993Z"
+    },
+    "copy-mcp-url": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T07:03:59.064Z",
+      "doneAt": "2026-11-01T07:10:32.391Z"
+    },
+    "access-tokens-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T07:10:40.615Z",
+      "doneAt": "2026-11-01T07:18:18.998Z"
+    },
+    "docs-mcp-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T07:18:26.223Z",
+      "doneAt": "2026-11-01T07:19:31.760Z"
+    },
+    "docs-scopes-auth": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T07:19:34.187Z",
+      "doneAt": "2026-11-01T07:20:36.582Z"
+    },
+    "approve-scope.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:36:51.883Z"
+    },
+    "approve-scope.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:37:09.388Z"
+    },
+    "approve-scope.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:37:26.316Z"
+    },
+    "approve-route-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:37:47.894Z"
+    },
+    "approve-route-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:38:08.641Z"
+    },
+    "approve-route-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:38:29.811Z"
+    },
+    "mcp-route-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:38:46.913Z"
+    },
+    "mcp-route-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:39:05.835Z"
+    },
+    "mcp-route-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:39:24.140Z"
+    },
+    "workers-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:39:42.687Z"
+    },
+    "workers-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:40:03.425Z"
+    },
+    "workers-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:40:26.962Z"
+    },
+    "workers-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:40:47.283Z"
+    },
+    "mcp-core-read.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:41:09.014Z"
+    },
+    "mcp-core-read.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:41:29.875Z"
+    },
+    "mcp-core-read.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:41:55.434Z"
+    },
+    "mcp-core-read.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:42:16.291Z"
+    },
+    "mcp-write-tools.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:42:37.457Z"
+    },
+    "mcp-write-tools.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:42:56.968Z"
+    },
+    "mcp-write-tools.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:14.961Z"
+    },
+    "mcp-write-tools.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:34.386Z"
+    },
+    "mcp-approve-tools.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:52.964Z"
+    },
+    "mcp-approve-tools.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:44:14.253Z"
+    },
+    "mcp-approve-tools.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:44:32.350Z"
+    },
+    "mcp-approve-tools.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:44:49.220Z"
+    },
+    "mcp-http-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:45:07.753Z"
+    },
+    "mcp-http-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:45:28.628Z"
+    },
+    "mcp-http-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:45:51.067Z"
+    },
+    "mcp-http-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:46:13.663Z"
+    },
+    "mcp-stdio-command.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:46:34.991Z"
+    },
+    "mcp-stdio-command.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:46:55.115Z"
+    },
+    "mcp-stdio-command.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:47:12.841Z"
+    },
+    "mcp-acceptance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:47:30.034Z"
+    },
+    "mcp-acceptance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:47:45.698Z"
+    },
+    "mcp-acceptance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:48:03.665Z"
+    },
+    "mcp-acceptance.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:48:24.573Z"
+    },
+    "mcp-acceptance.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:48:41.098Z"
+    },
+    "copy-mcp-url.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:48:58.041Z"
+    },
+    "copy-mcp-url.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:49:16.176Z"
+    },
+    "copy-mcp-url.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:49:35.513Z"
+    },
+    "copy-mcp-url.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:49:54.507Z"
+    },
+    "access-tokens-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:50:15.787Z"
+    },
+    "access-tokens-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:50:38.681Z"
+    },
+    "access-tokens-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:50:58.881Z"
+    },
+    "access-tokens-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:51:24.499Z"
+    },
+    "docs-mcp-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:51:43.495Z"
+    },
+    "docs-mcp-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:52:00.821Z"
+    },
+    "docs-mcp-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:52:24.452Z"
+    },
+    "docs-mcp-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:52:47.700Z"
+    },
+    "docs-scopes-auth.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:53:05.498Z"
+    },
+    "docs-scopes-auth.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:53:25.831Z"
+    },
+    "docs-scopes-auth.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:53:42.778Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

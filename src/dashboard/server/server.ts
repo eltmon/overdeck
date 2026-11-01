@@ -45,6 +45,7 @@ import { velocityRouteLayer } from './routes/velocity.js'
 import { agentsRouteLayer } from './routes/agents.js'
 import { agentDirectoryRouteLayer } from './routes/agent-directory.js'
 import { workersRegisterRouteLayer } from './routes/workers-register.js'
+import { workersRouteLayer } from './routes/workers.js'
 import { lanesRouteLayer } from './routes/lanes.js'
 import { workspacesRouteLayer } from './routes/workspaces.js'
 import { workspaceRegistryRouteLayer } from './routes/workspace-registry.js'
@@ -60,6 +61,7 @@ import { anywhereRouteLayer } from './routes/anywhere.js'
 import { pushRouteLayer } from './routes/push.js'
 import { tailscaleRouteLayer } from './routes/tailscale.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
+import { mcpRouteLayer } from './routes/mcp.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { settingsRouteLayer } from './routes/settings.js'
 import { modelPresetsRouteLayer } from './routes/model-presets.js'
@@ -300,6 +302,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   agentsRouteLayer,
   agentDirectoryRouteLayer,
   workersRegisterRouteLayer,
+  workersRouteLayer,
   lanesRouteLayer,
   workspacesRouteLayer,
   workspaceRegistryRouteLayer,
@@ -365,6 +368,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   pushRouteLayer,
   tailscaleRouteLayer,
   accessTokensRouteLayer,
+  mcpRouteLayer,
   staticRouteLayer,
 );
 
