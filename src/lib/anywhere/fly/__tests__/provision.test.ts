@@ -245,3 +245,23 @@ describe('destroyFlyVm (PAN-4652 WI-7)', () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining('Could not copy GitHub auth'));
   });
 });
+
+describe('onCreated hook (review of PR #4742)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it('reports the machine as soon as it exists, before preparing it', async () => {
+    const h = harness();
+    const onCreated = vi.fn(async () => { h.events.push('onCreated'); });
+    await provisionFlyMachine({}, h.deps, { onCreated });
+    expect(onCreated).toHaveBeenCalledWith({ machineId: MACHINE_ID, machineName: 'overdeck-machine-1a2b3c4d', appName: 'overdeck-ws', region: 'iad' });
+    expect(h.events.indexOf('onCreated')).toBe(h.events.indexOf('createMachine') + 1);
+  });
+
+  it('destroys the VM when the hook fails', async () => {
+    const h = harness();
+    await expect(provisionFlyMachine({}, h.deps, { onCreated: async () => { throw new Error('disk full'); } })).rejects.toThrow('disk full');
+    expect(h.destroyMachine).toHaveBeenCalledWith('overdeck-ws', MACHINE_ID);
+  });
+});

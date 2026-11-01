@@ -199,7 +199,8 @@ when it next connects. An unknown target prints `No machine link matches "<targe
 exits 1. `--json` prints `{ ok, peerNotified, ssh, fly }`.
 
 A Fly machine is destroyed unless you pass `--keep-server`, and its record here is deleted
-either way:
+either way. With `--keep-server` nothing heartbeats the machine any more, so it stops itself
+within about 5 minutes and loses its disk:
 
 ```
 Destroyed the Fly machine behind fly-148e21ea7e1689.
@@ -225,7 +226,7 @@ Left the Overdeck server on vps running (in-use).
 
 | Flag | Effect |
 | --- | --- |
-| `--keep-server` | For an SSH machine this dashboard started: leave its Overdeck server running. For a Fly machine: do not destroy it. |
+| `--keep-server` | For an SSH machine this dashboard started: leave its Overdeck server running. For a Fly machine: do not destroy it now; with no heartbeat from here it stops itself within about 5 minutes. |
 | `--json` | Print `{ ok, peerNotified, ssh, fly }` as JSON. |
 
 ## forward

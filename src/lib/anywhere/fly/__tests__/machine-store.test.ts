@@ -71,6 +71,12 @@ describe('Fly machine store (PAN-4652 WI-6)', () => {
     expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({ v: 1, machines: [record()] });
   });
 
+  it('reads a zero-byte file (a crash mid-write) as empty', async () => {
+    await writeFile(join(home, 'fly-machines.json'), '', 'utf8');
+    expect(await store.listFlyMachines()).toEqual([]);
+    expect(store.countFlyMachines()).toBe(0);
+  });
+
   it('reads a missing file as empty', async () => {
     expect(await store.listFlyMachines()).toEqual([]);
     expect(store.countFlyMachines()).toBe(0);

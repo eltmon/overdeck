@@ -162,7 +162,7 @@ export async function runMachinesUnlink(target: string, options: { json?: boolea
   if (result.fly) {
     console.log(result.fly.destroyed
       ? `Destroyed the Fly machine behind ${target}.`
-      : `Left the Fly machine behind ${target} running (--keep-server); it is no longer linked or tracked here.`);
+      : `Left the Fly machine behind ${target} running (--keep-server). Nothing here heartbeats it any more, so it stops itself within about 5 minutes and loses its disk.`);
   }
 }
 

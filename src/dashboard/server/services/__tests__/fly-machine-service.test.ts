@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MachineLinkView } from '@overdeck/contracts';
 
 import { _resetFlyMachineStoreForTests, _settleFlyMachineWritesForTests, listFlyMachines, upsertFlyMachine } from '../../../../lib/anywhere/fly/machine-store.js';
-import type { FlyProvisionResult } from '../../../../lib/anywhere/fly/provision.js';
+import type { FlyCreatedMachine, FlyProvisionResult } from '../../../../lib/anywhere/fly/provision.js';
 import type { MachineLink } from '../../../../lib/anywhere/link-store.js';
 import { _resetFlyMachineServiceForTests, addFlyMachine, type FlyMachineServiceDeps, removeFlyMachineForLink, startFlyConversation } from '../fly-machine-service.js';
 import { MachineLinkError } from '../machine-link-service.js';
@@ -41,7 +41,10 @@ function fakes(overrides: Partial<FlyMachineServiceDeps> = {}) {
     loadConfig: vi.fn(async () => ({ remote: { enabled: true, max_concurrent_agents: 3 } })),
     hasFlyToken: vi.fn(() => true),
     checkCap: vi.fn(() => ({ allowed: true })),
-    provision: vi.fn(async () => VM),
+    provision: vi.fn(async (_input: unknown, onCreated: (machine: FlyCreatedMachine) => Promise<void>) => {
+      await onCreated(VM);
+      return VM;
+    }),
     destroy: vi.fn(async () => undefined),
     createMachineLink: vi.fn(async () => ({ link: LINK, view: VIEW })),
     removeLink: vi.fn(async () => null),
@@ -215,8 +218,13 @@ describe('spend cap reservation (CodeRabbit on PR #4742)', () => {
   const oneSlot = (_config: unknown, pending: number) => ({ allowed: pending < 1, message: 'Remote agent cap reached: 1/1 active remote agents and Fly machines.' });
 
   it('refuses a second concurrent add while the first is still provisioning, then frees the slot', async () => {
-    let finish!: (vm: FlyProvisionResult) => void;
-    const first = fakes({ checkCap: vi.fn(oneSlot), provision: vi.fn(() => new Promise<FlyProvisionResult>((resolve) => { finish = resolve; })) });
+    let finish!: () => Promise<void>;
+    const first = fakes({
+      checkCap: vi.fn(oneSlot),
+      provision: vi.fn((_input: unknown, onCreated: (machine: FlyCreatedMachine) => Promise<void>) => new Promise<FlyProvisionResult>((resolve) => {
+        finish = async () => { await onCreated(VM); resolve(VM); };
+      })),
+    });
     const firstAdd = addFlyMachine({}, first);
     await vi.waitFor(() => expect(first.provision).toHaveBeenCalledTimes(1));
 
@@ -224,7 +232,7 @@ describe('spend cap reservation (CodeRabbit on PR #4742)', () => {
     await expect(addFlyMachine({}, second)).rejects.toMatchObject({ code: 'cap-reached' });
     expect(second.provision).not.toHaveBeenCalled();
 
-    finish(VM);
+    await finish();
     await firstAdd;
     const third = fakes({ checkCap: vi.fn(() => ({ allowed: true })), newId: () => 'rec-3' });
     await addFlyMachine({}, third);
@@ -237,5 +245,37 @@ describe('spend cap reservation (CodeRabbit on PR #4742)', () => {
     const next = fakes({ checkCap: vi.fn(() => ({ allowed: true })) });
     await addFlyMachine({}, next);
     expect(next.checkCap).toHaveBeenCalledWith(expect.anything(), 0);
+  });
+});
+
+describe('record before failure (review of PR #4742)', () => {
+  const failAfterCreate = (error: Error) => vi.fn(async (_input: unknown, onCreated: (machine: FlyCreatedMachine) => Promise<void>) => {
+    await onCreated(VM);
+    throw error;
+  });
+
+  it('writes the record as soon as the VM exists, and deletes it when the destroy after a failed provision succeeds', async () => {
+    const deps = fakes({ provision: failAfterCreate(new Error('server-not-ready')) });
+    await expect(addFlyMachine({}, deps)).rejects.toThrow('server-not-ready');
+    expect(deps.destroy).toHaveBeenCalledWith('overdeck-ws', VM.machineId);
+    expect(await listFlyMachines()).toEqual([]);
+  });
+
+  it('keeps the record when the destroy fails, so the sweep can destroy the VM later', async () => {
+    const deps = fakes({
+      provision: failAfterCreate(new Error('server-not-ready')),
+      destroy: vi.fn(async () => { throw new Error('Fly API error 403'); }),
+    });
+    await expect(addFlyMachine({}, deps)).rejects.toThrow('server-not-ready');
+    expect(await listFlyMachines()).toEqual([expect.objectContaining({ id: 'rec-1', linkId: null, machineId: VM.machineId, label: VM.label })]);
+  });
+
+  it('keeps the record when the destroy fails after a link failure', async () => {
+    const deps = fakes({
+      createMachineLink: vi.fn(async () => { throw new MachineLinkError('unreachable', 'ECONNREFUSED'); }),
+      destroy: vi.fn(async () => { throw new Error('Fly API error 500'); }),
+    });
+    await expect(addFlyMachine({}, deps)).rejects.toMatchObject({ code: 'unreachable' });
+    expect(await listFlyMachines()).toHaveLength(1);
   });
 });

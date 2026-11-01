@@ -162,7 +162,7 @@ lower).
 A Fly machine is destroyed, never stopped, because a Fly VM loses its disk when it stops.
 That happens when:
 
-- you unlink it (`pan machines unlink fly-<machineId>`), unless you pass `--keep-server`;
+- you unlink it (`pan machines unlink fly-<machineId>`). With `--keep-server` it is not destroyed at once, but nothing heartbeats it any more, so it stops itself within about 5 minutes;
 - no linked conversation on it has been active for `[remote.fly] machine_idle_minutes`
   (default 30; 0 turns the idle check off);
 - this machine stops sending its heartbeat for 5 minutes (the VM stops itself, and this

@@ -194,9 +194,21 @@ export async function destroyFlyVm(appName: string, machineId: string, deps: { a
   }
 }
 
+/** The machine as soon as it exists, before it is prepared. */
+export interface FlyCreatedMachine {
+  machineId: string;
+  machineName: string;
+  appName: string;
+  region: string;
+}
+
 export async function provisionFlyMachine(
   input: { region?: string; image?: string },
   overrides: Partial<FlyProvisionDeps> = {},
+  hooks: {
+    /** Called once the machine exists, so the caller can record it before any later step can fail. */
+    onCreated?: (machine: FlyCreatedMachine) => Promise<void>;
+  } = {},
 ): Promise<FlyProvisionResult> {
   const deps = await resolveDeps(overrides);
   const cfg = deps.flyConfig;
@@ -221,6 +233,7 @@ export async function provisionFlyMachine(
   const region = machine.region || input.region || cfg.region || DEFAULT_REGION;
 
   try {
+    await hooks.onCreated?.({ machineId, machineName, appName, region });
     return await prepareMachine(deps, { appName, machineId, machineName, region });
   } catch (error) {
     await destroyFlyVm(appName, machineId, deps).catch((destroyError: unknown) => {

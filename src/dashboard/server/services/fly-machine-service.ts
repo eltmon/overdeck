@@ -9,9 +9,11 @@
  * record, links home → VM one way over the public route (D-2, D-3), then
  * patches the record with the link.
  *
- * Any failure after the VM exists destroys it, removes the link if one was
- * made and deletes the record before rethrowing: a machine left behind costs
- * money and is a bug.
+ * The record is written the moment the VM exists, before any step that can fail
+ * after it. Any failure destroys the VM, removes the link if one was made and
+ * deletes the record before rethrowing: a machine left behind costs money and is
+ * a bug. When the destroy itself fails, the record stays, so the deacon's sweep
+ * destroys the VM later ("provisioning never linked it").
  *
  * `notifyLinksChanged` is a required argument, not a default: the link
  * supervisor must pick the new link up before anything sends a request through
@@ -43,7 +45,7 @@ import {
   upsertFlyMachine,
 } from '../../../lib/anywhere/fly/machine-store.js';
 import { ensureFlyProject } from '../../../lib/anywhere/fly/project.js';
-import { destroyFlyVm, FlyMachineError, type FlyProvisionResult, provisionFlyMachine } from '../../../lib/anywhere/fly/provision.js';
+import { destroyFlyVm, type FlyCreatedMachine, FlyMachineError, type FlyProvisionResult, provisionFlyMachine } from '../../../lib/anywhere/fly/provision.js';
 import { loadConfig, type RemoteConfig } from '../../../lib/config.js';
 import { createFlyApiClient } from '../../../lib/remote/fly-api.js';
 import { checkRemoteSpendCap } from '../../../lib/remote/remote-agents.js';
@@ -80,7 +82,8 @@ export interface FlyMachineServiceDeps {
   hasFlyToken: (remote: RemoteConfig | undefined) => boolean;
   /** The spend cap, counting `pending` adds that passed it but have no record yet. */
   checkCap: (config: { remote?: RemoteConfig }, pending: number) => { allowed: boolean; message?: string };
-  provision: (input: { region?: string; image?: string }) => Promise<FlyProvisionResult>;
+  /** `onCreated` runs as soon as the VM exists, before any step that can fail after it. */
+  provision: (input: { region?: string; image?: string }, onCreated: (machine: FlyCreatedMachine) => Promise<void>) => Promise<FlyProvisionResult>;
   destroy: (appName: string, machineId: string) => Promise<void>;
   createMachineLink: (input: Parameters<typeof createMachineLink>[0]) => Promise<{ link: MachineLink; view: MachineLinkView }>;
   removeLink: (id: string) => Promise<unknown>;
@@ -108,7 +111,7 @@ const defaultDeps: Omit<FlyMachineServiceDeps, 'notifyLinksChanged'> = {
     }
   },
   checkCap: (config, pending) => checkRemoteSpendCap(config, { countFlyMachines: () => countFlyMachines() + pending }),
-  provision: (input) => provisionFlyMachine(input),
+  provision: (input, onCreated) => provisionFlyMachine(input, {}, { onCreated }),
   destroy: (appName, machineId) => destroyFlyVm(appName, machineId),
   createMachineLink: (input) => createMachineLink(input),
   removeLink,
@@ -177,26 +180,35 @@ export async function addFlyMachine(
 }
 
 async function provisionAndLink(input: AddFlyMachineInput, deps: FlyMachineServiceDeps, release: () => void): Promise<AddFlyMachineResult> {
-  // Provisioning destroys its own VM when it fails, so rollback starts after it.
-  const vm = await deps.provision({ region: input.region, image: input.image });
   const recordId = deps.newId();
+  let machine: FlyCreatedMachine | null = null;
+  let vm: FlyProvisionResult;
+  try {
+    vm = await deps.provision({ region: input.region, image: input.image }, async (createdMachine) => {
+      machine = createdMachine;
+      await deps.upsertRecord({
+        id: recordId,
+        linkId: null,
+        environmentId: null,
+        machineId: createdMachine.machineId,
+        machineName: createdMachine.machineName,
+        appName: createdMachine.appName,
+        region: createdMachine.region,
+        label: `fly-${createdMachine.machineId}`,
+        projectKey: input.projectKey ?? null,
+        docker: false,
+        createdAt: deps.now(),
+      });
+      release(); // the record counts toward the cap from here on
+    });
+  } catch (error) {
+    // Provisioning already tried to destroy its VM; this destroy settles whether the record may go.
+    if (machine) await rollback(deps, machine, recordId, null);
+    throw error;
+  }
+
   let linkId: string | null = null;
   try {
-    await deps.upsertRecord({
-      id: recordId,
-      linkId: null,
-      environmentId: null,
-      machineId: vm.machineId,
-      machineName: vm.machineName,
-      appName: vm.appName,
-      region: vm.region,
-      label: vm.label,
-      projectKey: input.projectKey ?? null,
-      docker: vm.docker,
-      createdAt: deps.now(),
-    });
-    release();
-
     let created: { link: MachineLink; view: MachineLinkView };
     try {
       created = await deps.createMachineLink({
@@ -212,7 +224,7 @@ async function provisionAndLink(input: AddFlyMachineInput, deps: FlyMachineServi
     }
     linkId = created.link.id;
 
-    const record = await deps.updateRecord(recordId, { linkId, environmentId: created.link.environmentId });
+    const record = await deps.updateRecord(recordId, { linkId, environmentId: created.link.environmentId, docker: vm.docker });
     if (!record) throw new Error(`The Fly machine record ${recordId} disappeared while linking`);
     deps.notifyLinksChanged();
 
@@ -252,17 +264,24 @@ export async function startFlyConversation(
   return { environmentId: link.environmentId, name, path: `/conv/@${link.environmentId}/${name}` };
 }
 
-/** Undo everything addFlyMachine made after provisioning. Each step logs its own failure and the next still runs. */
-async function rollback(deps: FlyMachineServiceDeps, vm: FlyProvisionResult, recordId: string, linkId: string | null): Promise<void> {
-  const attempt = async (what: string, step: () => Promise<unknown>): Promise<void> => {
-    await step().catch((error: unknown) => deps.log(`Rollback could not ${what}: ${(error as Error).message}`));
-  };
-  await attempt(`destroy Fly machine ${vm.machineId}`, () => deps.destroy(vm.appName, vm.machineId));
+/**
+ * Undo everything addFlyMachine made. Each step logs its own failure and the next
+ * still runs. The record is deleted only when the destroy succeeded; otherwise it
+ * stays so the sweep destroys the VM later.
+ */
+async function rollback(deps: FlyMachineServiceDeps, vm: Pick<FlyCreatedMachine, 'appName' | 'machineId'>, recordId: string, linkId: string | null): Promise<void> {
+  const attempt = async (what: string, step: () => Promise<unknown>): Promise<boolean> =>
+    step().then(() => true, (error: unknown) => {
+      deps.log(`Rollback could not ${what}: ${(error as Error).message}`);
+      return false;
+    });
+  const destroyed = await attempt(`destroy Fly machine ${vm.machineId}`, () => deps.destroy(vm.appName, vm.machineId));
   if (linkId !== null) {
     await attempt(`remove link ${linkId}`, () => deps.removeLink(linkId));
     deps.notifyLinksChanged();
   }
-  await attempt(`delete record ${recordId}`, () => deps.removeRecord(recordId));
+  if (destroyed) await attempt(`delete record ${recordId}`, () => deps.removeRecord(recordId));
+  else deps.log(`Kept the record of Fly machine ${vm.machineId} so the sweep destroys it later`);
 }
 
 /**

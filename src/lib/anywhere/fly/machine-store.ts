@@ -81,6 +81,8 @@ function isRecord(value: unknown): value is FlyMachineRecord {
 }
 
 function parseMachines(raw: string, path: string): FlyMachineRecord[] {
+  // A crash can leave a zero-byte file behind (PAN-2623); it holds no records.
+  if (raw.trim() === '') return [];
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -204,12 +206,12 @@ export async function removeFlyMachine(id: string): Promise<FlyMachineRecord | n
   });
 }
 
-/** Test-only: wait for queued writes to settle. */
+/** Test seam: no production caller; tests wait for queued writes to settle. */
 export async function _settleFlyMachineWritesForTests(): Promise<void> {
   await writeQueue;
 }
 
-/** Test-only: drop the queue. */
+/** Test seam: no production caller; tests drop the write queue between cases. */
 export function _resetFlyMachineStoreForTests(): void {
   writeQueue = Promise.resolve();
 }
