@@ -4,17 +4,17 @@
     "created": "2026-11-01T05:00:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1254: Set up Tailscale from Overdeck: install, sign in, Serve HTTPS, peer discovery",
-    "updated": "2026-11-01T05:14:00.105Z"
+    "updated": "2026-11-01T05:45:19.013Z"
   },
   "plan": {
     "id": "pan-1254",
     "title": "Set up Tailscale from Overdeck: install, sign in, Serve HTTPS, peer discovery",
-    "status": "proposed",
+    "status": "running",
     "uid": "d12cacd6-d815-4db7-b4e5-b861d60a1ca5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T05:00:00Z",
-    "updated": "2026-11-01T05:14:00.105Z",
+    "updated": "2026-11-01T05:45:19.013Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1254",
@@ -1723,5 +1723,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
