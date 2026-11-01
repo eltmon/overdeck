@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T16:31:58.214891Z · model: claude-opus-5-5 · open: 859_
+_Last sequenced: 2026-11-01T16:32:36.471787Z · model: claude-opus-5-5 · open: 859_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1194,7 +1194,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T16:31:58.214891Z",
+  "generatedAt": "2026-11-01T16:32:36.471787Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 859,
