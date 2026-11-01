@@ -276,6 +276,63 @@ describe('pack git cache', () => {
   });
 });
 
+describe('plugin root packs', () => {
+  let up: Upstream;
+  let first = '';
+
+  beforeAll(() => {
+    up = createUpstream();
+    up.commitFile('harness/pstack/claude-code/.claude-plugin/plugin.json', JSON.stringify({ name: 'pstack' }), 'plugin');
+    up.commitFile('harness/pstack/claude-code/skills/alpha/SKILL.md', skillMd('alpha'), 'alpha');
+    up.commitFile('harness/pstack/claude-code/skills/setup-pstack/SKILL.md', skillMd('setup-pstack'), 'setup-pstack');
+    first = up.commitFile('other/skills/x/SKILL.md', skillMd('x'), 'other');
+    up.tag('v1', first);
+  });
+
+  afterAll(() => {
+    rmSync(up.scratch, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    rmSync(packsHome(), { recursive: true, force: true });
+  });
+
+  it('addPack previews the skills under the known plugin root', async () => {
+    writeFileSync(configPath(), '# keep me\n');
+    const result = await addPack({ id: 'pstack', url: up.url, ref: 'v1' }, vi.fn(async () => true));
+    expect(result.preview.manifest.skills.map((skill) => skill.name)).toEqual(['alpha', 'setup-pstack']);
+    expect(result.preview.manifest.skills.find((skill) => skill.name === 'setup-pstack')?.optIn).toBe(true);
+    expect(result.preview.pluginRoot).toBe('harness/pstack/claude-code');
+  });
+
+  it('extracts only the plugin root', async () => {
+    writeFileSync(configPath(), '# keep me\n');
+    const result = await addPack({ id: 'pstack', url: up.url, ref: 'v1' }, vi.fn(async () => true));
+    const dir = packExtractDir('pstack', result.preview.commit);
+    expect(existsSync(join(dir, 'other'))).toBe(false);
+    expect(existsSync(join(dir, 'harness', 'pstack', 'claude-code', 'skills', 'alpha', 'SKILL.md'))).toBe(true);
+  });
+
+  it('re-extracts a cached commit that lacks the plugin root', async () => {
+    const dir = packExtractDir('pstack', first);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'unrelated.txt'), 'stale\n');
+    await fetchPackSource('pstack', up.url);
+    const extracted = await extractCommit('pstack', first, 'harness/pstack/claude-code');
+    expect(existsSync(join(extracted, 'harness', 'pstack', 'claude-code', 'skills', 'alpha', 'SKILL.md'))).toBe(true);
+  });
+
+  it('updatePack reports a changed skill by its repo-relative tree hash', async () => {
+    writeFileSync(configPath(), '# keep me\n');
+    await addPack({ id: 'pstack', url: up.url, ref: 'v1' }, vi.fn(async () => true));
+    up.commitFile('harness/pstack/claude-code/skills/alpha/SKILL.md', `${skillMd('alpha')}\nChanged.\n`, 'change alpha');
+    const next = up.commitFile('harness/pstack/claude-code/skills/alpha/notes.md', 'notes\n', 'notes');
+    const result = await updatePack('pstack', { ref: 'main' }, vi.fn(async () => true));
+    expect(result.preview.commit).toBe(next);
+    expect(result.preview.diff).toEqual({ added: [], removed: [], changed: ['alpha'], newCapabilities: [] });
+  });
+});
+
 describe('pack lifecycle', () => {
   let up: Upstream;
   let first = '';

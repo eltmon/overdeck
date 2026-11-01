@@ -257,15 +257,40 @@ export async function resolveRef(id: string, ref: string): Promise<string> {
   return commit;
 }
 
-/** Extract a commit into `packs/<id>/<commit>/` (temp dir, then rename); reuses an existing extraction. */
-export async function extractCommit(id: string, commit: string): Promise<string> {
+async function isDirAt(path: string): Promise<boolean> {
+  try {
+    return (await lstat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extract a commit into `packs/<id>/<commit>/` (temp dir, then rename);
+ * reuses an existing extraction, unless `pluginRoot` is given and missing
+ * from it, in which case the stale extraction is removed and rebuilt.
+ */
+export async function extractCommit(id: string, commit: string, pluginRoot?: string): Promise<string> {
+  if (pluginRoot !== undefined) assertOperand('plugin root', pluginRoot);
   const dir = packExtractDir(id, commit);
-  if (await exists(dir)) return dir;
+  if (await exists(dir)) {
+    if (!pluginRoot || (await isDirAt(join(dir, pluginRoot)))) return dir;
+    await rm(dir, { recursive: true, force: true });
+  }
   const tmp = `${dir}.tmp-${randomBytes(6).toString('hex')}`;
   const tar = `${tmp}.tar`;
   try {
     await mkdir(tmp, { recursive: true });
-    await git(['--git-dir', packRepoDir(id), 'archive', '--format=tar', '-o', tar, commit]);
+    await git([
+      '--git-dir',
+      packRepoDir(id),
+      'archive',
+      '--format=tar',
+      '-o',
+      tar,
+      commit,
+      ...(pluginRoot ? ['--', pluginRoot] : []),
+    ]);
     await execFileAsync('tar', ['-xf', tar, '-C', tmp]);
     try {
       await rename(tmp, dir);
@@ -336,6 +361,7 @@ export interface PackPreview {
   commit: string;
   adapter: PackAdapterId;
   manifest: PackManifest;
+  pluginRoot?: string;
   previousCommit?: string;
   diff?: { added: string[]; removed: string[]; changed: string[]; newCapabilities: string[] };
   /** Runtime packs: the render command trusting runs once, with `cwd` = the extraction. */
@@ -360,8 +386,16 @@ async function packAdapter(id: string, dir: string, explicit?: PackAdapterId): P
   return explicit ?? KNOWN_PACKS[id]?.adapter ?? (await detectAdapter(dir));
 }
 
+const pluginRootOf = (id: string): string | undefined => KNOWN_PACKS[id]?.pluginRoot;
+
 async function manifestAt(id: string, dir: string, adapter: PackAdapterId): Promise<PackManifest> {
-  return gitStep(id, () => readPackManifest(dir, adapter, { optIn: KNOWN_PACKS[id]?.optIn ?? [], skillsRoot: KNOWN_PACKS[id]?.skillsRoot }));
+  return gitStep(id, () =>
+    readPackManifest(dir, adapter, {
+      optIn: KNOWN_PACKS[id]?.optIn ?? [],
+      skillsRoot: KNOWN_PACKS[id]?.skillsRoot,
+      pluginRoot: pluginRootOf(id),
+    }),
+  );
 }
 
 async function renderStep<T>(step: () => Promise<T>): Promise<T> {
@@ -412,7 +446,7 @@ export async function addPack(
     await fetchPackSource(id, url);
     return resolveRef(id, ref);
   });
-  const dir = await gitStep(id, () => extractCommit(id, commit));
+  const dir = await gitStep(id, () => extractCommit(id, commit, pluginRootOf(id)));
   const adapter = await packAdapter(id, dir, input.adapter);
   const runtime = adapter === 'gstack-runtime' ? await runtimePreview(id, dir, commit) : undefined;
   const preview: PackPreview = {
@@ -423,6 +457,7 @@ export async function addPack(
     adapter,
     manifest: await manifestAt(id, dir, adapter),
     ...(runtime ? { runtime } : {}),
+    ...(pluginRootOf(id) ? { pluginRoot: pluginRootOf(id) } : {}),
   };
   if (!(await confirm(preview))) return { written: false, preview };
   if (runtime) await renderPack(id, dir, commit);
@@ -446,8 +481,8 @@ export async function updatePack(
     await fetchPackSource(id, entry.url);
     return resolveRef(id, ref);
   });
-  const dir = await gitStep(id, () => extractCommit(id, commit));
-  const oldDir = await gitStep(id, () => extractCommit(id, entry.commit));
+  const dir = await gitStep(id, () => extractCommit(id, commit, pluginRootOf(id)));
+  const oldDir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
   const adapter = await packAdapter(id, dir, entry.adapter);
   const manifest = await manifestAt(id, dir, adapter);
   const oldManifest = await manifestAt(id, oldDir, adapter);
@@ -469,6 +504,7 @@ export async function updatePack(
     commit,
     adapter,
     manifest,
+    ...(pluginRootOf(id) ? { pluginRoot: pluginRootOf(id) } : {}),
     previousCommit: entry.commit,
     diff: {
       added: manifest.skills.map((skill) => skill.name).filter((name) => !oldByName.has(name)),
@@ -508,7 +544,7 @@ export async function syncPack(id: string): Promise<{ commit: string; dir: strin
   const dir = await gitStep(id, async () => {
     await fetchPackSource(id, entry.url);
     await resolveRef(id, entry.commit);
-    return extractCommit(id, entry.commit);
+    return extractCommit(id, entry.commit, pluginRootOf(id));
   });
   if ((entry.adapter ?? KNOWN_PACKS[id]?.adapter) === 'gstack-runtime') await renderPack(id, dir, entry.commit);
   return { commit: entry.commit, dir };

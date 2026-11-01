@@ -395,6 +395,31 @@ describe('skill pack launch (PAN-4334)', () => {
     expect(await applyClaudePacks(ctx, link, new Set(['mattpocock']))).toEqual([]);
   });
 
+  it('mounts pstack skills with the Claude Code adapter doc (PAN-4728)', async () => {
+    const root = packExtractDir('pstack', COMMIT);
+    mkdirSync(join(root, 'harness', 'pstack', 'claude-code', 'skills', 'tdd'), { recursive: true });
+    writeFileSync(join(root, 'harness', 'pstack', 'claude-code', 'skills', 'tdd', 'SKILL.md'), '---\nname: tdd\ndescription: x\n---\n');
+    mkdirSync(join(root, 'harness', 'pstack', 'claude-code', 'docs', 'harness'), { recursive: true });
+    writeFileSync(join(root, 'harness', 'pstack', 'claude-code', 'docs', 'harness', 'claude-code.md'), '# Adapter\n');
+    const base = catalogEntry(true);
+    listPackCatalog.mockResolvedValue([
+      {
+        ...base,
+        id: 'pstack',
+        adapter: 'claude-plugin',
+        manifest: {
+          ...base.manifest!,
+          skills: [skill('tdd', 'harness/pstack/claude-code/skills/tdd')],
+          pluginName: 'pstack',
+        },
+      },
+    ]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { pstack: true } } });
+    expect(await applyClaudePacks(ctx, link)).toEqual([]);
+    expect(existsSync(join(link, 'pstack', 'skills', 'tdd', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(link, 'pstack', 'docs', 'harness', 'claude-code.md'))).toBe(true);
+  });
+
   it('stays quiet about an uncached pack that nothing turns on', async () => {
     listPackCatalog.mockResolvedValue([catalogEntry(false)]);
     loadSkillOverrideLayers.mockResolvedValue({ global: {} });

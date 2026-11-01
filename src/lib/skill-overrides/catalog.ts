@@ -115,7 +115,11 @@ export async function listPackCatalog(): Promise<PackCatalogEntry[]> {
       let manifest: PackManifest | null = null;
       if (cached) {
         try {
-          manifest = await readPackManifest(dir, adapter, { optIn: known?.optIn ?? [], skillsRoot: known?.skillsRoot });
+          manifest = await readPackManifest(dir, adapter, {
+            optIn: known?.optIn ?? [],
+            skillsRoot: known?.skillsRoot,
+            pluginRoot: known?.pluginRoot,
+          });
         } catch {
           manifest = null;
         }

@@ -578,6 +578,45 @@ describe('pan skills pack', () => {
     expect(mocks.addPack).toHaveBeenCalledWith(expect.objectContaining({ adapter: 'deft-readonly' }), expect.any(Function));
   });
 
+  it('add pstack with no url or ref uses the known defaults', async () => {
+    await run('pack', 'add', 'pstack', '--yes');
+    expect(mocks.addPack).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'pstack',
+        url: 'https://github.com/eltmon/plugins',
+        ref: 'ae5650febf4320793844c12c4adaa937f417f8da',
+      }),
+      expect.any(Function),
+    );
+  });
+
+  it('add mattpocock without --ref exits 1 naming the missing ref', async () => {
+    await expect(run('pack', 'add', 'mattpocock')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('pack mattpocock has no default ref; pass --ref <tag-or-branch>');
+    expect(mocks.addPack).not.toHaveBeenCalled();
+  });
+
+  it('add of an unknown id without a url exits 1', async () => {
+    await expect(run('pack', 'add', 'foo')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('pack foo has no default url');
+    expect(mocks.addPack).not.toHaveBeenCalled();
+  });
+
+  it('prints a Root row for a plugin-root preview', async () => {
+    mocks.addPack.mockImplementation(async (_input: unknown, confirm: (p: unknown) => Promise<boolean>) => {
+      const rootPreview = { ...preview, id: 'pstack', pluginRoot: 'harness/pstack/claude-code' };
+      const written = await confirm(rootPreview);
+      return { written, preview: rootPreview };
+    });
+    await run('pack', 'add', 'pstack', '--yes');
+    expect(logs.join('\n')).toContain('  Root         harness/pstack/claude-code');
+  });
+
+  it('prints no Root row for a repo-root preview', async () => {
+    await expect(run(...addArgs)).rejects.toThrow('exit 1');
+    expect(logs.join('\n')).not.toContain('Root');
+  });
+
   it('lists packs as JSON offline without an update check', async () => {
     mocks.listPackCatalog.mockResolvedValue([
       { id: 'mattpocock', url: preview.url, ref: 'v1.2.3', commit: COMMIT, adapter: 'claude-plugin', cached: true, manifest: preview.manifest },

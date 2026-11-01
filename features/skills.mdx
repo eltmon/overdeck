@@ -304,6 +304,8 @@ Adding a pack trusts this commit and enables nothing. Turn it on with: pan skill
 
 Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly|gstack-runtime` to choose. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
 
+For a known pack (`mattpocock`, `deft`, `sageox`, `pstack`) the url is optional; `pstack` also has a default ref, so `pan skills pack add pstack` is enough.
+
 ### Pinning and updates
 
 The registry stores the **ref** you asked for (a tag or a branch) and the **trusted commit** you approved. Every launch mounts exactly the trusted commit, even if the tag or branch moves.
@@ -331,6 +333,55 @@ pan skills set --pack mattpocock inherit --project <key>          # project: und
 pan skills set --pack mattpocock on --issue <id>                  # issue: on
 pan skills set --pack mattpocock inherit --issue <id>              # issue: undo
 ```
+
+### pstack
+
+`pstack` is poteto's (Lauren Tan's) skill pack for Cursor — `principle-*`, `unslop`, `tdd`, `architect`, `poteto-mode`, and more — mounted from the operator's fork `https://github.com/eltmon/plugins`, pinned to `ae5650f`. Overdeck mounts Cursor's generated Claude Code build at `harness/pstack/claude-code`, not the Cursor source tree; the `KNOWN_PACKS.pstack` entry carries that subfolder as its `pluginRoot`, so the manifest, skill scan, and capability probes all read from inside it. Re-pin with `pan skills pack update pstack --ref <commit-or-branch>`.
+
+```bash
+pan skills pack add pstack
+```
+
+```
+Pack pstack
+  Source       https://github.com/eltmon/plugins @ ae5650febf4320793844c12c4adaa937f417f8da (ae5650f)
+  Root         harness/pstack/claude-code
+  Adapter      claude-plugin
+  License      MIT
+  Skills       58 (7 opt-in: automate-me, create-formal-verification-skill, create-verification-skill, maintain-verification-skill, make-bot-ui, reflect, setup-pstack)
+  Not applied  agents, executables (6), project-mutating skills (7)
+Trusted pstack @ ae5650f.
+```
+
+```bash
+pan skills set --pack pstack on                              # global: on
+pan skills set --pack pstack off                             # global: undo
+
+pan skills set --pack pstack on --project <key>               # project: on
+pan skills set --pack pstack inherit --project <key>          # project: undo
+
+pan skills set --pack pstack on --issue <id>                  # issue: on
+pan skills set --pack pstack inherit --issue <id>              # issue: undo
+```
+
+Most pstack skills set `disable-model-invocation: true`, so the agent picks them up only when you invoke them directly, e.g. `/pstack:principle-laziness-protocol`.
+
+Seven skills are opt-in — turning the pack on never turns them on:
+
+- `setup-pstack` — writes `~/.claude/rules/pstack-models.md`, which every Claude Code session on the host loads, including sessions outside Overdeck.
+- `automate-me` — writes a personal mode skill, then commits and opens a PR.
+- `reflect` — copies a skill folder into a skills dir and edits it.
+- `create-verification-skill`, `create-formal-verification-skill` — write a project-local skill under `.cursor/skills/` → `.claude/skills/`, an Overdeck sync target in workspaces.
+- `maintain-verification-skill` — opens at most one PR of proven corrections.
+- `make-bot-ui` — builds a webhook UI for a Grok bot and exposes it on Tailscale.
+
+The mount also copies the plugin's `docs/` and `README.md` next to `skills/` (`KnownPack.mountExtras`), so the skills' link to the Claude Code adapter doc (`docs/harness/claude-code.md`) resolves instead of dangling.
+
+A few pstack skills name Cursor model ids (`arena`, `architect`, `setup-pstack`); the adapter doc maps e.g. `claude-opus-5-5-xhigh` to `model: "opus"` with effort `xhigh` and runs `grok-*`/`gpt-*` roles on the session model. pstack's defaults spawn subagents at `xhigh`; the opt-in `/pstack:setup-pstack` can lower the budget.
+
+`agents/` is not applied, so `poteto-mode`'s delegations to `pstack:poteto-agent` and `pstack:comment-sicko` fall back to `general-purpose`. `poteto-mode`'s shipping and babysit playbooks open and merge PRs with `gh` and run `scripts/watch-pr/watch-pr`; Overdeck never runs these scripts, and inside an Overdeck issue the pipeline owns PRs and merges.
+
+Codex receives the same Claude Code build; the fork has no Codex-specific build.
 
 ### Names: `pack/skill` and `pack:skill`
 
