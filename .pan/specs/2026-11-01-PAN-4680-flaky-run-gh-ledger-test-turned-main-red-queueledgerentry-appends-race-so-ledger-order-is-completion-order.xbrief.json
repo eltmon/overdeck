@@ -4,17 +4,17 @@
     "created": "2026-11-01T07:16:41Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4680: Flaky run-gh ledger test turned main red: queueLedgerEntry appends race, so ledger order is completion order",
-    "updated": "2026-11-01T07:22:56.839Z"
+    "updated": "2026-11-01T07:24:11.755Z"
   },
   "plan": {
     "id": "pan-4680",
     "title": "Flaky run-gh ledger test turned main red: queueLedgerEntry appends race, so ledger order is completion order",
-    "status": "proposed",
+    "status": "running",
     "uid": "7faf64d9-05b0-4adb-8b26-6973d7d1490a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T07:16:41Z",
-    "updated": "2026-11-01T07:22:56.839Z",
+    "updated": "2026-11-01T07:24:11.755Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4680",
@@ -323,5 +323,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
