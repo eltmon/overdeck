@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T18:52:34.553Z",
+  "updated": "2026-11-01T18:52:42.487Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4651",
       "claimedAt": "2026-11-01T18:42:06.073Z",
       "doneAt": "2026-11-01T18:52:34.553Z"
+    },
+    "wi3-project-lists": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T18:52:42.487Z"
     }
   }
 }
