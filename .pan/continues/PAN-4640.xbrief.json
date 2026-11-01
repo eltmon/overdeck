@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4640",
   "created": "2026-11-01T04:51:29.241Z",
-  "updated": "2026-11-01T05:50:21.082Z",
+  "updated": "2026-11-01T05:50:39.443Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "resume-cause-override.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T05:50:21.081Z"
+    },
+    "schedule-sweep.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:50:39.443Z"
     }
   }
 }
