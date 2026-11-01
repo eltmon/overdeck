@@ -374,9 +374,15 @@ a Settings save calls `invalidateRemoteAccessConfig()`, so the Settings toggle
   (`traefik.bind` in `~/.overdeck/config.toml`), so other machines cannot
   connect. Even with `bind = "all"`, a Docker-bridge peer whose rightmost
   `X-Forwarded-For` entry is not loopback or a host Docker-bridge IP gets
-  **401** from the session mint and from the remote request gate. IPv6 LAN
-  clients reach Traefik through the `[::]` docker-proxy listener and appear as
-  the bridge gateway, so only the loopback binding defends against them.
+  **401** from the session mint and from the remote request gate. With
+  `bind = "all"`, Overdeck writes the 80, 443 and 8080 port lines with the
+  explicit IPv4 host address `0.0.0.0`, which requests no IPv6 `[::]` listener
+  for those ports. A port line you add without a host address
+  publishes on IPv6 as well, and IPv6 clients on it reach Traefik through
+  docker-proxy as the bridge gateway. A container created from a compose file
+  older than PAN-4299 still publishes the managed ports on `[::]` until
+  `pan restart --traefik` recreates it; `pan doctor` reports that as
+  **Traefik port binding**.
 
 **Does NOT defend:**
 - Any process running on this machine. It can mint a session as a loopback
