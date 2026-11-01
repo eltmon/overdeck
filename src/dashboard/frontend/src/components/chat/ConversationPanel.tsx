@@ -983,7 +983,7 @@ export function ConversationPanel({
             <ConversationBranchMeta conversation={conversation} />
             <ConversationMachineChip conversation={conversation} />
             <span className={styles.conversationMetaSep} aria-hidden>·</span>
-            <PanOpenInPicker openInCwd={conversation.cwd} />
+            <PanOpenInPicker openInCwd={conversation.cwd} remote={conversation.origin === 'linked' ? { conversation: conversation.name } : undefined} />
             {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
               <>
                 <span className={styles.conversationMetaSep} aria-hidden>·</span>

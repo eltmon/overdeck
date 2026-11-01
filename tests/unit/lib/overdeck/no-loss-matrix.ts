@@ -458,6 +458,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/conversations/:name/reclaim',      kind: 'http', disposition: 'WRITE',       door: 'conversation-release-service.reclaimRelease (asks the target over the link) (PAN-4650)' },
   { surface: 'POST /api/linked-conversations/pull',        kind: 'http', disposition: 'WRITE',       door: 'conversation-pull.startPull (release, transfer, adopt via vault-continue, finish) (PAN-4650)' },
   { surface: 'GET /api/linked-conversations/pull/:pullId', kind: 'http', disposition: 'READ',        door: 'conversation-pull.getPull (in-memory job) (PAN-4650)' },
+  { surface: 'POST /api/linked-conversations/open-in-editor', kind: 'http', disposition: 'WRITE',    door: 'open-remote.resolveRemoteEditorLaunch (code --remote ssh-remote+<host>) (PAN-4650)' },
   { surface: 'POST /api/machines/:id/reconnect',           kind: 'http', disposition: 'WRITE',       door: 'link-supervisor.reconnect (PAN-4645)' },
   { surface: 'POST /api/machines/:id/routes',              kind: 'http', disposition: 'WRITE',       door: 'link-store.setLinkRoutes (manual route) (PAN-4645, closes #4403)' },
   { surface: 'POST /api/machines/:id/forwards',            kind: 'http', disposition: 'WRITE',       door: 'port-forwards.startForward (probe /ws/forward, listen on 127.0.0.1) (PAN-4650)' },
