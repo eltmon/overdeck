@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4640",
   "created": "2026-11-01T04:51:29.241Z",
-  "updated": "2026-11-01T05:53:48.315Z",
+  "updated": "2026-11-01T05:54:11.439Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "schedule-cli.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T05:53:48.315Z"
+    },
+    "schedule-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:54:11.438Z"
     }
   }
 }
