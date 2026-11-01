@@ -4,7 +4,10 @@
  *
  *   pan machines link <pairing-url> [--one-way] [--agent-fenced] [--allow-loopback] [--json]
  *   pan machines list [--json]
- *   pan machines unlink <label|environment-id|link-id> [--json]
+ *   pan machines unlink <label|environment-id|link-id> [--keep-server] [--json]
+ *
+ * The SSH verbs (`add-ssh`, `test-ssh`, the hidden `ssh-helper`) live in
+ * `machines-ssh.ts` (PAN-4404).
  *
  * Every verb talks to the running dashboard with the internal token; the
  * dashboard owns the keys, the channel and the link store. Registered from
@@ -15,32 +18,14 @@ import type { Command } from 'commander';
 import type { MachineLinkView, MachinesResponse } from '@overdeck/contracts';
 
 import { callDashboard, errorText, isDashboardUnreachable } from './dashboard-call.js';
+import { call, fail, NEEDS_PAN_UP, NOT_RUNNING } from './machines-call.js';
 import { registerMachinesSshCommands } from './machines-ssh.js';
 
+export { NOT_RUNNING } from './machines-call.js';
+
 const DOCS_PAGE = 'configuration/linked-machines.mdx';
-export const NOT_RUNNING = 'Overdeck dashboard is not running. Start the dashboard with pan up, then retry.';
-const NEEDS_PAN_UP = 'The dashboard rejected this machine\'s internal token. Start the dashboard with pan up (a `pan serve` server does not share it).';
 
 export interface MachinesLinkOptions { oneWay?: boolean; agentFenced?: boolean; allowLoopback?: boolean; json?: boolean }
-
-async function fail(message: string): Promise<never> {
-  console.error(chalk.red(message));
-  const { exitCli } = await import('../exit.js');
-  return exitCli(1);
-}
-
-async function call(verb: string, path: string, init: { method: string; body?: unknown }): Promise<Response | never> {
-  let response: Response;
-  try {
-    response = await callDashboard(path, init);
-  } catch (error) {
-    if (isDashboardUnreachable(error)) return fail(NOT_RUNNING);
-    throw error;
-  }
-  if (response.status === 401) return fail(NEEDS_PAN_UP);
-  if (!response.ok) return fail(`pan machines ${verb} failed: ${await errorText(response)}`);
-  return response;
-}
 
 /** `5.0 s`, `850 ms`. */
 export function formatDuration(ms: number): string {
@@ -105,8 +90,15 @@ export async function runMachinesList(options: { json?: boolean }): Promise<void
   } else {
     console.log('');
     table(
-      ['LABEL', 'STATE', 'ROUTE', 'ACCESS', 'FINGERPRINT'],
-      machines.links.map((link) => [link.label, formatLinkState(link), link.currentRoute ?? link.routes[0]?.url ?? '-', link.access, link.fingerprint]),
+      ['LABEL', 'STATE', 'ROUTE', 'ACCESS', 'SSH', 'FINGERPRINT'],
+      machines.links.map((link) => [
+        link.label,
+        formatLinkState(link),
+        link.currentRoute ?? link.routes[0]?.url ?? '-',
+        link.access,
+        link.ssh ? `${link.ssh.destination} (${link.ssh.forward}, ${link.ssh.launch})` : '-',
+        link.fingerprint,
+      ]),
     );
   }
   console.log('');
@@ -121,10 +113,10 @@ export async function runMachinesList(options: { json?: boolean }): Promise<void
   }
 }
 
-export async function runMachinesUnlink(target: string, options: { json?: boolean }): Promise<void> {
+export async function runMachinesUnlink(target: string, options: { json?: boolean; keepServer?: boolean }): Promise<void> {
   let response: Response;
   try {
-    response = await callDashboard(`/api/machines/${encodeURIComponent(target)}`, { method: 'DELETE' });
+    response = await callDashboard(`/api/machines/${encodeURIComponent(target)}${options.keepServer ? '?keepServer=1' : ''}`, { method: 'DELETE' });
   } catch (error) {
     if (isDashboardUnreachable(error)) return fail(NOT_RUNNING);
     throw error;
@@ -132,7 +124,7 @@ export async function runMachinesUnlink(target: string, options: { json?: boolea
   if (response.status === 404) return fail(`No machine link matches "${target}" (by label, environment id or link id). \`pan machines list\` shows the links.`);
   if (response.status === 401) return fail(NEEDS_PAN_UP);
   if (!response.ok) return fail(`pan machines unlink failed: ${await errorText(response)}`);
-  const result = await response.json() as { ok: boolean; peerNotified: boolean };
+  const result = await response.json() as { ok: boolean; peerNotified: boolean; ssh?: { stopped: boolean; reason: string } | null };
   if (options.json) {
     console.log(JSON.stringify(result));
     return;
@@ -140,6 +132,11 @@ export async function runMachinesUnlink(target: string, options: { json?: boolea
   console.log(result.peerNotified
     ? `Unlinked "${target}"; the other machine was told and its token here was revoked.`
     : `Unlinked "${target}"; its token here was revoked. The other machine could not be reached and will see the link as revoked when it next connects.`);
+  if (result.ssh) {
+    console.log(result.ssh.stopped
+      ? `Stopped the Overdeck server on ${target}.`
+      : `Left the Overdeck server on ${target} running (${result.ssh.reason}).`);
+  }
 }
 
 export function registerMachinesCommands(program: Command): void {
@@ -162,7 +159,8 @@ export function registerMachinesCommands(program: Command): void {
   machines
     .command('unlink <target>')
     .description('Remove a link by label, environment id or link id, revoking the token the other machine holds')
-    .option('--json', 'Print { ok, peerNotified } as JSON')
-    .action((target: string, options: { json?: boolean }) => runMachinesUnlink(target, options));
+    .option('--keep-server', 'For an SSH machine this dashboard started: leave its Overdeck server running')
+    .option('--json', 'Print { ok, peerNotified, ssh } as JSON')
+    .action((target: string, options: { json?: boolean; keepServer?: boolean }) => runMachinesUnlink(target, options));
   registerMachinesSshCommands(machines);
 }
