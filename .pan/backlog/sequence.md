@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T06:15:58Z · model: claude-opus-5-5 · open: 866_
+_Last sequenced: 2026-11-01T06:17:21Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -21,6 +21,8 @@ _Last sequenced: 2026-11-01T06:15:58Z · model: claude-opus-5-5 · open: 866_
 | 14 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 15 | PAN-4672 | S | high | ok |  |  | In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout. |
 | 16 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
+| 17 | PAN-4674 | S | high | ok |  |  | Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist |
+| 18 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 22 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
@@ -938,6 +940,14 @@ New in-pipeline substrate bug with four concrete, test-backed fixes; the hold-ti
 
 New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
 
+### PAN-4674 (rank 17)
+
+New operator-reported substrate bug: tiered-execution crew removal and model changes do not persist, so the operator cannot route the expert difficulty to Opus 5.5. Clear repro steps, file pointers, and testable ACs; ranked beside the other fresh operator-reported substrate fixes.
+
+### PAN-4673 (rank 18)
+
+New operator-reported settings UI bug (substrate-improvement label sets a high floor): truncated model names make the operator misread which model is routed. Cause and fix are already identified in WorkhorsePanel.tsx, so it is a small, self-contained change; ranked just below the crew-removal bug because it misleads but does not block configuration.
+
 ### PAN-4572 (rank 21)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
@@ -1186,14 +1196,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 
 Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
 
-### PAN-1824 (rank 86)
-
-Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass — PAN-3243, PAN-3492, PAN-3520 and PAN-2421 — all trace red or flaky main to real-timer tests under load. This is the shared fix for that family and it is now marked ready, so it should sit with the other CI-integrity work rather than behind it.
-
-### PAN-2932 (rank 87)
-
-Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (502) after pan reload.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1201,10 +1203,10 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T06:15:58Z",
+  "generatedAt": "2026-11-01T06:17:21Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 866,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -1387,6 +1389,58 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "dependsOn": [],
       "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
       "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4672",
+      "rank": 15,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout.",
+      "rationale": "New in-pipeline substrate bug with four concrete, test-backed fixes; the hold-timeout gap reopens the original dashboard request hang, so it sits in the first free slot below the pinned tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4671",
+      "rank": 16,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff.",
+      "rationale": "New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4674",
+      "rank": 17,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist",
+      "rationale": "New operator-reported substrate bug: tiered-execution crew removal and model changes do not persist, so the operator cannot route the expert difficulty to Opus 5.5. Clear repro steps, file pointers, and testable ACs; ranked beside the other fresh operator-reported substrate fixes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4673",
+      "rank": 18,
+      "size": "S",
+      "importance": "high",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text",
+      "rationale": "New operator-reported settings UI bug (substrate-improvement label sets a high floor): truncated model names make the operator misread which model is routed. Cause and fix are already identified in WorkhorsePanel.tsx, so it is a small, self-contained change; ranked just below the crew-removal bug because it misleads but does not block configuration.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12021,32 +12075,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       ],
       "why": "Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work.",
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4672",
-      "rank": 15,
-      "size": "S",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout.",
-      "rationale": "New in-pipeline substrate bug with four concrete, test-backed fixes; the hold-timeout gap reopens the original dashboard request hang, so it sits in the first free slot below the pinned tier.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4671",
-      "rank": 16,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff.",
-      "rationale": "New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.",
       "gate": "auto",
       "planning": "auto"
     }
