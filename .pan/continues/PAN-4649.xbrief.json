@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T07:47:12.841Z",
+  "updated": "2026-11-01T07:47:30.035Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -220,6 +220,10 @@
     "mcp-stdio-command.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T07:47:12.841Z"
+    },
+    "mcp-acceptance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:47:30.034Z"
     }
   }
 }
