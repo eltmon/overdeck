@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T18:54:28.069Z",
+  "updated": "2026-11-01T18:54:33.622Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4652",
       "claimedAt": "2026-11-01T18:53:00.504Z",
       "doneAt": "2026-11-01T18:54:28.069Z"
+    },
+    "wi7-provision-vm": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T18:54:33.622Z"
     }
   }
 }
