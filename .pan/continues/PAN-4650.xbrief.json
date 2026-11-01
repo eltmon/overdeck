@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T16:57:56.444Z",
+  "updated": "2026-11-01T16:58:11.168Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -376,6 +376,10 @@
     "wi13-rows-hide-machine.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T16:57:56.443Z"
+    },
+    "wi13-rows-hide-machine.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:58:11.167Z"
     }
   },
   "agentModel": "claude-opus-5-5"
