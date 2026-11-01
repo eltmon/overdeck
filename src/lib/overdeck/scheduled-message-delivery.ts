@@ -18,7 +18,7 @@
  */
 import { emitActivityEntry } from '../activity-logger.js';
 import { paneHasBlockingChoiceMenu } from '../pane-choice-menu.js';
-import { capturePane } from '../tmux.js';
+import { resolveAgentPaneIo } from '../terminal-backends/agent-pane-io.js';
 import { handleConversationMessage } from './conversation-message.js';
 import { resolveSessionFile } from './conversation-reads.js';
 import { handleConversationResume } from './conversation-runtime.js';
@@ -83,9 +83,17 @@ async function defaultDeliver(name: string, text: string): Promise<DoorResponse>
   }));
 }
 
+/** Reads the pane on either terminal backend (Herdr or tmux); an unreadable pane is not blocked. */
 async function defaultPaneBlocked(tmuxSession: string): Promise<boolean> {
-  const pane = await capturePane(tmuxSession, 90).catch(() => '');
+  const pane = await resolveAgentPaneIo(tmuxSession)
+    .then((io) => io.read(90))
+    .catch(() => '');
   return Boolean(pane) && paneHasBlockingChoiceMenu(pane);
+}
+
+/** The door said the text never reached the terminal (`deliveryUnknown: false`), so a retry cannot duplicate it. */
+function knownNotDelivered(body: unknown): boolean {
+  return (body as { deliveryUnknown?: unknown } | null)?.deliveryUnknown === false;
 }
 
 function errorOf(body: unknown): string | null {
@@ -143,6 +151,43 @@ async function deliverPendingHead(conv: Conversation, head: ScheduledMessage, ct
   }
   if (!claimScheduledMessage(head.id, now)) return;
 
+  // Every exit from the claimed section must leave the row out of `sending`:
+  // a throw before the paste puts it back to `pending`, one after it to `unknown`.
+  let pasteAttempted = false;
+  try {
+    await deliverClaimedHead(conv, head, ctx, () => { pasteAttempted = true; });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    if (pasteAttempted) {
+      failScheduledMessage(head.id, now, 'unknown', reason);
+      emit({ source: 'dashboard', level: 'warn', message: `Queued message for "${titleOf(conv)}" may not have been delivered: ${reason}`, link: `/conv/${conv.id}` });
+      actions.push(`${conv.name}: #${head.id} unknown (${reason})`);
+    } else {
+      releaseScheduledToPending(head.id, now, reason, now + SCHEDULED_MESSAGES_INTERVAL_MS);
+      actions.push(`${conv.name}: #${head.id} back to pending (${reason})`);
+    }
+  }
+}
+
+/**
+ * Retry a row that certainly did not reach the terminal (resume failed, or the
+ * door refused the paste) at the next tick, counting the attempt so a
+ * conversation that never recovers ends `failed` instead of retrying forever.
+ */
+function retryCounted(conv: Conversation, head: ScheduledMessage, ctx: TickContext, reason: string): void {
+  const { now, emit, actions } = ctx;
+  const next = { notBefore: now + SCHEDULED_MESSAGES_INTERVAL_MS, resetSource: head.resetSource, limitWindow: head.limitWindow };
+  const rearmed = rearmScheduledMessage(head.id, now, next, { countAttempt: true });
+  if (rearmed.status === 'failed') {
+    emit({ source: 'dashboard', level: 'warn', message: `Queued message for "${titleOf(conv)}" was not sent: ${reason}; ${rearmed.lastError ?? 'gave up'}`, link: `/conv/${conv.id}` });
+  } else {
+    releaseScheduledToPending(head.id, now, reason);
+  }
+  actions.push(`${conv.name}: #${head.id} not sent (${reason}) → ${rearmed.status}`);
+}
+
+async function deliverClaimedHead(conv: Conversation, head: ScheduledMessage, ctx: TickContext, markPasteAttempted: () => void): Promise<void> {
+  const { now, deps, emit, actions } = ctx;
   const harnessAlive = deps.harnessAlive ?? ((session: string) => conversationHarnessAlive(session));
   if (conv.status === 'ended' || !(await harnessAlive(conv.tmuxSession))) {
     const resumed = await (deps.resume ?? defaultResume)(conv.name).catch((error: unknown) => ({
@@ -150,9 +195,7 @@ async function deliverPendingHead(conv: Conversation, head: ScheduledMessage, ct
       body: { error: error instanceof Error ? error.message : String(error) },
     }));
     if (resumed.status < 200 || resumed.status >= 300) {
-      const reason = errorOf(resumed.body) ?? `status ${resumed.status}`;
-      releaseScheduledToPending(head.id, now, `resume failed: ${reason}`, now + SCHEDULED_MESSAGES_INTERVAL_MS);
-      actions.push(`${conv.name}: #${head.id} resume failed (${reason})`);
+      retryCounted(conv, head, ctx, `resume failed: ${errorOf(resumed.body) ?? `status ${resumed.status}`}`);
       return;
     }
   }
@@ -163,6 +206,7 @@ async function deliverPendingHead(conv: Conversation, head: ScheduledMessage, ct
     return;
   }
 
+  markPasteAttempted();
   const delivered = await (deps.deliver ?? defaultDeliver)(conv.name, head.text).catch((error: unknown) => ({
     status: 500,
     body: { error: error instanceof Error ? error.message : String(error) },
@@ -180,6 +224,8 @@ async function deliverPendingHead(conv: Conversation, head: ScheduledMessage, ct
     failScheduledMessage(head.id, now, 'failed', reason);
     emit({ source: 'dashboard', level: 'warn', message: `Queued message for "${titleOf(conv)}" could not be sent: ${reason}`, link });
     actions.push(`${conv.name}: #${head.id} failed (${reason})`);
+  } else if (knownNotDelivered(delivered.body)) {
+    retryCounted(conv, head, ctx, errorOf(delivered.body) ?? `status ${delivered.status}`);
   } else {
     const reason = errorOf(delivered.body) ?? 'delivery not confirmed';
     failScheduledMessage(head.id, now, 'unknown', reason);

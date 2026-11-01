@@ -14,11 +14,31 @@ import type { DoorResponse, ScheduledDeliveryDeps } from '../scheduled-message-d
 vi.mock('../conversation-message.js', () => ({ handleConversationMessage: vi.fn() }));
 vi.mock('../conversation-runtime.js', () => ({ handleConversationResume: vi.fn() }));
 vi.mock('../conversation-reads.js', () => ({ resolveSessionFile: async () => null }));
+// The default choice-menu check reads the pane through the backend-aware door (Herdr or tmux).
+const paneIo = vi.hoisted(() => ({ text: '', reads: [] as string[] }));
+vi.mock('../../terminal-backends/agent-pane-io.js', () => ({
+  resolveAgentPaneIo: async (session: string) => {
+    paneIo.reads.push(session);
+    return { backend: 'herdr', read: async () => paneIo.text, sendKey: async () => undefined };
+  },
+}));
+
+const RESUME_GATE_MENU = [
+  'Resuming the full session will consume a substantial portion of your usage limits.',
+  '',
+  '❯ 1. Resume from summary (recommended)',
+  '  2. Resume full session as-is',
+  "  3. Don't ask me again",
+  '',
+  'Enter to confirm · Esc to cancel',
+].join('\n');
 
 let testHome: string;
 let originalHome: string | undefined;
 
 beforeEach(async () => {
+  paneIo.text = '';
+  paneIo.reads.length = 0;
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-09-02T09:00:00.000Z'));
   originalHome = process.env.HOME;
@@ -313,6 +333,77 @@ describe('tickScheduledMessages', () => {
     await tick.tickScheduledMessages(h.deps);
     expect(store.listScheduledMessages('conv-a')).toEqual([]);
     expect(store.listScheduledMessages('conv-a', { includeDelivered: true })[0]).toMatchObject({ status: 'delivered', lastError: 'no transcript confirmation' });
+  });
+});
+
+describe('tickScheduledMessages review hardening', () => {
+  it('reads the pane through the backend-aware door and defers on a choice menu', async () => {
+    const { tick, store } = await setup();
+    const h = harness();
+    const { paneBlocked: _unused, ...deps } = h.deps;
+    await schedule('continue');
+    paneIo.text = RESUME_GATE_MENU;
+    await advanceTo(DUE_AT);
+    await tick.tickScheduledMessages(deps);
+    expect(paneIo.reads).toEqual(['conv-conv-a']);
+    expect(h.delivered).toEqual([]);
+    expect(store.headScheduledMessage('conv-a')).toMatchObject({ status: 'pending', lastError: expect.stringContaining('choice menu') });
+
+    paneIo.text = 'ready for input';
+    await advanceTo(DUE_AT + 60_000);
+    await tick.tickScheduledMessages(deps);
+    expect(h.delivered).toEqual(['continue']);
+  });
+
+  it('retries a 5xx the door marks as not delivered, counting the attempt', async () => {
+    const { tick, store } = await setup();
+    const h = harness();
+    await schedule('continue');
+    h.setDeliver({ status: 502, body: { error: 'Not delivered: menu open', code: 'not-delivered', deliveryUnknown: false, retryable: true } });
+    await advanceTo(DUE_AT);
+    await tick.tickScheduledMessages(h.deps);
+    expect(store.headScheduledMessage('conv-a')).toMatchObject({ status: 'pending', attempts: 1, lastError: 'Not delivered: menu open' });
+
+    h.setDeliver({ status: 200, body: {} });
+    await advanceTo(DUE_AT + 60_000);
+    await tick.tickScheduledMessages(h.deps);
+    expect(store.headScheduledMessage('conv-a')).toMatchObject({ status: 'sent' });
+  });
+
+  it('gives up on a conversation whose resume keeps failing, with a warn entry', async () => {
+    const { tick, store } = await setup();
+    const h = harness();
+    await schedule('continue');
+    const { markConversationEnded } = await import('../conversations.js');
+    markConversationEnded('conv-a');
+    h.setResume({ status: 500, body: { error: 'spawn failed' } });
+    for (let i = 0; i <= store.MAX_SCHEDULED_ATTEMPTS; i += 1) {
+      await advanceTo(DUE_AT + i * 60_000);
+      await tick.tickScheduledMessages(h.deps);
+    }
+    expect(h.resumed).toHaveLength(store.MAX_SCHEDULED_ATTEMPTS + 1);
+    expect(store.headScheduledMessage('conv-a')).toMatchObject({ status: 'failed', lastError: 'gave up after 24 attempts' });
+    expect(h.emit).toHaveBeenCalledWith(expect.objectContaining({ level: 'warn', message: expect.stringContaining('resume failed: spawn failed') }));
+  });
+
+  it('puts a claimed row back to pending when a check throws before the paste', async () => {
+    const { tick, store } = await setup();
+    const h = harness();
+    await schedule('continue');
+    await advanceTo(DUE_AT);
+    await tick.tickScheduledMessages({ ...h.deps, harnessAlive: async () => { throw new Error('backend unavailable'); } });
+    expect(h.delivered).toEqual([]);
+    expect(store.headScheduledMessage('conv-a')).toMatchObject({ status: 'pending', lastError: 'backend unavailable' });
+  });
+
+  it('marks a claimed row unknown when a write throws after the paste', async () => {
+    const { tick, store } = await setup();
+    const h = harness();
+    await schedule('continue');
+    await advanceTo(DUE_AT);
+    await tick.tickScheduledMessages({ ...h.deps, emit: vi.fn(() => { throw new Error('event store down'); }) });
+    expect(h.delivered).toEqual(['continue']);
+    expect(store.headScheduledMessage('conv-a')?.status).not.toBe('sending');
   });
 });
 

@@ -849,11 +849,15 @@ dismisses it.
   to that reset without counting an attempt.
 - Otherwise the row is claimed atomically (`pending → sending`). An ended conversation, or one
   whose harness process is gone, is resumed first through `handleConversationResume`; a failed
-  resume puts the row back to `pending` for the next tick. A blocking choice menu in the pane
-  (`paneHasBlockingChoiceMenu`) defers the row.
+  resume puts the row back to `pending` for the next tick and counts an attempt. A blocking
+  choice menu in the pane defers the row; the pane is read through `resolveAgentPaneIo`, so the
+  check works on Herdr and tmux. A throw inside the claimed section never leaves the row in
+  `sending`: before the paste it returns to `pending`, after it the row becomes `unknown`.
 - The delivery door `handleConversationMessage` is called directly (not through the HTTP
-  receipt cache). 2xx → `sent`; 409 → back to `pending`; other 4xx → `failed`; 5xx or a thrown
-  error → `unknown`. An `unknown` row is never pasted again automatically.
+  receipt cache). 2xx → `sent`; 409 → back to `pending`; other 4xx → `failed`. A 5xx whose body
+  says `deliveryUnknown: false` (the terminal refused the paste, e.g. 502 `not-delivered`)
+  returns to `pending` and counts an attempt; any other 5xx or a thrown error → `unknown`. An
+  `unknown` row is never pasted again automatically.
 - A `sent` row's outcome is read from the transcript: a newer assistant reply → `delivered`; a
   newer usage-limit error → re-armed to the new reset with `attempts + 1`; no newer assistant
   record within the 10-minute outcome window → `delivered` with `last_error: no transcript
