@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:34:28.680Z",
+  "updated": "2026-11-01T14:34:40.876Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,10 @@
     "wi6-link-transport.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T14:34:28.680Z"
+    },
+    "wi6-link-transport.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:34:40.876Z"
     }
   }
 }
