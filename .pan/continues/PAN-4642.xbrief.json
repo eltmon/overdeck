@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4642",
   "created": "2026-11-01T04:49:54.715Z",
-  "updated": "2026-11-01T05:53:28.811Z",
+  "updated": "2026-11-01T05:53:48.447Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,10 @@
     "citation-docs.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T05:53:28.811Z"
+    },
+    "citation-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:53:48.446Z"
     }
   }
 }
