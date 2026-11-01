@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T18:59:49.622Z",
+  "updated": "2026-11-01T19:03:55.179Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-01T18:59:44.295Z"
     },
     "wi5-work-door-workers": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4651",
-      "claimedAt": "2026-11-01T18:59:49.622Z"
+      "claimedAt": "2026-11-01T18:59:49.622Z",
+      "doneAt": "2026-11-01T19:03:55.178Z"
     }
   }
 }
