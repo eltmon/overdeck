@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4681",
   "created": "2026-11-01T07:25:21.124Z",
-  "updated": "2026-11-01T08:07:24.561Z",
+  "updated": "2026-11-01T08:52:28.244Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T08:52:28.243Z"
+    }
+  ],
   "items": {
     "register-messagerows-test": {
       "status": "completed",
@@ -76,5 +82,6 @@
       "doneAt": "2026-11-01T07:49:51.187Z"
     }
   },
-  "feedback": []
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
 }
