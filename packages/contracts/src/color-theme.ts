@@ -193,6 +193,13 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
+function normalizeSource(raw: unknown): ColorThemeSource | undefined {
+  if (!isPlainObject(raw)) return undefined
+  if (raw.kind !== "vscode-import") return undefined
+  if (typeof raw.fileName !== "string" || typeof raw.importedAt !== "string") return undefined
+  return { kind: "vscode-import", fileName: raw.fileName, importedAt: raw.importedAt }
+}
+
 function normalizeTerminal(raw: unknown, warnings: string[]): Partial<TerminalPalette> | undefined {
   if (raw === undefined) return undefined
   if (!isPlainObject(raw)) {
@@ -321,6 +328,7 @@ export function normalizeColorTheme(raw: unknown, id: string): { theme: ColorThe
   const terminal = normalizeTerminal(raw.terminal, warnings)
   const ui = normalizeUi(raw.ui, warnings)
   const syntax = normalizeSyntax(raw.syntax, warnings)
+  const source = normalizeSource(raw.source)
 
   const theme: ColorTheme = {
     id,
@@ -330,6 +338,7 @@ export function normalizeColorTheme(raw: unknown, id: string): { theme: ColorThe
     ...(terminal !== undefined ? { terminal } : {}),
     ...(syntax !== undefined ? { syntax } : {}),
     ...(ui !== undefined ? { ui } : {}),
+    ...(source !== undefined ? { source } : {}),
   }
 
   return { theme, warnings }

@@ -42,6 +42,15 @@ describe("normalizeColorTheme", () => {
     expect("errors" in result).toBe(true)
   })
 
+  it("passes through a well-formed vscode-import source", () => {
+    const result = normalizeColorTheme(
+      { name: "Test", type: "dark", source: { kind: "vscode-import", fileName: "ayu-dark.json", importedAt: "2026-11-01T00:00:00.000Z" } },
+      "test",
+    )
+    if ("errors" in result) throw new Error("expected a theme")
+    expect(result.theme.source).toEqual({ kind: "vscode-import", fileName: "ayu-dark.json", importedAt: "2026-11-01T00:00:00.000Z" })
+  })
+
   it("accepts a minimal valid theme with no optional groups", () => {
     const result = normalizeColorTheme({ name: "Minimal", type: "light" }, "minimal")
     if ("errors" in result) throw new Error("expected a theme")
