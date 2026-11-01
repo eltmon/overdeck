@@ -207,6 +207,8 @@ terminal backends (`tests/unit/lib/vault/import-graph.test.ts`). PAN-4329 adds
 resolves config/key/store into a tagged state and prints nothing; `src/dashboard/server/services/vault-service.ts`
 runs every dashboard vault operation through one queue (`enqueueVaultOperation`) plus the sync loop
 (primary dashboard only, or `OVERDECK_VAULT_IN_PEER=1`); `routes/vault.ts` + Settings → Session Vault.
+PAN-4647: `vault-agent-subjects.ts` also lists pipeline agents inside their tracking window, so
+the settle poller auto-saves work/review/test/plan transcripts, not just managed conversations.
 
 ## Pull requests on conversations and issue rows (PAN-3822, PAN-4457)
 
@@ -219,6 +221,15 @@ and refreshes snapshots; links are never deleted, only dismissed. `pan done` /
 (`ProjectTree/FeatureItem.tsx`) and sidebar workspace rows read the issue's PR
 from `DerivedIssueState.pr`, not from links; the conversation list's badge
 (`primitives/PullRequestBadge.tsx`) reads the effective link.
+
+Conversation-message delivery (`handleConversationMessage`,
+`src/lib/overdeck/conversation-message.ts`) refuses an `ended` conversation with
+422; callers resume first via `handleConversationResume`
+(`conversation-runtime.ts`). Deacon-lite runs in the forked `deacon.js` child and
+reaches the dashboard only over internal HTTP, so work that resumes or messages
+conversations belongs in a dashboard service like the PR sync sweep. PAN-4640
+added `conversation_schedules` and `services/conversation-schedule-service.ts`
+on that pattern.
 
 ## Dashboard auth (verified 2026-09-30)
 

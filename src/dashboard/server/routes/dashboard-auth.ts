@@ -314,6 +314,26 @@ export function peerIsLocalContainerNetwork(
   return false;
 }
 
+/**
+ * PAN-4299: Traefik appends the IP it accepted the connection from to
+ * X-Forwarded-For, so the LAST entry is the client Traefik saw — a caller can
+ * prepend fake entries but never replace that one. A local browser reaches
+ * Traefik via docker-proxy and shows up as the bridge gateway, so "local" is
+ * loopback or a host Docker-bridge IP. No header = a host-local container
+ * calling the API directly (unchanged trust).
+ */
+export function forwardedClientIsLocal(
+  headers: HeaderMap,
+  interfaces: NodeJS.Dict<NetworkInterfaceInfo[]>,
+): boolean {
+  const forwardedFor = getHeaderFromMap(headers, 'x-forwarded-for');
+  if (forwardedFor === undefined) return true;
+  const last = forwardedFor.split(',').pop()?.trim() ?? '';
+  const client = last.startsWith('::ffff:') ? last.slice('::ffff:'.length) : last;
+  if (client === '127.0.0.1' || client === '::1') return true;
+  return peerIsHostLocalDockerBridge(client, interfaces);
+}
+
 /** Docker creates /.dockerenv in every container — stable in-container signal. */
 const runningInContainer = existsSync('/.dockerenv');
 
@@ -328,9 +348,11 @@ const runningInContainer = existsSync('/.dockerenv');
  * This is the auto-bootstrap that removes the manual one-time #overdeck_token
  * step: any browser on overdeck.localhost gets a session with no user action. It is
  * NOT a security downgrade for the LAN — the raw API ports bind 0.0.0.0, but a
- * direct LAN hit has a non-loopback, non-Docker-bridge peer and is rejected. We
- * read ONLY the real TCP peer (request.remoteAddress), never X-Forwarded-For,
- * which a caller could spoof.
+ * direct LAN hit has a non-loopback, non-Docker-bridge peer and is rejected. The
+ * peer is read from the TCP socket (request.remoteAddress). For a Docker-bridge
+ * peer only, the rightmost X-Forwarded-For entry must also be local
+ * ({@link forwardedClientIsLocal}, PAN-4299): Traefik forwards LAN clients from
+ * a bridge IP too, and the entry Traefik appends is the one a caller cannot spoof.
  */
 export function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest): boolean {
   const remoteAddress = (request as { remoteAddress?: unknown }).remoteAddress;
@@ -343,8 +365,11 @@ export function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest): bo
   // Node reports dual-stack IPv4 peers as IPv4-mapped IPv6 (::ffff:a.b.c.d).
   const addr = raw.startsWith('::ffff:') ? raw.slice('::ffff:'.length) : raw;
   if (addr === '127.0.0.1' || addr === '::1') return true;
-  if (peerIsHostLocalDockerBridge(addr, networkInterfaces())) return true;
-  return runningInContainer && peerIsLocalContainerNetwork(addr, networkInterfaces());
+  const interfaces = networkInterfaces();
+  if (peerIsHostLocalDockerBridge(addr, interfaces)) {
+    return forwardedClientIsLocal(request.headers as HeaderMap, interfaces);
+  }
+  return runningInContainer && peerIsLocalContainerNetwork(addr, interfaces);
 }
 
 /**

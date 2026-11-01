@@ -171,6 +171,14 @@ With the dashboard running, conversations started from it are saved automaticall
 after they go quiet, and synced every 5 minutes; no hook is needed. This arrives in the next
 release (v0.65.0).
 
+The dashboard also saves pipeline agents automatically — work, review, test, planning and the
+other Overdeck agents running Claude Code or Codex — while they run and for up to 30 minutes
+after they stop. Each saved agent is titled `<issue> <role> agent (<agent id>)`, so another
+machine shows, for example, "PAN-4630 work agent (agent-pan-4630)" as a read-only "from
+`<machine>`" copy after its next sync. Agents that stopped earlier are not saved automatically:
+`pan vault save --all` saves older Claude Code transcripts, and older Codex agent transcripts
+are not covered. Run `pan vault exclude --path <workspace>` to opt a project's agents out.
+
 To sync right away, click **Sync now** in Settings → Session Vault. The button appears only
 in the primary dashboard, which runs the sync loop; the section then shows the new last-sync
 time. Change the interval with `syncIntervalSec` in `~/.overdeck/vault/config.json` (see

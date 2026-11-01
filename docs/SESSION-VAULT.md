@@ -356,11 +356,17 @@ Session Vault gives eviction review a UI. This layer is additive: every command 
 works the same way against the same on-disk vault.
 
 - **Auto-settle.** A poller checks every active managed conversation (`claude-code`, `codex`)
-  every **15 seconds**. Growth (re-)arms a `debounceSec` timer (`vault/config.json`, default
-  **30 seconds**) that settles the transcript once it has been quiet that long, so a busy
-  conversation is not settled mid-turn. Session end and dashboard shutdown force an immediate
-  settle regardless of the debounce, bounded by a **10-second** flush budget on shutdown;
-  anything not settled in time is picked up by the next boot's sync cycle.
+  plus every pipeline-agent subject (PAN-4647: any role with a `state.json`, running/starting
+  or stopped less than 30 minutes ago) every **15 seconds**. Agent subjects come from a 60-second
+  cached scan of agent state (`vault-agent-subjects.ts`), named `agent:<agentId>:<path>` so a
+  new session's path makes the old subject drop out and force-settle once. Growth (re-)arms a
+  `debounceSec` timer (`vault/config.json`, default **30 seconds**) that settles the transcript
+  once it has been quiet that long, so a busy conversation is not settled mid-turn; a first
+  settle that mints a record for a pipeline agent names it with `recordTitle`
+  (`<issue> <role> agent (<agent id>)`) instead of the transcript's first human text. Session
+  end and dashboard shutdown force an immediate settle regardless of the debounce, bounded by a
+  **10-second** flush budget on shutdown; anything not settled in time is picked up by the next
+  boot's sync cycle.
 - **Sync cycle.** The primary dashboard also runs the vault's own sync loop: first cycle
   **5 seconds** after the dashboard starts, then every `syncIntervalSec`, with the engine's
   normal offline backoff when the backend is unreachable. A peer/isolated dashboard
@@ -554,6 +560,7 @@ src/cli/commands/vault/*.ts       the pan vault verbs
 
 src/dashboard/server/services/vault-service.ts          boot delay, sync loop, eviction-batch API, snapshot, queued setup/join/Sync now
 src/dashboard/server/services/vault-settle-poller.ts    15s liveness poll, debounceSec settle, shutdown flush
+src/dashboard/server/services/vault-agent-subjects.ts    pipeline-agent poll subjects: tracking window, transcript path, record title
 src/dashboard/server/services/vault-liveness.ts         Overdeck-mode isLive: conversation/agent liveness doors
 src/dashboard/server/services/vault-browse-service.ts   after each sync: refresh browse cache, reconcile vault-<id> rows
 src/lib/overdeck/conversation-vault-rows.ts             browse-row door: upsert/remove vault-<id> conversation rows
