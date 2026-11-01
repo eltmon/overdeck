@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4656",
   "created": "2026-11-01T13:30:21.841Z",
-  "updated": "2026-11-01T13:53:12.216Z",
+  "updated": "2026-11-01T13:59:21.281Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
       "claimedBy": "agent-pan-4656",
       "claimedAt": "2026-11-01T13:51:38.094Z",
       "doneAt": "2026-11-01T13:53:12.216Z"
+    },
+    "supervisor-unit-install-section.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:59:21.280Z"
     }
   }
 }
