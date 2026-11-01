@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T07:40:43.346Z",
+  "updated": "2026-11-01T07:41:06.089Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -264,6 +264,10 @@
     "pan-tailscale-setup.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T07:40:43.345Z"
+    },
+    "pan-tailscale-setup.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:41:06.088Z"
     }
   }
 }
