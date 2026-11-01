@@ -91,6 +91,24 @@ CREATE TABLE `conversation_bookmarks` (
 	FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
+CREATE TABLE `conversation_schedules` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`conversation_id` text NOT NULL,
+	`prompt` text NOT NULL,
+	`cron` text NOT NULL,
+	`time_zone` text NOT NULL,
+	`enabled` integer NOT NULL DEFAULT 1,
+	`next_run_at` integer,
+	`last_run_at` integer,
+	`last_run_status` text,
+	`last_run_error` text,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `idx_conversation_schedules_due` ON `conversation_schedules` (`enabled`, `next_run_at`);--> statement-breakpoint
+CREATE INDEX `idx_conversation_schedules_conversation` ON `conversation_schedules` (`conversation_id`);--> statement-breakpoint
 CREATE TABLE `conversations` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,

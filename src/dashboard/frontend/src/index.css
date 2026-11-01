@@ -1337,3 +1337,6 @@ body::after {
                           background: color-mix(in srgb, currentColor 10%, transparent);
                           padding: 0.1em 0.3em; border-radius: 3px; }
 .prose-notes a          { color: var(--primary); text-decoration: underline; }
+
+/* PAN-4642: highlights a pending citation's quoted text in its message row. */
+::highlight(overdeck-citation) { background-color: color-mix(in srgb, var(--primary) 22%, transparent); }

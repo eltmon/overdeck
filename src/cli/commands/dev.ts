@@ -293,6 +293,8 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     if (existsSync(traefikDir)) {
       try {
         console.log(chalk.dim('Starting Traefik...'));
+        // PAN-4299: ports on the configured bind address; `up -d` recreates the container on change.
+        (await import('../../lib/traefik.js')).migrateTraefikCompose(join(traefikDir, 'docker-compose.yml'));
         execSync('docker compose up -d', { cwd: traefikDir, stdio: 'pipe' });
         console.log(chalk.green('✓ Traefik started'));
       } catch {

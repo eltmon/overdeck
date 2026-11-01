@@ -324,3 +324,71 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   `overdeck-feature-pan-*_default` networks (32 → 21). Distinct from PAN-3900
   (orphaned networks from removed worktrees). Check `docker network ls | wc -l`
   against ~31 whenever a stack rebuild fails.
+- 2026-11-01 06:05 UTC: Anywhere epic (#2350, plan `.pan/drafts/pan-2350.md`
+  rev 5) handed to the Flywheel by conv 20261029-6880 with operator approval.
+  Ignore order book 2026-08-08-overdeck-anywhere (draft reference only).
+  Start-when-prereqs-merged map: PAN-4650 (4645, 4646 mockup approved),
+  PAN-2356 (4645, 4330, 4648), PAN-4404 (4645), PAN-4654 (4645), PAN-4656
+  (4645, 4628), PAN-4651 (4650, 4649), PAN-4652 (4645, 4295, 4650), PAN-4296
+  (4652), PAN-4638 (4651, 4652). PAN-4646 is a mockup only (no PR): surface,
+  never merge or close. Operator authorized acknowledging agent-count
+  guardrails for these launches, never memory or CPU.
+- Guardrail acknowledgement has no CLI flag. Recipe: POST
+  `/api/agents` with header `x-overdeck-internal-token: $(cat
+  ~/.overdeck/internal-token)`, `origin: http://127.0.0.1:3011`, body
+  `{"issueId":..,"role":"work","startedBy":"flywheel:conv-flywheel",
+  "guardrailAcknowledgedWarnings":["agent_count_high","agent_count_ceiling"]}`.
+  Any other `startedBy` is refused ("Invalid internal startedBy provenance").
+- Until PAN-4663 merges, every new Overdeck stack recreates an empty
+  `_default` network; remove empty `overdeck-feature-pan-*_default` networks
+  each tick (32 → 26 at 06:00).
+- PAN-4666 (needs-handoff): flywheel status drops agents whose Herdr pane says
+  `done` (turn finished, process alive). Confirm liveness with
+  `pan show <id> --health`, never the status list, before any respawn.
+- 2026-11-01 06:15 UTC: PAN-4669 (needs-handoff): `idle-stack-reaper.ts`
+  line 166 checks tmux sessions only, so on Herdr it stops every running
+  agent's server/frontend containers after 10 min. Same class as PAN-4666
+  (liveness decided outside `liveness.ts`). The dashboard offered "Start" on
+  PAN-4643 while agent-pan-4643 was working, and the click failed with
+  "Invalid CSRF token"; cause not yet found (token derivation is stable,
+  dashboard not restarted since 2026-10-26). Operator also asked: deploy
+  #4637 (7c97ec4ddaa) via `pan reload` on green main CI and verify
+  buildCommit; track PAN-4626 (agent started by the operator).
+- 2026-11-01 06:10 UTC: the PAN-4643 "Start work" + "Invalid CSRF token" was
+  the simple-mode issue page: `postJson` in `lib/simple/useSimpleActions.ts`
+  sends no CSRF header (every simple action 403s), and `isPlanReadyToStart`
+  (`lib/simple/derive.ts`) lets an idle, finished planner override a running
+  work agent. Filed and started PAN-4670. `pan reload` builds into the idle
+  generation, then waits for `pan restart approve` from the operator; the
+  reload process exits after the build, so check `/api/health` buildCommit
+  with `git merge-base --is-ancestor` before calling it deployed.
+- 2026-11-01 06:25 UTC: operator rule (memory `coderabbit-advisory-not-blocking`):
+  review CodeRabbit findings when it posts; when rate-limited or silent, merge
+  without it. The review context ingests CodeRabbit only at review start, so
+  check for newer coderabbitai[bot] inline comments before every merge
+  (PAN-4671, needs-handoff). Missed findings on #4662/#4637 → PAN-4672.
+- 2026-11-01 06:35 UTC: PAN-4675 (needs-handoff). A `gh` network timeout in
+  `addLabel` (`merge-agent.ts` ~line 500, `Effect.promise`) aborted
+  PAN-4299's post-merge lifecycle after the merge door had merged it; the
+  door then answers "Already merged". Instance recovery: `pan kill <id>`
+  (stops agent and stack), then `pan close <id> --force` passed with no
+  override. `pan close` blocks on a confirmation prompt: always pass
+  `--force` and `< /dev/null` from the loop.
+- 2026-11-01 07:15 UTC: sending late CodeRabbit findings to a work agent does
+  not stop the merge train. PR #4667 (PAN-4642) merged at 07:02 while the
+  agent was fixing them, and post-merge stopped the agent with the fix
+  uncommitted; follow-up PAN-4681. Next time hold the PR first with
+  `pan merge` (cancels the actionable auto-merge row), then route findings.
+- Same merge turned main red with an unrelated flake
+  (`run-gh.test.ts`, ledger appends race: PAN-4680, started). Re-ran failed
+  jobs (run 41283191295 attempt 2). `gh run list` timed out on the workflow
+  listing; `gh api repos/eltmon/overdeck/actions/runs?branch=main` works.
+- 2026-11-01 07:55 UTC: PAN-4690 (needs-handoff). Review dispatch
+  (`review-agent.ts` ~457, `clearFeedbackFiles` → `clearFeedbackForIssue`)
+  rewrites the tracked `.pan/continues/<ID>.xbrief.json` without committing,
+  so the dirty-tree gate blocks the review it was dispatching. Symptom:
+  `verification.passed` then no reviewer, and dashboard.log "could not
+  re-request the undispatched review — Workspace has uncommitted changes".
+  Recovery: confirm the only dirty file is the continue file, commit it as
+  bookkeeping on the feature branch, push, `pan review request <id>` (re-runs
+  verification). Hit PAN-4643 and PAN-4626.
