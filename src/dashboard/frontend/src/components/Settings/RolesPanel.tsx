@@ -379,7 +379,7 @@ function ModelPicker({ label, value, workhorses, providerGroups, providers, clau
           <optgroup key={group.provider} label={group.label}>
             {group.models.map((model) => (
               <option key={`${group.provider}:${model.id}`} value={model.id}>
-                {group.label} &gt; {model.name}
+                {model.name}
               </option>
             ))}
           </optgroup>

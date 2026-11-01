@@ -18,7 +18,7 @@ export function SettingsLayout({ sidebar, children, header }: SettingsLayoutProp
           {sidebar}
         </aside>
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-[800px] mx-auto px-6 @2xl/shell:px-10 py-6 @container">
+          <div className="max-w-[1200px] mx-auto px-6 @2xl/shell:px-10 py-6 @container">
             {children}
           </div>
         </main>
