@@ -92,3 +92,23 @@ Notes on the plan:
 - The Chromium step reuses `bin/gstack-browser-ensure`'s background-and-poll timeout loop instead of the `timeout` command, which macOS lacks.
 - On failure the cleanup also removes the three `dist/.version` files (not in FR-2's list; they are written by this step).
 - A manual smoke run before the commit (stub `bun` and `node`, real render) passed the success path and the failure cleanup; WI-F5 turns it into `test/pack-browser.test.ts`.
+
+## Fork: pack browser test
+
+Fork commit: `fb781f7177b9edc8bca724ea6180611462e9f6fd` — `test(pack-browser): the browser step runs only the pinned commands and writes only R and C`.
+
+Files: `test/pack-browser.test.ts` (new), `docs/pack-mode.md` (the `## Test` section lists the three pack-browser test files).
+
+Notes on the plan:
+
+- Each case renders its own fresh `R`, because the success and failure cases change `R`.
+- The floor case checks that the only bun call was `--version` (stronger than "no `install` line"), and that `C` was never created.
+- No registry change was needed for the new test file: the free-test ratchets, `test/exercised-map.test.ts` and `test/helpers/hermetic-env.test.ts` pass with it.
+
+```
+$ bun test test/pack-browser.test.ts test/pack-browser-guards.test.ts test/pack-env.test.ts test/pack-mode.test.ts test/setup-help.test.ts test/state-root-ratchet.test.ts test/free-seed-ratchet.test.ts test/test-free-shards.test.ts test/free-fixtures.test.ts test/exercised-map.test.ts test/helpers/hermetic-env.test.ts
+ 188 pass
+ 0 fail
+ 2998 expect() calls
+Ran 188 tests across 11 files. [38.48s]
+```
