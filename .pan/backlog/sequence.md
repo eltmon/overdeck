@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T16:07:20Z · model: claude-opus-5-5 · open: 858_
+_Last sequenced: 2026-11-01T16:10:13Z · model: claude-opus-5-5 · open: 860_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -224,10 +224,12 @@ _Last sequenced: 2026-11-01T16:07:20Z · model: claude-opus-5-5 · open: 858_
 | 220 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 221 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 222 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
+| 223 | PAN-4727 | L | medium | ok |  |  | In pipeline: gstack skill pack with full runtime via eltmon/gstack fork pack mode; on/off per scope, clean removal. |
 | 224 | PAN-4650 | XL | medium | ok |  | PAN-4646 | Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
 | 227 | PAN-4646 | S | medium | needs-refinement |  |  | Interactive mockup for machine-aware conversation UI (title bar, chips, offline banner); D-6 needs it approved first. Body pending. |
+| 228 | PAN-4728 | S | medium | ok |  |  | In pipeline: pstack skill pack from eltmon/plugins fork; needs a subfolder plugin root for the claude-plugin adapter. |
 | 229 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 230 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
 | 231 | PAN-4348 | S | medium | ok |  |  | Verification emits warn-first evidence of changed files outside every item's files_scope, so scope creep is visible |
@@ -1193,10 +1195,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T16:07:20Z",
+  "generatedAt": "2026-11-01T16:10:13Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 858,
+  "openCount": 860,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -11890,6 +11892,32 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "rationale": "New substrate-improvement performance bug already in the pipeline: getCostsByIssue() runs a full GROUP BY over every cost_events row on a 15 s refresh, holding the dashboard database worker's poll lane about 1.5 s per run and growing with every agent turn. The issue gives clear acceptance criteria (equivalence test, under 50 ms refresh at production size, overdeck.db migration path), so its condition is ok. As an in-pipeline issue it takes the free rank 4 and no other node moves; it is a sibling of PAN-4544, which removes the same kind of synchronous cost scan from /api/costs/stream.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4727",
+      "rank": 223,
+      "size": "L",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: gstack skill pack with full runtime via eltmon/gstack fork pack mode; on/off per scope, clean removal.",
+      "rationale": "New issue already in planning, so it is pinned in a free mid-tier slot next to the other in-pipeline medium work. It is self-contained feature work on the skill-pack system with clear operator decisions and acceptance criteria, but needs a fork-side pack mode first, so it sizes L.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4728",
+      "rank": 228,
+      "size": "S",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: pstack skill pack from eltmon/plugins fork; needs a subfolder plugin root for the claude-plugin adapter.",
+      "rationale": "New issue already in planning, pinned in a free mid-tier slot beside PAN-4727. The change is small and well scoped (a pluginRoot field on KnownPack plus a KNOWN_PACKS entry and docs), with verified facts and checkable acceptance criteria.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13233,6 +13261,13 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     {
       "from": "PAN-4724",
       "to": "PAN-4544",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4728",
+      "to": "PAN-4727",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
