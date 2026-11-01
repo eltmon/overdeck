@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:35:07.251Z",
+  "updated": "2026-11-01T14:35:21.306Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,6 +190,10 @@
     "wi7-ssh-machine-service.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T14:35:07.250Z"
+    },
+    "wi7-ssh-machine-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:35:21.306Z"
     }
   }
 }
