@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T20:23:59.366Z",
+  "updated": "2026-11-01T20:29:11.165Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,9 +130,10 @@
       "doneAt": "2026-11-01T20:23:54.364Z"
     },
     "wi21-fleet-search": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4651",
-      "claimedAt": "2026-11-01T20:23:59.366Z"
+      "claimedAt": "2026-11-01T20:23:59.366Z",
+      "doneAt": "2026-11-01T20:29:11.165Z"
     }
   }
 }
