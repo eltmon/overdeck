@@ -220,7 +220,7 @@ describe('live browse daemons (WI-O9)', () => {
   it('reports a live daemon with a kill command and never signals it', async () => {
     const dir = project(process.pid);
     mocks.listProjectsAsync.mockResolvedValue([{ key: 'p', config: { path: dir } }]);
-    expect(await daemonLines()).toEqual([`Browse daemon still running in ${dir}: pid ${process.pid} — stop with: kill ${process.pid}`]);
+    expect(await daemonLines()).toEqual([`Browse daemon still running in ${dir}: pid ${process.pid} — stop with: kill -INT ${process.pid}`]);
     // Still alive: only signal 0 was sent.
     expect(() => process.kill(process.pid, 0)).not.toThrow();
   });
@@ -245,7 +245,7 @@ describe('live browse daemons (WI-O9)', () => {
   it('browser off and remove print the live daemons', async () => {
     const dir = project(process.pid);
     mocks.listProjectsAsync.mockResolvedValue([{ key: 'p', config: { path: dir } }]);
-    const line = `Browse daemon still running in ${dir}: pid ${process.pid} — stop with: kill ${process.pid}`;
+    const line = `Browse daemon still running in ${dir}: pid ${process.pid} — stop with: kill -INT ${process.pid}`;
 
     await run('pack', 'browser', 'gstack', 'off');
     expect(logs).toContain(line);

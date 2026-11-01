@@ -36,7 +36,8 @@ function isAlive(pid: number): boolean {
 /**
  * PAN-4730 D14: one line per live browse daemon in a registered project, read
  * from the `pid` gstack's browse writes to `<project>/.gstack/browse.json`. It
- * reports and never signals: the daemon also exits after 30 idle minutes.
+ * reports and never signals: the daemon also exits after 30 idle minutes. The
+ * stop hint is SIGINT because a headless daemon ignores a plain `kill`.
  */
 export async function daemonLines(): Promise<string[]> {
   const [{ listProjectsAsync }, { readFile }, { join }] = await Promise.all([
@@ -55,7 +56,8 @@ export async function daemonLines(): Promise<string[]> {
     }
     // pid 0 and negative pids name process groups; never probe those.
     if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 1 || !isAlive(pid)) continue;
-    lines.push(`Browse daemon still running in ${config.path}: pid ${pid} — stop with: kill ${pid}`);
+    // Headless browse ignores SIGTERM (gstack browse/src/server.ts); SIGINT is its Ctrl+C shutdown.
+    lines.push(`Browse daemon still running in ${config.path}: pid ${pid} — stop with: kill -INT ${pid}`);
   }
   return lines;
 }
