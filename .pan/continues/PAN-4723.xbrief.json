@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4723",
   "created": "2026-11-01T15:14:51.273Z",
-  "updated": "2026-11-01T15:42:24.566Z",
+  "updated": "2026-11-01T15:44:23.420Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,10 @@
       "claimedBy": "agent-pan-4723",
       "claimedAt": "2026-11-01T15:17:23.748Z",
       "doneAt": "2026-11-01T15:18:27.020Z"
+    },
+    "mock-disk-floor-create-workspace-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:44:23.420Z"
     }
   },
   "agentModel": "claude-sonnet-5"
