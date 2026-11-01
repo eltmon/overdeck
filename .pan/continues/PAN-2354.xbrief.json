@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2354",
   "created": "2026-11-01T05:46:47.920Z",
-  "updated": "2026-11-01T07:26:15.432Z",
+  "updated": "2026-11-01T07:26:40.532Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,10 @@
     "subscriptions.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T07:26:15.431Z"
+    },
+    "subscriptions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:26:40.532Z"
     }
   }
 }
