@@ -4,17 +4,17 @@
     "created": "2026-11-01T04:42:10Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4639: Add snooze, settle and auto-settle to the conversation list",
-    "updated": "2026-11-01T04:46:26.973Z"
+    "updated": "2026-11-01T04:47:27.427Z"
   },
   "plan": {
     "id": "pan-4639",
     "title": "Add snooze, settle and auto-settle to the conversation list",
-    "status": "proposed",
+    "status": "running",
     "uid": "891de9ce-ef61-48b9-8a8a-eb2738884014",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T04:42:10Z",
-    "updated": "2026-11-01T04:46:26.973Z",
+    "updated": "2026-11-01T04:47:27.427Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4639",
@@ -854,5 +854,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
