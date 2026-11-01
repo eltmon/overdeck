@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4402",
   "created": "2026-11-01T05:03:16.844Z",
-  "updated": "2026-11-01T05:37:21.720Z",
+  "updated": "2026-11-01T05:37:37.376Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "machine-url.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T05:37:21.720Z"
+    },
+    "machine-url.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:37:37.376Z"
     }
   }
 }
