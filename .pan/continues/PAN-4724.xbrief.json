@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4724",
   "created": "2026-11-01T16:06:34.998Z",
-  "updated": "2026-11-01T16:16:13.144Z",
+  "updated": "2026-11-01T16:16:54.769Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-01T16:16:11.636Z"
     },
     "rollup-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4724",
-      "claimedAt": "2026-11-01T16:16:13.144Z"
+      "claimedAt": "2026-11-01T16:16:13.144Z",
+      "doneAt": "2026-11-01T16:16:54.768Z"
     }
   }
 }
