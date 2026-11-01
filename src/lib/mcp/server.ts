@@ -18,6 +18,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 
 import { errorResult, type McpToolContext, type OverdeckTool } from './tool.js';
 import { READ_TOOLS } from './tools-read.js';
+import { WRITE_TOOLS } from './tools-write.js';
 
 export type { McpToolContext, OverdeckTool } from './tool.js';
 export { routeErrorResult } from './tool.js';
@@ -30,7 +31,7 @@ const MCP_SERVER_VERSION = '0.0.0';
 export const MCP_DEFAULT_SCOPES = ['read:state', 'read:conversations', 'operate'] as const;
 
 /** Every tool, in tools/list order. Exported so tests compare against it. */
-export const ALL_TOOLS: readonly OverdeckTool[] = [...READ_TOOLS];
+export const ALL_TOOLS: readonly OverdeckTool[] = [...READ_TOOLS, ...WRITE_TOOLS];
 
 export function createOverdeckMcpServer(ctx: McpToolContext): Server {
   const server = new Server({ name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION }, { capabilities: { tools: {} } });
