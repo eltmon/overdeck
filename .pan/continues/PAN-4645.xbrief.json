@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T10:51:45.185Z",
+  "updated": "2026-11-01T11:18:56.807Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -452,9 +452,10 @@
       "doneAt": "2026-11-01T10:49:47.102Z"
     },
     "wi21-two-machine-smoke": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4645",
-      "claimedAt": "2026-11-01T10:50:00.697Z"
+      "claimedAt": "2026-11-01T10:50:00.697Z",
+      "doneAt": "2026-11-01T11:18:56.807Z"
     }
   }
 }
