@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T20:54:26.039Z",
+  "updated": "2026-11-01T20:54:30.749Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,11 @@
       "claimedBy": "agent-pan-4651",
       "claimedAt": "2026-11-01T20:50:22.996Z",
       "doneAt": "2026-11-01T20:54:26.039Z"
+    },
+    "wi30-two-machine-smoke": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:54:30.748Z"
     }
   }
 }
