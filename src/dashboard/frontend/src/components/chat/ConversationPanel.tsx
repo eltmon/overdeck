@@ -1468,7 +1468,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           targetMessageNonce={targetMessageNonce}
           onTargetMessageHandled={onTargetMessageHandled}
           bookmarksEnabled
-          citationsEnabled={!hideComposer}
+          citationsEnabled={!hideComposer && !onResume && !isForking && !conversation.clearedToConvId && conversation.origin !== 'vault'}
           history={olderHistory}
           onLoadOlder={olderHistory.loadOlder}
           onLoadOlderUntil={olderHistory.loadOlderUntil}
