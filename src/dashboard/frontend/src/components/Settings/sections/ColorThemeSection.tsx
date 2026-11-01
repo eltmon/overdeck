@@ -1,18 +1,32 @@
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useColorTheme } from '../../../hooks/useColorTheme';
-import type { ColorThemeType } from '@overdeck/contracts';
+import type { ColorTheme, ColorThemeType } from '@overdeck/contracts';
+import { ColorThemeImportPreview } from './ColorThemeImportPreview';
 
 /** Light and dark color theme pickers, rendered under the Overdeck Theme cards (PAN-4644). */
 export function ColorThemeSection() {
   const themes = useColorTheme((s) => s.themes);
   const selection = useColorTheme((s) => s.selection);
   const select = useColorTheme((s) => s.select);
+  const previewImport = useColorTheme((s) => s.previewImport);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<{ themes: ColorTheme[]; warnings: string[] } | null>(null);
 
   const handleChange = async (mode: ColorThemeType, id: string) => {
     try {
       await select(mode, id);
     } catch (err) {
       toast.error(`Failed to save color theme: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const handleFileChosen = async (file: File) => {
+    try {
+      const result = await previewImport(file);
+      setPreview(result);
+    } catch (err) {
+      toast.error(`Failed to preview theme import: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -51,6 +65,34 @@ export function ColorThemeSection() {
           </select>
         </label>
       </div>
+
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        className="mt-3 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/30"
+      >
+        Import VS Code theme
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        data-testid="color-theme-import-input"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void handleFileChosen(file);
+        }}
+      />
+
+      {preview && (
+        <ColorThemeImportPreview
+          themes={preview.themes}
+          warnings={preview.warnings}
+          onDone={() => setPreview(null)}
+        />
+      )}
     </div>
   );
 }
