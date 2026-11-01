@@ -3,7 +3,8 @@
  *
  * GET /api/machines/versions — one row per machine: this machine first, then
  * every outbound link in link-store order. Online links are asked for their
- * version report in parallel; a `404` means the peer predates fleet updates.
+ * version report in parallel; a `404`, or the older gate's `403 insufficient_scope
+ * (admin)`, means the peer predates fleet updates.
  *
  * POST /api/machines/update `{ mode?, environmentIds?, cancel? }` — sends one
  * start (or cancel) request to each online linked machine, then starts this
@@ -71,6 +72,19 @@ function errorCode(json: unknown): string | null {
   return typeof error === 'string' ? error : null;
 }
 
+/**
+ * D-11: a peer that predates fleet updates. Routing answers `404`, but a machine
+ * credential reaches routing only for paths in the peer's scope table; an older
+ * peer has no row for `/api/versions/self*`, so its remote request gate answers
+ * `403 insufficient_scope (admin)` first. A current peer never does: the report
+ * needs `read:state` and the update routes `operate`, which every machine token holds.
+ */
+function predatesFleetUpdates(status: number, json: unknown): boolean {
+  if (status === 404) return true;
+  const body = json as { error?: unknown; missingScope?: unknown } | null;
+  return status === 403 && body?.error === 'insufficient_scope' && body.missingScope === 'admin';
+}
+
 function linkState(link: MachineLink, status: ReturnType<LinkStatusSource['status']>): FleetVersionRow['state'] {
   return link.revokedAt ? 'revoked' : status.state;
 }
@@ -102,8 +116,8 @@ async function linkRow(link: MachineLink, deps: FleetDeps, localVersion: string)
       if (Option.isNone(report)) return { ...row, error: `${link.label} sent a version report this machine cannot read` };
       return { ...row, report: report.value as MachineVersionsReport, updateSupported: true };
     }
-    if (status === 404) {
-      // D-11: no capability flag; a 404 means the peer predates fleet updates.
+    if (predatesFleetUpdates(status, json)) {
+      // D-11: no capability flag; the peer predates fleet updates.
       return {
         ...row,
         install: { version: localVersion, on: 'peer', command: overdeckInstallCommand(localVersion) },
@@ -181,8 +195,10 @@ async function updatePeer(link: MachineLink, body: FleetUpdateBody, deps: FleetD
       if (Option.isSome(job)) return { started: { ...target, job: job.value as FleetUpdateJob } };
       return { skipped: { ...target, reason: `${link.label} answered ${status} without a job` } };
     }
-    if (status === 404) return { skipped: { ...target, reason: `${link.label} predates fleet updates` } };
-    if (status === 403) return { skipped: { ...target, reason: `${link.label}: this link is agent-fenced; Update all needs an operator-level link` } };
+    if (predatesFleetUpdates(status, json)) return { skipped: { ...target, reason: `${link.label} predates fleet updates` } };
+    if (status === 403 && errorCode(json) === 'fleet-update-forbidden') {
+      return { skipped: { ...target, reason: `${link.label}: this link is agent-fenced; Update all needs an operator-level link` } };
+    }
     if (status === 409) return { skipped: { ...target, reason: `${link.label}: ${errorCode(json) ?? 'conflict'}` } };
     return { skipped: { ...target, reason: `${link.label} answered ${status}${errorCode(json) ? `: ${errorCode(json)}` : ''}` } };
   } catch (error) {

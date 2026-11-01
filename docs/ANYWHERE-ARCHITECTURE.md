@@ -244,7 +244,12 @@ state (D-3).
   and desktop installs skip the Overdeck component.
 - **Older peers (D-11).** There is no capability flag and no protocol bump: a `404` from
   `GET /api/versions/self` means the peer predates fleet updates, and its row names the
-  version and command to install.
+  version and command to install. In practice an older peer answers
+  `403 { error: 'insufficient_scope', missingScope: 'admin' }` instead, because its
+  remote request gate has no scope row for the path and refuses the machine credential
+  before routing; that answer is read the same way. A current peer never sends it for
+  these paths, since every machine token holds `read:state` and `operate`. Update all
+  treats only `403 fleet-update-forbidden` as an agent-fenced link.
 
 ## Decisions added by sibling issues
 

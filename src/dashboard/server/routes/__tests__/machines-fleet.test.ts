@@ -100,6 +100,13 @@ describe('GET /api/machines/versions (PAN-4654 WI-7)', () => {
     });
   });
 
+  it('an older peer whose gate refuses with insufficient_scope (admin) is also treated as predating fleet updates', async () => {
+    const { deps: d } = deps({ lab: { state: 'online', peerVersion: '0.73.0', answer: () => ({ status: 403, json: { error: 'insufficient_scope', missingScope: 'admin' } }) } });
+    const { rows } = await buildFleetVersions(d);
+    expect(rows[1]).toMatchObject({ updateSupported: false, install: { version: '0.73.0', on: 'peer' } });
+    expect(rows[1]!.error).toContain('predates fleet updates');
+  });
+
   it('a peer that cannot answer gets its error and no report', async () => {
     const { deps: d } = deps({ lab: { state: 'online', answer: () => new Error('did not answer within 2.5 s') }, shed: { state: 'online', answer: () => ({ status: 200, json: { nope: true } }) } });
     const { rows } = await buildFleetVersions(d);
@@ -152,15 +159,19 @@ describe('POST /api/machines/update (PAN-4654 WI-7)', () => {
     expect('skipped' in result && result.skipped[0]?.reason).toBe('lab: this link is agent-fenced; Update all needs an operator-level link');
   });
 
-  it('a 404 peer predates fleet updates; a 409 peer reports its error code; a thrown peer reports the message', async () => {
+  it('a 404 or gate-refused peer predates fleet updates; a 409 peer reports its error code; a thrown peer reports the message', async () => {
     const { deps: d } = deps({
       old: { state: 'online', answer: () => ({ status: 404, json: null }) },
+      older: { state: 'online', answer: () => ({ status: 403, json: { error: 'insufficient_scope', missingScope: 'admin' } }) },
+      odd: { state: 'online', answer: () => ({ status: 403, json: { error: 'insufficient_scope', missingScope: 'operate' } }) },
       busy: { state: 'online', answer: () => ({ status: 409, json: { error: 'update-in-progress' } }) },
       gone: { state: 'online', answer: () => new Error('link went away') },
     });
     const result = await runFleetUpdate(body(), d);
     expect('skipped' in result && result.skipped.map((entry) => entry.reason)).toEqual([
       'old predates fleet updates',
+      'older predates fleet updates',
+      'odd answered 403: insufficient_scope',
       'busy: update-in-progress',
       'gone: link went away',
     ]);
