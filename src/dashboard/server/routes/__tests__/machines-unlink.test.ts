@@ -10,16 +10,35 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { HttpServerResponse } from 'effect/unstable/http';
+import { Effect } from 'effect';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
+
+// PAN-4404 WI-9: the SSH side of a link is the service's job; these tests see only its calls.
+const sshMocks = vi.hoisted(() => ({
+  removeSshMachineForLink: vi.fn(async () => null as unknown),
+  sshInfoForLink: vi.fn(async () => undefined as unknown),
+  reconnectSshMachine: vi.fn(async () => null as unknown),
+}));
+vi.mock('../../services/ssh-machine-service.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/ssh-machine-service.js')>()),
+  removeSshMachineForLink: sshMocks.removeSshMachineForLink,
+  sshInfoForLink: sshMocks.sshInfoForLink,
+  reconnectSshMachine: sshMocks.reconnectSshMachine,
+}));
+vi.mock('../dashboard-auth.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../dashboard-auth.js')>()),
+  rejectUnauthorizedDashboardRequest: () => null,
+  rejectUnsafeDashboardMutationRequest: () => null,
+}));
 
 const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, listActiveRecordsOfKind, MACHINE_TOKEN_SCOPES, verifyAccessToken } = await import('../../../../lib/access-tokens.js');
 const { _resetLinkStoreForTests, _settleLinkStoreWritesForTests, listLinks, upsertLink } = await import('../../../../lib/anywhere/link-store.js');
 const { openChannel } = await import('../../../../lib/anywhere/channel/open.js');
 const { _resetChannelListenerForTests, installChannelListener, liveChannelCount } = await import('../../channel-listener.js');
-const { buildMachinesResponse, handleAddRoute, handleInboundRevoke, handleMachinesSelfRevoke, handleMachinesUnlink } = await import('../machines.js');
+const { buildMachinesResponse, handleAddRoute, handleInboundRevoke, handleMachinesSelfRevoke, handleMachinesUnlink, machinesRouteLayer } = await import('../machines.js');
 const { resolveDashboardCredential } = await import('../dashboard-auth.js');
 type MachineKeyPair = import('../../../../lib/anywhere/machine-key.js').MachineKeyPair;
 
@@ -95,7 +114,7 @@ describe('machine link routes (PAN-4645 WI-13)', () => {
     });
     const { status, json } = await read(await handleMachinesUnlink(link.id, async () => { throw new Error('ECONNREFUSED'); }));
     expect(status).toBe(200);
-    expect(json).toEqual({ ok: true, peerNotified: false });
+    expect(json).toEqual({ ok: true, peerNotified: false, ssh: null });
     expect(await listLinks()).toEqual([]);
     expect(verifyAccessToken(reverse)).toEqual({ ok: false });
 
@@ -104,7 +123,7 @@ describe('machine link routes (PAN-4645 WI-13)', () => {
     // By label, with a peer that answers.
     await upsertLink({ environmentId: 'env-lab', label: 'lab', machineKey: 'c3'.repeat(32), token: `odk_${'8'.repeat(64)}`, access: 'agent-fenced', reverseTokenId: null, routes: [] });
     const byLabel = await read(await handleMachinesUnlink('lab', async () => true));
-    expect(byLabel.json).toEqual({ ok: true, peerNotified: true });
+    expect(byLabel.json).toEqual({ ok: true, peerNotified: true, ssh: null });
     expect(await listLinks()).toEqual([]);
   });
 
@@ -175,5 +194,63 @@ describe('POST /api/machines/:id/routes (PAN-4645 WI-19 Add route)', () => {
     expect((await read(await handleAddRoute(link.id, JSON.stringify({ url: 'tcp://192.168.1.6' })))).status).toBe(400);
     expect((await read(await handleAddRoute(link.id, '{'))).status).toBe(400);
     expect((await read(await handleAddRoute('nobody', JSON.stringify({ url: 'tcp://192.168.1.6:3011' })))).status).toBe(404);
+  });
+});
+
+describe('SSH-backed links (PAN-4404 WI-9)', () => {
+  const SSH_INFO = { destination: 'me@desk', launch: 'managed', forward: 'up', forwardDetail: null, localPort: 41234, remotePort: 3011 } as const;
+
+  async function sshLink(label = 'desk', environmentId = 'env-desk', key = 'd4'.repeat(32)) {
+    const { link } = await upsertLink({
+      environmentId, label, machineKey: key, token: `odk_${'7'.repeat(64)}`, access: 'operator', reverseTokenId: null,
+      routes: [{ url: 'tcp://127.0.0.1:41234', kind: 'ssh', source: 'pairing', addedAt: '2026-11-01T00:00:00.000Z' }],
+    });
+    return link;
+  }
+
+  async function route(method: string, path: string): Promise<{ status: number; json: Record<string, unknown> }> {
+    const req = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, { method }));
+    const response = await Effect.runPromise(
+      Effect.scoped(Effect.flatMap(HttpRouter.toHttpEffect(machinesRouteLayer), (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, req))),
+    );
+    return read(response);
+  }
+
+  beforeEach(() => {
+    sshMocks.removeSshMachineForLink.mockReset().mockResolvedValue(null);
+    sshMocks.sshInfoForLink.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('unlink of a managed SSH link runs the SSH removal with keepServer false before removing the link', async () => {
+    const link = await sshLink();
+    sshMocks.removeSshMachineForLink.mockImplementation(async () => {
+      // The link still exists while the SSH side is torn down.
+      expect((await listLinks()).map((l) => l.id)).toEqual([link.id]);
+      return { stopped: true, reason: 'stopped' };
+    });
+    const { status, json } = await read(await handleMachinesUnlink(link.id, async () => true));
+    expect(status).toBe(200);
+    expect(json).toEqual({ ok: true, peerNotified: true, ssh: { stopped: true, reason: 'stopped' } });
+    expect(sshMocks.removeSshMachineForLink).toHaveBeenCalledWith(expect.objectContaining({ id: link.id }), { keepServer: false });
+    expect(await listLinks()).toEqual([]);
+  });
+
+  it('DELETE /api/machines/:id?keepServer=1 passes keepServer true to the SSH removal', async () => {
+    const link = await sshLink();
+    sshMocks.removeSshMachineForLink.mockResolvedValue({ stopped: false, reason: 'kept' });
+    const { status, json } = await route('DELETE', `/api/machines/${link.id}?keepServer=1`);
+    expect(status).toBe(200);
+    expect(json).toMatchObject({ ok: true, ssh: { stopped: false, reason: 'kept' } });
+    expect(sshMocks.removeSshMachineForLink).toHaveBeenCalledWith(expect.objectContaining({ id: link.id }), { keepServer: true });
+  });
+
+  it('GET /api/machines carries the ssh block only for SSH-backed links', async () => {
+    const ssh = await sshLink();
+    await upsertLink({ environmentId: 'env-plain', label: 'plain', machineKey: 'e5'.repeat(32), token: `odk_${'6'.repeat(64)}`, access: 'operator', reverseTokenId: null, routes: [] });
+    sshMocks.sshInfoForLink.mockImplementation(async (linkId: unknown) => (linkId === ssh.id ? SSH_INFO : undefined));
+    const response = await buildMachinesResponse();
+    const byLabel = Object.fromEntries(response.links.map((l) => [l.label, l]));
+    expect(byLabel['desk']!.ssh).toEqual(SSH_INFO);
+    expect('ssh' in byLabel['plain']!).toBe(false);
   });
 });

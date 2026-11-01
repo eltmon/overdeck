@@ -4,7 +4,9 @@
  * `createMachineLink` turns a `pan pair` link from another machine into a
  * machine link, in this order (D-4645-18, continue.json D14):
  *
- *  1. `routeFromPairingUrl`: the transport route and the pairing code.
+ *  1. `routeFromPairingUrl`: the transport route and the pairing code — or a
+ *     transport this server already set up (an SSH forward, PAN-4404), taken
+ *     as given: its kind, no pairing-URL parsing and no loopback refusal.
  *  2. `ensureMachineKey`: our static key.
  *  3. `openChannel` in pairing mode (Noise XXpsk0 keyed by the code). Only now
  *     is the peer's machine key known.
@@ -32,6 +34,7 @@ import {
   LINK_PROTOCOL_VERSION,
   type LinkAccess,
   type MachineLinkView,
+  type RouteKind,
 } from '@overdeck/contracts';
 
 import { createAccessToken, MACHINE_TOKEN_SCOPES, revokeAccessToken } from '../../../lib/access-tokens.js';
@@ -41,7 +44,7 @@ import { currentAdvertisedEndpoints } from '../../../lib/anywhere/endpoints.js';
 import { ChannelOpenError, openChannel, type TransportUrl } from '../../../lib/anywhere/channel/open.js';
 import { type MachineLink, upsertLink } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
-import { type LinkRoute, mergeAdvertised, routeFromPairingUrl } from '../../../lib/anywhere/routes.js';
+import { type LinkRoute, mergeAdvertised, parseRouteUrl, routeFromPairingUrl } from '../../../lib/anywhere/routes.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 
 export const MACHINE_EXCHANGE_PATH = '/api/machines/exchange';
@@ -169,8 +172,11 @@ const defaultDeps: MachineLinkServiceDeps = {
   now: () => new Date().toISOString(),
 };
 
+/** Exactly one of `pairingUrl` or `transport`. */
 export interface CreateMachineLinkInput {
-  pairingUrl: string;
+  pairingUrl?: string;
+  /** A transport this server already set up (an SSH forward): no pairing-URL parsing, no loopback refusal. */
+  transport?: { url: TransportUrl; kind: RouteKind; pairingCode: string };
   bothWays?: boolean;
   access?: LinkAccess;
   allowLoopback?: boolean;
@@ -197,9 +203,17 @@ export async function createMachineLink(
   const bothWays = input.bothWays ?? true;
   const access: LinkAccess = input.access ?? 'operator';
 
+  if (input.pairingUrl === undefined && input.transport === undefined) {
+    throw new MachineLinkError('bad-pairing-url', 'A link needs a pairing link or a prepared transport');
+  }
   let route;
   try {
-    route = routeFromPairingUrl(input.pairingUrl, { allowLoopback: input.allowLoopback ?? false });
+    if (input.transport && !input.transport.pairingCode.startsWith('odp_')) {
+      throw new Error('The prepared transport carries no odp_ pairing code');
+    }
+    route = input.transport
+      ? { url: parseRouteUrl(input.transport.url).url, kind: input.transport.kind, source: 'pairing' as const, pairingCode: input.transport.pairingCode }
+      : routeFromPairingUrl(input.pairingUrl ?? '', { allowLoopback: input.allowLoopback ?? false });
   } catch (error) {
     throw new MachineLinkError('bad-pairing-url', (error as Error).message);
   }

@@ -11,6 +11,8 @@ See [Linked machines](/configuration/linked-machines).
 
 Every verb talks to the running dashboard with this machine's internal token, so the
 dashboard must be up (`pan up`); without one it prints the not-running message and exits 1.
+`add-ssh` and `test-ssh` also run through the dashboard: the dashboard server runs `ssh`
+with its own keys and `~/.ssh/config`, not the shell you type the command in.
 [`pan connect`](#connect) is the exception: it starts the dashboard itself, on the machine
 you want to link to.
 
@@ -39,6 +41,67 @@ Failures name the cause and exit 1: not a pairing link, the other machine unreac
 the pairing link expired or already used, the other machine running an Overdeck without
 machine links, or a machine answering with a key other than the one the link names.
 
+## add-ssh
+
+```bash
+pan machines add-ssh <host> [--pan-path <path>] [--one-way] [--agent-fenced] [--json]
+```
+
+Links a machine that this machine reaches over SSH. The dashboard runs `ssh` to `<host>`,
+checks that the host has the same `pan` version, adopts the Overdeck dashboard already
+running there or starts one with `pan up`, forwards a loopback port to it, and links over
+that port. `<host>` is an SSH config alias (`desk`), `user@host`, a host name, an IP, or
+`ssh://user@host:port`. See [SSH machines](/configuration/linked-machines#ssh-machines).
+
+| Flag | Effect |
+| --- | --- |
+| `--pan-path <path>` | Absolute path to `pan` on the host. Default: `pan` from the host's login `PATH`. |
+| `--one-way` | Only this machine reaches the other; the other gets no link back. |
+| `--agent-fenced` | Agent-fenced access: forwarded requests are never operator-level. |
+| `--json` | Print the new link as JSON, with its `ssh` block. |
+
+```
+Linked vps (0a71-b2da-d646-3485-3ce1) over ssh me@vps.example.com; Overdeck started there
+`pan machines list` shows its state; `pan machines unlink` removes it.
+```
+
+`Overdeck started there` means this machine ran `pan up` on the host, so removing the
+machine stops that server. `was already running there` means it adopted a running server,
+which removal never stops. The command can take up to a few minutes when it starts Overdeck.
+
+Failures print the server's message and exit 1:
+
+| Error | Remedy |
+| --- | --- |
+| `bad-destination` | Use an alias, `user@host`, a host name or `ssh://user@host:port`. A `:port` needs the `ssh://` prefix. |
+| `busy` | Another add, remove or reconnect for this host is running here or on another machine. Try again in a minute. |
+| `unresolvable` | The host name does not resolve from this machine. |
+| `unreachable` | SSH could not connect (refused, timed out, no route). |
+| `host-key` | The host key is unknown or changed. Run `ssh <host>` once in a terminal on this machine and check it. |
+| `auth-failed` | SSH refused the login. The dashboard needs a key or agent it can use without a prompt. |
+| `pan-missing` | `pan` is not on the host. Install it there: `npm install -g @overdeck/core@<version>`, or pass `--pan-path`. |
+| `version-mismatch` | The host has another `pan` version; the message names both. Install this machine's version there: `npm install -g @overdeck/core@<version>`. |
+| `helper-failed` | The helper on the host failed. The message carries the last lines it printed. |
+| `start-failed` | `pan up` on the host did not bring a dashboard up. The message carries its last output lines. |
+| `forward-failed` | The port forward did not come up within 15 s. |
+| `self-link` | The host is this machine. |
+
+## test-ssh
+
+```bash
+pan machines test-ssh <host> [--pan-path <path>] [--json]
+```
+
+Checks that the dashboard reaches `<host>` over SSH and that the host has the same `pan`
+version. It never starts, stops or pairs anything.
+
+```
+Reached desk: pan 0.73.0 (matches this machine)
+```
+
+A failure prints the same messages as `add-ssh` and exits 1. `--json` prints
+`{ reachable, panVersion, localVersion, versionMatches, error, message }`.
+
 ## list
 
 ```bash
@@ -50,9 +113,10 @@ Shows this machine, every link with its state, and the machines that hold access
 ```
 This machine: studio (1111-2222-3333-4444-5555)
 
-LABEL  STATE                            ROUTE                     ACCESS    FINGERPRINT
-desk   online                           tcp://192.168.1.5:3011    operator  0a71-b2da-d646-3485-3ce1
-laptop offline (network 12.0 s, 1 h ago)  tcp://10.0.0.9:3011       operator  7c0d-11aa-9b3e-4d2f-88e1
+LABEL   STATE                             ROUTE                    ACCESS    SSH                       FINGERPRINT
+desk    online                            tcp://192.168.1.5:3011   operator  -                         0a71-b2da-d646-3485-3ce1
+laptop  offline (network 12.0 s, 1 h ago) tcp://10.0.0.9:3011      operator  -                         7c0d-11aa-9b3e-4d2f-88e1
+vps     online                            tcp://127.0.0.1:41234    operator  me@vps (up, managed)      5e1f-0b9c-2d44-a1e7-63c0
 
 Inbound
 LABEL  ACCESS    FINGERPRINT               LAST USED  TOKEN ID
@@ -60,7 +124,9 @@ desk   operator  0a71-b2da-d646-3485-3ce1  just now   tok_…
 ```
 
 The STATE cell carries the last incident (`froze` when the other dashboard stalled,
-`network` otherwise) and, for `unsupported`, `revoked` and `offline`, the detail.
+`network` otherwise) and, for `unsupported`, `revoked` and `offline`, the detail. The SSH
+cell shows `<destination> (<forward state>, <managed|external>)` for an SSH machine and
+`-` for any other link.
 
 | Flag | Effect |
 | --- | --- |
@@ -71,7 +137,7 @@ With no links: `` No linked machines. Link one with `pan machines link <pairing-
 ## unlink
 
 ```bash
-pan machines unlink <label|environment-id|link-id> [--json]
+pan machines unlink <label|environment-id|link-id> [--keep-server] [--json]
 ```
 
 Removes the link and tells the other machine to revoke this machine's access.
@@ -82,7 +148,30 @@ Unlinked "desk"; the other machine was told and its token here was revoked.
 
 When the other machine cannot be reached it prints that it will see the link as revoked
 when it next connects. An unknown target prints `No machine link matches "<target>"` and
-exits 1. `--json` prints `{ ok, peerNotified }`.
+exits 1. `--json` prints `{ ok, peerNotified, ssh }`.
+
+For an SSH machine, unlink also stops its port forward. When this machine started the
+host's server (`managed`), unlink stops that server too, unless you pass `--keep-server`.
+A second line says which:
+
+```
+Stopped the Overdeck server on vps.
+Left the Overdeck server on vps running (in-use).
+```
+
+| Reason | Meaning |
+| --- | --- |
+| `kept` | You passed `--keep-server`. |
+| `external` | The server was already running when this machine added it. |
+| `in-use` | Another machine holds an active link to that server. |
+| `restarted` | The server was restarted since this machine started it. |
+| `not-running` | No server was running on the host. |
+| `stop-failed` | The host could not be reached; the link was removed anyway. |
+
+| Flag | Effect |
+| --- | --- |
+| `--keep-server` | For an SSH machine this dashboard started: leave its Overdeck server running. |
+| `--json` | Print `{ ok, peerNotified, ssh }` as JSON. |
 
 ## versions
 
