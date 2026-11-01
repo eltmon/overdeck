@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4330",
   "created": "2026-11-01T04:59:32.820Z",
-  "updated": "2026-11-01T07:41:18.976Z",
+  "updated": "2026-11-01T07:41:43.418Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "account-logout.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T07:41:18.975Z"
+    },
+    "account-logout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:41:43.418Z"
     }
   }
 }
