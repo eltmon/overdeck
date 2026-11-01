@@ -362,3 +362,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   generation, then waits for `pan restart approve` from the operator; the
   reload process exits after the build, so check `/api/health` buildCommit
   with `git merge-base --is-ancestor` before calling it deployed.
+- 2026-11-01 06:25 UTC: operator rule (memory `coderabbit-advisory-not-blocking`):
+  review CodeRabbit findings when it posts; when rate-limited or silent, merge
+  without it. The review context ingests CodeRabbit only at review start, so
+  check for newer coderabbitai[bot] inline comments before every merge
+  (PAN-4671, needs-handoff). Missed findings on #4662/#4637 → PAN-4672.
