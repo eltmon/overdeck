@@ -24,6 +24,11 @@
   node-pty for Electron's ABI; macOS notarization runs in the `afterSign`
   hook `scripts/notarize.cjs` with `mac.notarize: false`. See `docs/BUILD.md`.
 - **CLI:** commander (`src/cli/index.ts`), self-documenting `--help`.
+- **Dependency bundling:** the root tsdown build keeps root `dependencies`
+  external (`lint:dist-externals` fails a bare import that is not declared);
+  the server tsdown build bundles everything not in
+  `src/dashboard/server/package.json`. The only cron library is `croner`
+  (pinned `10.0.1`, PAN-4640), always constructed `paused: true`.
 - **Tests:** Vitest (`npm test` = root + frontend projects). Fake timers
   mandatory for delay-based logic. Playwright MCP for browser UAT.
 - **Evals:** Evalite (`npm run eval` = `cd evals && evalite .`), not in CI. Anthropic models can run through the `claude` CLI on a subscription with `OVERDECK_EVAL_ANTHROPIC_VIA=claude-cli` (`evals/lib/claude-cli.ts`).
@@ -65,4 +70,4 @@
   `wrangler dev --local`, `--dry-run` bundles, real-workerd tests); deploying is
   operator-only. See `docs/ACCOUNT-SERVICE.md`.
 
-<!-- last-verified: 2026-10-04 -->
+<!-- last-verified: 2026-11-01 -->

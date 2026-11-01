@@ -4,9 +4,11 @@ services:
     container_name: overdeck-traefik
     restart: unless-stopped
     ports:
-      - "80:80"       # HTTP (redirects to HTTPS)
-      - "443:443"     # HTTPS
-      - "8080:8080"   # Traefik Dashboard
+      # Loopback only (PAN-4299). Set [traefik] bind = "all" in config.toml to
+      # publish on every interface; pan up/install/sync rewrite these lines.
+      - "127.0.0.1:80:80"       # HTTP (redirects to HTTPS)
+      - "127.0.0.1:443:443"     # HTTPS
+      - "127.0.0.1:8080:8080"   # Traefik Dashboard
     volumes:
       # Traefik configuration
       - ./traefik.yml:/etc/traefik/traefik.yml:ro

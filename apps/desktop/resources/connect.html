@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open another machine</title>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --fg: #1d1d1b;
+    --muted: #6b6b66;
+    --border: #d6d6d0;
+    --field: #ffffff;
+    --accent: #1d1d1b;
+    --accent-fg: #ffffff;
+    --error: #b42318;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1b1a;
+      --fg: #ececea;
+      --muted: #9a9a94;
+      --border: #3a3a37;
+      --field: #252524;
+      --accent: #ececea;
+      --accent-fg: #1b1b1a;
+      --error: #f97066;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px;
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 16px; }
+  section { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
+  section:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+  .status { color: var(--muted); margin: 0 0 12px; word-break: break-all; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--field);
+    color: var(--fg);
+    font: inherit;
+  }
+  button {
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--field);
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+  }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .pair-row { display: flex; gap: 8px; margin-top: 8px; }
+  .pair-row input { flex: 1; }
+  .alert { color: var(--error); margin: 16px 0 0; min-height: 1.5em; }
+  .note { margin: 16px 0 0; min-height: 1.5em; }
+  .hint { color: var(--muted); margin: 12px 0 0; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<h1>Open another machine</h1>
+
+<section id="machine" hidden>
+  <p class="status" id="machine-status"></p>
+  <div class="row">
+    <button type="button" class="primary" id="open"></button>
+    <button type="button" id="use-local">Use this computer</button>
+    <button type="button" id="forget"></button>
+  </div>
+</section>
+
+<section>
+  <form id="pair-form">
+    <label for="link">Pairing link</label>
+    <div class="pair-row">
+      <input id="link" type="text" autocomplete="off" spellcheck="false" placeholder="http://100.x.y.z:3011/#pair=odp_…">
+      <button type="submit" class="primary" id="connect">Connect</button>
+    </div>
+  </form>
+  <p class="hint">Create the link on that machine: Settings → Anywhere → Pair a device, or run <code>pan pair --url &lt;its Tailscale address&gt;</code>.</p>
+  <p class="alert" id="error" role="alert"></p>
+  <p class="note" id="note" role="status"></p>
+</section>
+
+<script>
+  const api = window.overdeckConnect;
+  const els = {
+    machine: document.getElementById("machine"),
+    status: document.getElementById("machine-status"),
+    open: document.getElementById("open"),
+    useLocal: document.getElementById("use-local"),
+    forget: document.getElementById("forget"),
+    form: document.getElementById("pair-form"),
+    link: document.getElementById("link"),
+    connect: document.getElementById("connect"),
+    error: document.getElementById("error"),
+    note: document.getElementById("note"),
+  };
+  const buttons = [els.open, els.useLocal, els.forget, els.connect];
+  let canUseThisComputer = false;
+
+  function setBusy(busy) {
+    for (const button of buttons) button.disabled = busy;
+    els.link.disabled = busy;
+    if (!busy) els.useLocal.disabled = !canUseThisComputer;
+  }
+
+  function render(state) {
+    canUseThisComputer = state.canUseThisComputer;
+    const machine = state.machine;
+    els.machine.hidden = !machine;
+    if (machine) {
+      els.status.textContent = machine.label + " · " + machine.baseUrl;
+      els.open.textContent = "Open " + machine.label;
+      els.forget.textContent = "Forget " + machine.label;
+    }
+    els.useLocal.disabled = !canUseThisComputer;
+    els.error.textContent = state.error || "";
+  }
+
+  async function refresh() {
+    const state = await api.getState();
+    if (state && "mode" in state) render(state);
+  }
+
+  async function run(action) {
+    setBusy(true);
+    els.note.textContent = "";
+    try {
+      const result = await action();
+      if (result.ok) {
+        els.error.textContent = "";
+        if (result.message) els.note.textContent = result.message;
+      } else {
+        els.error.textContent = result.error;
+      }
+    } finally {
+      setBusy(false);
+      await refresh();
+    }
+  }
+
+  els.form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const link = els.link.value.trim();
+    if (!link) return;
+    void run(async () => {
+      const result = await api.pair(link);
+      if (result.ok) els.link.value = "";
+      return result;
+    });
+  });
+  els.open.addEventListener("click", () => void run(() => api.openMachine()));
+  els.useLocal.addEventListener("click", () => void run(() => api.useThisComputer()));
+  els.forget.addEventListener("click", () => void run(() => api.forget()));
+  api.onStateChanged(() => void refresh());
+
+  void refresh();
+</script>
+</body>
+</html>
