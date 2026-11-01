@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4728",
   "created": "2026-11-01T17:45:22.507Z",
-  "updated": "2026-11-01T18:51:47.102Z",
+  "updated": "2026-11-01T18:52:01.705Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "known-pack-pstack.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T18:51:47.102Z"
+    },
+    "known-pack-pstack.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:52:01.704Z"
     }
   }
 }
