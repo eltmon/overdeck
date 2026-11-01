@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:54:08.259Z",
+  "updated": "2026-11-01T14:54:22.520Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -404,6 +404,10 @@
       "claimedBy": "agent-pan-2356",
       "claimedAt": "2026-11-01T14:53:50.477Z",
       "doneAt": "2026-11-01T14:54:08.259Z"
+    },
+    "wi18-status-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:54:22.519Z"
     }
   }
 }
