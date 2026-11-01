@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:22:39.942Z",
+  "updated": "2026-11-01T21:22:54.545Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "wi1-provenance-fence.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T21:22:39.941Z"
+    },
+    "wi1-provenance-fence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:22:54.545Z"
     }
   }
 }
