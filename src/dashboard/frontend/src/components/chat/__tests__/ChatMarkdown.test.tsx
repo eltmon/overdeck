@@ -15,6 +15,16 @@ vi.mock('../../../lib/wsTransport', () => ({
   getTransport: () => wsTransportMock,
 }));
 
+// PAN-4644 review: a rejected ensureSyntaxTheme must not become an unhandled
+// promise rejection — the code block should just keep its plain-text fallback.
+vi.mock('../../../lib/syntaxTheme', async () => {
+  const actual = await vi.importActual<typeof import('../../../lib/syntaxTheme')>('../../../lib/syntaxTheme');
+  return {
+    ...actual,
+    ensureSyntaxTheme: vi.fn().mockRejectedValue(new Error('registration failed')),
+  };
+});
+
 import { ChatMarkdown } from '../ChatMarkdown';
 import { _resetFilePathExistsCacheForTests } from '../../../lib/filePathExistsCache';
 
@@ -142,5 +152,13 @@ describe('ChatMarkdown file links', () => {
 
     rerender(<ChatMarkdown text="Bad [link](javascript:alert(1))." cwd="/tmp/project" />);
     await waitFor(() => expect(screen.getByText(/link \[blocked\]/).closest('a')).toBeNull());
+  });
+
+  it('renders a fenced code block with its plain-text fallback when syntax theme registration rejects (PAN-4644 review)', async () => {
+    mockExists(true, 'file');
+    renderMarkdown(<ChatMarkdown text={'```ts\nconst x = 1;\n```'} cwd="/tmp/project" />);
+
+    const pre = await screen.findByText('const x = 1;');
+    expect(pre.closest('pre')).toBeInTheDocument();
   });
 });

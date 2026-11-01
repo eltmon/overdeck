@@ -66,6 +66,7 @@ import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { settingsRouteLayer } from './routes/settings.js'
 import { modelPresetsRouteLayer } from './routes/model-presets.js'
 import { jevRouteLayer } from './routes/jev.js'
+import { colorThemesRouteLayer } from './routes/color-themes.js'
 import { vaultRouteLayer } from './routes/vault.js'
 import { voiceRouteLayer } from './routes/voice.js';
 import { autopresoRouteLayer } from './routes/autopreso.js';
@@ -316,6 +317,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   settingsRouteLayer,
   modelPresetsRouteLayer,
   jevRouteLayer,
+  colorThemesRouteLayer,
   vaultRouteLayer,
   voiceRouteLayer,
   autopresoRouteLayer,

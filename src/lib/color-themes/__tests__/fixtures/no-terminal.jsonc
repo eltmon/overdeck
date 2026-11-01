@@ -1,0 +1,13 @@
+// Hand-written fixture: a theme with no terminal.* keys at all.
+{
+  "name": "No Terminal",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#101010",
+    "editor.foreground": "#e0e0e0",
+  },
+  "tokenColors": [
+    { "scope": "comment", "settings": { "foreground": "#808080", "fontStyle": "italic" } },
+    { "scope": ["string", "string.quoted"], "settings": { "foreground": "#a0d0a0" } },
+  ],
+}

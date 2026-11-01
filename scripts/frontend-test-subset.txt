@@ -39,6 +39,8 @@ src/components/GodView/confluence/__tests__/rail-link.test.tsx
 src/components/GodView/confluence/__tests__/useConfluenceData.test.ts
 src/components/HealthDashboard.test.tsx
 src/components/IssueActionMenu/__tests__/useIssueActions.render-count.test.tsx
+src/components/Settings/__tests__/ColorThemeImportPreview.test.tsx
+src/components/Settings/__tests__/ColorThemeSection.test.tsx
 src/components/Settings/__tests__/ModelPresetsBar.test.tsx
 src/components/Settings/anywhere/__tests__/AddTriggerDialog.test.tsx
 src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx
@@ -132,6 +134,7 @@ src/components/terminal/TerminalDrawer.pending.test.tsx
 src/components/terminal/terminalControlFrames.test.ts
 src/components/workspace/new/__tests__/smartField.test.ts
 src/components/workspace/new/__tests__/useWorkspaceCreateIntent.test.ts
+src/hooks/__tests__/useColorTheme.test.ts
 src/lib/__tests__/citationFormat.test.ts
 src/lib/__tests__/composerCitations.test.ts
 src/lib/__tests__/connectionState.test.ts
@@ -144,6 +147,7 @@ src/lib/__tests__/pendingInputAnswer.test.ts
 src/lib/__tests__/selectBackendPanes.render-count.test.tsx
 src/lib/__tests__/simple-derive.test.ts
 src/lib/__tests__/simple-feed.test.ts
+src/lib/__tests__/syntaxTheme.test.ts
 src/lib/__tests__/telemetry.test.ts
 src/lib/__tests__/useDecisions.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts

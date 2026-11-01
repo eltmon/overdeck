@@ -586,6 +586,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'PUT /api/jev/settings',                                kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via jev settings path-scoped write (PAN-4508)' },
   { surface: 'GET /api/jev/usage',                                   kind: 'http', disposition: 'READ',        door: 'jev usage log summary, read-only (PAN-4508)' },
 
+  // ── color-themes.ts (PAN-4644) ───────────────────────────────────────────
+  { surface: 'GET /api/color-themes',                                kind: 'http', disposition: 'READ',        door: 'color theme store + selection resolve (PAN-4644)' },
+  { surface: 'PUT /api/color-themes/selection',                      kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via color theme selection path-scoped write (PAN-4644)' },
+  { surface: 'POST /api/color-themes/import/preview',                kind: 'http', disposition: 'READ',        door: 'VS Code theme mapping preview; writes nothing (PAN-4644)' },
+  { surface: 'POST /api/color-themes',                               kind: 'http', disposition: 'WRITE',       door: 'color theme store save, under OVERDECK_HOME/themes (PAN-4644)' },
+
   // ── vault.ts ──────────────────────────────────────────────────────────────
   { surface: 'GET /api/vault/status',                                kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via vault-service snapshot (PAN-4307)' },
   { surface: 'GET /api/vault/eviction-batch',                        kind: 'http', disposition: 'READ',        door: 'FILE via src/lib/vault/evict.ts batch read (PAN-4307)' },

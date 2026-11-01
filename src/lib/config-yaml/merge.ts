@@ -275,6 +275,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     ui: {
       openInEditorCommand: DEFAULT_CONFIG.ui.openInEditorCommand,
       theme: DEFAULT_CONFIG.ui.theme,
+      colorTheme: { ...DEFAULT_CONFIG.ui.colorTheme },
     },
     experimental: {
       experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
@@ -900,6 +901,24 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         throw new Error('config.yaml: ui.theme must be ledger or broadsheet');
       }
       result.ui.theme = config.ui.theme;
+    }
+
+    if (config.ui?.color_theme !== undefined) {
+      const rawColorTheme = config.ui.color_theme;
+      if (typeof rawColorTheme === 'object' && rawColorTheme !== null && !Array.isArray(rawColorTheme)) {
+        const colorThemeIdRe = /^[a-z0-9][a-z0-9-]{0,63}$/;
+        for (const mode of ['light', 'dark'] as const) {
+          const value = rawColorTheme[mode];
+          if (value === undefined) continue;
+          if (typeof value === 'string' && colorThemeIdRe.test(value)) {
+            result.ui.colorTheme[mode] = value;
+          } else {
+            console.warn(`config.yaml: ui.color_theme.${mode} must be a theme id; ignoring`);
+          }
+        }
+      } else {
+        console.warn('config.yaml: ui.color_theme must be a map of theme ids; ignoring');
+      }
     }
 
     if (config.issues) {

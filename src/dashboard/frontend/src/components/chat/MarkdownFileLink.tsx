@@ -11,12 +11,14 @@ import {
 } from 'lucide-react';
 import { EDITORS, type EditorId, WS_METHODS } from '@overdeck/contracts';
 import { toast } from 'sonner';
-import type { DiffsThemeNames } from '@pierre/diffs';
 
 import { showContextMenu, type ContextMenuFallbackItem } from '../../contextMenuFallback';
 import { getMarkdownOpenTarget, getPreferredEditor, setMarkdownOpenTarget, setPreferredEditor } from '../../editorPreferences';
 import { cn } from '../../lib/utils';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
+import { ensureSyntaxTheme, highlight, syntaxThemeName } from '../../lib/syntaxTheme';
+import { useTheme } from '../../hooks/useTheme';
+import { useColorTheme } from '../../hooks/useColorTheme';
 import type { MarkdownFileLinkMeta } from '../../markdown-links';
 import { useStageDeck } from '../Stage/StageDeckContext';
 import { usePickerPosition } from './usePickerPosition';
@@ -73,12 +75,9 @@ const IMAGE_EXTENSIONS = new Set(['avif', 'gif', 'jpeg', 'jpg', 'png', 'svg', 'w
 const ARCHIVE_EXTENSIONS = new Set(['7z', 'gz', 'rar', 'tar', 'tgz', 'zip']);
 const CONFIG_EXTENSIONS = new Set(['env', 'toml', 'yaml', 'yml']);
 
-let sharedQuickviewHighlighterPromise: Promise<unknown> | null = null;
-
 // PAN-3260 — module-level cache for the right-click menu's external-editor
-// list, same pattern as sharedQuickviewHighlighterPromise above. On fetch
-// failure the cache is cleared (so the next open retries) and the menu
-// proceeds with an empty external list rather than blocking.
+// list. On fetch failure the cache is cleared (so the next open retries) and
+// the menu proceeds with an empty external list rather than blocking.
 let sharedAvailableEditorsPromise: Promise<readonly EditorId[]> | null = null;
 
 async function fetchAvailableEditors(): Promise<readonly EditorId[]> {
@@ -145,17 +144,9 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;');
 }
 
-async function highlightQuickviewCode(code: string, lang: string): Promise<string> {
+async function highlightQuickviewCode(code: string, lang: string, themeName: string): Promise<string> {
   try {
-    if (!sharedQuickviewHighlighterPromise) {
-      sharedQuickviewHighlighterPromise = import('@pierre/diffs').then((m) =>
-        m.getSharedHighlighter({ themes: ['github-dark' as DiffsThemeNames], langs: [] }),
-      );
-    }
-    const highlighter = await sharedQuickviewHighlighterPromise as {
-      codeToHtml: (code: string, options: { lang: string; theme: string }) => string;
-    };
-    return highlighter.codeToHtml(code, { lang: lang || 'text', theme: 'github-light' });
+    return await highlight(code, lang, themeName);
   } catch {
     return `<pre><code>${escapeHtml(code)}</code></pre>`;
   }
@@ -199,6 +190,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
   });
   const previewIssueId = issueId ?? issueIdFromPath(targetPath);
   const previewRelativePath = useMemo(() => relativePathForPreview(displayPath), [displayPath]);
+  const mode = useTheme((s) => s.resolvedTheme);
+  const activeTheme = useColorTheme((s) => s.activeTheme(mode));
 
   const handleOpen = useCallback(() => {
     void resolvePreferredEditor()
@@ -288,34 +281,38 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
     setQuickviewState({ status: 'loading' });
     setQuickviewOpen(true);
 
-    void getTransport().request((client) =>
-      (client as PanRpcProtocolClient)[WS_METHODS.readWorkspaceFile]({
-        issueId: activeIssueId,
-        relativePath: previewRelativePath,
-        ...(line ? { line } : {}),
-        contextLines: QUICKVIEW_CONTEXT_LINES,
-      }),
-    )
-      .then((result) => highlightQuickviewCode(
-        (result as WorkspaceFilePreviewResult).text,
-        (result as WorkspaceFilePreviewResult).lang,
-      ).then((html) => ({ html, result: result as WorkspaceFilePreviewResult })))
-      .then(({ html, result }) => {
-        if (requestId !== requestIdRef.current) return;
-        setQuickviewState({
-          status: 'ready',
-          html,
-          truncated: result.truncated,
-          totalLines: result.totalLines,
+    void ensureSyntaxTheme(activeTheme).then(() => {
+      const themeName = syntaxThemeName(activeTheme);
+      return getTransport().request((client) =>
+        (client as PanRpcProtocolClient)[WS_METHODS.readWorkspaceFile]({
+          issueId: activeIssueId,
+          relativePath: previewRelativePath,
+          ...(line ? { line } : {}),
+          contextLines: QUICKVIEW_CONTEXT_LINES,
+        }),
+      )
+        .then((result) => highlightQuickviewCode(
+          (result as WorkspaceFilePreviewResult).text,
+          (result as WorkspaceFilePreviewResult).lang,
+          themeName,
+        ).then((html) => ({ html, result: result as WorkspaceFilePreviewResult })))
+        .then(({ html, result }) => {
+          if (requestId !== requestIdRef.current) return;
+          setQuickviewState({
+            status: 'ready',
+            html,
+            truncated: result.truncated,
+            totalLines: result.totalLines,
+          });
         });
-      })
+    })
       .catch((error) => {
         if (requestId !== requestIdRef.current) return;
         const message = error instanceof Error ? error.message : String(error);
         setQuickviewState({ status: 'error', message });
         toast.error(`Failed to load Quickview: ${message}`);
       });
-  }, [line, previewIssueId, previewRelativePath]);
+  }, [line, previewIssueId, previewRelativePath, activeTheme]);
 
   const copyPath = useCallback((value: string, label: string) => {
     void navigator.clipboard.writeText(value)
