@@ -17,9 +17,51 @@ import { createFlyProviderFromConfig } from './remote/index.js';
 import { writeRemoteFile } from './remote/remote-agents.js';
 import { saveWorkspaceMetadata } from './remote/workspace-metadata.js';
 import type { RemoteWorkspaceMetadata } from './remote/interface.js';
+import type { FlyProvider } from './remote/fly-provider.js';
+import { shellQuote } from './remote/remote-tmux.js';
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssueSync, getIssuePrefix } from './projects.js';
 
 const execAsync = promisify(exec);
+
+const CLONE_POLL_INTERVAL_MS = 5_000;
+const CLONE_DEADLINE_MS = 20 * 60_000;
+
+/**
+ * Clone the repo into /workspace detached, then poll for its exit code
+ * (PAN-4685). A synchronous clone of a large repo outlasts the Machines exec
+ * deadline (60 s) and fails creation with a 408. The log and exit files live
+ * in /tmp because git clone needs an empty /workspace.
+ */
+async function cloneDetached(
+  fly: FlyProvider,
+  vmName: string,
+  repoUrl: string,
+): Promise<{ exitCode: number; output: string }> {
+  const script = `git clone ${repoUrl} /workspace > /tmp/pan-clone.log 2>&1; echo $? > /tmp/pan-clone.exit`;
+  const start = await Effect.runPromise(fly.ssh(
+    vmName,
+    `rm -f /tmp/pan-clone.exit && setsid nohup sh -c ${shellQuote(script)} > /dev/null 2>&1 < /dev/null &`,
+  ));
+  if (start.exitCode !== 0) return { exitCode: start.exitCode, output: start.stderr || start.stdout };
+
+  const deadline = Date.now() + CLONE_DEADLINE_MS;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, CLONE_POLL_INTERVAL_MS));
+    let code = '';
+    try {
+      // No exit file yet (cat exits 1) or a failed exec both mean: poll again.
+      const poll = await Effect.runPromise(fly.ssh(vmName, 'cat /tmp/pan-clone.exit 2>/dev/null'));
+      if (poll.exitCode === 0) code = poll.stdout.trim();
+    } catch {
+      continue;
+    }
+    if (code === '') continue;
+    if (code === '0') return { exitCode: 0, output: '' };
+    const log = await Effect.runPromise(fly.ssh(vmName, 'tail -5 /tmp/pan-clone.log'));
+    return { exitCode: Number(code) || 1, output: log.stdout };
+  }
+  return { exitCode: 1, output: `clone did not finish within ${CLONE_DEADLINE_MS / 60_000} min` };
+}
 
 export interface CreateRemoteWorkspaceOptions {
   dryRun?: boolean;
@@ -111,10 +153,10 @@ export async function createRemoteWorkspace(
   // VMs hold no SSH key (PAN-4295): clone over https, authenticated by the
   // synced gh token's credential helper.
   const httpsRepoUrl = repoUrl.replace(/^git@([^:]+):/, 'https://$1/');
-  const cloneResult = await Effect.runPromise(fly.ssh(vmName, `git clone ${httpsRepoUrl} /workspace`));
+  const cloneResult = await cloneDetached(fly, vmName, httpsRepoUrl);
   if (cloneResult.exitCode !== 0) {
     await Effect.runPromise(fly.deleteVm(vmName));
-    throw new Error(`Failed to clone: ${cloneResult.stderr}`);
+    throw new Error(`Failed to clone: ${cloneResult.output}`);
   }
   await Effect.runPromise(
     fly.ssh(vmName, `cd /workspace && git config user.email "panopticon-agent[bot]@users.noreply.github.com" && git config user.name "panopticon-agent[bot]"`)
