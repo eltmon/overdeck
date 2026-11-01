@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T06:02:58.210Z",
+  "updated": "2026-11-01T06:03:15.319Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -18,6 +18,10 @@
     "wi1-machine-key.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T06:02:58.209Z"
+    },
+    "wi1-machine-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:03:15.319Z"
     }
   }
 }
