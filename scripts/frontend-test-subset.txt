@@ -148,6 +148,7 @@ src/components/sessionFeed/__tests__/gauntletRunEntries.test.ts
 src/components/sessionFeed/__tests__/useActivityEntryFeed.test.ts
 src/components/sessionFeed/__tests__/useConversationFeed.test.ts
 src/components/sessionFeed/__tests__/useMergedFeed.test.ts
+src/components/sidebar/__tests__/AddProjectToMachineDialog.test.tsx
 src/components/terminal/TerminalDrawer.pending.test.tsx
 src/components/terminal/terminalControlFrames.test.ts
 src/components/workspace/new/__tests__/smartField.test.ts

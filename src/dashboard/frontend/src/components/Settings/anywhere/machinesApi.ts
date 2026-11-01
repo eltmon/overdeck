@@ -116,6 +116,45 @@ export async function loadFleetProjects(): Promise<FleetProjectsResponse> {
   return { combine: body?.combine !== false, projects: Array.isArray(body?.projects) ? body.projects : [] };
 }
 
+/** PAN-4651 D-4651-14: a project's source facts and copyable ignored files on a linked machine. */
+export interface OwnerProjectSource {
+  key: string;
+  name: string;
+  issuePrefix: string | null;
+  gitOrigin: string | null;
+  cloneUrl: string | null;
+  ignoredFiles: Array<{ path: string; bytes: number; preselected: boolean }>;
+}
+
+export interface AddProjectJob {
+  step: 'clone' | 'files' | 'done' | 'failed';
+  error?: string;
+  projectKey?: string;
+  files?: Array<{ path: string; result: 'written' | 'skipped' | 'failed' }>;
+}
+
+export async function loadOwnerProjectSource(machine: string, projectKey: string): Promise<OwnerProjectSource> {
+  const params = new URLSearchParams({ machine, projectKey });
+  const result = await readResult<OwnerProjectSource>(await fetch(`/api/fleet/projects/source?${params.toString()}`));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body;
+}
+
+/** Add here: clone the linked machine's project to this machine and copy `files`. */
+export async function addProjectHere(input: { machine: string; projectKey: string; files: string[] }): Promise<ApiResult<{ jobId: string }>> {
+  return readResult(await fetch('/api/fleet/projects/add-here', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(input),
+  }));
+}
+
+export async function loadAddProjectJob(jobId: string): Promise<AddProjectJob> {
+  const result = await readResult<AddProjectJob>(await fetch(`/api/fleet/projects/add-jobs/${encodeURIComponent(jobId)}`));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body;
+}
+
 /** PAN-4650: Hide this machine (or show it again) in the conversation list. */
 export async function setMachineHidden(id: string, hidden: boolean): Promise<ApiResult<MachineLinkView>> {
   return readResult(await fetch(`/api/machines/${encodeURIComponent(id)}`, {
