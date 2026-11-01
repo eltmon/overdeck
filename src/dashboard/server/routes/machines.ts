@@ -8,7 +8,8 @@
  * - `DELETE /api/machines/:id[?keepServer=1]` unlinks: tells the peer (best
  *   effort, 2.5 s, through the link supervisor once WI-18 provides it), tears
  *   down an SSH machine's side (PAN-4404: stops the host's server only when this
- *   machine started it and `keepServer` is not set, then the forward), revokes
+ *   machine started it and `keepServer` is not set, then the forward), destroys
+ *   a Fly machine unless `keepServer` (PAN-4652) and deletes its record, revokes
  *   the reverse token we issued the peer (closing its channels here) and
  *   removes the link.
  * - `DELETE /api/machines/self` lets a linked machine revoke its own token.
@@ -36,6 +37,7 @@ import { LinkUnavailableError } from '../../../lib/anywhere/link-client.js';
 import { ForwardRefusedError, listForwards, startForward, stopForward } from '../services/port-forwards.js';
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
 import { classifyHost, parseRouteUrl } from '../../../lib/anywhere/routes.js';
+import { FLY_MACHINE_ERROR_STATUS, FlyMachineError } from '../../../lib/anywhere/fly/provision.js';
 import { SshMachineError } from '../../../lib/anywhere/ssh/target.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
@@ -43,6 +45,7 @@ import { channelOfRequest } from '../channel-peer.js';
 import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import { createMachineLink, type LinkStatusSource, MachineLinkError, machineLinkView } from '../services/machine-link-service.js';
+import { type FlyRemoval, removeFlyMachineForLink } from '../services/fly-machine-service.js';
 import {
   reconnectSshMachine,
   removeSshMachineForLink,
@@ -114,6 +117,9 @@ function sshFailure(error: unknown): HttpServerResponse.HttpServerResponse {
   if (error instanceof SshMachineError) {
     return jsonResponse({ error: error.code, message: error.message, detail: error.detail }, { status: SSH_MACHINE_ERROR_STATUS[error.code] });
   }
+  if (error instanceof FlyMachineError) {
+    return jsonResponse({ error: error.code, message: error.message, detail: error.detail }, { status: FLY_MACHINE_ERROR_STATUS[error.code] });
+  }
   throw error;
 }
 
@@ -129,7 +135,7 @@ async function notifyPeerWithin(link: MachineLink, notifier: PeerUnlinkNotifier)
   }
 }
 
-/** Unlink by link id, environment id or label. `keepServer` leaves an SSH machine's server running. */
+/** Unlink by link id, environment id or label. `keepServer` leaves an SSH machine's server or a Fly machine running. */
 export async function handleMachinesUnlink(
   idOrEnvOrLabel: string,
   notifier: PeerUnlinkNotifier = peerUnlinkNotifier,
@@ -139,8 +145,10 @@ export async function handleMachinesUnlink(
   if (!link) return jsonResponse({ error: `no machine link matches ${idOrEnvOrLabel}` }, { status: 404 });
   const peerNotified = await notifyPeerWithin(link, notifier);
   let ssh: SshRemoval | null;
+  let fly: FlyRemoval | null;
   try {
     ssh = await removeSshMachineForLink(link, { keepServer: options.keepServer === true });
+    fly = await removeFlyMachineForLink(link, { keepServer: options.keepServer === true });
   } catch (error) {
     return sshFailure(error);
   }
@@ -155,9 +163,9 @@ export async function handleMachinesUnlink(
     source: 'dashboard',
     level: 'info',
     message: `Unlinked machine "${link.label}"`,
-    details: JSON.stringify({ linkId: link.id, environmentId: link.environmentId, peerNotified, ssh }),
+    details: JSON.stringify({ linkId: link.id, environmentId: link.environmentId, peerNotified, ssh, fly }),
   });
-  return jsonResponse({ ok: true, peerNotified, ssh });
+  return jsonResponse({ ok: true, peerNotified, ssh, fly });
 }
 
 /** A linked machine revokes its own token (the peer unlinked us). Exactly a machine credential may call this. */

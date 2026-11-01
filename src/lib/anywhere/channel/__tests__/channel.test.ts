@@ -15,7 +15,7 @@ import type { MachineKeyPair } from '../../machine-key.js';
 import { acceptChannel, type AcceptChannelOptions } from '../accept.js';
 import { type ChannelSocket, isChannelSocket } from '../channel-socket.js';
 import { approvalCommitment, approvalNonce, approvalSas, pairingSecrets, prologueFor, xxInitiator } from '../noise.js';
-import { openChannel } from '../open.js';
+import { FLY_INSTANCE_PARAM, openChannel } from '../open.js';
 import {
   encodeFrame,
   encodePreamble,
@@ -25,6 +25,18 @@ import {
   parsePreambleHead,
   REFUSAL_CODES,
 } from '../wire.js';
+
+// A wss:// dial needs TLS; this wrapper sends it to a plain local ws server so
+// the tests can read the real upgrade request (PAN-4652 WI-4). ws:// dials pass through.
+vi.mock('ws', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ws')>();
+  class PlainWebSocket extends actual.WebSocket {
+    constructor(address: string | URL, ...rest: never[]) {
+      super(String(address).replace(/^wss:/, 'ws:'), ...rest);
+    }
+  }
+  return { ...actual, WebSocket: PlainWebSocket };
+});
 
 const _require = createRequire(import.meta.url);
 const dh = _require('noise-handshake/dh') as { generateKeyPair(): MachineKeyPair };
@@ -566,5 +578,46 @@ describe('wire format (D-4645-5)', () => {
     expect(reader.detach().toString()).toBe('tail');
     a.destroy();
     b.destroy();
+  });
+});
+
+describe('fly-instance route parameter (PAN-4652 WI-4)', () => {
+  /** A ws server that records each upgrade request and drops it, so the dial fails fast. */
+  async function startUpgradeRecorder(): Promise<{ port: number; upgrades: Array<{ url: string; instance: string | undefined }> }> {
+    const upgrades: Array<{ url: string; instance: string | undefined }> = [];
+    const http = createHttpServer();
+    http.on('upgrade', (req, socket) => {
+      const instance = req.headers['fly-force-instance-id'];
+      upgrades.push({ url: req.url ?? '', instance: Array.isArray(instance) ? instance[0] : instance });
+      socket.destroy();
+    });
+    await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
+    cleanups.push(() => new Promise<void>((resolve) => http.close(() => resolve())));
+    return { port: (http.address() as { port: number }).port, upgrades };
+  }
+
+  it('exports the parameter name', () => {
+    expect(FLY_INSTANCE_PARAM).toBe('fly-instance');
+  });
+
+  it('moves fly-instance from the URL into the fly-force-instance-id header', async () => {
+    const recorder = await startUpgradeRecorder();
+    await expect(openChannel(`wss://127.0.0.1:${recorder.port}/ws/link?fly-instance=abc&keep=1`, { mode: 'link', localKey: freshKey(), remoteKeyHex: 'ab'.repeat(32) }))
+      .rejects.toMatchObject({ code: 'unreachable' });
+
+    expect(recorder.upgrades).toHaveLength(1);
+    const dialled = new URL(recorder.upgrades[0]!.url, 'http://x');
+    expect(dialled.pathname).toBe('/ws/link');
+    expect(dialled.searchParams.has('fly-instance')).toBe(false);
+    expect(dialled.searchParams.get('keep')).toBe('1');
+    expect(recorder.upgrades[0]!.instance).toBe('abc');
+  });
+
+  it('dials a URL without the parameter unchanged and without the header', async () => {
+    const recorder = await startUpgradeRecorder();
+    await expect(openChannel(`wss://127.0.0.1:${recorder.port}/ws/link?keep=1`, { mode: 'link', localKey: freshKey(), remoteKeyHex: 'ab'.repeat(32) }))
+      .rejects.toMatchObject({ code: 'unreachable' });
+
+    expect(recorder.upgrades).toEqual([{ url: '/ws/link?keep=1', instance: undefined }]);
   });
 });

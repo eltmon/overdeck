@@ -105,4 +105,29 @@ describe('serveCommand', () => {
     const secondUrl = openBrowser2.mock.calls[0]?.[0] as string;
     expect(firstUrl).toBe(secondUrl);
   });
+
+  it('opens the browser exactly once after 1.5 s without --no-open', async () => {
+    const { spawn } = fakeSpawn();
+    const openBrowser = vi.fn().mockResolvedValue(undefined);
+
+    const promise = serveCommand({ port: '39103' }, { spawn, openBrowser });
+    await promise;
+    await vi.advanceTimersByTimeAsync(1_499);
+    expect(openBrowser).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(openBrowser).toHaveBeenCalledTimes(1);
+  });
+
+  it('never opens the browser with --no-open and still spawns the server on the port', async () => {
+    const { spawn, calls } = fakeSpawn();
+    const openBrowser = vi.fn().mockResolvedValue(undefined);
+
+    await serveCommand({ port: '39104', open: false }, { spawn, openBrowser });
+    await vi.runAllTimersAsync();
+
+    expect(openBrowser).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.env?.PORT).toBe('39104');
+  });
 });

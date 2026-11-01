@@ -16,6 +16,8 @@
  */
 import { ROUTE_KINDS, type RouteKind, type RouteSource } from '@overdeck/contracts';
 
+import { FLY_INSTANCE_PARAM } from './channel/open.js';
+
 export type TransportKind = 'tcp' | 'wss' | 'rtc';
 
 export interface LinkRoute {
@@ -32,7 +34,10 @@ export interface ParsedRouteUrl {
   host: string;
   /** For `rtc`: 0. */
   port: number;
-  /** The URL in its canonical form (`tcp://host:port`, `wss://host[:port]/ws/link`, `rtc://<id>`, `rtc+turn://<id>`). */
+  /**
+   * The URL in its canonical form (`tcp://host:port`, `wss://host[:port]/ws/link`, `rtc://<id>`, `rtc+turn://<id>`).
+   * A wss URL keeps a `fly-instance` parameter, which pins one Fly machine (PAN-4652 D-3).
+   */
   url: string;
   /** Set for `rtc` URLs, whose kind comes from the scheme; `tcp`/`wss` kinds come from `classifyHost`. */
   kind?: 'direct' | 'relay';
@@ -72,7 +77,9 @@ export function parseRouteUrl(url: string): ParsedRouteUrl {
   if (parsed.protocol === 'wss:') {
     const port = parsed.port ? Number(parsed.port) : 443;
     if (!Number.isInteger(port) || port <= 0 || port > 65535) throw new Error(`wss:// route has a bad port: ${url}`);
-    return { transport: 'wss', host, port, url: `wss://${parsed.hostname}${parsed.port ? `:${parsed.port}` : ''}/ws/link` };
+    const instance = parsed.searchParams.get(FLY_INSTANCE_PARAM);
+    const pin = instance ? `?${FLY_INSTANCE_PARAM}=${encodeURIComponent(instance)}` : '';
+    return { transport: 'wss', host, port, url: `wss://${parsed.hostname}${parsed.port ? `:${parsed.port}` : ''}/ws/link${pin}` };
   }
   throw new Error(`Unsupported route scheme in ${url} (expected tcp://, wss://, rtc:// or rtc+turn://)`);
 }

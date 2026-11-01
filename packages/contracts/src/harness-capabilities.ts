@@ -64,6 +64,8 @@ export interface HarnessCapabilities {
   readonly answersQuestionByMessage: boolean
   /** How the dashboard delivers an operator's answer to a pending AskUserQuestion in a conversation. */
   readonly askAnswerDelivery: HarnessAskAnswerDelivery
+  /** A conversation may be started on a Fly machine (`pan machines add-fly`, PAN-4652); other harnesses wait on #4296. */
+  readonly runsOnFlyMachine: boolean
 }
 
 export const HARNESS_CAPABILITY_KEYS = [
@@ -87,6 +89,7 @@ export const HARNESS_CAPABILITY_KEYS = [
   "correlatesBySessionId",
   "answersQuestionByMessage",
   "askAnswerDelivery",
+  "runsOnFlyMachine",
 ] as const satisfies readonly (keyof HarnessCapabilities)[]
 
 export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -110,6 +113,7 @@ export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
   correlatesBySessionId: false,
   answersQuestionByMessage: true,
   askAnswerDelivery: "message",
+  runsOnFlyMachine: true,
 }
 
 export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
@@ -133,6 +137,7 @@ export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
   askAnswerDelivery: "pi-ask-modal",
+  runsOnFlyMachine: false,
 }
 
 export const CODEX_CAPABILITIES: HarnessCapabilities = {
@@ -156,6 +161,7 @@ export const CODEX_CAPABILITIES: HarnessCapabilities = {
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
   askAnswerDelivery: "message",
+  runsOnFlyMachine: false,
 }
 
 export const ACP_CAPABILITIES: HarnessCapabilities = {
@@ -179,6 +185,7 @@ export const ACP_CAPABILITIES: HarnessCapabilities = {
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
   askAnswerDelivery: "message",
+  runsOnFlyMachine: false,
 }
 
 export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -202,6 +209,7 @@ export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
   askAnswerDelivery: "message",
+  runsOnFlyMachine: false,
 }
 
 export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
@@ -225,6 +233,7 @@ export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
   askAnswerDelivery: "message",
+  runsOnFlyMachine: false,
 }
 
 export const MUSE_CAPABILITIES: HarnessCapabilities = {
@@ -248,6 +257,7 @@ export const MUSE_CAPABILITIES: HarnessCapabilities = {
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
   askAnswerDelivery: "message",
+  runsOnFlyMachine: false,
 }
 
 export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
@@ -271,4 +281,5 @@ export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
   askAnswerDelivery: "message",
+  runsOnFlyMachine: false,
 }

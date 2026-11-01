@@ -90,9 +90,13 @@ export function replaceLinkedConversations(
   else emptyAnswerHashes.delete(environmentId);
 }
 
-/** Every cached row, ordered by environment then owner name. */
-export function listLinkedConversations(): LinkedConversationRecord[] {
-  return getOverdeckDatabase()
+/**
+ * Every cached row, ordered by environment then owner name. `readOnly` is for
+ * readers outside the dashboard (the deacon child's Fly machine sweep), which
+ * must not open the dashboard-owned database for writing.
+ */
+export function listLinkedConversations(options: { readOnly?: boolean } = {}): LinkedConversationRecord[] {
+  return getOverdeckDatabase(undefined, options)
     .prepare(`${SELECT_ROW} ORDER BY environment_id, name`)
     .all<LinkedRow>()
     .map(toRecord);
