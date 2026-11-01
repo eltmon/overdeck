@@ -171,6 +171,7 @@ CREATE TABLE `conversations` (
 	`vault_owner_label` text,
 	`environment_id` text,
 	`released_to` text,
+	`pulled_from` text,
 	`settled_at` integer,
 	`settle_reason` text,
 	`snoozed_until` integer,

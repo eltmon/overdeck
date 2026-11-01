@@ -10,12 +10,18 @@
  *   GET  /api/conversations/:name/release/transfer/:transferId
  *   POST /api/conversations/:name/release/undo
  *   POST /api/conversations/:name/release/complete
+ *
+ * Viewer side (WI-10, D-4650-12), admin (no route-scope row): the Pull here job.
+ *
+ *   POST /api/linked-conversations/pull   { conversation: '@<machine>/<name>', whenTurnRunning }  → 202 { pullId }
+ *   GET  /api/linked-conversations/pull/:pullId
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { getConversationByName } from '../../../lib/overdeck/conversations.js';
 import { jsonResponse } from '../http-helpers.js';
+import { getPull, startPull } from '../services/conversation-pull.js';
 import {
   completeRelease,
   readTransferPack,
@@ -130,4 +136,34 @@ const completeRoute = HttpRouter.add(
   }),
 );
 
-export const conversationPullRouteLayer = Layer.mergeAll(releaseRoute, transferRoute, undoRoute, completeRoute);
+const startPullRoute = HttpRouter.add(
+  'POST',
+  '/api/linked-conversations/pull',
+  Effect.gen(function* () {
+    const body = yield* readJsonBody;
+    const when = body['whenTurnRunning'] ?? 'wait';
+    if (typeof body['conversation'] !== 'string') return jsonResponse({ error: 'conversation is required' }, { status: 400 });
+    if (when !== 'wait' && when !== 'stop') return jsonResponse({ error: "whenTurnRunning must be 'wait' or 'stop'" }, { status: 400 });
+    const started = yield* Effect.promise(() => startPull({ conversation: body['conversation'] as string, whenTurnRunning: when as WhenTurnRunning }));
+    if (started.status !== 202) return jsonResponse({ error: started.error, code: started.code }, { status: started.status });
+    return jsonResponse({ pullId: started.pullId }, { status: 202 });
+  }),
+);
+
+const getPullRoute = HttpRouter.add(
+  'GET',
+  '/api/linked-conversations/pull/:pullId',
+  Effect.gen(function* () {
+    const job = getPull((yield* HttpRouter.params)['pullId'] ?? '');
+    if (!job) return jsonResponse({ error: 'No such pull', code: 'pull-not-found' }, { status: 404 });
+    return jsonResponse({
+      step: job.step,
+      state: job.state,
+      mode: job.mode,
+      ...(job.error ? { error: job.error, code: job.code } : {}),
+      ...(job.result ? { conversation: job.result } : {}),
+    });
+  }),
+);
+
+export const conversationPullRouteLayer = Layer.mergeAll(releaseRoute, transferRoute, undoRoute, completeRoute, startPullRoute, getPullRoute);

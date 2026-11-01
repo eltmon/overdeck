@@ -31,6 +31,35 @@ export function clearConversationRelease(name: string): void {
   getOverdeckDatabase().prepare('UPDATE conversations SET released_to = ? WHERE name = ?').run(null, name);
 }
 
+/** The machine and native session a conversation was pulled from (D-4650-14). */
+export interface PulledFrom {
+  environmentId: string;
+  nativeSessionId: string;
+}
+
+/**
+ * Record where a pulled conversation came from. Adoption mints a new native
+ * session id, so this is the only link back to the old owner's released row:
+ * when that machine pulls the conversation back, the release answer carries
+ * it and the old row is archived.
+ */
+export function markPulledFrom(name: string, from: PulledFrom): void {
+  getOverdeckDatabase().prepare('UPDATE conversations SET pulled_from = ? WHERE name = ?').run(JSON.stringify(from), name);
+}
+
+export function readPulledFrom(name: string): PulledFrom | null {
+  const row = getOverdeckDatabase().prepare('SELECT pulled_from FROM conversations WHERE name = ?').get<{ pulled_from: string | null }>(name);
+  if (!row?.pulled_from) return null;
+  try {
+    const value = JSON.parse(row.pulled_from) as Partial<PulledFrom>;
+    return typeof value.environmentId === 'string' && typeof value.nativeSessionId === 'string'
+      ? { environmentId: value.environmentId, nativeSessionId: value.nativeSessionId }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The label of the machine a conversation was released to, else the start of its environment id. */
 function releasedToLabel(environmentId: string): string {
   return linksSnapshot().find((link) => link.environmentId === environmentId)?.label ?? environmentId.slice(0, 8);

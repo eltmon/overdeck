@@ -154,6 +154,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // are backfilled at boot by `bootConversationEnvironment`.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `environment_id` text');
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `released_to` text');
+  // PAN-4650 D-4650-14: where a pulled conversation came from (JSON), so a push back archives the old copy.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `pulled_from` text');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `conversations_environment_idx` ON `conversations` (`environment_id`)');
   // PAN-4639: operator triage state (settle / snooze) for the conversation list.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `settled_at` integer');

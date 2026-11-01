@@ -25,7 +25,13 @@ import { conversationHarnessAlive } from '../../../lib/overdeck/conversation-liv
 import { getEnrichedConversationList } from '../../../lib/overdeck/conversation-list.js';
 import { handleConversationAbort } from '../../../lib/overdeck/conversation-delivery.js';
 import { resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
-import { clearConversationRelease, conversationWriteRefusalBody, markConversationReleased } from '../../../lib/overdeck/conversation-release.js';
+import {
+  clearConversationRelease,
+  conversationWriteRefusalBody,
+  markConversationReleased,
+  readPulledFrom,
+  type PulledFrom,
+} from '../../../lib/overdeck/conversation-release.js';
 import { handleConversationResume, handleConversationStop } from '../../../lib/overdeck/conversation-runtime.js';
 import { getConversationByName, type LegacyConversation } from '../../../lib/overdeck/conversations.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
@@ -53,6 +59,8 @@ export interface ReleaseAnswer {
   harness: string;
   nativeSessionId: string | null;
   bytes: number;
+  /** D-4650-14: where this machine pulled the conversation from, so a push back archives that copy. */
+  pulledFrom: PulledFrom | null;
 }
 
 export interface ServiceAnswer {
@@ -200,6 +208,7 @@ async function buildTransfer(
     harness,
     nativeSessionId: conv.claudeSessionId,
     bytes: pack.length,
+    pulledFrom: readPulledFrom(conv.name),
   };
 }
 
