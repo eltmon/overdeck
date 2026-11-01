@@ -340,6 +340,15 @@ loops (PAN-4295). With no active remote agent, none of them calls the Fly API.
 | Credential refresh | checked every 60 s | Copies host Claude credentials to each active VM when the host credentials file changes, or every 15 min at most. A failed copy is retried on the next check. | keeps running |
 | Reap | every 60 s deacon-lite tick | On `REMOTE_DONE`, materializes `workspaces/feature-<id>`, opens the PR, destroys the machine and requests review. On a crash (no session, no sentinel, or a stopped machine), salvages unpushed work, stops the machine and marks the agent `error`. An unreachable Fly API or a failed exec leaves the agent alone until the next tick. `starting` agents are skipped. | skipped |
 
+Fly machines (PAN-4652, `## Fly machines (linked)` above) have two more loops of their
+own in `src/lib/remote/fly-machine-loops.ts`, and the credential refresh covers them too.
+With no Fly machine record, neither calls the Fly API.
+
+| Loop | Cadence | What it does | Deacon frozen |
+|---|---|---|---|
+| `heartbeatFlyMachines` | every 60 s | Writes `/workspace/.pan/host-heartbeat` on every Fly machine, so its watchdog keeps it running while home is up. A failed exec is reported as a failure, never as refreshed. | keeps running |
+| `sweepFlyMachines` | every 60 s | Destroys the machine, removes its link and deletes its record when the Fly API reports it `stopped`, `destroyed` or `failed` or answers 404; when no unreleased linked conversation on it has been active for `[remote.fly] machine_idle_minutes` (default 30, 0 disables); or when provisioning never linked it within 30 min. Any other API error leaves it alone. | keeps running |
+
 The heartbeat and credential refresh run in `src/lib/cloister/hygiene-scheduler.ts`;
 the reap runs last in `runDeaconLite()` through `src/lib/cloister/remote-reap-routine.ts`.
 Before the reap destroys or stops a machine, it copies the session transcripts and
