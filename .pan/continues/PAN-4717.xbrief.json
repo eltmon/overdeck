@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4717",
   "created": "2026-11-01T14:07:20.462Z",
-  "updated": "2026-11-01T14:52:38.523Z",
+  "updated": "2026-11-01T14:52:51.779Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,10 @@
     "drawer-tracker-url-fallback.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T14:52:38.523Z"
+    },
+    "drawer-tracker-url-fallback.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:52:51.779Z"
     }
   }
 }
