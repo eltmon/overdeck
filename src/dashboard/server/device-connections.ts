@@ -45,10 +45,10 @@ export function closeDeviceConnections(deviceId: string): number {
   return set.size;
 }
 
-/** The registry record id behind a revocable credential (device or token); null for root credentials. */
+/** The registry record id behind a revocable credential (device, token or machine); null for root credentials. */
 export function revocableCredentialId(credential: DashboardCredential | null): string | null {
   if (credential?.kind === 'device') return credential.deviceId;
-  if (credential?.kind === 'token') return credential.tokenId;
+  if (credential?.kind === 'token' || credential?.kind === 'machine') return credential.tokenId;
   return null;
 }
 

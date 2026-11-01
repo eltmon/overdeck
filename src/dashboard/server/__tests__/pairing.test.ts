@@ -7,7 +7,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Effect } from 'effect';
+import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,12 +23,13 @@ const INTERNAL_TOKEN = 'pairing-internal-token-0123456789';
 const originalHome = process.env.OVERDECK_HOME;
 let home: string;
 
-async function post(path: string, body: unknown, headers: Record<string, string> = {}) {
+async function post(path: string, body: unknown, headers: Record<string, string> = {}, peer = '127.0.0.1') {
+  // The local browser is a loopback peer; PAN-4645 refuses cookie pairing to remote plain-HTTP peers.
   const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
-  }));
+  })).modify({ remoteAddress: Option.some(peer) });
   const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
     HttpRouter.toHttpEffect(pairingRouteLayer),
     (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
@@ -50,8 +51,8 @@ async function issue() {
   return res;
 }
 
-function exchange(credential: string, delivery: 'cookie' | 'bearer' = 'cookie') {
-  return post('/api/pairing/exchange', { credential, label: 'Browser on test', delivery }, { Origin: 'http://localhost:3011' });
+function exchange(credential: string, delivery: 'cookie' | 'bearer' = 'cookie', extra: { peer?: string; headers?: Record<string, string> } = {}) {
+  return post('/api/pairing/exchange', { credential, label: 'Browser on test', delivery }, { Origin: 'http://localhost:3011', ...extra.headers }, extra.peer);
 }
 
 beforeEach(async () => {
@@ -151,5 +152,26 @@ describe('pairing credentials and exchange (PAN-3762)', () => {
     const issued = await issue();
     const res = await post('/api/pairing/exchange', { credential: issued.json.credential, label: 'x', delivery: 'cookie' }, { Origin: 'https://evil.example' });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('cookie pairing over plain HTTP (PAN-4645 WI-16, D-4645-13)', () => {
+  it('ac3: a LAN peer on plain HTTP gets 403 use-https for cookie delivery and keeps its credential; bearer proceeds', async () => {
+    const { credential } = (await issue()).json as { credential: string };
+    const refused = await exchange(credential, 'cookie', { peer: '192.0.2.44' });
+    expect(refused.status).toBe(403);
+    expect(refused.json).toEqual({ error: 'use-https' });
+    expect(refused.setCookie).toBe('');
+
+    // The credential was not consumed: the same code still pairs over HTTPS (forwarded proto) ...
+    const viaHttps = await exchange(credential, 'cookie', { peer: '192.0.2.44', headers: { 'X-Forwarded-Proto': 'https' } });
+    expect(viaHttps.status).toBe(200);
+    expect(viaHttps.setCookie).toContain('overdeck_device=');
+
+    // ... and bearer delivery from a plain-HTTP LAN peer is unaffected.
+    const { credential: second } = (await issue()).json as { credential: string };
+    const bearer = await exchange(second, 'bearer', { peer: '192.0.2.44' });
+    expect(bearer.status).toBe(200);
+    expect(bearer.json.token).toMatch(/^odk_/);
   });
 });

@@ -1,0 +1,382 @@
+/**
+ * PAN-4645 WI-2: secure channel core over real loopback TCP between two
+ * in-process endpoints, plus the wire-format encoders.
+ */
+import { createRequire } from 'node:module';
+import { createServer as createHttpServer, request as httpRequest, type Server as HttpServer } from 'node:http';
+import { createServer as createNetServer, type Server as NetServer, type Socket } from 'node:net';
+import { duplexPair, type Duplex } from 'node:stream';
+
+import { WebSocket as WsClient, WebSocketServer } from 'ws';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import type { MachineKeyPair } from '../../machine-key.js';
+import { acceptChannel, type AcceptChannelOptions } from '../accept.js';
+import { type ChannelSocket, isChannelSocket } from '../channel-socket.js';
+import { pairingSecrets } from '../noise.js';
+import { openChannel } from '../open.js';
+import {
+  encodeFrame,
+  encodePreamble,
+  encodeRefusal,
+  FrameReader,
+  MAX_HANDSHAKE_FRAME,
+  parsePreambleHead,
+  REFUSAL_CODES,
+} from '../wire.js';
+
+const _require = createRequire(import.meta.url);
+const dh = _require('noise-handshake/dh') as { generateKeyPair(): MachineKeyPair };
+const freshKey = (): MachineKeyPair => dh.generateKeyPair();
+const hex = (key: MachineKeyPair): string => key.publicKey.toString('hex');
+
+interface Responder {
+  port: number;
+  url: `tcp://${string}`;
+  accepted: ChannelSocket[];
+  acceptErrors: Error[];
+  requests: string[];
+  http: HttpServer;
+  close(): Promise<void>;
+}
+
+const cleanups: Array<() => Promise<void> | void> = [];
+afterEach(async () => {
+  vi.useRealTimers();
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+});
+
+async function startResponder(opts: AcceptChannelOptions): Promise<Responder> {
+  const requests: string[] = [];
+  const http = createHttpServer((req, res) => {
+    let body = '';
+    req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+    req.on('end', () => {
+      requests.push(`${req.method} ${req.url} ${body}`);
+      res.end(`pong ${req.url} from=${req.socket.remoteAddress}`);
+    });
+  });
+  const accepted: ChannelSocket[] = [];
+  const acceptErrors: Error[] = [];
+  const net: NetServer = createNetServer((raw: Socket) => {
+    acceptChannel(raw, opts).then(
+      (channel) => {
+        accepted.push(channel);
+        http.emit('connection', channel);
+      },
+      (error: Error) => { acceptErrors.push(error); },
+    );
+  });
+  await new Promise<void>((resolve) => net.listen(0, '127.0.0.1', resolve));
+  const port = (net.address() as { port: number }).port;
+  const responder: Responder = {
+    port,
+    url: `tcp://127.0.0.1:${port}`,
+    accepted,
+    acceptErrors,
+    requests,
+    http,
+    close: async () => {
+      for (const channel of accepted) channel.destroy();
+      await new Promise<void>((resolve) => net.close(() => resolve()));
+      await new Promise<void>((resolve) => http.close(() => resolve()));
+    },
+  };
+  cleanups.push(responder.close);
+  return responder;
+}
+
+function requestOverChannel(
+  channel: ChannelSocket,
+  init: { method?: string; path: string; body?: string },
+): Promise<{ status: number; text: string }> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      {
+        method: init.method ?? 'GET',
+        path: init.path,
+        host: 'link.invalid',
+        createConnection: () => channel as unknown as Socket,
+        headers: init.body ? { 'content-length': String(Buffer.byteLength(init.body)) } : {},
+      },
+      (res) => {
+        let text = '';
+        res.on('data', (chunk: Buffer) => { text += chunk.toString(); });
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, text }));
+      },
+    );
+    req.on('error', reject);
+    if (init.body) req.write(init.body);
+    req.end();
+  });
+}
+
+const neverPairing = (): 'unknown' => 'unknown';
+
+describe('secure channel (PAN-4645 WI-2)', () => {
+  it('opens a Noise IK channel and serves an HTTP request through it', async () => {
+    const initiator = freshKey();
+    const responderKey = freshKey();
+    const responder = await startResponder({
+      localKey: responderKey,
+      isPinnedPeer: (key) => key === hex(initiator),
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+    });
+
+    const channel = await openChannel(responder.url, { mode: 'link', localKey: initiator, remoteKeyHex: hex(responderKey) });
+    cleanups.push(() => channel.destroy());
+
+    expect(isChannelSocket(channel)).toBe(true);
+    expect(channel.channel).toEqual({ mode: 'link', remoteKeyHex: hex(responderKey), pairingId: null });
+    expect(channel.remoteAddress).toBe(`link:${hex(responderKey).slice(0, 16)}`);
+
+    const res = await requestOverChannel(channel, { path: '/api/ping' });
+    expect(res.status).toBe(200);
+    expect(res.text).toBe(`pong /api/ping from=link:${hex(initiator).slice(0, 16)}`);
+    expect(responder.accepted).toHaveLength(1);
+    expect(responder.accepted[0]!.channel).toEqual({ mode: 'link', remoteKeyHex: hex(initiator), pairingId: null });
+    expect(channel.bytesOut).toBeGreaterThan(0);
+    expect(channel.bytesIn).toBeGreaterThan(0);
+  });
+
+  it('rejects with identity-refused when the responder holds a different key, and no request reaches HTTP', async () => {
+    const initiator = freshKey();
+    const expected = freshKey();
+    const actual = freshKey();
+    const responder = await startResponder({
+      localKey: actual,
+      isPinnedPeer: () => true,
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+    });
+
+    await expect(openChannel(responder.url, { mode: 'link', localKey: initiator, remoteKeyHex: hex(expected) }))
+      .rejects.toMatchObject({ code: 'identity-refused' });
+    await vi.waitFor(() => expect(responder.acceptErrors).toHaveLength(1));
+    expect(responder.acceptErrors[0]).toMatchObject({ code: 'handshake-failed' });
+    expect(responder.accepted).toHaveLength(0);
+    expect(responder.requests).toHaveLength(0);
+  });
+
+  it('refuses an unpinned initiator with unknown-peer', async () => {
+    const initiator = freshKey();
+    const responderKey = freshKey();
+    const responder = await startResponder({
+      localKey: responderKey,
+      isPinnedPeer: () => false,
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+    });
+
+    await expect(openChannel(responder.url, { mode: 'link', localKey: initiator, remoteKeyHex: hex(responderKey) }))
+      .rejects.toMatchObject({ code: 'unknown-peer' });
+    await vi.waitFor(() => expect(responder.acceptErrors).toHaveLength(1));
+    expect(responder.acceptErrors[0]).toMatchObject({ code: 'unknown-peer' });
+    expect(responder.accepted).toHaveLength(0);
+  });
+
+  it('refuses a mismatched link protocol with unsupported, naming the responder version', async () => {
+    const responderKey = freshKey();
+    const responder = await startResponder({
+      localKey: responderKey,
+      isPinnedPeer: () => true,
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+      linkProtocol: 7,
+      serverVersion: '9.9.9',
+    });
+
+    await expect(openChannel(responder.url, { mode: 'link', localKey: freshKey(), remoteKeyHex: hex(responderKey) }))
+      .rejects.toMatchObject({ code: 'unsupported', detail: { linkProtocol: 7, serverVersion: '9.9.9' } });
+  });
+
+  it('pairs over Noise XXpsk0 with the right code and both sides learn the other key', async () => {
+    const initiator = freshKey();
+    const responderKey = freshKey();
+    const code = 'odp_test-code-123';
+    const { pairingId, psk } = pairingSecrets(code);
+    const taken: string[] = [];
+    let consumed = 0;
+    const responder = await startResponder({
+      localKey: responderKey,
+      isPinnedPeer: () => false,
+      takePairing: (id) => {
+        taken.push(id);
+        return id === pairingId ? { psk, onSuccess: () => { consumed += 1; } } : 'unknown';
+      },
+      onPairingFailure: () => { throw new Error('unexpected pairing failure'); },
+    });
+
+    const channel = await openChannel(responder.url, { mode: 'pairing', localKey: initiator, pairingCode: code });
+    cleanups.push(() => channel.destroy());
+
+    expect(channel.channel).toEqual({ mode: 'pairing', remoteKeyHex: hex(responderKey), pairingId });
+    await vi.waitFor(() => expect(responder.accepted).toHaveLength(1));
+    expect(responder.accepted[0]!.channel).toEqual({ mode: 'pairing', remoteKeyHex: hex(initiator), pairingId });
+    expect(taken).toEqual([pairingId]);
+    expect(consumed).toBe(1);
+
+    const res = await requestOverChannel(channel, { path: '/api/environment' });
+    expect(res.text).toContain('pong /api/environment');
+  });
+
+  it('rejects a wrong pairing code with pairing-refused and reports the failure', async () => {
+    const responderKey = freshKey();
+    const { pairingId, psk } = pairingSecrets('right-code');
+    const failures: number[] = [];
+    const responder = await startResponder({
+      localKey: responderKey,
+      isPinnedPeer: () => false,
+      takePairing: (id) => (id === pairingId ? { psk } : 'unknown'),
+      onPairingFailure: () => { failures.push(1); },
+    });
+
+    // Same pairing id as the stored credential, different PSK: fails inside the handshake.
+    const wrongPsk = pairingSecrets('wrong-code');
+    const responderWithSameId = await startResponder({
+      localKey: responderKey,
+      isPinnedPeer: () => false,
+      takePairing: () => ({ psk: wrongPsk.psk }),
+      onPairingFailure: () => { failures.push(2); },
+    });
+
+    await expect(openChannel(responder.url, { mode: 'pairing', localKey: freshKey(), pairingCode: 'wrong-code' }))
+      .rejects.toMatchObject({ code: 'pairing-refused' });
+    await expect(openChannel(responderWithSameId.url, { mode: 'pairing', localKey: freshKey(), pairingCode: 'right-code' }))
+      .rejects.toMatchObject({ code: 'pairing-refused' });
+    await vi.waitFor(() => expect(failures).toEqual([1, 2]));
+    expect(responder.accepted).toHaveLength(0);
+    expect(responderWithSameId.accepted).toHaveLength(0);
+  });
+
+  it('carries a WebSocket upgrade and delivers a server close(4401) to the client', async () => {
+    const initiator = freshKey();
+    const responderKey = freshKey();
+    const responder = await startResponder({
+      localKey: responderKey,
+      isPinnedPeer: () => true,
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+    });
+    const wss = new WebSocketServer({ noServer: true });
+    cleanups.push(() => new Promise<void>((resolve) => wss.close(() => resolve())));
+    responder.http.on('upgrade', (req, socket, head) => {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        ws.send(`hello ${req.socket.remoteAddress}`);
+        ws.on('message', (data) => {
+          if (String(data) === 'bye') ws.close(4401, 'device revoked');
+        });
+      });
+    });
+
+    const channel = await openChannel(responder.url, { mode: 'link', localKey: initiator, remoteKeyHex: hex(responderKey) });
+    const ws = new WsClient('ws://link.invalid/ws/rpc', { createConnection: () => channel as unknown as Socket });
+    cleanups.push(() => { ws.terminate(); channel.destroy(); });
+
+    const greeting = await new Promise<string>((resolve, reject) => {
+      ws.once('message', (data) => resolve(String(data)));
+      ws.once('error', reject);
+    });
+    expect(greeting).toBe(`hello link:${hex(initiator).slice(0, 16)}`);
+
+    const closed = new Promise<{ code: number; reason: string }>((resolve) => {
+      ws.once('close', (code, reason) => resolve({ code, reason: String(reason) }));
+    });
+    ws.send('bye');
+    expect(await closed).toEqual({ code: 4401, reason: 'device revoked' });
+  });
+
+  it('drops a silent peer once the handshake timeout elapses (fake timers)', async () => {
+    vi.useFakeTimers();
+    const [initiatorSide, responderSide] = duplexPair();
+    const pending = acceptChannel(responderSide as Duplex, {
+      localKey: freshKey(),
+      isPinnedPeer: () => true,
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+      timeoutMs: 10_000,
+    });
+    const settled = pending.then(() => 'resolved' as const, (error: Error) => error);
+
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(responderSide.destroyed).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    const outcome = await settled;
+    expect(outcome).toMatchObject({ code: 'timeout' });
+    expect(responderSide.destroyed).toBe(true);
+    initiatorSide.destroy();
+  });
+
+  it('respects an external abort signal while connecting', async () => {
+    const controller = new AbortController();
+    const pending = openChannel('tcp://127.0.0.1:9', { mode: 'link', localKey: freshKey(), remoteKeyHex: 'ab'.repeat(32), signal: controller.signal });
+    const settled = pending.catch((error: Error) => error);
+    controller.abort();
+    const outcome = await settled;
+    expect(['aborted', 'unreachable']).toContain((outcome as { code: string }).code);
+  });
+
+  it('reports an unreachable transport', async () => {
+    const closed = createNetServer();
+    await new Promise<void>((resolve) => closed.listen(0, '127.0.0.1', resolve));
+    const port = (closed.address() as { port: number }).port;
+    await new Promise<void>((resolve) => closed.close(() => resolve()));
+
+    await expect(openChannel(`tcp://127.0.0.1:${port}`, { mode: 'link', localKey: freshKey(), remoteKeyHex: 'ab'.repeat(32), timeoutMs: 2_000 }))
+      .rejects.toMatchObject({ code: 'unreachable' });
+  });
+});
+
+describe('wire format (D-4645-5)', () => {
+  it('round-trips the preamble', () => {
+    const link = encodePreamble({ linkProtocol: 1, mode: 'link', pairingId: null });
+    expect([...link]).toEqual([0x00, 0x4f, 0x56, 0x44, 0x4c, 0x01, 0x01]);
+    expect(parsePreambleHead(link)).toEqual({ linkProtocol: 1, mode: 'link' });
+
+    const pairingId = 'ab'.repeat(16);
+    const pairing = encodePreamble({ linkProtocol: 1, mode: 'pairing', pairingId });
+    expect(pairing.length).toBe(7 + 16);
+    expect(parsePreambleHead(pairing.subarray(0, 7))).toEqual({ linkProtocol: 1, mode: 'pairing' });
+    expect(pairing.subarray(7).toString('hex')).toBe(pairingId);
+
+    expect(() => parsePreambleHead(Buffer.from('GET /ab'))).toThrow(/preamble/);
+    expect(() => encodePreamble({ linkProtocol: 1, mode: 'pairing', pairingId: null })).toThrow();
+  });
+
+  it('frames handshake messages with a uint24le length and caps them at 1024 bytes', async () => {
+    const message = Buffer.from('noise message');
+    const frame = encodeFrame(message);
+    expect([...frame.subarray(0, 3)]).toEqual([message.length, 0, 0]);
+    expect(() => encodeFrame(Buffer.alloc(MAX_HANDSHAKE_FRAME + 1))).toThrow(/out of range/);
+
+    const [a, b] = duplexPair();
+    const reader = new FrameReader(b as Duplex);
+    a.write(frame.subarray(0, 5));
+    const pending = reader.readFrame();
+    a.write(frame.subarray(5));
+    expect(await pending).toEqual({ kind: 'message', payload: message });
+
+    const oversized = Buffer.from([0xff, 0xff, 0xff]);
+    a.write(oversized);
+    await expect(reader.readFrame()).rejects.toMatchObject({ code: 'frame-too-large' });
+    a.destroy();
+    b.destroy();
+  });
+
+  it('encodes and parses refusal frames, keeping bytes behind them as leftover', async () => {
+    const unsupported = encodeRefusal({ code: REFUSAL_CODES.unsupported, linkProtocol: 2, serverVersion: '0.73.0' });
+    expect([...unsupported.subarray(0, 6)]).toEqual([0, 0, 0, 2, 2, 6]);
+    const busy = encodeRefusal({ code: REFUSAL_CODES.busy });
+    expect([...busy]).toEqual([0, 0, 0, 4]);
+
+    const [a, b] = duplexPair();
+    const reader = new FrameReader(b as Duplex);
+    a.write(Buffer.concat([unsupported, busy, Buffer.from('tail')]));
+    expect(await reader.readFrame()).toEqual({ kind: 'refusal', refusal: { code: 2, linkProtocol: 2, serverVersion: '0.73.0' } });
+    expect(await reader.readFrame()).toEqual({ kind: 'refusal', refusal: { code: 4 } });
+    expect(reader.detach().toString()).toBe('tail');
+    a.destroy();
+    b.destroy();
+  });
+});

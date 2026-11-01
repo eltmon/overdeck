@@ -343,6 +343,25 @@ dashboard, a Settings save that turns it off keeps it on; turn Serve off first
 (`tailscale serve --https=443 off`). See
 [Serve HTTPS and token sign-in](/configuration/tailscale#serve-https-and-token-sign-in).
 
+### On automatically
+
+Since v0.73.0 `require_token_mint` is on by itself whenever this machine has any
+remote access: a trusted address that is not loopback, an active paired device, or
+a [machine link](/configuration/linked-machines) in either direction. The toggle in
+Settings then shows **On automatically because this machine has …** and cannot be
+turned off. A `false` in `config.yaml` cannot turn it off either while remote access
+exists; the effective value can only be widened, never narrowed. Remove the last
+trusted address, device or link and the YAML value applies again.
+
+### Use HTTPS
+
+A browser on another device that opens the dashboard over plain `http://` gets a
+**Use HTTPS** page (status 403) instead of the app, and a pairing exchange that would
+set the session cookie over plain HTTP is refused the same way. Cookies and tokens
+never cross the network in the clear; open the dashboard through an HTTPS address
+(Tailscale Serve, a reverse proxy with a certificate). Browsers on the machine itself
+and linked machines (whose traffic is already inside the secure channel) are not affected.
+
 ## What pairing is not
 
 - **The relay is optional reachability.** The Overdeck relay
@@ -355,9 +374,11 @@ dashboard, a Settings save that turns it off keeps it on; turn Serve off first
 
 ## What comes next
 
-- Linking machines to each other, with one machine list and version checks:
-  [PAN-4645](https://github.com/eltmon/overdeck/issues/4645).
-- Discovered HTTPS and Tailscale endpoints and advertised origins:
-  [PAN-4403](https://github.com/eltmon/overdeck/issues/4403).
+- A desktop connection list, environment switcher and version gating:
+  [PAN-4402](https://github.com/eltmon/overdeck/issues/4402).
+- Discovered LAN and Tailscale endpoints shipped with machine links in v0.73.0
+  ([PAN-4403](https://github.com/eltmon/overdeck/issues/4403),
+  [PAN-4645](https://github.com/eltmon/overdeck/issues/4645)); see
+  [Linked machines](/configuration/linked-machines).
 - Launching Overdeck on an SSH host from the desktop app:
   [PAN-4404](https://github.com/eltmon/overdeck/issues/4404).

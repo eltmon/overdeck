@@ -59,6 +59,7 @@
               "anywhere",
               "configuration/session-vault",
               "configuration/remote-access",
+              "configuration/linked-machines",
               "configuration/triggers",
               "configuration/tailscale",
               "configuration/mcp",
@@ -69,6 +70,7 @@
               "cli/tailscale",
               "cli/account",
               "cli/devices",
+              "cli/machines",
               "cli/token",
               "cli/triggers"
             ]

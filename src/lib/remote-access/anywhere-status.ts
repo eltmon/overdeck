@@ -26,13 +26,16 @@ export interface AnywhereProblem {
   action: AnywhereAction;
 }
 
-export type AnywhereViewerKind = 'root-session' | 'device' | 'token' | 'internal-token';
+/** PAN-4645: `machine` is a linked machine reading the status over its secure channel. */
+export type AnywhereViewerKind = 'root-session' | 'device' | 'token' | 'internal-token' | 'machine';
 
 export interface AnywhereStatus {
   machine: { environmentId: string; label: string } | null;
   addresses: Array<{ origin: string; loopback: boolean }>;
   devices: { active: number };
   vault: { state: AnywhereVaultState; backend: string | null };
+  /** PAN-4645 D-4645-12: the enforced `require_token_mint`, the YAML value, and why it is on by itself. */
+  tokenMint: { effective: boolean; configured: boolean; autoReasons: string[] };
   problems: AnywhereProblem[];
   /** Tailscale on this machine (PAN-1254 FR-9); `not-installed` when no CLI resolves. */
   tailscale: { nextStep: TailscaleNextStep | 'not-installed'; serveUrl: string | null; magicDnsName: string | null };

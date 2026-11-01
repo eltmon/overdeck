@@ -51,11 +51,13 @@ export interface AnywhereStatus {
   addresses: Array<{ origin: string; loopback: boolean }>;
   devices: { active: number };
   vault: { state: AnywhereVaultState; backend: string | null };
+  /** PAN-4645: the enforced require_token_mint and why it is on by itself; absent on older servers. */
+  tokenMint?: { effective: boolean; configured: boolean; autoReasons: string[] };
   problems: AnywhereProblem[];
   /** Tailscale on this machine (PAN-1254 FR-9). */
   tailscale: { nextStep: AnywhereTailscaleStep; serveUrl: string | null; magicDnsName: string | null };
   /** Who is asking (PAN-4455 D-3); null when no credential resolves. */
-  viewer: { kind: 'root-session' | 'device' | 'token' | 'internal-token' | null };
+  viewer: { kind: 'root-session' | 'device' | 'token' | 'internal-token' | 'machine' | null };
 }
 
 export interface PairingLinkBody {

@@ -8,6 +8,8 @@
 
 import { Schema } from "effect"
 
+import { AdvertisedEndpoint } from "./machines"
+
 /** Wire protocol version a client and server must agree on. */
 export const ENVIRONMENT_PROTOCOL_VERSION = 1
 
@@ -21,6 +23,8 @@ export const EnvironmentCapabilities = Schema.Struct({
   deviceSessions: Schema.Boolean,
   /** `/ws/*` upgrades require a credential (PAN-1166). */
   terminalAuth: Schema.Boolean,
+  /** Secure machine links are accepted (PAN-4645). Absent on older servers ⇒ `unsupported`. */
+  machineLinks: Schema.optional(Schema.Boolean),
 })
 export type EnvironmentCapabilities = typeof EnvironmentCapabilities.Type
 
@@ -34,6 +38,12 @@ export const EnvironmentDescriptor = Schema.Struct({
   /** The server's `ENVIRONMENT_PROTOCOL_VERSION`. */
   protocolVersion: Schema.Number,
   capabilities: EnvironmentCapabilities,
+  /** Long-term X25519 machine public key, 64 lowercase hex (PAN-4645). */
+  machineKey: Schema.optional(Schema.String),
+  /** The server's `LINK_PROTOCOL_VERSION`; optional so older descriptors still decode (D-4645-11). */
+  linkProtocol: Schema.optional(Schema.Number),
+  /** Endpoints this machine advertises for secure channels. */
+  endpoints: Schema.optional(Schema.Array(AdvertisedEndpoint)),
 })
 export type EnvironmentDescriptor = typeof EnvironmentDescriptor.Type
 

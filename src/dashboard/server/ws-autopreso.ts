@@ -2,7 +2,7 @@ import http from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { autoPresoSession } from '../../autopreso/session.js';
 import { boundedAutoPresoElements } from '../../autopreso/limits.js';
-import { authorizeDashboardUpgrade, rejectUpgrade, trackDeviceSocket } from './ws-auth.js';
+import { authorizeDashboardUpgrade, channelOfIncoming, rejectUpgrade, trackDeviceSocket } from './ws-auth.js';
 
 function sendJson(ws: WebSocket, payload: unknown): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -34,7 +34,7 @@ export function setupAutoPresoWebSocket(server: http.Server): void {
   originalOn('upgrade', (request: http.IncomingMessage, socket: import('net').Socket, head: Buffer) => {
     const url = new URL(request.url || '', `http://${request.headers.host}`);
     if (url.pathname !== '/ws/autopreso') return;
-    const auth = authorizeDashboardUpgrade(request.headers, request.method ?? 'GET');
+    const auth = authorizeDashboardUpgrade(request.headers, request.method ?? 'GET', 'admin', channelOfIncoming(request));
     if (!auth.ok) {
       rejectUpgrade(socket, auth.status, auth.message);
       return;

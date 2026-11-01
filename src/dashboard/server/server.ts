@@ -36,6 +36,13 @@ import { setupTerminalWebSocket } from './ws-terminal.js';
 import { knowledgeViewerRouteLayer, setupKnowledgeViewerProxy } from './routes/knowledge-viewer.js';
 import { setupVoiceWebSocket } from './ws-voice.js';
 import { setupAutoPresoWebSocket } from './ws-autopreso.js';
+import { installChannelListener } from './channel-listener.js';
+import { plainHttpNavigationGuard } from './plain-http-guard.js';
+import { recordPairingExchangeFailure, takePairingById } from './pairing-credentials.js';
+import { getOverdeckVersion } from './routes/misc/shared.js';
+import { hostsMachineLinks } from '../../lib/boot-gates.js';
+import { ensureMachineKey } from '../../lib/anywhere/machine-key.js';
+import { findActiveMachineTokenByKey } from '../../lib/access-tokens.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
 import { testRemovalWaiverRouteLayer } from './routes/test-removal-waiver.js'
@@ -58,6 +65,8 @@ import { remoteRouteLayer } from './routes/remote.js'
 import { environmentRouteLayer } from './routes/environment.js'
 import { pairingRouteLayer } from './routes/pairing.js'
 import { anywhereRouteLayer } from './routes/anywhere.js'
+import { machinesRouteLayer } from './routes/machines.js'
+import { machinesPeerRouteLayer } from './routes/machines-peer.js'
 import { pushRouteLayer } from './routes/push.js'
 import { tailscaleRouteLayer } from './routes/tailscale.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
@@ -140,6 +149,21 @@ const HttpServerLive = Layer.unwrap(
       setupKnowledgeViewerProxy(nodeServer);
       setupVoiceWebSocket(nodeServer);
       setupAutoPresoWebSocket(nodeServer);
+      // PAN-4645: secure machine channels on the dashboard port (the primary, or a
+      // peer-mode dashboard that opted in; see hostsMachineLinks). An IK initiator is
+      // pinned when an active machine token is bound to its key; a pairing initiator
+      // must name a live `pan pair` credential.
+      installChannelListener(nodeServer, {
+        primary: hostsMachineLinks(),
+        localKey: ensureMachineKey,
+        isPinnedPeer: (remoteKeyHex) => findActiveMachineTokenByKey(remoteKeyHex) !== null,
+        takePairing: (pairingId) => {
+          const taken = takePairingById(pairingId);
+          return taken === 'unknown' || taken === 'expired' ? 'unknown' : taken;
+        },
+        onPairingFailure: recordPairingExchangeFailure,
+        serverVersion: getOverdeckVersion,
+      });
       return nodeServer;
     }, {
       host: config.host,
@@ -190,6 +214,11 @@ const staticRouteLayer = HttpRouter.add(
     if (url.value.pathname === '/api' || url.value.pathname.startsWith('/api/')) {
       return jsonResponse({ error: 'Not Found' }, { status: 404 });
     }
+
+    // PAN-4645 D-4645-13: a remote browser on plain HTTP gets "Use HTTPS"
+    // instead of the SPA shell (both `/` and the SPA fallback); assets are untouched.
+    const useHttps = plainHttpNavigationGuard(request, url.value.pathname);
+    if (useHttps) return useHttps;
 
     const config = yield* ServerConfig;
     const fileSystem = yield* FileSystem.FileSystem;
@@ -369,6 +398,8 @@ export const makeRoutesLayer = Layer.mergeAll(
   environmentRouteLayer,
   pairingRouteLayer,
   anywhereRouteLayer,
+  machinesRouteLayer,
+  machinesPeerRouteLayer,
   pushRouteLayer,
   tailscaleRouteLayer,
   accessTokensRouteLayer,

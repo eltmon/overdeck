@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T13:00:09Z · model: claude-opus-5-5 · open: 859_
+_Last sequenced: 2026-11-01T13:30:48Z · model: claude-opus-5-5 · open: 859_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -223,8 +223,8 @@ _Last sequenced: 2026-11-01T13:00:09Z · model: claude-opus-5-5 · open: 859_
 | 220 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 221 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 222 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 223 | PAN-4656 | M | medium | needs-refinement |  | PAN-4645 | pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending. |
-| 224 | PAN-4650 | XL | medium | needs-refinement |  | PAN-4645, PAN-4646 | Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending. |
+| 223 | PAN-4656 | M | medium | ok |  | PAN-4645 | pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending. |
+| 224 | PAN-4650 | XL | medium | ok |  | PAN-4645, PAN-4646 | Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 225 | PAN-4645 | XL | high | ok |  |  | Anywhere build step 1: machine keys, Noise channel, machine tokens, owner column, links. Everything else needs it. Body pending. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
@@ -272,7 +272,7 @@ _Last sequenced: 2026-11-01T13:00:09Z · model: claude-opus-5-5 · open: 859_
 | 269 | PAN-4696 | XS | medium | ok |  |  | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 272 | PAN-4654 | M | medium | needs-refinement |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
+| 272 | PAN-4654 | M | medium | ok |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 276 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
@@ -677,7 +677,7 @@ _Last sequenced: 2026-11-01T13:00:09Z · model: claude-opus-5-5 · open: 859_
 | 683 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
 | 684 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 685 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 686 | PAN-2356 | M | low | needs-refinement |  | PAN-4297, PAN-4645 | Overdeck Anywhere P3: relay service |
+| 686 | PAN-2356 | M | low | ok |  | PAN-4297, PAN-4645 | Overdeck Anywhere P3: relay service |
 | 687 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 688 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 689 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -1194,7 +1194,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T13:00:09Z",
+  "generatedAt": "2026-11-01T13:30:48Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 859,
@@ -3931,7 +3931,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "size": "M",
       "importance": "medium",
       "score": 50,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4645"
       ],
@@ -3946,7 +3946,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "size": "XL",
       "importance": "medium",
       "score": 54,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4645",
         "PAN-4646"
@@ -4533,7 +4533,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "size": "M",
       "importance": "medium",
       "score": 46,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4645"
       ],
@@ -9548,7 +9548,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "size": "M",
       "importance": "low",
       "score": 26,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4297",
         "PAN-4645"
@@ -13161,29 +13161,29 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "from": "PAN-4645",
       "to": "PAN-4656",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.85
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-4645",
       "to": "PAN-4650",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-4646",
       "to": "PAN-4650",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-4645",
       "to": "PAN-4654",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-4650",
@@ -13331,6 +13331,13 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-2356",
+      "to": "PAN-4656",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
     }
   ]
 }

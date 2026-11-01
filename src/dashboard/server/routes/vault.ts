@@ -41,9 +41,8 @@ import {
 import { continueHere, previewContinue } from '../services/vault-continue.js';
 import { handOffConversation } from '../services/vault-handoff.js';
 import { jsonResponse } from '../http-helpers.js';
-import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest, resolveDashboardCredential } from './dashboard-auth.js';
+import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
-import type { HeaderMap } from './origin-validation.js';
 
 const MALFORMED_JSON = Symbol('malformed-json');
 
@@ -209,7 +208,7 @@ function noStore(response: HttpServerResponse.HttpServerResponse): HttpServerRes
 
 /** D-8: the operator's browser or a paired device; never the internal token or a scoped token. */
 function rejectNonOperatorCredential(request: HttpServerRequest.HttpServerRequest): HttpServerResponse.HttpServerResponse | null {
-  const kind = resolveDashboardCredential(request.headers as HeaderMap)?.kind;
+  const kind = resolveRequestCredential(request)?.kind;
   if (kind === 'root-session' || kind === 'device') return null;
   return jsonResponse({ error: 'Only the dashboard in a browser or a paired device can set up, join or sync the Session Vault.' }, { status: 403 });
 }

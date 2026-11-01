@@ -169,6 +169,8 @@ CREATE TABLE `conversations` (
 	`critic_of_conversation_id` text,
 	`origin` text NOT NULL DEFAULT 'local',
 	`vault_owner_label` text,
+	`environment_id` text,
+	`released_to` text,
 	`settled_at` integer,
 	`settle_reason` text,
 	`snoozed_until` integer,

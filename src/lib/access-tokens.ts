@@ -2,17 +2,28 @@
  * Access-token registry (PAN-2351 W1, adopted by PAN-3762 for device sessions).
  *
  * The single read/write door for `${OVERDECK_HOME}/access-tokens.json`. Each
- * record is one revocable credential: a paired device (`kind: 'device'`) or an
- * API token (`kind: 'token'`). A record with no `kind` is a device. Tokens are
- * `odk_<64 hex>`; only their SHA-256 hex digest is stored, and comparison is
- * constant-time.
+ * record is one revocable credential: a paired device (`kind: 'device'`), an
+ * API token (`kind: 'token'`) or a linked machine (`kind: 'machine'`, PAN-4645).
+ * A record with no `kind` is a device. Tokens are `odk_<64 hex>`; only their
+ * SHA-256 hex digest is stored, and comparison is constant-time.
  *
  * Every record carries scopes from `ACCESS_TOKEN_SCOPES`. `admin` satisfies
- * every scope, `operate` satisfies `tell`, and the three `read:*` scopes and
+ * every scope, `operate` satisfies `tell`, and the `read:*` scopes and
  * `approve` (answering blocking prompts, PAN-4649) are independent grants
  * (`scopeSatisfies`). Pairing always grants `['admin']`.
  * `createAccessToken` accepts only known scopes, but a record read from the
  * file may hold any string: an unknown scope parses and satisfies nothing.
+ *
+ * A `machine` record is bound to the peer's machine key (`machineKey`, 64 hex)
+ * and names the peer environment and the link's access level. It never holds
+ * `admin` (FR-7) and authenticates only inside a secure channel whose remote
+ * key equals `machineKey` (`routes/dashboard-auth.ts`, D-4645-9). A `machine`
+ * record missing any of those fields makes the file corrupt, so a downgrade to
+ * a version without this kind refuses every token until links are removed (H4).
+ *
+ * `onAccessTokensRevoked` tells the dashboard when a record was revoked or
+ * vanished, whether by this process or by another one seen at the next refresh
+ * (D-4645-16), so live sockets of that record can be closed.
  *
  * The file is written atomically (temp file in the same directory, then
  * rename) with mode 0600. It is a file, not a database table, because the
@@ -40,9 +51,25 @@ export const ACCESS_TOKEN_REFRESH_MS = 5_000;
 const LAST_USED_THROTTLE_MS = 60_000;
 const MAX_NAME_LENGTH = 200;
 
-export const ACCESS_TOKEN_SCOPES = ['read:events', 'read:state', 'read:conversations', 'tell', 'operate', 'approve', 'admin'] as const;
+export const ACCESS_TOKEN_SCOPES = [
+  'read:events',
+  'read:state',
+  'read:conversations',
+  'read:costs',
+  'read:settings',
+  'tell',
+  'operate',
+  'approve',
+  'forward',
+  'admin',
+] as const;
 export type AccessTokenScope = (typeof ACCESS_TOKEN_SCOPES)[number];
-export type AccessTokenKind = 'device' | 'token';
+export type AccessTokenKind = 'device' | 'token' | 'machine';
+/** Access level of a machine link (PAN-4645 FR-4). */
+export type MachineAccess = 'operator' | 'agent-fenced';
+export const MACHINE_ACCESS_LEVELS: readonly MachineAccess[] = ['operator', 'agent-fenced'];
+
+const MACHINE_KEY_HEX = /^[0-9a-f]{64}$/;
 
 export interface AccessTokenRecord {
   id: string;
@@ -54,6 +81,19 @@ export interface AccessTokenRecord {
   lastUsedAt: string | null;
   revokedAt?: string;
   kind?: AccessTokenKind;
+  /** `machine` only: the peer's machine public key, 64 lowercase hex. */
+  machineKey?: string;
+  /** `machine` only: the peer's environment id. */
+  environmentId?: string;
+  /** `machine` only: the link's access level. */
+  access?: MachineAccess;
+}
+
+/** The scopes a `machine` token carries (FR-7): never `admin`; `forward` only on operator-level links. */
+export function MACHINE_TOKEN_SCOPES(access: MachineAccess): AccessTokenScope[] {
+  const scopes: AccessTokenScope[] = ['read:events', 'read:state', 'read:conversations', 'read:costs', 'read:settings', 'tell', 'operate'];
+  // Operator-level links answer the other machine's prompts (`approve`, PAN-4649) and forward; fenced links do neither.
+  return access === 'operator' ? [...scopes, 'approve', 'forward'] : scopes;
 }
 
 /** A record as shown to callers: never carries the hash. */
@@ -77,6 +117,38 @@ let snapshot: Snapshot = { records: [], fingerprint: null, error: null };
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let writeQueue: Promise<unknown> = Promise.resolve();
 const lastUsedWrittenAt = new Map<string, number>();
+const revokedListeners = new Set<(record: PublicAccessTokenRecord) => void>();
+
+/**
+ * Be told when a record is revoked or disappears: by `revokeAccessToken` in
+ * this process, or by another process whose write the next refresh sees
+ * (D-4645-16). Returns the unsubscribe function. Listener errors are logged,
+ * never propagated.
+ */
+export function onAccessTokensRevoked(listener: (record: PublicAccessTokenRecord) => void): () => void {
+  revokedListeners.add(listener);
+  return () => {
+    revokedListeners.delete(listener);
+  };
+}
+
+function fireRevoked(records: AccessTokenRecord[]): void {
+  for (const record of records) {
+    for (const listener of revokedListeners) {
+      try {
+        listener(toPublic(record));
+      } catch (error) {
+        console.error(`[access-tokens] revocation listener failed for ${record.id}: ${(error as Error).message}`);
+      }
+    }
+  }
+}
+
+/** Records active in `previous` that are revoked or missing in `next`. */
+function newlyRevoked(previous: AccessTokenRecord[], next: AccessTokenRecord[]): AccessTokenRecord[] {
+  const byId = new Map(next.map((record) => [record.id, record] as const));
+  return previous.filter((record) => !record.revokedAt && (byId.get(record.id)?.revokedAt !== undefined || !byId.has(record.id)));
+}
 
 /** True when `granted` covers `required`: admin covers all, operate covers tell. */
 export function scopeSatisfies(granted: readonly string[], required: AccessTokenScope): boolean {
@@ -118,10 +190,14 @@ function toPublic(record: AccessTokenRecord): PublicAccessTokenRecord {
   return { ...rest, scopes: [...rest.scopes] };
 }
 
+function isMachineAccess(value: unknown): value is MachineAccess {
+  return (MACHINE_ACCESS_LEVELS as readonly unknown[]).includes(value);
+}
+
 function isRecord(value: unknown): value is AccessTokenRecord {
   if (typeof value !== 'object' || value === null) return false;
   const r = value as Record<string, unknown>;
-  return (
+  const base =
     typeof r.id === 'string' &&
     typeof r.name === 'string' &&
     Array.isArray(r.scopes) &&
@@ -131,7 +207,18 @@ function isRecord(value: unknown): value is AccessTokenRecord {
     typeof r.createdAt === 'string' &&
     (r.lastUsedAt === null || typeof r.lastUsedAt === 'string') &&
     (r.revokedAt === undefined || typeof r.revokedAt === 'string') &&
-    (r.kind === undefined || r.kind === 'device' || r.kind === 'token')
+    (r.kind === undefined || r.kind === 'device' || r.kind === 'token' || r.kind === 'machine');
+  if (!base) return false;
+  const machineKeyOk = typeof r.machineKey === 'string' && MACHINE_KEY_HEX.test(r.machineKey);
+  const environmentOk = typeof r.environmentId === 'string' && r.environmentId !== '';
+  const accessOk = isMachineAccess(r.access);
+  // A machine record needs all three binding fields; other kinds may carry none,
+  // and any field present must still be well-formed.
+  if (r.kind === 'machine') return machineKeyOk && environmentOk && accessOk;
+  return (
+    (r.machineKey === undefined || machineKeyOk) &&
+    (r.environmentId === undefined || environmentOk) &&
+    (r.access === undefined || accessOk)
   );
 }
 
@@ -216,8 +303,13 @@ export async function refreshAccessTokens(): Promise<void> {
     const fingerprint = await fingerprintOf(path);
     if (snapshot.error === null && fingerprint === snapshot.fingerprint) return;
     const records = await readRegistry(path);
+    const revoked = newlyRevoked(snapshot.records, records);
     snapshot = { records, fingerprint, error: null };
+    fireRevoked(revoked);
   } catch (error) {
+    // A corrupt file accepts no new request, but there is no new snapshot to
+    // diff against, so live sockets are left alone rather than mass-closed on
+    // what could be a transient read error.
     failSnapshot(error as Error);
     throw error;
   }
@@ -237,11 +329,19 @@ export function stopAccessTokenRefresh(): void {
   refreshTimer = null;
 }
 
-export async function createAccessToken(input: {
+export interface CreateAccessTokenInput {
   name: string;
   scopes: AccessTokenScope[];
   kind?: AccessTokenKind;
-}): Promise<{ token: string; record: PublicAccessTokenRecord }> {
+  /** Required for `kind: 'machine'`: the peer's machine public key, 64 lowercase hex. */
+  machineKey?: string;
+  /** Required for `kind: 'machine'`. */
+  environmentId?: string;
+  /** Required for `kind: 'machine'`. */
+  access?: MachineAccess;
+}
+
+export async function createAccessToken(input: CreateAccessTokenInput): Promise<{ token: string; record: PublicAccessTokenRecord }> {
   const name = typeof input.name === 'string' ? input.name.trim() : '';
   if (name === '' || name.length > MAX_NAME_LENGTH) {
     throw new Error(`Access-token name must be a non-empty string of at most ${MAX_NAME_LENGTH} characters`);
@@ -252,6 +352,24 @@ export async function createAccessToken(input: {
   } catch (error) {
     throw new Error(`Invalid access-token scopes: ${(error as Error).message}`);
   }
+  let binding: Pick<AccessTokenRecord, 'machineKey' | 'environmentId' | 'access'> = {};
+  if (input.kind === 'machine') {
+    if (typeof input.machineKey !== 'string' || !MACHINE_KEY_HEX.test(input.machineKey)) {
+      throw new Error('A machine token needs machineKey: 64 lowercase hex characters');
+    }
+    if (typeof input.environmentId !== 'string' || input.environmentId === '') {
+      throw new Error('A machine token needs the peer environmentId');
+    }
+    if (!isMachineAccess(input.access)) {
+      throw new Error(`A machine token needs access: one of ${MACHINE_ACCESS_LEVELS.join(', ')}`);
+    }
+    if (scopes.includes('admin')) {
+      throw new Error('A machine token never carries admin (PAN-4645 FR-7)');
+    }
+    binding = { machineKey: input.machineKey, environmentId: input.environmentId, access: input.access };
+  } else if (input.machineKey !== undefined || input.environmentId !== undefined || input.access !== undefined) {
+    throw new Error('machineKey, environmentId and access belong to kind: machine only');
+  }
   const token = `${ACCESS_TOKEN_PREFIX}${randomBytes(32).toString('hex')}`;
   const record: AccessTokenRecord = {
     id: randomUUID(),
@@ -261,9 +379,25 @@ export async function createAccessToken(input: {
     createdAt: new Date().toISOString(),
     lastUsedAt: null,
     ...(input.kind ? { kind: input.kind } : {}),
+    ...binding,
   };
   await mutate((records) => ({ records: [...records, record], result: undefined }));
   return { token, record: toPublic(record) };
+}
+
+/** Active (not revoked) records of one kind, from the in-memory snapshot. */
+export function listActiveRecordsOfKind(kind: AccessTokenKind): PublicAccessTokenRecord[] {
+  return snapshot.records
+    .filter((record) => !record.revokedAt && (record.kind ?? 'device') === kind)
+    .map(toPublic);
+}
+
+/** The active `machine` record bound to `machineKey` (64 hex), from the snapshot; null when none. */
+export function findActiveMachineTokenByKey(machineKey: string): PublicAccessTokenRecord | null {
+  const match = snapshot.records.find(
+    (record) => record.kind === 'machine' && !record.revokedAt && record.machineKey === machineKey,
+  );
+  return match ? toPublic(match) : null;
 }
 
 /** All records, revoked included, freshly read from the file. */
@@ -273,15 +407,20 @@ export async function listAccessTokens(): Promise<PublicAccessTokenRecord[]> {
 
 /** Revoke by id. Returns the revoked record, or null when no record has that id. */
 export async function revokeAccessToken(id: string): Promise<PublicAccessTokenRecord | null> {
-  return mutate((records) => {
+  let fire: AccessTokenRecord | null = null;
+  const result = await mutate((records) => {
     const index = records.findIndex((record) => record.id === id);
     if (index === -1) return { records, result: null };
     const existing = records[index]!;
-    const revoked = existing.revokedAt ? existing : { ...existing, revokedAt: new Date().toISOString() };
+    if (existing.revokedAt) return { records, result: toPublic(existing) };
+    const revoked = { ...existing, revokedAt: new Date().toISOString() };
+    fire = revoked;
     const next = records.slice();
     next[index] = revoked;
     return { records: next, result: toPublic(revoked) };
   });
+  if (fire) fireRevoked([fire]);
+  return result;
 }
 
 function recordLastUsed(record: AccessTokenRecord): void {
@@ -329,4 +468,5 @@ export function _resetAccessTokensForTests(): void {
   snapshot = { records: [], fingerprint: null, error: null };
   writeQueue = Promise.resolve();
   lastUsedWrittenAt.clear();
+  revokedListeners.clear();
 }

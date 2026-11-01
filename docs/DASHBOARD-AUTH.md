@@ -31,16 +31,31 @@ defend, and what they do not. User-facing guide:
   with `pan token create` or `POST /api/access-tokens`. It authenticates only
   from `Authorization: Bearer odk_…`, carries named scopes (see "Scopes"), and
   is revocable one token at a time.
+- **Machine credential** (PAN-4645) — a linked machine's `odk_<64 hex>` token: a
+  `kind: 'machine'` record bound to that machine's public key (`machineKey`),
+  environment id and access level, minted by the pairing exchange
+  (`POST /api/machines/exchange`). It authenticates only from `Authorization:
+  Bearer odk_…` **inside a secure channel** whose handshake proved that key
+  (D-4645-9); the same token over plain HTTP, or over a channel another key
+  opened, resolves to `null`. Scopes come from `MACHINE_TOKEN_SCOPES(access)`.
+  Revocable per machine (`DELETE /api/machines/inbound/:tokenId`); revoking
+  closes that machine's channels. See `docs/ANYWHERE-ARCHITECTURE.md`.
 - **CSRF token** — an HMAC token returned by the session mint and sent back on
   mutating requests as `x-overdeck-csrf-token`. Only checked for mutations
   (`rejectUnsafeDashboardMutationRequest`); WebSocket upgrades never carry it.
   It is one global value; a revoked device's cookie no longer authenticates, so
   the shared CSRF token alone grants nothing.
 
-`resolveDashboardCredential(headers)` (`dashboard-auth.ts`) is THE credential
-check. It returns `{ kind: 'internal-token' }`, `{ kind: 'root-session' }`,
+`resolveDashboardCredential(headers, channel)` (`dashboard-auth.ts`) is THE
+credential check; `channel` is the secure-channel marker of the connection the
+request arrived on (`channelOfRequest`, `channel-peer.ts`) or `null`. It returns
+`{ kind: 'internal-token' }`, `{ kind: 'root-session' }`,
 `{ kind: 'device', deviceId, scopes }`, `{ kind: 'token', tokenId, scopes }`,
-or `null`, in that precedence. The `odk_` value is read from the
+`{ kind: 'machine', tokenId, machineKey, environmentId, access, scopes }`, or
+`null`, in that precedence. A `machine` record needs `channel.mode === 'link'`
+and `channel.remoteKeyHex === record.machineKey`. Channel requests are never
+loopback peers (`remoteAddress` is `link:<key>`), so the session mint answers
+401 to them and the remote request gate treats them as remote. The `odk_` value is read from the
 `overdeck_device` cookie first, else the Bearer header. A `kind: 'token'`
 record authenticates only from the Bearer header: the same plaintext in the
 `overdeck_device` cookie resolves to `null` (D-9). A record with no `kind` is
@@ -172,7 +187,13 @@ each host needs its own mint.
 `authorizeDashboardUpgrade(headers, method, requiredScope = 'admin')`
 (`src/dashboard/server/ws-auth.ts`) is the single chokepoint all four raw
 upgrades route through — `/ws/terminal`, `/ws/rpc`, `/ws/voice`,
-`/ws/autopreso`. It runs four checks in order:
+`/ws/autopreso`. The one upgrade that happens **before** any credential is
+`/ws/link` (PAN-4645): it only carries the secure channel's own handshake, which
+is the authentication, and the raw-TCP channel on the dashboard port is the
+same thing without HTTP (`channel-listener.ts` reads the first byte; `0x00` is
+a channel). Everything that then travels inside the channel, including these
+four upgrades, passes this gate like any other connection, with the channel
+marker as its credential context. It runs four checks in order:
 
 1. **Origin** (`validateOriginHeaders`) — a *present* `Origin` (or `Referer`)
    must be in `getTrustedOrigins()`, or the upgrade is rejected with **403**.
@@ -336,7 +357,7 @@ counts unrevoked device records. `problems` are computed on the server, each
 with an `action` (`pair-dialog`, `settings-section`, or `none` with an optional
 `docsUrl`) that the UI maps to a button. `viewer.kind` is the caller's
 credential kind from `resolveDashboardCredential()` (`root-session`, `device`,
-`token`, `internal-token`, or `null`); the Continue on another device dialog
+`token`, `internal-token`, `machine` for a linked machine over its channel, or `null`); the Continue on another device dialog
 offers **Also pair the device** only to the `root-session` (PAN-4455 D-3).
 
 **`POST /api/vault/sessions/by-conversation/:name/settle`** (PAN-4455, Hand off
@@ -346,6 +367,36 @@ scoped tokens get **403** without the service running, and every response is
 `Cache-Control: no-store`. A device also needs the `admin` scope, which
 `route-scopes.ts` already requires for routes it does not list. A conversation
 name longer than 100 characters never matches the route.
+
+## Machine links (PAN-4645)
+
+`routes/machines.ts` and `routes/machines-peer.ts` serve Settings → Anywhere →
+Machines and `pan machines`. Rules:
+
+- **`POST /api/machines/link`**, **`DELETE /api/machines/:id`**,
+  **`POST /api/machines/:id/reconnect`**, **`POST /api/machines/:id/routes`** and
+  **`DELETE /api/machines/inbound/:tokenId`** are operator actions: `admin`
+  scope, CSRF-checked, and **403** to any request that arrives over a channel
+  (a linked machine never manages links here).
+- **`GET /api/machines`** needs `read:state`; **`DELETE /api/machines/self`**
+  takes exactly a machine credential (the peer unlinking itself).
+- **`POST /api/machines/exchange`** runs only inside a **pairing** channel
+  (`PAIRING_CHANNEL_ALLOWLIST` in `remote-request-gate.ts`); it mints the
+  `machine` token for the key the XXpsk0 handshake proved and consumes the
+  pairing credential. **`GET /api/machines/heartbeat`** (SSE) takes a machine
+  credential only and ends when that credential is revoked.
+- **`/ws/rpc`** from a non-admin credential (machine, device, token) gets the
+  restricted RPC group: every tag whose `RPC_METHOD_SCOPES` entry is outside the
+  credential's scopes is omitted at upgrade (`ws-rpc-auth.ts`, D-4645-14).
+  Revocation closes the socket with 4401 (D-4645-15).
+- Scopes for a machine: `read:events`, `read:state`, `read:conversations`,
+  `read:costs`, `read:settings`, `tell`, `operate`, plus `forward` at operator
+  level. An agent-fenced link stamps `x-overdeck-link-actor: agent:<id>` and
+  `x-overdeck-link-ceiling` on forwarded requests (`src/lib/anywhere/link-actor.ts`).
+- Any remote access (trusted remote origin, device, machine link or token) turns
+  `require_token_mint` on (`src/lib/remote-access/config.ts`, D-4645-12); a
+  plain-HTTP browser on another device gets the Use HTTPS page
+  (`plain-http-guard.ts`, D-4645-13).
 
 ## Remote request gate
 

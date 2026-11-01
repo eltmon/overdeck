@@ -35,6 +35,8 @@ export interface BrowseCopy {
   harness: BrowseHarness;
   title: string;
   ownerLabel: string;
+  /** PAN-4645: environment id of the machine that owns the record (absent on manifests written before it). */
+  ownerEnvironmentId?: string;
   cwd: string;
   model: string | null;
   createdAt: string;
@@ -58,6 +60,8 @@ interface ManifestEntry {
   updatedAt: string;
   title: string;
   ownerLabel: string;
+  /** PAN-4645: owner environment id; an entry without it is refreshed once to learn it. */
+  ownerEnvironmentId?: string;
   cwd: string;
   model: string | null;
   createdAt: string;
@@ -156,6 +160,7 @@ function copyFromEntry(vaultId: string, entry: ManifestEntry): BrowseCopy {
     harness: entry.harness,
     title: entry.title,
     ownerLabel: entry.ownerLabel,
+    ...(entry.ownerEnvironmentId !== undefined ? { ownerEnvironmentId: entry.ownerEnvironmentId } : {}),
     cwd: entry.cwd,
     model: entry.model,
     createdAt: entry.createdAt,
@@ -199,6 +204,7 @@ async function refreshOne(
     updatedAt: record.updatedAt,
     title: record.title,
     ownerLabel: record.owner.label,
+    ownerEnvironmentId: record.owner.environmentId,
     cwd: record.cwd,
     model: record.model,
     createdAt: record.createdAt,
@@ -222,7 +228,8 @@ export async function refreshBrowseCache(options: {
   for (const row of wanted) {
     try {
       const entry = manifest.entries[row.vaultId];
-      if (entry && entry.updatedAt === row.updatedAt && entry.harness === row.harness
+      // An entry from before PAN-4645 lacks the owner id: refresh it once (D-4645-19).
+      if (entry && entry.ownerEnvironmentId !== undefined && entry.updatedAt === row.updatedAt && entry.harness === row.harness
         && (await fileSize(vaultBrowseFilePath(row.vaultId, row.harness))) === entry.bytes) {
         result.copies.push(copyFromEntry(row.vaultId, entry));
         kept.add(row.vaultId);

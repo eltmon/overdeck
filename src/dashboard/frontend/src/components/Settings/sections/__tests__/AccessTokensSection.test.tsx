@@ -54,6 +54,8 @@ function mockFetch(opts: {
   onCreate?: (body: { name: string; scopes: string[] }) => void;
   createStatus?: number;
   createError?: string;
+  /** PAN-4645: what GET /api/anywhere/status answers (404 when omitted, as before). */
+  anywhereStatus?: unknown;
 } = {}) {
   const tokens = opts.tokens ?? [RECORD_A, RECORD_B];
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -83,13 +85,53 @@ function mockFetch(opts: {
       opts.onDelete?.(id);
       return new Response(JSON.stringify({ ok: true, token: { ...RECORD_A, id, revokedAt: '2026-09-05T00:00:00.000Z' } }), { status: 200 });
     }
+    if (url === '/api/anywhere/status' && opts.anywhereStatus !== undefined) {
+      return new Response(JSON.stringify(opts.anywhereStatus), { status: 200 });
+    }
     return new Response('not found', { status: 404 });
   });
 }
 
+const STATUS_WITH_LINK = {
+  machine: { environmentId: 'env-us', label: 'laptop' },
+  addresses: [],
+  devices: { active: 0 },
+  vault: { state: 'off', backend: null },
+  tokenMint: { effective: true, configured: false, autoReasons: ['machine-link'] },
+  problems: [],
+  viewer: { kind: 'root-session' },
+};
+
 describe('AccessTokensSection', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('PAN-4645 ac4: renders the token-mint toggle checked and disabled with the automatic reason when the status reports a machine link', async () => {
+    mockFetch({ anywhereStatus: STATUS_WITH_LINK });
+    const onSettingsChange = vi.fn();
+    renderSection({ formData: { dashboard: { require_token_mint: false } } as unknown as SettingsConfig, onSettingsChange });
+
+    const note = await screen.findByTestId('require-token-mint-auto');
+    expect(note).toHaveTextContent('On automatically because this machine has a machine link');
+    const toggle = screen.getByRole('switch', { name: '' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(toggle).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(toggle);
+    expect(onSettingsChange).not.toHaveBeenCalled();
+  });
+
+  it('PAN-4645: without automatic reasons the toggle follows the saved value and stays editable', async () => {
+    mockFetch({ anywhereStatus: { ...STATUS_WITH_LINK, tokenMint: { effective: false, configured: false, autoReasons: [] } } });
+    const onSettingsChange = vi.fn();
+    renderSection({ formData: { dashboard: { require_token_mint: false } } as unknown as SettingsConfig, onSettingsChange });
+    await screen.findByText('ci-bot');
+    expect(screen.queryByTestId('require-token-mint-auto')).toBeNull();
+    const toggle = screen.getByRole('switch', { name: '' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(toggle).toHaveAttribute('aria-disabled', 'false');
+    fireEvent.click(toggle);
+    expect(onSettingsChange).toHaveBeenCalledWith(expect.objectContaining({ dashboard: { require_token_mint: true } }));
   });
 
   it('renders each record with name, scopes, Never for a null lastUsedAt, and the revoked time for a revoked one', async () => {

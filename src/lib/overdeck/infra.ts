@@ -146,6 +146,12 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // PAN-4436: Session Vault browse copies (`vault-<vaultId>` rows) are origin 'vault'.
   runSchemaTopUp(db, "ALTER TABLE `conversations` ADD COLUMN `origin` text NOT NULL DEFAULT 'local'");
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `vault_owner_label` text');
+  // PAN-4645 D-4645-19: the owner machine of every row (environment id) and the
+  // machine a row was released to (#4650 Pull here). Nullable top-ups; local rows
+  // are backfilled at boot by `bootConversationEnvironment`.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `environment_id` text');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `released_to` text');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `conversations_environment_idx` ON `conversations` (`environment_id`)');
   // PAN-4639: operator triage state (settle / snooze) for the conversation list.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `settled_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `settle_reason` text');
