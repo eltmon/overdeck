@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4295",
   "created": "2026-11-01T05:48:47.966Z",
-  "updated": "2026-11-01T11:28:18.211Z",
+  "updated": "2026-11-01T11:28:30.927Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,10 @@
     "single-remote-creator.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T11:28:18.211Z"
+    },
+    "docs-fly-remote.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:28:30.927Z"
     }
   }
 }
