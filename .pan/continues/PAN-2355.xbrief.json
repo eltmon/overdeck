@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2355",
   "created": "2026-11-01T05:47:25.756Z",
-  "updated": "2026-11-01T07:41:40.985Z",
+  "updated": "2026-11-01T07:42:03.712Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "mobile-shell.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:41:40.985Z"
+    },
+    "mobile-shell.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:42:03.712Z"
     }
   }
 }
