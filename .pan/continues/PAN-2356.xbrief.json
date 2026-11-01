@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:15:30.772Z",
+  "updated": "2026-11-01T14:15:45.164Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,10 @@
     "wi10-rtc-transport.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T14:15:30.772Z"
+    },
+    "wi10-rtc-transport.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:15:45.164Z"
     }
   }
 }
