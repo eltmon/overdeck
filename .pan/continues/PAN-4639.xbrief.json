@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T09:18:32.187Z",
+  "updated": "2026-11-01T09:33:19.668Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
       "claimedBy": "agent-pan-4639",
       "claimedAt": "2026-11-01T09:04:26.064Z",
       "doneAt": "2026-11-01T09:18:32.186Z"
+    },
+    "triage-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:33:19.668Z"
     }
   }
 }
