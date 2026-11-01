@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T09:03:58.085Z",
+  "updated": "2026-11-01T09:04:16.774Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -380,6 +380,10 @@
       "claimedBy": "agent-pan-1254",
       "claimedAt": "2026-11-01T09:01:50.150Z",
       "doneAt": "2026-11-01T09:03:58.085Z"
+    },
+    "tailscale-phone-qr.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:04:16.773Z"
     }
   }
 }
