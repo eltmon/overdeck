@@ -429,6 +429,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/anywhere/trusted-origins',        kind: 'http', disposition: 'WRITE',       door: 'remote-access/trusted-origins.addSavedTrustedOrigin (PAN-4445)' },
   { surface: 'GET /api/anywhere/status',                  kind: 'http', disposition: 'AGGREGATE',   door: 'environment-identity + trusted origins + access-tokens + vault config (PAN-4445)' },
   { surface: 'GET /api/tailscale/status',                 kind: 'http', disposition: 'AGGREGATE',   door: 'lib/tailscale/state.readTailscaleState + installer.resolveInstallPlan (PAN-1254)' },
+  { surface: 'GET /api/tailscale/peers',                  kind: 'http', disposition: 'AGGREGATE',   door: 'lib/tailscale/state.readTailscaleState + peers.discoverTailnetPeers (PAN-1254)' },
   { surface: 'POST /api/tailscale/userspace',             kind: 'http', disposition: 'WRITE',       door: 'lib/tailscale/userspace.installUserspaceTailscale / restartUserspaceDaemon (PAN-1254)' },
   { surface: 'POST /api/tailscale/login',                 kind: 'http', disposition: 'WRITE',       door: 'lib/tailscale/login.startTailscaleLogin (PAN-1254)' },
   { surface: 'POST /api/tailscale/serve',                 kind: 'http', disposition: 'WRITE',       door: 'lib/tailscale/serve.enableTailscaleServe (PAN-1254)' },

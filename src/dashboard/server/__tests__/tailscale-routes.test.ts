@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { InstallPlan } from '../../../lib/tailscale/installer.js';
 import type { LoginResult } from '../../../lib/tailscale/login.js';
+import type { TailnetPeer } from '../../../lib/tailscale/peers.js';
 import type { ServeResult } from '../../../lib/tailscale/serve.js';
 import type { TailscaleState } from '../../../lib/tailscale/state.js';
 import type { UserspaceResult } from '../../../lib/tailscale/userspace.js';
@@ -26,11 +27,15 @@ const enableTailscaleServe = vi.fn<(deps: { alreadyTrusted?: readonly string[] }
 const installUserspaceTailscale = vi.fn<() => Promise<UserspaceResult>>();
 const restartUserspaceDaemon = vi.fn<() => Promise<UserspaceResult>>();
 const invalidateTrustedOriginsCache = vi.fn();
+const discoverTailnetPeers = vi.fn<(state: TailscaleState, opts: { port: number; selfEnvironmentId: string }) => Promise<TailnetPeer[]>>();
 
 vi.mock('../../../lib/tailscale/installer.js', () => ({
   resolveInstallPlan: (opts: { userspace: boolean; port?: number }) => resolveInstallPlan(opts),
   operatorCommand: (name: string) => `sudo tailscale set --operator=${name}`,
   USERSPACE_MODE_AVAILABLE: false,
+}));
+vi.mock('../../../lib/tailscale/peers.js', () => ({
+  discoverTailnetPeers: (state: TailscaleState, opts: { port: number; selfEnvironmentId: string }) => discoverTailnetPeers(state, opts),
 }));
 vi.mock('../../../lib/tailscale/login.js', () => ({ startTailscaleLogin: (state: TailscaleState) => startTailscaleLogin(state) }));
 vi.mock('../../../lib/tailscale/serve.js', () => ({ enableTailscaleServe: (deps: { alreadyTrusted?: readonly string[] }) => enableTailscaleServe(deps) }));
@@ -119,7 +124,7 @@ beforeEach(async () => {
   _resetDashboardSessionTokenForTests();
   _resetTrustedOriginsForTests();
   _resetAccessTokensForTests();
-  for (const mock of [startTailscaleLogin, enableTailscaleServe, installUserspaceTailscale, restartUserspaceDaemon, invalidateTrustedOriginsCache]) mock.mockReset();
+  for (const mock of [startTailscaleLogin, enableTailscaleServe, installUserspaceTailscale, restartUserspaceDaemon, invalidateTrustedOriginsCache, discoverTailnetPeers]) mock.mockReset();
   readTailscaleState.mockReset();
   resolveInstallPlan.mockReset();
   readTailscaleState.mockResolvedValue(state());
@@ -258,5 +263,36 @@ describe('POST /api/tailscale/userspace', () => {
     expect(res.status).toBe(200);
     expect(res.json).toEqual({ ok: true });
     expect(restartUserspaceDaemon).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('GET /api/tailscale/peers', () => {
+  const LAPTOP: TailnetPeer = {
+    hostName: 'laptop',
+    dnsName: 'laptop.tailnet.ts.net',
+    os: 'macOS',
+    online: true,
+    overdeck: { environmentId: 'env-laptop', label: 'laptop', serverVersion: '0.72.0', url: 'https://laptop.tailnet.ts.net' },
+  };
+
+  it('returns the discovered peers, not cacheable', async () => {
+    discoverTailnetPeers.mockResolvedValue([LAPTOP]);
+    const res = await call('GET', '/api/tailscale/peers', ROOT);
+    expect(res.status).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.json).toEqual({ peers: [LAPTOP] });
+    expect(discoverTailnetPeers).toHaveBeenCalledWith(expect.objectContaining({ backendState: 'Running' }), { port: 3999, selfEnvironmentId: expect.any(String) });
+  });
+
+  it('returns no peers without probing when Tailscale is not running', async () => {
+    readTailscaleState.mockResolvedValue(state({ backendState: 'NeedsLogin', nextStep: 'login' }));
+    const res = await call('GET', '/api/tailscale/peers', ROOT);
+    expect(res.status).toBe(200);
+    expect(res.json).toEqual({ peers: [] });
+    expect(discoverTailnetPeers).not.toHaveBeenCalled();
+  });
+
+  it('answers 401 without a credential', async () => {
+    expect((await call('GET', '/api/tailscale/peers', {})).status).toBe(401);
   });
 });

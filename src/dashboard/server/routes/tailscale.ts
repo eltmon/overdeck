@@ -6,6 +6,9 @@
  *   the dashboard port. `?userspace=1` asks for the userspace plan on Linux.
  *   Any dashboard credential may read it (default `admin` scope).
  *
+ * - `GET /api/tailscale/peers` lists the online tailnet peers, each with its
+ *   Overdeck descriptor when one answered (`discoverTailnetPeers`). Empty when
+ *   Tailscale is not `Running`.
  * - `POST /api/tailscale/userspace` installs Overdeck's userspace Tailscale,
  *   or restarts its daemon when it is already the active install. A fresh
  *   install is refused (409) while userspace mode is off (C-1).
@@ -28,8 +31,10 @@ import { Effect, Layer, Result } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
+import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { operatorCommand, resolveInstallPlan, USERSPACE_MODE_AVAILABLE } from '../../../lib/tailscale/installer.js';
 import { startTailscaleLogin } from '../../../lib/tailscale/login.js';
+import { discoverTailnetPeers } from '../../../lib/tailscale/peers.js';
 import { enableTailscaleServe } from '../../../lib/tailscale/serve.js';
 import { readTailscaleState } from '../../../lib/tailscale/state.js';
 import { installUserspaceTailscale, restartUserspaceDaemon } from '../../../lib/tailscale/userspace.js';
@@ -67,6 +72,27 @@ const tailscaleStatusRoute = HttpRouter.add(
       return { state, install, operatorCommand: operatorCommand(currentUsername()), port: state.port };
     });
     return noStore(jsonResponse(body));
+  }),
+);
+
+const tailscalePeersRoute = HttpRouter.add(
+  'GET',
+  '/api/tailscale/peers',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return noStore(authError);
+    const result = yield* Effect.result(Effect.tryPromise({
+      try: async () => {
+        const state = await readTailscaleState();
+        if (state.backendState !== 'Running') return [];
+        const { environmentId } = await ensureEnvironmentIdentity();
+        return discoverTailnetPeers(state, { port: state.port, selfEnvironmentId: environmentId });
+      },
+      catch: (cause) => (cause instanceof Error ? cause.message : String(cause)),
+    }));
+    if (Result.isFailure(result)) return noStore(jsonResponse({ error: result.failure }, { status: 500 }));
+    return noStore(jsonResponse({ peers: result.success }));
   }),
 );
 
@@ -163,6 +189,7 @@ const tailscaleServeRoute = HttpRouter.add(
 
 export const tailscaleRouteLayer = Layer.mergeAll(
   tailscaleStatusRoute,
+  tailscalePeersRoute,
   tailscaleUserspaceRoute,
   tailscaleLoginRoute,
   tailscaleServeRoute,
