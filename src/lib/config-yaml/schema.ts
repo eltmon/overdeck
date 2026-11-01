@@ -488,6 +488,8 @@ export interface UiConfig {
   open_in_editor_command?: string;
   /** Overdeck Theme design language. Defaults to 'broadsheet' when unset. */
   theme?: DesignLanguage;
+  /** Selected color theme id per mode (PAN-4644). Unset means the built-in for that mode. */
+  color_theme?: { light?: string; dark?: string };
 }
 
 /** Overdeck Theme design language: Ledger (legacy, frozen) or Broadsheet (default). */
@@ -997,7 +999,7 @@ export interface NormalizedConfig {
   telemetry: Required<Pick<TelemetryConfig, 'enabled' | 'operator_grouping'>> & Pick<TelemetryConfig, 'posthog_read_key' | 'posthog_project_id'>;
 
   /** Dashboard UI behavior, normalised (always defined; null when unset). */
-  ui: { openInEditorCommand: string | null; theme: DesignLanguage };
+  ui: { openInEditorCommand: string | null; theme: DesignLanguage; colorTheme: { light: string | null; dark: string | null } };
 
   /** Experimental flag values, normalised (always defined, never undefined). */
   experimental: NormalizedExperimentalConfig;

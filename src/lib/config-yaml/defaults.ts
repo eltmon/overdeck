@@ -263,6 +263,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   ui: {
     openInEditorCommand: null,
     theme: 'broadsheet',
+    colorTheme: { light: null, dark: null },
   },
   experimental: {
     experimentalFeatures: false,

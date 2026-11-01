@@ -988,10 +988,19 @@ async function saveSettingsApiPromiseUnlocked(
     // only saveDesignLanguage's fresh-inside-the-queue read may set it.
     ui: ((honorThemeFromSettings && settings.ui?.theme !== undefined)
       || currentConfig.ui.theme !== DEFAULT_CONFIG.ui.theme
-      || currentConfig.ui.openInEditorCommand !== null)
+      || currentConfig.ui.openInEditorCommand !== null
+      || currentConfig.ui.colorTheme.light !== null || currentConfig.ui.colorTheme.dark !== null)
       ? {
           ...(currentConfig.ui.openInEditorCommand !== null ? { open_in_editor_command: currentConfig.ui.openInEditorCommand } : {}),
           theme: honorThemeFromSettings ? (settings.ui?.theme ?? currentConfig.ui.theme) : currentConfig.ui.theme,
+          ...(currentConfig.ui.colorTheme.light !== null || currentConfig.ui.colorTheme.dark !== null
+            ? {
+                color_theme: {
+                  ...(currentConfig.ui.colorTheme.light !== null ? { light: currentConfig.ui.colorTheme.light } : {}),
+                  ...(currentConfig.ui.colorTheme.dark !== null ? { dark: currentConfig.ui.colorTheme.dark } : {}),
+                },
+              }
+            : {}),
         }
       : undefined,
     conversationSearch: settings.conversationSearch,
