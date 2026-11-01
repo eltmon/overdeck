@@ -12,6 +12,11 @@
  *      delivery route; every other method and path gets 404, credential or
  *      not (PAN-4648 FR-9). Funnel proxies to 127.0.0.1, so without this rule
  *      a public request would look like the local operator.
+ *  0b. With `OVERDECK_PUBLIC_LINK_ONLY=1` (a linked Fly machine, PAN-4652
+ *      FR-5), a request that is neither a secure-channel request nor a
+ *      loopback peer without a proxy forwarding header gets 404 on every
+ *      path, the static SPA included. The `/ws/link` upgrade is handled
+ *      before this gate, so home still links in.
  *   1. The path is not under `/api/` or `/events/` (the static SPA): pass.
  *   2. `METHOD path` is on REMOTE_GATE_ALLOWLIST: pass.
  *   3. The request carries a dashboard credential: pass when its scopes satisfy
@@ -86,6 +91,11 @@ function hasEventsStreamToken(headers: HeaderMap): boolean {
   return timingSafeEqual(digest(token), digest(expected));
 }
 
+/** True when this server answers only secure channels and local callers (rule 0b). */
+export function publicLinkOnly(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env['OVERDECK_PUBLIC_LINK_ONLY'] === '1';
+}
+
 /** True when the request is a trusted local caller under the current config. */
 export function isTrustedLocalRequest(request: HttpServerRequest.HttpServerRequest): boolean {
   if (!isLoopbackPeer(request)) return false;
@@ -116,6 +126,10 @@ export function remoteGateRejection(
   if (pathname === null) return { status: 401 };
   if (isTailscaleFunnelRequest(request.headers as HeaderMap)) {
     return request.method === 'POST' && pathname.startsWith('/hooks/') ? null : { status: 404 };
+  }
+  if (publicLinkOnly() && channel === null
+    && !(isLoopbackPeer(request) && !hasProxyForwardingHeader(request.headers as HeaderMap))) {
+    return { status: 404 };
   }
   if (!isGatedPath(pathname)) return null;
   const surface = `${request.method} ${pathname}`;
