@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4643",
+  "created": "2026-11-01T04:53:44.765Z",
+  "updated": "2026-11-01T04:53:44.765Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "doctor-json": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4643",
+      "claimedAt": "2026-11-01T04:53:44.765Z"
+    }
+  }
+}
