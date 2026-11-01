@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4641",
   "created": "2026-11-01T05:00:29.700Z",
-  "updated": "2026-11-01T07:04:31.301Z",
+  "updated": "2026-11-01T07:05:04.774Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -210,6 +210,10 @@
     "patrol-host.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T07:04:31.300Z"
+    },
+    "patrol-host.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:05:04.773Z"
     }
   }
 }
