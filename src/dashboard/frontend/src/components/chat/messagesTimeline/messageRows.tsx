@@ -11,6 +11,7 @@ import { openImageLightbox } from '../ImageLightbox';
 import { extractAttachmentImageRefs, formatElapsed, formatTimestamp } from './helpers';
 import { SlashCommandDivider } from './dividers';
 import { MessageRoleIcon } from '../bookmarks/MessageRoleIcon';
+import { ScheduledMessageRow } from './ScheduledMessageRow';
 
 /** PAN-4493: clickable thumbnails for the image attachments a sent message references. */
 function AttachmentThumbnails({ text }: { text: string }) {
@@ -85,6 +86,10 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable }: { messag
         <MessageRoleIcon message={message} role="user" bookmarkable={false} className="ml-2 mt-3 shrink-0 text-muted-foreground opacity-70" />
       </div>
     );
+  }
+
+  if (message.deliveryState === 'scheduled' && message.scheduled) {
+    return <ScheduledMessageRow message={message} scheduled={message.scheduled} cwd={cwd} issueId={issueId} />;
   }
 
   if (message.deliveryState === 'held') {

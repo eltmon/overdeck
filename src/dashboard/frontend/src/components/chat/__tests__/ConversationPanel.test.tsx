@@ -160,6 +160,10 @@ function defaultConversationResponse(method: string, url: string): Response | un
   if (method === 'GET' && /^\/api\/conversations\/[^/]+\/bookmarks$/.test(url)) {
     return Response.json({ bookmarks: [] });
   }
+  // PAN-4641 — the timeline polls the conversation's scheduled messages.
+  if (method === 'GET' && /^\/api\/conversations\/[^/]+\/scheduled-messages$/.test(url)) {
+    return Response.json({ supported: true, limit: null, messages: [] });
+  }
   return undefined;
 }
 
