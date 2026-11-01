@@ -95,6 +95,18 @@ export interface FleetUpdateResponse {
   skipped: { environmentId: string; label: string; reason: string }[]
 }
 
+/** Fleet-table column order (D-16): these binaries first, then any other binary alphabetically. */
+export const FLEET_BINARY_ORDER: readonly string[] = ["claude", "codex", "kimi", "opencode", "muse", "prime-agent", "omp"]
+
+/** Sort comparator for harness binary names in D-16 order. */
+export function compareFleetBinaries(a: string, b: string): number {
+  const rank = (binary: string): number => {
+    const index = FLEET_BINARY_ORDER.indexOf(binary)
+    return index === -1 ? FLEET_BINARY_ORDER.length : index
+  }
+  return rank(a) - rank(b) || a.localeCompare(b)
+}
+
 /** After this long waiting for turns, the row says it is still waiting and points at Update now (FR-8). */
 export const FLEET_UPDATE_STILL_WAITING_MS = 30 * 60_000
 

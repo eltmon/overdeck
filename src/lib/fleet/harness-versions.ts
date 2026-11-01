@@ -12,7 +12,7 @@ import { access, constants as fsConstants, realpath, stat } from 'node:fs/promis
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { type HarnessCapabilities, type HarnessVersionView, KNOWN_HARNESSES } from '@overdeck/contracts';
+import { compareFleetBinaries, type HarnessCapabilities, type HarnessVersionView, KNOWN_HARNESSES } from '@overdeck/contracts';
 
 import { harnessBinaryName, resolveHarnessBinary } from '../harness-binary.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -24,9 +24,6 @@ const execFileAsync = promisify(execFile);
 export const VERSION_TIMEOUT_MS = 8_000;
 /** A version read is reused this long for the same real path and modification time (NFR-2). */
 export const VERSION_CACHE_MS = 60_000;
-
-/** Fleet-table column order (D-16); any other binary sorts after these, alphabetically. */
-const BINARY_ORDER = ['claude', 'codex', 'kimi', 'opencode', 'muse', 'prime-agent', 'omp'];
 
 export interface HarnessUpdatePlan {
   /** The argv Overdeck may run, or null when it must not run anything. */
@@ -161,11 +158,6 @@ export async function harnessUpdatePlan(
   return { argv: null, display: installHint ?? '', reason: `Overdeck does not update ${binaryLabel}` };
 }
 
-function binaryRank(binary: string): number {
-  const index = BINARY_ORDER.indexOf(binary);
-  return index === -1 ? BINARY_ORDER.length : index;
-}
-
 /** Every installed harness CLI, one entry per binary, ordered per D-16. */
 export async function detectHarnessClis(
   opts: { refresh: boolean },
@@ -204,7 +196,7 @@ export async function detectHarnessClis(
     } satisfies InstalledHarnessCli;
   }));
 
-  return clis.sort((a, b) => binaryRank(a.binary) - binaryRank(b.binary) || a.binary.localeCompare(b.binary));
+  return clis.sort((a, b) => compareFleetBinaries(a.binary, b.binary));
 }
 
 /** The wire view of `detectHarnessClis` for `GET /api/versions/self`. */
