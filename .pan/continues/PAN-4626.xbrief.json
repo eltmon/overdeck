@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4626",
   "created": "2026-11-01T05:58:08.711Z",
-  "updated": "2026-11-01T06:59:00.498Z",
+  "updated": "2026-11-01T06:59:28.902Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "hook-stop-pending.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T06:59:00.497Z"
+    },
+    "hook-stop-pending.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:59:28.902Z"
     }
   }
 }
