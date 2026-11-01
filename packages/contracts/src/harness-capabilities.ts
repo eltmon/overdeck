@@ -43,6 +43,10 @@ export interface HarnessCapabilities {
   readonly binaryLabel: string
   /** Install command shown when the binary is missing, or null for none. */
   readonly installHint: string | null
+  /** Argv after the binary that updates the CLI in place, or null when Overdeck must not update it (PAN-4654). */
+  readonly updateArgs: readonly string[] | null
+  /** npm package of the CLI; a binary installed under <prefix>/lib/node_modules/<package>/ is updated with npm (PAN-4654). */
+  readonly npmPackage: string | null
   /** Config key holding an operator-configured binary path, or null for none. */
   readonly binaryConfigKey: HarnessBinaryConfigKey | null
   /** Preflight check run before a launch, or null for none. */
@@ -75,6 +79,8 @@ export const HARNESS_CAPABILITY_KEYS = [
   "hostEffortFlag",
   "binaryLabel",
   "installHint",
+  "updateArgs",
+  "npmPackage",
   "binaryConfigKey",
   "launchPreflight",
   "workspaceResolution",
@@ -96,6 +102,8 @@ export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "Claude Code",
   installHint: "curl -fsSL https://claude.ai/install.sh | bash",
+  updateArgs: ["update"],
+  npmPackage: "@anthropic-ai/claude-code",
   binaryConfigKey: null,
   launchPreflight: "claude-code-model-minimum",
   workspaceResolution: "claude-project-hash",
@@ -117,6 +125,8 @@ export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "OhMyPi",
   installHint: null,
+  updateArgs: null,
+  npmPackage: null,
   binaryConfigKey: null,
   launchPreflight: null,
   workspaceResolution: "first-message-only",
@@ -138,6 +148,8 @@ export const CODEX_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "Codex CLI",
   installHint: null,
+  updateArgs: ["update"],
+  npmPackage: "@openai/codex",
   binaryConfigKey: null,
   launchPreflight: null,
   workspaceResolution: "agent-dir",
@@ -159,6 +171,8 @@ export const ACP_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "Kimi Code CLI",
   installHint: null,
+  updateArgs: ["upgrade", "--yes"],
+  npmPackage: null,
   binaryConfigKey: "acp.kimi.binaryPath",
   launchPreflight: null,
   workspaceResolution: "agent-dir",
@@ -180,6 +194,8 @@ export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "Kimi Code CLI",
   installHint: null,
+  updateArgs: ["upgrade", "--yes"],
+  npmPackage: null,
   binaryConfigKey: "kimiCode.binaryPath",
   launchPreflight: null,
   workspaceResolution: "first-message-only",
@@ -201,6 +217,8 @@ export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: true,
   binaryLabel: "OpenCode",
   installHint: null,
+  updateArgs: ["upgrade"],
+  npmPackage: "opencode-ai",
   binaryConfigKey: null,
   launchPreflight: null,
   workspaceResolution: "agent-dir",
@@ -222,6 +240,8 @@ export const MUSE_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "Muse Code",
   installHint: null,
+  updateArgs: null,
+  npmPackage: null,
   binaryConfigKey: null,
   launchPreflight: null,
   workspaceResolution: "first-message-only",
@@ -243,6 +263,8 @@ export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "Prime Agent",
   installHint: null,
+  updateArgs: null,
+  npmPackage: null,
   binaryConfigKey: null,
   launchPreflight: null,
   workspaceResolution: "first-message-only",

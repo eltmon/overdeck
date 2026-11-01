@@ -14,6 +14,11 @@ import { Schema } from "effect"
  */
 export const LINK_PROTOCOL_VERSION = 1
 
+/** The exact command that installs one Overdeck version (PAN-4654 FR-1, D-2). */
+export function overdeckInstallCommand(version: string): string {
+  return `npm install -g @overdeck/core@${version}`
+}
+
 /** Route kinds, ranked best to worst (D-10 of the Anywhere PRD). */
 export const ROUTE_KINDS = ["lan", "tailnet", "ssh", "public", "direct", "relay"] as const
 export const RouteKind = Schema.Literals(ROUTE_KINDS)

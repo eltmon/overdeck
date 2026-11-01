@@ -47,6 +47,7 @@ src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx
 src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx
 src/components/Settings/anywhere/__tests__/DevicesPanel.test.tsx
 src/components/Settings/anywhere/__tests__/DirectoryPanel.test.tsx
+src/components/Settings/anywhere/__tests__/FleetVersionsPanel.test.tsx
 src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx
 src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx
 src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx
@@ -70,6 +71,8 @@ src/components/__tests__/DegradedModeBanner.test.tsx
 src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
 src/components/__tests__/Sidebar.workspacePullRequest.test.tsx
+src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx
+src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx
 src/components/chat/__tests__/ComposerFooter.citations.test.tsx
 src/components/chat/__tests__/ComposerFooter.schedule.test.tsx
 src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
@@ -102,6 +105,8 @@ src/components/chat/messagesTimeline/__tests__/UserMessageAttachments.test.tsx
 src/components/chat/messagesTimeline/__tests__/attachmentRefs.test.ts
 src/components/chat/messagesTimeline/__tests__/workLogRows.test.tsx
 src/components/chat/messagesTimeline/messageRows.test.tsx
+src/components/drawer/IssueDrawer.tracker-fallback.test.tsx
+src/components/drawer/useDrawerData.absent-issue.test.tsx
 src/components/home/__tests__/HomeComposer.test.tsx
 src/components/home/__tests__/HomeComposerProjectChip.test.tsx
 src/components/home/__tests__/homeComposerIntents.test.ts

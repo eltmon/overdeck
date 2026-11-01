@@ -1,12 +1,14 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T13:03:39Z · model: claude-opus-5-5 · open: 859_
+_Last sequenced: 2026-11-01T15:19:40Z · model: claude-opus-5-5 · open: 862_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 2 | PAN-4723 | S | critical | ok |  |  | In pipeline: flaky create-workspace-row test turned main red via an unmocked git call in a non-git temp dir; red main stalls merges |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
+| 5 | PAN-4717 | S | high | ok |  |  | In pipeline: conversation issue links may open an empty drawer for issues absent from the snapshot; CodeRabbit follow-up to #4716. |
 | 6 | PAN-4714 | S | medium | ok |  |  | In pipeline: an issue link in a conversation opens the issue drawer, not a GitHub tab; modifier clicks keep the tracker link. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
@@ -223,8 +225,8 @@ _Last sequenced: 2026-11-01T13:03:39Z · model: claude-opus-5-5 · open: 859_
 | 220 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 221 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 222 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 223 | PAN-4656 | M | medium | needs-refinement |  | PAN-4645 | pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending. |
-| 224 | PAN-4650 | XL | medium | needs-refinement |  | PAN-4645, PAN-4646 | Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending. |
+| 223 | PAN-4656 | M | medium | ok |  | PAN-4645 | pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending. |
+| 224 | PAN-4650 | XL | medium | ok |  | PAN-4645, PAN-4646 | Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 225 | PAN-4645 | XL | high | ok |  |  | Anywhere build step 1: machine keys, Noise channel, machine tokens, owner column, links. Everything else needs it. Body pending. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
@@ -272,9 +274,10 @@ _Last sequenced: 2026-11-01T13:03:39Z · model: claude-opus-5-5 · open: 859_
 | 269 | PAN-4696 | XS | medium | ok |  |  | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 272 | PAN-4654 | M | medium | needs-refinement |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
+| 272 | PAN-4654 | M | medium | ok |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 275 | PAN-4722 | S | medium | ok |  | PAN-4654, PAN-4656 | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix instead. Follow-up to PAN-4654/4656. |
 | 276 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
 | 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
 | 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
@@ -677,7 +680,7 @@ _Last sequenced: 2026-11-01T13:03:39Z · model: claude-opus-5-5 · open: 859_
 | 683 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
 | 684 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 685 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 686 | PAN-2356 | M | low | needs-refinement |  | PAN-4297, PAN-4645 | Overdeck Anywhere P3: relay service |
+| 686 | PAN-2356 | M | low | ok |  | PAN-4297, PAN-4645 | Overdeck Anywhere P3: relay service |
 | 687 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 688 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 689 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -871,9 +874,17 @@ _Last sequenced: 2026-11-01T13:03:39Z · model: claude-opus-5-5 · open: 859_
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
+### PAN-4723 (rank 2)
+
+New issue since the prior run, already in pipeline: a flaky unit test turned main CI red, and a red main empties the merge gate for every PR, so it takes the free rank-2 slot as critical substrate work.
+
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
+
+### PAN-4717 (rank 5)
+
+New in-pipeline follow-up to PAN-4714 (merged as #4716) fixing an unreviewed CodeRabbit finding; pinned into a free top-tier slot next to its parent and not re-ranked.
 
 ### PAN-4714 (rank 6)
 
@@ -1179,14 +1190,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
 
 Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
 
-### PAN-3096 (rank 82)
-
-New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
-
-### PAN-3084 (rank 83)
-
-Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1194,10 +1197,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T13:03:39Z",
+  "generatedAt": "2026-11-01T15:19:40Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 859,
+  "openCount": 862,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -3931,7 +3934,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "size": "M",
       "importance": "medium",
       "score": 50,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4645"
       ],
@@ -3946,7 +3949,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "size": "XL",
       "importance": "medium",
       "score": 54,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4645",
         "PAN-4646"
@@ -4533,7 +4536,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "size": "M",
       "importance": "medium",
       "score": 46,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4645"
       ],
@@ -9548,7 +9551,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "size": "M",
       "importance": "low",
       "score": 26,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4297",
         "PAN-4645"
@@ -11915,6 +11918,48 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "rationale": "New in-pipeline issue with a live workspace, so it is pinned near the top in the slot freed by the closed PAN-4672. It is a small, well-specified frontend change with clear component-test acceptance criteria.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4717",
+      "rank": 5,
+      "size": "S",
+      "importance": "high",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: conversation issue links may open an empty drawer for issues absent from the snapshot; CodeRabbit follow-up to #4716.",
+      "rationale": "New in-pipeline follow-up to PAN-4714 (merged as #4716) fixing an unreviewed CodeRabbit finding; pinned into a free top-tier slot next to its parent and not re-ranked.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4722",
+      "rank": 275,
+      "size": "S",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4654",
+        "PAN-4656"
+      ],
+      "why": "Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix instead. Follow-up to PAN-4654/4656.",
+      "rationale": "New issue: a correctness bug in in-pipeline PAN-4654's Update all for runtime installs from PAN-4656; ranked beside the fleet work it fixes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4723",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: flaky create-workspace-row test turned main red via an unmocked git call in a non-git temp dir; red main stalls merges",
+      "rationale": "New issue since the prior run, already in pipeline: a flaky unit test turned main CI red, and a red main empties the merge gate for every PR, so it takes the free rank-2 slot as critical substrate work.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13161,29 +13206,29 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "from": "PAN-4645",
       "to": "PAN-4656",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.85
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-4645",
       "to": "PAN-4650",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-4646",
       "to": "PAN-4650",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-4645",
       "to": "PAN-4654",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-4650",
@@ -13331,6 +13376,34 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-2356",
+      "to": "PAN-4656",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4714",
+      "to": "PAN-4717",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4654",
+      "to": "PAN-4722",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4656",
+      "to": "PAN-4722",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
     }
   ]
 }

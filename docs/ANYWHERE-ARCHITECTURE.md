@@ -28,14 +28,24 @@ step, each named in the output:
 
 | Step | What it asserts |
 | --- | --- |
+| `fake-clis` | fresh homes, each with a fake `HOME`, a fake npm prefix holding fake `claude` 2.1.0 and `codex` 0.150.0, and a fake `npm`; the servers run on a hard link to Node in `.tmp/anywhere-node/bin` (see below) |
 | `start` | both servers answer `GET /api/environment` within 90 s |
 | `proxy` | a byte-logging TCP proxy on a free loopback port fronts B |
 | `pair+link` | `pan pair --url http://127.0.0.1:<proxy> --json` on B, `pan machines link <url> --allow-loopback --json` on A; B holds the reverse link |
 | `online` | both `pan machines list --json` show the other online within 15 s, and A's current route is the proxy (the pairing route outranks B's advertised LAN routes by source order) |
+| `versions` | `pan machines versions --json` on A shows two rows with claude 2.1.0 and codex 0.150.0; unless each row lists exactly claude and codex with update commands inside `.tmp/anywhere-`, the script stops before Update all |
+| `update-all` | `pan machines update --json` on A; within 60 s both rows are `done` with claude `2.1.0 → 2.1.5` and codex `0.150.0 → 0.159.0`, Overdeck skipped (development install) |
 | `kill B` | after `SIGKILL`, A shows the link offline within 30 s |
 | `restart B` | A shows it online again within 60 s |
 | `no-http` | the proxy capture starts with the channel preamble byte `0x00` and contains no `HTTP/1.1` |
 | `stop` | both servers stopped; nothing outside `.tmp/anywhere-a|b` touched |
+
+The servers run with `HOME=<home>/fakehome`, `PATH=<home>/npm/bin:/usr/local/bin:/usr/bin:/bin`
+and no `SHELL`, because the harness-binary resolver also searches home directories and a
+login shell. They also run on a hard link to the Node binary in an otherwise empty
+directory: the dashboard puts its own Node's directory first on `PATH`
+(`src/dashboard/server/path-env.ts`), and an nvm or npm-global bin directory also holds
+the operator's real CLIs, which Update all would otherwise update.
 
 Exit 0 on success, exit 1 with `FAILED at step <name>: <why>` otherwise.
 `--inject-plain-http` sends one plain request through the proxy so the detector's
@@ -201,6 +211,11 @@ route that answers. States: `connecting`, `online`, `offline`, `unsupported`, `r
 - **Refusals**: refusal `01` on any route marks the link `revoked` (the peer no longer holds
   our token) and probing stops until `Reconnect`. A peer without `machineLinks` or with
   another link protocol is `unsupported` with the version to install.
+  `unsupportedInstall()` decides which version and where, for both the descriptor check
+  and handshake refusal `02`: the peer's version on this machine when the peer speaks a
+  newer link protocol, this machine's version on the peer otherwise. The state detail ends
+  with `npm install -g @overdeck/core@<version>` (`overdeckInstallCommand`), and
+  `status().unsupported` carries the structured value for the fleet table (PAN-4654).
 
 ## Machine credentials and fencing (D-4645-9, D-4645-10, FR-4)
 
@@ -311,6 +326,87 @@ machine opens events with sodium-native's `crypto_box_seal_open`
 trigger core (`deliverInboxEvent`; a Stripe signature is checked against `receivedAt`).
 2xx and terminal 4xx answers send `inbox-ack`; `503` and `429` send `inbox-nack`, re-sent after
 `max(retryAfter, 60 s)`. The Durable Object alarm deletes events after 24 hours.
+
+## Fleet versions and updates (PAN-4654)
+
+Each machine reports itself and runs its own update; the viewing machine keeps no fleet
+state (D-3).
+
+| Route | Scope | What it does |
+| --- | --- | --- |
+| `GET /api/versions/self` | `read:state` | This machine's report: Overdeck version, install mode, link protocol, one entry per installed harness CLI (by binary) with its version and update plan, and the current update job. `?refresh=1` bypasses the 60 s `--version` cache. |
+| `POST /api/versions/self/update` | `operate` | Start the update job (`202`), or with `mode: 'now'` escalate a waiting one (`200`); another start while a job is active is `409 update-in-progress`. |
+| `DELETE /api/versions/self/update` | `operate` | Cancel a waiting job (`200`), else `409 not-waiting`. |
+| `GET /api/machines/versions` | `admin` | The fleet table: this machine first, then each outbound link; online links are asked for their report in parallel, 2.5 s each. |
+| `POST /api/machines/update` | `admin` | Update all: one start (or cancel) request per online linked machine, then this machine last (D-12). |
+
+- **Fencing (D-10).** Through a channel, the update routes need a machine credential on an
+  operator-level link with the `operator` actor stamp; an agent stamp or an agent-fenced
+  link gets `403 fleet-update-forbidden`. Locally the mutation guard applies and a device or
+  token credential needs `admin`. The body carries only `mode`; every command comes from
+  the machine's own update plan (NFR-3). The fleet routes refuse any request through a
+  channel, and the update routes answer `409 not-primary` on a peer dashboard (D-14).
+- **Update plans** (`src/lib/fleet/harness-versions.ts`) read declared capability data
+  (`updateArgs`, `npmPackage` in `HarnessCapabilities`), never harness names. Windows never
+  runs; a binary under `<prefix>/lib/node_modules/<npmPackage>/` updates with that
+  prefix's npm; Homebrew is shown, not run; otherwise the declared `updateArgs`.
+- **The job** (`services/fleet-update-service.ts`) lives in `${OVERDECK_HOME}/fleet-update.json`,
+  written temp file + rename at every change (D-4). Phases: `waiting`, `updating`,
+  `restarting`, `done`, `failed`, `cancelled`. On boot a job left in `restarting` is
+  finished from the running Overdeck version (`updated`, or `failed` when the version did
+  not change); one left in `waiting` or `updating` is failed as interrupted.
+- **Turn wait (D-5).** When-idle waits for zero `working` entries in the live agent
+  directory, machine-wide, re-checking every 5 s. It never proceeds on its own; after 30
+  minutes the row says it is still waiting and points at Update now.
+- **Overdeck last (D-8, D-9).** On `npm-global` installs the job uses the dashboard's one
+  `UpdateManager` (`check()`, `install()`, poll), then restarts through
+  `restartDashboardDetached()`, the same function `POST /api/system/restart-dashboard`
+  uses, so it claims the restart gate and never waits on the approval banner. Development
+  and desktop installs skip the Overdeck component.
+- **Older peers (D-11).** There is no capability flag and no protocol bump: a `404` from
+  `GET /api/versions/self` means the peer predates fleet updates, and its row names the
+  version and command to install. In practice an older peer answers
+  `403 { error: 'insufficient_scope', missingScope: 'admin' }` instead, because its
+  remote request gate has no scope row for the path and refuses the machine credential
+  before routing; that answer is read the same way. A current peer never sends it for
+  these paths, since every machine token holds `read:state` and `operate`. Update all
+  treats only `403 fleet-update-forbidden` as an agent-fenced link.
+
+## pan connect (W-LINK9, FR-25)
+
+`pan connect` (`src/cli/commands/connect.ts`, registered lazily from `pair.ts`) turns a
+machine reached over SSH into a lasting linked machine: durable runtime, primary dashboard,
+service, lingering, then one pairing link (`.pan/drafts/PAN-4656.md`).
+
+- **D-1 The supervisor unit, no dashboard unit.** The service is the existing
+  `overdeck-supervisor.service`; its watchdog restarts the dashboard through the same
+  `pan restart --dashboard` path as every other restart. A `Restart=always` dashboard unit
+  would fight `pan restart`, `pan reload` and the watchdog for the port.
+- **D-2 `[Install]` always rendered, enabled only by `pan connect`.**
+  `renderSupervisorUnit()` ends with `[Install]\nWantedBy=default.target`, so `pan up`'s
+  re-render keeps the text stable. `pan up` never runs `systemctl --user enable`, so a
+  machine that never ran `pan connect` still does not start the supervisor at boot (PAN-2253).
+  `explainSystemdUserUnavailable()` (`src/lib/systemd.ts`) names why the user manager is
+  unusable; `systemdUserAvailable()` is that reason being null.
+- **D-3 Boot path.** Lingering starts the user manager at boot ⇒ the enabled supervisor unit
+  starts ⇒ the watchdog waits out its 5-minute boot grace ⇒ `pan restart --dashboard`
+  starts the dashboard. The dashboard answers within about 6 minutes of boot.
+- **D-4 Durable runtime.** Under npx, `ensureDurableRuntime()`
+  (`src/lib/anywhere/connect-runtime.ts`) runs `npm install --prefix <home>/runtime` of the
+  exact running version (never `--global`, which needs sudo on a system Node).
+- **D-5 Re-exec.** `pan connect` then re-runs itself from the runtime with
+  `OVERDECK_CONNECT_REEXEC=1`, so the unit's `ExecStart`, its `WorkingDirectory`, the
+  dashboard bundle and the primary identity all point into the runtime and the watchdog
+  never sees the dashboard as foreign. A process with that variable never re-execs.
+- **D-8 PATH for the user manager.** `persistUserManagerPath()`
+  (`src/lib/systemd-user-session.ts`) writes `~/.config/environment.d/60-overdeck.conf`
+  and runs `systemctl --user set-environment PATH=…` before the unit starts, minus any
+  `/git-guard` shim directory. The unit itself carries no `PATH`, because `pan up`
+  re-renders it from whatever shell runs it.
+- **D-10 macOS.** `src/lib/launchd.ts` writes `~/Library/LaunchAgents/ai.overdeck.supervisor.plist`
+  (`RunAtLoad`, `KeepAlive`) and bootstraps it into `gui/<uid>`, falling back to
+  `user/<uid>`; a changed plist is booted out first. The agent starts at login only. `pan up`
+  on a Mac with the agent loaded does not start a second supervisor.
 
 ## Decisions added by sibling issues
 

@@ -1,6 +1,6 @@
 ---
 title: pan machines
-description: Link this machine's dashboard to another machine, list the links, or remove one
+description: Link this machine's dashboard to another machine, list or remove the links, see or update versions on every machine, or turn a server into a lasting linked machine
 ---
 
 # `pan machines`
@@ -11,6 +11,8 @@ See [Linked machines](/configuration/linked-machines).
 
 Every verb talks to the running dashboard with this machine's internal token, so the
 dashboard must be up (`pan up`); without one it prints the not-running message and exits 1.
+[`pan connect`](#connect) is the exception: it starts the dashboard itself, on the machine
+you want to link to.
 
 ## link
 
@@ -160,3 +162,225 @@ exist keep working over their other routes.
 ```
 Removed vps from the directory.
 ```
+
+## versions
+
+```bash
+pan machines versions [--json]
+```
+
+Shows the Overdeck version and the version of each installed harness CLI on every
+machine: this machine first, then each linked machine. A linked machine that is not
+`online` shows its last known Overdeck version and no CLI versions.
+
+```
+MACHINE  STATE         OVERDECK  CLAUDE         CODEX               KIMI   UPDATE
+studio   this machine  0.73.0    2.1.0 → 2.1.5  0.150.0 → 0.159.0   2.0.2  done
+desk     online        0.73.0    2.1.293        0.159.0             -      waiting (2 turns)
+attic    unsupported   0.71.0    -              -                   -      -
+
+attic: install Overdeck 0.73.0 on attic: npm install -g @overdeck/core@0.73.0
+```
+
+There is one column per harness CLI found on any machine. While an update job has
+changed a version, the cell shows `before → after`. The UPDATE cell shows the machine's
+update job: `waiting (N turns)` while it waits for running turns to end (after 30
+minutes, `waiting (N turns, M min: use --now)`), then `updating`, `restarting`, `done`,
+`failed: <component>` or `cancelled`. After the table, each machine that needs another
+Overdeck version gets one line with the exact install command.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Print `{ rows }` as JSON. |
+
+Exit codes: 0 when the table printed; 1 when the dashboard is not running or refused the request.
+
+## update
+
+```bash
+pan machines update [--now] [--machine <label>]... [--cancel] [--json]
+```
+
+Starts **Update all**: each online machine updates its installed harness CLIs (Claude
+Code, Codex CLI, Kimi Code CLI, OpenCode) with their own update commands, then updates
+Overdeck itself on an `npm install -g` install and restarts its dashboard. By default each
+machine waits until no turn is running there. A development checkout or the desktop app
+keeps its Overdeck and still updates the CLIs. Offline, connecting, unsupported and
+revoked machines are skipped with the reason, and so is a machine whose link is
+agent-fenced: Update all needs an operator-level link.
+
+```
+Started on desk (when-idle)
+Started on studio (when-idle)
+Skipped attic: attic is unsupported: Install Overdeck 0.73.0 on attic: npm install -g @overdeck/core@0.73.0
+Run `pan machines versions` to follow the update.
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--now` | Do not wait for running turns to end. On a machine already waiting, this starts its update at once. |
+| `--machine <label>` | Only this machine; repeat for more. An unknown label prints `No machine named <label>` and exits 1. |
+| `--cancel` | Cancel waiting updates (on every machine, or on the `--machine` ones). |
+| `--json` | Print `{ started, skipped }` as JSON. |
+
+Exit codes: 0 when the request went out, even if some machines were skipped; 1 when the
+dashboard is not running, refused the request, or a `--machine` label is unknown.
+
+## connect
+
+```bash
+pan connect [--url <base>] [--label <name>] [--json]
+npx @overdeck/core connect [--url <base>] [--label <name>] [--json]
+```
+
+Turns the machine you run it on (typically a fresh server you reached over SSH) into a
+lasting linked machine. It installs the Overdeck server as a service that survives logout
+and reboot, starts it, and prints one link. You paste that link into
+`pan machines link` on the machine that should reach this one. Run it from your normal
+login shell: it saves that shell's `PATH` for the service, so agents started later find
+`node` and the harness CLIs. Linux and macOS only; on Windows it exits 1 and asks you to
+run it inside WSL.
+
+| Flag | Effect |
+| --- | --- |
+| `--url <base>` | Address the other machine reaches this one at, such as `https://box.example.com`. Default: picked automatically (see below). |
+| `--label <name>` | Name recorded for the pairing in the activity log. |
+| `--json` | Print the result as one JSON object: `url`, `credential`, `expiresAt`, `base`, `service`, `linger`, `runtime`, `replacedRepoRoot`. Never waits for input. |
+
+What it does, in order:
+
+1. **Installs a durable copy under npx.** `npx` runs from a cache that npm may delete at any
+   time, so `npx @overdeck/core connect` first installs the same version into
+   `~/.overdeck/runtime` (`npm install --prefix`, no `sudo`) and runs itself again from there.
+   Every path the service uses points into that copy. A machine that already has that version
+   skips the install.
+2. **Starts the dashboard.** A dashboard already running from this install is left alone.
+   Otherwise it starts one and waits up to two minutes for it. If a dashboard from another
+   checkout held the port, it is replaced and the output says so.
+3. **Installs the service.** On Linux, the systemd user unit `overdeck-supervisor.service`:
+   installed, enabled at boot, and started. On macOS, the launch agent
+   `ai.overdeck.supervisor`. The service runs the supervisor, whose watchdog starts the
+   dashboard again whenever it is down.
+4. **Turns lingering on (Linux).** See below.
+5. **Prints the link.** The link is printed last because it expires 10 minutes after it is
+   created.
+
+```
+Overdeck server: user service overdeck-supervisor.service, enabled at boot.
+Lingering is on for alice, so the server keeps running after you log out and starts at boot.
+
+Link this machine from another machine within 10 minutes, before this machine restarts:
+
+  pan machines link 'http://203.0.113.7:3011/#pair=odp_…'
+
+or paste the link into Settings → Anywhere → Machines → Link a machine.
+Expires: 2026-11-01T14:10:00.000Z (single use)
+The other machine must reach 203.0.113.7:3011. If a firewall blocks it, open that port or set up Tailscale with `pan tailscale setup`, then run pan connect again.
+Run Overdeck commands on this machine with: /home/alice/.overdeck/runtime/node_modules/.bin/pan
+```
+
+The last line appears only after an `npx` run. The link works once and is held in the
+dashboard's memory, so a restart of this machine before you use it drops it; run
+`pan connect` again for a fresh one. Running `pan connect` again on a connected machine is
+safe: it installs nothing twice, leaves the running dashboard alone, and prints a new link.
+
+### Lingering (Linux)
+
+Without lingering, systemd stops every user service when you log out and starts them again
+only when you log in, so the server would not come back after a reboot. `pan connect` turns
+lingering on with `loginctl enable-linger`. When that needs a password, it prints the
+command to run in another terminal:
+
+```
+Lingering is off for alice. Run this in another terminal on this machine:
+  sudo loginctl enable-linger alice
+Waiting for lingering to turn on… (press Enter to continue without it)
+```
+
+It waits (checking every 2 seconds) until lingering is on, then carries on. Press Enter to
+continue without it. Without a terminal, or with `--json`, it does not wait. Continuing
+without lingering is not an error, and the output says what it means:
+
+```
+Lingering is off for alice, so the server stops when you log out and starts again only when you log in. Turn it on with: sudo loginctl enable-linger alice
+```
+
+### macOS
+
+The launch agent `~/Library/LaunchAgents/ai.overdeck.supervisor.plist` starts when you log
+in. macOS has no lingering for user agents, so a Mac that must come back after a reboot
+with nobody logged in needs automatic login (**System Settings → Users & Groups**).
+
+### No systemd
+
+In a container, without `XDG_RUNTIME_DIR` (for example after `su` instead of logging in over
+SSH as that user), or wherever `systemctl --user` does not work, `pan connect` runs the
+supervisor as a plain process and says why:
+
+```
+No systemd user manager is available here (this is a container), so the server runs as a plain process: it stops when you log out and does not start after a reboot.
+```
+
+The same fallback applies when `OVERDECK_HOME` is not `~/.overdeck`, unless you set
+`OVERDECK_SUPERVISOR_UNIT=1`.
+
+### Which address the link uses
+
+The first match wins:
+
+1. `--url`, exactly as given.
+2. This machine's Tailscale address (`100.64.0.0/10`).
+3. The address you reached this machine at over SSH (from `SSH_CONNECTION`), unless it is
+   a loopback address.
+4. Another address on a real network interface (container bridges are skipped), public
+   addresses before private ones.
+5. `localhost`, with the `pan pair` warning that the link only works on this machine.
+
+Unless the address is a Tailscale address, the output names the host and port the other
+machine must reach. If a firewall blocks that port, open it or set up Tailscale with
+`pan tailscale setup`, then run `pan connect` again.
+
+### After a reboot
+
+On a Linux machine with lingering on, systemd starts the supervisor at boot. The watchdog
+waits out its 5-minute boot grace and then starts the dashboard, so the dashboard answers
+within about 6 minutes. A linked machine retries with a back-off of up to 5 minutes, so it
+shows this machine **online** again within about 15 minutes. If Traefik is enabled here,
+the output adds that Traefik and CLIProxy wait for `pan up` after a reboot.
+
+### Updating and removing
+
+Update a machine connected with npx by running the newest version:
+
+```bash
+npx @overdeck/core@latest connect
+```
+
+It installs that version into `~/.overdeck/runtime` and rewrites the service. To remove
+the service:
+
+```bash
+# Linux
+systemctl --user disable --now overdeck-supervisor.service
+sudo loginctl disable-linger <user>
+
+# macOS
+launchctl bootout gui/$(id -u)/ai.overdeck.supervisor
+rm ~/Library/LaunchAgents/ai.overdeck.supervisor.plist
+```
+
+`pan connect` installs only the Overdeck server. Agents on that machine still need the
+harness CLIs and Herdr: run `~/.overdeck/runtime/node_modules/.bin/pan install` there.
+
+### Troubleshooting
+
+The watchdog stops restarting the dashboard after three failed restarts in a row, and it
+remembers that across supervisor restarts (and so across reboots). If the dashboard is
+still down after a reboot, start it by hand:
+
+```bash
+~/.overdeck/runtime/node_modules/.bin/pan restart --dashboard --now
+```
+
+Do not use `pan up` for this on a server: it expects the full host setup from `pan install`
+(terminal backend and sidecars), which a fresh server may not have.

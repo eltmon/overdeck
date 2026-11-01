@@ -410,7 +410,7 @@ function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: 
         !/^(javascript|data|vbscript):/i.test(href.trim())
           ? href
           : undefined;
-      // PAN-3822: a PR/MR URL inside a conversation gets a link/unlink context menu.
+      // PAN-3822 / PAN-4714: inside a conversation, PR/MR URLs get a link/unlink menu and issue URLs open the issue drawer.
       return <TranscriptLink href={safeHref} className={styles.mdLink}>{children}</TranscriptLink>;
     },
   };

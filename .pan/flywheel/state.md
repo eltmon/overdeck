@@ -441,3 +441,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   `ps -eo pid,args | grep "[p]an reload"`: `pgrep -f "pan reload"` inside a
   `for … kill` also matches the shell running it and kills that shell
   (exit 144, 2026-11-01).
+- 2026-11-01 13:06 UTC: PAN-4645 (Anywhere foundation) merged (#4715). Launched
+  `pan start --plan auto` for PAN-4650, PAN-2356, PAN-4404, PAN-4654, PAN-4656.
+  Still gated: PAN-4651 (4650), PAN-4652 (4650), PAN-4296 (4652), PAN-4638
+  (4651, 4652). Every other Anywhere prerequisite (4330, 4648, 4628, 4649, 4295)
+  is merged. Watch the five hand-offs for PAN-4710 give-ups.

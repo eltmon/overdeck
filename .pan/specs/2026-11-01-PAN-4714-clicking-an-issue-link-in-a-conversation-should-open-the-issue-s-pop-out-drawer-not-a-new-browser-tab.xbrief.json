@@ -1,0 +1,429 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T12:23:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4714: Clicking an issue link in a conversation should open the issue's pop-out drawer, not a new browser tab",
+    "updated": "2026-11-01T12:30:26.065Z"
+  },
+  "plan": {
+    "id": "pan-4714",
+    "title": "Clicking an issue link in a conversation should open the issue's pop-out drawer, not a new browser tab",
+    "status": "running",
+    "uid": "268fc80d-5691-4591-a7a1-44b57720fb67",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T12:23:52Z",
+    "updated": "2026-11-01T12:30:26.065Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4714",
+        "label": "PAN-4714",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4714.md",
+        "label": "PRD draft",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "conversations",
+      "issue-drawer",
+      "contracts"
+    ],
+    "narratives": {
+      "Problem": "Conversation transcripts render issue references as tracker links (e.g. [PAN-4645](https://github.com/eltmon/overdeck/issues/4645)). TranscriptLink renders every link as <a target=_blank>, so a click opens GitHub in a new tab and the operator loses their place in the conversation.",
+      "Proposal": "Add a pure tracker-issue URL parser and resolver to @overdeck/contracts (parseTrackerIssueUrl / resolveTrackerIssueId) beside parsePullRequestRef. Expose each project's tracker type on GET /api/registered-projects via the existing tryResolveProjectTrackerType. Inside a conversation (ConversationPullRequestContext present), TranscriptLink delegates non-PR tracker issue URLs to a new TranscriptIssueLink that resolves the issue ID against the cached ['registered-projects'] query; a plain left click calls openIssue(id, 'overview') and prevents navigation, while modified clicks, middle-click and the context menu keep the new-tab default. Unresolvable links, PR links and links outside a conversation are unchanged. Full detail: .pan/drafts/PAN-4714.md.",
+      "NonGoals": "- Issue links outside a conversation transcript (PrdViewer, PlanApprovalDialog, SessionPanel raw ChatMarkdown, AgentSection, ReviewSummary, DiscussionsTab, MarkdownTab, MessagesTimeline hosts that bypass ConversationPanel) must keep opening a new tab.\n- No GitLab, Rally, GitHub Enterprise or www.github.com issue URL support.\n- No issue_prefixes (multi-prefix) resolution; only issue_prefix.\n- Bare issue IDs in plain text must not become links.\n- No hardcoded prefix-to-repo table may be added (do not extend GITHUB_REPO_BY_PREFIX in lib/issueLinks.ts).\n- Do not fix the stale KRUX entry in lib/issueLinks.ts in this issue.\n- Do not refactor the existing inline ['registered-projects'] useQuery calls into a shared hook.\n- Do not change PR/MR link behaviour (PAN-3822 menu and new-tab click).\n- Do not edit the OKF knowledge bundle (separate repo)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Drawer-open behaviour applies only inside conversation transcripts (ConversationPullRequestContext present).",
+        "rationale": "The issue scopes the change to conversations, and ChatMarkdown also renders in PrdViewer (z-110) and PlanApprovalDialog (z-100) where a drawer (z-100) would open hidden behind the modal."
+      },
+      {
+        "summary": "Parser and resolver live in @overdeck/contracts (packages/contracts/src/tracker-issue-ref.ts) beside parsePullRequestRef.",
+        "rationale": "Mirrors PAN-3822's placement, stays pure and unit-testable, and avoids importing src/lib/issue-id.ts (contains require('node:fs')) into the browser."
+      },
+      {
+        "summary": "Add a tracker field to GET /api/registered-projects using tryResolveProjectTrackerType; GitHub URLs map only for tracker === 'github' projects, Linear URLs only for tracker === 'linear' projects with the matching prefix.",
+        "rationale": "lexerra has tracker: linear plus github_repo; without the tracker type a GitHub issue URL would map to the wrong LEX-<n> issue. Reusing the existing resolver avoids a new rule table."
+      },
+      {
+        "summary": "Projects without issue_prefix do not resolve; their links keep the new-tab behaviour.",
+        "rationale": "linearTeam is null for them (papers-please, orca) and there is no reliable issue ID to open."
+      },
+      {
+        "summary": "Only a plain left click (button 0, no Ctrl/Meta/Shift/Alt, not defaultPrevented) is intercepted; href/target/rel stay on the anchor.",
+        "rationale": "Keeps Ctrl/Cmd-click, Shift-click, middle-click (auxclick) and the context menu as browser defaults, as the issue requires."
+      },
+      {
+        "summary": "A click on the open drawer's own issue switches it to the overview tab; no special case.",
+        "rationale": "Follows directly from openIssue(id, 'overview'), matches the issue's AC literally, and keeps the code simple."
+      },
+      {
+        "summary": "The Playwright check is a UAT checkpoint with a PR screenshot, not a committed e2e spec.",
+        "rationale": "The existing e2e harness needs ~200 lines of Vite and WS mocks to show a conversation; the issue asks only for a Playwright check with a screenshot in the PR."
+      },
+      {
+        "summary": "Also add the existing ChatMarkdown.pull-request-links.test.tsx to the CI frontend test subset.",
+        "rationale": "The TranscriptLink change can regress PAN-3822 behaviour, and that test is not in the subset today."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Five small items across contracts, one server route, the chat link component and docs; 12 files total.",
+      "canonicalFilename": "2026-11-01-PAN-4714-clicking-an-issue-link-in-a-conversation-should-open-the-issue-s-pop-out-drawer-not-a-new-browser-tab.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "contracts-tracker-issue-ref",
+        "title": "Add parseTrackerIssueUrl and resolveTrackerIssueId to @overdeck/contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T12:23:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4714",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "transcript-issue-link"
+          ],
+          "files_scope": [
+            "packages/contracts/src/tracker-issue-ref.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/tracker-issue-ref.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/contracts && npx vitest run --configLoader runner --config vitest.config.ts src/__tests__/tracker-issue-ref.test.ts",
+            "cd packages/contracts && npx tsc --noEmit -p ."
+          ],
+          "expected_outputs": [
+            "tracker-issue-ref.test.ts passes all 7 named cases",
+            "contracts typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. Create packages/contracts/src/tracker-issue-ref.ts exporting TrackerIssueUrlRef, TrackerIssueProject, parseTrackerIssueUrl(input) and resolveTrackerIssueId(ref, projects) with the code given in the PRD. GitHub URLs must have host github.com and path <owner>/<repo>/issues/<n> (n > 0, safe integer; tails like /, ?x and #issuecomment-1 allowed); repository is lower-cased. Linear URLs are linear.app/<ws>/issue/<KEY-n>[/slug]; identifier is upper-cased. resolveTrackerIssueId returns <PREFIX>-<n> for the first project with tracker === 'github', a non-empty linearTeam and githubRepo equal (case-insensitive) to the repository; for Linear it returns the identifier when a project with tracker === 'linear' has linearTeam equal to the identifier's prefix; otherwise null. It must tolerate null/junk rows. Export the module from packages/contracts/src/index.ts right after the pull-request-ref export. Write the 7 named test cases listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "contracts-tracker-issue-ref.ac1",
+            "title": "Given https://github.com/Eltmon/Overdeck/issues/4645 and the same URL with #issuecomment-9, parseTrackerIssueUrl returns { tracker: 'github', repository: 'eltmon/overdeck', number: 4645 }; given https://linear.app/mindyournow/issue/min-663/some-title it returns { tracker: 'linear', identifier: 'MIN-663' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-tracker-issue-ref.ac2",
+            "title": "parseTrackerIssueUrl returns null for a /pull/42 URL, a bare /issues list, /issues/new, /issues/0 and https://gitlab.com/a/b/-/issues/3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-tracker-issue-ref.ac3",
+            "title": "resolveTrackerIssueId returns 'PAN-4645' for eltmon/overdeck #4645 with a { linearTeam: 'PAN', githubRepo: 'eltmon/overdeck', tracker: 'github' } project, and returns null for eltmon/lexerra #1 when that project has tracker: 'linear'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-tracker-issue-ref.ac4",
+            "title": "resolveTrackerIssueId returns 'MIN-663' through a { linearTeam: 'MIN', tracker: 'linear' } project, returns null for XYZ-1, and returns null without throwing for a project with linearTeam null and for a null row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "registered-projects-tracker-field",
+        "title": "Return a tracker field from GET /api/registered-projects",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T12:23:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4714",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/meta.ts",
+            "tests/unit/dashboard/routes/registered-projects-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/routes/registered-projects-route.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "registered-projects-route.test.ts passes with tracker values github, null and linear",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In src/dashboard/server/routes/misc/meta.ts import tryResolveProjectTrackerType from '../../../../lib/project-tracker-type.js' and add `tracker: tryResolveProjectTrackerType(p.config),` after the githubRepo field in the GET /api/registered-projects row mapper. Do not remove or rename any existing field. Update tests/unit/dashboard/routes/registered-projects-route.test.ts: expect tracker 'github' on the queryable fixture and null on unqueryable, add a third fixture { key: 'linear-with-repo', config: { name: 'Linear With Repo', path: '/lwr', issue_prefix: 'LWR', tracker: 'linear', github_repo: 'owner/lwr' } } expecting tracker 'linear', and rename the test to 'adds membershipQueryable and tracker without removing existing project fields'. No no-loss-matrix change: the route already has a row."
+        },
+        "items": [
+          {
+            "id": "registered-projects-tracker-field.ac1",
+            "title": "GET /api/registered-projects returns tracker 'github' for a project with issue_prefix and github_repo, null for a project with neither, and 'linear' for a project with tracker: linear plus github_repo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registered-projects-tracker-field.ac2",
+            "title": "The route response preserves every pre-existing row field (key, name, path, linearTeam, membershipQueryable, githubRepo, linearProject) with unchanged values in the route test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcript-issue-link",
+        "title": "Open the issue drawer from a tracker issue link in a conversation transcript",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T12:23:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4714",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/TranscriptIssueLink.tsx",
+            "src/dashboard/frontend/src/components/chat/TranscriptPullRequestLink.tsx",
+            "src/dashboard/frontend/src/components/chat/ChatMarkdown.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx src/components/chat/__tests__/ChatMarkdown.test.tsx",
+            "cd src/dashboard/frontend && npx tsc --noEmit",
+            "node scripts/run-frontend-test-subset.mjs --dry-run"
+          ],
+          "expected_outputs": [
+            "ChatMarkdown.issue-links.test.tsx passes its 5 named cases; the pull-request-links and ChatMarkdown tests still pass",
+            "frontend tsc completes without errors",
+            "the dry run lists ChatMarkdown.issue-links.test.tsx and ChatMarkdown.pull-request-links.test.tsx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly. Create components/chat/TranscriptIssueLink.tsx (code in the PRD): it reads the shared ['registered-projects'] query (staleTime 60_000, throws on !res.ok), treats non-array data as no projects, resolves the issue ID with resolveTrackerIssueId, renders <a href target=_blank rel='noopener noreferrer' className data-issue-id={issueId}> and, on a plain click only (button 0, no ctrl/meta/shift/alt, not defaultPrevented, issueId resolved), calls preventDefault() then openIssue(issueId, 'overview'). In TranscriptPullRequestLink.tsx, make TranscriptLink compute issueRef = context && href && !prRef ? parseTrackerIssueUrl(href) : null and return <TranscriptIssueLink> when issueRef is set; leave the PR path unchanged; update the file header comment to describe both behaviours (PAN-4714). In ChatMarkdown.tsx change only the comment on line 413 to mention PAN-4714. Write components/chat/__tests__/ChatMarkdown.issue-links.test.tsx with the 5 named cases in the PRD (stub fetch for /api/registered-projects, replace openIssue via useDashboardStore.setState and restore it in afterEach, stub window.open with vi.spyOn(window, 'open').mockReturnValue(null) and restore it in afterEach (happy-dom's anchor dispatchEvent calls window.open(href, target, features) for every click that is not default-prevented, so that call is the evidence of default navigation), waitFor data-issue-id before clicking). Add ChatMarkdown.issue-links.test.tsx and ChatMarkdown.pull-request-links.test.tsx to scripts/frontend-test-subset.txt in sorted position. Fallback: if vi.spyOn(window, 'open') does not intercept happy-dom's internal window.open call, keep the fireEvent.click return-value and openIssue assertions and drop only the window.open expectation."
+        },
+        "items": [
+          {
+            "id": "transcript-issue-link.ac1",
+            "title": "Given [PAN-4645](https://github.com/eltmon/overdeck/issues/4645) rendered by ChatMarkdown inside ConversationPullRequestProvider with registered projects loaded, a plain fireEvent.click returns false, calls openIssue once with ('PAN-4645', 'overview'), and window.open is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-issue-link.ac2",
+            "title": "When the same link is Ctrl-clicked or Cmd-clicked, fireEvent.click returns true, openIssue is not called, and the stubbed window.open receives the tracker URL and '_blank' (happy-dom's default anchor navigation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-issue-link.ac3",
+            "title": "Given an issue URL for an unregistered repo, a GitHub issue URL for a linear-tracked project, or the PAN-4645 link rendered outside a conversation, the anchor has no data-issue-id attribute, fireEvent.click returns true, the stubbed window.open receives that URL and '_blank', and openIssue is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-issue-link.ac4",
+            "title": "A PR URL (https://github.com/eltmon/overdeck/pull/42) inside a conversation still renders the 'Link to conversation' context menu on right-click and returns true from a plain fireEvent.click without calling openIssue; the existing ChatMarkdown.pull-request-links.test.tsx passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-issue-link.ac5",
+            "title": "scripts/frontend-test-subset.txt lists ChatMarkdown.issue-links.test.tsx and ChatMarkdown.pull-request-links.test.tsx in sorted position, and node scripts/run-frontend-test-subset.mjs --dry-run prints both paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-issue-drawer-screenshot",
+        "title": "Browser check: clicking an issue link in a live conversation opens the drawer (screenshot on PR)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T12:23:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4714",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".tmp/pan-4714-issue-drawer.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd packages/contracts && npm run build",
+            "test -s .tmp/pan-4714-issue-drawer.png"
+          ],
+          "expected_outputs": [
+            "contracts build completes and dist exports parseTrackerIssueUrl",
+            "the screenshot file exists and is non-empty, showing [data-testid=issue-drawer] open after clicking a[data-issue-id]"
+          ],
+          "readiness": "sequential",
+          "acJustification": "One observable outcome (the drawer screenshot) plus its isolation constraint; a third AC would restate the component tests.",
+          "traces": [
+            "FR-1",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implementation checkpoint, PRD WI-4. Build contracts (cd packages/contracts && npm run build), start the workspace frontend in the background with `cd src/dashboard/frontend && npx vite --port 3110 --strictPort` (proxies /api and /ws to the live dashboard at 127.0.0.1:3011). In a fresh, isolated Playwright browser (chromium.launch + newContext; never a shared profile or another agent's session), if /api/registered-projects lacks a tracker field, intercept it with page.route and add tracker per row ('github' when githubRepo, else 'linear' when linearTeam). Open a /conv/<id> whose transcript contains a https://github.com/eltmon/overdeck/issues/<n> link, click a[data-issue-id], assert [data-testid=issue-drawer] is visible with that issue ID in its header, save .tmp/pan-4714-issue-drawer.png (gitignored), and attach the screenshot plus the commands used to the PR description. Stop the Vite server afterwards. Fallback: if the dev server cannot start, record the exact error in the PR description and leave these steps to the test role's UAT."
+        },
+        "items": [
+          {
+            "id": "uat-issue-drawer-screenshot.ac1",
+            "title": "Given a live conversation containing a PAN issue link, when the link is clicked in an isolated Playwright browser, then [data-testid=issue-drawer] renders with that issue ID in its header and the PR description includes the screenshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-issue-drawer-screenshot.ac2",
+            "title": "The browser check opens its own chromium.launch() context, and the PR description contains the exact commands used (or, on fallback, the exact dev-server error)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-issue-links",
+        "title": "Document conversation issue-link clicks in conversations.mdx and DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T12:23:52Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4714",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"PAN-4714\" docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n -i \"issue's drawer\\|issue drawer\" features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "DASHBOARD-ARCHITECTURE.md prints a PAN-4714 bullet naming TranscriptIssueLink",
+            "conversations.mdx prints the new issue-link paragraph"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. In features/conversations.mdx, after the paragraph beginning 'In a transcript, right-click a pull request or merge request link' (line ~614), add a short paragraph (optionally under a '### Issue links' heading) saying: clicking an issue link in a conversation transcript (a GitHub issue of a registered project, or a Linear issue whose prefix belongs to a registered project) opens that issue's drawer in the dashboard; Ctrl/Cmd-click, middle-click or the browser's right-click menu still open the tracker in a new tab; links to issues Overdeck doesn't track stay plain links. In docs/DASHBOARD-ARCHITECTURE.md, after the 'Pull requests on conversations (PAN-3822)' bullet (line ~393), add the PAN-4714 bullet text given in the PRD, naming TranscriptLink, TranscriptIssueLink, parseTrackerIssueUrl/resolveTrackerIssueId, /api/registered-projects and its tracker field from tryResolveProjectTrackerType, and openIssue(id, 'overview')."
+        },
+        "items": [
+          {
+            "id": "docs-issue-links.ac1",
+            "title": "features/conversations.mdx states that a plain click on a tracked issue link in a conversation opens the issue drawer, and that Ctrl/Cmd-click, middle-click and the right-click menu still open the tracker in a new tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-issue-links.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md renders a PAN-4714 bullet after the PAN-3822 bullet that names TranscriptIssueLink, parseTrackerIssueUrl/resolveTrackerIssueId, the registered-projects tracker field, and openIssue(id, 'overview')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-tracker-issue-ref",
+        "to": "transcript-issue-link",
+        "type": "blocks"
+      },
+      {
+        "from": "transcript-issue-link",
+        "to": "uat-issue-drawer-screenshot",
+        "type": "blocks"
+      },
+      {
+        "from": "registered-projects-tracker-field",
+        "to": "uat-issue-drawer-screenshot",
+        "type": "informs"
+      },
+      {
+        "from": "contracts-tracker-issue-ref",
+        "to": "uat-issue-drawer-screenshot",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
