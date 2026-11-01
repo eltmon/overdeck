@@ -1,3 +1,5 @@
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -85,6 +87,7 @@ import { LinearClient } from '../../services/linear-client.js';
 import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
 import { _resetDashboardSessionTokenForTests } from '../dashboard-auth.js';
 import { _resetTrustedOriginsForTests } from '../origin-validation.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 
 function eventStoreLayerFor(appendedEvents: Record<string, unknown>[]) {
   return Layer.succeed(EventStoreService, {
@@ -159,6 +162,9 @@ describe('POST /api/issues/:id/reopen', () => {
     vi.clearAllMocks();
     process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
     delete process.env.OVERDECK_TRUSTED_ORIGINS;
+    // The token file wins over env (PAN-4628); delete any file a sibling
+    // test in this worker's shared OVERDECK_HOME left behind.
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
     _resetTrustedOriginsForTests();

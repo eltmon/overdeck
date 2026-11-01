@@ -1,8 +1,11 @@
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { validateAgentDeliveryMethodOrigin, validateAgentMessageOrigin, validateAgentRuntimeEventAuth } from '../agents.js';
 import { _resetTrustedOriginsForTests } from '../origin-validation.js';
 import { validateSpecialistAutoCompleteMetadata } from '../specialists.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 
 describe('agent mutation origin validation', () => {
   beforeEach(() => {
@@ -10,6 +13,9 @@ describe('agent mutation origin validation', () => {
     process.env.PORT = '3011';
     delete process.env.DASHBOARD_URL;
     delete process.env.OVERDECK_INTERNAL_TOKEN;
+    // The token file wins over env (PAN-4628); delete any file a sibling
+    // test in this worker's shared OVERDECK_HOME left behind.
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetTrustedOriginsForTests();
   });
 

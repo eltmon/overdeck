@@ -1,3 +1,5 @@
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +11,7 @@ import {
   dashboardSessionCookieHeader,
 } from '../dashboard-auth.js';
 import { uatStackActionRouteLayer } from '../workspaces/uat-stack-actions.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 
 const childProcess = vi.hoisted(() => ({
   spawn: vi.fn(),
@@ -53,6 +56,7 @@ describe('UAT stack action route auth', () => {
   beforeEach(() => {
     process.env.OVERDECK_INTERNAL_TOKEN = 'test-dashboard-token';
     process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
     childProcess.spawn.mockReset();
