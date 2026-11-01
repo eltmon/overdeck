@@ -15,7 +15,9 @@
  * This module imports only the registry so `remote-request-gate.ts` and
  * `dashboard-auth.ts` can both import it without an import cycle.
  */
-import type { AccessTokenScope } from '../../lib/access-tokens.js';
+import { PanRpcGroup } from '@overdeck/contracts';
+
+import { scopeSatisfies, type AccessTokenScope } from '../../lib/access-tokens.js';
 
 export interface RouteScope {
   method: string;
@@ -58,10 +60,38 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/palette/search', scope: 'read:conversations' },
   { method: 'POST', path: '/api/conversations', scope: 'operate' },
   { method: 'POST', path: '/api/workers', scope: 'operate' },
+  // PAN-4645 WI-5: the operate surfaces a linked machine (and any token with
+  // operate) may drive; the approval routes take `approve` (PAN-4649, above).
+  { method: 'POST', path: '/api/conversations/:name/stop', scope: 'operate' },
+  { method: 'POST', path: '/api/conversations/:name/abort', scope: 'operate' },
+  { method: 'POST', path: '/api/lanes', scope: 'operate' },
+  // PAN-4645 WI-13: a linked machine revokes its own token (the route then
+  // requires exactly a machine credential).
+  { method: 'DELETE', path: '/api/machines/self', scope: 'read:state' },
+  // PAN-4645 WI-18: the heartbeat stream a linked machine holds open.
+  { method: 'GET', path: '/api/machines/heartbeat', scope: 'read:state' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */
 export const WS_TERMINAL_SCOPE: AccessTokenScope = 'operate';
+
+/**
+ * `/ws/rpc` methods a non-admin credential may call, by RPC tag (PAN-4645
+ * D-4645-14). Any method absent here needs `admin`. The upgrade itself needs
+ * one of `WS_RPC_UPGRADE_SCOPES`.
+ */
+export const RPC_METHOD_SCOPES: Readonly<Record<string, AccessTokenScope>> = {
+  'pan.subscribeConversationMessages': 'read:conversations',
+  'pan.subscribeDomainEvents': 'read:events',
+};
+export const WS_RPC_UPGRADE_SCOPES: ReadonlyArray<AccessTokenScope> = ['read:events', 'read:conversations'];
+
+/** The RPC tags of `PanRpcGroup` that `scopes` may call, sorted. `admin` allows every tag. */
+export function allowedRpcTags(scopes: readonly string[]): string[] {
+  return [...PanRpcGroup.requests.keys()]
+    .filter((tag) => scopeSatisfies(scopes, RPC_METHOD_SCOPES[tag] ?? 'admin'))
+    .sort();
+}
 
 /**
  * The request path as the gate judges it. The router matches loosely (a

@@ -44,6 +44,7 @@ import { initDeployProgress } from './services/deploy-progress.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { ensureInternalToken } from '../../lib/internal-token.js';
 import { refreshAccessTokens, startAccessTokenRefresh } from '../../lib/access-tokens.js';
+import { registerRevocationClosers } from './ws-rpc-auth.js';
 import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
 import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
@@ -98,8 +99,10 @@ import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { startProjectCiRefillAfterProjectionReady } from './services/project-ci-refill-startup.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive, dropPipelineStateMirrorTables, dropDeadIssuesForeignKeys } from '../../lib/overdeck/infra.js';
+import { bootConversationEnvironmentOrWarn } from '../../lib/overdeck/conversation-environment.js';
+import { startAnywhere } from './services/anywhere-boot.js';
 import { startServerBootTelemetry } from './telemetry.js';
-import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
+import { hostsMachineLinks, isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { isSmeeConfigured, startSmeeProcess } from '../../lib/smee.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import { backfillIssueWorkspaces, migrateMemoryHomesToWorkspacesOnce, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
@@ -148,6 +151,7 @@ ensureInternalToken();
 // corrupt registry is already logged loudly and accepts no token.
 await refreshAccessTokens().catch(() => undefined);
 startAccessTokenRefresh();
+registerRevocationClosers(); // PAN-4645 D-4645-16: revokes (any process) close live sockets and channels.
 
 // PAN-785 prepared the managed tmux context here, before any code path could spawn
 // tmux. Since PAN-1379 made that boot hook an Effect, the `await` here returned
@@ -202,6 +206,9 @@ try {
   console.warn('[overdeck] Dead-issues-FK rebuild failed (non-fatal):', err);
 }
 
+// PAN-4645 D-4645-19: this machine's environment id on local conversation rows (non-fatal).
+await bootConversationEnvironmentOrWarn();
+
 // Bind the HTTP socket before starting any background service or the Deacon.
 // A bind failure is retried by server.ts and then terminates this process through
 // Effect's Node runtime; no headless orchestrator is allowed to survive it.
@@ -214,6 +221,7 @@ if (typeof Bun !== 'undefined') {
   runMain(main as never);
 }
 await whenDashboardListening();
+void startAnywhere({ primary: hostsMachineLinks() }).catch((err) => console.warn('[anywhere] boot failed (non-fatal):', err)); // PAN-4645 D-4645-21
 startServerBootTelemetry();
 
 startEventLoopMonitor();

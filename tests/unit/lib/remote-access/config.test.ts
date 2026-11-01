@@ -34,12 +34,12 @@ afterEach(async () => {
 
 describe('readRemoteAccessConfig (PAN-3762)', () => {
   it('defaults to false when config.yaml is missing', () => {
-    expect(readRemoteAccessConfig()).toEqual({ requireTokenMint: false });
+    expect(readRemoteAccessConfig()).toEqual({ requireTokenMint: false, configured: false, autoReasons: [] });
   });
 
   it('reads dashboard.require_token_mint: true', async () => {
     await writeConfig('dashboard:\n  require_token_mint: true\n');
-    expect(readRemoteAccessConfig()).toEqual({ requireTokenMint: true });
+    expect(readRemoteAccessConfig()).toEqual({ requireTokenMint: true, configured: true, autoReasons: [] });
   });
 
   it('treats a non-boolean or invalid YAML as false', async () => {

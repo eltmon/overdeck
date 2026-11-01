@@ -1,0 +1,234 @@
+/**
+ * Reaching a linked machine from this dashboard (PAN-4645 WI-18, FR-3, FR-4).
+ *
+ * `openLinkSocket` opens one secure channel to a link on the route the link
+ * supervisor currently trusts; `linkFetch` sends one JSON request over such a
+ * channel with the link's machine token and the actor stamp
+ * (`x-overdeck-link-actor`, optional `x-overdeck-link-ceiling`). `LinkAgent`
+ * is an `http.Agent` whose connections are channels, so keep-alive pools
+ * amortise the 1-RTT handshake (D-4645-3).
+ *
+ * No user-facing call waits more than 2.5 s on an unreachable machine: an
+ * `offline`, `revoked` or `unsupported` link fails at once, a `connecting` link
+ * waits at most 2.5 s to come online. The supervisor registers itself through
+ * `setLinkRouteSource`; this module never imports the dashboard.
+ */
+import { Agent, request as httpRequest, type AgentOptions, type ClientRequestArgs } from 'node:http';
+import type { Duplex } from 'node:stream';
+import type { LinkState } from '@overdeck/contracts';
+
+import type { AccessTokenScope } from '../access-tokens.js';
+import type { ChannelSocket } from './channel/channel-socket.js';
+import { openChannel, type TransportUrl } from './channel/open.js';
+import { LINK_ACTOR_HEADER, LINK_CEILING_HEADER } from './link-actor.js';
+import type { MachineKeyPair } from './machine-key.js';
+
+export const LINK_WAIT_MS = 2_500;
+
+export type LinkUnavailableCode = 'no-link' | 'machine-offline' | 'machine-unreachable' | 'machine-revoked' | 'machine-unsupported';
+
+export class LinkUnavailableError extends Error {
+  constructor(
+    readonly code: LinkUnavailableCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'LinkUnavailableError';
+  }
+}
+
+export interface LinkRouteInfo {
+  state: LinkState;
+  /** The route the supervisor currently trusts; null unless online. */
+  url: TransportUrl | null;
+  /** The peer's pinned machine key, 64 hex. */
+  machineKey: string;
+  /** The machine token the peer issued us. */
+  token: string;
+  label: string;
+}
+
+/** What the link supervisor exposes to this module. */
+export interface LinkRouteSource {
+  routeFor(environmentId: string): LinkRouteInfo | null;
+  /** Resolves true when the link is online, false when `timeoutMs` passes or the link gives up first. */
+  waitOnline(environmentId: string, timeoutMs: number): Promise<boolean>;
+  localKey(): Promise<MachineKeyPair>;
+}
+
+let source: LinkRouteSource | null = null;
+
+export function setLinkRouteSource(next: LinkRouteSource | null): void {
+  source = next;
+}
+
+function unavailable(info: LinkRouteInfo | null, environmentId: string): LinkUnavailableError | null {
+  if (!info) return new LinkUnavailableError('no-link', `No machine link to ${environmentId}`);
+  switch (info.state) {
+    case 'offline':
+      return new LinkUnavailableError('machine-offline', `${info.label} is offline`);
+    case 'revoked':
+      return new LinkUnavailableError('machine-revoked', `${info.label} revoked this machine's link`);
+    case 'unsupported':
+      return new LinkUnavailableError('machine-unsupported', `${info.label} runs an Overdeck version without machine links`);
+    default:
+      return null;
+  }
+}
+
+/** After a wait for a connecting link gave up: a terminal state keeps its own code, anything else is unreachable. */
+function afterWait(info: LinkRouteInfo | null, environmentId: string, label: string): LinkUnavailableError {
+  const terminal = unavailable(info, environmentId);
+  if (terminal && (terminal.code === 'no-link' || terminal.code === 'machine-revoked' || terminal.code === 'machine-unsupported')) return terminal;
+  return new LinkUnavailableError('machine-unreachable', `${label} did not come online within ${LINK_WAIT_MS} ms`);
+}
+
+/**
+ * One secure channel to a linked machine. Fails synchronously-fast for an
+ * offline, revoked or unsupported link; waits up to 2.5 s for a connecting one.
+ */
+export async function openLinkSocket(
+  environmentId: string,
+  opts: { signal?: AbortSignal; routeSource?: LinkRouteSource } = {},
+): Promise<ChannelSocket> {
+  const routes = opts.routeSource ?? source;
+  if (!routes) throw new LinkUnavailableError('no-link', 'Machine links are not running on this dashboard');
+  let info = routes.routeFor(environmentId);
+  const early = unavailable(info, environmentId);
+  if (early) throw early;
+  if (info!.state !== 'online' || !info!.url) {
+    const label = info!.label;
+    const online = await routes.waitOnline(environmentId, LINK_WAIT_MS);
+    info = routes.routeFor(environmentId);
+    if (!online || !info || info.state !== 'online' || !info.url) throw afterWait(info, environmentId, label);
+  }
+  return openChannel(info!.url, {
+    mode: 'link',
+    localKey: await routes.localKey(),
+    remoteKeyHex: info!.machineKey,
+    timeoutMs: LINK_WAIT_MS,
+    ...(opts.signal ? { signal: opts.signal } : {}),
+  });
+}
+
+/** An `http.Agent` whose connections are secure channels to one linked machine. */
+export class LinkAgent extends Agent {
+  constructor(
+    readonly environmentId: string,
+    options: AgentOptions = {},
+    private readonly routeSource?: LinkRouteSource,
+  ) {
+    super({ keepAlive: true, maxSockets: 4, ...options });
+  }
+
+  override createConnection(_options: ClientRequestArgs, callback?: (error: Error | null, stream: Duplex) => void): Duplex | null | undefined {
+    openLinkSocket(this.environmentId, { routeSource: this.routeSource }).then(
+      (channel) => callback?.(null, channel),
+      (error: Error) => callback?.(error, undefined as unknown as Duplex),
+    );
+    // Node's Agent uses the callback form when nothing is returned.
+    return undefined;
+  }
+}
+
+export type LinkActorInit = 'operator' | { agentId: string };
+
+export interface LinkFetchInit {
+  method?: string;
+  body?: unknown;
+  /** Who this request acts for; the linked machine trusts it only inside the channel (FR-4). Default operator. */
+  actor?: LinkActorInit;
+  /** Scopes the linked machine must not exceed for this request; it can only narrow. */
+  ceiling?: AccessTokenScope[];
+  signal?: AbortSignal;
+  /** Test seam: the agent to send through (default: a pooled LinkAgent for the environment). */
+  agent?: Agent;
+  routeSource?: LinkRouteSource;
+}
+
+const agents = new Map<string, LinkAgent>();
+
+function agentFor(environmentId: string, routeSource?: LinkRouteSource): LinkAgent {
+  const existing = agents.get(environmentId);
+  if (existing) return existing;
+  const created = new LinkAgent(environmentId, {}, routeSource);
+  agents.set(environmentId, created);
+  return created;
+}
+
+/** Drop pooled channels to a machine (after unlink or revoke). */
+export function closeLinkAgent(environmentId: string): void {
+  agents.get(environmentId)?.destroy();
+  agents.delete(environmentId);
+}
+
+export function _resetLinkClientForTests(): void {
+  for (const agent of agents.values()) agent.destroy();
+  agents.clear();
+  source = null;
+}
+
+/** The actor stamp headers for a forwarded request. Pure. */
+export function linkActorHeaders(actor: LinkActorInit = 'operator', ceiling?: readonly AccessTokenScope[]): Record<string, string> {
+  const headers: Record<string, string> = { [LINK_ACTOR_HEADER]: actor === 'operator' ? 'operator' : `agent:${actor.agentId}` };
+  if (ceiling && ceiling.length > 0) headers[LINK_CEILING_HEADER] = ceiling.join(',');
+  return headers;
+}
+
+/**
+ * One JSON request to a linked machine. Rejects with `LinkUnavailableError`
+ * when the link cannot carry it (offline at once, unreachable after 2.5 s).
+ */
+export async function linkFetch(
+  environmentId: string,
+  path: string,
+  init: LinkFetchInit = {},
+): Promise<{ status: number; json: unknown }> {
+  const routes = init.routeSource ?? source;
+  if (!routes) throw new LinkUnavailableError('no-link', 'Machine links are not running on this dashboard');
+  const info = routes.routeFor(environmentId);
+  const early = unavailable(info, environmentId);
+  if (early) throw early;
+  if (info!.state !== 'online') {
+    // The agent would wait too, but failing here keeps the 2.5 s bound explicit.
+    const online = await routes.waitOnline(environmentId, LINK_WAIT_MS);
+    if (!online) throw afterWait(routes.routeFor(environmentId), environmentId, info!.label);
+  }
+  const payload = init.body === undefined ? null : Buffer.from(JSON.stringify(init.body), 'utf8');
+  const agent = init.agent ?? agentFor(environmentId, init.routeSource);
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      {
+        method: init.method ?? 'GET',
+        path,
+        host: 'link.invalid',
+        agent,
+        headers: {
+          accept: 'application/json',
+          authorization: `Bearer ${info!.token}`,
+          ...linkActorHeaders(init.actor, init.ceiling),
+          ...(payload ? { 'content-type': 'application/json', 'content-length': String(payload.length) } : {}),
+        },
+        ...(init.signal ? { signal: init.signal } : {}),
+      },
+      (res) => {
+        let text = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk: string) => { text += chunk; });
+        res.on('end', () => {
+          let json: unknown = null;
+          try {
+            json = text ? JSON.parse(text) : null;
+          } catch {
+            json = { error: 'invalid-json', text };
+          }
+          resolve({ status: res.statusCode ?? 0, json });
+        });
+        res.on('error', reject);
+      },
+    );
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}

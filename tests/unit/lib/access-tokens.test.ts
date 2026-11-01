@@ -120,7 +120,7 @@ describe('access-token registry (PAN-3762)', () => {
 });
 
 describe('access-token scopes (PAN-2351)', () => {
-  const ALL = ['read:events', 'read:state', 'read:conversations', 'tell', 'operate', 'approve', 'admin'] as const;
+  const ALL = ['read:events', 'read:state', 'read:conversations', 'read:costs', 'read:settings', 'tell', 'operate', 'approve', 'forward', 'admin'] as const;
 
   it('scopeSatisfies: admin covers every scope, operate covers tell, each other scope covers only itself', () => {
     expect(registry.ACCESS_TOKEN_SCOPES).toEqual(ALL);

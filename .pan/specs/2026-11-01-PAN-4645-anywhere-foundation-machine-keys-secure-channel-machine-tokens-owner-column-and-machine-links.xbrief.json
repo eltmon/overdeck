@@ -1,0 +1,1919 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T05:17:19Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4645: Anywhere foundation: machine keys, secure channel, machine tokens, owner column and machine links",
+    "updated": "2026-11-01T05:43:58.457Z"
+  },
+  "plan": {
+    "id": "pan-4645",
+    "title": "Anywhere foundation: machine keys, secure channel, machine tokens, owner column and machine links",
+    "status": "running",
+    "uid": "6d1855e7-7544-4d7c-84f4-6b00bf9d0d40",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T05:17:19Z",
+    "updated": "2026-11-01T05:43:58.457Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4645",
+        "label": "PAN-4645",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4645.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-2350.md",
+        "label": "Epic PRD revision 5",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "security",
+      "noise",
+      "machine-links",
+      "auth",
+      "dashboard-server"
+    ],
+    "metadata": {
+      "sizeJustification": "The Anywhere epic (pan-2350 rev 5) already decomposed the work into about 25 issues and assigned W-SEC1, W-SEC4, W-SEC5, W-CONV1 and W-LINK1-3 to this foundation issue, which #4650, #4651, #2356, #4652, #4404, #4654 and #4656 each depend on. The secure channel, the machine credential and the link store are mutually dependent (a link is useless without the channel and the credential), so the plan stays one issue and is decomposed into 22 serialized-where-needed items instead.",
+      "canonicalFilename": "2026-11-01-PAN-4645-anywhere-foundation-machine-keys-secure-channel-machine-tokens-owner-column-and-machine-links.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck machines cannot reach each other securely. There is no machine key, no encrypted channel, no machine-scoped credential, no record of which machine owns a conversation, and no way to link two machines and keep a connection to the best route. Every other Anywhere issue is blocked on these pieces. Separately, require_token_mint defaults to off, so a reverse proxy lets remote visitors mint a root session, and plain-HTTP LAN browsers can receive session cookies.",
+      "Proposal": "Give each machine an X25519 key; carry all machine-to-machine HTTP and WebSocket traffic inside Noise IK channels (XXpsk0 with the pairing code for pairing) using noise-handshake and secret-stream, over raw TCP on the dashboard port or WSS through Tailscale Serve; add a machine token kind bound to the peer key with D-9 scopes, a restricted /ws/rpc and 4401 revocation; add conversations.environment_id/released_to with backfill; add machine links (pan machines link|list|unlink, Settings Machines panel, Link both ways, machine-links.json), advertised and learned routes, and a link supervisor with heartbeat and freeze-vs-network diagnosis; turn require_token_mint on automatically and refuse plain-HTTP remote browsers. Full detail in .pan/drafts/PAN-4645.md.",
+      "NonGoals": "- No overdeck.ai directory, direct or relay routes (#2356); no SSH machines (#4404); no Fly machines (#4652); no pan connect (#4656); no fleet versions or Update all (#4654).\n- No changes to pan pair on npx machines (#4628) or Traefik binding (#4299).\n- No Set up Tailscale flow (#1254); only read tailscale status --json when the binary exists.\n- No linked-conversation cache, merged list, remote control, Pull here, released_to writers or title-bar states (#4650, #4646).\n- No fencing of agent mutations to link-started conversations, no load in the heartbeat, no --machine flag (#4651).\n- No route-scope rows for routes that do not exist yet (worker spawn, release/transfer/settle, costs and settings reads).\n- No stream multiplexer, no ENVIRONMENT_PROTOCOL_VERSION bump, no dedicated link port unless the D-4645-4 checkpoint falls back.\n- No per-conversation privacy flag and no machine-key rotation.\n- Must not raise any scripts/file-size-allowlist.txt cap; conversations.ts, ws-rpc.ts, settings-api.ts and cli/index.ts must not grow.\n- Must not let any machine credential satisfy admin, and must not treat a channel request as a loopback or trusted local caller."
+    },
+    "autoDecisions": [
+      {
+        "summary": "noise-handshake@4.2.0 + @hyperswarm/secret-stream@6.9.2 are the vetted Noise library (W-SEC1 checkpoint); XXpsk0 is supported natively so the pairing code is the PSK",
+        "rationale": "Live probe on 2026-11-01 proved XXpsk0, IK, impostor refusal and HTTP/WS over secret-stream with ciphertext on the wire; the only alternatives (libp2p-noise XX-only, noise-c.wasm 2022) lack IK or are stale."
+      },
+      {
+        "summary": "One Noise session per transport connection; no stream multiplexer",
+        "rationale": "No vetted multiplexer fits; IK is one round trip and HTTP keep-alive pools amortise it; every route kind opens extra connections cheaply."
+      },
+      {
+        "summary": "Raw TCP channels share the dashboard port through a first-byte (0x00) dispatcher, with a dedicated port 3017 as the implementation-checkpoint fallback",
+        "rationale": "D-2 requires raw TCP on lan/tailnet and the W-SEC1 check forbids plaintext HTTP on the wire, which rules out a plain WebSocket upgrade; the sniff probe showed HTTP keeps working."
+      },
+      {
+        "summary": "Reconnect back-off caps at 45 s for network failures (300 s only for identity-refused routes)",
+        "rationale": "W-LINK3 requires online within 60 s of plugging back, which a 300 s cap cannot meet; the operator-facing contract wins over the generic FR-3 number."
+      },
+      {
+        "summary": "require_token_mint YAML can only add: false cannot switch it off while remote access exists",
+        "rationale": "The lossy whole-document Settings save writes the read value back, so honouring an explicit false would freeze the insecure state after a link appears."
+      },
+      {
+        "summary": "The Use HTTPS refusal is always on for remote plain-HTTP browsers, independent of require_token_mint",
+        "rationale": "A session cookie over plain LAN HTTP was never safe; the W-SEC4 done-when names the page unconditionally."
+      },
+      {
+        "summary": "ENVIRONMENT_PROTOCOL_VERSION stays 1; link compatibility uses the new machineLinks capability and linkProtocol field",
+        "rationale": "Bumping the protocol would make existing desktop-app clients see every server as incompatible."
+      },
+      {
+        "summary": "/ws/rpc scoping uses a restricted PanRpcGroup chosen at upgrade",
+        "rationale": "RPC middleware sees per-message headers, not the upgrade credential, so per-method checks cannot see the credential."
+      },
+      {
+        "summary": "Machine tokens stay in access-tokens.json with kind machine and are bound to the peer machine key",
+        "rationale": "D-9 names a new token kind; binding to the key means a stolen token is useless without the machine key."
+      },
+      {
+        "summary": "Owner column backfill runs at every primary boot (fills NULLs only); vault rows fill from the browse manifest on the next refresh",
+        "rationale": "ensureEnvironmentIdentity is async and cannot run in the sync schema top-up; the manifest is the only local source of the owner id."
+      },
+      {
+        "summary": "WI-8 moves archived listing out of conversations.ts before W-CONV1",
+        "rationale": "conversations.ts is above the 1000-line ceiling and may not grow; agents may not raise allowlist caps."
+      },
+      {
+        "summary": "Link supervisor and channel listener run only on primary dashboards",
+        "rationale": "Peer dashboards share OVERDECK_HOME and would hold duplicate channels with the same machine key."
+      },
+      {
+        "summary": "Live two-machine verification is a script run by the work and test roles, not a CI test",
+        "rationale": "Two dashboards need two OVERDECK_HOMEs and a build; module-level singletons prevent an in-process version."
+      },
+      {
+        "summary": "One plan with sizeJustification instead of more sibling issues",
+        "rationale": "The epic already split Anywhere into about 25 issues and names this one as the single dependency of seven siblings; re-splitting would change the operator-authored issue body."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-machine-key",
+        "title": "WI-1 Machine key file, Noise dependencies and descriptor key",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "package.json",
+            "bun.lock",
+            "tsdown.config.ts",
+            "src/dashboard/server/tsdown.config.ts",
+            "src/lib/anywhere/machine-key.ts",
+            "packages/contracts/src/environment.ts",
+            "packages/contracts/src/machines.ts",
+            "packages/contracts/src/index.ts",
+            "src/dashboard/server/routes/environment.ts",
+            "src/lib/anywhere/__tests__/machine-key.test.ts",
+            "src/dashboard/server/__tests__/environment-descriptor-key.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/anywhere/__tests__/machine-key.test.ts src/dashboard/server/__tests__/environment-descriptor-key.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "machine-key.test.ts and environment-descriptor-key.test.ts report all tests passed"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Pin noise-handshake@4.2.0 and @hyperswarm/secret-stream@6.9.2 in dependencies, bun install, add noise-handshake, @hyperswarm/secret-stream, sodium-universal, sodium-native to deps.neverBundle in tsdown.config.ts and src/dashboard/server/tsdown.config.ts (D-4645-2). Create src/lib/anywhere/machine-key.ts mirroring environment-identity.ts (machine-key.json with 64-hex public and secret keys, 0600; every key in this issue is 64 lowercase hex, temp+link(), never rewritten, corrupt => throw naming path; ensureMachineKey, readMachineKey, machineKeyFingerprint = first 10 bytes of SHA-256 as 5 dash groups of 4 hex). Create packages/contracts/src/machines.ts (LINK_PROTOCOL_VERSION=1, ROUTE_KINDS, AdvertisedEndpoint, LinkState, MachineLinkView, InboundMachineView, MachinesResponse) and export it. Descriptor gains optional machineKey, linkProtocol, endpoints and capability machineLinks; buildEnvironmentDescriptor sets machineKey, linkProtocol 1, machineLinks true. Keep ENVIRONMENT_PROTOCOL_VERSION = 1 (D-4645-11)."
+        },
+        "items": [
+          {
+            "id": "wi1-machine-key.ac1",
+            "title": "Given no machine-key.json, when ensureMachineKey() runs twice concurrently, then exactly one file exists with mode 0600 and both calls return the same 32-byte public key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-machine-key.ac2",
+            "title": "When machine-key.json holds invalid JSON, ensureMachineKey() throws an error naming the file path and the file contents are preserved unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-machine-key.ac3",
+            "title": "GET /api/environment returns machineKey decoding to 32 bytes, linkProtocol 1 and capabilities.machineLinks true, while protocolVersion stays 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-machine-key.ac4",
+            "title": "machineKeyFingerprint() returns five dash-separated groups of four lowercase hex characters for a fixed test key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-secure-channel",
+        "title": "WI-2 Secure channel core: wire format, Noise IK/XXpsk0, ChannelSocket, open and accept",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "deep",
+          "difficulty": "expert",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "wi3-channel-listener",
+            "wi12-pairing-exchange",
+            "wi18-link-supervisor",
+            "wi19-advertised-endpoints"
+          ],
+          "files_scope": [
+            "src/lib/anywhere/channel/wire.ts",
+            "src/lib/anywhere/channel/noise.ts",
+            "src/lib/anywhere/channel/channel-socket.ts",
+            "src/lib/anywhere/channel/accept.ts",
+            "src/lib/anywhere/channel/open.ts",
+            "src/lib/anywhere/channel/__tests__/channel.test.ts",
+            "src/lib/anywhere/channel/__tests__/channel-capture.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "parallelSafeReason": "All files are new under src/lib/anywhere/channel/; no existing module is modified.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/anywhere/channel/__tests__/channel.test.ts src/lib/anywhere/channel/__tests__/channel-capture.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "channel.test.ts and channel-capture.test.ts report all tests passed"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and the Interfaces section; this is the stream interface every downstream Anywhere issue builds on, land it first. Create src/lib/anywhere/channel/{wire,noise,channel-socket,accept,open}.ts exactly per D-4645-1, D-4645-3, D-4645-5, D-4645-17. noise-handshake does the IK and XXpsk0 handshakes with its default X25519 dh; @hyperswarm/secret-stream with the handshake option frames transport bytes; never hand-roll crypto framing. ChannelSocket extends stream.Duplex, remoteAddress = link:<16 hex of remote key>, carries channel marker {mode, remoteKeyHex, pairingId}, counts ciphertext bytes on a copy (secret-stream decrypts in place). open.ts supports tcp://host:port and wss://host/ws/link and maps failures to ChannelOpenError codes; timeouts use AbortController+setTimeout, never AbortSignal.timeout. accept.ts enforces 10 s handshake timeout, 1024-byte frames, isPinnedPeer after IK msg1 (refusal 01), takePairing before XXpsk0 msg1 (refusal 03), link protocol mismatch refusal 02. Tests use real loopback TCP between two in-process endpoints plus a byte-logging TCP proxy."
+        },
+        "items": [
+          {
+            "id": "wi2-secure-channel.ac1",
+            "title": "Given an IK initiator holding the wrong responder key, when openChannel runs, then it rejects with code identity-refused and the responder HTTP server receives zero requests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-secure-channel.ac2",
+            "title": "Given a byte-logging TCP proxy between initiator and responder, when a GET and a POST run through the channel, then the captured bytes contain neither \"HTTP/1.1\" nor the POST body text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-secure-channel.ac3",
+            "title": "When XXpsk0 runs with the right pairing code, both sides report the other static key; with a wrong code openChannel rejects with pairing-refused and onPairingFailure is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-secure-channel.ac4",
+            "title": "Given an initiator key that isPinnedPeer rejects, acceptChannel sends refusal 01 and openChannel rejects with unknown-peer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-secure-channel.ac5",
+            "title": "When a ws WebSocket upgrades over a ChannelSocket and the server closes with code 4401, then the client receives close code 4401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-channel-listener",
+        "title": "WI-3 Channel listener on the dashboard port and the channel-peer leaf",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/channel-peer.ts",
+            "src/dashboard/server/channel-listener.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/__tests__/channel-listener.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "parallelSafeReason": "Only server.ts is shared, and every other item touching it is ordered after this one by an edge.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/channel-listener.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "channel-listener.test.ts reports all tests passed",
+            "lint:circular reports no cycles"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-6",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D-4645-4. Create src/dashboard/server/channel-peer.ts (leaf: channelOfIncoming, channelOfRequest via NodeHttpServerRequest.toIncomingMessage, null for non-Node requests) and src/dashboard/server/channel-listener.ts (installChannelListener: swap the http server connection listeners for a first-byte dispatcher; 0x00 => acceptChannel, else unshift and call the saved listeners; /ws/link upgrade via ws WebSocketServer noServer + createWebSocketStream; max 32 pending handshakes => refusal 04; Map of live channel sockets by peer key with closeChannelsForPeer and closeAllChannels; installed only on primary dashboards). Call it from the NodeHttpServer.make factory in server.ts after the setup* calls and close all channels on shutdown. Implementation checkpoint: if the dispatcher breaks existing dashboard tests or the live pan up smoke, fall back to a dedicated listener on anywhere.link_port (default 3017) and record the fallback in continue.json."
+        },
+        "items": [
+          {
+            "id": "wi3-channel-listener.ac1",
+            "title": "Given the listener is installed on an http.Server, when a client sends a keep-alive pair of GETs, a 200 KB POST and a WebSocket upgrade, then each returns the same response as without the listener",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-channel-listener.ac2",
+            "title": "When a socket starts with the 0x00 preamble and completes the IK handshake, a request through it arrives with req.socket.remoteAddress starting \"link:\" and channelOfIncoming(req) returns the marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-channel-listener.ac3",
+            "title": "Given 32 handshakes already pending, when a 33rd channel connects, then it receives refusal frame code 04 and is closed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-channel-listener.ac4",
+            "title": "When closeChannelsForPeer(key) is called, every live ChannelSocket for that key closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-machine-credential",
+        "title": "WI-4 machine token kind and channel-bound credential resolution",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "deep",
+          "difficulty": "expert",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "wi5-route-scope-rows",
+            "wi6-ws-rpc-scoped",
+            "wi7-ws-rpc-4401",
+            "wi12-pairing-exchange",
+            "wi13-machines-list-unlink",
+            "wi15-token-mint-auto"
+          ],
+          "files_scope": [
+            "src/lib/access-tokens.ts",
+            "src/lib/anywhere/link-actor.ts",
+            "src/dashboard/server/routes/dashboard-auth.ts",
+            "src/dashboard/server/remote-request-gate.ts",
+            "src/dashboard/server/ws-auth.ts",
+            "src/dashboard/server/ws-terminal.ts",
+            "src/dashboard/server/ws-voice.ts",
+            "src/dashboard/server/ws-autopreso.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/device-connections.ts",
+            "tests/unit/lib/access-tokens-machine.test.ts",
+            "src/dashboard/server/__tests__/machine-credential.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "parallelSafeReason": "Ordered after WI-3 and before every other item that touches the auth modules; no parallel item edits these files.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/access-tokens-machine.test.ts src/dashboard/server/__tests__/machine-credential.test.ts tests/unit/lib/access-tokens.test.ts src/dashboard/server/__tests__/dashboard-device-auth.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "all four test files report all tests passed",
+            "lint-file-size reports no violations (ws-rpc.ts not grown)"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, D-4645-9, D-4645-10, D-4645-16. access-tokens.ts: scopes gain read:costs, read:settings, forward; kind gains machine with required machineKey (64 hex), environmentId, access; isRecord accepts machine only with all three; MACHINE_TOKEN_SCOPES(access); findActiveMachineTokenByKey; listActiveRecordsOfKind; onAccessTokensRevoked(listener) fired from refresh and revoke for records that became revoked or vanished. New leaf src/lib/anywhere/link-actor.ts (parseLinkActor, effectiveScopes; missing stamp => agent; agent-fenced downgrades operator). dashboard-auth.ts: DashboardCredential machine arm; resolveDashboardCredential(headers, channel) per D-4645-9 (root, device and token credentials resolve to null over a channel); rejectUnauthorizedDashboardRequest passes channelOfRequest. remote-request-gate.ts: pass the channel; channel requests never reach the trusted-local rule; a pairing-mode channel passes the gate for exactly GET /api/environment and POST /api/machines/exchange (before the credential check) and gets 401 elsewhere; a non-channel POST /api/machines/exchange gets 401. ws-auth.ts authorizeDashboardUpgrade gains a channel parameter, and ws-terminal, ws-voice, ws-autopreso, ws-rpc pass it. device-connections revocableCredentialId covers machine."
+        },
+        "items": [
+          {
+            "id": "wi4-machine-credential.ac1",
+            "title": "Given a machine record bound to key K, when its token arrives over a plain socket or over a channel with another key, then resolveDashboardCredential returns null; over a channel with key K it returns a machine credential with the FR-7 scopes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-machine-credential.ac2",
+            "title": "When the internal token header or the root session cookie arrives over a channel, then resolveDashboardCredential returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-machine-credential.ac3",
+            "title": "Given an x-overdeck-link-ceiling header of read:events, when a machine credential resolves, then credentialScopes returns only read:events and never admin; with no actor header the actor resolves to agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-machine-credential.ac4",
+            "title": "When access-tokens.json gains a machine record without machineKey, the registry rejects the file as corrupt and accepts no token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-machine-credential.ac5",
+            "title": "When another process marks a record revoked, the next refresh tick fires onAccessTokensRevoked with that record id (fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-route-scope-rows",
+        "title": "WI-5 Route-scope rows for operate routes and link limits test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/__tests__/route-scopes-machine.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/route-scopes-machine.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "route-scopes-machine.test.ts reports all tests passed"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add the ten operate rows listed in the PRD to ROUTE_SCOPES in src/dashboard/server/route-scopes.ts (conversation create, stop, abort, permission, codex-approval, pane-choice, pi-ask-answer, agent answer-question, agent permission respond, lane create). No rows for routes that do not exist yet. Table-driven test over remoteGateRejection with a machine credential arriving over a channel marker."
+        },
+        "items": [
+          {
+            "id": "wi5-route-scope-rows.ac1",
+            "title": "Given a machine credential over a channel, when it calls POST /api/conversations/:name/stop or POST /api/lanes, then the gate passes the request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-route-scope-rows.ac2",
+            "title": "Given a machine credential over a channel, when it calls GET /api/access-tokens, PUT /api/settings, POST /api/pairing/credentials, GET /api/devices or POST /api/machines/link, then each returns 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-route-scope-rows.ac3",
+            "title": "When an operate-scoped kind token calls POST /api/conversations/:name/abort, the gate passes it, and with only tell it returns 403 with missingScope operate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-ws-rpc-scoped",
+        "title": "WI-6 Scoped /ws/rpc through a restricted RPC group",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/ws-rpc-auth.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/__tests__/ws-rpc-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "parallelSafeReason": "Shares route-scopes.ts and ws-rpc.ts only with items ordered before or after it by edges.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/ws-rpc-auth.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "ws-rpc-auth.test.ts reports all tests passed",
+            "lint-file-size reports no violations"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and D-4645-14. Add RPC_METHOD_SCOPES and allowedRpcTags to route-scopes.ts. New src/dashboard/server/ws-rpc-auth.ts selects the full PanRpcGroup handler for admin credentials and PanRpcGroup.omit(...) memoised by allowed-tag set for others; the upgrade needs read:events or read:conversations. Replace the /ws/rpc route body (ws-rpc.ts:1138-1155) with a call into ws-rpc-auth.ts; ws-rpc.ts net line change must be <= 0."
+        },
+        "items": [
+          {
+            "id": "wi6-ws-rpc-scoped.ac1",
+            "title": "Given a machine credential, the restricted group contains exactly pan.subscribeConversationMessages and pan.subscribeDomainEvents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-ws-rpc-scoped.ac2",
+            "title": "When a credential holding only read:state upgrades /ws/rpc, the server returns 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-ws-rpc-scoped.ac3",
+            "title": "When a scoped client calls pan.deepWipe on the restricted group, the call fails and the deepWipe handler is never invoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-ws-rpc-scoped.ac4",
+            "title": "Given an admin credential, the handler serves the full PanRpcGroup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-ws-rpc-4401",
+        "title": "WI-7 /ws/rpc closes with 4401 and cross-process revokes close sockets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/ws-rpc-auth.ts",
+            "src/dashboard/server/main.ts",
+            "src/dashboard/server/__tests__/ws-rpc-revoke.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "parallelSafeReason": "main.ts edits are ordered after WI-9 and before WI-18 by edges; ws-rpc-auth.ts is shared only with WI-6, which precedes it.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/ws-rpc-revoke.test.ts src/dashboard/server/__tests__/device-revocation-connections.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "ws-rpc-revoke.test.ts and device-revocation-connections.test.ts report all tests passed"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7, D-4645-15 and D-4645-16. Implement the 4401 close: find the ws WebSocket on toIncomingMessage(request).socket via Object.getOwnPropertySymbols(socket).find(s => s.description === \"websocket\") and call close(4401, \"device revoked\"); never yield request.upgrade twice (upgradeEffect is not cached). If the lookup finds nothing, ship close-without-code and record the deviation in continue.json. Export registerRevocationClosers() from ws-rpc-auth.ts (closeDeviceConnections for every revoked record, closeChannelsForPeer for machine records) and call it in main.ts right after startAccessTokenRefresh()."
+        },
+        "items": [
+          {
+            "id": "wi7-ws-rpc-4401.ac1",
+            "title": "When a token behind an open /ws/rpc socket is revoked in process, the client receives close code 4401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-ws-rpc-4401.ac2",
+            "title": "When another process writes the revocation into access-tokens.json, the socket closes after the fake clock advances 5 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-ws-rpc-4401.ac3",
+            "title": "When a machine record is revoked, every channel socket for its machineKey closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-conversations-headroom",
+        "title": "WI-8 Move archived-conversation listing out of conversations.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "refactor",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/conversation-archive.ts",
+            "tests/unit/dashboard/server/routes/conversations-fork-failure.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:circular",
+            "bash scripts/lint-file-size.sh",
+            "npx vitest run tests/unit/dashboard/server/routes/conversations-fork-failure.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "lint:circular reports no cycles",
+            "lint-file-size reports no violations",
+            "conversations-fork-failure.test.ts reports all tests passed"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Move listArchivedConversationsWithEnrichment (conversations.ts:723-876) and the ArchivedConversationWithEnrichment / ArchivedConversationListOptions interfaces (:300-350) into src/lib/overdeck/conversation-archive.ts, its only production consumer; export toIso from conversations.ts; conversations.ts must not import conversation-archive.ts. No behavior change. Update the import in the one test that imports the moved symbol."
+        },
+        "items": [
+          {
+            "id": "wi8-conversations-headroom.ac1",
+            "title": "After the move, wc -l src/lib/overdeck/conversations.ts prints at most 1080",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-conversations-headroom.ac2",
+            "title": "GET /api/conversations/archived returns the same rows for the same fixture database as before the move",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-conversations-headroom.ac3",
+            "title": "npm run lint:circular exits 0, so conversations.ts and conversation-archive.ts form no import cycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-conv-environment-local",
+        "title": "WI-9 conversations.environment_id and released_to columns with local-row backfill",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/overdeck/infra.ts",
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/conversation-environment.ts",
+            "src/dashboard/server/main.ts",
+            "src/lib/overdeck/__tests__/conversation-environment.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-environment.test.ts src/lib/overdeck/__tests__/conversation-vault-browse.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "both test files report all tests passed",
+            "lint-file-size reports no violations"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and D-4645-19. Add the two nullable ALTER TABLE top-ups plus conversations_environment_idx after infra.ts:141 and both columns in drizzle/overdeck/0000_overdeck_init.sql after vault_owner_label. New src/lib/overdeck/conversation-environment.ts: setLocalEnvironmentId, localEnvironmentId, backfillLocalConversationEnvironmentIds, bootConversationEnvironment. conversations.ts: LegacyConversation gains environmentId and releasedTo; SELECT, row type and mapper carry them; createConversation INSERT writes environment_id from localEnvironmentId(). main.ts calls bootConversationEnvironment() on a primary dashboard before listening, inside try/catch."
+        },
+        "items": [
+          {
+            "id": "wi9-conv-environment-local.ac1",
+            "title": "Given a database created from the init SQL without the two columns, when it is opened twice, then both columns exist and the second open logs no top-up error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-conv-environment-local.ac2",
+            "title": "When bootConversationEnvironment runs, every origin = local row has environment_id equal to this machine environment id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-conv-environment-local.ac3",
+            "title": "Given setLocalEnvironmentId(X), when createConversation inserts a row, then getConversationByName returns environmentId X and releasedTo null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-conv-environment-vault",
+        "title": "WI-10 Owner environment id for Session Vault browse rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/vault/browse.ts",
+            "src/dashboard/server/services/vault-browse-service.ts",
+            "src/lib/overdeck/conversation-vault-rows.ts",
+            "src/lib/overdeck/__tests__/conversation-vault-browse.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-vault-browse.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "conversation-vault-browse.test.ts reports all tests passed"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. ManifestEntry and BrowseCopy in src/lib/vault/browse.ts gain optional ownerEnvironmentId set from record.owner.environmentId; vault-browse-service passes it; VaultBrowseRowInput gains ownerEnvironmentId; upsertVaultBrowseRow writes environment_id and includes it in the unchanged comparison so old rows fill on the next refresh."
+        },
+        "items": [
+          {
+            "id": "wi10-conv-environment-vault.ac1",
+            "title": "When upsertVaultBrowseRow inserts a row, it stores the owner environment id in environment_id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-conv-environment-vault.ac2",
+            "title": "Given an existing vault row whose environment_id is null, when it is upserted with an owner id, then the call returns updated and the column holds the id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-conv-environment-vault.ac3",
+            "title": "After boot backfill and one browse refresh over a fixture vault, SELECT COUNT(*) FROM conversations WHERE environment_id IS NULL returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-link-store",
+        "title": "WI-11 Link store machine-links.json and the route model",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "wi12-pairing-exchange",
+            "wi13-machines-list-unlink",
+            "wi15-token-mint-auto",
+            "wi18-link-supervisor",
+            "wi19-advertised-endpoints"
+          ],
+          "files_scope": [
+            "src/lib/anywhere/link-store.ts",
+            "src/lib/anywhere/routes.ts",
+            "src/lib/anywhere/__tests__/link-store.test.ts",
+            "src/lib/anywhere/__tests__/routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/anywhere/__tests__/link-store.test.ts src/lib/anywhere/__tests__/routes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "link-store.test.ts and routes.test.ts report all tests passed"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. New src/lib/anywhere/link-store.ts (machine-links.json door: v1 shape from the PRD, 0600, temp+rename, in-process write queue, 5 s snapshot refresh, corrupt => zero links and a loud error; listLinks, getLink, upsertLink replacing by environmentId, removeLink, markLinkRevoked, setLinkRoutes, linksSnapshot, hasActiveLinks, start/stopLinkStoreRefresh). New src/lib/anywhere/routes.ts (parseRouteUrl, classifyHost, routeFromPairingUrl with allowLoopback option, rankRoutes, mergeAdvertised) per the PRD rules. Imports only Node built-ins, paths and contracts."
+        },
+        "items": [
+          {
+            "id": "wi11-link-store.ac1",
+            "title": "When upsertLink writes the first link, machine-links.json exists with mode 0600 and listLinks returns the link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-link-store.ac2",
+            "title": "Given a corrupt machine-links.json, listLinks returns zero links and logs an error naming the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-link-store.ac3",
+            "title": "When upsertLink receives a second link with the same environmentId, the file contains one link holding the second token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-link-store.ac4",
+            "title": "rankRoutes returns lan before tailnet before public, and tcp before wss within a kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-link-store.ac5",
+            "title": "mergeAdvertised drops an advertised route no longer advertised and preserves the pairing route; routeFromPairingUrl refuses a loopback base unless allowLoopback, which yields a lan route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-pairing-exchange",
+        "title": "WI-12 Pairing exchange route and machine link creation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "expert",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/pairing-credentials.ts",
+            "src/dashboard/server/routes/machines-peer.ts",
+            "src/dashboard/server/routes/machines.ts",
+            "src/dashboard/server/services/machine-link-service.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/channel-listener.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/machines-exchange.test.ts",
+            "src/dashboard/server/services/__tests__/machine-link-service.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "parallelSafeReason": "Every shared file (server.ts, channel-listener.ts, machines routes) is ordered by edges; runs alone in its slot.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/machines-exchange.test.ts src/dashboard/server/services/__tests__/machine-link-service.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "all three test files report all tests passed"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12, D-4645-17, D-4645-18. pairing-credentials.ts stores psk and pairingId and gains takePairingById. channel-listener passes the pairing hooks. New routes/machines-peer.ts with POST /api/machines/exchange (NOT on REMOTE_GATE_ALLOWLIST; the WI-4 gate rule admits it only from a pairing-mode channel and the route also returns 403 unless the request channel is pairing mode; mints the machine token bound to the channel key, revokes the previous one for that environment id, writes the reverse link when present). New routes/machines.ts with POST /api/machines/link (admin, refuses channel requests) delegating to services/machine-link-service.ts createMachineLink with injectable deps in the order (a)-(g) from the PRD; any failure after minting revokes the reverse token. Register both route layers in server.ts. Add no-loss-matrix rows."
+        },
+        "items": [
+          {
+            "id": "wi12-pairing-exchange.ac1",
+            "title": "Given a pairing-mode channel marker, when POST /api/machines/exchange runs, then the returned token verifies as a machine record whose machineKey equals the channel remote key and whose scopes equal MACHINE_TOKEN_SCOPES(operator)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-pairing-exchange.ac2",
+            "title": "When POST /api/machines/exchange arrives without a channel marker, the route returns 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-pairing-exchange.ac3",
+            "title": "When createMachineLink runs with bothWays true, it calls openChannel before minting the reverse token and writes one link with a pairing-source route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-pairing-exchange.ac4",
+            "title": "Given the exchange step fails, createMachineLink revokes the minted reverse token and returns the error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-pairing-exchange.ac5",
+            "title": "Given a descriptor without capabilities.machineLinks, createMachineLink refuses with unsupported and writes no link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-machines-list-unlink",
+        "title": "WI-13 Machines list, unlink, self-revoke and inbound removal routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/machines.ts",
+            "src/dashboard/server/routes/machines-peer.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/machines-unlink.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/machines-unlink.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "machines-unlink.test.ts and no-loss-matrix.test.ts report all tests passed"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. In routes/machines.ts: GET /api/machines (admin; self, links as MachineLinkView, inbound as InboundMachineView; state from a LinkStatusSource whose default returns connecting until WI-18), DELETE /api/machines/:id (admin, refuses channel requests; best-effort peer notify via linkFetch with 2.5 s, revoke reverseTokenId, removeLink; returns peerNotified), DELETE /api/machines/inbound/:tokenId (admin). In routes/machines-peer.ts: DELETE /api/machines/self (machine credential only; route-scope row read:state). No response ever carries token or tokenHash. no-loss rows for all four."
+        },
+        "items": [
+          {
+            "id": "wi13-machines-list-unlink.ac1",
+            "title": "GET /api/machines returns links and inbound machine tokens and the JSON contains no token or tokenHash field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-machines-list-unlink.ac2",
+            "title": "Given the peer is unreachable, when DELETE /api/machines/:id runs, then the link is removed, the reverse token is revoked and the response reports peerNotified false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-machines-list-unlink.ac3",
+            "title": "When DELETE /api/machines/self is called with a device credential, it returns 403; with a machine credential it revokes that token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-machines-list-unlink.ac4",
+            "title": "When DELETE /api/machines/inbound/:tokenId runs, the channel sockets of that peer key close",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-cli-machines",
+        "title": "WI-14 pan machines link|list|unlink",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/machines.ts",
+            "src/cli/commands/pair.ts",
+            "src/cli/commands/__tests__/machines.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/machines.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "machines.test.ts reports all tests passed",
+            "lint-file-size reports no violations"
+          ],
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. New src/cli/commands/machines.ts with registerMachinesCommands(program), called from registerPairCommands in src/cli/commands/pair.ts (src/cli/index.ts is not touched). Verbs and output exactly as the PRD: link <pairing-url> [--one-way] [--agent-fenced] [--allow-loopback] [--json], list [--json] with Links and Inbound tables and the froze incident text, unlink <label|environment-id|link-id> [--json]. Static imports limited to Commander types and chalk; reuse callDashboard from pair.ts; unreachable dashboard exits 1 with \"Start the dashboard with pan up\"."
+        },
+        "items": [
+          {
+            "id": "wi14-cli-machines.ac1",
+            "title": "When pan machines link succeeds, the CLI prints \"Linked <label> (<fingerprint>) over <kind> <url>, both ways, operator-level\" and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-cli-machines.ac2",
+            "title": "Given a link with incident froze of 5000 ms, pan machines list prints \"online (froze 5.0 s\" for that row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-cli-machines.ac3",
+            "title": "When pan machines unlink names an unknown label, the CLI exits 1 and prints the label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-cli-machines.ac4",
+            "title": "When the dashboard is unreachable, every machines verb exits 1 and prints \"Start the dashboard with pan up\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi15-token-mint-auto",
+        "title": "WI-15 require_token_mint turns itself on with remote access",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/remote-access/config.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/remote-access/anywhere-status.ts",
+            "src/dashboard/server/routes/anywhere.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/RequireTokenMintRow.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts",
+            "src/lib/remote-access/__tests__/config-auto-mint.test.ts",
+            "src/dashboard/server/__tests__/remote-request-gate-auto-mint.test.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/remote-access/__tests__/config-auto-mint.test.ts src/dashboard/server/__tests__/remote-request-gate-auto-mint.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "all three test files report all tests passed",
+            "lint-file-size reports no violations (settings-api.ts not grown)"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15 and D-4645-12. readRemoteAccessConfig returns requireTokenMint (effective), configured and autoReasons; YAML and saved non-loopback trusted origins are cached until invalidateRemoteAccessConfig (called after adding a trusted origin); devices and machine links/tokens read in-memory snapshots per call. settings-api.ts:766 reads .configured (same line count). AnywhereStatus gains tokenMint. RequireTokenMintRow renders checked and disabled with \"On automatically because this machine has <reasons>\" when autoReasons is non-empty."
+        },
+        "items": [
+          {
+            "id": "wi15-token-mint-auto.ac1",
+            "title": "Given the YAML key unset and one active machine link, when a loopback peer carrying X-Forwarded-For POSTs /api/dashboard/session, then the mint returns 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-token-mint-auto.ac2",
+            "title": "Given no trusted remote origin, device or link, readRemoteAccessConfig().requireTokenMint returns false and the same forwarded mint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-token-mint-auto.ac3",
+            "title": "Given YAML require_token_mint false and one active paired device, requireTokenMint stays true while GET /api/settings reports require_token_mint false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-token-mint-auto.ac4",
+            "title": "When the status reports autoReasons machine-link, the Access Tokens section renders the checkbox checked and disabled with \"On automatically because this machine has a machine link\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi16-use-https-page",
+        "title": "WI-16 Use HTTPS page for remote plain-HTTP browsers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/plain-http-guard.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/routes/pairing.ts",
+            "src/dashboard/server/__tests__/plain-http-guard.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/plain-http-guard.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "plain-http-guard.test.ts reports all tests passed"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16 and D-4645-13. New src/dashboard/server/plain-http-guard.ts (isRemotePlainHttpBrowser = !isLoopbackPeer && !isHttpsRequest && no channel; useHttpsPage() 403 text/html with title Use HTTPS, the sentence from the PRD and the remote-access docs link). The static route in server.ts returns it before serving index.html for / and the SPA fallback; assets with extensions are unaffected. routes/pairing.ts exchange with delivery cookie under the same condition returns 403 {error: use-https}; bearer delivery unaffected."
+        },
+        "items": [
+          {
+            "id": "wi16-use-https-page.ac1",
+            "title": "When a non-loopback peer GETs / over plain HTTP, the server returns 403 with an HTML body containing \"Use HTTPS\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-use-https-page.ac2",
+            "title": "When a loopback peer GETs / with X-Forwarded-Proto https, or without forwarding headers, the server returns index.html",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-use-https-page.ac3",
+            "title": "When a LAN peer over plain HTTP posts /api/pairing/exchange with delivery cookie, the route returns 403 with error use-https; with delivery bearer it proceeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi17-stall-record",
+        "title": "WI-17 Event-loop stall record in the event-loop monitor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/event-loop-monitor.ts",
+            "src/dashboard/server/services/__tests__/event-loop-monitor-stall.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/event-loop-monitor-stall.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "event-loop-monitor-stall.test.ts reports all tests passed"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17. Extend src/dashboard/server/services/event-loop-monitor.ts with a 250 ms unref drift probe; a gap exceeding the interval by >= 1000 ms records {durationMs: gap - 250, endedAt}. Export getLastEventLoopStall() returning {durationMs, endedAgoMs} or null and onEventLoopStall(listener) for stalls >= 2000 ms. Inject now() and setInterval through EventLoopMonitorDeps for tests."
+        },
+        "items": [
+          {
+            "id": "wi17-stall-record.ac1",
+            "title": "Given an injected clock, when one probe interval observes a 5000 ms gap, then getLastEventLoopStall returns durationMs 4750 and the stall listener fires once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-stall-record.ac2",
+            "title": "When the observed gap is 600 ms, getLastEventLoopStall returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-stall-record.ac3",
+            "title": "When the clock advances 3000 ms after a stall, endedAgoMs returns 3000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi18-link-supervisor",
+        "title": "WI-18 Heartbeat stream, link supervisor, linkFetch and the Anywhere boot module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "expert",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/machines-peer.ts",
+            "src/dashboard/server/services/link-supervisor.ts",
+            "src/lib/anywhere/link-client.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/main.ts",
+            "src/dashboard/server/routes/machines.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/services/__tests__/link-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "parallelSafeReason": "All shared files (machines.ts, machines-peer.ts, main.ts, route-scopes.ts, no-loss-matrix.ts) are ordered by edges before and after it.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/link-supervisor.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "link-supervisor.test.ts and no-loss-matrix.test.ts report all tests passed",
+            "lint-file-size reports no violations (main.ts under 1000)"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-9",
+            "NFR-3",
+            "NFR-4",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18 with D-4645-6, D-4645-7, D-4645-8, D-4645-20, D-4645-21. GET /api/machines/heartbeat (machine credential, row read:state) SSE: immediate event, every 15 s, and right after onEventLoopStall; data {seq, lastStall, endpointsHash, serverVersion}; wrapped in endStreamOnDeviceRevocation. New services/link-supervisor.ts per steps 1-7 (parallel 2.5 s probes, descriptor check -> unsupported with the exact version, watchdog late 17.5 s -> connecting, 20 s -> offline, diagnoseGap froze vs network, refusal 01 or heartbeat 401 -> revoked, back-off 1 s doubling to 45 s with 20% jitter and 300 s for identity-refused, 60 s better-route check, reconnect(linkId)). New src/lib/anywhere/link-client.ts (LinkAgent, openLinkSocket, linkFetch with actor stamp headers and Bearer token; offline -> immediate LinkUnavailableError machine-offline, connecting -> 2.5 s wait then machine-unreachable). New services/anywhere-boot.ts startAnywhere({primary, port}): ensureMachineKey and startLinkStoreRefresh on every dashboard, endpoint advertiser and supervisor on the primary only; main.ts calls it once after whenDashboardListening(). POST /api/machines/:id/reconnect (admin). GET /api/machines reads supervisor status. Fake timers for every timing test."
+        },
+        "items": [
+          {
+            "id": "wi18-link-supervisor.ac1",
+            "title": "Given an online link, when its transport drops, then status moves to connecting at 17.5 s and offline by 20 s after the last heartbeat (fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-link-supervisor.ac2",
+            "title": "Given an offline link at the back-off cap, when the transport returns, then status returns online within 47.5 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-link-supervisor.ac3",
+            "title": "When a heartbeat arrives 5 s late carrying lastStall durationMs 5000 and endedAgoMs 0, the link stays online and records incident froze",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-link-supervisor.ac4",
+            "title": "When the heartbeat answers 401, the link is marked revoked and no further probe runs; when the descriptor lacks machineLinks, the state is unsupported and no probe runs until reconnect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-link-supervisor.ac5",
+            "title": "linkFetch to an offline link rejects with machine-offline in under 10 ms, and to a connecting unreachable link rejects with machine-unreachable at 2.5 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi19-advertised-endpoints",
+        "title": "WI-19 Advertised endpoints, learned routes and Add route (closes #4403)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/anywhere/endpoints.ts",
+            "src/dashboard/server/routes/environment.ts",
+            "src/dashboard/server/services/link-supervisor.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/routes/machines.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/lib/anywhere/__tests__/endpoints.test.ts",
+            "src/dashboard/server/services/__tests__/link-supervisor-routes.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "parallelSafeReason": "Follows WI-18 on every shared file; no other item edits these files afterwards except docs.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/anywhere/__tests__/endpoints.test.ts src/dashboard/server/services/__tests__/link-supervisor-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "all three test files report all tests passed"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-19. New src/lib/anywhere/endpoints.ts discoverEndpoints with injected networkInterfaces, execFile (tailscale status --json, async, 5 s, absent => skip) and fetch (Serve self-check matching our environmentId => wss://<DNSName>/ws/link); interface-name exclusions from the PRD; cached, refreshed at boot and every 10 min; endpointsHash. Descriptor sets endpoints. Supervisor merges advertised endpoints on connect and hash change, persists via setLinkRoutes, prefers a better route at the 60 s check. POST /api/machines/:id/routes (admin) adds a manual route. The PR body carries \"Closes #4403\"."
+        },
+        "items": [
+          {
+            "id": "wi19-advertised-endpoints.ac1",
+            "title": "discoverEndpoints returns tcp://192.168.1.5:3011 as lan for enp3s0, nothing for 172.17.0.1 on docker0, and tcp://100.101.1.2:3011 as tailnet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-advertised-endpoints.ac2",
+            "title": "When the Serve self-check returns our environmentId, discoverEndpoints includes wss://<name>/ws/link; with another id or no tailscale binary it omits it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-advertised-endpoints.ac3",
+            "title": "Given a link holding only a tailnet route, when the peer advertises a lan endpoint that answers, then within one 60 s re-check the supervisor switches currentRoute to the lan route (fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-advertised-endpoints.ac4",
+            "title": "When an advertised route disappears from the descriptor, the supervisor removes it and preserves the pairing route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi20-machines-panel",
+        "title": "WI-20 Settings > Anywhere > Machines panel and Link dialog",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/MachinesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/LinkMachineDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/machinesApi.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "MachinesPanel.test.tsx reports all tests passed"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-20. Load the pan-style-guide skill first. New MachinesPanel.tsx, LinkMachineDialog.tsx and machinesApi.ts under src/dashboard/frontend/src/components/Settings/anywhere/; AnywhereSection.tsx renders MachinesPanel after DevicesPanel. Panel: this machine label and fingerprint, link rows (label, state badge per the style guide with online never green, current route, access, Reconnect for offline/unsupported, Unlink with confirm naming the label, expandable routes with Add route), Inbound list with Remove; Link a machine dialog (pairing link input, Operator-level default with the PRD text, Agent-fenced, Link both ways checked). Poll GET /api/machines every 5 s while mounted. Append the new test path to test:frontend-subset in package.json. Browser check must use an isolated Playwright profile."
+        },
+        "items": [
+          {
+            "id": "wi20-machines-panel.ac1",
+            "title": "Given GET /api/machines returns one online link named desk, the panel renders \"desk\" with an online badge that does not use the green color token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-machines-panel.ac2",
+            "title": "When the operator confirms Unlink on desk, the panel sends DELETE /api/machines/<id>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-machines-panel.ac3",
+            "title": "When the operator submits the Link dialog with defaults, it posts {pairingUrl, bothWays: true, access: operator} to /api/machines/link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-machines-panel.ac4",
+            "title": "test:frontend-subset in package.json contains src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi21-two-machine-smoke",
+        "title": "WI-21 Two-dashboard live smoke script",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "scripts/anywhere/two-machine-smoke.mjs"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "sequential",
+          "verify_commands": [
+            "npm run build",
+            "node scripts/anywhere/two-machine-smoke.mjs"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "the smoke script prints each step and exits 0"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-21 and D-4645-22. New scripts/anywhere/two-machine-smoke.mjs: requires npm run build; starts two node dist/dashboard/server.js with OVERDECK_HOME=<repo>/.tmp/anywhere-a|b on ports 3041/3042; starts a byte-logging TCP proxy in front of B; pan pair --url http://127.0.0.1:<proxyPort> --json on B and pan machines link <url> --allow-loopback on A so the pairing route and heartbeat cross the proxy; waits for both lists to show the other online (<= 15 s); kills B and asserts offline on A within 30 s; restarts B and asserts online within 60 s; asserts no HTTP/1.1 in the proxy capture; stops both processes; touches nothing outside .tmp/anywhere-*. Not in CI. The work agent runs it before pan done and pastes the output into the PR description."
+        },
+        "items": [
+          {
+            "id": "wi21-two-machine-smoke.ac1",
+            "title": "When run against a fresh build, the script exits 0 after both dashboards list each other as online within 15 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-two-machine-smoke.ac2",
+            "title": "When dashboard B is killed, the script observes offline on A within 30 s, and online within 60 s after B restarts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-two-machine-smoke.ac3",
+            "title": "The script fails with exit 1 naming the step when the proxy capture contains \"HTTP/1.1\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi22-docs",
+        "title": "WI-22 Documentation: architecture doc, user pages, nav, topic index, supersede headers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:17:19Z",
+        "metadata": {
+          "issueLabel": "pan-4645",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "CLAUDE.md",
+            "configuration/linked-machines.mdx",
+            "cli/machines.mdx",
+            "configuration/remote-access.mdx",
+            "docs.json",
+            "docs/DASHBOARD-AUTH.md",
+            "docs/SKILLS-CONVENTION.md",
+            ".pan/drafts/pan-2352.md",
+            ".pan/drafts/pan-2355.md",
+            ".pan/drafts/pan-2356.md",
+            ".pan/drafts/pan-3513.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c \"Superseded by\" .pan/drafts/pan-2352.md .pan/drafts/pan-2355.md .pan/drafts/pan-2356.md .pan/drafts/pan-3513.md",
+            "grep -n \"ANYWHERE-ARCHITECTURE\" CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "each of the four drafts reports a count of at least 1",
+            "CLAUDE.md prints one Topic Index row naming docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-22, content exactly as listed there: create docs/ANYWHERE-ARCHITECTURE.md (with the smoke section and the sibling-decisions placeholder), configuration/linked-machines.mdx, cli/machines.mdx; add the require_token_mint section to configuration/remote-access.mdx; add both new pages to the Overdeck Anywhere group in docs.json; add the CLAUDE.md Topic Index row; extend docs/DASHBOARD-AUTH.md; change the docs/SKILLS-CONVENTION.md:64 row; add the supersede line to pan-2352, pan-2355, pan-2356 and pan-3513 drafts; refresh the dashboard-auth paragraph and last-verified date in .overdeck/context/codebase/architecture.md."
+        },
+        "items": [
+          {
+            "id": "wi22-docs.ac1",
+            "title": "docs.json lists configuration/linked-machines and cli/machines in the Overdeck Anywhere group and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi22-docs.ac2",
+            "title": "cli/machines.mdx contains the link, list and unlink verbs with --one-way, --agent-fenced and --json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi22-docs.ac3",
+            "title": "configuration/remote-access.mdx contains a require_token_mint section stating that a trusted remote address, paired device or machine link turns it on and that YAML false cannot turn it off then",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi22-docs.ac4",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md contains the wire format, the supervisor thresholds (15 s, 17.5 s, 20 s, 45 s cap) and a \"Running the two-machine smoke\" section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi22-docs.ac5",
+            "title": "Line 1 of each of pan-2352.md, pan-2355.md, pan-2356.md and pan-3513.md contains \"Superseded by\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-machine-key",
+        "to": "wi2-secure-channel",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-secure-channel",
+        "to": "wi3-channel-listener",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-channel-listener",
+        "to": "wi4-machine-credential",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-machine-credential",
+        "to": "wi5-route-scope-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-route-scope-rows",
+        "to": "wi6-ws-rpc-scoped",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-ws-rpc-scoped",
+        "to": "wi7-ws-rpc-4401",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-conv-environment-local",
+        "to": "wi7-ws-rpc-4401",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-conversations-headroom",
+        "to": "wi9-conv-environment-local",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-conv-environment-local",
+        "to": "wi10-conv-environment-vault",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-channel-listener",
+        "to": "wi16-use-https-page",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-use-https-page",
+        "to": "wi12-pairing-exchange",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-ws-rpc-scoped",
+        "to": "wi12-pairing-exchange",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-link-store",
+        "to": "wi12-pairing-exchange",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-pairing-exchange",
+        "to": "wi13-machines-list-unlink",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-machines-list-unlink",
+        "to": "wi14-cli-machines",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-machine-credential",
+        "to": "wi15-token-mint-auto",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-link-store",
+        "to": "wi15-token-mint-auto",
+        "type": "blocks"
+      },
+      {
+        "from": "wi17-stall-record",
+        "to": "wi18-link-supervisor",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-machines-list-unlink",
+        "to": "wi18-link-supervisor",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-ws-rpc-4401",
+        "to": "wi18-link-supervisor",
+        "type": "blocks"
+      },
+      {
+        "from": "wi18-link-supervisor",
+        "to": "wi19-advertised-endpoints",
+        "type": "blocks"
+      },
+      {
+        "from": "wi18-link-supervisor",
+        "to": "wi20-machines-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "wi19-advertised-endpoints",
+        "to": "wi20-machines-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-cli-machines",
+        "to": "wi21-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi19-advertised-endpoints",
+        "to": "wi21-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-cli-machines",
+        "to": "wi22-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi15-token-mint-auto",
+        "to": "wi22-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi16-use-https-page",
+        "to": "wi22-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi19-advertised-endpoints",
+        "to": "wi22-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi20-machines-panel",
+        "to": "wi22-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi21-two-machine-smoke",
+        "to": "wi22-docs",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "active"
+}

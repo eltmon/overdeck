@@ -1,0 +1,110 @@
+---
+title: Linked machines
+description: Link two machines' dashboards over an encrypted channel, learn routes, and watch each other's health
+---
+
+# Linked machines
+
+Each machine runs its own Overdeck and owns its own conversations, agents and
+credentials. A **machine link** lets one machine's dashboard reach another machine's
+dashboard: the two servers talk to each other over an end-to-end encrypted channel, so
+this machine can show and control what runs on the other one. Your browser still talks
+only to the machine it opened. Released in v0.73.0.
+
+A link is one direction. **Link both ways** (the default) creates the mirror link in the
+same step, so either dashboard can show both machines.
+
+## Link a machine
+
+On the machine you want to reach, create a pairing link, exactly as for a device:
+
+```bash
+pan pair
+```
+
+or **Settings → Anywhere → Pair a device**. The link looks like
+`https://desk.tailnet.ts.net/#pair=odp_…` and works once, for ten minutes.
+
+On the machine that should reach it, paste the link:
+
+```bash
+pan machines link https://desk.tailnet.ts.net/#pair=odp_…
+```
+
+or **Settings → Anywhere → Machines → Link a machine**. The dialog takes the pairing
+link, the access level and the **Link both ways** checkbox. Linking takes a few seconds:
+the two machines prove their keys to each other through the pairing code, exchange
+tokens, and the new link shows up as **Online** on both sides.
+
+Both servers on one host (for a test) need `--allow-loopback`, because a `localhost`
+pairing link only works on the machine that printed it.
+
+## Access levels
+
+| Level | What this machine may do on the other | Flag |
+| --- | --- | --- |
+| **Operator-level** (default) | Read and control the other machine's conversations, agents and terminals as the operator. | none |
+| **Agent-fenced** | Only what an agent on this machine is allowed to do, within that agent's own scopes; requests are stamped with the agent and are never operator-level. | `--agent-fenced` |
+
+Neither level can pair devices, mint tokens or change the other machine's settings. The
+other machine refuses those routes to any linked machine.
+
+## What is encrypted
+
+Everything, on every route. The channel is a Noise protocol session (X25519,
+ChaCha20-Poly1305) between the two machine keys; the pairing code only introduces the
+keys. Every request, the event stream and every terminal that crosses a link runs inside
+the channel. A machine's key lives in `~/.overdeck/machine-key.json`, mode 0600, and its
+fingerprint (five groups of four hex characters) is shown next to each link so you can
+compare it with the other machine's **This machine** line.
+
+## Routes
+
+A link keeps a list of ways to reach the other machine, best first: a LAN address, a
+Tailscale address, then public or relayed ones. Where they come from:
+
+- The **pairing** address is the one in the pairing link.
+- **Advertised** addresses are learned from the other machine itself: its LAN and
+  Tailscale addresses, and its Tailscale Serve name when it has one. When a better one
+  answers, the link moves to it within a minute. Addresses the other machine stops
+  advertising are dropped.
+- **Add route** (in the expanded route list) adds an address you know works, for
+  example an SSH-forwarded port: `tcp://127.0.0.1:3041`.
+
+Expand a link's **Routes** to see each address, its kind, where it came from and whether
+it answered last time.
+
+## States
+
+| State | Meaning |
+| --- | --- |
+| **Online** | Heartbeats arrive every 15 s over the channel. |
+| **Connecting** | A heartbeat is late (17.5 s); every route is being tried while the old channel stays open. |
+| **Offline** | No heartbeat for 20 s and no route answered. Retries back off from 1 s to 45 s; the link comes back within a minute of the other machine returning. |
+| **Unsupported** | The other machine runs an Overdeck without machine links, or another link protocol. The state names the version to install; **Reconnect** tries again. |
+| **Revoked** | The other machine removed this machine's access. Link again with a new pairing link. |
+
+When a link drops, the row says why. **froze** means the other dashboard's event loop
+stalled (it reports its own stalls in the next heartbeat, so a frozen machine is told
+apart from a dead network); **network** means nothing arrived.
+
+## Unlink
+
+**Unlink** on a link (or `pan machines unlink <label>`) removes it here and tells the
+other machine to drop its access token for this machine. If the other machine is
+unreachable, it sees the link as **Revoked** when it next connects. The **Inbound** list
+shows machines that hold access to this one; **Remove** revokes one and closes its open
+connections.
+
+## Troubleshooting
+
+- **Unsupported**: update Overdeck on the machine the state names, then **Reconnect**.
+- **Revoked**: the other side unlinked. Create a new pairing link there and link again.
+- **Offline with "ECONNREFUSED"**: the other dashboard is not running, or no advertised
+  address reaches it from here. Add a route you know works.
+- **Offline with "closed the connection before proving the pinned machine key"**: every
+  route answered but none proved the expected key. Either the other machine's key changed
+  (its `machine-key.json` was replaced) or a proxy answered for a dead peer. Unlink and
+  link again if the key really changed.
+- The link exists but `require_token_mint` turned itself on: that is expected. Any remote
+  access turns it on; see [Remote access](/configuration/remote-access#local-reverse-proxies-require_token_mint).
