@@ -95,6 +95,7 @@ import { startProjectCiRefillAfterProjectionReady } from './services/project-ci-
 import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive, dropPipelineStateMirrorTables, dropDeadIssuesForeignKeys } from '../../lib/overdeck/infra.js';
 import { bootConversationEnvironment } from '../../lib/overdeck/conversation-environment.js';
+import { startAnywhere } from './services/anywhere-boot.js';
 import { startServerBootTelemetry } from './telemetry.js';
 import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { isSmeeConfigured, startSmeeProcess } from '../../lib/smee.js';
@@ -221,6 +222,7 @@ if (typeof Bun !== 'undefined') {
   runMain(main as never);
 }
 await whenDashboardListening();
+void startAnywhere({ primary: !isPeerDashboardProcess() }).catch((err) => console.warn('[anywhere] boot failed (non-fatal):', err)); // PAN-4645 D-4645-21
 startServerBootTelemetry();
 
 startEventLoopMonitor();

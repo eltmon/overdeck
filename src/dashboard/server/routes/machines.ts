@@ -58,6 +58,11 @@ export function setLinkStatusSource(source: LinkStatusSource | null): void {
   statusSource = source;
 }
 
+/** A link was created or removed: let the supervisor pick it up now rather than on its next tick. */
+export function notifyLinksChanged(): void {
+  statusSource?.reconcile?.();
+}
+
 function inboundView(record: PublicAccessTokenRecord): InboundMachineView {
   return {
     tokenId: record.id,
@@ -105,6 +110,7 @@ export async function handleMachinesUnlink(
   }
   closeChannelsForPeer(link.machineKey);
   await removeLink(link.id);
+  notifyLinksChanged();
   emitActivityEntry({
     source: 'dashboard',
     level: 'info',
@@ -202,6 +208,7 @@ const linkRoute = HttpRouter.add(
       return jsonResponse({ error: 'link-failed', message: (error as Error).message }, { status: 500 });
     }
     const { link, view } = outcome.result;
+    notifyLinksChanged();
     emitActivityEntry({
       source: 'dashboard',
       level: 'info',
@@ -252,6 +259,22 @@ const unlinkRoute = HttpRouter.add(
   }),
 );
 
+const reconnectRoute = HttpRouter.add(
+  'POST',
+  '/api/machines/:id/reconnect',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = refuseChannel(request) ?? rejectUnauthorizedDashboardRequest(request);
+    if (refused) return refused;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const link = yield* Effect.promise(() => getLink(id));
+    if (!link) return jsonResponse({ error: `no machine link matches ${id}` }, { status: 404 });
+    if (!statusSource?.reconnect) return jsonResponse({ error: 'the link supervisor is not running on this dashboard' }, { status: 503 });
+    const started = statusSource.reconnect(link.id);
+    return jsonResponse({ ok: started, link: machineLinkView(link, null, statusSource) }, { status: started ? 200 : 409 });
+  }),
+);
+
 const inboundRevokeRoute = HttpRouter.add(
   'DELETE',
   '/api/machines/inbound/:tokenId',
@@ -264,4 +287,4 @@ const inboundRevokeRoute = HttpRouter.add(
   }),
 );
 
-export const machinesRouteLayer = Layer.mergeAll(linkRoute, listRoute, selfRevokeRoute, unlinkRoute, inboundRevokeRoute);
+export const machinesRouteLayer = Layer.mergeAll(linkRoute, listRoute, selfRevokeRoute, unlinkRoute, reconnectRoute, inboundRevokeRoute);

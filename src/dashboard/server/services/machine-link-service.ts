@@ -274,18 +274,22 @@ export async function createMachineLink(
   }
 }
 
-/** Live state for a link; WI-18's supervisor provides the real one. */
+/** Live state for a link; the link supervisor (WI-18) provides the real one. */
 export interface LinkStatusSource {
-  status(linkId: string): Pick<MachineLinkView, 'state' | 'stateDetail' | 'currentRoute' | 'lastHeartbeatAt' | 'incident'> & {
+  status(linkId: string): Pick<MachineLinkView, 'state' | 'stateDetail' | 'currentRoute' | 'lastHeartbeatAt' | 'incident' | 'peerVersion'> & {
     routeStatus: (url: string) => MachineLinkView['routes'][number]['status'];
   };
+  /** Reset back-off and probe now; false for an unknown or revoked link. */
+  reconnect?(linkId: string): boolean;
+  /** Pick up links the store gained or lost. */
+  reconcile?(): void;
 }
 
 export const connectingStatusSource: LinkStatusSource = {
-  status: () => ({ state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, routeStatus: () => 'untried' }),
+  status: () => ({ state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, routeStatus: () => 'untried' }),
 };
 
-/** The public face of a link: never the token. */
+/** The public face of a link: never the token. `peerVersion` falls back to what the caller learned when the source has none. */
 export function machineLinkView(link: MachineLink, peerVersion: string | null, source: LinkStatusSource = connectingStatusSource): MachineLinkView {
   const live = source.status(link.id);
   return {
@@ -300,7 +304,7 @@ export function machineLinkView(link: MachineLink, peerVersion: string | null, s
     routes: link.routes.map((route) => ({ url: route.url, kind: route.kind, source: route.source, status: live.routeStatus(route.url) })),
     lastHeartbeatAt: live.lastHeartbeatAt,
     incident: live.incident,
-    peerVersion,
+    peerVersion: live.peerVersion ?? peerVersion,
     createdAt: link.createdAt,
   };
 }

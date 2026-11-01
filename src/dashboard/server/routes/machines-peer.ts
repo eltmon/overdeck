@@ -8,8 +8,8 @@
  * environment's previous one, D-4645-18) and, when the caller sent a reverse
  * token, writes this machine's own link back to it.
  */
-import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
+import { Effect, Layer, Stream } from 'effect';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { type AdvertisedEndpoint, ROUTE_KINDS } from '@overdeck/contracts';
 
 import {
@@ -24,8 +24,13 @@ import { upsertLink } from '../../../lib/anywhere/link-store.js';
 import { type LinkRoute, mergeAdvertised } from '../../../lib/anywhere/routes.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
+import { endStreamOnDeviceRevocation } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
+import { startHeartbeatSource } from '../services/link-heartbeat.js';
+import { resolveRequestCredential } from './dashboard-auth.js';
 import { buildEnvironmentDescriptor } from './environment.js';
+import { notifyLinksChanged } from './machines.js';
+import { getOverdeckVersion } from './misc/shared.js';
 
 const MAX_LABEL_LENGTH = 200;
 
@@ -112,6 +117,7 @@ export async function handleMachinesExchange(
     });
     if (replaced?.reverseTokenId && replaced.reverseTokenId !== record.id) await revokeAccessToken(replaced.reverseTokenId).catch(() => null);
     reverseLinkId = link.id;
+    notifyLinksChanged();
   }
 
   emitActivityEntry({
@@ -135,4 +141,54 @@ const exchangeRoute = HttpRouter.add(
   }),
 );
 
-export const machinesPeerRouteLayer = Layer.mergeAll(exchangeRoute);
+/**
+ * `GET /api/machines/heartbeat` (WI-18, D-4645-7): a linked machine's supervisor
+ * holds this stream open over its channel. Exactly a machine credential may
+ * open it; revoking that credential ends the stream.
+ */
+const heartbeatRoute = HttpRouter.add(
+  'GET',
+  '/api/machines/heartbeat',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const credential = resolveRequestCredential(request);
+    if (credential?.kind !== 'machine') {
+      return jsonResponse({ error: 'the heartbeat is for linked machines only' }, { status: 403 });
+    }
+    const serverVersion = yield* Effect.promise(() => getOverdeckVersion());
+    const encoder = new TextEncoder();
+    let stop: (() => void) | null = null;
+    const nodeStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const source = startHeartbeatSource(serverVersion, (chunk) => {
+          try {
+            controller.enqueue(encoder.encode(chunk));
+          } catch {
+            source.stop();
+          }
+        });
+        stop = () => {
+          source.stop();
+          try {
+            controller.close();
+          } catch {
+            /* already closed */
+          }
+        };
+      },
+      cancel() {
+        stop?.();
+        stop = null;
+      },
+    });
+    const body = endStreamOnDeviceRevocation(
+      Stream.fromReadableStream<Uint8Array, unknown>({ evaluate: () => nodeStream, onError: (error) => error }),
+      credential,
+    );
+    return HttpServerResponse.stream(body, {
+      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' },
+    });
+  }),
+);
+
+export const machinesPeerRouteLayer = Layer.mergeAll(exchangeRoute, heartbeatRoute);

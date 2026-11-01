@@ -59,6 +59,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // PAN-4645 WI-13: a linked machine revokes its own token (the route then
   // requires exactly a machine credential).
   { method: 'DELETE', path: '/api/machines/self', scope: 'read:state' },
+  // PAN-4645 WI-18: the heartbeat stream a linked machine holds open.
+  { method: 'GET', path: '/api/machines/heartbeat', scope: 'read:state' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

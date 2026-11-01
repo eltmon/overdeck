@@ -175,6 +175,11 @@ export class ChannelSocket extends Duplex {
     callback(error);
   }
 
+  /** The idle timeout in force (`net.Socket.timeout`); `http.Agent` reads it when pooling. */
+  get timeout(): number {
+    return this.idleMs;
+  }
+
   /** Idle timeout with `net.Socket` semantics: `0` disables, otherwise `'timeout'` fires after `ms` without traffic. */
   setTimeout(ms: number, callback?: () => void): this {
     this.clearIdle();
