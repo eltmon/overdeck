@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T18:47:10.711Z",
+  "updated": "2026-11-01T18:48:04.678Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -25,6 +25,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4652",
       "claimedAt": "2026-11-01T18:47:10.711Z"
+    },
+    "wi4-fly-instance-route-param": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T18:48:04.678Z"
     }
   }
 }
