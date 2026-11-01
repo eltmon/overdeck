@@ -39,7 +39,7 @@ export interface ParsedRouteUrl {
 
 const RTC_ROUTE_RE = /^rtc(\+turn)?:\/\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/;
 
-const SOURCE_RANK: Record<RouteSource, number> = { manual: 0, pairing: 1, advertised: 2 };
+const SOURCE_RANK: Record<RouteSource, number> = { manual: 0, pairing: 1, advertised: 2, directory: 3 };
 const TRANSPORT_RANK: Record<TransportKind, number> = { tcp: 0, wss: 1, rtc: 2 };
 
 function stripBrackets(host: string): string {

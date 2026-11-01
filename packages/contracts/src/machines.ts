@@ -19,8 +19,11 @@ export const ROUTE_KINDS = ["lan", "tailnet", "ssh", "public", "direct", "relay"
 export const RouteKind = Schema.Literals(ROUTE_KINDS)
 export type RouteKind = typeof RouteKind.Type
 
-/** Where a route on a link came from. */
-export const RouteSource = Schema.Literals(["pairing", "manual", "advertised"])
+/**
+ * Where a route on a link came from. `directory` routes (PAN-2356) are dynamic: offered while the
+ * overdeck.ai directory lists the peer, never stored in machine-links.json.
+ */
+export const RouteSource = Schema.Literals(["pairing", "manual", "advertised", "directory"])
 export type RouteSource = typeof RouteSource.Type
 
 /** An endpoint a machine advertises in its descriptor (`lan` and `tailnet` only in this issue). */

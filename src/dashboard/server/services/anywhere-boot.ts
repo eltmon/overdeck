@@ -18,6 +18,7 @@ import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js'
 import { setLinkStatusSource, setPeerUnlinkNotifier } from '../routes/machines.js';
 import { getOverdeckVersion } from '../routes/misc/shared.js';
 import { DirectoryClient, defaultOpenSocket, setDirectoryClient } from './directory-client.js';
+import { directoryRoutesFor } from './directory-routes.js';
 import { startDirectoryRtc, stopDirectoryRtc } from './directory-rtc.js';
 import { setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
@@ -69,7 +70,12 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   // run the same secure-channel handshake as TCP.
   startDirectoryRtc(directory);
 
-  supervisor = new LinkSupervisor(defaultLinkSupervisorDeps(serverVersion));
+  supervisor = new LinkSupervisor({
+    ...defaultLinkSupervisorDeps(serverVersion),
+    // WI-12: direct, relay and directory-reported routes, offered while the directory lists the peer.
+    dynamicRoutes: (link) => directoryRoutesFor(link, directory),
+    relayEntitled: () => directory?.relayEntitled() ?? false,
+  });
   supervisor.start();
   setLinkStatusSource(supervisor);
   setLinkRouteSource(supervisor);
