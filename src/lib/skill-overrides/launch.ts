@@ -89,13 +89,19 @@ export async function resolveLaunchPackSelection(
   ctx: LaunchSkillContext,
   exclude: ReadonlySet<string> = new Set(),
 ): Promise<{ selection: MountSelection; warnings: string[] }> {
-  const [{ resolvePackSkill, resolvePackToggle }, { listPackCatalog }, { packExtractDir, packRenderDir }, { KNOWN_PACKS }] =
-    await Promise.all([
-      import('./resolve.js'),
-      import('./catalog.js'),
-      import('../skill-packs/sources.js'),
-      import('../skill-packs/adapters.js'),
-    ]);
+  const [
+    { resolvePackSkill, resolvePackToggle },
+    { listPackCatalog },
+    { packExtractDir, packRenderDir },
+    { KNOWN_PACKS },
+    { GSTACK_BROWSER_SKILLS },
+  ] = await Promise.all([
+    import('./resolve.js'),
+    import('./catalog.js'),
+    import('../skill-packs/sources.js'),
+    import('../skill-packs/adapters.js'),
+    import('../skill-packs/gstack.js'),
+  ]);
   const [layers, packs] = await Promise.all([loadLaunchLayers(ctx), listPackCatalog()]);
   const selection: MountSelection = { packs: [] };
   const warnings: string[] = [];
@@ -108,6 +114,14 @@ export async function resolveLaunchPackSelection(
         warnings.push(`[launcher] WARNING: skill pack ${pack.id} not cached; run pan skills pack sync ${pack.id}`);
       }
       continue;
+    }
+    // PAN-4730 D8: consent recorded but the browser runtime not built; launches never build, so they warn.
+    if (pack.browser === 'missing') {
+      const browserSkillOn = [layers.conversation, layers.global, layers.project, layers.issue].some(map =>
+        Object.entries(map ?? {}).some(([id, enabled]) => enabled && GSTACK_BROWSER_SKILLS.some(name => id === `${pack.id}/${name}`)));
+      if (browserSkillOn || resolvePackToggle(pack.id, layers).enabled) {
+        warnings.push(`[launcher] WARNING: gstack browser runtime not built; run pan skills pack sync ${pack.id}`);
+      }
     }
     const skills = pack.manifest.skills
       .filter(skill => resolvePackSkill(`${pack.id}/${skill.name}`, skill.optIn, layers).enabled)

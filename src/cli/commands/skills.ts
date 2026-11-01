@@ -379,7 +379,9 @@ export async function skillsPackListCommand(options: PackListOptions): Promise<v
     license: pack.manifest?.license ?? null,
     skills: pack.manifest?.skills.length ?? 0,
     notApplied: pack.manifest ? notAppliedLabels(pack.manifest.capabilities) : [],
-    ...(options.offline ? {} : { updateAvailable: await packUpdateAvailable(pack) }),
+    ...(options.offline
+      ? {}
+      : { updateAvailable: await packUpdateAvailable({ id: pack.id, url: pack.url, ref: pack.ref, commit: pack.commit }) }),
   })));
   if (options.json) {
     console.log(JSON.stringify(rows, null, 2));

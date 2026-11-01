@@ -487,6 +487,74 @@ describe('skill pack launch (PAN-4334)', () => {
       expect(ready).toMatchObject({ adapter: 'gstack-runtime', cached: true });
       expect(ready?.manifest?.skills.map((s) => s.name)).toEqual(['review']);
     });
+
+    describe('browser runtime (PAN-4730)', () => {
+      const browserMarker = join(renderRoot, '.gstack-pack-browser.json');
+
+      /** A rendered gstack pack holding review, qa (browser) and ship (browser-opt-in); the real catalog reads it. */
+      async function browserFixture(opts: { consent: boolean; built: boolean }): Promise<void> {
+        for (const root of [packExtractDir('gstack', GSTACK_COMMIT), renderRoot]) {
+          for (const name of ['review', 'qa', 'ship']) {
+            mkdirSync(join(root, name), { recursive: true });
+            writeFileSync(join(root, name, 'SKILL.md'), `---\nname: ${name}\ndescription: ${name}.\n---\n`);
+          }
+        }
+        writeFileSync(join(renderRoot, '.gstack-pack.json'), '{"packMode":1}\n');
+        if (opts.built) writeFileSync(browserMarker, '{"packBrowser":1}\n');
+        else rmSync(browserMarker, { force: true });
+        await writePackEntry({
+          id: 'gstack',
+          url: 'https://github.com/eltmon/gstack',
+          ref: 'main',
+          commit: GSTACK_COMMIT,
+          ...(opts.consent ? { browser: true as const } : {}),
+        });
+        const { listPackCatalog: real } = await vi.importActual<typeof import('../catalog.js')>('../catalog.js');
+        listPackCatalog.mockImplementation(real);
+      }
+      const mounted = (name: string) => existsSync(join(link, 'gstack', 'skills', name, 'SKILL.md'));
+
+      it('consent and a built runtime mount browser skills with the pack, browser-opt-in ones stay off', async () => {
+        await browserFixture({ consent: true, built: true });
+        loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { gstack: true } } });
+        expect(await applyClaudePacks(ctx, link)).toEqual([]);
+        expect([mounted('review'), mounted('qa'), mounted('ship')]).toEqual([true, true, false]);
+      });
+
+      it('a per-skill on mounts a browser-opt-in skill', async () => {
+        await browserFixture({ consent: true, built: true });
+        loadSkillOverrideLayers.mockResolvedValue({ global: { 'gstack/ship': true }, packs: { project: { gstack: true } } });
+        expect(await applyClaudePacks(ctx, link)).toEqual([]);
+        expect([mounted('qa'), mounted('ship')]).toEqual([true, true]);
+      });
+
+      it('consent without a built runtime mounts no browser skill and warns', async () => {
+        await browserFixture({ consent: true, built: false });
+        loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { gstack: true } } });
+        expect(await applyClaudePacks(ctx, link)).toEqual([
+          '[launcher] WARNING: gstack browser runtime not built; run pan skills pack sync gstack',
+        ]);
+        expect([mounted('review'), mounted('qa')]).toEqual([true, false]);
+      });
+
+      it('a built runtime without consent mounts no browser skill and does not warn', async () => {
+        await browserFixture({ consent: false, built: true });
+        loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { gstack: true } } });
+        expect(await applyClaudePacks(ctx, link)).toEqual([]);
+        expect([mounted('review'), mounted('qa')]).toEqual([true, false]);
+      });
+
+      it('catalog reports the browser state', async () => {
+        const { listPackCatalog: real } = await vi.importActual<typeof import('../catalog.js')>('../catalog.js');
+        const row = async () => (await real()).find((pack) => pack.id === 'gstack')?.browser;
+        await browserFixture({ consent: false, built: true });
+        expect(await row()).toBe('off');
+        await browserFixture({ consent: true, built: false });
+        expect(await row()).toBe('missing');
+        await browserFixture({ consent: true, built: true });
+        expect(await row()).toBe('ready');
+      });
+    });
   });
 
   it('writes the Codex pack block for the same selection', async () => {
