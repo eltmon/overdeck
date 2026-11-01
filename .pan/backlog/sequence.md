@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T18:03:04.839861Z · model: claude-opus-5-5 · open: 857_
+_Last sequenced: 2026-11-01T18:11:31.073431Z · model: claude-opus-5-5 · open: 857_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -274,7 +274,7 @@ _Last sequenced: 2026-11-01T18:03:04.839861Z · model: claude-opus-5-5 · open: 
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
-| 276 | PAN-4651 | L | medium | needs-refinement |  | PAN-4650 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
+| 276 | PAN-4651 | L | medium | ok |  | PAN-4650, PAN-4652 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
 | 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
 | 278 | PAN-4730 | L | medium | needs-refinement |  | PAN-4727 | Opt-in gstack browser/design/PDF runtime so 21 needs-binary skills (qa, browse) mount; blocked on PAN-4727; scope open for PRD |
 | 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
@@ -561,7 +561,7 @@ _Last sequenced: 2026-11-01T18:03:04.839861Z · model: claude-opus-5-5 · open: 
 | 564 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
 | 565 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
 | 566 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 567 | PAN-4652 | L | medium | needs-refinement |  |  | Fly VMs as machines: pan serve on the VM, linked at spawn; link foundation PAN-4645 merged, so W-FLY2 is unblocked. Body pending. |
+| 567 | PAN-4652 | L | medium | ok |  | PAN-4650 | Fly VMs as machines: pan serve on the VM, linked at spawn; link foundation PAN-4645 merged, so W-FLY2 is unblocked. Body pending. |
 | 568 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 569 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
 | 570 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
@@ -1192,7 +1192,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T18:03:04.839861Z",
+  "generatedAt": "2026-11-01T18:11:31.073431Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 857,
@@ -4539,9 +4539,10 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "size": "L",
       "importance": "medium",
       "score": 50,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
-        "PAN-4650"
+        "PAN-4650",
+        "PAN-4652"
       ],
       "why": "Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending.",
       "rationale": "Rank held: dependency PAN-4645 closed as completed on 2026-11-01; PAN-4650 still gates this issue, so order is unchanged.",
@@ -8068,8 +8069,10 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "size": "L",
       "importance": "medium",
       "score": 50,
-      "condition": "needs-refinement",
-      "dependsOn": [],
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4650"
+      ],
       "why": "Fly VMs as machines: pan serve on the VM, linked at spawn; link foundation PAN-4645 merged, so W-FLY2 is unblocked. Body pending.",
       "rationale": "Rank held: its only dependency PAN-4645 closed as completed on 2026-11-01, so it is now unblocked, but the body is still a placeholder (needs-refinement).",
       "gate": "auto",
@@ -13071,15 +13074,15 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "from": "PAN-4650",
       "to": "PAN-4651",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-4652",
       "to": "PAN-4651",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.6
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-4651",
@@ -13190,6 +13193,20 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "from": "PAN-4727",
       "to": "PAN-4730",
       "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4650",
+      "to": "PAN-4652",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4651",
+      "to": "PAN-4405",
+      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     }
