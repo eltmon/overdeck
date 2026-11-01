@@ -61,6 +61,9 @@ so it works from any browser that can open this dashboard:
 **Test** in the dialog (or `pan machines test-ssh <host>`) runs only step 2. The host field
 suggests the concrete `Host` aliases of this machine's `~/.ssh/config`.
 
+To set a server up from the server itself instead (a lasting service that survives
+logout and reboot), use [Link a fresh server](#link-a-fresh-server).
+
 ### Requirements
 
 - OpenSSH (`ssh`) on this machine, on the dashboard's `PATH`.
@@ -97,6 +100,20 @@ local port when its port is taken. When SSH refuses the login or the host key, t
 stops retrying and the row shows **forward attention** with the reason. Fix the key or the
 host key, then press **Reconnect**, which restarts the forward and starts or adopts the
 host's server again.
+
+## Link a fresh server
+
+To link a server you reach over SSH, one command on the server does everything: it
+installs Overdeck as a service that survives logout and reboot, starts it, and prints the
+link.
+
+```bash
+# on the server, over SSH
+npx @overdeck/core connect
+```
+
+Then run the `pan machines link '…'` line it prints on your laptop. See
+[`pan connect`](/cli/machines#connect) for lingering, macOS, firewalls and removal.
 
 ## Access levels
 

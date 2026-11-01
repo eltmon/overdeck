@@ -38,6 +38,8 @@ import { saveSnapshotToCache } from './snapshotCache'
 export type DrawerState = {
   issueId: string | null
   tab: string
+  // PAN-4717: fallback tracker URL for issues absent from the dashboard snapshot.
+  trackerUrl?: string
 }
 
 export interface DashboardState extends ReadModelState {
@@ -64,7 +66,7 @@ export interface DashboardStore extends DashboardState {
    * in the store win on id collisions.
    */
   seedRecentActivity(entries: unknown[]): void
-  openIssue(issueId: string, tab?: string): void
+  openIssue(issueId: string, tab?: string, trackerUrl?: string): void
   openIssueFromRoute(issueId: string, parentPath: string, routePath: string): void
   closeIssue(): void
   openTasksViewer(issueId: string): void
@@ -210,9 +212,9 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
       return { recentActivity: merged }
     }),
 
-  openIssue: (issueId, tab = 'conversation') => {
+  openIssue: (issueId, tab = 'conversation', trackerUrl) => {
     directIssueRoute = null
-    const drawer = { issueId, tab }
+    const drawer = trackerUrl ? { issueId, tab, trackerUrl } : { issueId, tab }
     replaceDrawerUrl(drawer)
     set({ drawer })
   },
@@ -248,7 +250,9 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
 
   setDrawerTab: (tab) =>
     set((state) => {
-      const drawer = { issueId: state.drawer.issueId, tab }
+      const drawer = state.drawer.trackerUrl
+        ? { issueId: state.drawer.issueId, tab, trackerUrl: state.drawer.trackerUrl }
+        : { issueId: state.drawer.issueId, tab }
       replaceDrawerUrl(drawer)
       return { drawer }
     }),

@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T14:48:15Z · model: claude-opus-5-5 · open: 860_
+_Last sequenced: 2026-11-01T15:12:32Z · model: claude-opus-5-5 · open: 862_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 2 | PAN-4723 | S | critical | ok |  |  | In pipeline: flaky create-workspace-row test turned main red via an unmocked git call in a non-git temp dir; red main stalls merges |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 5 | PAN-4717 | S | high | ok |  |  | In pipeline: conversation issue links may open an empty drawer for issues absent from the snapshot; CodeRabbit follow-up to #4716. |
 | 6 | PAN-4714 | S | medium | ok |  |  | In pipeline: an issue link in a conversation opens the issue drawer, not a GitHub tab; modifier clicks keep the tracker link. |
@@ -276,6 +277,7 @@ _Last sequenced: 2026-11-01T14:48:15Z · model: claude-opus-5-5 · open: 860_
 | 272 | PAN-4654 | M | medium | ok |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 275 | PAN-4722 | S | medium | ok |  | PAN-4654, PAN-4656 | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix instead. Follow-up to PAN-4654/4656. |
 | 276 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
 | 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
 | 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
@@ -872,6 +874,10 @@ _Last sequenced: 2026-11-01T14:48:15Z · model: claude-opus-5-5 · open: 860_
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
+### PAN-4723 (rank 2)
+
+New issue since the prior run, already in pipeline: a flaky unit test turned main CI red, and a red main empties the merge gate for every PR, so it takes the free rank-2 slot as critical substrate work.
+
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1184,10 +1190,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
 
 Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
 
-### PAN-3096 (rank 82)
-
-New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1195,10 +1197,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T14:48:15Z",
+  "generatedAt": "2026-11-01T15:12:32Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 860,
+  "openCount": 862,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -11929,6 +11931,35 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "rationale": "New in-pipeline follow-up to PAN-4714 (merged as #4716) fixing an unreviewed CodeRabbit finding; pinned into a free top-tier slot next to its parent and not re-ranked.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4722",
+      "rank": 275,
+      "size": "S",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4654",
+        "PAN-4656"
+      ],
+      "why": "Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix instead. Follow-up to PAN-4654/4656.",
+      "rationale": "New issue: a correctness bug in in-pipeline PAN-4654's Update all for runtime installs from PAN-4656; ranked beside the fleet work it fixes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4723",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: flaky create-workspace-row test turned main red via an unmocked git call in a non-git temp dir; red main stalls merges",
+      "rationale": "New issue since the prior run, already in pipeline: a flaky unit test turned main CI red, and a red main empties the merge gate for every PR, so it takes the free rank-2 slot as critical substrate work.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13359,6 +13390,20 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-4654",
+      "to": "PAN-4722",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4656",
+      "to": "PAN-4722",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
     }
   ]
 }

@@ -12,6 +12,12 @@ import { IssueDrawerAvailableContext } from '../drawer/issueDrawerAvailableConte
  * (the standalone pop-outs, `/m`), `IssueDrawerAvailableContext` is `false`
  * and the link stays a plain anchor — a review fix after PAN-4714's first
  * cycle found the click was otherwise swallowed there.
+ *
+ * PAN-4717: the drawer opens even for an issue absent from the dashboard
+ * snapshot. The server backfills aged-out closed issues (PAN-3659), but a
+ * current-cycle-filtered or unresolvable issue never hydrates — so the link
+ * always passes its own href through to openIssue, stored as
+ * drawer.trackerUrl, letting the drawer's tracker button still work.
  */
 export function TranscriptIssueLink({ href, issueRef, className, children }: {
   href: string;
@@ -44,7 +50,7 @@ export function TranscriptIssueLink({ href, issueRef, className, children }: {
     if (!issueId || event.defaultPrevented || event.button !== 0
       || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
-    openIssue(issueId, 'overview');
+    openIssue(issueId, 'overview', href);
   };
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" className={className}

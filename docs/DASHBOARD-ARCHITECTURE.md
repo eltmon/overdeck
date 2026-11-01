@@ -454,7 +454,15 @@ door that does not exist; a real record read door would be a separate change.
   mobile app (`/m`) also render `ConversationPanel` but don't mount the
   drawer, so the context defaults to `false` there and issue links keep their
   plain new-tab behaviour (review fix after the first PAN-4714 review cycle
-  found the click otherwise went to a nonexistent drawer).
+  found the click otherwise went to a nonexistent drawer). PAN-4717: the
+  drawer opens even for an issue absent from the dashboard snapshot —
+  `useIssueData` subscribes `subscribeIssueEvents` regardless, and
+  `backfillIssue` (PAN-3659) loads aged-out closed issues, whose row arrives
+  as `issues.delta` on the global stream. `backfillIssue` cannot load a
+  current-cycle-filtered (backlog, canceled) or otherwise unresolvable issue,
+  so the link passes its own href as `openIssue(id, 'overview', href)`,
+  stored as `drawer.trackerUrl` (never written to the URL), and the header's
+  tracker button falls back to it when the issue row carries no `url`.
 - Conversation schedules (PAN-4640): the `conversation_schedules` table holds one
   prompt, a 5-field cron, an IANA `time_zone`, `enabled`, `next_run_at`, and the
   last run's time, status (`delivered`, `failed`, `skipped`) and error, deleted with

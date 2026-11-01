@@ -24,6 +24,7 @@ const REGISTERED_PROJECTS = [
 ];
 
 const originalOpenIssue = useDashboardStore.getState().openIssue;
+const originalIssuesRaw = useDashboardStore.getState().issuesRaw;
 const openIssueMock = vi.fn();
 const fetchMock = vi.fn();
 
@@ -57,7 +58,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  useDashboardStore.setState({ openIssue: originalOpenIssue });
+  useDashboardStore.setState({ openIssue: originalOpenIssue, issuesRaw: originalIssuesRaw });
 });
 
 describe('ChatMarkdown issue links (PAN-4714)', () => {
@@ -69,7 +70,7 @@ describe('ChatMarkdown issue links (PAN-4714)', () => {
     expect(fireEvent.click(link)).toBe(false);
 
     expect(openIssueMock).toHaveBeenCalledOnce();
-    expect(openIssueMock).toHaveBeenCalledWith('PAN-4645', 'overview');
+    expect(openIssueMock).toHaveBeenCalledWith('PAN-4645', 'overview', 'https://github.com/eltmon/overdeck/issues/4645');
     expect(window.open).not.toHaveBeenCalled();
   });
 
@@ -81,7 +82,7 @@ describe('ChatMarkdown issue links (PAN-4714)', () => {
     expect(fireEvent.click(link)).toBe(false);
 
     expect(openIssueMock).toHaveBeenCalledOnce();
-    expect(openIssueMock).toHaveBeenCalledWith('MIN-663', 'overview');
+    expect(openIssueMock).toHaveBeenCalledWith('MIN-663', 'overview', 'https://linear.app/mindyournow/issue/min-663/some-title');
   });
 
   it('keeps the new tab on every modifier and middle-click', async () => {
@@ -153,5 +154,36 @@ describe('ChatMarkdown issue links (PAN-4714)', () => {
     expect(fetchMock).not.toHaveBeenCalledWith('/api/registered-projects');
     expect(fireEvent.click(link)).toBe(true);
     expect(openIssueMock).not.toHaveBeenCalled();
+  });
+
+  it('opens the drawer for an issue absent from the store snapshot (PAN-4717)', async () => {
+    useDashboardStore.setState({
+      issuesRaw: [{
+        id: 'PAN-4645',
+        identifier: 'PAN-4645',
+        title: 'Present issue',
+        status: 'Todo',
+        priority: 3,
+        labels: [],
+        url: 'https://github.com/eltmon/overdeck/issues/4645',
+        createdAt: '2026-05-18T00:00:00.000Z',
+        updatedAt: '2026-05-18T00:00:00.000Z',
+      }],
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderIn(<ChatMarkdown text={[
+      '[PAN-3659](https://github.com/eltmon/overdeck/issues/3659)',
+      '[PAN-4645](https://github.com/eltmon/overdeck/issues/4645)',
+    ].join(' ')} />);
+    const absentLink = await screen.findByRole('link', { name: 'PAN-3659' });
+    const presentLink = screen.getByRole('link', { name: 'PAN-4645' });
+    await waitFor(() => expect(absentLink).toHaveAttribute('data-issue-id', 'PAN-3659'));
+    await waitFor(() => expect(presentLink).toHaveAttribute('data-issue-id', 'PAN-4645'));
+
+    expect(fireEvent.click(absentLink)).toBe(false);
+    expect(fireEvent.click(presentLink)).toBe(false);
+
+    expect(openIssueMock).toHaveBeenCalledWith('PAN-3659', 'overview', 'https://github.com/eltmon/overdeck/issues/3659');
+    expect(openIssueMock).toHaveBeenCalledWith('PAN-4645', 'overview', 'https://github.com/eltmon/overdeck/issues/4645');
+    expect(window.open).not.toHaveBeenCalled();
   });
 });
