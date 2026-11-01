@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T16:48:12.841Z",
+  "updated": "2026-11-01T16:48:29.994Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -208,6 +208,10 @@
     "wi3-viewer-sync.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T16:48:12.841Z"
+    },
+    "wi4-merged-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:48:29.994Z"
     }
   },
   "agentModel": "claude-opus-5-5"
