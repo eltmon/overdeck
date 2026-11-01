@@ -20,6 +20,7 @@ export type {
   LinkState,
   MachineLinkView,
   MachinesResponse,
+  SshLinkInfo,
 } from '@overdeck/contracts';
 
 export const MACHINES_QUERY_KEY = ['anywhere-machines'] as const;
