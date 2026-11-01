@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T19:12:14.139Z",
+  "updated": "2026-11-01T19:14:05.854Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-01T19:12:09.557Z"
     },
     "wi7-placement-rule": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4651",
-      "claimedAt": "2026-11-01T19:12:14.139Z"
+      "claimedAt": "2026-11-01T19:12:14.139Z",
+      "doneAt": "2026-11-01T19:14:05.854Z"
     }
   }
 }
