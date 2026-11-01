@@ -764,7 +764,8 @@ export function loadSettingsApi(): ApiSettingsConfig {
     },
     // D-1: reports the enforced value (raw config.yaml), not the merged
     // config — a project .pan.yaml never reaches enforcement.
-    dashboard: { require_token_mint: readRemoteAccessConfig().configured },
+    // The enforced value (D-1): with remote access it is on by itself and the toggle shows why (PAN-4645 D-4645-12).
+    dashboard: { require_token_mint: readRemoteAccessConfig().requireTokenMint },
     tiered_execution: config.tieredExecution,
   };
 }

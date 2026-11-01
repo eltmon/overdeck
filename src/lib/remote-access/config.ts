@@ -15,8 +15,9 @@
  * (outbound link or inbound machine token). An explicit `false` cannot turn it
  * off while remote access exists, because the lossy whole-document Settings
  * save writes the current value back and would otherwise freeze `false` after
- * a link appears. `configured` is the YAML value Settings shows and saves;
- * `autoReasons` says why the toggle is on by itself.
+ * a link appears. Settings reports the enforced value (D-1); `configured` is
+ * the YAML value and `autoReasons` says why the toggle is on by itself (both
+ * ride in the Anywhere status so the toggle can explain itself).
  *
  * The YAML value and the saved-origins check are cached until a Settings save
  * or trusted-origin add calls `invalidateRemoteAccessConfig()`; device and
@@ -38,7 +39,7 @@ export type AutoMintReason = 'trusted-address' | 'paired-device' | 'machine-link
 export interface RemoteAccessConfig {
   /** The enforced value: `configured || autoReasons.length > 0`. */
   requireTokenMint: boolean;
-  /** The YAML value (what Settings shows and saves). */
+  /** The YAML value (the Anywhere status carries it; Settings reports the enforced value). */
   configured: boolean;
   /** Why the value is on regardless of the YAML; empty when only the YAML decides. */
   autoReasons: AutoMintReason[];
