@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T08:39:44.353Z",
+  "updated": "2026-11-01T08:49:14.019Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,9 +146,10 @@
       "doneAt": "2026-11-01T08:39:16.310Z"
     },
     "wi7-ws-rpc-4401": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4645",
-      "claimedAt": "2026-11-01T08:39:44.352Z"
+      "claimedAt": "2026-11-01T08:39:44.352Z",
+      "doneAt": "2026-11-01T08:49:14.018Z"
     }
   }
 }
