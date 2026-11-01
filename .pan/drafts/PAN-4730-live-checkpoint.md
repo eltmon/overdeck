@@ -126,6 +126,8 @@ PR: https://github.com/eltmon/gstack/pull/2
 
 **Pack-browser SHA** (used by the live acceptance): `fb781f7177b9edc8bca724ea6180611462e9f6fd`
 
+After the operator's review of #2, the PR head is `92a51a50ee5c065690b4a2db212ea6be5d469c35` (see "Fork: review fix" below); the isolated-HOME live rerun used it.
+
 ## Live acceptance
 
 Run 2026-11-01 from this workspace's build (`bun install` then `npm run typecheck` rc 0 and `npm run build` rc 0), `P=node /home/eltmon/Projects/overdeck/workspaces/feature-pan-4730/dist/cli/index.js`, with `OVERDECK_HOME=/tmp/pan-4730-live/overdeck-home` on every `$P` command. No `pan up`, `pan start` or dashboard command used the isolated home. Fork commit: the pack-browser SHA `fb781f7177b9edc8bca724ea6180611462e9f6fd`. Host bun 1.3.14 (the fork's floor is 1.3.3; it reports `untested` below 1.4.2). `bun install --frozen-lockfile` accepted the lockfile, so **no `bun upgrade` was needed** and the host bun is unchanged.
@@ -304,3 +306,67 @@ $ (~/.claude/settings.json and ~/.cache/ms-playwright listing hashes equal befor
 ```
 
 The http server was stopped and `/tmp/pan-4730-live` removed.
+
+## Fork: review fix (XDG_CACHE_HOME)
+
+Operator review of eltmon/gstack#2: a real build with an empty HOME passed (BROWSER_OK), but Chromium's launch wrote `$HOME/.cache/fontconfig/*.cache-11` and `$HOME/.cache/nvidia/GLCache`. Fork commit `92a51a50ee5c065690b4a2db212ea6be5d469c35` — `fix(pack-browser): keep Chromium's caches out of $HOME`, pushed to `overdeck/pack-browser` (PR #2 not merged; the operator merges it):
+
+- `scripts/pack-browser.sh` exports `XDG_CACHE_HOME="$C/xdg-cache"` with the other cache variables and creates it.
+- `lib/pack-env.ts` `applyPackEnv` sets `XDG_CACHE_HOME`, when unset, to `dirname(<.gstack-pack-browsers-path value>)/xdg-cache`, so the compiled CLIs and the browse daemon keep Chromium's caches in the pack at runtime.
+- `bin/gstack-browser-ensure` does the same in a render (from the marker's value, not an inherited `PLAYWRIGHT_BROWSERS_PATH`).
+- Tests: `test/pack-env.test.ts`, `test/pack-browser-guards.test.ts`, `test/pack-browser.test.ts`; `docs/pack-mode.md` names the variable.
+
+```
+$ bun test test/pack-env.test.ts test/pack-browser-guards.test.ts test/pack-browser.test.ts test/gstack-browser-ensure.test.ts test/pack-mode.test.ts test/setup-help.test.ts test/state-root-ratchet.test.ts test/free-seed-ratchet.test.ts test/test-free-shards.test.ts test/free-fixtures.test.ts test/exercised-map.test.ts test/helpers/hermetic-env.test.ts design/test/auth.test.ts
+ 211 pass
+ 0 fail
+ 3088 expect() calls
+Ran 211 tests across 13 files. [38.47s]
+```
+
+Overdeck follow-up: the consent preview's `Writes` list now names `<C>/xdg-cache`.
+
+## Live acceptance rerun at 92a51a50 (isolated HOME)
+
+Run 2026-11-01 with `HOME=/tmp/pan-4730-live2/home` (empty) and `OVERDECK_HOME=/tmp/pan-4730-live2/overdeck-home` on every command, including `claude -p`. Claude Code authenticated through `CLAUDE_CONFIG_DIR=/home/eltmon/.claude`; `XDG_CACHE_HOME` was unset for the run.
+
+Deviations and findings:
+
+- **`CLAUDE_CONFIG_DIR` side effect.** Pointing it at the real config dir made Claude Code create `/home/eltmon/.claude/.claude.json` (61 KB, born 16:45:49 by the one-turn auth probe). The normal launch path reads `~/.claude.json` and does not use that file. It was left in place for the operator to keep or delete.
+- **The isolated HOME cannot be empty after a `claude -p` run.** Claude Code writes `HOME/.cache/claude-cli-nodejs` (its MCP logs), and the hooks in the real `~/.claude/settings.json` wrote `HOME/.overdeck/` (Overdeck hooks) and `HOME/.tokentracker/`, `HOME/.config/tokentracker/`. None of these come from gstack. The assertion is therefore: `HOME/.cache` holds nothing but `claude-cli-nodejs`.
+- **One gstack write to HOME remains:** `HOME/.bun/install/cache/@t@/0018b284b7b425ee.pile` (34 KB, gstack's `lib/redact-patterns.ts` transpiled), written when the skill ran `bun R/bin/gstack-qa-evidence materialize …` from the agent's shell, which has no `BUN_RUNTIME_TRANSPILER_CACHE_PATH`. It is outside `.cache` and outside the requested fix; recorded under Limits in `features/skills.mdx`.
+
+```
+$ $P skills pack add gstack https://github.com/eltmon/gstack --ref 92a51a50ee5c065690b4a2db212ea6be5d469c35 --browser --yes
+… Browser runtime for gstack is on. Browser skills mount at the next launch.   rc=0
+$ ls $C;  ls $C/xdg-cache
+bun-cache  playwright  xdg-cache
+fontconfig  nvidia                      (Chromium's caches, in the pack)
+$ find $HOME                            (after the build)
+/tmp/pan-4730-live2/home                (empty)
+$ $P skills set --pack gstack on --project live; $P skills launch-settings … --plugin-link $L/link
+browse qa qa-only mounted; ship, pair-agent absent
+$ … HOME=$L/home CLAUDE_CONFIG_DIR=/home/eltmon/.claude GSTACK_SESSION_KIND=spawned claude -p "/gstack:qa-only Test http://127.0.0.1:8765/ — click the Go button and confirm the title changes; report only, do not edit files." --plugin-dir $L/link …
+result: {'subtype': 'success', 'is_error': False, 'num_turns': 41, 'duration_ms': 168729, 'total_cost_usd': 1.39}
+result text (start): "The test passed: clicking Go changes the page title, and nothing broke. …"
+qa.jsonl: BROWSER_OK node 151.0.7922.34
+report copy: $OVERDECK_HOME/packs/gstack/state/projects/project/unknown-user-master-test-outcome-20261101T214903Z.md
+$ ls -A $HOME/.cache
+claude-cli-nodejs                       (no fontconfig, no nvidia: PASS)
+$ tr '\0' '\n' < /proc/<daemon pid>/environ | grep -E '^(HOME|XDG_CACHE_HOME|PLAYWRIGHT_BROWSERS_PATH|GSTACK_STATE_ROOT)='
+HOME=/tmp/pan-4730-live2/home
+GSTACK_STATE_ROOT=/tmp/pan-4730-live2/overdeck-home/packs/gstack/state
+PLAYWRIGHT_BROWSERS_PATH=/tmp/pan-4730-live2/overdeck-home/packs/gstack/browser/playwright
+XDG_CACHE_HOME=/tmp/pan-4730-live2/overdeck-home/packs/gstack/browser/xdg-cache
+$ $P skills pack browser gstack off
+Browse daemon still running in /tmp/pan-4730-live2/project: pid 2511034 — stop with: kill -INT 2511034
+$ kill -INT 2511034  → daemon stopped within 3 s
+$ $P skills pack remove gstack
+Removed pack gstack, its cache, 1 mount(s) and 0 Codex cache(s).
+$ find $OVERDECK_HOME -path '*gstack*'
+(no output)
+$ test ! -e ~/.gstack && echo no-gstack
+no-gstack
+```
+
+The http server was stopped and `/tmp/pan-4730-live2` removed.
