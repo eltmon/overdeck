@@ -4,17 +4,17 @@
     "created": "2026-11-01T16:40:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4727: gstack as a skill pack: full runtime from the eltmon/gstack fork, toggle at global/project/issue level, clean removal",
-    "updated": "2026-11-01T16:46:27.818Z"
+    "updated": "2026-11-01T17:45:41.680Z"
   },
   "plan": {
     "id": "pan-4727",
     "title": "gstack as a skill pack: full runtime from the eltmon/gstack fork, toggle at global/project/issue level, clean removal",
-    "status": "proposed",
+    "status": "running",
     "uid": "b43077ee-781a-4f21-be5c-947ef4959f9f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-01T16:40:00Z",
-    "updated": "2026-11-01T16:46:27.818Z",
+    "updated": "2026-11-01T17:45:41.680Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4727",
@@ -1365,5 +1365,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
