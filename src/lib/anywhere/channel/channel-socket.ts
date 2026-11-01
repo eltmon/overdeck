@@ -30,6 +30,10 @@ export interface ChannelMarker {
   remoteKeyHex: string;
   /** Pairing mode only. */
   pairingId: string | null;
+  /** Approval mode only (PAN-2356): the approval request id, 32 hex. */
+  requestId?: string;
+  /** Approval mode only: the six-digit SAS both operators compare, as `123 456`. */
+  approvalSas?: string;
 }
 
 interface SecretStreamLike {

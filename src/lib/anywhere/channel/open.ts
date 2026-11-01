@@ -16,9 +16,9 @@ import type { Duplex } from 'node:stream';
 import { createWebSocketStream, WebSocket as WsClient } from 'ws';
 
 import type { MachineKeyPair } from '../machine-key.js';
-import { type ChannelSocket, createChannelSocket } from './channel-socket.js';
-import { type Handshake, ikInitiator, NOISE_LINK_PROTOCOL, pairingSecrets, prologueFor, xxPskInitiator } from './noise.js';
-import { encodeFrame, encodePreamble, FrameReader, type Refusal, REFUSAL_CODES, WireError } from './wire.js';
+import { type ChannelMarker, type ChannelSocket, createChannelSocket } from './channel-socket.js';
+import { approvalSas, type Handshake, ikInitiator, NOISE_LINK_PROTOCOL, pairingSecrets, prologueFor, xxInitiator, xxPskInitiator } from './noise.js';
+import { type ChannelMode, encodeFrame, encodePreamble, FrameReader, type Refusal, REFUSAL_CODES, WireError } from './wire.js';
 
 export const DEFAULT_OPEN_TIMEOUT_MS = 10_000;
 
@@ -72,7 +72,9 @@ interface CommonOpenOptions {
 
 export type OpenChannelOptions =
   | (CommonOpenOptions & { mode: 'link'; remoteKeyHex: string })
-  | (CommonOpenOptions & { mode: 'pairing'; pairingCode: string });
+  | (CommonOpenOptions & { mode: 'pairing'; pairingCode: string })
+  /** PAN-2356 D-2356-9: Noise XX for one approval request (32 hex); authenticated only by the SAS. */
+  | (CommonOpenOptions & { mode: 'approval'; requestId: string });
 
 export async function openChannel(url: TransportUrl, opts: OpenChannelOptions): Promise<ChannelSocket> {
   return withDeadline(url, opts, async (signal, track) => {
@@ -171,6 +173,22 @@ async function handshakeAsInitiator(
     return finish(raw, reader, handshake, null, { mode: 'link', remoteKeyHex: opts.remoteKeyHex, pairingId: null });
   }
 
+  if (opts.mode === 'approval') {
+    raw.write(encodePreamble({ linkProtocol: NOISE_LINK_PROTOCOL, mode: 'approval', pairingId: opts.requestId }));
+    const handshake = xxInitiator(opts.localKey, prologueFor('approval', opts.requestId));
+    raw.write(encodeFrame(handshake.send()));
+    const message2 = await readMessage(reader, 'approval');
+    try {
+      handshake.recv(message2);
+    } catch {
+      throw new ChannelOpenError('protocol', `${label} sent an approval handshake message that did not verify`);
+    }
+    const message3 = handshake.send();
+    const remoteKeyHex = handshake.remoteKey().toString('hex');
+    const sas = approvalSas(handshake.result().hash);
+    return finish(raw, reader, handshake, message3, { mode: 'approval', remoteKeyHex, pairingId: null, requestId: opts.requestId, approvalSas: sas });
+  }
+
   const { psk, pairingId } = pairingSecrets(opts.pairingCode);
   raw.write(encodePreamble({ linkProtocol: NOISE_LINK_PROTOCOL, mode: 'pairing', pairingId }));
   const handshake = xxPskInitiator(opts.localKey, psk, prologueFor('pairing', pairingId));
@@ -191,14 +209,14 @@ function finish(
   reader: FrameReader,
   handshake: Handshake,
   finalMessage: Buffer | null,
-  channel: { mode: 'link' | 'pairing'; remoteKeyHex: string; pairingId: string | null },
+  channel: ChannelMarker,
 ): ChannelSocket {
   const leftover = reader.detach();
   if (finalMessage) raw.write(encodeFrame(finalMessage));
   return createChannelSocket({ raw, initiator: true, handshake: handshake.result(), channel, leftover });
 }
 
-async function readMessage(reader: FrameReader, mode: 'link' | 'pairing'): Promise<Buffer> {
+async function readMessage(reader: FrameReader, mode: ChannelMode): Promise<Buffer> {
   let frame;
   try {
     frame = await reader.readFrame();
@@ -206,13 +224,19 @@ async function readMessage(reader: FrameReader, mode: 'link' | 'pairing'): Promi
     if (error instanceof WireError && error.code === 'closed') {
       // The responder dropped us without a refusal: in link mode it could not
       // decrypt message 1 (it does not hold the key we pinned).
-      throw mode === 'link'
-        ? new ChannelOpenError('identity-refused', 'Responder closed the connection before proving the pinned machine key')
-        : new ChannelOpenError('pairing-refused', 'Responder closed the connection during pairing');
+      if (mode === 'link') {
+        throw new ChannelOpenError('identity-refused', 'Responder closed the connection before proving the pinned machine key');
+      }
+      throw new ChannelOpenError('pairing-refused', `Responder closed the connection during ${mode === 'approval' ? 'approval' : 'pairing'}`);
     }
     throw error;
   }
-  if (frame.kind === 'refusal') throw refusalToError(frame.refusal);
+  if (frame.kind === 'refusal') {
+    if (mode === 'approval' && frame.refusal.code === REFUSAL_CODES.pairingRefused) {
+      throw new ChannelOpenError('pairing-refused', 'Responder has no live approval request with this id');
+    }
+    throw refusalToError(frame.refusal);
+  }
   return frame.payload;
 }
 

@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MachineKeyPair } from '../../machine-key.js';
 import { acceptChannel, type AcceptChannelOptions } from '../accept.js';
 import { type ChannelSocket, isChannelSocket } from '../channel-socket.js';
-import { pairingSecrets } from '../noise.js';
+import { approvalSas, pairingSecrets } from '../noise.js';
 import { openChannel } from '../open.js';
 import {
   encodeFrame,
@@ -325,6 +325,124 @@ describe('secure channel (PAN-4645 WI-2)', () => {
 
     await expect(openChannel(`tcp://127.0.0.1:${port}`, { mode: 'link', localKey: freshKey(), remoteKeyHex: 'ab'.repeat(32), timeoutMs: 2_000 }))
       .rejects.toMatchObject({ code: 'unreachable' });
+  });
+});
+
+describe('approval channel (PAN-2356 WI-13)', () => {
+  const REQUEST_ID = 'ab'.repeat(16);
+
+  it('completes Noise XX for a live request id and both sides derive the same six-digit SAS', async () => {
+    const approver = freshKey();
+    const requester = freshKey();
+    const taken: string[] = [];
+    const responder = await startResponder({
+      localKey: requester,
+      isPinnedPeer: () => false,
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+      takeApproval: (id) => {
+        taken.push(id);
+        return id === REQUEST_ID;
+      },
+    });
+
+    const channel = await openChannel(responder.url, { mode: 'approval', localKey: approver, requestId: REQUEST_ID });
+    cleanups.push(() => channel.destroy());
+    await vi.waitFor(() => expect(responder.accepted).toHaveLength(1));
+    const sas = channel.channel.approvalSas;
+    expect(sas).toMatch(/^\d{3} \d{3}$/);
+    expect(responder.accepted[0]!.channel).toEqual({
+      mode: 'approval',
+      remoteKeyHex: hex(approver),
+      pairingId: null,
+      requestId: REQUEST_ID,
+      approvalSas: sas,
+    });
+    expect(channel.channel).toMatchObject({ mode: 'approval', remoteKeyHex: hex(requester), requestId: REQUEST_ID });
+    expect(taken).toEqual([REQUEST_ID]);
+
+    const res = await requestOverChannel(channel, { path: '/api/environment' });
+    expect(res.text).toContain('pong /api/environment');
+  });
+
+  it('shows two different codes when a proxy terminates and re-originates the handshake with its own key', async () => {
+    const approver = freshKey();
+    const requester = freshKey();
+    const mitm = freshKey();
+    const real = await startResponder({
+      localKey: requester,
+      isPinnedPeer: () => false,
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+      takeApproval: (id) => id === REQUEST_ID,
+    });
+    // The proxy accepts the approver's handshake as itself and opens its own to the requester.
+    const proxied: ChannelSocket[] = [];
+    const proxy = createNetServer((raw: Socket) => {
+      void acceptChannel(raw, {
+        localKey: mitm,
+        isPinnedPeer: () => false,
+        takePairing: neverPairing,
+        onPairingFailure: () => undefined,
+        takeApproval: () => true,
+      }).then(async (front) => {
+        proxied.push(front, await openChannel(real.url, { mode: 'approval', localKey: mitm, requestId: REQUEST_ID }));
+      });
+    });
+    await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+    cleanups.push(() => new Promise<void>((resolve) => proxy.close(() => resolve())));
+    cleanups.push(() => { for (const c of proxied) c.destroy(); });
+
+    const approverSide = await openChannel(`tcp://127.0.0.1:${(proxy.address() as { port: number }).port}`, {
+      mode: 'approval',
+      localKey: approver,
+      requestId: REQUEST_ID,
+    });
+    cleanups.push(() => approverSide.destroy());
+    await vi.waitFor(() => expect(real.accepted).toHaveLength(1));
+    const requesterSide = real.accepted[0]!;
+
+    expect(approverSide.channel.approvalSas).toMatch(/^\d{3} \d{3}$/);
+    expect(requesterSide.channel.approvalSas).toMatch(/^\d{3} \d{3}$/);
+    expect(approverSide.channel.approvalSas).not.toBe(requesterSide.channel.approvalSas);
+    // Each side sees the proxy's key, not the other machine's.
+    expect(approverSide.channel.remoteKeyHex).toBe(hex(mitm));
+    expect(requesterSide.channel.remoteKeyHex).toBe(hex(mitm));
+  });
+
+  it('refuses an approval preamble with code 03 when takeApproval returns false', async () => {
+    const responder = await startResponder({
+      localKey: freshKey(),
+      isPinnedPeer: () => false,
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+      takeApproval: () => false,
+    });
+    await expect(openChannel(responder.url, { mode: 'approval', localKey: freshKey(), requestId: REQUEST_ID })).rejects.toMatchObject({
+      code: 'pairing-refused',
+      message: 'Responder has no live approval request with this id',
+    });
+    await vi.waitFor(() => expect(responder.acceptErrors[0]).toMatchObject({ code: 'approval-refused' }));
+  });
+
+  it('refuses approval mode on a responder without takeApproval', async () => {
+    const responder = await startResponder({ localKey: freshKey(), isPinnedPeer: () => false, takePairing: neverPairing, onPairingFailure: () => undefined });
+    await expect(openChannel(responder.url, { mode: 'approval', localKey: freshKey(), requestId: REQUEST_ID })).rejects.toMatchObject({ code: 'pairing-refused' });
+  });
+
+  it('derives the SAS per D-2356-10', () => {
+    const hash = Buffer.alloc(64, 7);
+    const sas = approvalSas(hash);
+    expect(sas).toMatch(/^\d{3} \d{3}$/);
+    expect(approvalSas(hash)).toBe(sas);
+    expect(approvalSas(Buffer.alloc(64, 8))).not.toBe(sas);
+  });
+
+  it('round-trips the approval preamble with its request id', () => {
+    const preamble = encodePreamble({ linkProtocol: 1, mode: 'approval', pairingId: REQUEST_ID });
+    expect(preamble.length).toBe(7 + 16);
+    expect(parsePreambleHead(preamble.subarray(0, 7))).toEqual({ linkProtocol: 1, mode: 'approval' });
+    expect(preamble.subarray(7).toString('hex')).toBe(REQUEST_ID);
   });
 });
 

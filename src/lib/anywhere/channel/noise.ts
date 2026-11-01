@@ -9,6 +9,9 @@
  *  - `Noise_XXpsk0`: pairing. Neither side knows the other's static key; the
  *    pre-shared key derived from the one-time pairing code authenticates the
  *    exchange, and each side learns the other's key during the handshake.
+ *  - `Noise_XX`: approval (PAN-2356 D-2356-9). No pre-shared secret: each side
+ *    learns the other's key, and the operators authenticate the exchange by
+ *    comparing the six-digit SAS derived from the handshake hash on both screens.
  *
  * Nothing is hand-rolled on raw primitives; this module only drives the
  * library and copies its outputs. The static key pair is never zeroed by the
@@ -36,7 +39,7 @@ interface NoiseState {
 
 interface NoiseConstructor {
   new (
-    pattern: 'IK' | 'XXpsk0',
+    pattern: 'IK' | 'XX' | 'XXpsk0',
     initiator: boolean,
     staticKeyPair: MachineKeyPair,
     opts?: { psk?: Uint8Array },
@@ -96,14 +99,26 @@ export class Handshake {
 
 /**
  * The Noise prologue both ends must agree on:
- * `overdeck-link/<protocol>\0<mode byte>\0<pairing id hex or empty>`.
+ * `overdeck-link/<protocol>\0<mode byte>\0<pairing id or approval request id hex, or empty>`.
  */
 export function prologueFor(mode: ChannelMode, pairingId: string | null): Buffer {
   return Buffer.concat([
     Buffer.from(`overdeck-link/${NOISE_LINK_PROTOCOL}`, 'utf8'),
     Buffer.from([0, MODE_BYTES[mode], 0]),
-    Buffer.from(mode === 'pairing' ? pairingId ?? '' : '', 'utf8'),
+    Buffer.from(mode === 'link' ? '' : pairingId ?? '', 'utf8'),
   ]);
+}
+
+/**
+ * The six-digit short authentication string of an approval channel (D-2356-10):
+ * `uint32BE(SHA-256("overdeck-approve-sas/1" || 0x00 || handshakeHash)[0..4]) mod 1_000_000`,
+ * zero-padded and shown as `123 456`. A man in the middle runs two handshakes with two different
+ * hashes, so the two screens show different codes.
+ */
+export function approvalSas(handshakeHash: Buffer): string {
+  const digest = createHash('sha256').update('overdeck-approve-sas/1').update(Buffer.from([0])).update(handshakeHash).digest();
+  const code = (digest.readUInt32BE(0) % 1_000_000).toString().padStart(6, '0');
+  return `${code.slice(0, 3)} ${code.slice(3)}`;
 }
 
 /** PSK and pairing id derived from a pairing code (D-4645-17). */
@@ -133,6 +148,18 @@ export function ikResponder(localKey: MachineKeyPair, prologue: Buffer): Handsha
 
 export function xxPskInitiator(localKey: MachineKeyPair, psk: Buffer, prologue: Buffer): Handshake {
   const state = new Noise('XXpsk0', true, localKey, { psk });
+  state.initialise(prologue);
+  return new Handshake(state, localKey.publicKey);
+}
+
+export function xxInitiator(localKey: MachineKeyPair, prologue: Buffer): Handshake {
+  const state = new Noise('XX', true, localKey);
+  state.initialise(prologue);
+  return new Handshake(state, localKey.publicKey);
+}
+
+export function xxResponder(localKey: MachineKeyPair, prologue: Buffer): Handshake {
+  const state = new Noise('XX', false, localKey);
   state.initialise(prologue);
   return new Handshake(state, localKey.publicKey);
 }
