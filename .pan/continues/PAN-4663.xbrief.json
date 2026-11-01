@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4663",
   "created": "2026-11-01T11:01:24.996Z",
-  "updated": "2026-11-01T11:16:35.521Z",
+  "updated": "2026-11-01T11:16:47.961Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,6 +54,10 @@
     "network-rule-docs.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T11:16:35.521Z"
+    },
+    "network-rule-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:16:47.961Z"
     }
   }
 }
