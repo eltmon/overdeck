@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4717",
   "created": "2026-11-01T14:07:20.462Z",
-  "updated": "2026-11-01T14:53:06.020Z",
+  "updated": "2026-11-01T14:53:21.615Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,6 +54,10 @@
     "drawer-tracker-url-fallback.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:53:06.020Z"
+    },
+    "drawer-absent-issue-hydration-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:53:21.614Z"
     }
   }
 }
