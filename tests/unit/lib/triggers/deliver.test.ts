@@ -189,4 +189,36 @@ describe('deliverTriggerEvent (PAN-4648)', () => {
     expect(logged).not.toContain('very-private-payload');
     expect(logged).not.toContain(URL_SECRET);
   });
+
+  it('logs an id that is not shaped like a trigger id as -', async () => {
+    const { deps: d } = deps([record()]);
+    await deliverTriggerEvent(event({ triggerId: 'trg_x\n[triggers] forged line' }), d);
+    expect(d.log).toHaveBeenCalledWith('[triggers] - not found 404');
+  });
+
+  it('lets only 6 of 7 concurrent project events through while the CPU check is pending', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const { deps: d } = deps([projectRecord()], {
+      cpuPressure: vi.fn(async () => {
+        await gate;
+        return { saturated: false };
+      }),
+    });
+    const pending = Array.from({ length: 7 }, () => deliverTriggerEvent(event(), d));
+    await new Promise((resolve) => setImmediate(resolve));
+    release();
+    const statuses = (await Promise.all(pending)).map((result) => result.status).sort();
+    expect(statuses).toEqual([202, 202, 202, 202, 202, 202, 429]);
+    expect(d.startConversation).toHaveBeenCalledTimes(6);
+  });
+
+  it('does not spend rate-limit budget on a CPU hold', async () => {
+    let saturated = true;
+    const { deps: d } = deps([projectRecord()], { cpuPressure: vi.fn(async () => ({ saturated })) });
+    for (let i = 0; i < 10; i++) expect((await deliverTriggerEvent(event(), d)).status).toBe(503);
+    saturated = false;
+    for (let i = 0; i < 6; i++) expect((await deliverTriggerEvent(event(), d)).status).toBe(202);
+    expect((await deliverTriggerEvent(event(), d)).status).toBe(429);
+  });
 });

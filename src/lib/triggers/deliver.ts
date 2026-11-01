@@ -17,7 +17,16 @@
  *    message door. Project target: the create door, passing model, harness and
  *    effort only when the record sets them.
  *
- * Logs name the trigger id and outcome only — never the body or any secret.
+ * Steps 3 and 4 are atomic per process: the rate-limit slot is reserved in
+ * the same synchronous block as the check, before any await, and released
+ * when the CPU hold refuses, so concurrent events cannot overrun the limit.
+ *
+ * `findTriggerByUrl` is step 1 on its own, so the route can refuse an unknown
+ * URL before it reads a single body byte.
+ *
+ * Logs name the trigger id and outcome only — never the body or any secret. An
+ * id that is not `trg_` plus 12 hex characters is logged as `-`, because it is
+ * whatever a caller put in the URL.
  * Server functions arrive through `TriggerDeliveryDeps`, because `src/lib`
  * never imports dashboard server code.
  */
@@ -106,18 +115,34 @@ function held(reason: string): TriggerDeliveryResult {
 }
 
 const TARGET_GONE: TriggerDeliveryResult = { status: 410, body: { error: 'target gone' } };
+export const TRIGGER_NOT_FOUND: TriggerDeliveryResult = { status: 404, body: { error: 'not found' } };
+const TRIGGER_ID_PATTERN = /^trg_[0-9a-f]{12}$/;
+
+/** Log one outcome line. The id comes from the URL, so anything not shaped like a trigger id is logged as `-`. */
+export function logTriggerOutcome(triggerId: string, result: TriggerDeliveryResult, log: (line: string) => void = console.log): void {
+  const outcome = typeof result.body.error === 'string' ? result.body.error : result.body.started ? 'started' : 'delivered';
+  log(`[triggers] ${TRIGGER_ID_PATTERN.test(triggerId) ? triggerId : '-'} ${outcome} ${result.status}`);
+}
+
+/** Step 1: the record whose id and URL secret both match, else null. Unknown id and wrong secret look the same. */
+export async function findTriggerByUrl(
+  input: Pick<TriggerEventInput, 'triggerId' | 'urlSecret'>,
+  deps: Pick<TriggerDeliveryDeps, 'readTriggers'>,
+): Promise<TriggerRecord | null> {
+  const record = (await deps.readTriggers()).find((candidate) => candidate.id === input.triggerId);
+  return record && secretMatches(record, input.urlSecret) ? record : null;
+}
 
 export async function deliverTriggerEvent(input: TriggerEventInput, deps: TriggerDeliveryDeps): Promise<TriggerDeliveryResult> {
   const result = await runDelivery(input, deps);
-  const outcome = typeof result.body.error === 'string' ? result.body.error : result.body.started ? 'started' : 'delivered';
-  (deps.log ?? console.log)(`[triggers] ${input.triggerId} ${outcome} ${result.status}`);
+  logTriggerOutcome(input.triggerId, result, deps.log);
   return result;
 }
 
 async function runDelivery(input: TriggerEventInput, deps: TriggerDeliveryDeps): Promise<TriggerDeliveryResult> {
   // Step 1: URL secret. Unknown id and wrong secret must look the same.
-  const record = (await deps.readTriggers()).find((candidate) => candidate.id === input.triggerId);
-  if (!record || !secretMatches(record, input.urlSecret)) return { status: 404, body: { error: 'not found' } };
+  const record = await findTriggerByUrl(input, deps);
+  if (!record) return TRIGGER_NOT_FOUND;
 
   // Step 2: signature over the exact raw bytes.
   let source: TriggerEnvelopeSource = 'unsigned';
@@ -131,15 +156,23 @@ async function runDelivery(input: TriggerEventInput, deps: TriggerDeliveryDeps):
     source = record.verify;
   }
 
-  // Step 3: rolling one-hour rate limit.
+  // Step 3: rolling one-hour rate limit. Check and reserve with no await in
+  // between, so concurrent events for one trigger cannot all pass the check.
   const now = deps.now();
   const recent = (acceptedDeliveries.get(record.id) ?? []).filter((at) => now - at < TRIGGER_RATE_WINDOW_MS);
   acceptedDeliveries.set(record.id, recent);
   const limit = record.target.kind === 'project' ? TRIGGER_PROJECT_STARTS_PER_HOUR : TRIGGER_CONVERSATION_MESSAGES_PER_HOUR;
   if (recent.length >= limit) return { status: 429, body: { error: 'rate limit' }, retryAfterSeconds: RATE_LIMIT_RETRY_AFTER_SECONDS };
+  recent.push(now);
 
-  // Step 4: CPU hold.
-  if ((await deps.cpuPressure()).saturated) return held('host is CPU-saturated');
+  // Step 4: CPU hold. A refusal here does not count, so release the slot.
+  if ((await deps.cpuPressure()).saturated) {
+    // Another event may have replaced this trigger's array meanwhile; release from the current one.
+    const current = acceptedDeliveries.get(record.id) ?? [];
+    const index = current.indexOf(now);
+    if (index !== -1) current.splice(index, 1);
+    return held('host is CPU-saturated');
+  }
 
   // Step 5: envelope.
   const message = buildTriggerEnvelope({
@@ -149,8 +182,7 @@ async function runDelivery(input: TriggerEventInput, deps: TriggerDeliveryDeps):
     rawBody: input.rawBody,
   });
 
-  // Step 6: deliver. Reaching here consumes rate-limit budget.
-  recent.push(now);
+  // Step 6: deliver. Reaching here keeps the reserved rate-limit slot.
   const target = record.target;
   if (target.kind === 'conversation') {
     const pending = await deps.pendingInputKinds(target.conversation);

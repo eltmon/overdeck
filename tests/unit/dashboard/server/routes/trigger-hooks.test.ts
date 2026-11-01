@@ -57,8 +57,9 @@ afterEach(async () => {
   await rm(home, { recursive: true, force: true });
 });
 
-async function post(path: string, body: Buffer | string, headers: Record<string, string> = {}) {
-  const request = HttpServerRequest.fromWeb(new Request(`http://127.0.0.1${path}`, { method: 'POST', headers, body }));
+async function post(path: string, body: Buffer | string | ReadableStream<Uint8Array>, headers: Record<string, string> = {}) {
+  const init = { method: 'POST', headers, body, ...(body instanceof ReadableStream ? { duplex: 'half' } : {}) } as RequestInit;
+  const request = HttpServerRequest.fromWeb(new Request(`http://127.0.0.1${path}`, init));
   const response = await Effect.runPromise(Effect.scoped(
     Effect.flatMap(HttpRouter.toHttpEffect(triggerHooksRouteLayer), (app) =>
       Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)),
@@ -149,5 +150,51 @@ describe('POST /hooks/:id/:secret (PAN-4648)', () => {
     expect(await post(created.hookPath, big)).toMatchObject({ status: 413, body: { error: 'event too large' } });
     expect(await post(created.hookPath, 'small', { 'content-length': '1048577' })).toMatchObject({ status: 413 });
     expect(mocks.message).not.toHaveBeenCalled();
+  });
+
+  it('reads a multi-chunk body in full', async () => {
+    const created = await createTrigger({ name: 'ci', target: { kind: 'conversation', conversation: '20261101-0007' } });
+    let pulls = 0;
+    const threeChunks = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        if (pulls > 3) controller.close();
+        else controller.enqueue(new TextEncoder().encode(`part${pulls};`));
+      },
+    });
+
+    expect((await post(created.hookPath, threeChunks)).status).toBe(202);
+    expect((mocks.message.mock.calls[0]?.[1] as { message: string }).message).toContain('\npart1;part2;part3;\n');
+  });
+
+  it('stops reading a chunked body with no Content-Length at 1 MiB and answers 413 (PAN-4648 review)', async () => {
+    const created = await createTrigger({ name: 'ci', target: { kind: 'conversation', conversation: '20261101-0007' } });
+    let pulled = 0;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 65_536;
+        controller.enqueue(new Uint8Array(65_536).fill(97));
+      },
+    });
+
+    const response = await post(created.hookPath, endless);
+    expect(response).toMatchObject({ status: 413, body: { error: 'event too large' } });
+    expect(pulled).toBeLessThan(4 * 1_048_576);
+    expect(mocks.message).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 for an unknown URL without reading the body', async () => {
+    await createTrigger({ name: 'ci', target: { kind: 'conversation', conversation: '20261101-0007' } });
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        controller.enqueue(new Uint8Array(1024));
+      },
+    });
+
+    const response = await post(`/hooks/trg_ffffffffffff/${'0'.repeat(64)}`, body);
+    expect(response).toMatchObject({ status: 404, body: { error: 'not found' } });
+    expect(pulled).toBeLessThanOrEqual(1);
   });
 });

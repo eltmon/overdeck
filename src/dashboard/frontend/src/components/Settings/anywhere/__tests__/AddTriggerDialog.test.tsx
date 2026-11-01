@@ -109,6 +109,9 @@ describe('AddTriggerDialog (PAN-4648)', () => {
     const posted = JSON.parse(String((callsWith('POST')[0]?.[1] as RequestInit).body)) as Record<string, unknown>;
     expect(posted).toMatchObject({ name: 'ci-failures', target: { kind: 'conversation', conversation: '20261101-0001' }, verify: 'github' });
 
+    await user.click(screen.getByTestId('trigger-dialog-backdrop'));
+    expect(screen.getByTestId('trigger-created-url')).toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: 'Done' }));
     expect(screen.queryByTestId('trigger-created-url')).toBeNull();
     expect(document.body.textContent).not.toContain(URL_SECRET);

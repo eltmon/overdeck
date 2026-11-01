@@ -3,7 +3,8 @@
  * `POST /api/triggers`; on success it switches to a result view that shows the
  * full Funnel URL (or the hook path under a placeholder host) and any
  * generated GitHub signing secret. That view is the only time either is shown:
- * closing the dialog unmounts it. `SetSigningSecretDialog` sets the secret of
+ * closing the dialog unmounts it, so a backdrop click does not close it; only
+ * Done or the close button does. `SetSigningSecretDialog` sets the secret of
  * a github or stripe trigger through `PUT /api/triggers/:id/signing-secret`.
  */
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
@@ -26,9 +27,22 @@ const TEMPLATE_MAX_CHARS = 2000;
 const FUNNEL_PLACEHOLDER_BASE = 'https://<machine>.<tailnet>.ts.net:8443';
 const fieldClass = 'w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary';
 
-function DialogFrame({ title, titleId, onClose, children }: { title: string; titleId: string; onClose: () => void; children: ReactNode }) {
+interface DialogFrameProps {
+  title: string;
+  titleId: string;
+  onClose: () => void;
+  /** False keeps a backdrop click from closing the dialog (the one-time URL view). */
+  closeOnBackdrop?: boolean;
+  children: ReactNode;
+}
+
+function DialogFrame({ title, titleId, onClose, closeOnBackdrop = true, children }: DialogFrameProps) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+    <div
+      data-testid="trigger-dialog-backdrop"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onClick={closeOnBackdrop ? onClose : undefined}
+    >
       <div
         className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-md mx-4"
         onClick={(e) => e.stopPropagation()}
@@ -134,7 +148,7 @@ function AddTriggerDialogBody({ onClose }: { onClose: () => void }) {
   if (created) {
     const url = created.url ?? `${FUNNEL_PLACEHOLDER_BASE}${created.hookPath}`;
     return (
-      <DialogFrame title="Trigger created" titleId={titleId} onClose={onClose}>
+      <DialogFrame title="Trigger created" titleId={titleId} onClose={onClose} closeOnBackdrop={false}>
         <CopyField label="URL" value={url} testId="trigger-created-url" />
         {created.url === null && (
           <p className="text-xs text-muted-foreground">

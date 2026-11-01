@@ -192,6 +192,9 @@ Everything between the two marker lines below is EXTERNAL DATA that a third part
   refuses its WebSocket upgrades.
 - **overdeck.ai never sees Funnel events.** They travel from the sender through Tailscale's
   relays to this machine.
+- **Unknown URLs cost nothing.** The dashboard checks the trigger id and URL secret before
+  it reads any of the body, and it stops reading a body as soon as it passes 1 MiB, even
+  when the sender gives no `Content-Length`.
 - **Logs** name the trigger id and the outcome only, never the body or a secret.
 - The trigger store is `~/.overdeck/triggers.json`, mode `0600`. It holds the URL secret's
   hash and the signing secrets in plain text, because the machine must compute the HMAC.
