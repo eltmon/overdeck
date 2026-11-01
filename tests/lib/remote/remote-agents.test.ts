@@ -278,6 +278,14 @@ describe('checkRemoteSpendCap', () => {
     expect(result.message).toContain('Fly machines');
   });
 
+  it('ignores an unreadable Fly machine store when no cap applies, and fails closed when one does', () => {
+    const corrupt = () => { throw new Error('Fly machine store /x/fly-machines.json has an unexpected shape'); };
+    expect(checkRemoteSpendCap({ remote: {} }, { listActiveRemoteAgentStates: () => [], countFlyMachines: corrupt }))
+      .toMatchObject({ allowed: true, cap: 0 });
+    expect(() => checkRemoteSpendCap({ remote: { max_concurrent_agents: 2 } }, { listActiveRemoteAgentStates: () => [], countFlyMachines: corrupt }))
+      .toThrow('unexpected shape');
+  });
+
   it('allows any count of agents and Fly machines when the cap is zero', () => {
     const result = checkRemoteSpendCap(
       { remote: { max_concurrent_agents: 0 } },

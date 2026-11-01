@@ -64,7 +64,7 @@ function harness(respond: Responder = () => undefined): Harness {
     deps: {
       api,
       flyConfig: { app: 'overdeck-ws', org: 'acme', vm_memory: 1024 },
-      syncAllCredentials: vi.fn(async () => { events.push('syncAllCredentials'); }),
+      syncAllCredentials: vi.fn(async () => { events.push('syncAllCredentials'); return { claude: true, github: true }; }),
       configureClaudeCode: vi.fn(async () => { events.push('configureClaudeCode'); }),
       writeRemoteFile: vi.fn(async (_name: string, path: string, content: string) => {
         events.push(`write:${path}`);
@@ -226,5 +226,22 @@ describe('destroyFlyVm (PAN-4652 WI-7)', () => {
 
     const broken = { destroyMachine: vi.fn(async () => { throw new FlyApiError('boom', 500, ''); }) } as unknown as FlyMachineApi;
     await expect(destroyFlyVm('app', 'm1', { api: broken })).rejects.toThrow('boom');
+  });
+
+  it('fails with credentials-failed and destroys the VM when Claude credentials did not reach it', async () => {
+    const h = harness();
+    h.deps.syncAllCredentials = vi.fn(async () => ({ claude: false, github: true }));
+    await expect(provisionFlyMachine({}, h.deps)).rejects.toMatchObject({ code: 'credentials-failed' });
+    expect(h.execs.some((command) => command.includes('pan serve'))).toBe(false);
+    expect(h.destroyMachine).toHaveBeenCalledWith('overdeck-ws', MACHINE_ID);
+  });
+
+  it('logs and continues when only the GitHub auth did not reach the VM', async () => {
+    const h = harness();
+    const log = vi.fn();
+    h.deps.syncAllCredentials = vi.fn(async () => ({ claude: true, github: false }));
+    h.deps.log = log;
+    await expect(provisionFlyMachine({}, h.deps)).resolves.toMatchObject({ pairingCode: PAIRING });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Could not copy GitHub auth'));
   });
 });

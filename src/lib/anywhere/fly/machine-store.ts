@@ -8,7 +8,10 @@
  * and whether Docker came up on it.
  *
  * The write path copies `ssh/machine-store.ts`: mode 0600, temp file in the same
- * directory then rename, and an in-process write queue. Unlike that store, a
+ * directory then rename, and an in-process write queue. Each read-modify-write
+ * also holds a cross-process lock file (`fly-machines.json.lock`): the dashboard
+ * adds and patches records while the deacon child removes them, and an
+ * in-process queue cannot stop one process overwriting the other's change. Unlike that store, a
  * corrupt file makes every read throw (the loops that count or destroy Fly
  * machines must not act on an empty list that is not really empty), and nothing
  * rewrites it. A change that alters nothing writes nothing. Imports only Node
@@ -21,6 +24,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { getOverdeckHome } from '../../paths.js';
+import { withFileLock } from '../../vault/file-lock.js';
 
 export const FLY_MACHINES_FILENAME = 'fly-machines.json';
 
@@ -128,9 +132,12 @@ async function writeMachines(path: string, machines: FlyMachineRecord[]): Promis
 function mutate<T>(change: (machines: FlyMachineRecord[]) => { machines: FlyMachineRecord[] | null; result: T }): Promise<T> {
   const run = writeQueue.then(async () => {
     const path = flyMachinesPath();
-    const { machines, result } = change(await readMachines(path));
-    if (machines !== null) await writeMachines(path, machines);
-    return result;
+    await mkdir(getOverdeckHome(), { recursive: true, mode: 0o700 });
+    return withFileLock(`${path}.lock`, async () => {
+      const { machines, result } = change(await readMachines(path));
+      if (machines !== null) await writeMachines(path, machines);
+      return result;
+    });
   });
   writeQueue = run.catch(() => undefined);
   return run;

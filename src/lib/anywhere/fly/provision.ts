@@ -37,6 +37,7 @@ import { REMOTE_PAN_DIR, shellQuote } from '../../remote/remote-tmux.js';
 
 export type FlyMachineErrorCode =
   | 'bad-request'
+  | 'credentials-failed'
   | 'remote-disabled'
   | 'no-fly-token'
   | 'cap-reached'
@@ -51,6 +52,7 @@ export type FlyMachineErrorCode =
 /** HTTP status of each Fly machine error. */
 export const FLY_MACHINE_ERROR_STATUS: Record<FlyMachineErrorCode, number> = {
   'bad-request': 400,
+  'credentials-failed': 424,
   'remote-disabled': 409,
   'no-fly-token': 424,
   'cap-reached': 409,
@@ -104,7 +106,7 @@ export type FlyMachineApi = Pick<FlyApiClient, 'ensureApp' | 'createMachine' | '
 export interface FlyProvisionDeps {
   api: FlyMachineApi;
   flyConfig: NonNullable<RemoteConfig['fly']>;
-  syncAllCredentials: (machineName: string) => Promise<unknown>;
+  syncAllCredentials: (machineName: string) => Promise<{ claude: boolean; github: boolean }>;
   configureClaudeCode: (machineName: string) => Promise<void>;
   writeRemoteFile: (machineName: string, path: string, content: string) => Promise<void>;
   localVersion: () => Promise<string>;
@@ -275,8 +277,13 @@ async function prepareMachine(
   await deps.writeRemoteFile(machineName, identityPath, `${JSON.stringify(identity, null, 2)}\n`);
   await run(`chmod 600 ${shellQuote(identityPath)}`, 'Protecting the identity file');
 
-  // 6. Credentials and Claude Code settings.
-  await deps.syncAllCredentials(machineName);
+  // 6. Credentials and Claude Code settings. Without Claude credentials the VM cannot
+  // run a conversation, so that fails here; a missing GitHub token fails only a later clone.
+  const synced = await deps.syncAllCredentials(machineName);
+  if (!synced.claude) {
+    throw new FlyMachineError('credentials-failed', `Could not copy Claude Code credentials to Fly machine ${machineId}: this machine has no ~/.claude/.credentials.json, or the copy failed. Log in to Claude Code here, then try again.`);
+  }
+  if (!synced.github) deps.log(`Could not copy GitHub auth to Fly machine ${machineId}; cloning a private repository there will fail`);
   await deps.configureClaudeCode(machineName);
 
   // 7. Docker when the image has it (D-8). A failure is logged, never fatal.

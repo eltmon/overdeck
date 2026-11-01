@@ -9,6 +9,19 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Records every lock the store takes, and still takes it for real.
+const lockPaths = vi.hoisted(() => [] as string[]);
+vi.mock('../../../vault/file-lock.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../vault/file-lock.js')>();
+  return {
+    ...actual,
+    withFileLock: (path: string, fn: () => Promise<unknown>, options?: Parameters<typeof actual.withFileLock>[2]) => {
+      lockPaths.push(path);
+      return actual.withFileLock(path, fn, options);
+    },
+  };
+});
+
 type Store = typeof import('../machine-store.js');
 type FlyMachineRecord = import('../machine-store.js').FlyMachineRecord;
 
@@ -105,5 +118,16 @@ describe('Fly machine store (PAN-4652 WI-6)', () => {
   it('keeps every record when upserts run concurrently', async () => {
     await Promise.all(['a', 'b', 'c'].map((id) => store.upsertFlyMachine(record({ id, machineId: id, label: `fly-${id}` }))));
     expect((await store.listFlyMachines()).map((entry) => entry.id).sort()).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('cross-process lock (CodeRabbit on PR #4742)', () => {
+  it('runs every read-modify-write under fly-machines.json.lock and leaves no lock behind', async () => {
+    lockPaths.length = 0;
+    await store.upsertFlyMachine(record());
+    await store.updateFlyMachine('rec-1', { docker: false });
+    await store.removeFlyMachine('rec-1');
+    expect(lockPaths).toEqual(Array(3).fill(join(home, 'fly-machines.json.lock')));
+    await expect(stat(join(home, 'fly-machines.json.lock'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });

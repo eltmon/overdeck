@@ -15,7 +15,7 @@ import type { MachineLinkView } from '@overdeck/contracts';
 import { _resetFlyMachineStoreForTests, _settleFlyMachineWritesForTests, listFlyMachines, upsertFlyMachine } from '../../../../lib/anywhere/fly/machine-store.js';
 import type { FlyProvisionResult } from '../../../../lib/anywhere/fly/provision.js';
 import type { MachineLink } from '../../../../lib/anywhere/link-store.js';
-import { addFlyMachine, type FlyMachineServiceDeps, removeFlyMachineForLink, startFlyConversation } from '../fly-machine-service.js';
+import { _resetFlyMachineServiceForTests, addFlyMachine, type FlyMachineServiceDeps, removeFlyMachineForLink, startFlyConversation } from '../fly-machine-service.js';
 import { MachineLinkError } from '../machine-link-service.js';
 
 const ENV_ID = '3f2c1b7e-9a4d-4c2b-8e1f-0a1b2c3d4e5f';
@@ -60,6 +60,7 @@ beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), 'pan-4652-fly-service-'));
   process.env.OVERDECK_HOME = home;
   _resetFlyMachineStoreForTests();
+  _resetFlyMachineServiceForTests();
 });
 
 afterEach(async () => {
@@ -207,5 +208,34 @@ describe('removeFlyMachineForLink (PAN-4652 WI-8)', () => {
     const destroy = vi.fn(async () => { throw new Error('Fly API error 500'); });
     await expect(removeFlyMachineForLink({ id: 'link-1' }, { keepServer: false }, { destroy })).rejects.toMatchObject({ code: 'unreachable' });
     expect(await listFlyMachines()).toHaveLength(1);
+  });
+});
+
+describe('spend cap reservation (CodeRabbit on PR #4742)', () => {
+  const oneSlot = (_config: unknown, pending: number) => ({ allowed: pending < 1, message: 'Remote agent cap reached: 1/1 active remote agents and Fly machines.' });
+
+  it('refuses a second concurrent add while the first is still provisioning, then frees the slot', async () => {
+    let finish!: (vm: FlyProvisionResult) => void;
+    const first = fakes({ checkCap: vi.fn(oneSlot), provision: vi.fn(() => new Promise<FlyProvisionResult>((resolve) => { finish = resolve; })) });
+    const firstAdd = addFlyMachine({}, first);
+    await vi.waitFor(() => expect(first.provision).toHaveBeenCalledTimes(1));
+
+    const second = fakes({ checkCap: vi.fn(oneSlot) });
+    await expect(addFlyMachine({}, second)).rejects.toMatchObject({ code: 'cap-reached' });
+    expect(second.provision).not.toHaveBeenCalled();
+
+    finish(VM);
+    await firstAdd;
+    const third = fakes({ checkCap: vi.fn(() => ({ allowed: true })), newId: () => 'rec-3' });
+    await addFlyMachine({}, third);
+    expect(third.checkCap).toHaveBeenCalledWith(expect.anything(), 0);
+  });
+
+  it('frees the slot when provisioning fails', async () => {
+    const failing = fakes({ provision: vi.fn(async () => { throw new Error('createMachine 500'); }) });
+    await expect(addFlyMachine({}, failing)).rejects.toThrow('createMachine 500');
+    const next = fakes({ checkCap: vi.fn(() => ({ allowed: true })) });
+    await addFlyMachine({}, next);
+    expect(next.checkCap).toHaveBeenCalledWith(expect.anything(), 0);
   });
 });

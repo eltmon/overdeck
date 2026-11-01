@@ -35,6 +35,7 @@ import { linkFetch } from '../../../lib/anywhere/link-client.js';
 import type { MachineLink } from '../../../lib/anywhere/link-store.js';
 import { removeLink } from '../../../lib/anywhere/link-store.js';
 import {
+  countFlyMachines,
   type FlyMachineRecord,
   getFlyMachineByLinkId,
   removeFlyMachine,
@@ -77,7 +78,8 @@ export interface FlyRemoval {
 export interface FlyMachineServiceDeps {
   loadConfig: () => Promise<{ remote?: RemoteConfig }>;
   hasFlyToken: (remote: RemoteConfig | undefined) => boolean;
-  checkCap: (config: { remote?: RemoteConfig }) => { allowed: boolean; message?: string };
+  /** The spend cap, counting `pending` adds that passed it but have no record yet. */
+  checkCap: (config: { remote?: RemoteConfig }, pending: number) => { allowed: boolean; message?: string };
   provision: (input: { region?: string; image?: string }) => Promise<FlyProvisionResult>;
   destroy: (appName: string, machineId: string) => Promise<void>;
   createMachineLink: (input: Parameters<typeof createMachineLink>[0]) => Promise<{ link: MachineLink; view: MachineLinkView }>;
@@ -105,7 +107,7 @@ const defaultDeps: Omit<FlyMachineServiceDeps, 'notifyLinksChanged'> = {
       return false;
     }
   },
-  checkCap: (config) => checkRemoteSpendCap(config),
+  checkCap: (config, pending) => checkRemoteSpendCap(config, { countFlyMachines: () => countFlyMachines() + pending }),
   provision: (input) => provisionFlyMachine(input),
   destroy: (appName, machineId) => destroyFlyVm(appName, machineId),
   createMachineLink: (input) => createMachineLink(input),
@@ -120,6 +122,14 @@ const defaultDeps: Omit<FlyMachineServiceDeps, 'notifyLinksChanged'> = {
   now: () => new Date().toISOString(),
   log: (message) => console.warn(`[fly-machines] ${message}`),
 };
+
+/**
+ * Adds that passed the spend cap and have no record yet. Provisioning takes
+ * minutes before the record exists, so without this two concurrent adds would
+ * both pass a cap with one free slot. The check and the increment run in one
+ * synchronous step, so no other add can pass in between.
+ */
+let pendingProvisions = 0;
 
 /** D-10: the Machines API cannot allocate the app's public IPs; the operator does it once. */
 function publicIpHint(appName: string): string {
@@ -142,8 +152,9 @@ async function refuseEarly(input: AddFlyMachineInput, deps: FlyMachineServiceDep
   if (input.message !== undefined && !input.projectKey) {
     throw new FlyMachineError('bad-request', 'A message needs a project: pass projectKey (--project) with it.');
   }
-  const cap = deps.checkCap(config);
+  const cap = deps.checkCap(config, pendingProvisions);
   if (!cap.allowed) throw new FlyMachineError('cap-reached', cap.message ?? 'The remote spend cap is reached.');
+  pendingProvisions += 1;
 }
 
 export async function addFlyMachine(
@@ -152,7 +163,20 @@ export async function addFlyMachine(
 ): Promise<AddFlyMachineResult> {
   const deps: FlyMachineServiceDeps = { ...defaultDeps, ...overrides };
   await refuseEarly(input, deps);
+  // The reserved cap slot is released once the record exists (it counts from then on) or on failure.
+  let reserved = true;
+  const release = (): void => {
+    if (reserved) pendingProvisions -= 1;
+    reserved = false;
+  };
+  try {
+    return await provisionAndLink(input, deps, release);
+  } finally {
+    release();
+  }
+}
 
+async function provisionAndLink(input: AddFlyMachineInput, deps: FlyMachineServiceDeps, release: () => void): Promise<AddFlyMachineResult> {
   // Provisioning destroys its own VM when it fails, so rollback starts after it.
   const vm = await deps.provision({ region: input.region, image: input.image });
   const recordId = deps.newId();
@@ -171,6 +195,7 @@ export async function addFlyMachine(
       docker: vm.docker,
       createdAt: deps.now(),
     });
+    release();
 
     let created: { link: MachineLink; view: MachineLinkView };
     try {
@@ -262,4 +287,9 @@ export async function removeFlyMachineForLink(
   }
   await deps.removeRecord(record.id);
   return { destroyed: !options.keepServer };
+}
+
+/** Test seam: no production caller; tests use it to clear cap reservations left by a test. */
+export function _resetFlyMachineServiceForTests(): void {
+  pendingProvisions = 0;
 }

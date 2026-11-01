@@ -415,9 +415,14 @@ export function checkRemoteSpendCap(
   config: { remote?: { max_concurrent_agents?: number } },
   deps: CheckRemoteSpendCapDeps = {},
 ): RemoteSpendCapResult {
-  const current = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)().length
-    + (deps.countFlyMachines ?? countFlyMachines)();
   const cap = config.remote?.max_concurrent_agents ?? 0;
+  let flyMachines = 0;
+  try {
+    flyMachines = (deps.countFlyMachines ?? countFlyMachines)();
+  } catch (error) {
+    if (cap > 0) throw error; // fail closed only when a cap applies
+  }
+  const current = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)().length + flyMachines;
 
   if (!cap || cap <= 0) {
     return { allowed: true, current, cap: 0 };

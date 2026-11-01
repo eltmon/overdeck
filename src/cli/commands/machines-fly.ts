@@ -31,10 +31,17 @@ interface AddFlyResponse {
   conversation?: { environmentId: string; name: string; path: string };
 }
 
-type PostOutcome = { status: number; json: unknown } | { unreachable: string };
+export type PostOutcome = { status: number; json: unknown } | { unreachable: string };
 
-/** POST to the dashboard with the internal token and no client timeout. */
-async function postWithoutTimeout(base: string, path: string, body: unknown): Promise<PostOutcome> {
+/**
+ * POST to the dashboard with the internal token and no client timeout. A
+ * connection that closes before the response completes (a dashboard restart)
+ * resolves as unreachable instead of leaving the command waiting forever.
+ *
+ * Test seam: exported so tests can drive it against a local server; its only
+ * production caller is runMachinesAddFly.
+ */
+export async function postWithoutTimeout(base: string, path: string, body: unknown): Promise<PostOutcome> {
   const { ensureInternalToken, INTERNAL_TOKEN_HEADER } = await import('../../lib/internal-token.js');
   const url = new URL(path, base);
   const { request } = url.protocol === 'https:' ? await import('node:https') : await import('node:http');
@@ -59,6 +66,10 @@ async function postWithoutTimeout(base: string, path: string, body: unknown): Pr
           json = { error: text };
         }
         resolve({ status: res.statusCode ?? 0, json });
+      });
+      res.on('error', (error) => resolve({ unreachable: error.message }));
+      res.on('close', () => {
+        if (!res.complete) resolve({ unreachable: 'the dashboard closed the connection before it finished answering' });
       });
     });
     req.on('error', (error) => resolve({ unreachable: error.message }));
