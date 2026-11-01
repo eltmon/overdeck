@@ -83,8 +83,12 @@ Without `--url`, `pan pair` uses this machine's own dashboard address. When
 that address is `localhost` (or `127.0.0.1`, `::1`, `*.localhost`), the URL only
 works on this machine, and `pan pair` says so.
 
-`pan pair` talks to a dashboard started by `pan up`, which shares this
-machine's internal token. A paired device cannot create more pairing
+`pan pair` talks to the running dashboard with this machine's internal
+token, read from `~/.overdeck/internal-token`. Dashboards started by
+`pan up` and by `npx @overdeck/core` both use that file. If `pan pair`
+reports that the dashboard rejected the token, the dashboard was started
+with a different `OVERDECK_HOME` or before the file existed: restart it
+and run `pan pair` again. A paired device cannot create more pairing
 credentials.
 
 ### From the desktop app

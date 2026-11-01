@@ -1,9 +1,12 @@
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { HttpServerRequest } from 'effect/unstable/http';
 import {
   isInternalAgentRequest,
   resolveRequestedStartedBy,
 } from '../agents/shared.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 
 const INTERNAL_TOKEN_HEADER = 'x-overdeck-internal-token';
 
@@ -13,6 +16,9 @@ describe('agent spawn provenance boundary', () => {
   beforeEach(() => {
     previousInternalToken = process.env['OVERDECK_INTERNAL_TOKEN'];
     process.env['OVERDECK_INTERNAL_TOKEN'] = 'test-internal-token';
+    // The token file wins over env (PAN-4628); delete any file a sibling
+    // test in this worker's shared OVERDECK_HOME left behind.
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   });
 
   afterEach(() => {

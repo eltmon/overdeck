@@ -31,7 +31,9 @@ export interface PairOptions { label?: string; url?: string; json?: boolean }
 
 const DOCS_PAGE = 'configuration/remote-access.mdx';
 const NOT_RUNNING = 'Overdeck dashboard is not running; start it with `pan up`.';
-const NEEDS_PAN_UP = 'The dashboard rejected this machine\'s internal token. `pan pair` needs a dashboard started by `pan up` (a `pan serve` server does not share it).';
+const TOKEN_REJECTED = 'The dashboard rejected this machine\'s internal token (from $OVERDECK_HOME/internal-token, default ~/.overdeck/internal-token). '
+  + 'The running dashboard holds a different token: it uses another OVERDECK_HOME, or it was started before that file existed. '
+  + 'Restart it with `pan up` or `npx @overdeck/core`, then run this command again.';
 const LOOPBACK_WARNING = 'This URL only works on this machine. Pass --url with an address another device can reach, and add that origin to OVERDECK_TRUSTED_ORIGINS.';
 
 /** `<base>/#pair=<credential>`: the credential rides in the fragment only. */
@@ -82,7 +84,7 @@ export async function runPair(options: PairOptions): Promise<void> {
     if (isDashboardUnreachable(error)) return fail(NOT_RUNNING);
     throw error;
   }
-  if (response.status === 401) return fail(NEEDS_PAN_UP);
+  if (response.status === 401) return fail(TOKEN_REJECTED);
   if (!response.ok) return fail(`pan pair failed: ${await errorText(response)}`);
 
   const { credential, expiresAt } = await response.json() as { credential: string; expiresAt: string };
@@ -113,7 +115,7 @@ export async function runDevicesList(options: { json?: boolean }): Promise<void>
     if (isDashboardUnreachable(error)) return fail(NOT_RUNNING);
     throw error;
   }
-  if (response.status === 401) return fail(NEEDS_PAN_UP);
+  if (response.status === 401) return fail(TOKEN_REJECTED);
   if (!response.ok) return fail(`pan devices list failed: ${await errorText(response)}`);
   const { devices } = await response.json() as { devices: DeviceRow[] };
 
@@ -147,7 +149,7 @@ export async function runDevicesRevoke(id: string): Promise<void> {
     return;
   }
   if (response.status === 404) return fail(`No paired device with id ${id}.`);
-  if (response.status === 401) return fail(NEEDS_PAN_UP);
+  if (response.status === 401) return fail(TOKEN_REJECTED);
   if (!response.ok) return fail(`pan devices revoke failed: ${await errorText(response)}`);
   const { device } = await response.json() as { device: DeviceRow };
   console.log(`Revoked device "${device.name}" (${device.id}); its live connections were closed.`);
