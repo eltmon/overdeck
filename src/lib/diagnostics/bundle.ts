@@ -111,7 +111,7 @@ export function renderManifest(options: {
     '## What was redacted',
     '',
     '- Shape-matched API keys, tokens, JWTs, AWS access keys, database URLs, basic-auth URLs, and private keys',
-    '- Sensitive `NAME=value` assignments and labelled secrets (`token: ...`, `password: ...`, ...)',
+    '- Sensitive NAME=value assignments and labelled secrets under names like token, password, or secret',
     '- Config values under secret-looking key names (`api_key`, `token`, `secret`, `password`, `credential`, `cookie`, ...)',
     '- The home directory path, shown as `~`',
     '',
