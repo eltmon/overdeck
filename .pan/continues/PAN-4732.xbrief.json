@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4732",
   "created": "2026-11-01T18:35:44.841Z",
-  "updated": "2026-11-01T18:57:39.502Z",
+  "updated": "2026-11-01T18:57:56.680Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,6 +28,10 @@
     "quarantine-title-bar-spec.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T18:57:39.502Z"
+    },
+    "quarantine-title-bar-spec.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:57:56.680Z"
     }
   }
 }
