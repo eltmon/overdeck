@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T07:50:36.478Z",
+  "updated": "2026-11-01T07:50:48.229Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-4639",
       "claimedAt": "2026-11-01T07:31:49.926Z",
       "doneAt": "2026-11-01T07:50:36.477Z"
+    },
+    "keyboard-undo": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4639",
+      "claimedAt": "2026-11-01T07:50:48.229Z"
     }
   }
 }
