@@ -271,7 +271,7 @@ _Last sequenced: 2026-11-01T20:29:34.359998Z · model: claude-opus-5-5 · open: 
 | 269 | PAN-4696 | XS | medium | ok |  |  | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 272 | PAN-4739 | M | high | ok |  |  | Fly VM lifecycle patrol marks a live conversation ended each tick, so home's idle sweep can destroy a VM that is in use. |
+| 272 | PAN-4739 | M | high | needs-refinement |  |  | Fly VM patrol marks a live conversation ended each tick; idle sweep may destroy a used VM. Root cause probe not yet found. |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
@@ -11887,9 +11887,9 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "size": "M",
       "importance": "high",
       "score": 62,
-      "condition": "ok",
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Fly VM lifecycle patrol marks a live conversation ended each tick, so home's idle sweep can destroy a VM that is in use.",
+      "why": "Fly VM patrol marks a live conversation ended each tick; idle sweep may destroy a used VM. Root cause probe not yet found.",
       "rationale": "New bug from the PAN-4652 live check: the VM's conversation-lifecycle patrol disagrees with the live tmux session, and sweepFlyMachines reads that status, so an active Fly machine can be reaped. Ranked beside the other Fly remote correctness bugs (PAN-4682, PAN-4685) because it can destroy live work.",
       "gate": "auto",
       "planning": "auto"
