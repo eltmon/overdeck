@@ -4,17 +4,17 @@
     "created": "2026-11-01T04:43:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4642: Cite selected reply text with a comment and send it with the next prompt",
-    "updated": "2026-11-01T04:48:41.940Z"
+    "updated": "2026-11-01T04:49:39.972Z"
   },
   "plan": {
     "id": "pan-4642",
     "title": "Cite selected reply text with a comment and send it with the next prompt",
-    "status": "proposed",
+    "status": "running",
     "uid": "40147394-3535-41f2-b356-7abe3ede2fa9",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T04:43:40Z",
-    "updated": "2026-11-01T04:48:41.940Z",
+    "updated": "2026-11-01T04:49:39.972Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4642",
@@ -844,5 +844,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

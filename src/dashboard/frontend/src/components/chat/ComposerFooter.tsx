@@ -11,7 +11,7 @@
  */
 
 import { memo, useState, useRef, useCallback, useEffect } from 'react';
-import { AlertCircle, FileText, Mic, MicOff, Paperclip, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
+import { AlertCircle, Mic, MicOff, Paperclip, Scissors, SendHorizontal, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import { getHarnessBehavior } from '@overdeck/contracts';
@@ -33,6 +33,7 @@ import { VaultContinuityNotice } from './VaultContinuityNotice';
 import { HandoffNotice } from './HandoffNotice';
 import { HeldKickoffConflictError, HeldKickoffNotice, kickoffUnchanged, startHeldKickoff, useHeldKickoff, useSeedHeldKickoff } from './heldKickoff';
 import { openImageLightbox, useImageLightboxStore } from './ImageLightbox';
+import { ComposerAttachmentStrip } from './ComposerAttachmentStrip';
 import { useHandoffNotice } from './continueOnDevice/handoffNoticeStore';
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -105,14 +106,6 @@ function openComposerUi(
       focus,
     },
   }));
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.min(Math.floor(Math.log10(bytes) / 3), units.length - 1);
-  const value = bytes / Math.pow(1000, i);
-  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -703,57 +696,14 @@ function ComposerFooterInput({
       {heldKickoff.held && <HeldKickoffNotice />}
       {/* Single unified container — T3Chat style */}
       <div className={styles.composerBox} onDrop={handleDrop} onDragOver={handleDragOver}>
-        {pendingAttachments.length > 0 && (
-          <div className={styles.composerImageStrip}>
-            {pendingAttachments.map((attachment) => {
-              const isUploading = !attachment.serverPath && !attachment.error;
-              const statusLabel = attachment.error
-                ? attachment.error
-                : attachment.serverPath
-                  ? 'Uploaded'
-                  : 'Uploading…';
-              return (
-                <div key={attachment.id} className={styles.composerImageCard}>
-                  {attachment.previewUrl ? (
-                    <button
-                      type="button"
-                      className={styles.composerImageThumbButton}
-                      onClick={() => {
-                        lightboxOwnerRef.current = { id: attachment.id, src: attachment.previewUrl! };
-                        openImageLightbox(attachment.previewUrl!, attachment.file.name);
-                      }}
-                      title={`View ${attachment.file.name}`}
-                    >
-                      <img src={attachment.previewUrl} alt={attachment.file.name} className={styles.composerImageThumb} />
-                    </button>
-                  ) : (
-                    <div className={`${styles.composerImageThumb} ${styles.composerFileThumb}`} title={attachment.file.name}>
-                      <FileText size={16} />
-                    </div>
-                  )}
-                  <div className={styles.composerImageMeta}>
-                    <span className={styles.composerImageName}>{attachment.file.name}</span>
-                    <span className={attachment.error ? styles.composerImageError : styles.composerImageStatus}>
-                      {isUploading ? <Loader2 size={12} className={styles.spinner} /> : null}
-                      {statusLabel}
-                      {attachment.kind === 'file' && !attachment.error && (
-                        <span className={styles.composerFileSize}>· {formatFileSize(attachment.file.size)}</span>
-                      )}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.composerImageRemoveButton}
-                    onClick={() => removePendingAttachment(attachment.id)}
-                    title={`Remove ${attachment.file.name}`}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <ComposerAttachmentStrip
+          attachments={pendingAttachments}
+          onOpenImage={(attachment) => {
+            lightboxOwnerRef.current = { id: attachment.id, src: attachment.previewUrl! };
+            openImageLightbox(attachment.previewUrl!, attachment.file.name);
+          }}
+          onRemove={removePendingAttachment}
+        />
 
         {subagentNotice && (
           <div
