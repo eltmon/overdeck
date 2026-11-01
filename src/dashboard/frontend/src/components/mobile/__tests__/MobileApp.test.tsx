@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import MobileApp, { readMobileRoute } from '../MobileApp';
+import { MobilePairScreen, parsePairingInput } from '../MobilePairScreen';
 import { useConnectionState } from '../../../lib/connectionState';
 
 vi.mock('../../EventRouter', () => ({ EventRouter: () => null }));
 // The shell is under test here; the screens have their own suites.
 vi.mock('../MobileNeedsYou', () => ({ MobileNeedsYou: () => <h2>Needs you</h2> }));
 vi.mock('../MobileConversations', () => ({ MobileConversations: () => <h2>Conversations</h2> }));
+
+const decodeQr = vi.fn<(data: Uint8ClampedArray, width: number, height: number) => { data: string } | null>(() => null);
+vi.mock('jsqr', () => ({ default: (data: Uint8ClampedArray, width: number, height: number) => decodeQr(data, width, height) }));
 
 describe('readMobileRoute', () => {
   it('reads each D-3 deep link', () => {
@@ -81,5 +85,110 @@ describe('MobileApp', () => {
     });
     expect(window.location.search).toBe('?tab=conversations');
     expect(screen.getByRole('heading', { name: 'Conversations' })).toBeInTheDocument();
+  });
+});
+
+const CODE = `odp_${'ab12'.repeat(16)}`;
+
+describe('parsePairingInput', () => {
+  const origin = 'https://desk.ts.net';
+
+  it('accepts a bare code and a same-origin link', () => {
+    expect(parsePairingInput(CODE, origin)).toEqual({ credential: CODE });
+    expect(parsePairingInput(`  https://desk.ts.net/m#pair=${CODE} `, origin)).toEqual({ credential: CODE });
+  });
+
+  it('rejects a link for another origin and garbage', () => {
+    expect(parsePairingInput(`https://other.ts.net/m#pair=${CODE}`, origin)).toEqual({
+      error: 'This code is for https://other.ts.net. Open Overdeck at that address instead.',
+    });
+    expect(parsePairingInput('hello', origin)).toEqual({ error: 'That is not an Overdeck pairing code.' });
+  });
+});
+
+describe('MobilePairScreen', () => {
+  let replaceState: ReturnType<typeof vi.spyOn>;
+  const reload = vi.fn();
+  const originalLocation = window.location;
+
+  beforeEach(() => {
+    replaceState = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
+    reload.mockClear();
+    decodeQr.mockReset().mockReturnValue(null);
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { origin: originalLocation.origin, reload },
+    });
+  });
+
+  afterEach(() => {
+    replaceState.mockRestore();
+    vi.restoreAllMocks();
+    Reflect.deleteProperty(HTMLVideoElement.prototype, 'videoWidth');
+    Reflect.deleteProperty(HTMLVideoElement.prototype, 'videoHeight');
+    Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('hands a pasted link to the bootstrap', () => {
+    render(<MobilePairScreen />);
+    fireEvent.change(screen.getByLabelText('Pairing link'), { target: { value: `${originalLocation.origin}/m#pair=${CODE}` } });
+    fireEvent.click(screen.getByRole('button', { name: 'Pair' }));
+    expect(replaceState).toHaveBeenCalledWith(null, '', `/m#pair=${CODE}`);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to pasting when the camera is unavailable', async () => {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn(async () => { throw new Error('denied'); }) },
+    });
+    render(<MobilePairScreen />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Scan pairing code' }));
+    });
+    expect(screen.getByText('Camera is not available. Paste the pairing link instead.')).toBeInTheDocument();
+    const input = screen.getByLabelText('Pairing link');
+    fireEvent.change(input, { target: { value: 'typed' } });
+    expect(input).toHaveValue('typed');
+  });
+
+  it('pairs from a scanned code and stops the camera', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => cb(0), 16) as unknown as number);
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => clearTimeout(id));
+    const stopTrack = vi.fn();
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: stopTrack }] })) },
+    });
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+    // happy-dom accepts only a real MediaStream here.
+    vi.spyOn(HTMLMediaElement.prototype, 'srcObject', 'set').mockImplementation(() => {});
+    vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(4);
+    // happy-dom has no video dimensions.
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 2 });
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, get: () => 2 });
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+      getImageData: () => ({ data: new Uint8ClampedArray(16), width: 2, height: 2 }),
+    } as unknown as CanvasRenderingContext2D);
+    decodeQr.mockReturnValueOnce(null).mockReturnValue({ data: `${originalLocation.origin}/m#pair=${CODE}` });
+
+    render(<MobilePairScreen />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Scan pairing code' }));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16);
+    });
+    expect(replaceState).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16);
+    });
+    expect(replaceState).toHaveBeenCalledWith(null, '', `/m#pair=${CODE}`);
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(stopTrack).toHaveBeenCalled();
   });
 });

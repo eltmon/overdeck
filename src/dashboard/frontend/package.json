@@ -41,6 +41,7 @@
     "cmdk": "^1.1.1",
     "effect": "catalog:",
     "framer-motion": "^11.18.2",
+    "jsqr": "1.4.0",
     "lexical": "^0.41.0",
     "lucide-react": "^0.400.0",
     "monaco-editor": "^0.55.1",
