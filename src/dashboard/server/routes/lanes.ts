@@ -13,18 +13,25 @@
  * - `GET /api/lanes/:name` → one LaneView (a local lane, or a stand-in for a
  *   lane on another machine), or 404 when the name is not a lane.
  * - `POST /api/lanes/:name/reap` with `{ park?, keep? }` → `reapLane` with the
- *   archive route's own dependencies (D14), never a second copy of them.
+ *   archive route's own dependencies (D14), never a second copy of them. A
+ *   lane on another machine is reaped by its owner's lane reap door; home then
+ *   archives the stand-in unless `keep` (PAN-4638 D-4638-13).
+ * - `POST /api/lanes/:name/stop` → the conversation stop door for a local lane,
+ *   or the owner's `POST /api/conversations/<name>/stop` as the caller for a
+ *   lane on another machine. 200 `{ stopped: true }`.
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
 
 import { listFlyMachines } from '../../../lib/anywhere/fly/machine-store.js';
+import type { MachineLink } from '../../../lib/anywhere/link-store.js';
 import { launchLane, type LaneLaunchDeps, type RemoteLaneTarget } from '../../../lib/lanes/launch.js';
 import { LaneReapError, reapLane } from '../../../lib/lanes/reap.js';
-import { readRemoteLane } from '../../../lib/lanes/remote-lanes.js';
+import { markRemoteLaneArchived, readRemoteLane } from '../../../lib/lanes/remote-lanes.js';
 import { LaneLaunchError, type LaneLaunchRequest } from '../../../lib/lanes/types.js';
 import { invalidateLaneViews, listLaneViews, type LaneViewFilter } from '../../../lib/lanes/views.js';
-import { getConversationByName, LANE_ROLES, type LaneRole } from '../../../lib/overdeck/conversations.js';
+import { stopConversationRuntime } from '../../../lib/overdeck/conversation-runtime.js';
+import { getConversationByName, LANE_ROLES, markConversationEnded, type LaneRole, type LegacyConversation } from '../../../lib/overdeck/conversations.js';
 import { channelOfRequest } from '../channel-peer.js';
 import { jsonResponse } from '../http-helpers.js';
 import { SENDER_HEADER } from '../linked-conversation-proxy.js';
@@ -65,6 +72,9 @@ export interface LaneRouteDeps extends Pick<FleetSpawnDeps, 'resolveTarget' | 'p
   launch: (request: LaneLaunchRequest, deps: LaneLaunchDeps) => ReturnType<typeof launchLane>;
   flyEnvironmentIds: () => Promise<string[]>;
   follow: (name: string) => void;
+  /** The conversation stop door: stop the runtime, then mark the row ended. */
+  stopLocal: (conv: LegacyConversation) => Promise<void>;
+  now: () => Date;
 }
 
 export const defaultLaneRouteDeps = (): LaneRouteDeps => {
@@ -77,8 +87,70 @@ export const defaultLaneRouteDeps = (): LaneRouteDeps => {
     launch: launchLane,
     flyEnvironmentIds: async () => (await listFlyMachines()).flatMap((record) => (record.environmentId ? [record.environmentId] : [])),
     follow: followRemoteLane,
+    stopLocal: async (conv) => {
+      await stopConversationRuntime(conv, conv.name);
+      markConversationEnded(conv.name);
+    },
+    now: () => new Date(),
   };
 };
+
+/** The owner's link for a remote lane; a refusal answers 503 machine-unreachable when it is offline. */
+async function ownerLinkOf(
+  environmentId: string,
+  deps: LaneRouteDeps,
+): Promise<{ ok: true; link: MachineLink } | { ok: false; response: HttpServerResponse.HttpServerResponse }> {
+  const target = await deps.resolveTarget(environmentId, null, []);
+  if (target.ok && !target.self) return { ok: true, link: target.link };
+  if (target.ok) return { ok: false, response: jsonResponse({ error: 'the stand-in names this machine' }, { status: 409 }) };
+  const body = target.body as { code?: unknown; error?: unknown };
+  if (target.status === 503) return { ok: false, response: jsonResponse({ ...body, code: 'machine-unreachable' }, { status: 503 }) };
+  return { ok: false, response: jsonResponse(body, { status: target.status }) };
+}
+
+/** `POST /api/lanes/:name/stop`. */
+export async function handleLaneStop(name: string, caller: FleetCaller, deps: LaneRouteDeps = defaultLaneRouteDeps()): Promise<HttpServerResponse.HttpServerResponse> {
+  const row = getConversationByName(name);
+  if (row?.laneKey) {
+    await deps.stopLocal(row);
+    invalidateLaneViews();
+    return jsonResponse({ stopped: true });
+  }
+  const remote = await readRemoteLaneIfNamed(name);
+  if (!remote) return jsonResponse({ error: `${name} is not a lane` }, { status: 404 });
+  const owner = await ownerLinkOf(remote.facts.environmentId, deps);
+  if (!owner.ok) return owner.response;
+  const answer = await postWorkDoor(deps, owner.link, `/api/conversations/${encodeURIComponent(name)}/stop`, {}, caller);
+  if (answer.status !== 200) return jsonResponse(answer.json, { status: answer.status });
+  invalidateLaneViews();
+  return jsonResponse({ stopped: true });
+}
+
+/** `POST /api/lanes/:name/reap` for a lane on another machine (D-4638-13). */
+export async function handleRemoteLaneReap(
+  name: string,
+  options: { park: boolean; keep: boolean },
+  caller: FleetCaller,
+  deps: LaneRouteDeps = defaultLaneRouteDeps(),
+): Promise<HttpServerResponse.HttpServerResponse | null> {
+  const remote = await readRemoteLaneIfNamed(name);
+  if (!remote) return null;
+  const owner = await ownerLinkOf(remote.facts.environmentId, deps);
+  if (!owner.ok) return owner.response;
+  const answer = await postWorkDoor(deps, owner.link, `/api/machines/work/lanes/${encodeURIComponent(name)}/reap`, options, caller);
+  if (answer.status === 200) {
+    if (!options.keep) await markRemoteLaneArchived(name, deps.now().toISOString());
+    invalidateLaneViews();
+    return jsonResponse(answer.json);
+  }
+  if (answer.status === 404 && (answer.json as { code?: unknown } | null)?.code === 'unknown-lane') {
+    await markRemoteLaneArchived(name, deps.now().toISOString());
+    invalidateLaneViews();
+    const warning = `the lane is gone from ${remote.facts.label}; archived it here`;
+    return jsonResponse({ removed: false, archived: true, parkedPatch: null, warnings: [warning] });
+  }
+  return jsonResponse(answer.json, { status: answer.status });
+}
 
 const LANE_ERROR_STATUSES: ReadonlySet<number> = new Set([400, 403, 404, 409, 429, 503]);
 const laneStatus = (status: number): LaneLaunchError['status'] => (LANE_ERROR_STATUSES.has(status) ? status : 500) as LaneLaunchError['status'];
@@ -265,9 +337,17 @@ const reapLaneRoute = HttpRouter.add(
     for (const field of ['park', 'keep'] as const) {
       if (body[field] !== undefined && typeof body[field] !== 'boolean') return jsonResponse({ error: `${field} must be a boolean` }, { status: 400 });
     }
+    const sender = (request.headers as Record<string, string | string[] | undefined>)[SENDER_HEADER];
+    const caller = fleetCaller(resolveRequestCredential(request), Array.isArray(sender) ? sender[0] : sender);
+    if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
+    const options = { park: body.park === true, keep: body.keep === true };
     return yield* Effect.promise(async () => {
       try {
-        const result = await reapLane(name, { park: body.park === true, keep: body.keep === true }, { archive: conversationArchiveDependencies });
+        if (!getConversationByName(name)?.laneKey) {
+          const remote = await handleRemoteLaneReap(name, options, caller);
+          if (remote) return remote;
+        }
+        const result = await reapLane(name, options, { archive: conversationArchiveDependencies });
         invalidateLaneViews();
         return jsonResponse(result);
       } catch (error: unknown) {
@@ -277,4 +357,26 @@ const reapLaneRoute = HttpRouter.add(
   }),
 );
 
-export const lanesRouteLayer = Layer.mergeAll(postLaneRoute, listLanesRoute, getLaneRoute, reapLaneRoute);
+const stopLaneRoute = HttpRouter.add(
+  'POST',
+  '/api/lanes/:name/stop',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    const rawName = (yield* HttpRouter.params)['name'] ?? '';
+    const name = rawName.startsWith('conv-') ? rawName.slice('conv-'.length) : rawName;
+    const sender = (request.headers as Record<string, string | string[] | undefined>)[SENDER_HEADER];
+    const caller = fleetCaller(resolveRequestCredential(request), Array.isArray(sender) ? sender[0] : sender);
+    if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
+    return yield* Effect.promise(async () => {
+      try {
+        return await handleLaneStop(name, caller);
+      } catch (error: unknown) {
+        return errorResponse(error, 'stop');
+      }
+    });
+  }),
+);
+
+export const lanesRouteLayer = Layer.mergeAll(postLaneRoute, listLanesRoute, getLaneRoute, reapLaneRoute, stopLaneRoute);

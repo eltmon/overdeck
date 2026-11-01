@@ -65,6 +65,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/conversations/:name/stop', scope: 'operate' },
   { method: 'POST', path: '/api/conversations/:name/abort', scope: 'operate' },
   { method: 'POST', path: '/api/lanes', scope: 'operate' },
+  // PAN-4638 WI-8: stop a lane here, or on its owner through the link.
+  { method: 'POST', path: '/api/lanes/:name/stop', scope: 'operate' },
   // PAN-4645 WI-13: a linked machine revokes its own token (the route then
   // requires exactly a machine credential).
   { method: 'DELETE', path: '/api/machines/self', scope: 'read:state' },
