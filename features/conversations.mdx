@@ -732,14 +732,18 @@ change. It applies to the diff in every view, and the panel remembers it in this
 browser. A turn's file list can still name a file whose only change was
 whitespace; opening it then shows no net changes.
 
-## Archiving a conversation
+## Stopping or archiving a conversation
 
-Archive is in the row menu, the tab menu, and the conversation header menu.
-After you confirm, the row shows a spinner and the Archive action reads
-"Archiving…" and is disabled while Overdeck ends the session; on success a
-toast says `Archived "<title>"`, the row leaves the list and its tab closes;
-on failure an error toast shows the server's message and the row and tab
-stay.
+Stop is the `X` on the row or "Stop agent" in the row menu, the tab menu, or
+the conversation header menu; Archive is in those same menus. After you stop
+or confirm archive, the row dims and stops responding to clicks, and its
+second line reads "Stopping…" or "Archiving…" (a nested row shows the label
+after the title instead); the row's `X` becomes a spinner. The conversation
+header shows the same status. The row stays dimmed until the conversation
+list has refreshed — then a stopped row shows its stopped (gray) dot, and an
+archived row leaves the list with a toast reading `Archived "<title>"` and
+its tab closes. On failure, an error toast shows the server's message and
+the row returns to normal.
 
 ## See also
 
