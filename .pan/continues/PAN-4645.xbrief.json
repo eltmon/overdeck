@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T07:43:41.001Z",
+  "updated": "2026-11-01T07:43:58.917Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "wi4-machine-credential.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T07:43:41.000Z"
+    },
+    "wi4-machine-credential.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:58.917Z"
     }
   }
 }
