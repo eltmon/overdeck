@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FREE_MACHINE_LIMIT_MESSAGE } from '../../../../packages/contracts/src/connect.ts';
+import { FREE_MACHINE_LIMIT_MESSAGE, RELAY_CAP_MESSAGE, RELAY_MONTHLY_CAP_BYTES } from '../../../../packages/contracts/src/connect.ts';
 import type { MachineToDirectoryFrame } from '../../../../packages/contracts/src/connect.ts';
 import { EMPTY_DIRECTORY, reduce } from '../../../../services/connect/src/directory-state.ts';
 import type { DirectoryEffect, DirectoryState, SocketIdentity } from '../../../../services/connect/src/directory-state.ts';
@@ -30,7 +30,7 @@ function hello(state: DirectoryState, n: number, identity = FREE, online: string
   return reduce(
     state,
     { kind: 'hello', registeredAs: null, identity, frame: helloFrame(n), fingerprint: `fp-${n}` },
-    { now: NOW, online: new Set(online), stunUrls: [] },
+    { now: NOW, online: new Set(online), stunUrls: [], relayCapBytes: RELAY_MONTHLY_CAP_BYTES, turnConfigured: false },
   );
 }
 
@@ -68,7 +68,7 @@ describe('directory reducer: presence and the machine limit (PAN-2356 WI-5)', ()
     const forgotten = reduce(
       state,
       { kind: 'frame', registeredAs: env(1), frame: { type: 'forget', environmentId: env(3) } },
-      { now: NOW, online: new Set([env(3)]), stunUrls: [] },
+      { now: NOW, online: new Set([env(3)]), stunUrls: [], relayCapBytes: RELAY_MONTHLY_CAP_BYTES, turnConfigured: false },
     );
     expect(forgotten.state.machines.map((m) => m.environmentId)).toEqual([env(1), env(2)]);
     expect(forgotten.effects).toContainEqual({ kind: 'delete-machine', environmentId: env(3) });
@@ -94,7 +94,7 @@ describe('directory reducer: presence and the machine limit (PAN-2356 WI-5)', ()
   it('marks a machine offline with a new last-seen time when its last socket goes', () => {
     const state = register(2);
     const later = NOW + 60_000;
-    const { state: next, effects } = reduce(state, { kind: 'socket-gone', registeredAs: env(2) }, { now: later, online: new Set([env(1)]), stunUrls: [] });
+    const { state: next, effects } = reduce(state, { kind: 'socket-gone', registeredAs: env(2) }, { now: later, online: new Set([env(1)]), stunUrls: [], relayCapBytes: RELAY_MONTHLY_CAP_BYTES, turnConfigured: false });
     expect(next.machines[1]?.lastSeenAt).toBe(later);
     const frame = sends(effects)[0];
     expect(frame).toMatchObject({ to: 'others', frame: { type: 'directory' } });
@@ -104,12 +104,12 @@ describe('directory reducer: presence and the machine limit (PAN-2356 WI-5)', ()
   });
 
   it('closes a socket that sends another frame before hello with 4010', () => {
-    const { effects } = reduce(EMPTY_DIRECTORY, { kind: 'frame', registeredAs: null, frame: { type: 'endpoints', endpoints: [] } }, { now: NOW, online: new Set(), stunUrls: [] });
+    const { effects } = reduce(EMPTY_DIRECTORY, { kind: 'frame', registeredAs: null, frame: { type: 'endpoints', endpoints: [] } }, { now: NOW, online: new Set(), stunUrls: [], relayCapBytes: RELAY_MONTHLY_CAP_BYTES, turnConfigured: false });
     expect(closes(effects)).toEqual([{ kind: 'close', to: 'self', code: 4010, reason: 'hello required' }]);
   });
 
   it('answers an unsupported protocol with an error and close 4010', () => {
-    const { effects } = reduce(EMPTY_DIRECTORY, { kind: 'bad-frame', registeredAs: null, reason: 'unsupported' }, { now: NOW, online: new Set(), stunUrls: [] });
+    const { effects } = reduce(EMPTY_DIRECTORY, { kind: 'bad-frame', registeredAs: null, reason: 'unsupported' }, { now: NOW, online: new Set(), stunUrls: [], relayCapBytes: RELAY_MONTHLY_CAP_BYTES, turnConfigured: false });
     expect(sends(effects)[0]).toMatchObject({ frame: { type: 'error', code: 'unsupported' } });
     expect(closes(effects)[0]).toMatchObject({ code: 4010 });
   });
@@ -118,7 +118,7 @@ describe('directory reducer: presence and the machine limit (PAN-2356 WI-5)', ()
     const { effects } = reduce(
       EMPTY_DIRECTORY,
       { kind: 'hello', registeredAs: null, identity: FREE, frame: helloFrame(1, 'SECRET-LABEL'), fingerprint: 'fp' },
-      { now: NOW, online: new Set(), stunUrls: [] },
+      { now: NOW, online: new Set(), stunUrls: [], relayCapBytes: RELAY_MONTHLY_CAP_BYTES, turnConfigured: false },
     );
     const logs = effects.filter((e) => e.kind === 'log');
     expect(logs).toEqual([{ kind: 'log', type: 'hello', environmentId: env(1), outcome: 'registered' }]);
@@ -156,7 +156,7 @@ describe('keyFingerprint', () => {
 });
 
 describe('directory reducer: signalling and approvals (PAN-2356 WI-6)', () => {
-  const ctx = (online: string[], now = NOW) => ({ now, online: new Set(online), stunUrls: ['stun:stun.cloudflare.com:3478'] });
+  const ctx = (online: string[], now = NOW) => ({ now, online: new Set(online), stunUrls: ['stun:stun.cloudflare.com:3478'], relayCapBytes: RELAY_MONTHLY_CAP_BYTES, turnConfigured: false });
   const id = (n: number) => n.toString(16).padStart(32, '0');
   const offer = { sdp: { type: 'offer' as const, sdp: 'v=0' } };
 
@@ -263,5 +263,54 @@ describe('directory reducer: signalling and approvals (PAN-2356 WI-6)', () => {
       to: 'self',
       frame: { type: 'ice-servers', requestId: 'r1', iceServers: [{ urls: ['stun:stun.cloudflare.com:3478'] }] },
     });
+  });
+});
+
+describe('directory reducer: relay credentials and metering (PAN-2356 WI-7)', () => {
+  const CAP = 1_000;
+  const ctx = (now = NOW, turnConfigured = true) => ({ now, online: new Set<string>(), stunUrls: [], relayCapBytes: CAP, turnConfigured });
+  const ask = (state: DirectoryState, now = NOW, turnConfigured = true) =>
+    reduce(state, { kind: 'frame', registeredAs: env(1), frame: { type: 'ice-servers', requestId: 'r', relay: true } }, ctx(now, turnConfigured));
+  const report = (state: DirectoryState, bytes: number, now = NOW) =>
+    reduce(state, { kind: 'frame', registeredAs: env(1), frame: { type: 'relay-usage', bytes } }, ctx(now));
+
+  it('refuses a free plan with relay_not_allowed', () => {
+    const { effects } = ask(register(1, FREE));
+    expect(sends(effects)[0]).toMatchObject({ frame: { type: 'error', code: 'relay_not_allowed', requestId: 'r' } });
+  });
+
+  it('mints TURN credentials for a tester account under the cap', () => {
+    const { effects } = ask(register(1, TESTER));
+    expect(effects).toContainEqual({ kind: 'fetch-turn', requestId: 'r' });
+  });
+
+  it('refuses with turn_unavailable when the TURN secrets are unset', () => {
+    const { effects } = ask(register(1, TESTER), NOW, false);
+    expect(sends(effects)[0]).toMatchObject({ frame: { code: 'turn_unavailable' } });
+  });
+
+  it('broadcasts stopped once when usage crosses the cap, then refuses with relay_cap_reached', () => {
+    let state = register(1, TESTER);
+    const first = report(state, 600);
+    expect(sends(first.effects)).toEqual([]);
+    state = first.state;
+    const second = report(state, 500);
+    expect(sends(second.effects)).toEqual([
+      { kind: 'send', to: 'all', frame: { type: 'relay-status', month: '2026-11', bytesUsed: 1_100, capBytes: CAP, stopped: true } },
+    ]);
+    const third = report(second.state, 10);
+    expect(sends(third.effects)).toEqual([]);
+    const refused = ask(third.state);
+    expect(sends(refused.effects)[0]).toMatchObject({ frame: { code: 'relay_cap_reached', message: RELAY_CAP_MESSAGE } });
+  });
+
+  it('starts a fresh allowance on 1 December UTC', () => {
+    const capped = report(register(1, TESTER), 2_000).state;
+    const december = Date.UTC(2026, 11, 1, 0, 0, 0);
+    expect(ask(capped, december).effects).toContainEqual({ kind: 'fetch-turn', requestId: 'r' });
+    const welcome = reduce(capped, { kind: 'hello', registeredAs: null, identity: TESTER, frame: helloFrame(1), fingerprint: 'fp-1' }, ctx());
+    expect(sends(welcome.effects)[0]).toMatchObject({ frame: { relay: { month: '2026-11', bytesUsed: 2_000, capBytes: CAP, stopped: true } } });
+    const decemberWelcome = reduce(capped, { kind: 'hello', registeredAs: null, identity: TESTER, frame: helloFrame(1), fingerprint: 'fp-1' }, ctx(december));
+    expect(sends(decemberWelcome.effects)[0]).toMatchObject({ frame: { relay: { month: '2026-12', bytesUsed: 0, stopped: false } } });
   });
 });

@@ -17,6 +17,8 @@ export const MAX_ENDPOINT_URL_CHARS = 256;
 export const MAX_VERSION_CHARS = 64;
 export const MAX_SDP_CHARS = 32_768;
 export const MAX_CANDIDATE_CHARS = 2_048;
+/** One `relay-usage` report covers at most 1e9 bytes. */
+export const MAX_RELAY_USAGE_BYTES = 1_000_000_000;
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const KEY_HEX_RE = /^[0-9a-f]{64}$/;
@@ -157,6 +159,11 @@ function build(obj: Obj): MachineToDirectoryFrame {
     }
     case 'approval-cancel':
       return { type, requestId: str(obj, 'requestId', 32, ID_HEX_RE) };
+    case 'relay-usage': {
+      const bytes = obj['bytes'];
+      if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes < 0 || bytes > MAX_RELAY_USAGE_BYTES) fail();
+      return { type, bytes };
+    }
     default:
       return fail();
   }

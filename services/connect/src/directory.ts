@@ -13,11 +13,14 @@ import type { ConnectPlan, DirectoryEndpoint, DirectoryToMachineFrame } from '..
 import { EMPTY_DIRECTORY, reduce } from './directory-state.ts';
 import type { ApprovalRow, DirectoryEffect, DirectoryEvent, DirectoryState, MachineRow, Target } from './directory-state.ts';
 import type { ConnectIdentity, Deps, Env } from './env.ts';
-import { HDR_IDENTITY, INTERNAL, parseConfig } from './env.ts';
+import { HDR_IDENTITY, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
 import { keyFingerprint } from './fingerprint.ts';
 import { isWebSocketUpgrade } from './http.ts';
 import { logFrame } from './log.ts';
 import { decodeMachineFrame } from './protocol.ts';
+import { relayCapBytes } from './relay-meter.ts';
+import type { RelayUsage } from './relay-meter.ts';
+import { fetchIceServers } from './turn.ts';
 
 const MACHINE_TAG = 'machine';
 
@@ -47,6 +50,7 @@ const SCHEMA = [
     created_at INTEGER NOT NULL,
     expires_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS relay_usage (month TEXT PRIMARY KEY, bytes INTEGER NOT NULL)`,
 ];
 
 interface ApprovalSqlRow {
@@ -153,7 +157,9 @@ export class DirectoryHost {
         createdAt: r.created_at,
         expiresAt: r.expires_at,
       }));
-    return { plan, machines, approvals };
+    const relayRow = sql.exec<{ month: string; bytes: number }>('SELECT month, bytes FROM relay_usage ORDER BY month DESC LIMIT 1').toArray()[0];
+    const relay: RelayUsage | null = relayRow ? { month: relayRow.month, bytes: relayRow.bytes } : null;
+    return { plan, machines, approvals, relay };
   }
 
   async fetch(req: Request): Promise<Response> {
@@ -172,14 +178,18 @@ export class DirectoryHost {
     if (!attachment) return;
     const registeredAs = attachment.environmentId;
     const decoded = decodeMachineFrame(message);
-    if (!decoded.ok) return this.apply(ws, { kind: 'bad-frame', registeredAs, reason: decoded.reason });
+    if (!decoded.ok) {
+      await this.apply(ws, { kind: 'bad-frame', registeredAs, reason: decoded.reason });
+      return;
+    }
     const frame = decoded.frame;
     if (frame.type === 'hello') {
       const { deviceId, plan, maxDevices } = attachment.identity;
       const fingerprint = await keyFingerprint(frame.publicKeyHex);
-      return this.apply(ws, { kind: 'hello', registeredAs, identity: { deviceId, plan, maxDevices }, frame, fingerprint });
+      await this.apply(ws, { kind: 'hello', registeredAs, identity: { deviceId, plan, maxDevices }, frame, fingerprint });
+      return;
     }
-    return this.apply(ws, { kind: 'frame', registeredAs, frame });
+    await this.apply(ws, { kind: 'frame', registeredAs, frame });
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
@@ -217,28 +227,37 @@ export class DirectoryHost {
     const online = new Set(this.registered(ws).map((r) => r.environmentId));
     const config = parseConfig(this.env);
     const stunUrls = config.ok ? config.config.stunUrls : [];
-    const { state, effects } = reduce(this.state, event, { now: this.deps.now(), online, stunUrls });
+    const { state, effects } = reduce(this.state, event, {
+      now: this.deps.now(),
+      online,
+      stunUrls,
+      relayCapBytes: relayCapBytes(this.env.RELAY_CAP_BYTES),
+      turnConfigured: parseTurnConfig(this.env) !== null,
+    });
     this.state = state;
-    this.execute(ws, effects);
+    await this.execute(ws, effects);
   }
 
   private resolve(self: WebSocket, to: Target): WebSocket[] {
     if (to === 'self') return [self];
     const others = this.registered(self);
     if (to === 'others') return others.map((r) => r.ws);
+    if (to === 'all') return [self, ...others.map((r) => r.ws)];
     return others.filter((r) => r.environmentId === to.environmentId).map((r) => r.ws);
   }
 
-  /** Persistence, then registration, then sends, then closes, then logs. */
-  private execute(self: WebSocket, effects: DirectoryEffect[]): void {
+  /** Persistence, then registration, then sends (and TURN answers), then closes, then logs. */
+  private async execute(self: WebSocket, effects: DirectoryEffect[]): Promise<void> {
     const order: Record<DirectoryEffect['kind'], number> = {
       'put-plan': 0,
       'put-machine': 0,
       'delete-machine': 0,
       'put-approval': 0,
       'delete-approval': 0,
+      'put-relay-usage': 0,
       register: 1,
       send: 2,
+      'fetch-turn': 2,
       close: 3,
       log: 4,
     };
@@ -276,6 +295,22 @@ export class DirectoryHost {
         case 'delete-approval':
           sql.exec('DELETE FROM approvals WHERE request_id = ?', e.requestId);
           break;
+        case 'put-relay-usage':
+          sql.exec(
+            'INSERT INTO relay_usage (month, bytes) VALUES (?, ?) ON CONFLICT(month) DO UPDATE SET bytes = excluded.bytes',
+            e.usage.month, e.usage.bytes,
+          );
+          break;
+        case 'fetch-turn': {
+          const result = await fetchIceServers(parseTurnConfig(this.env), this.deps);
+          safeSend(
+            self,
+            result.ok
+              ? { type: 'ice-servers', requestId: e.requestId, iceServers: result.iceServers }
+              : { type: 'error', code: 'turn_unavailable', message: 'relay credentials are not available', requestId: e.requestId },
+          );
+          break;
+        }
         case 'register': {
           const attachment = attachmentOf(self);
           if (attachment) self.serializeAttachment({ ...attachment, environmentId: e.environmentId } satisfies Attachment);

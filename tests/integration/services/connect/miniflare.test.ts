@@ -30,6 +30,8 @@ const SLOW = 60_000;
 const freeToken = (n: number) => 'odd_' + n.toString(16).padStart(64, 'f');
 const TESTER_TOKEN = 'odd_' + 'e'.repeat(64);
 const TESTER_TOKEN_2 = 'odd_' + 'e'.repeat(63) + 'd';
+/** A second tester account whose relay allowance the cap test spends. */
+const RELAY_TOKEN = 'odd_' + 'c'.repeat(64);
 
 const ACCOUNT_STUB = `
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -37,6 +39,9 @@ export class AccountRpc extends WorkerEntrypoint {
   async verifyDevice(token) {
     if (token === ${JSON.stringify(TESTER_TOKEN)} || token === ${JSON.stringify(TESTER_TOKEN_2)}) {
       return { ok: true, userId: 'u-tester', githubId: 2, deviceId: 'd-tester', entitlement: { plan: 'tester', maxDevices: null } };
+    }
+    if (token === ${JSON.stringify(RELAY_TOKEN)}) {
+      return { ok: true, userId: 'u-relay', githubId: 3, deviceId: 'd-relay', entitlement: { plan: 'tester', maxDevices: null } };
     }
     if (/^odd_f+[0-9a-f]$/.test(token)) {
       return { ok: true, userId: 'u-free', githubId: 1, deviceId: 'd-' + token.slice(-1), entitlement: { plan: 'free', maxDevices: 3 } };
@@ -49,6 +54,14 @@ export default { fetch() { return new Response('account stub'); } };
 
 /** Every line the Worker logged, from workerd's structured log stream. */
 const logs: string[] = [];
+
+const TURN_KEY_ID = 'turn-key-test';
+const STUB_ICE_SERVERS = [{ urls: ['turns:turn.cloudflare.com:443?transport=tcp'], username: 'stub-user', credential: 'stub-cred' }];
+/** Bodies of requests that reached the stubbed Cloudflare TURN credential API. */
+const turnBodies: string[] = [];
+const unexpectedOutbound: string[] = [];
+/** The relay allowance in this test (RELAY_CAP_BYTES), so the cap is reachable in a few reports. */
+const RELAY_CAP = 1_000;
 
 let tmp = '';
 let mf: Miniflare;
@@ -75,8 +88,28 @@ beforeAll(async () => {
             ACCOUNT: { type: 'worker', worker: 'account-stub', exportName: 'AccountRpc' },
             PUBLIC_BASE_URL: { type: 'text', value: BASE },
             STUN_URLS: { type: 'text', value: 'stun:stun.cloudflare.com:3478' },
+            TURN_KEY_ID: { type: 'text', value: TURN_KEY_ID },
+            TURN_KEY_API_TOKEN: { type: 'text', value: 'turn-api-token-test' }, // a Worker secret in production
+            RELAY_CAP_BYTES: { type: 'text', value: String(RELAY_CAP) },
           },
           exports: { AccountDirectory: { type: 'durable-object', storage: 'sqlite' } },
+        },
+        dev: {
+          outboundService: {
+            type: 'fetcher',
+            handler: async (request: Request) => {
+              const url = new URL(request.url);
+              if (
+                request.method === 'POST' &&
+                url.href === `https://rtc.live.cloudflare.com/v1/turn/keys/${TURN_KEY_ID}/credentials/generate-ice-servers`
+              ) {
+                turnBodies.push(await request.text());
+                return new Response(JSON.stringify({ iceServers: STUB_ICE_SERVERS }), { status: 201, headers: { 'Content-Type': 'application/json' } });
+              }
+              unexpectedOutbound.push(`${request.method} ${request.url}`);
+              return new Response('unexpected outbound request', { status: 599 });
+            },
+          },
         },
       },
       {
@@ -185,10 +218,10 @@ async function register(token: string, n: number, label?: string): Promise<Peer>
 }
 
 describe('connect service on real workerd (PAN-2356 WI-3)', () => {
-  it('GET /healthz reports configured: true and turn: false without TURN secrets', async () => {
+  it('GET /healthz reports configured: true and turn: true', async () => {
     const res = await req('/healthz');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, configured: true, turn: false });
+    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true });
   }, SLOW);
 
   it('answers 401 to a directory socket the account service rejects', async () => {
@@ -248,6 +281,36 @@ describe('connect service on real workerd (PAN-2356 WI-3)', () => {
       iceServers: [{ urls: ['stun:stun.cloudflare.com:3478'] }],
     });
     a.close();
+  }, SLOW);
+
+  it('mints relay credentials for a tester, refuses a free plan, and stops the relay at the cap (WI-7)', async () => {
+    const free = await register(freeToken(1), 1); // already registered: the free account is full
+    free.send({ type: 'ice-servers', requestId: 'r-free', relay: true });
+    expect(await free.waitFor(isType('error'))).toMatchObject({ code: 'relay_not_allowed', requestId: 'r-free' });
+    free.close();
+
+    const a = await register(RELAY_TOKEN, 21);
+    const b = await register(RELAY_TOKEN, 22);
+    expect(a.frames.find(isType('welcome'))).toMatchObject({ relayAllowed: true, relay: { bytesUsed: 0, capBytes: RELAY_CAP, stopped: false } });
+    a.send({ type: 'ice-servers', requestId: 'r-1', relay: true });
+    expect(await a.waitFor(isType('ice-servers'))).toEqual({ type: 'ice-servers', requestId: 'r-1', iceServers: STUB_ICE_SERVERS });
+    expect(JSON.parse(turnBodies.at(-1) ?? '{}')).toEqual({ ttl: 600 });
+
+    a.send({ type: 'relay-usage', bytes: 600 });
+    a.send({ type: 'relay-usage', bytes: 500 });
+    const stopped = await b.waitFor(isType('relay-status'));
+    expect(stopped).toMatchObject({ bytesUsed: 1_100, capBytes: RELAY_CAP, stopped: true });
+    await a.waitFor(isType('relay-status'));
+    const before = a.frames.length;
+    a.send({ type: 'ice-servers', requestId: 'r-2', relay: true });
+    expect(await a.waitFor(isType('error'), before)).toMatchObject({
+      code: 'relay_cap_reached',
+      message: 'Relay allowance used; install Tailscale or add 50 GB',
+      requestId: 'r-2',
+    });
+    expect(unexpectedOutbound).toEqual([]);
+    a.close();
+    b.close();
   }, SLOW);
 
   it('logs only frame types, ids and outcomes, never the label (WI-5)', async () => {

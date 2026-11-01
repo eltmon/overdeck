@@ -19,6 +19,8 @@ export interface Env {
   STUN_URLS?: string;
   TURN_KEY_ID?: string;
   TURN_KEY_API_TOKEN?: string;
+  /** Positive integer overriding the 50 GB monthly relay cap, for staging tests only. */
+  RELAY_CAP_BYTES?: string;
 }
 
 /** Time, outbound HTTP and randomness are injected so tests control all three without waiting. */

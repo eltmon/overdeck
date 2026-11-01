@@ -11,7 +11,7 @@ import {
   CONNECT_CLOSE_CODES,
   CONNECT_PROTOCOL_VERSION,
   FREE_MACHINE_LIMIT_MESSAGE,
-  RELAY_MONTHLY_CAP_BYTES,
+  RELAY_CAP_MESSAGE,
 } from '../../../packages/contracts/src/connect.ts';
 import type {
   ConnectErrorCode,
@@ -20,8 +20,9 @@ import type {
   DirectoryMachine,
   DirectoryToMachineFrame,
   MachineToDirectoryFrame,
-  RelayStatus,
 } from '../../../packages/contracts/src/connect.ts';
+import { addUsage, bytesThisMonth, relayStatusOf } from './relay-meter.ts';
+import type { RelayUsage } from './relay-meter.ts';
 
 /** One registered machine: a row of the `machines` table. */
 export interface MachineRow {
@@ -56,6 +57,8 @@ export interface DirectoryState {
   readonly machines: readonly MachineRow[];
   /** Pending approvals, oldest first. Expired rows are dropped lazily on every event. */
   readonly approvals: readonly ApprovalRow[];
+  /** The latest `relay_usage` row; a row from an earlier month counts as zero. */
+  readonly relay: RelayUsage | null;
 }
 
 export const MAX_PENDING_APPROVALS_PER_MACHINE = 1;
@@ -88,13 +91,17 @@ export interface ReduceContext {
   readonly online: ReadonlySet<string>;
   /** STUN servers handed out for `ice-servers { relay: false }` (the `STUN_URLS` var). */
   readonly stunUrls: readonly string[];
+  /** Monthly relay allowance in bytes (`RELAY_MONTHLY_CAP_BYTES` unless `RELAY_CAP_BYTES` overrides it). */
+  readonly relayCapBytes: number;
+  /** Both TURN secrets are set. */
+  readonly turnConfigured: boolean;
 }
 
 /**
  * Socket targets. `self` is the event's socket; `others` is every registered socket except it;
  * `{ environmentId }` is that machine's registered sockets except the event's own.
  */
-export type Target = 'self' | 'others' | { readonly environmentId: string };
+export type Target = 'self' | 'others' | 'all' | { readonly environmentId: string };
 
 export type DirectoryEffect =
   | { readonly kind: 'put-plan'; readonly plan: ConnectPlan }
@@ -102,6 +109,9 @@ export type DirectoryEffect =
   | { readonly kind: 'delete-machine'; readonly environmentId: string }
   | { readonly kind: 'put-approval'; readonly row: ApprovalRow }
   | { readonly kind: 'delete-approval'; readonly requestId: string }
+  | { readonly kind: 'put-relay-usage'; readonly usage: RelayUsage }
+  /** Mint TURN credentials and answer the event's socket with `ice-servers` or `turn_unavailable`. */
+  | { readonly kind: 'fetch-turn'; readonly requestId: string }
   | { readonly kind: 'register'; readonly environmentId: string }
   | { readonly kind: 'send'; readonly to: Target; readonly frame: DirectoryToMachineFrame }
   | { readonly kind: 'close'; readonly to: Target; readonly code: number; readonly reason: string }
@@ -112,16 +122,7 @@ export interface ReduceResult {
   readonly effects: DirectoryEffect[];
 }
 
-export const EMPTY_DIRECTORY: DirectoryState = { plan: null, machines: [], approvals: [] };
-
-/** UTC calendar month of `now`, `YYYY-MM`. */
-export function monthOf(now: number): string {
-  return new Date(now).toISOString().slice(0, 7);
-}
-
-export function relayStatus(now: number): RelayStatus {
-  return { month: monthOf(now), bytesUsed: 0, capBytes: RELAY_MONTHLY_CAP_BYTES, stopped: false };
-}
+export const EMPTY_DIRECTORY: DirectoryState = { plan: null, machines: [], approvals: [], relay: null };
 
 export function toDirectoryMachines(machines: readonly MachineRow[], online: ReadonlySet<string>): DirectoryMachine[] {
   return machines.map((row) => ({
@@ -241,7 +242,7 @@ function hello(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'he
         maxMachines: identity.maxDevices,
         relayAllowed: plan !== 'free',
         inboxAllowed: plan !== 'free',
-        relay: relayStatus(ctx.now),
+        relay: relayStatusOf(next.relay, ctx.now, ctx.relayCapBytes),
         machines,
       },
     },
@@ -340,11 +341,23 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
     }
     case 'ice-servers': {
       if (f.relay) {
+        const ids = { requestId: f.requestId };
+        const refuse = (code: ConnectErrorCode, message: string): ReduceResult => ({
+          state,
+          effects: [
+            { kind: 'send', to: 'self', frame: errorFrame(code, message, ids) },
+            { kind: 'log', type: f.type, environmentId: self, outcome: code },
+          ],
+        });
+        // D-2356-12: plan, then cap, then TURN configured.
+        if (state.plan !== 'tester') return refuse('relay_not_allowed', 'the relay needs the relay plan');
+        if (bytesThisMonth(state.relay, ctx.now) >= ctx.relayCapBytes) return refuse('relay_cap_reached', RELAY_CAP_MESSAGE);
+        if (!ctx.turnConfigured) return refuse('turn_unavailable', 'relay credentials are not available');
         return {
           state,
           effects: [
-            { kind: 'send', to: 'self', frame: errorFrame('turn_unavailable', 'relay credentials are not available', { requestId: f.requestId }) },
-            { kind: 'log', type: f.type, environmentId: self, outcome: 'turn_unavailable' },
+            { kind: 'fetch-turn', requestId: f.requestId },
+            { kind: 'log', type: f.type, environmentId: self, outcome: 'turn' },
           ],
         };
       }
@@ -356,6 +369,17 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
           { kind: 'log', type: f.type, environmentId: self, outcome: 'stun' },
         ],
       };
+    }
+    case 'relay-usage': {
+      const { usage, reachedCap } = addUsage(state.relay, f.bytes, ctx.now, ctx.relayCapBytes);
+      const next: DirectoryState = { ...state, relay: usage };
+      const effects: DirectoryEffect[] = [{ kind: 'put-relay-usage', usage }];
+      if (reachedCap) {
+        // Every machine closes its relay channels; no new credentials until the next month.
+        effects.push({ kind: 'send', to: 'all', frame: { type: 'relay-status', ...relayStatusOf(usage, ctx.now, ctx.relayCapBytes) } });
+      }
+      effects.push({ kind: 'log', type: f.type, environmentId: self, outcome: reachedCap ? 'cap_reached' : 'counted' });
+      return { state: next, effects };
     }
     case 'approval-request': {
       const ids = { requestId: f.requestId };
