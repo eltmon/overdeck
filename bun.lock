@@ -163,6 +163,15 @@
         "wrangler": "4.146.0",
       },
     },
+    "services/connect": {
+      "name": "@overdeck/connect-service",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@cloudflare/workers-types": "5.20261002.1",
+        "miniflare": "5.20261001.0-alpha",
+        "wrangler": "4.146.0",
+      },
+    },
     "services/share": {
       "name": "@overdeck/share-service",
       "version": "0.0.0",
@@ -828,6 +837,8 @@
     "@opentelemetry/api": ["@opentelemetry/api@1.9.1", "", {}, "sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q=="],
 
     "@overdeck/account-service": ["@overdeck/account-service@workspace:services/account"],
+
+    "@overdeck/connect-service": ["@overdeck/connect-service@workspace:services/connect"],
 
     "@overdeck/contracts": ["@overdeck/contracts@workspace:packages/contracts"],
 
