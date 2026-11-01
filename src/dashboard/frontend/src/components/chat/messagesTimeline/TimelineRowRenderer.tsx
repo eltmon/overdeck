@@ -34,9 +34,11 @@ interface RowProps {
   onPaneChoiceAnswered?: (signature: string, label: string) => void;
   /** PAN-4498 — main conversation timeline only: role icons bookmark messages. */
   bookmarkable?: boolean;
+  /** PAN-4642 — main timeline only: selected message text can be cited into the composer. */
+  citeConversationName?: string;
 }
 
-export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, subagentByToolUseId, onOpenSubagent, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase, onConfirmCommand, onOpenTerminal, onPaneChoiceAnswered, bookmarkable }: RowProps) {
+export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, subagentByToolUseId, onOpenSubagent, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase, onConfirmCommand, onOpenTerminal, onPaneChoiceAnswered, bookmarkable, citeConversationName }: RowProps) {
   if (row.kind === 'working') {
     return <WorkingIndicator startedAt={row.createdAt} phase={workingPhase} />;
   }
@@ -73,7 +75,7 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isSt
     return <SessionPermissionsRow message={row.message} />;
   }
   if (row.message.role === 'user') {
-    return <UserMessageRow message={row.message} cwd={cwd} issueId={issueId} bookmarkable={bookmarkable} />;
+    return <UserMessageRow message={row.message} cwd={cwd} issueId={issueId} bookmarkable={bookmarkable} citeConversationName={citeConversationName} />;
   }
   return (
     <AssistantMessageRow
@@ -86,6 +88,7 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isSt
       onOpenTurnDiff={onOpenTurnDiff}
       resolvedTheme={resolvedTheme}
       bookmarkable={bookmarkable}
+      citeConversationName={citeConversationName}
     />
   );
 });

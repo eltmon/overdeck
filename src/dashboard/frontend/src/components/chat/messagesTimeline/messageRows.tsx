@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, ClipboardList, GitBranchPlus } from 'lucide-react';
 import type { ChatMessage, TurnDiffSummary } from '../chat-types';
 import { ChatMarkdown } from '../ChatMarkdown';
@@ -11,6 +11,39 @@ import { openImageLightbox } from '../ImageLightbox';
 import { extractAttachmentImageRefs, formatElapsed, formatTimestamp } from './helpers';
 import { SlashCommandDivider } from './dividers';
 import { MessageRoleIcon } from '../bookmarks/MessageRoleIcon';
+import { useCitationHighlight } from '../citations/citationHighlight';
+
+/** PAN-4642 WI-8: wraps a citable row body, painting pending-citation highlights.
+ *  A separate component (not a conditional hook call) keeps the hook unconditional. */
+function CitableText({
+  conversationName,
+  messageId,
+  text,
+  role,
+  className,
+  children,
+}: {
+  conversationName: string;
+  messageId: string;
+  text: string;
+  role: 'assistant' | 'user';
+  className?: string;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const cited = useCitationHighlight(ref, conversationName, messageId, text);
+  return (
+    <div
+      ref={ref}
+      className={className}
+      data-cite-message-id={messageId}
+      data-cite-role={role}
+      data-cited={cited ? 'true' : undefined}
+    >
+      {children}
+    </div>
+  );
+}
 
 /** PAN-4493: clickable thumbnails for the image attachments a sent message references. */
 function AttachmentThumbnails({ text }: { text: string }) {
@@ -58,7 +91,7 @@ function parseSlashCommandMessage(text: string): { command: string } | null {
   return match ? { command: match[1] } : null;
 }
 
-export function UserMessageRow({ message, cwd, issueId, bookmarkable }: { message: ChatMessage; cwd?: string; issueId?: string | null; bookmarkable?: boolean }) {
+export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConversationName }: { message: ChatMessage; cwd?: string; issueId?: string | null; bookmarkable?: boolean; citeConversationName?: string }) {
   const slashCommand = parseSlashCommandMessage(message.text);
   if (slashCommand) {
     return <SlashCommandDivider command={slashCommand.command} createdAt={message.createdAt} />;
@@ -114,6 +147,9 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable }: { messag
   }
 
   const isPending = message.id.startsWith('optimistic-') && !message.acknowledged;
+  const isOptimistic = message.id.startsWith('optimistic-');
+  const isCitable = !!citeConversationName && !isPending && !isOptimistic;
+  const userMessageText = <ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} />;
   return (
     <div className={styles.userMessageRow}>
       <div
@@ -121,7 +157,13 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable }: { messag
         style={isPending ? { opacity: 0.6 } : undefined}
         title={isPending ? 'Pending — waiting for agent to process' : undefined}
       >
-        <div className={styles.userMessageText}><ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} /></div>
+        {isCitable ? (
+          <CitableText conversationName={citeConversationName!} messageId={message.id} text={message.text} role="user" className={styles.userMessageText}>
+            {userMessageText}
+          </CitableText>
+        ) : (
+          <div className={styles.userMessageText}>{userMessageText}</div>
+        )}
         <AttachmentThumbnails text={message.text} />
         <span className={styles.messageTimestamp}>
           {isPending ? (
@@ -209,6 +251,7 @@ export function AssistantMessageRow({
   cwd,
   issueId,
   bookmarkable,
+  citeConversationName,
 }: {
   message: ChatMessage;
   durationStart: string;
@@ -219,23 +262,30 @@ export function AssistantMessageRow({
   onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
   resolvedTheme?: 'light' | 'dark';
   bookmarkable?: boolean;
+  citeConversationName?: string;
 }) {
   const duration = message.completedAt
     ? formatElapsed(durationStart, message.completedAt)
     : null;
 
   const [allExpanded, setAllExpanded] = useState(false);
+  const stillStreaming = isStreaming && !message.completedAt;
+  const turnBody = <TurnBody text={message.text} streaming={stillStreaming} cwd={cwd} issueId={issueId} />;
 
   return (
     <div className={styles.assistantMessageRow}>
       <MessageRoleIcon
         message={message}
         role="assistant"
-        bookmarkable={!!bookmarkable && !(isStreaming && !message.completedAt)}
+        bookmarkable={!!bookmarkable && !stillStreaming}
         className={styles.assistantMessageAvatar}
       />
       <div className={styles.assistantMessageContent}>
-        <TurnBody text={message.text} streaming={isStreaming && !message.completedAt} cwd={cwd} issueId={issueId} />
+        {citeConversationName && !stillStreaming ? (
+          <CitableText conversationName={citeConversationName} messageId={message.id} text={message.text} role="assistant">
+            {turnBody}
+          </CitableText>
+        ) : turnBody}
         {turnDiffSummary && turnDiffSummary.files.length > 0 && (
           <div className="mt-2 rounded-md border border-border/50 bg-muted/30 p-2">
             <div className="flex items-center justify-between mb-1.5">
