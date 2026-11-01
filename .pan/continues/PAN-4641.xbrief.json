@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4641",
   "created": "2026-11-01T05:00:29.700Z",
-  "updated": "2026-11-01T07:05:37.125Z",
+  "updated": "2026-11-01T07:06:05.583Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,10 @@
     "cli-tell-when-limit-resets.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:05:37.124Z"
+    },
+    "cli-tell-when-limit-resets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:06:05.583Z"
     }
   }
 }
