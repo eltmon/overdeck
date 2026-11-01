@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4295",
   "created": "2026-11-01T05:48:47.966Z",
-  "updated": "2026-11-01T11:30:00.374Z",
+  "updated": "2026-11-01T11:30:13.599Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -198,6 +198,9 @@
     "fly-live-smoke.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T11:30:00.373Z"
+    },
+    "fly-live-smoke.ac5": {
+      "status": "cancelled"
     }
   }
 }
