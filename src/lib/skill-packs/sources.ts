@@ -25,10 +25,11 @@ import {
   type PackAdapterId,
   type PackManifest,
 } from './adapters.js';
+import { assertRenderable, isRenderReady, RenderError, renderCommand, renderRuntimePack } from './render.js';
 
 export const PACK_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
-const ADAPTERS: readonly PackAdapterId[] = ['plain', 'claude-plugin', 'deft-readonly'];
+const ADAPTERS: readonly PackAdapterId[] = ['plain', 'claude-plugin', 'deft-readonly', 'gstack-runtime'];
 const LS_REMOTE_TIMEOUT_MS = 5000;
 
 const execFileAsync = promisify(execFile);
@@ -67,6 +68,17 @@ export function packExtractDir(id: string, commit: string): string {
   return join(packCacheDir(id), commit);
 }
 
+/** A gstack-runtime pack's render of one commit (eltmon/gstack pack mode). */
+export function packRenderDir(id: string, commit: string): string {
+  assertCommit(commit);
+  return join(packCacheDir(id), 'render', commit);
+}
+
+/** A runtime pack's state root, shared across commits; removed with the pack. */
+export function packStateDir(id: string): string {
+  return join(packCacheDir(id), 'state');
+}
+
 async function readTextOrEmpty(path: string): Promise<string> {
   try {
     return await readFile(path, 'utf8');
@@ -99,6 +111,30 @@ export async function listPacks(): Promise<PackRegistryEntry[]> {
     .map(([id, raw]) => toEntry(id, raw))
     .filter((entry): entry is PackRegistryEntry => entry !== null)
     .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * The registry as gc must read it (PAN-4727): every `skills.packs` key counts as registered, with its
+ * trusted commit, or null when the entry is malformed; `readable` is false when config.yaml cannot be
+ * read or parsed, or `skills.packs` is not a map. Unlike listPacks, nothing is silently dropped, so gc
+ * never mistakes a registered pack for an orphan.
+ */
+export async function readPackRegistry(): Promise<{ readable: boolean; packs: Map<string, string | null> }> {
+  const packs = new Map<string, string | null>();
+  let doc: Document;
+  try {
+    doc = parseDocument(await readTextOrEmpty(getGlobalConfigPath()));
+  } catch {
+    return { readable: false, packs };
+  }
+  if (doc.errors.length > 0) return { readable: false, packs };
+  const raw = (doc.toJS() as { skills?: { packs?: unknown } } | null)?.skills?.packs;
+  if (raw === undefined || raw === null) return { readable: true, packs };
+  if (typeof raw !== 'object' || Array.isArray(raw)) return { readable: false, packs };
+  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+    packs.set(id, toEntry(id, value)?.commit ?? null);
+  }
+  return { readable: true, packs };
 }
 
 export async function getPack(id: string): Promise<PackRegistryEntry | null> {
@@ -306,7 +342,7 @@ export async function packUpdateAvailable(entry: PackRegistryEntry): Promise<str
   return remote && remote !== entry.commit ? remote : null;
 }
 
-export type PackSourceErrorCode = 'bad-id' | 'exists' | 'unknown-pack' | 'git';
+export type PackSourceErrorCode = 'bad-id' | 'exists' | 'unknown-pack' | 'git' | 'render';
 
 export class PackSourceError extends Error {
   constructor(
@@ -328,6 +364,8 @@ export interface PackPreview {
   pluginRoot?: string;
   previousCommit?: string;
   diff?: { added: string[]; removed: string[]; changed: string[]; newCapabilities: string[] };
+  /** Runtime packs: the render command trusting runs once, with `cwd` = the extraction. */
+  runtime?: { command: string[] };
 }
 
 export type ConfirmPack = (preview: PackPreview) => Promise<boolean>;
@@ -360,6 +398,28 @@ async function manifestAt(id: string, dir: string, adapter: PackAdapterId): Prom
   );
 }
 
+async function renderStep<T>(step: () => Promise<T>): Promise<T> {
+  try {
+    return await step();
+  } catch (error) {
+    if (error instanceof RenderError) throw new PackSourceError('render', error.message);
+    throw error;
+  }
+}
+
+/** Before consent: the commit supports pack mode and bun is on PATH; returns the command trusting runs. */
+async function runtimePreview(id: string, dir: string, commit: string): Promise<{ command: string[] }> {
+  await renderStep(() => assertRenderable(dir, commit));
+  return { command: renderCommand(packRenderDir(id, commit), packStateDir(id)) };
+}
+
+/** After consent, before the registry write: render the commit unless its render is already ready. */
+async function renderPack(id: string, dir: string, commit: string): Promise<void> {
+  const renderDir = packRenderDir(id, commit);
+  if (await isRenderReady(renderDir)) return;
+  await renderStep(() => renderRuntimePack({ extractDir: dir, commit, renderDir, stateDir: packStateDir(id) }));
+}
+
 async function requirePack(id: string): Promise<PackRegistryEntry> {
   if (!PACK_ID_PATTERN.test(id)) throw new PackSourceError('bad-id', `invalid pack id: ${JSON.stringify(id)}`);
   const entry = await getPack(id);
@@ -388,6 +448,7 @@ export async function addPack(
   });
   const dir = await gitStep(id, () => extractCommit(id, commit, pluginRootOf(id)));
   const adapter = await packAdapter(id, dir, input.adapter);
+  const runtime = adapter === 'gstack-runtime' ? await runtimePreview(id, dir, commit) : undefined;
   const preview: PackPreview = {
     id,
     url,
@@ -395,9 +456,11 @@ export async function addPack(
     commit,
     adapter,
     manifest: await manifestAt(id, dir, adapter),
+    ...(runtime ? { runtime } : {}),
     ...(pluginRootOf(id) ? { pluginRoot: pluginRootOf(id) } : {}),
   };
   if (!(await confirm(preview))) return { written: false, preview };
+  if (runtime) await renderPack(id, dir, commit);
   await writePackEntry({ id, url, ref, commit, ...(input.adapter ? { adapter: input.adapter } : {}) });
   return { written: true, preview };
 }
@@ -451,7 +514,11 @@ export async function updatePack(
     },
   };
   if (commit === entry.commit && ref === entry.ref) return { written: false, preview };
+  // Checked only when there is something to move to, so an up-to-date pack needs no bun.
+  const runtime = adapter === 'gstack-runtime' ? await runtimePreview(id, dir, commit) : undefined;
+  if (runtime) preview.runtime = runtime;
   if (!(await confirm(preview))) return { written: false, preview };
+  if (runtime) await renderPack(id, dir, commit);
   await writePackEntry({ ...entry, ref, commit });
   return { written: true, preview };
 }
@@ -468,7 +535,10 @@ export async function removePack(id: string): Promise<{ removed: boolean }> {
   return { removed };
 }
 
-/** Re-fetch a registered pack and make sure its trusted commit is extracted. Never moves the commit. */
+/**
+ * Re-fetch a registered pack and make sure its trusted commit is extracted, and for a runtime pack
+ * rendered. Never moves the commit.
+ */
 export async function syncPack(id: string): Promise<{ commit: string; dir: string }> {
   const entry = await requirePack(id);
   const dir = await gitStep(id, async () => {
@@ -476,5 +546,6 @@ export async function syncPack(id: string): Promise<{ commit: string; dir: strin
     await resolveRef(id, entry.commit);
     return extractCommit(id, entry.commit, pluginRootOf(id));
   });
+  if ((entry.adapter ?? KNOWN_PACKS[id]?.adapter) === 'gstack-runtime') await renderPack(id, dir, entry.commit);
   return { commit: entry.commit, dir };
 }

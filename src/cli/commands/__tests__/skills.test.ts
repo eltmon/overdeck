@@ -34,6 +34,11 @@ const mocks = vi.hoisted(() => {
     listPackCatalog: vi.fn(),
     listLowerLevelPackOverrides: vi.fn(),
     gcMounts: vi.fn(),
+    removePackFromMounts: vi.fn(),
+    gcPackRenders: vi.fn(),
+    renderRootsUsedBy: vi.fn(),
+    readPackRegistry: vi.fn(),
+    packsHome: vi.fn(() => '/h/.overdeck/packs'),
     listSkillStates: vi.fn(),
     setSkillOverride: vi.fn(),
     resolveLaunchDisabledSkills: vi.fn(),
@@ -82,6 +87,8 @@ vi.mock('../../../lib/skill-packs/sources.js', () => ({
   syncPack: mocks.syncPack,
   listPacks: mocks.listPacks,
   packUpdateAvailable: mocks.packUpdateAvailable,
+  packsHome: mocks.packsHome,
+  readPackRegistry: mocks.readPackRegistry,
   writePackEntry: mocks.writePackEntry,
   getPack: mocks.getPack,
 }));
@@ -114,7 +121,13 @@ vi.mock('../../../lib/skill-overrides/launch.js', async importOriginal => ({
   launchMountsDeft: mocks.launchMountsDeft,
 }));
 
-vi.mock('../../../lib/skill-packs/mount.js', () => ({ writeCodexPackBlock: mocks.writeCodexPackBlock, gcMounts: mocks.gcMounts }));
+vi.mock('../../../lib/skill-packs/render.js', () => ({ gcPackRenders: mocks.gcPackRenders }));
+vi.mock('../../../lib/skill-packs/mount.js', () => ({
+  writeCodexPackBlock: mocks.writeCodexPackBlock,
+  gcMounts: mocks.gcMounts,
+  removePackFromMounts: mocks.removePackFromMounts,
+  renderRootsUsedBy: mocks.renderRootsUsedBy,
+}));
 
 import { registerSkillsCommands } from '../skills.js';
 
@@ -504,8 +517,60 @@ describe('pan skills pack', () => {
 
   it('rejects an unknown adapter before any work', async () => {
     await expect(run(...addArgs, '--adapter', 'npm')).rejects.toThrow('exit 1');
-    expect(errors.join('\n')).toContain('--adapter must be plain, claude-plugin, or deft-readonly');
+    expect(errors.join('\n')).toContain('--adapter must be plain, claude-plugin, deft-readonly, or gstack-runtime');
     expect(mocks.addPack).not.toHaveBeenCalled();
+  });
+
+  it('truncates a non-runtime pack executables list after three', async () => {
+    const many = { ...preview, manifest: { ...preview.manifest, capabilities: { ...capabilities, executables: ['a.sh', 'b.sh', 'c.sh', 'd.sh'] } } };
+    mocks.addPack.mockImplementation(async (_input: unknown, confirm: (p: typeof many) => Promise<boolean>) => ({ written: await confirm(many), preview: many }));
+    await expect(run(...addArgs)).rejects.toThrow('exit 1');
+    const out = logs.join('\n');
+    expect(out).toContain('  Executables  a.sh, b.sh, c.sh, …');
+    expect(out).not.toContain('d.sh');
+    expect(out).not.toContain('  Runs');
+  });
+
+  describe('gstack runtime pack (PAN-4727)', () => {
+    const GSTACK_COMMIT = '541f9683'.padEnd(40, '0');
+    const executables = ['bin/gstack-config', 'bin/gstack-paths', 'bin/gstack-skill-start', 'review/bin/x.sh', 'scripts/pack-render.sh'];
+    const command = ['bash', 'setup', '--pack-root', `/h/.overdeck/packs/gstack/render/${GSTACK_COMMIT}`, '--pack-state-root', '/h/.overdeck/packs/gstack/state'];
+    const gstackPreview = {
+      id: 'gstack', url: 'https://github.com/eltmon/gstack', ref: 'main', commit: GSTACK_COMMIT, adapter: 'gstack-runtime',
+      runtime: { command },
+      manifest: {
+        skills: [
+          { name: 'codex', dir: 'codex', description: '', optIn: true },
+          { name: 'review', dir: 'review', description: '', optIn: false },
+        ],
+        capabilities: { ...capabilities, hooks: true, executables, projectMutatingSkills: ['codex'], requiresCli: ['bun'], runtime: true },
+        license: 'MIT', pluginName: null,
+        excluded: [{ name: 'gstack-upgrade', reason: 'Runs git reset --hard on the install; Overdeck pins commits.' }, { name: 'qa', reason: 'Calls $B.' }],
+      },
+    };
+    const gstackArgs = ['pack', 'add', 'gstack', 'https://github.com/eltmon/gstack', '--ref', 'main'];
+
+    beforeEach(() => {
+      mocks.addPack.mockImplementation(async (_input: unknown, confirm: (p: typeof gstackPreview) => Promise<boolean>) => {
+        const written = await confirm(gstackPreview);
+        if (written) mocks.writePackEntry();
+        return { written, preview: gstackPreview };
+      });
+    });
+
+    it('shows the render command, every executable, what is not mounted and bun', async () => {
+      await expect(run(...gstackArgs)).rejects.toThrow('exit 1');
+      const out = logs.join('\n');
+      expect(out).toContain(`  Runs         ${command.join(' ')}`);
+      expect(out).toContain('  Executables  5 files the mounted skills can run:');
+      for (const file of executables) expect(out).toContain(`\n                ${file}`);
+      expect(out).not.toContain('…');
+      expect(out).toContain('  Not mounted  2: gstack-upgrade (Runs git reset --hard on the install; Overdeck pins commits.); qa (Calls $B.)');
+      expect(out).toContain('  Requires     bun');
+      expect(out).toContain('Trusting runs the command above once now; skills run the listed scripts when you invoke them.');
+      expect(out).toContain('Not written: re-run with --yes to trust 541f968.');
+      expect(mocks.writePackEntry).not.toHaveBeenCalled();
+    });
   });
 
   it('accepts the deft-readonly adapter', async () => {
@@ -587,9 +652,52 @@ describe('pan skills pack', () => {
 
   it('removes a pack and reports inert lower-level toggles', async () => {
     mocks.removePack.mockResolvedValue({ removed: true });
+    mocks.removePackFromMounts.mockResolvedValue({ removedMounts: [], removedLinks: [], removedCodexCaches: [], failures: [] });
     mocks.listLowerLevelPackOverrides.mockResolvedValue({ mattpocock: { projects: ['tst'], issues: ['TST-1'] } });
     await run('pack', 'remove', 'mattpocock');
     expect(logs.join('\n')).toContain('2 project or issue toggle(s) for mattpocock remain');
+  });
+
+  it('names project .gstack dirs for a gstack fork registered under another id, and not for other packs', async () => {
+    const root = fs.mkdtempSync(path.join(tmpdir(), 'gstack-remove-fork-'));
+    try {
+      fs.mkdirSync(path.join(root, '.gstack'), { recursive: true });
+      mocks.listProjectsAsync.mockResolvedValue([{ key: 'tst', config: { name: 'Test', path: root } }]);
+      mocks.removePack.mockResolvedValue({ removed: true });
+      mocks.removePackFromMounts.mockResolvedValue({ removedMounts: [], removedLinks: [], removedCodexCaches: [], failures: [] });
+      mocks.listLowerLevelPackOverrides.mockResolvedValue({});
+      mocks.getPack.mockResolvedValue({ id: 'mygstack', url: 'u', ref: 'main', commit: 'c'.repeat(40), adapter: 'gstack-runtime' });
+      await run('pack', 'remove', 'mygstack');
+      expect(logs.join('\n')).toContain(`Project files gstack skills wrote (not removed): ${path.join(root, '.gstack')}`);
+      logs.length = 0;
+      mocks.getPack.mockResolvedValue({ id: 'mattpocock', url: 'u', ref: 'v1', commit: 'c'.repeat(40) });
+      await run('pack', 'remove', 'mattpocock');
+      expect(logs.join('\n')).not.toContain('Project files gstack skills wrote');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('removes gstack mounts and Codex caches and names project .gstack dirs without deleting them (PAN-4727)', async () => {
+    const root = fs.mkdtempSync(path.join(tmpdir(), 'gstack-remove-'));
+    try {
+      fs.mkdirSync(path.join(root, '.gstack', 'tmp'), { recursive: true });
+      mocks.listProjectsAsync.mockResolvedValue([{ key: 'tst', config: { name: 'Test', path: root } }]);
+      mocks.removePack.mockResolvedValue({ removed: true });
+      mocks.removePackFromMounts.mockResolvedValue({ removedMounts: ['/m/1', '/m/2'], removedLinks: ['/l/1'], removedCodexCaches: ['/c/1'], failures: [] });
+      mocks.listLowerLevelPackOverrides.mockResolvedValue({});
+      mocks.getPack.mockResolvedValue({ id: 'gstack', url: 'https://github.com/eltmon/gstack', ref: 'main', commit: 'c'.repeat(40) });
+      await run('pack', 'remove', 'gstack');
+      expect(mocks.removePackFromMounts).toHaveBeenCalledWith('gstack');
+      const out = logs.join('\n');
+      expect(out).toContain('Removed pack gstack, its cache, 2 mount(s) and 1 Codex cache(s).');
+      const dir = path.join(root, '.gstack');
+      expect(out).toContain(`Project files gstack skills wrote (not removed): ${dir}  — remove with: rm -rf ${dir}`);
+      expect(out).not.toContain('.gstack-worktrees');
+      expect(fs.existsSync(dir)).toBe(true);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('syncs every registered pack and fails when one fails', async () => {
@@ -603,11 +711,46 @@ describe('pan skills pack', () => {
     expect(errors.join('\n')).toContain('pack b: unreachable');
   });
 
+  it('aborts before removing anything when the registry cannot be read', async () => {
+    mocks.readPackRegistry.mockResolvedValue({ readable: false, packs: new Map() });
+    await expect(run('pack', 'gc')).rejects.toThrow('exit 1');
+    expect(mocks.gcMounts).not.toHaveBeenCalled();
+    expect(mocks.gcPackRenders).not.toHaveBeenCalled();
+    expect(errors.join('\n')).toContain('Nothing removed: the global config.yaml could not be read or parsed');
+  });
+
+  it('reports sweep failures after removing a pack and exits 1', async () => {
+    mocks.removePack.mockResolvedValue({ removed: true });
+    mocks.getPack.mockResolvedValue({ id: 'mattpocock', url: 'u', ref: 'v1', commit: 'c'.repeat(40) });
+    mocks.removePackFromMounts.mockResolvedValue({
+      removedMounts: ['/m/1'], removedLinks: [], removedCodexCaches: [], failures: ['/m/2: EACCES: permission denied'],
+    });
+    mocks.listLowerLevelPackOverrides.mockResolvedValue({});
+    await expect(run('pack', 'remove', 'mattpocock')).rejects.toThrow('exit 1');
+    expect(logs.join('\n')).toContain('Removed pack mattpocock, its cache, 1 mount(s) and 0 Codex cache(s).');
+    expect(errors.join('\n')).toContain('Not removed: /m/2: EACCES: permission denied');
+    expect(errors.join('\n')).toContain('Run pan skills pack remove mattpocock again to retry.');
+  });
+
   it('collects garbage with the default age', async () => {
-    mocks.gcMounts.mockResolvedValue({ removedMounts: ['/m/1'], removedLinks: [] });
+    mocks.gcMounts.mockResolvedValue({ removedMounts: ['/m/1'], removedLinks: [], referencedMounts: ['/m/live'] });
+    mocks.renderRootsUsedBy.mockResolvedValue(new Set(['/h/.overdeck/packs/gstack/render/old']));
+    mocks.readPackRegistry.mockResolvedValue({ readable: true, packs: new Map([['gstack', COMMIT]]) });
+    mocks.gcPackRenders.mockResolvedValue({ removedRenders: ['/r/1', '/r/2'], removedStates: ['/s/1'] });
     await run('pack', 'gc');
-    expect(mocks.gcMounts).toHaveBeenCalledWith({ maxAgeMs: 7 * 24 * 60 * 60 * 1000 });
-    expect(logs.join('\n')).toContain('Removed 1 mount(s) and 0 dangling launch link(s).');
+    const maxAgeMs = 7 * 24 * 60 * 60 * 1000;
+    expect(mocks.gcMounts).toHaveBeenCalledWith({ maxAgeMs });
+    expect(mocks.gcPackRenders).toHaveBeenCalledWith({
+      packsHome: '/h/.overdeck/packs',
+      registered: new Map([['gstack', COMMIT]]),
+      registryReadable: true,
+      maxAgeMs,
+      keep: new Set(['/h/.overdeck/packs/gstack/render/old']),
+    });
+    expect(mocks.renderRootsUsedBy).toHaveBeenCalledWith(['/m/live']);
+    expect(logs.join('\n')).toContain(
+      'Removed 1 mount(s), 0 dangling launch link(s), 2 stale render(s) and 1 orphaned pack state dir(s).',
+    );
   });
 });
 

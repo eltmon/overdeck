@@ -2,7 +2,7 @@
  * PAN-4334 WI-1: pack adapters read skill lists and capabilities from real
  * fixture trees in temp dirs.
  */
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -16,6 +16,7 @@ import {
 } from '../adapters.js';
 import { SAGEOX_DISCLOSURE } from '../../sageox/disclosure.js';
 import { DEFT_SKILL_MAP } from '../deft.js';
+import { GSTACK_DISCLOSURE, GSTACK_OPT_IN_SKILLS, GSTACK_SKILL_MAP } from '../gstack.js';
 
 const roots: string[] = [];
 
@@ -241,7 +242,65 @@ describe('deft-readonly adapter', () => {
   });
 });
 
+describe('gstack-runtime adapter', () => {
+  function gstackFixture(): string {
+    const root = fixture({
+      'bin/gstack-x': '#!/usr/bin/env bash\n',
+      'bin/notes.txt': 'not executable',
+      'scripts/pack-render.sh': '#!/usr/bin/env bash\n',
+      'test/t.sh': '#!/usr/bin/env bash\n',
+      'node_modules/dep/run.sh': '#!/usr/bin/env bash\n',
+      '.git/hooks/pre-commit.sh': '#!/usr/bin/env bash\n',
+      'review/SKILL.md': skillMd('review', 'Pre-landing review.'),
+      'review/bin/helper.sh': '#!/usr/bin/env bash\n',
+      'codex/SKILL.md': skillMd('codex', 'Second opinion from Codex.'),
+      'qa/SKILL.md': skillMd('qa', 'QA with the browser.'),
+      'newskill/SKILL.md': skillMd('newskill', 'Added upstream later.'),
+    });
+    chmodSync(join(root, 'bin/gstack-x'), 0o755);
+    symlinkSync('review', join(root, 'connect-chrome'));
+    return root;
+  }
+
+  it('mounts default and opt-in skills from the map and lists every other skill dir as not mounted', async () => {
+    const manifest = await readPackManifest(gstackFixture(), 'gstack-runtime');
+    expect(manifest.skills).toEqual([
+      { name: 'codex', dir: 'codex', description: 'Second opinion from Codex.', optIn: true },
+      { name: 'review', dir: 'review', description: 'Pre-landing review.', optIn: false },
+    ]);
+    expect(manifest.excluded).toEqual([
+      { name: 'connect-chrome', reason: GSTACK_SKILL_MAP['connect-chrome']!.reason },
+      { name: 'newskill', reason: 'unreviewed' },
+      { name: 'qa', reason: GSTACK_SKILL_MAP['qa']!.reason },
+    ]);
+    expect(GSTACK_SKILL_MAP['qa']!.class).toBe('needs-binary');
+  });
+
+  it('lists every runtime executable outside .git, test and node_modules, and requires bun', async () => {
+    const { capabilities } = await readPackManifest(gstackFixture(), 'gstack-runtime');
+    expect(capabilities.executables).toEqual(['bin/gstack-x', 'review/bin/helper.sh', 'scripts/pack-render.sh']);
+    expect(capabilities).toMatchObject({ hooks: true, runtime: true, requiresCli: ['bun'], projectMutatingSkills: ['codex'] });
+  });
+
+  it('does not label runtime executables as not applied', async () => {
+    const { capabilities } = await readPackManifest(gstackFixture(), 'gstack-runtime');
+    const labels = notAppliedLabels(capabilities);
+    expect(labels.some((label) => label.startsWith('executables'))).toBe(false);
+    expect(labels).toContain('requires CLI (bun)');
+  });
+});
+
 describe('KNOWN_PACKS', () => {
+  it('registers gstack as the eltmon fork with the runtime adapter', () => {
+    expect(KNOWN_PACKS['gstack']).toEqual({
+      id: 'gstack',
+      url: 'https://github.com/eltmon/gstack',
+      adapter: 'gstack-runtime',
+      optIn: GSTACK_OPT_IN_SKILLS,
+      disclosure: GSTACK_DISCLOSURE,
+    });
+  });
+
   it('points deft at the eltmon/directive fork with the deft-readonly adapter', () => {
     expect(KNOWN_PACKS['deft']).toEqual({
       id: 'deft',

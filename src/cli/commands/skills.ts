@@ -238,15 +238,28 @@ function printPackPreview(preview: PackPreview, notAppliedLabels: NotAppliedLabe
   const { manifest } = preview;
   const optIn = manifest.skills.filter(skill => skill.optIn).map(skill => skill.name);
   const executables = manifest.capabilities.executables;
+  // A runtime pack (gstack) runs its scripts, so consent lists every one of them (PAN-4727 D5).
+  const runtime = manifest.capabilities.runtime === true;
   const rows: Array<[string, string]> = [
     ['Source', `${preview.url} @ ${preview.ref} (${short(preview.commit)})`],
     ...(preview.pluginRoot ? ([['Root', preview.pluginRoot]] as Array<[string, string]>) : []),
     ['Adapter', preview.adapter],
     ['License', manifest.license ?? 'unknown'],
     ['Skills', `${manifest.skills.length}${optIn.length > 0 ? ` (${optIn.length} opt-in: ${optIn.join(', ')})` : ''}`],
-    ['Executables', executables.length > 3 ? `${executables.slice(0, 3).join(', ')}, …` : listOrNone(executables)],
-    ['Not applied', listOrNone(notAppliedLabels(manifest.capabilities))],
   ];
+  if (manifest.excluded?.length) {
+    rows.push(['Not mounted', `${manifest.excluded.length}: ${manifest.excluded.map(skill => `${skill.name} (${skill.reason})`).join('; ')}`]);
+  }
+  if (runtime) {
+    rows.push(
+      ['Runs', preview.runtime?.command.join(' ') ?? 'unknown'],
+      ['Executables', `${executables.length} files the mounted skills can run:`],
+    );
+  } else {
+    rows.push(['Executables', executables.length > 3 ? `${executables.slice(0, 3).join(', ')}, …` : listOrNone(executables)]);
+  }
+  rows.push(['Not applied', listOrNone(notAppliedLabels(manifest.capabilities))]);
+  if (runtime) rows.push(['Requires', listOrNone(manifest.capabilities.requiresCli)]);
   if (preview.diff && preview.previousCommit) {
     rows.push(
       ['Previous', short(preview.previousCommit)],
@@ -258,6 +271,7 @@ function printPackPreview(preview: PackPreview, notAppliedLabels: NotAppliedLabe
   }
   console.log(chalk.bold(`Pack ${preview.id}`));
   for (const [label, value] of rows) console.log(`  ${label.padEnd(12)} ${value}`);
+  if (runtime) for (const file of executables) console.log(`${' '.repeat(16)}${file}`);
 }
 
 /** PD-10: `--yes` trusts; a TTY asks; anything else writes nothing. */
@@ -286,9 +300,10 @@ export async function skillsPackAddCommand(id: string, url: string | undefined, 
     options.adapter !== undefined &&
     options.adapter !== 'plain' &&
     options.adapter !== 'claude-plugin' &&
-    options.adapter !== 'deft-readonly'
+    options.adapter !== 'deft-readonly' &&
+    options.adapter !== 'gstack-runtime'
   ) {
-    console.error(chalk.red('--adapter must be plain, claude-plugin, or deft-readonly'));
+    console.error(chalk.red('--adapter must be plain, claude-plugin, deft-readonly, or gstack-runtime'));
     process.exit(1);
   }
   const [{ addPack }, { CORE_SKILLS }, { KNOWN_PACKS }] = await Promise.all([
@@ -307,7 +322,11 @@ export async function skillsPackAddCommand(id: string, url: string | undefined, 
     console.error(chalk.red(`pack ${id} has no default ref; pass --ref <tag-or-branch>`));
     process.exit(1);
   }
-  const note = `Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack ${id} on`;
+  const runtimeNote =
+    (options.adapter ?? known?.adapter) === 'gstack-runtime'
+      ? '\nTrusting runs the command above once now; skills run the listed scripts when you invoke them.'
+      : '';
+  const note = `Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack ${id} on${runtimeNote}`;
   const confirm = await packConfirm(options.yes, note);
   let result;
   try {
@@ -381,26 +400,65 @@ export async function skillsPackListCommand(options: PackListOptions): Promise<v
   }
 }
 
-export async function skillsPackRemoveCommand(id: string): Promise<void> {
-  const [{ removePack }, { listLowerLevelPackOverrides }] = await Promise.all([
-    import('../../lib/skill-packs/sources.js'),
-    import('../../lib/skill-overrides/store.js'),
+/** gstack skills write `.gstack/` and `.gstack-worktrees/` in the projects they run in (PAN-4727 D9); remove never deletes them. */
+async function projectGstackDirs(): Promise<string[]> {
+  const [{ listProjectsAsync }, { lstat }, { join }] = await Promise.all([
+    import('../../lib/projects.js'),
+    import('node:fs/promises'),
+    import('node:path'),
   ]);
+  const dirs: string[] = [];
+  for (const { config } of await listProjectsAsync()) {
+    if (!config.path) continue;
+    for (const name of ['.gstack', '.gstack-worktrees']) {
+      const dir = join(config.path, name);
+      if (await lstat(dir).then(() => true, () => false)) dirs.push(dir);
+    }
+  }
+  return dirs;
+}
+
+export async function skillsPackRemoveCommand(id: string): Promise<void> {
+  const [{ removePack, getPack }, { removePackFromMounts }, { listLowerLevelPackOverrides }, { KNOWN_PACKS }] =
+    await Promise.all([
+      import('../../lib/skill-packs/sources.js'),
+      import('../../lib/skill-packs/mount.js'),
+      import('../../lib/skill-overrides/store.js'),
+      import('../../lib/skill-packs/adapters.js'),
+    ]);
   let result;
+  let runtimePack = false;
   try {
+    // Read before removal: a gstack fork registered under another id still writes project .gstack dirs.
+    runtimePack = ((await getPack(id))?.adapter ?? KNOWN_PACKS[id]?.adapter) === 'gstack-runtime';
     result = await removePack(id);
   } catch (error) {
     return failOnPackError(error);
   }
+  // Mounts, dangling launch links and Codex caches hold copies of the pack outside its cache (PAN-4727 D8).
+  // The sweep lives here because mount.ts imports sources.ts.
+  const swept = await removePackFromMounts(id);
   if (!result.removed) {
     console.error(chalk.red(`pack ${id} is not registered`));
     process.exit(1);
   }
-  console.log(`Removed pack ${id} and its cache.`);
+  console.log(
+    `Removed pack ${id}, its cache, ${swept.removedMounts.length} mount(s) and ${swept.removedCodexCaches.length} Codex cache(s).`,
+  );
+  if (runtimePack) {
+    for (const dir of await projectGstackDirs()) {
+      console.log(`Project files gstack skills wrote (not removed): ${dir}  — remove with: rm -rf ${dir}`);
+    }
+  }
   const below = (await listLowerLevelPackOverrides())[id];
   const remaining = below ? below.projects.length + below.issues.length : 0;
   if (remaining > 0) {
     console.log(`${remaining} project or issue toggle(s) for ${id} remain; they do nothing unless ${id} is added again.`);
+  }
+  if (swept.failures.length > 0) {
+    for (const failure of swept.failures) console.error(chalk.red(`Not removed: ${failure}`));
+    console.error(chalk.red(`Run pan skills pack remove ${id} again to retry.`));
+    process.exit(1);
   }
 }
 
@@ -427,9 +485,34 @@ export async function skillsPackGcCommand(options: PackGcOptions): Promise<void>
     console.error(chalk.red('--max-age-days must be a number of days, 0 or more'));
     process.exit(1);
   }
-  const { gcMounts } = await import('../../lib/skill-packs/mount.js');
-  const { removedMounts, removedLinks } = await gcMounts({ maxAgeMs: days * 24 * 60 * 60 * 1000 });
-  console.log(`Removed ${removedMounts.length} mount(s) and ${removedLinks.length} dangling launch link(s).`);
+  const [{ gcMounts, renderRootsUsedBy }, { gcPackRenders }, { readPackRegistry, packsHome }] = await Promise.all([
+    import('../../lib/skill-packs/mount.js'),
+    import('../../lib/skill-packs/render.js'),
+    import('../../lib/skill-packs/sources.js'),
+  ]);
+  // Strict read first: a config that cannot be read or parsed must never make a registered pack look
+  // orphaned, so gc stops before it removes anything.
+  const registry = await readPackRegistry();
+  if (!registry.readable) {
+    console.error(chalk.red('Nothing removed: the global config.yaml could not be read or parsed, so registered packs are unknown.'));
+    console.error(chalk.red('Fix config.yaml, then run pan skills pack gc again.'));
+    process.exit(1);
+  }
+  const maxAgeMs = days * 24 * 60 * 60 * 1000;
+  const { removedMounts, removedLinks, referencedMounts } = await gcMounts({ maxAgeMs });
+  // A render that a linked mount's skills call into stays, whatever its age.
+  const keep = await renderRootsUsedBy(referencedMounts);
+  const { removedRenders, removedStates } = await gcPackRenders({
+    packsHome: packsHome(),
+    registered: registry.packs,
+    registryReadable: registry.readable,
+    maxAgeMs,
+    keep,
+  });
+  console.log(
+    `Removed ${removedMounts.length} mount(s), ${removedLinks.length} dangling launch link(s), ` +
+      `${removedRenders.length} stale render(s) and ${removedStates.length} orphaned pack state dir(s).`,
+  );
 }
 
 // ── pan skills pack sageox (PAN-2444) ───────────────────────────────────
@@ -508,7 +591,7 @@ export function registerSkillsCommands(program: Command): void {
   pack.command('add <id> [url]')
     .description('Register a git skill pack at the commit a ref resolves to (enables nothing); known packs default the url and ref')
     .option('--ref <ref>', 'Tag, branch or commit to pin (default: the known pack ref)')
-    .option('--adapter <adapter>', 'plain, claude-plugin, or deft-readonly')
+    .option('--adapter <adapter>', 'plain, claude-plugin, deft-readonly, or gstack-runtime')
     .option('--yes', 'Trust the resolved commit without asking').action(skillsPackAddCommand);
   pack.command('update <id>').description('Move a pack to the commit its ref (or --ref) now resolves to')
     .option('--ref <ref>', 'Switch to a different tag or branch').option('--yes', 'Trust the new commit without asking')
@@ -520,7 +603,7 @@ export function registerSkillsCommands(program: Command): void {
     .action(skillsPackRemoveCommand);
   pack.command('sync [id]').description('Re-fetch packs and extract their trusted commits (all packs when omitted)')
     .action(skillsPackSyncCommand);
-  pack.command('gc').description('Remove unused skill pack mounts and dangling launch links')
+  pack.command('gc').description('Remove unused skill pack mounts, dangling launch links, stale renders and orphaned pack state')
     .option('--max-age-days <n>', 'Keep unused mounts younger than this', '7').action(skillsPackGcCommand);
 
   const sageox = pack.command('sageox').description('SageOx pack state and per-project upload opt-in (PAN-2444)');
