@@ -29,8 +29,10 @@ import {
   listPacks,
   packCacheDir,
   packExtractDir,
+  packRenderDir,
   packRepoDir,
   packsHome,
+  packStateDir,
   packUpdateAvailable,
   PackSourceError,
   removePack,
@@ -132,6 +134,13 @@ describe('pack cache paths', () => {
     expect(() => packCacheDir('../x')).toThrow(/invalid pack id/);
     expect(() => packCacheDir('')).toThrow(/invalid pack id/);
     expect(() => packExtractDir('mattpocock', '../../etc')).toThrow(/invalid pack commit/);
+  });
+
+  it('puts a runtime pack render per commit and its state beside the extractions', () => {
+    expect(packRenderDir('gstack', COMMIT)).toBe(join(overdeckHome, 'packs', 'gstack', 'render', COMMIT));
+    expect(packStateDir('gstack')).toBe(join(overdeckHome, 'packs', 'gstack', 'state'));
+    expect(() => packRenderDir('gstack', '../../etc')).toThrow(/invalid pack commit/);
+    expect(() => packStateDir('../x')).toThrow(/invalid pack id/);
   });
 });
 

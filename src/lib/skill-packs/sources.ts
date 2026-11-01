@@ -67,6 +67,17 @@ export function packExtractDir(id: string, commit: string): string {
   return join(packCacheDir(id), commit);
 }
 
+/** A gstack-runtime pack's render of one commit (eltmon/gstack pack mode). */
+export function packRenderDir(id: string, commit: string): string {
+  assertCommit(commit);
+  return join(packCacheDir(id), 'render', commit);
+}
+
+/** A runtime pack's state root, shared across commits; removed with the pack. */
+export function packStateDir(id: string): string {
+  return join(packCacheDir(id), 'state');
+}
+
 async function readTextOrEmpty(path: string): Promise<string> {
   try {
     return await readFile(path, 'utf8');
