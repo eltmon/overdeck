@@ -41,6 +41,10 @@ export interface MountPack {
   root: string;
   transform?: MountTransform;
   skills: Array<{ name: string; dir: string }>;
+  /** Repo-relative plugin root the extras are read from (default: the repo root). */
+  pluginRoot?: string;
+  /** Plugin-root-relative files or dirs copied to plugins/<pack>/<extra>. */
+  extras?: string[];
 }
 
 export interface MountSelection {
@@ -65,6 +69,11 @@ export function mountHash(selection: MountSelection): string {
           `${pack.id}@${pack.commit}:${skill.name}:${pack.transform ? `${pack.transform}.${DEFT_HOST_NOTICE_VERSION}` : ''}`,
       ),
     )
+    .concat(
+      selection.packs.flatMap((pack) =>
+        (pack.extras ?? []).map((extra) => `${pack.id}@${pack.commit}:+${pack.pluginRoot ?? ''}/${extra}`),
+      ),
+    )
     .sort();
   return createHash('sha256').update(JSON.stringify({ v: MOUNT_FORMAT_VERSION, s: entries })).digest('hex');
 }
@@ -80,6 +89,18 @@ function assertMountPack(pack: MountPack): void {
     const normalized = posix.normalize(skill.dir);
     if (isAbsolute(skill.dir) || normalized === '..' || normalized.startsWith('../')) {
       throw new Error(`skill dir escapes pack ${pack.id}: ${JSON.stringify(skill.dir)}`);
+    }
+  }
+  for (const extra of pack.extras ?? []) {
+    const normalized = posix.normalize(extra);
+    if (isAbsolute(extra) || normalized === '..' || normalized.startsWith('../')) {
+      throw new Error(`mount path escapes pack ${pack.id}: ${JSON.stringify(extra)}`);
+    }
+    if (normalized === 'skills' || normalized === '.claude-plugin' || normalized === '.codex-plugin') {
+      throw new Error(`mount extra collides with generated content in pack ${pack.id}: ${JSON.stringify(extra)}`);
+    }
+    if (normalized.startsWith('skills/') || normalized.startsWith('.claude-plugin/') || normalized.startsWith('.codex-plugin/')) {
+      throw new Error(`mount extra collides with generated content in pack ${pack.id}: ${JSON.stringify(extra)}`);
     }
   }
 }
@@ -139,6 +160,11 @@ async function populateMount(dir: string, packs: MountPack[], hash: string): Pro
         const skillMd = join(dst, 'SKILL.md');
         await writeFile(skillMd, applyDeftHostNotice(await readFile(skillMd, 'utf8'), skill.name), 'utf8');
       }
+    }
+    for (const extra of pack.extras ?? []) {
+      const src = join(pack.root, pack.pluginRoot ?? '', extra);
+      if (!(await exists(src))) continue;
+      await copyWithoutSymlinks(src, join(pluginDir, extra));
     }
   }
 }

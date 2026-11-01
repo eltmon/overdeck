@@ -48,8 +48,14 @@ export interface KnownPack {
   id: string;
   url?: string;
   adapter?: PackAdapterId;
-  /** Directory the `plain` adapter scans instead of `skills/`. */
+  /** Directory the `plain` adapter scans instead of `skills/`, relative to the plugin root. */
   skillsRoot?: string;
+  /** Repo-relative dir that holds the plugin (manifest, skills, agents, hooks, LICENSE); default the repo root. */
+  pluginRoot?: string;
+  /** Ref `pan skills pack add <id>` pins when --ref is omitted (a tag, branch or 40-hex commit). */
+  ref?: string;
+  /** Plugin-root-relative files or dirs the mount copies next to skills/ (reference docs skills link to). */
+  mountExtras?: readonly string[];
   optIn?: readonly string[];
   /** One-line statement of what leaves the machine, shown on the pack row. */
   disclosure?: string;
@@ -80,6 +86,24 @@ export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
       'ox-cli-cart-drop',
     ],
     disclosure: SAGEOX_DISCLOSURE,
+  },
+  // Cursor's generated Claude Code build of poteto's pstack, from the eltmon/plugins fork (PAN-4728).
+  pstack: {
+    id: 'pstack',
+    url: 'https://github.com/eltmon/plugins',
+    ref: 'ae5650febf4320793844c12c4adaa937f417f8da',
+    adapter: 'claude-plugin',
+    pluginRoot: 'harness/pstack/claude-code',
+    mountExtras: ['docs', 'README.md'],
+    optIn: [
+      'automate-me',
+      'create-formal-verification-skill',
+      'create-verification-skill',
+      'maintain-verification-skill',
+      'make-bot-ui',
+      'reflect',
+      'setup-pstack',
+    ],
   },
 };
 
@@ -249,39 +273,48 @@ async function readLicense(root: string, plugin: Record<string, unknown> | null)
 export async function readPackManifest(
   root: string,
   adapter: PackAdapterId,
-  opts: { optIn?: readonly string[]; skillsRoot?: string } = {},
+  opts: { optIn?: readonly string[]; skillsRoot?: string; pluginRoot?: string } = {},
 ): Promise<PackManifest> {
-  const plugin = await readPluginJson(root, adapter === 'claude-plugin');
+  let prefix = '';
+  if (opts.pluginRoot !== undefined) {
+    const rel = toRepoRelative(opts.pluginRoot);
+    if (!rel) throw new Error(`invalid pack plugin root: ${JSON.stringify(opts.pluginRoot)}`);
+    prefix = rel;
+  }
+  const base = prefix ? join(root, prefix) : root;
+  const plugin = await readPluginJson(base, adapter === 'claude-plugin');
   const deft = adapter === 'deft-readonly';
   const skillDirs =
     adapter === 'claude-plugin'
-      ? await claudePluginSkillDirs(root, plugin ?? {})
+      ? await claudePluginSkillDirs(base, plugin ?? {})
       : deft
-        ? await deftReadonlySkillDirs(root)
-        : await scanSkillDirs(root, opts.skillsRoot ?? 'skills');
+        ? await deftReadonlySkillDirs(base)
+        : await scanSkillDirs(base, opts.skillsRoot ?? 'skills');
   const optIn = new Set(opts.optIn ?? []);
 
   const skills: PackSkill[] = [];
   const seen = new Set<string>();
   const executables: string[] = [];
   for (const dir of skillDirs) {
-    const content = await readTextOrNull(join(root, dir, 'SKILL.md'));
+    const content = await readTextOrNull(join(base, dir, 'SKILL.md'));
     if (content === null) continue;
     const frontmatter = readSkillFrontmatter(content);
     // Deft skills are named by the stripped dir name, never the `deft-directive-*` frontmatter name.
     const name = deft ? basename(dir).slice(DEFT_SKILL_PREFIX.length) : (frontmatter.name ?? basename(dir));
     if (!SKILL_NAME_PATTERN.test(name) || seen.has(name)) continue;
     seen.add(name);
-    skills.push({ name, dir, description: frontmatter.description, optIn: optIn.has(name) });
-    executables.push(...(await listExecutables(root, dir)));
+    const repoDir = prefix ? posix.join(prefix, dir) : dir;
+    skills.push({ name, dir: repoDir, description: frontmatter.description, optIn: optIn.has(name) });
+    const dirExecutables = await listExecutables(base, dir);
+    executables.push(...(prefix ? dirExecutables.map((e) => posix.join(prefix, e)) : dirExecutables));
   }
 
   // Deft always carries agent hooks, an AGENTS.md section, and .githooks, and its skills call the directive CLI.
   const capabilities: PackCapabilities = {
-    hooks: deft || (await isFile(join(root, 'hooks', 'hooks.json'))) || plugin?.['hooks'] !== undefined,
-    mcpServers: (await isFile(join(root, '.mcp.json'))) || plugin?.['mcpServers'] !== undefined,
-    commands: await isDir(join(root, 'commands')),
-    agents: await isDir(join(root, 'agents')),
+    hooks: deft || (await isFile(join(base, 'hooks', 'hooks.json'))) || plugin?.['hooks'] !== undefined,
+    mcpServers: (await isFile(join(base, '.mcp.json'))) || plugin?.['mcpServers'] !== undefined,
+    commands: await isDir(join(base, 'commands')),
+    agents: await isDir(join(base, 'agents')),
     contextInjection: deft,
     gitHooks: deft,
     executables,
@@ -289,7 +322,7 @@ export async function readPackManifest(
     requiresCli: deft ? ['directive'] : [],
   };
   const pluginName = typeof plugin?.['name'] === 'string' ? plugin['name'] : null;
-  return { skills, capabilities, license: await readLicense(root, plugin), pluginName };
+  return { skills, capabilities, license: await readLicense(base, plugin), pluginName };
 }
 
 /** Human labels for every capability a mount leaves out, e.g. `['hooks', 'MCP servers', 'executables (2)']`. */

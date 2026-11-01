@@ -6,7 +6,7 @@
  *   pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
  *   pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]   (PAN-4334; <skill> may be <pack>/<skill>)
  *   pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>] [--conversation <tmuxSession>] [--codex-home <dir>] [--plugin-link <path>]   (hidden; launchers)
- *   pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly] [--yes]      (PAN-4334)
+ *   pan skills pack add <id> [url] [--ref <ref>] [--adapter plain|claude-plugin|deft-readonly] [--yes]      (PAN-4334; known packs default url/ref, PAN-4728)
  *   pan skills pack update <id> [--ref <ref>] [--yes]
  *   pan skills pack list [--json] [--offline] | remove <id> | sync [id] | gc [--max-age-days <n>]
  *   pan skills pack sageox status [--project <key>] [--json] | upload on|off --project <key>   (PAN-2444)
@@ -24,7 +24,7 @@ import { registerSkillsDeftCommands } from './skills-deft.js';
 interface ListOptions { project?: string; issue?: string; json?: boolean }
 interface SetOptions { project?: string; issue?: string; pack?: string }
 interface LaunchSettingsOptions { harness: string; cwd: string; issue?: string; conversation?: string; codexHome?: string; pluginLink?: string }
-interface PackAddOptions { ref: string; adapter?: string; yes?: boolean }
+interface PackAddOptions { ref?: string; adapter?: string; yes?: boolean }
 interface PackUpdateOptions { ref?: string; yes?: boolean }
 interface PackListOptions { json?: boolean; offline?: boolean }
 interface PackGcOptions { maxAgeDays?: string }
@@ -240,6 +240,7 @@ function printPackPreview(preview: PackPreview, notAppliedLabels: NotAppliedLabe
   const executables = manifest.capabilities.executables;
   const rows: Array<[string, string]> = [
     ['Source', `${preview.url} @ ${preview.ref} (${short(preview.commit)})`],
+    ...(preview.pluginRoot ? ([['Root', preview.pluginRoot]] as Array<[string, string]>) : []),
     ['Adapter', preview.adapter],
     ['License', manifest.license ?? 'unknown'],
     ['Skills', `${manifest.skills.length}${optIn.length > 0 ? ` (${optIn.length} opt-in: ${optIn.join(', ')})` : ''}`],
@@ -280,7 +281,7 @@ async function packConfirm(yes: boolean | undefined, note?: string): Promise<(pr
   };
 }
 
-export async function skillsPackAddCommand(id: string, url: string, options: PackAddOptions): Promise<void> {
+export async function skillsPackAddCommand(id: string, url: string | undefined, options: PackAddOptions): Promise<void> {
   if (
     options.adapter !== undefined &&
     options.adapter !== 'plain' &&
@@ -290,16 +291,28 @@ export async function skillsPackAddCommand(id: string, url: string, options: Pac
     console.error(chalk.red('--adapter must be plain, claude-plugin, or deft-readonly'));
     process.exit(1);
   }
-  const [{ addPack }, { CORE_SKILLS }] = await Promise.all([
+  const [{ addPack }, { CORE_SKILLS }, { KNOWN_PACKS }] = await Promise.all([
     import('../../lib/skill-packs/sources.js'),
     import('../../lib/skill-overrides/resolve.js'),
+    import('../../lib/skill-packs/adapters.js'),
   ]);
+  const known = KNOWN_PACKS[id];
+  const resolvedUrl = url ?? known?.url;
+  const ref = options.ref ?? known?.ref;
+  if (!resolvedUrl) {
+    console.error(chalk.red(`pack ${id} has no default url; pass one: pan skills pack add ${id} <url> --ref <ref>`));
+    process.exit(1);
+  }
+  if (!ref) {
+    console.error(chalk.red(`pack ${id} has no default ref; pass --ref <tag-or-branch>`));
+    process.exit(1);
+  }
   const note = `Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack ${id} on`;
   const confirm = await packConfirm(options.yes, note);
   let result;
   try {
     result = await addPack(
-      { id, url, ref: options.ref, ...(options.adapter ? { adapter: options.adapter } : {}), reservedIds: CORE_SKILLS },
+      { id, url: resolvedUrl, ref, ...(options.adapter ? { adapter: options.adapter } : {}), reservedIds: CORE_SKILLS },
       confirm,
     );
   } catch (error) {
@@ -492,8 +505,10 @@ export function registerSkillsCommands(program: Command): void {
     .action(skillsLaunchSettingsCommand);
 
   const pack = skills.command('pack').description('Register, update, and cache external skill packs pinned to a commit');
-  pack.command('add <id> <url>').description('Register a git skill pack at the commit a ref resolves to (enables nothing)')
-    .requiredOption('--ref <ref>', 'Tag or branch to pin').option('--adapter <adapter>', 'plain, claude-plugin, or deft-readonly')
+  pack.command('add <id> [url]')
+    .description('Register a git skill pack at the commit a ref resolves to (enables nothing); known packs default the url and ref')
+    .option('--ref <ref>', 'Tag, branch or commit to pin (default: the known pack ref)')
+    .option('--adapter <adapter>', 'plain, claude-plugin, or deft-readonly')
     .option('--yes', 'Trust the resolved commit without asking').action(skillsPackAddCommand);
   pack.command('update <id>').description('Move a pack to the commit its ref (or --ref) now resolves to')
     .option('--ref <ref>', 'Switch to a different tag or branch').option('--yes', 'Trust the new commit without asking')

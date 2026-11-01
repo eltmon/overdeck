@@ -83,6 +83,22 @@ const deft = (): MountPack => ({
 });
 const beta = (): MountPack => ({ id: 'beta', commit: COMMIT_B, root: rootB, skills: [{ name: 'three', dir: 'skills/three' }] });
 
+const COMMIT_P = 'c'.repeat(40);
+const rootP = join(scratch, 'p');
+mkdirSync(join(rootP, 'harness', 'p', 'claude-code', 'skills', 'a'), { recursive: true });
+writeFileSync(join(rootP, 'harness', 'p', 'claude-code', 'skills', 'a', 'SKILL.md'), '---\nname: a\ndescription: A.\n---\n');
+mkdirSync(join(rootP, 'harness', 'p', 'claude-code', 'docs', 'harness'), { recursive: true });
+writeFileSync(join(rootP, 'harness', 'p', 'claude-code', 'docs', 'harness', 'claude-code.md'), '# Adapter\n');
+writeFileSync(join(rootP, 'harness', 'p', 'claude-code', 'README.md'), '# p\n');
+const pWithExtras = (extras: string[] = ['docs', 'README.md']): MountPack => ({
+  id: 'p',
+  commit: COMMIT_P,
+  root: rootP,
+  pluginRoot: 'harness/p/claude-code',
+  skills: [{ name: 'a', dir: 'harness/p/claude-code/skills/a' }],
+  extras,
+});
+
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
@@ -179,6 +195,30 @@ describe('buildMount', () => {
   it('rejects skill dirs that escape the pack', async () => {
     await expect(buildMount({ packs: [{ ...alpha(), skills: [{ name: 'one', dir: '../beta/skills/three' }] }] })).rejects.toThrow(
       /escapes pack/,
+    );
+  });
+
+  it('copies extras from the plugin root next to skills', async () => {
+    const mount = await buildMount({ packs: [pWithExtras(['docs', 'README.md', 'missing'])] });
+    if (!mount) throw new Error('expected a mount');
+    expect(readFileSync(join(mount.path, 'plugins', 'p', 'docs', 'harness', 'claude-code.md'), 'utf8')).toBe('# Adapter\n');
+    expect(readFileSync(join(mount.path, 'plugins', 'p', 'README.md'), 'utf8')).toBe('# p\n');
+    expect(existsSync(join(mount.path, 'plugins', 'p', 'missing'))).toBe(false);
+    expect(existsSync(join(mount.path, 'plugins', 'p', 'skills', 'a', 'SKILL.md'))).toBe(true);
+  });
+
+  it('covers extras in the hash and leaves extra-free hashes unchanged', () => {
+    const withExtras = pWithExtras(['docs']);
+    const { extras: _extras, ...noExtrasField } = withExtras;
+    expect(mountHash({ packs: [withExtras] })).not.toBe(mountHash({ packs: [noExtrasField] }));
+    expect(mountHash({ packs: [pWithExtras([])] })).toBe(mountHash({ packs: [noExtrasField] }));
+  });
+
+  it('rejects extras that escape or collide', async () => {
+    await expect(buildMount({ packs: [pWithExtras(['../x'])] })).rejects.toThrow(/escapes pack/);
+    await expect(buildMount({ packs: [pWithExtras(['skills'])] })).rejects.toThrow(/collides with generated content/);
+    await expect(buildMount({ packs: [pWithExtras(['.claude-plugin/plugin.json'])] })).rejects.toThrow(
+      /collides with generated content/,
     );
   });
 });
