@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4647",
   "created": "2026-11-01T04:58:27.549Z",
-  "updated": "2026-11-01T05:39:59.290Z",
+  "updated": "2026-11-01T05:40:16.701Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "agent-subject-lister.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T05:39:59.290Z"
+    },
+    "agent-subject-lister.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:40:16.700Z"
     }
   }
 }
