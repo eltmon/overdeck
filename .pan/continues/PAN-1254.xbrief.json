@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T08:43:24.235Z",
+  "updated": "2026-11-01T08:43:43.137Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -300,6 +300,10 @@
     "ts-token-mint-guard.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T08:43:24.235Z"
+    },
+    "ts-token-mint-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:43:43.137Z"
     }
   }
 }
