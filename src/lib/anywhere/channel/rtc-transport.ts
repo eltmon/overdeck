@@ -176,6 +176,22 @@ export class RtcTransport {
     pc.connectionStateChange.subscribe((state) => {
       if (state === 'failed' || state === 'closed') this.closeEntry(entry);
     });
+    // Either side may open data channels on a connected peer connection (dial reuses whichever
+    // connection exists for the peer), so both the initiator and the responder accept them.
+    pc.onDataChannel.subscribe((channel) => {
+      const deliver = () => {
+        entry.everOpen = true;
+        this.onIncoming(new RtcDuplex(channel, peer), purpose, peer, relay);
+      };
+      if (channel.readyState === 'open') deliver();
+      else {
+        const { unSubscribe } = channel.stateChanged.subscribe((state) => {
+          if (state !== 'open') return;
+          unSubscribe();
+          deliver();
+        });
+      }
+    });
     return entry;
   }
 
@@ -238,20 +254,6 @@ export class RtcTransport {
     const iceServers = await this.port.iceServers(relay);
     const pc = new RTCPeerConnection({ iceServers });
     const entry = this.register(pc, key, from, session, purpose, relay);
-    pc.onDataChannel.subscribe((channel) => {
-      const deliver = () => {
-        entry.everOpen = true;
-        this.onIncoming(new RtcDuplex(channel, from), purpose, from, relay);
-      };
-      if (channel.readyState === 'open') deliver();
-      else {
-        const { unSubscribe } = channel.stateChanged.subscribe((state) => {
-          if (state !== 'open') return;
-          unSubscribe();
-          deliver();
-        });
-      }
-    });
     await this.setRemote(entry, 'offer', sdp);
     if (candidate) await this.addRemoteCandidate(entry, candidate);
     const answer = await pc.createAnswer();

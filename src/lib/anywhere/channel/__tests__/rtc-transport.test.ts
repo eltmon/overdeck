@@ -115,6 +115,25 @@ describe('RtcTransport (PAN-2356 WI-10)', () => {
     expect(one.destroyed || two.destroyed).toBe(false);
   }, 20_000);
 
+  it('lets the responder dial back over the same connection, and the initiator accepts it', async () => {
+    const h = hub();
+    const incomingA: Duplex[] = [];
+    const incomingB: Duplex[] = [];
+    const a = new RtcTransport(h.port(A), (raw) => incomingA.push(raw));
+    const b = new RtcTransport(h.port(B), (raw) => incomingB.push(raw));
+    transports.push(a, b);
+    const signal = new AbortController().signal;
+    await a.dial(B, { relay: false, purpose: 'link', signal });
+    while (incomingB.length === 0) await new Promise((resolve) => setTimeout(resolve, 10));
+    // B now holds A's connection as its responder entry; dialing A reuses it.
+    const back = await b.dial(A, { relay: false, purpose: 'link', signal });
+    while (incomingA.length === 0) await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(a.peerConnectionCount()).toBe(1);
+    expect(b.peerConnectionCount()).toBe(1);
+    back.write(Buffer.from('hello A'));
+    expect((await readBytes(incomingA[0]!, 7)).toString()).toBe('hello A');
+  }, 20_000);
+
   it('rejects a dial whose signal aborts before the connection opens', async () => {
     const { a } = pair();
     const controller = new AbortController();
