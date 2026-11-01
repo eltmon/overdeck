@@ -1,11 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T08:26:02Z · model: claude-opus-5-5 · open: 873_
+_Last sequenced: 2026-11-01T09:03:36Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
 | 2 | PAN-4639 | L | medium | ok |  |  | In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4663 | XS | critical | ok |  |  | In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts |
@@ -297,7 +296,7 @@ _Last sequenced: 2026-11-01T08:26:02Z · model: claude-opus-5-5 · open: 873_
 | 290 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
 | 292 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
-| 292 | PAN-4648 | M | medium | ok |  | PAN-4645 | Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending. |
+| 292 | PAN-4648 | M | medium | ok |  |  | Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending. |
 | 293 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
 | 296 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
@@ -673,7 +672,6 @@ _Last sequenced: 2026-11-01T08:26:02Z · model: claude-opus-5-5 · open: 873_
 | 666 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651, PAN-4652 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 668 | PAN-4643 | M | medium | ok |  |  | pan diagnose: redacted diagnostics bundle (needs doctor --json) handed to a Claude Code or Codex session; works with dashboard down. |
 | 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
 | 669 | PAN-4641 | M | medium | ok |  |  | Server-held 'send when limits reset' composer message; needs a parsed reset time; usage-window data would come from #2065. |
 | 672 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
@@ -880,10 +878,6 @@ _Last sequenced: 2026-11-01T08:26:02Z · model: claude-opus-5-5 · open: 873_
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 
 ## Rationale detail
-
-### PAN-4626 (rank 1)
-
-New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.
 
 ### PAN-4639 (rank 2)
 
@@ -1201,6 +1195,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
+### PAN-4213 (rank 81)
+
+Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1208,24 +1206,11 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T08:26:02Z",
+  "generatedAt": "2026-11-01T09:03:36Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 873,
+  "openCount": 871,
   "nodes": [
-    {
-      "issue": "PAN-4626",
-      "rank": 1,
-      "size": "S",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending.",
-      "rationale": "New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-4639",
       "rank": 2,
@@ -4730,7 +4715,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
         "PAN-4295"
       ],
       "why": "Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build.",
-      "rationale": "New verification-only follow-up; it cannot run until PAN-4295 merges and deploys, so it ranks directly behind PAN-4295 in the Fly cluster.",
+      "rationale": "Updated after prior run without material body change; still waits on #4295 deploy and #4682/#4683 workarounds, rank kept.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4967,9 +4952,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 42,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4645"
-      ],
+      "dependsOn": [],
       "why": "Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending.",
       "rationale": "New Anywhere child (W-INT1); its Funnel route follows W-TS1 and its inbox follows W-LINK5, so it ranks last of the new children. Body is still a placeholder.",
       "gate": "auto",
@@ -9614,19 +9597,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4643",
-      "rank": 668,
-      "size": "M",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan diagnose: redacted diagnostics bundle (needs doctor --json) handed to a Claude Code or Codex session; works with dashboard down.",
-      "rationale": "New issue: a self-serve support path with clear scope and acceptance criteria, ranked with other medium operator-tooling features.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4641",
       "rank": 669,
       "size": "M",
@@ -12891,7 +12861,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "to": "PAN-2354",
       "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.5
+      "confidence": 0.3
     },
     {
       "from": "PAN-2350",
@@ -13412,13 +13382,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4626",
-      "to": "PAN-4639",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-2065",
       "to": "PAN-4641",
       "type": "informs",
@@ -13591,7 +13554,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "to": "PAN-4648",
       "type": "unblocks",
       "source": "ai-inferred",
-      "confidence": 0.6
+      "confidence": 0.4
     },
     {
       "from": "PAN-2350",
@@ -13737,15 +13700,15 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "from": "PAN-2354",
       "to": "PAN-2355",
       "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-1254",
       "to": "PAN-2355",
       "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-4666",
@@ -13818,20 +13781,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 0.4
     },
     {
-      "from": "PAN-4690",
-      "to": "PAN-4626",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4690",
-      "to": "PAN-4643",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-4295",
       "to": "PAN-4696",
       "type": "unblocks",
@@ -13858,6 +13807,34 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-1254",
+      "to": "PAN-4648",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1254",
+      "to": "PAN-4649",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2354",
+      "to": "PAN-2080",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4697",
+      "to": "PAN-4681",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }

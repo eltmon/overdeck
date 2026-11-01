@@ -621,6 +621,9 @@ export interface YamlConfig {
     summarizer?: TtsSummarizerConfig;
   };
 
+  /** Needs-you push to phones (PAN-2354) */
+  push?: import('./push-config.js').PushYamlConfig;
+
   /** Workhorse model slots for role model indirection. */
   workhorses?: WorkhorsesConfig;
 
@@ -955,6 +958,9 @@ export interface NormalizedConfig {
 
   /** TTS daemon configuration (normalised, never undefined) */
   tts: NormalizedTtsDaemonConfig;
+
+  /** Needs-you push configuration (PAN-2354; normalised, never undefined) */
+  push: import('./push-config.js').NormalizedPushConfig;
 
   /** TTS summarizer configuration (normalised, never undefined) */
   ttsSummarizer: {

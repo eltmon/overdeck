@@ -11,6 +11,7 @@ import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTi
 import { DEFAULT_CONFIG } from './defaults.js';
 import { normalizeOllamaConfig } from './ollama.js';
 import { normalizeJevConfig } from './jev.js';
+import { defaultPushConfig, mergePushConfig } from './push-config.js';
 import { normalizeSecurityConfig } from './semgrep.js';
 import { normalizeGovernorReserves } from './governor-reserves.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
@@ -230,6 +231,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },
       mutedIssues: [...DEFAULT_CONFIG.tts.mutedIssues],
     },
+    push: defaultPushConfig(),
     ttsSummarizer: {
       enabled: DEFAULT_CONFIG.ttsSummarizer.enabled,
       model: DEFAULT_CONFIG.ttsSummarizer.model,
@@ -742,6 +744,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge TTS daemon configuration
     mergeTtsConfig(result.tts, config);
+
+    // Merge needs-you push configuration (PAN-2354)
+    mergePushConfig(result.push, config);
 
     // Merge TTS summarizer configuration
     if (config.tts?.summarizer) {

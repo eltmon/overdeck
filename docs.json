@@ -59,8 +59,10 @@
               "anywhere",
               "configuration/session-vault",
               "configuration/remote-access",
+              "configuration/push-notifications",
               "cli/vault",
               "cli/pair",
+              "cli/account",
               "cli/devices",
               "cli/token"
             ]
