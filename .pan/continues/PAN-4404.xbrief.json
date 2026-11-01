@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:29:25.293Z",
+  "updated": "2026-11-01T14:29:40.257Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "wi1-contracts.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T14:29:25.293Z"
+    },
+    "wi2-ssh-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:29:40.257Z"
     }
   }
 }
