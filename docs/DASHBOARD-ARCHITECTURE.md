@@ -9,6 +9,7 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Server structure** (split from old 15K-line monolith in PAN-428):
 - `src/dashboard/server/main.ts` — entry point, dual-runtime (Bun dev, Node prod)
 - `src/dashboard/server/server.ts` — Effect HTTP server, route composition, layers
+- `src/dashboard/server/server-bind.ts` — bind retry on `EADDRINUSE`, and the startup request hold: Effect's server listens before `HttpRouter.serve` attaches its handler, so `holdRequestsUntilServed` queues requests that arrive in that gap and replays them to the first real handler. If none attaches within 120 s, held and new requests get `503` with `Retry-After: 5` until one does.
 - `src/dashboard/server/ws-rpc.ts` — Effect RPC over WebSocket at `/ws/rpc`
 - `src/dashboard/server/ws-terminal.ts` — raw WebSocket terminal at `/ws/terminal`
 - `src/dashboard/server/routes/` — ~60 route modules plus domain subdirs (agents/, misc/, resources/, specialists/, workspaces/)
