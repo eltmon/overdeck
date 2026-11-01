@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4723",
   "created": "2026-11-01T15:14:51.273Z",
-  "updated": "2026-11-01T15:18:27.021Z",
+  "updated": "2026-11-01T15:42:24.566Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-11-01T15:42:24.566Z"
+    }
+  ],
   "items": {
     "mock-disk-floor-create-workspace-row": {
       "status": "completed",
@@ -27,5 +33,6 @@
       "claimedAt": "2026-11-01T15:17:23.748Z",
       "doneAt": "2026-11-01T15:18:27.020Z"
     }
-  }
+  },
+  "agentModel": "claude-sonnet-5"
 }
