@@ -1,0 +1,245 @@
+{
+  "version": "1",
+  "issueId": "PAN-4295",
+  "created": "2026-11-01T05:48:47.966Z",
+  "updated": "2026-11-01T11:47:06.212Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T11:34Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T11:34:17.836Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T11:37Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-01T11:37:01.913Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T11:47Z] review-agent → CHANGES-REQUESTED — seq 3",
+      "timestamp": "2026-11-01T11:47:06.212Z"
+    }
+  ],
+  "items": {
+    "restore-credential-refresh": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4295",
+      "claimedAt": "2026-11-01T05:48:47.966Z",
+      "doneAt": "2026-11-01T05:54:02.667Z"
+    },
+    "heartbeat-exit-code": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4295",
+      "claimedAt": "2026-11-01T05:54:21.383Z",
+      "doneAt": "2026-11-01T05:58:27.626Z"
+    },
+    "reap-positive-evidence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4295",
+      "claimedAt": "2026-11-01T05:59:36.785Z",
+      "doneAt": "2026-11-01T06:06:27.790Z"
+    },
+    "reap-requests-review": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4295",
+      "claimedAt": "2026-11-01T06:06:33.852Z",
+      "doneAt": "2026-11-01T06:09:53.420Z"
+    },
+    "hygiene-remote-loops": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4295",
+      "claimedAt": "2026-11-01T06:10:02.159Z",
+      "doneAt": "2026-11-01T06:12:11.710Z"
+    },
+    "deacon-lite-reap": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4295",
+      "claimedAt": "2026-11-01T06:12:17.805Z",
+      "doneAt": "2026-11-01T06:19:17.305Z"
+    },
+    "single-remote-creator": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4295",
+      "claimedAt": "2026-11-01T06:19:23.952Z",
+      "doneAt": "2026-11-01T06:29:43.200Z"
+    },
+    "docs-fly-remote": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4295",
+      "claimedAt": "2026-11-01T06:29:50.598Z",
+      "doneAt": "2026-11-01T06:30:58.432Z"
+    },
+    "fly-live-smoke": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4295",
+      "claimedAt": "2026-11-01T06:38:03.395Z",
+      "doneAt": "2026-11-01T08:10:18.981Z"
+    },
+    "restore-credential-refresh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:12:35.208Z"
+    },
+    "restore-credential-refresh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:13:00.702Z"
+    },
+    "restore-credential-refresh.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:13:23.926Z"
+    },
+    "restore-credential-refresh.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:13:53.187Z"
+    },
+    "heartbeat-exit-code.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:14:21.987Z"
+    },
+    "heartbeat-exit-code.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:14:50.682Z"
+    },
+    "reap-positive-evidence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:15:23.691Z"
+    },
+    "reap-positive-evidence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:15:47.783Z"
+    },
+    "reap-positive-evidence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:16:10.284Z"
+    },
+    "reap-positive-evidence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:16:32.513Z"
+    },
+    "reap-positive-evidence.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:17:03.436Z"
+    },
+    "reap-requests-review.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:17:34.294Z"
+    },
+    "reap-requests-review.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:17:55.981Z"
+    },
+    "reap-requests-review.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:18:17.239Z"
+    },
+    "reap-requests-review.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:18:36.339Z"
+    },
+    "hygiene-remote-loops.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:18:59.758Z"
+    },
+    "hygiene-remote-loops.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:19:25.415Z"
+    },
+    "hygiene-remote-loops.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:19:47.769Z"
+    },
+    "deacon-lite-reap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:20:14.913Z"
+    },
+    "deacon-lite-reap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:20:51.215Z"
+    },
+    "deacon-lite-reap.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:21:28.974Z"
+    },
+    "deacon-lite-reap.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:22:31.036Z"
+    },
+    "single-remote-creator.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:23:03.002Z"
+    },
+    "single-remote-creator.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:23:29.317Z"
+    },
+    "single-remote-creator.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:24:07.817Z"
+    },
+    "single-remote-creator.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:28:18.211Z"
+    },
+    "docs-fly-remote.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:28:30.927Z"
+    },
+    "docs-fly-remote.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:28:44.015Z"
+    },
+    "docs-fly-remote.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:28:56.674Z"
+    },
+    "docs-fly-remote.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:29:09.243Z"
+    },
+    "fly-live-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:29:21.916Z"
+    },
+    "fly-live-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:29:34.319Z"
+    },
+    "fly-live-smoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:29:47.454Z"
+    },
+    "fly-live-smoke.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:30:00.373Z"
+    },
+    "fly-live-smoke.ac5": {
+      "status": "cancelled"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T11:34:17Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4295\n\nPull request: https://github.com/eltmon/overdeck/pull/4713 (head `a420adab`)\n\nSource: check_run:lint-group (core)\n\n## Failing checks (1)\n\n### lint-group (core)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124835380187/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41302221976/job/124835380187  \n```\nusly-skip-permissions' and 'bypassPermissions' must\nonly appear in src/lib/claude-permissions.ts (single source of truth) and\nin tests/UI/docs. Spawn sites must import DSP_FLAG, BYPASS_PERMISSION_MODE,\nbypassPrefixForAgentFlag, or buildClaudeUserSettings from that module.\n\nSee scripts/lint-permissions.sh for the full allowlist and rationale.\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.0\nTemporarily overriding HOME='/home/runner/work/_temp/831549d7-fa23-426c-ad91-76e4bd3624ad' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T11:37:01Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4295\n\nPull request: https://github.com/eltmon/overdeck/pull/4713 (head `a420adab`)\n\nSource: check_run:test-shard (2/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (3)\n\n### lint-group (effect)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124835380274/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41302221976/job/124835380274  \n```\nbuilds, delete the .tsbuildinfo files and perform a full build.\n✖ Effect diagnostics regressed: 231 findings (baseline 229).\n  Files whose finding count rose against the baseline (yours to fix):\n  NEW: src/lib/remote/remote-completion.ts (4, baseline 2)\n  Reproduce each lane with: node_modules/.bin/tsc --noEmit -p <tsconfig.effect-diag.json>\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.0\nTemporarily overriding HOME='/home/runner/work/_temp/0367ec0d-10f2-4f5f-b3eb-1328277dd99f' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n### lint-group (core)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124835380187/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41302221976/job/124835380187  \n```\nusly-skip-permissions' and 'bypassPermissions' must\nonly appear in src/lib/claude-permissions.ts (single source of truth) and\nin tests/UI/docs. Spawn sites must import DSP_FLAG, BYPASS_PERMISSION_MODE,\nbypassPrefixForAgentFlag, or buildClaudeUserSettings from that module.\n\nSee scripts/lint-permissions.sh for the full allowlist and rationale.\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.0\nTemporarily overriding HOME='/home/runner/work/_temp/831549d7-fa23-426c-ad91-76e4bd3624ad' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n### test-shard (2/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124835380173/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41302221976/job/124835380173  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/remote-settings-no-leak.test.ts\u001b[2m > \u001b[22mRemote VM provisioning — settings.json must NEVER hardcode bypassPermissions\u001b[2m > \u001b[22msrc/lib/remote/fly-provider.ts does NOT hardcode 'bypassPermissions' as a string literal\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/remote-settings-no-leak.test.ts\u001b[2m > \u001b[22mRemote VM provisioning — settings.json must NEVER hardcode bypassPermissions\u001b[2m > \u001b[22msrc/lib/remote/fly-provider.ts does NOT hardcode 'bypassPermissions' as a string literal\n\u001b[31m\u001b[1mAssertionError\u001b[22m: src/lib/remote/fly-provider.ts: 'bypassPermissions' must not appear as a string literal in code — use buildClaudeUserSettings(). Found: \"bypassPermissionsModeAccepted\": expected [ …(2), index: 16504, …(2) ] to be null\u001b[39m\n\n\u001b[32m- Expected:\u001b[39m\nnull\n\n\u001b[31m+ Received:\u001b[39m\n[\n  \"\\\"bypassPermissionsModeAccepted\\\"\",\n  \"\\\"\",\n]\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/__tests__/remote-settings-no-leak.test.ts:\u001b[2m56:9\u001b[22m\u001b[39m\n    \u001b[90m 54|\u001b[39m         stripped\u001b[33m.\u001b[39m\u001b[34mmatch\u001b[39m(quotedBypass)\u001b[33m,\u001b[39m\n    \u001b[90m 55|\u001b[39m         `${relPath}: 'bypassPermissions' must not appear as a string l…\n    \u001b[90m 56|\u001b[39m       )\u001b[33m.\u001b[39m\u001b[34mtoBeNull\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m         \u001b[31m^\u001b[39m\n    \u001b[90m 57|\u001b[39m     })\u001b[33m;\u001b[39m\n    \u001b[90m 58|\u001b[39m   }\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m507 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (509)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-01T11:47:06Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4295\n\n# Review — PAN-4295\n## Verdict: CHANGES REQUESTED — CI red at HEAD: a `bypassPermissions` string literal in fly-provider.ts:584, and two `copyFromVm` Effects in remote-completion.ts:137/356 that never run, so the now-automatic reap destroys VMs without copying transcripts\n\n## Context\n- Run ID: agent-pan-4295-review-a420adab\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4295/.pan/review/agent-pan-4295-review-a420adab/context.json\n- Branch / workspace: feature/pan-4295 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4295\n- PR: https://github.com/eltmon/overdeck/pull/4713\n- HEAD reviewed: a420adab85ccfa824b3dc6a462fbc5d95ccdf03a\n- Base / prior cycle SHA: merge-base 4e36b88e1ee8 (origin/main is 1 commit ahead) / no prior review cycle\n\nNote: while this review ran, the worktree had uncommitted edits to `src/lib/remote/fly-provider.ts`, `src/lib/remote/remote-completion.ts` and `tests/lib/remote/remote-completion.test.ts`. These edits appear to address both blockers. They are not part of the reviewed HEAD, and this report does not evaluate them. The next cycle must verify them after they are committed and pushed and CI is green.\n\n## Blocking Findings\n\n### [correctness] `bypassPermissions` literal in the VM onboarding script fails two CI gates — `src/lib/remote/fly-provider.ts:584`\n- Severity: ! (MUST)\n- Classification / requirement scope: implementation defect; in_pr_scope (commit 9cd4f494d44, the WI-9 smoke-test fix)\n- Trigger and changed-code connection: `configureClaudeCode()` now emits `data[\"bypassPermissionsModeAccepted\"] = True` as a quoted literal in the Python onboarding script.\n- Expected / observed / impact: The repo forbids the `bypassPermissions` token outside `src/lib/claude-permissions.ts`. CI on the PR head fails on two counts:\n  - `lint-group (core)` → `npm run lint:permissions`: \"✗ permission-flag leak: forbidden token outside allowlist … src/lib/remote/fly-provider.ts:584\".\n  - `test-shard (2/4)` → `src/lib/__tests__/remote-settings-no-leak.test.ts > … does NOT hardcode 'bypassPermissions' as a string literal`: \"Found: \"bypassPermissionsModeAccepted\"\" (1 failed / 5465 passed).\n  \n  The PR cannot merge with red required checks.\n- Evidence: `gh pr checks 4713` (jobs 124835380187 and 124835380173), log excerpts above. A local rerun of the test passed only because the uncommitted worktree edit had already replaced the literal. `git show HEAD:src/lib/remote/fly-provider.ts | grep bypassPermissionsModeAccepted` → line 584.\n- Fix: build the key from the imported constant (for example ``data[\"${BYPASS_PERMISSION_MODE}ModeAccepted\"]`` inside the template literal), then commit, push and get green `lint-group (core)` and `test-shard (2/4)` runs.\n\n### [correctness] The reap's `copyFromVm` Effects are awaited but never run: transcripts and continue.json are lost when the automatic reap destroys the VM — `src/lib/remote/remote-completion.ts:137`, `:356`\n- Severity: ! (MUST)\n- Classification / requirement scope: pre-existing implementation defect (the same code sits on main at lines 111/319). This PR exposes it and makes it this author's blocker for three reasons:\n  1. The Effect diagnostics ratchet now reports it as `NEW:`, a hard CI gate.\n  2. This PR turns a manual reap into a 60 s automatic loop. In both the hand-off path and the crash path, the loop then deletes or stops the machine after a copy that never ran.\n  3. The PR's own documentation says the copy succeeded, and that is false.\n- Trigger and changed-code connection: `FlyProvider.copyFromVm()` returns `Effect.Effect<void, RemoteError>` (`fly-provider.ts:445`). Both call sites write `await fly.copyFromVm(...)` without `Effect.runPromise`. Awaiting an Effect returns the Effect object without executing it. I verified this with the repo's `effect` version: after `await Effect.promise(...)` the body had not run, and the awaited value satisfies `Effect.isEffect`. Consequences:\n  - `captureRemoteForensics()` (step 5.5 and the crash path) counts `copied++` and logs \"Copied N/N session JSONL(s)\", but copies nothing.\n  - Step 3 logs \"Copied continue.json back from VM\", but copies nothing.\n  - `deleteVm` (hand-off) or `stopVm` (crash; the rootfs resets on the next start) then removes the only copy. The module's own comment says this loses the transcript irrecoverably.\n  \n  New in this PR: `deacon-lite.ts` → `remote-reap-routine.ts` → the dynamic `import('../remote/remote-completion.js')` puts `remote-completion.ts` into the dashboard-server diagnostics lane. The same two findings are now counted in two lanes: 4 findings against a baseline of 2.\n- Expected / observed / impact:\n  - Expected: the session JSONLs and continue.json reach the host before the machine goes.\n  - Observed in the PR's own live smoke test: `~/.overdeck/agents/agent-pan-4677/remote-sessions/` exists but is empty. The directory exists only because `files.length > 0`, so the copy loop ran without copying. `workspaces/feature-pan-4677/.pan/continue.json` is absent.\n  - Despite that, the Live verification section of `docs/fly-provider.md` (O3) says the reap \"copied the session JSONL\". That claim supports AC-9 and is contradicted by the evidence.\n  - Gate: `lint-group (effect)` fails with \"✖ Effect diagnostics regressed: 231 findings (baseline 229). NEW: src/lib/remote/remote-completion.ts (4, baseline 2)\". I reproduced this locally with `npm run lint:effect-diagnostics`.\n- Test masking: at HEAD, `tests/lib/remote/remote-completion.test.ts` fakes `copyFromVm` with `mockResolvedValue(undefined)`, which returns a Promise, not an Effect. The tests therefore pass with the defect live.\n- Evidence: `tsc --noEmit --pretty -p tsconfig.effect-diag.json` reports exactly two sites, `remote-completion.ts:137:11` and `:356:9`, both `effect(floatingEffect)`. Other evidence: `ls -la ~/.overdeck/agents/agent-pan-4677/remote-sessions` (empty), the Effect probe described above, and the CI job 124835380274 log.\n- Fix:\n  - Write `await Effect.runPromise(fly.copyFromVm(...))` at both sites, as the neighboring `fly.ssh` calls already do. This also drops the file below its baseline in both lanes.\n  - Make the test fake return an Effect and assert the copy executed.\n  - Correct the O3 sentence in `docs/fly-provider.md` (and the PR body) so it describes what really happened: the copy did not run at the time of the smoke test.\n  - The fix makes the PRD's known hazard live: `copyFromVm` shells out to `fly ssh sftp`, so `fly` must be on the deacon child's `PATH`.\n\n## Non-blocking Findings\n- ~ **AC-7 grep is not literally clean.** `grep -rnE \"\\.ssh/id_|'\\.ssh'|exe-dev-key|ssh-keyscan\" src --include=*.ts` prints `src/lib/memory/injection.ts:520` (the expected comment) and also `src/dashboard/server/services/__tests__/file-at-path.test.ts:140`, a pre-existing unrelated test fixture. No production code copies a key. AC-7 holds in substance; the PRD grep should exclude `__tests__`.\n- ? **A dry-run reap still mutates on the crash path** (`remote-completion.ts:286-317`). `--dry-run` is checked only after the crash branch, so a dry run on a dead agent salvages, stops the machine and writes `status: 'error'`. This is pre-existing and manual-only; the automatic loop never passes `dryRun`.\n- ? **A machine stopped by `pan workspace stop` is reaped as a crash within 60 s.** `stopCommand` stops the VM but leaves remote-state `running`. The automatic reap then sees `stopped`, takes the crash path and marks the agent `error`. This follows the PRD decision table (WI-3, \"stopped → crash path\"). A plain Fly stop kills tmux anyway, and the old code reached the same path through failed execs. It is a spec-level choice, not an implementation defect. Worth a follow-up if hibernate-and-resume is meant to keep the agent.\n- ? **`cloneDetached()` can leak a VM on a thrown exec** (`remote-workspace.ts:43-62`). If the start exec or the final `tail` exec rejects (rather than returning an exit code), `createRemoteWorkspace()` throws before its `deleteVm` cleanup. The previous synchronous clone had the same shape, so this is not a regression.\n- Advisory, no action: each of the three loops calls `listActiveRemoteAgentStates()` every 60 s, a sync scan of `~/.overdeck/agents`. Here that is 3172 directories and about 22 ms. It runs in the deacon child, not the dashboard server, so the cost is acceptable.\n- Advisory, no action: `IS_SANDBOX=1` and the pre-accepted bypass disclaimer on VMs are confined to the Fly sandbox, and the latter mirrors `preTrustDirectory()`. `settings.json` still follows the resolved permission mode. There is no security concern under the documented threat model.\n\n## Coverage\nChanged-file ledger (HEAD a420adab):\n| File | Status |\n|---|---|\n| src/dashboard/server/routes/workspaces/review-pipeline.ts | reviewed: source parser accepts `remote-reap` (FR-8); both 409 texts updated (FR-12); net +0 lines (NFR-4) |\n| src/lib/remote/remote-completion.ts | reviewed: decision table, tri-state probes, retry loop, `running`-only scan, review request after `deleteWorkspaceMetadata`. **Blocker 2** |\n| src/lib/remote/remote-credential-refresh.ts | reviewed: matches the restore; zero-agent short-circuit before config/provider/fingerprint; test-seam comment present (NFR-5) |\n| src/lib/remote/remote-agents.ts | reviewed: FR-2 exit-code check; `IS_SANDBOX=1` on both launch paths |\n| src/lib/remote/fly-provider.ts | reviewed: **Blocker 1** |\n| src/lib/remote-workspace.ts | reviewed: generic `git@host:` → https (FR-11); detached clone with poll (deadline 20 min); disabled-remote error names the real verb |\n| src/cli/commands/workspace-create.ts | reviewed: routes `--remote` through the lib creator; dry-run handled; failure exits 1 |\n| src/cli/commands/workspace-remote.ts | reviewed: duplicate creator, `convertToSshUrl` and key copy deleted; no orphaned imports (typecheck gate passed) |\n| src/cli/commands/remote/reap.ts | reviewed: `indeterminate` in yellow, not a failure; header updated |\n| src/lib/cloister/deacon-lite.ts | reviewed: reap last, after the freeze guard (FR-4); ticks are `setInterval` + `void`, so a long hand-off never blocks later ticks |\n| src/lib/cloister/remote-reap-routine.ts | reviewed: in-flight guard released in `finally`; activity entry + console line for handed-off/error only (FR-9) |\n| src/lib/cloister/hygiene-scheduler.ts | reviewed: two 60 s rows with arrow wrappers; not behind the freeze (FR-1, FR-3) |\n| src/lib/cloister/request-review-pipeline.ts | reviewed: `'remote-reap'` added to `RequestReviewSource` |\n| src/lib/cloister/pipeline-journal.ts | reviewed: comment only |\n| src/lib/__tests__/remote-settings-no-leak.test.ts | reviewed: provisioner list reduced to fly-provider.ts (correct after the deletion); this is the test that now fails on Blocker 1 |\n| src/lib/cloister/__tests__/remote-reap-routine.test.ts | reviewed: covers filtering, levels, overlap guard, empty case |\n| tests/lib/remote/remote-completion.test.ts | reviewed: covers indeterminate (exec fail, unknown state), still-running, crash, stopped, starting-skip, review order (`invocationCallOrder`), unreachable route; fake timers used. The `copyFromVm` fake returns a Promise and masks Blocker 2 |\n| tests/lib/remote/remote-credential-refresh.test.ts | reviewed: zero agents, fingerprint change, 15 min fallback, per-VM retry, pruning |\n| tests/lib/remote-workspace.test.ts | reviewed: https clone, gitlab host, detached clone polling under fake timers, failure deletes the VM |\n| tests/lib/remote/fly-provider.test.ts | reviewed: asserts the literal that Blocker 1 must remove (it will need to follow the fix) |\n| tests/lib/remote/remote-agents.test.ts, tests/lib/remote/remote-agent-provenance.test.ts | reviewed: non-zero heartbeat exit case; `IS_SANDBOX` in the launch command |\n| tests/unit/lib/cloister/deacon-lite.test.ts, tests/unit/lib/cloister/hygiene-scheduler.test.ts | reviewed: reap runs once and last, and not under the freeze; both remote routines run at start and at +60 s |\n| docs/fly-provider.md | reviewed: Automatic loops table, no-SSH-key sentence, credential table. The Live verification O3 claim \"copied the session JSONL\" is false (Blocker 2) |\n| features/workspaces.mdx, .overdeck/context/codebase/concerns.md | reviewed: accurate |\n| .pan/drafts/PAN-4295.md, .pan/specs/…xbrief.json, .pan/continues/PAN-4295.xbrief.json | not applicable: planning artifacts, read for requirements only |\n\nDimensions:\n- **Correctness:** two blockers, both above.\n- **Security:** no new trust boundary. SSH-key copying was removed from every creation path, and the VM sandbox flags are acceptable.\n- **Performance:** NFR-1 holds; every loop short-circuits on the local scan before building a provider. The bounded 15 s probe retry is acceptable.\n- **Requirements/UX:** see the matrix below.\n\nAC matrix:\n| AC | Status | Evidence |\n|---|---|---|\n| AC-1 credential refresh restored | met | remote-credential-refresh.test.ts zero-agent case asserts no provider/config/fingerprint call |\n| AC-2 heartbeat exit code | met | remote-agents.ts:377-383; remote-agents test |\n| AC-3 positive evidence, starting skipped | met | remote-completion.ts:234-262; tests at :150, :166, :216 |\n| AC-4 review via route, `remote-reap` | met | remote-completion.ts:432-442; review-pipeline.ts:755; ordering test at :226 |\n| AC-5 hygiene loops at 60 s | met | hygiene-scheduler.ts:77-78; test |\n| AC-6 reap last, freeze-gated, overlap-guarded | met | deacon-lite.ts:551-562; remote-reap-routine.ts; tests |\n| AC-7 no key copy, https clone | met in substance | grep also matches a pre-existing test fixture (advisory); creator test asserts no `.ssh` command |\n| AC-8 docs | met | docs/fly-provider.md \"Automatic loops\", \"never copies ~/.ssh\"; features/workspaces.mdx |\n| AC-9 live verification recorded | **unmet as written** | section and #4696 link exist, but O3's \"copied the session JSONL\" is contradicted by the empty `remote-sessions/` (Blocker 2) |\n\n## Verification\n- CI on the exact HEAD (`gh pr checks 4713`):\n  - **lint-group (core)** failed (lint:permissions, Blocker 1).\n  - **lint-group (effect)** failed (NEW diagnostics, Blocker 2).\n  - **test-shard (2/4)** failed (remote-settings-no-leak, Blocker 1).\n  - test-shard 1/3/4, build (22), lint-group (state/skills), clean-install smoke and overdeck/verification passed.\n  - test-e2e and the flake lane were still pending at review time.\n- `npm run lint:effect-diagnostics` (run once): failed, `NEW: src/lib/remote/remote-completion.ts (4, baseline 2)`. `tsc --pretty -p tsconfig.effect-diag.json` pins the two sites, 137 and 356.\n- Focused tests run: `npx vitest run` on all 10 touched test files, 123/123 passed. Caveat: this ran against the worktree, which by then may have held the agent's uncommitted test edits, so it is not proof for HEAD. The CI shard results above are the authoritative HEAD result.\n- Effect execution probe (scratch file, deleted afterwards): awaiting an Effect does not run it.\n- Live state inspection: `~/.overdeck/agents/agent-pan-4677/remote-sessions/` is empty, and `workspaces/feature-pan-4677/.pan/continue.json` is absent.\n- I did not run the full test suite; CI owns it.\n\n## Scope Note\nThe work agent is editing the worktree while review runs: fly-provider.ts, remote-completion.ts and remote-completion.test.ts carry uncommitted changes aimed at both blockers. The next review cycle should start from the commit that contains them, with green CI.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4295/.pan/review/agent-pan-4295-review-a420adab/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4295 -m \"Fixed review issues\"`"
+    }
+  ]
+}

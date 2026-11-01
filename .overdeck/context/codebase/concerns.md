@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-09-26.
+Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bullet 2026-11-01).
 
 - **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
   ohmypi/prime-agent + Anthropic + subscription auth (plus the model/harness pairing
@@ -126,7 +126,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   with a VM-side continuous commit+push heartbeat daemon plus per-bead push
   instructions; the durable tier mitigates it by mounting a persistent Fly volume at
   `/workspace`. Never run durable work without verifying the volume mount
-  (PAN-1845).
+  (PAN-1845). The three host loops for Fly agents (PAN-4295): the heartbeat and
+  credential refresh run in `hygiene-scheduler.ts` (not behind the deacon freeze,
+  or every ephemeral watchdog would stop its machine); the reap runs in
+  `deacon-lite.ts` via `remote-reap-routine.ts` (behind the freeze). The reap acts
+  only on positive evidence: a failed exec is `indeterminate`, never a crash.
 - **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
   `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts` now holds only
   merge detection (`isBranchMerged`, squash-aware via the merged PR). `closeOut()` reads

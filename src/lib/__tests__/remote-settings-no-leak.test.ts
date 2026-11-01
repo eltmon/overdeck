@@ -22,9 +22,10 @@ import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = join(__dirname, '..', '..', '..');
 
+// FlyProvider.configureClaudeCode is the only writer of the VM's settings.json;
+// every creation path goes through it (PAN-4295 deleted the CLI's own creator).
 const REMOTE_PROVISIONERS = [
   'src/lib/remote/fly-provider.ts',
-  'src/cli/commands/workspace-remote.ts',
 ];
 
 describe('Remote VM provisioning — settings.json must NEVER hardcode bypassPermissions', () => {

@@ -18,7 +18,7 @@ import { homedir } from 'os';
 import { parse } from 'yaml';
 import { Effect, Stream } from 'effect';
 import { getIsolatedPlaywrightMcpConfig } from '../claude-mcp.js';
-import { buildClaudeUserSettings } from '../claude-permissions.js';
+import { BYPASS_PERMISSION_MODE, buildClaudeUserSettings } from '../claude-permissions.js';
 import { FlyApiClient, createFlyApiClient, FlyApiError } from './fly-api.js';
 import type { RemoteProvider, VmInfo, VmStatus, ExecResult } from './interface.js';
 import { RemoteError } from './interface.js';
@@ -569,7 +569,9 @@ export class FlyProvider implements RemoteProvider {
     await this.sshImpl(vmName, 'mkdir -p ~/.claude');
 
     // Set onboarding complete + pre-trust /workspace so the agent doesn't
-    // hang at the "do you trust this folder?" dialog on first launch.
+    // hang at the "do you trust this folder?" dialog on first launch, and
+    // pre-acknowledge the Bypass Permissions disclaimer (default "No, exit"),
+    // as preTrustDirectory() does for local workspaces (PAN-4295 smoke test).
     const onboardingScript = `
 import json, os
 path = os.path.expanduser("~/.claude.json")
@@ -579,6 +581,7 @@ if os.path.exists(path):
         data = json.load(f)
 data["hasCompletedOnboarding"] = True
 data["lastOnboardingVersion"] = "2.0.50"
+data["${BYPASS_PERMISSION_MODE}ModeAccepted"] = True
 projects = data.setdefault("projects", {})
 ws = projects.setdefault("/workspace", {})
 ws["hasTrustDialogAccepted"] = True

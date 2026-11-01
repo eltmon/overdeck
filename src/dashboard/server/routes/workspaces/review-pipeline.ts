@@ -386,7 +386,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     // the local worktree before review (PAN-1676).
     if (workspaceInfo.isRemote) {
       return jsonResponse({
-        error: `${issueId} is executing remotely on ${workspaceInfo.vmName ?? 'a fly machine'} — run 'pan admin remote reap --issue ${issueId}' after the agent finishes, then review.`,
+        error: `${issueId} is executing remotely on ${workspaceInfo.vmName ?? 'a fly machine'} — Overdeck reaps it automatically after the agent writes REMOTE_DONE (force it with 'pan admin remote reap --issue ${issueId}'), then review starts.`,
       }, { status: 409 });
     }
     const workspacePath = workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${numericSuffix}`);
@@ -752,7 +752,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     const rawSource = (body as { source?: unknown }).source;
     const requestSource: RequestReviewSource =
       rawSource === 'pan-done' || rawSource === 'pan-review-request' || rawSource === 'pan-unpause'
-        || rawSource === 'webhook' || rawSource === 'deacon-lite'
+        || rawSource === 'webhook' || rawSource === 'deacon-lite' || rawSource === 'remote-reap'
         ? rawSource
         : 'api';
     const eventStore = yield* EventStoreService;
@@ -817,7 +817,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         if (wsInfoRerun.isRemote) {
           return jsonResponse({
             success: false,
-            message: `${canonicalIssueId} is executing remotely on ${wsInfoRerun.vmName ?? 'a fly machine'} — run 'pan admin remote reap --issue ${canonicalIssueId}' after the agent finishes, then review.`,
+            message: `${canonicalIssueId} is executing remotely on ${wsInfoRerun.vmName ?? 'a fly machine'} — Overdeck reaps it automatically after the agent writes REMOTE_DONE (force it with 'pan admin remote reap --issue ${canonicalIssueId}'), then review starts.`,
           }, { status: 409 });
         }
         const workspacePathRerun = wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);

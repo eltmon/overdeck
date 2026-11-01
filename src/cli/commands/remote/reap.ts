@@ -1,10 +1,10 @@
 /**
  * pan admin remote reap — hand completed remote agents to the review pipeline.
  *
- * Scans remote agent states for the PAN_REMOTE_DONE marker (or an exited
- * session with a pushed branch), materializes the local worktree, creates
- * review artifacts, writes the completion marker for the cloister, and
- * stops the fly machine.
+ * Scans running remote agents for the REMOTE_DONE sentinel, materializes the
+ * local worktree, creates review artifacts, writes the completion marker,
+ * stops the fly machine and requests review. Deacon-lite runs the same reap
+ * every 60 s; this command forces it.
  */
 
 import { exitCli } from '../../exit.js';
@@ -29,6 +29,7 @@ export async function reapCommand(options: ReapOptions): Promise<void> {
     const color =
       result.status === 'handed-off' ? chalk.green :
       result.status === 'still-running' ? chalk.cyan :
+      result.status === 'indeterminate' ? chalk.yellow :
       result.status === 'stale' ? chalk.dim : chalk.red;
     console.log(color(`${result.agentId} (${result.issueId}): ${result.status}`));
     for (const detail of result.details) {
