@@ -4,7 +4,7 @@ import type { SharedConversationRow } from '@overdeck/contracts';
 
 import type { MachineLink } from '../../../../src/lib/anywhere/link-store.js';
 import type { LinkedConversationRecord } from '../../../../src/lib/overdeck/linked-conversations.js';
-import { mergeConversationRows, type MergeConversationRowsInput } from '../../../../src/lib/overdeck/linked-conversations-merge.js';
+import { mergeConversationRows, type MergeConversationRowsInput, remoteLaneKey, type RemoteLaneEntry } from '../../../../src/lib/overdeck/linked-conversations-merge.js';
 
 const SELF = 'env-laptop';
 
@@ -121,5 +121,67 @@ describe('mergeConversationRows (PAN-4650 WI-4)', () => {
       vaultCopies: [vaultCopy('v1')],
     });
     expect(names(rows)).toEqual(['vault-v1']);
+  });
+});
+
+describe('remote lanes nest under their orchestrator (PAN-4638 WI-10)', () => {
+  const FLY = link('env-fly', 'fly-abc');
+  const entry = (overrides: Partial<RemoteLaneEntry> = {}): RemoteLaneEntry => ({
+    parentName: 'orch', run: 'hotel', key: '663', role: 'builder', criticOfName: null, projectKey: 'ov', ...overrides,
+  });
+
+  it('ac1: a linked row matching a stand-in carries the orchestrator id, the lane facts and home\'s project key', () => {
+    const rows = merge({
+      links: [FLY],
+      local: [{ id: 41, name: 'orch', claudeSessionId: 's-orch', origin: 'local' }],
+      linked: [linked('env-fly', 'lane-a', { projectKey: 'ov-owner' })],
+      remoteLanes: new Map([[remoteLaneKey('env-fly', 'lane-a'), entry()]]),
+    });
+    expect(rows.find((row) => row.remoteName === 'lane-a')).toMatchObject({
+      parentConversationId: 41,
+      parentConversationName: 'orch',
+      projectKey: 'ov',
+      gauntletRun: 'hotel',
+      laneKey: '663',
+      laneRole: 'builder',
+      criticOfConversationId: null,
+    });
+  });
+
+  it('ac2: a remote critic of a remote builder points at the builder linked row id', () => {
+    const builder = linked('env-fly', 'lane-b');
+    const critic = linked('env-desk', 'lane-c');
+    const rows = merge({
+      links: [FLY, link('env-desk', 'desk')],
+      linked: [builder, critic],
+      remoteLanes: new Map([
+        [remoteLaneKey('env-fly', 'lane-b'), entry()],
+        [remoteLaneKey('env-desk', 'lane-c'), entry({ role: 'critic', criticOfName: 'lane-b' })],
+      ]),
+    });
+    expect(rows.find((row) => row.remoteName === 'lane-c')?.criticOfConversationId).toBe(-builder.id);
+    expect(rows.find((row) => row.remoteName === 'lane-c')?.parentConversationId).toBeNull();
+  });
+
+  it('a remote critic of a local builder points at the local row id', () => {
+    const rows = merge({
+      links: [FLY],
+      local: [{ id: 52, name: 'lane-local', claudeSessionId: 's-local', origin: 'local' }],
+      linked: [linked('env-fly', 'lane-d')],
+      remoteLanes: new Map([[remoteLaneKey('env-fly', 'lane-d'), entry({ role: 'critic', criticOfName: 'lane-local' })]]),
+    });
+    expect(rows.find((row) => row.remoteName === 'lane-d')?.criticOfConversationId).toBe(52);
+  });
+
+  it('ac3: a linked row with no stand-in entry has no lane fields', () => {
+    const rows = merge({
+      links: [FLY],
+      linked: [linked('env-fly', 'plain', { projectKey: 'owner-key' })],
+      remoteLanes: new Map([[remoteLaneKey('env-desk', 'plain'), entry()]]),
+    });
+    const row = rows.find((candidate) => candidate.remoteName === 'plain')!;
+    expect(row.gauntletRun).toBeUndefined();
+    expect(row.parentConversationId).toBeUndefined();
+    expect(row.projectKey).toBe('owner-key');
   });
 });

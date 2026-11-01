@@ -14,10 +14,15 @@
  *   `vault-<vaultId>`. A saved copy whose conversation is listed (locally or
  *   as a linked row) is dropped, and a kept linked row carries its name as
  *   `savedCopyName`. Saved copies of hidden or unlinked machines stay.
+ * - PAN-4638 FR-8: a kept linked row of a gauntlet lane this machine launched
+ *   on that machine (a remote lane stand-in) carries the lane facts — parent,
+ *   run, key, role, critic link — and home's project key, so the Command Deck
+ *   nests it under its orchestrator and the Awareness rail counts it in the run.
  */
 import { linkedConversationName, type LinkState, type SharedConversationRow } from '@overdeck/contracts';
 
 import type { MachineLink } from '../anywhere/link-store.js';
+import type { LaneRole } from './conversations.js';
 import { EMPTY_CONVERSATION_TRIAGE } from './conversation-triage-store.js';
 import { VAULT_BROWSE_PREFIX } from './conversation-vault-rows.js';
 import type { LinkedConversationRecord } from './linked-conversations.js';
@@ -37,6 +42,22 @@ export interface MergeConversationRowsInput {
   links: readonly MachineLink[];
   selfEnvironmentId: string | null;
   presence: (link: MachineLink) => LinkPresence;
+  /** PAN-4638: unarchived remote lane stand-ins, keyed `<environmentId>\u0000<name>`. */
+  remoteLanes?: ReadonlyMap<string, RemoteLaneEntry>;
+}
+
+/** The stand-in facts a remote lane's linked row is stamped with. */
+export interface RemoteLaneEntry {
+  parentName: string;
+  run: string;
+  key: string;
+  role: LaneRole;
+  criticOfName: string | null;
+  projectKey: string;
+}
+
+export function remoteLaneKey(environmentId: string, name: string): string {
+  return `${environmentId}\u0000${name}`;
 }
 
 /** A linked row in the shape of an enriched list row, with the D-4650-3 fields. */
@@ -121,11 +142,27 @@ export function mergeConversationRows(input: MergeConversationRowsInput): Array<
   kept.sort((a, b) => a.record.id - b.record.id);
 
   const vaultCopiesByName = new Map(input.vaultCopies.map((row) => [row.name, row]));
+  const localIds = new Map(input.local.map((row) => [row.name, typeof row['id'] === 'number' ? row['id'] : null]));
+  // A remote critic may judge a builder on any machine: its linked row id by the owner's name.
+  const linkedIds = new Map(kept.map(({ record }) => [record.row.name, -record.id]));
   const linkedRows = kept.map(({ record, link }) => {
     const vaultId = record.row.vaultId;
     if (vaultId) claimedVaultIds.add(vaultId);
     const savedCopy = vaultId ? vaultCopiesByName.get(`${VAULT_BROWSE_PREFIX}${vaultId}`) ?? null : null;
-    return linkedListRow(record, link, input.presence(link), savedCopy);
+    const row = linkedListRow(record, link, input.presence(link), savedCopy);
+    const lane = input.remoteLanes?.get(remoteLaneKey(record.environmentId, record.row.name));
+    if (!lane) return row;
+    const criticOf = lane.criticOfName === null ? null : (localIds.get(lane.criticOfName) ?? linkedIds.get(lane.criticOfName) ?? null);
+    return {
+      ...row,
+      projectKey: lane.projectKey,
+      parentConversationId: localIds.get(lane.parentName) ?? null,
+      parentConversationName: lane.parentName,
+      gauntletRun: lane.run,
+      laneKey: lane.key,
+      laneRole: lane.role,
+      criticOfConversationId: criticOf,
+    };
   });
 
   const vaultCopies = input.vaultCopies.filter((row) => !claimedVaultIds.has(row.name.slice(VAULT_BROWSE_PREFIX.length)));
