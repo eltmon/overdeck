@@ -10,6 +10,7 @@
  * after the paste decides. Both reuse `providerErrorFromTranscriptTail` so the
  * classification of a limit record lives in one place.
  */
+import type { HarnessTranscriptKind } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { providerErrorFromTranscriptTail, readTranscriptTail, type ConversationUsageLimit } from './conversation-provider-error.js';
 import { isVaultBrowseConversation } from './conversation-vault-rows.js';
@@ -38,10 +39,25 @@ export type DeliveryOutcome =
 
 type JsonRecord = { [key: string]: unknown };
 
-/** Whether `conv` can have scheduled messages: its harness transcriptKind is 'claude-jsonl' and it is not a vault browse copy. */
+/**
+ * Transcript formats Overdeck reads usage-limit records from (D2). Only Claude
+ * Code writes `quotaLimits` / `resets …` on its limit records today; a new
+ * transcript kind must decide here.
+ */
+const USAGE_LIMIT_READER: Record<HarnessTranscriptKind, boolean> = {
+  'claude-jsonl': true,
+  'ohmypi-jsonl': false,
+  'codex-rollout-jsonl': false,
+  'acp-jsonl': false,
+  'kimi-wire-jsonl': false,
+  'muse-jsonl': false,
+  'prime-agent-jsonl': false,
+};
+
+/** Whether `conv` can have scheduled messages: its transcript has a usage-limit reader and it is not a vault browse copy. */
 export function conversationSupportsScheduledMessages(conv: Conversation): boolean {
   if (isVaultBrowseConversation(conv)) return false;
-  return getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl';
+  return USAGE_LIMIT_READER[getHarnessBehavior(conv.harness).transcriptKind];
 }
 
 async function defaultResolveSessionFile(conv: Conversation): Promise<string | null> {
