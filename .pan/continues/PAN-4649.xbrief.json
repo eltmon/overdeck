@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T08:48:19.145Z",
+  "updated": "2026-11-01T09:20:32.756Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T09:20:32.755Z"
+    }
+  ],
   "items": {
     "approve-scope": {
       "status": "completed",
@@ -302,5 +308,6 @@
       "doneAt": "2026-11-01T07:53:42.778Z"
     }
   },
-  "feedback": []
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
 }
