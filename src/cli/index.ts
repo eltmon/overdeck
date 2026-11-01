@@ -43,6 +43,7 @@ import type { RuntimeName } from '../lib/runtimes/types.js';
 import { defineUpCommand, registerReloadAndRestartCommands } from './commands/dashboard-lifecycle-commands.js';
 import { registerSkillsCommands } from './commands/skills.js';
 import { registerPairCommands } from './commands/pair.js';
+import { registerTailscaleCommands } from './commands/tailscale.js';
 import { registerTokenCommands } from './commands/token.js';
 import { CommandGroupLoader, resolveGroupDemand } from './command-group-loader.js';
 import { COMMAND_GROUPS } from './command-groups.js';
@@ -224,6 +225,7 @@ backup
 
 registerSkillsCommands(program);
 registerPairCommands(program);
+registerTailscaleCommands(program);
 registerTokenCommands(program);
 
 // pan issues — list and triage work
@@ -346,6 +348,7 @@ program
   .description('Send message to running agent')
   .option('--force', 'Deliver even to a critic or verifier lane that already filed its verdict')
   .option('--steer', 'Interrupt the running turn and send now (Claude Code send-now; Ctrl+X Ctrl+S)')
+  .option('--when-limit-resets', 'Queue the message on the server; it sends when the conversation\'s usage limit resets (conversations only)')
   .action(lazyAction(() => import('./commands/tell.js'), 'tellCommand'));
 program
   .command('ask <id> [question]')

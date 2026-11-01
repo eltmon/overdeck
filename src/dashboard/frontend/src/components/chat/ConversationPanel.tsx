@@ -51,6 +51,7 @@ import { SubagentTranscript } from './SubagentTranscript';
 import { ForkProgressView } from './ForkProgressView';
 import { HeldHandoffView, HeldKickoffLookupFailedView } from './HeldHandoffView';
 import { useHeldKickoff } from './heldKickoff';
+import { scheduledToChatMessages, useScheduledMessages } from './scheduledMessages';
 import { TranscriptLoadingSkeleton } from './TranscriptLoadingSkeleton';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
 import { ViewToggle } from '../shared/ViewToggle';
@@ -1231,7 +1232,8 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
   const { onSend: handleMessageSent, contextWindowUsage } = useStableComposerProps({ conversation, data, serverMessages, addOptimistic });
 
   const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages, data?.subagents ?? [], data?.streaming ?? false);
-  const messages = [...serverMessages, ...visibleOptimistic, ...commandResults];
+  const scheduled = useScheduledMessages(conversation.name, !agentId);
+  const messages = [...serverMessages, ...visibleOptimistic, ...scheduledToChatMessages(scheduled.messages), ...commandResults];
 
   // PAN-4268: only Claude Code's agent selector says where typed input goes.
   // Agent-backed panels carry no inputTarget; their sends still switch.

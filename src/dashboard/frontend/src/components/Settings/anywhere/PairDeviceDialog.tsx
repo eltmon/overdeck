@@ -7,7 +7,6 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import qrcode from 'qrcode-generator';
 import { X } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -21,6 +20,7 @@ import {
   loadAnywhereStatus,
   loadDevices,
 } from './anywhereApi';
+import { QrImage } from './QrImage';
 
 const OTHER = '__other__';
 const LOCAL = '__local__';
@@ -49,16 +49,6 @@ function originOf(raw: string): string | null {
 function expiresInText(expiresAt: number): string {
   const minutes = Math.max(1, Math.round((expiresAt - Date.now()) / 60_000));
   return `Expires in ${minutes} minute${minutes === 1 ? '' : 's'} · works once`;
-}
-
-function QrImage({ link }: { link: string }) {
-  const src = useMemo(() => {
-    const qr = qrcode(0, 'M');
-    qr.addData(link);
-    qr.make();
-    return qr.createDataURL(6, 8);
-  }, [link]);
-  return <img alt="Pairing QR code" src={src} className="rounded-md bg-white p-1 w-48 h-48" />;
 }
 
 export function PairDeviceDialog({ open, onClose }: PairDeviceDialogProps) {
@@ -307,7 +297,7 @@ function PairDeviceDialogBody({ onClose }: { onClose: () => void }) {
                 </div>
               ) : (
                 <>
-                  <QrImage link={pairing.link} />
+                  <QrImage link={pairing.link} alt="Pairing QR code" />
                   <p className="text-xs text-muted-foreground">{expiresInText(pairing.expiresAt)}</p>
                 </>
               )}
