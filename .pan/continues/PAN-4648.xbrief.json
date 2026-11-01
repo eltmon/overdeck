@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4648",
   "created": "2026-11-01T05:50:45.229Z",
-  "updated": "2026-11-01T07:49:55.127Z",
+  "updated": "2026-11-01T07:50:16.659Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "trigger-store.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T07:49:55.126Z"
+    },
+    "trigger-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:50:16.659Z"
     }
   }
 }
