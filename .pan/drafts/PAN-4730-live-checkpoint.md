@@ -47,7 +47,7 @@ $ bun test test/pack-browser-guards.test.ts test/setup-help.test.ts test/gstack-
 Ran 189 tests across 10 files. [31.14s]
 ```
 
-## Fork: render gstack paths
+## Fork: ~/.gstack rewrite
 
 Fork commit: `e746e65edf637a771d36c02cfab577d69f6111c3` — `feat(pack-mode): point literal ~/.gstack paths in skill docs at the state root`.
 
