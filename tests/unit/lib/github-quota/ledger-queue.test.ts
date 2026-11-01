@@ -86,10 +86,12 @@ describe('ledger append queue ordering (PAN-4680)', () => {
     queueLedgerEntry(entry(3));
 
     await new Promise((r) => setImmediate(r));
-    expect(mkdirMock).toHaveBeenCalledTimes(1);
-    expect(appendFileMock).not.toHaveBeenCalled();
-
-    release();
+    try {
+      expect(mkdirMock).toHaveBeenCalledTimes(1);
+      expect(appendFileMock).not.toHaveBeenCalled();
+    } finally {
+      release();
+    }
     await flushLedgerWrites();
 
     expect(readLedgerWindow(Date.now()).map((e) => e.cost)).toEqual([1, 2, 3]);
