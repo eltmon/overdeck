@@ -1,0 +1,193 @@
+/**
+ * Responder side of a secure channel (PAN-4645 WI-2, D-4645-5).
+ *
+ * Transport-agnostic: the caller hands in a raw duplex (a TCP socket whose
+ * first byte was `0x00`, or a `/ws/link` WebSocket stream). `acceptChannel`
+ * reads the preamble, runs Noise IK (link) or XXpsk0 (pairing), and resolves
+ * with a {@link ChannelSocket} the dashboard can treat as a connection.
+ *
+ * Refusals (D-4645-5 step 2) are written before the connection is closed so
+ * the initiator learns why. A responder that cannot decrypt an IK message 1
+ * (the initiator pinned a different key) says nothing and drops the connection.
+ */
+import type { Duplex } from 'node:stream';
+
+import type { MachineKeyPair } from '../machine-key.js';
+import { type ChannelSocket, createChannelSocket } from './channel-socket.js';
+import { type Handshake, ikResponder, NOISE_LINK_PROTOCOL, prologueFor, xxPskResponder } from './noise.js';
+import {
+  encodeFrame,
+  encodeRefusal,
+  FrameReader,
+  PAIRING_ID_LENGTH,
+  parsePreambleHead,
+  PREAMBLE_LENGTH,
+  REFUSAL_CODES,
+  type Refusal,
+  WireError,
+} from './wire.js';
+
+export const DEFAULT_ACCEPT_TIMEOUT_MS = 10_000;
+
+export type ChannelAcceptErrorCode =
+  | 'timeout'
+  | 'bad-preamble'
+  | 'unsupported'
+  | 'unknown-peer'
+  | 'pairing-refused'
+  | 'handshake-failed'
+  | 'closed';
+
+export class ChannelAcceptError extends Error {
+  constructor(
+    readonly code: ChannelAcceptErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ChannelAcceptError';
+  }
+}
+
+export interface PairingSecret {
+  psk: Buffer;
+  /** Called once the XXpsk0 handshake completes (the credential is spent). */
+  onSuccess?: () => void;
+}
+
+export interface AcceptChannelOptions {
+  localKey: MachineKeyPair;
+  /** IK: is this initiator static key (64 hex) pinned here? False ⇒ refusal `01`. */
+  isPinnedPeer: (remoteKeyHex: string) => boolean;
+  /** XXpsk0: the PSK for a pairing id (32 hex), or `'unknown'` ⇒ refusal `03`. */
+  takePairing: (pairingId: string) => PairingSecret | 'unknown';
+  /** Called on every failed pairing attempt (unknown id or wrong code). */
+  onPairingFailure: () => void;
+  /** Whole handshake must finish within this; default 10 s (NFR-6). */
+  timeoutMs?: number;
+  /** Link protocol this responder speaks; default 1. */
+  linkProtocol?: number;
+  /** Reported inside refusal `02`. */
+  serverVersion?: string;
+}
+
+interface Closer {
+  destroySoon?: () => void;
+}
+
+/** Write a refusal frame and close once it has flushed. */
+export function refuseChannel(raw: Duplex, refusal: Refusal): void {
+  raw.write(encodeRefusal(refusal));
+  const closer = raw as Duplex & Closer;
+  if (typeof closer.destroySoon === 'function') closer.destroySoon();
+  else raw.end();
+}
+
+export async function acceptChannel(raw: Duplex, opts: AcceptChannelOptions): Promise<ChannelSocket> {
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_ACCEPT_TIMEOUT_MS;
+  const linkProtocol = opts.linkProtocol ?? NOISE_LINK_PROTOCOL;
+  const reader = new FrameReader(raw);
+  let refused = false;
+  const refuse = (code: ChannelAcceptErrorCode, refusal: Refusal, message: string): ChannelAcceptError => {
+    refused = true;
+    refuseChannel(raw, refusal);
+    return new ChannelAcceptError(code, message);
+  };
+  const timer = setTimeout(() => {
+    reader.fail(new ChannelAcceptError('timeout', `Secure-channel handshake did not finish within ${timeoutMs} ms`));
+    raw.destroy();
+  }, timeoutMs);
+
+  try {
+    const head = parsePreambleHead(await reader.readBytes(PREAMBLE_LENGTH));
+    if (head.linkProtocol !== linkProtocol) {
+      throw refuse(
+        'unsupported',
+        { code: REFUSAL_CODES.unsupported, linkProtocol, serverVersion: opts.serverVersion ?? '' },
+        `Peer speaks link protocol ${head.linkProtocol}, this machine speaks ${linkProtocol}`,
+      );
+    }
+
+    if (head.mode === 'link') {
+      const handshake = ikResponder(opts.localKey, prologueFor('link', null));
+      const message1 = await readMessage(reader);
+      try {
+        handshake.recv(message1);
+      } catch {
+        // The initiator pinned a key that is not ours: nothing useful can be said.
+        throw new ChannelAcceptError('handshake-failed', 'Noise IK message 1 did not decrypt (initiator pinned another key)');
+      }
+      const remoteKeyHex = handshake.remoteKey().toString('hex');
+      if (!opts.isPinnedPeer(remoteKeyHex)) {
+        throw refuse('unknown-peer', { code: REFUSAL_CODES.unknownPeer }, `Initiator key ${remoteKeyHex.slice(0, 16)}… is not pinned here`);
+      }
+      const message2 = handshake.send();
+      return finish(raw, reader, handshake, false, message2, { mode: 'link', remoteKeyHex, pairingId: null });
+    }
+
+    const pairingId = (await reader.readBytes(PAIRING_ID_LENGTH)).toString('hex');
+    const taken = opts.takePairing(pairingId);
+    if (taken === 'unknown') {
+      opts.onPairingFailure();
+      throw refuse('pairing-refused', { code: REFUSAL_CODES.pairingRefused }, `Unknown or expired pairing id ${pairingId}`);
+    }
+    const handshake = xxPskResponder(opts.localKey, taken.psk, prologueFor('pairing', pairingId));
+    const message1 = await readMessage(reader);
+    try {
+      handshake.recv(message1);
+    } catch {
+      opts.onPairingFailure();
+      throw refuse('pairing-refused', { code: REFUSAL_CODES.pairingRefused }, 'Pairing code did not match');
+    }
+    raw.write(encodeFrame(handshake.send()));
+    const message3 = await readMessage(reader);
+    try {
+      handshake.recv(message3);
+    } catch {
+      opts.onPairingFailure();
+      throw refuse('pairing-refused', { code: REFUSAL_CODES.pairingRefused }, 'Pairing handshake message 3 did not verify');
+    }
+    const remoteKeyHex = handshake.remoteKey().toString('hex');
+    taken.onSuccess?.();
+    return finish(raw, reader, handshake, false, null, { mode: 'pairing', remoteKeyHex, pairingId });
+  } catch (error) {
+    reader.detach();
+    if (!refused && !raw.destroyed) raw.destroy();
+    throw toAcceptError(error);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readMessage(reader: FrameReader): Promise<Buffer> {
+  const frame = await reader.readFrame();
+  if (frame.kind !== 'message') {
+    throw new ChannelAcceptError('bad-preamble', `Initiator sent refusal code ${frame.refusal.code} instead of a handshake message`);
+  }
+  return frame.payload;
+}
+
+/**
+ * Last handshake step: detach the reader, write the final message (if this
+ * side sends one) and build the secure stream in the same tick.
+ */
+function finish(
+  raw: Duplex,
+  reader: FrameReader,
+  handshake: Handshake,
+  initiator: boolean,
+  finalMessage: Buffer | null,
+  channel: { mode: 'link' | 'pairing'; remoteKeyHex: string; pairingId: string | null },
+): ChannelSocket {
+  const leftover = reader.detach();
+  if (finalMessage) raw.write(encodeFrame(finalMessage));
+  return createChannelSocket({ raw, initiator, handshake: handshake.result(), channel, leftover });
+}
+
+function toAcceptError(error: unknown): ChannelAcceptError {
+  if (error instanceof ChannelAcceptError) return error;
+  if (error instanceof WireError) {
+    if (error.code === 'closed') return new ChannelAcceptError('closed', error.message);
+    return new ChannelAcceptError('bad-preamble', error.message);
+  }
+  return new ChannelAcceptError('closed', (error as Error)?.message ?? String(error));
+}
