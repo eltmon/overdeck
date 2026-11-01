@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T21:21:59.343103Z · model: claude-opus-5-5 · open: 861_
+_Last sequenced: 2026-11-01T21:28:04.533327Z · model: claude-opus-5-5 · open: 861_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -601,7 +601,7 @@ _Last sequenced: 2026-11-01T21:21:59.343103Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 603 | PAN-4296 | L | medium | needs-refinement |  | PAN-1676, PAN-4652 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
+| 603 | PAN-4296 | L | medium | ok |  | PAN-1676, PAN-4652 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
 | 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -1196,7 +1196,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T21:21:59.343103Z",
+  "generatedAt": "2026-11-01T21:28:04.533327Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 861,
@@ -8496,7 +8496,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "size": "L",
       "importance": "medium",
       "score": 34,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-1676",
         "PAN-4652"
