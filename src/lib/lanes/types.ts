@@ -48,3 +48,11 @@ export class LaneLaunchError extends Error {
     this.name = 'LaneLaunchError';
   }
 }
+
+/** Branch, head, commits ahead of upstream and dirtiness of a lane's worktree (NFR-3 of PAN-4223). */
+export interface LaneGitFacts {
+  branch: string | null;
+  head: string | null;
+  ahead: number | null;
+  dirty: boolean;
+}

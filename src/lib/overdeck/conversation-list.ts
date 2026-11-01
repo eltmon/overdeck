@@ -7,7 +7,7 @@ import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInp
 import { getAgentRuntimeStateSync } from '../agents.js';
 import { latestWorkerReport, type WorkerReport } from '../agents/worker/report.js';
 import { withConcurrencyLimit } from '../concurrency.js';
-import { laneIterations } from '../lanes/iteration.js';
+import { laneIterations, localIterationRow } from '../lanes/iteration.js';
 import { pairBuilder, type PairingRow, type VerdictState } from '../lanes/pairing.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { conversationHarnessAlive, listLiveConversationSessions } from './conversation-liveness.js';
@@ -93,7 +93,7 @@ async function laneEnrichment(conversations: readonly LegacyConversation[]): Pro
   const runs = [...new Set(conversations.filter((conv) => conv.laneKey && conv.gauntletRun).map((conv) => conv.gauntletRun as string))];
   if (runs.length === 0) return enrichment;
   const context = runs.flatMap((run) => listLaneConversations({ run }));
-  const iterations = laneIterations(context);
+  const iterations = laneIterations(context.map(localIterationRow));
   const reports = new Map<string, WorkerReport | null>();
   await withConcurrencyLimit(context.map((row) => async () => {
     reports.set(row.name, await latestWorkerReport(`conv-${row.name}`));

@@ -18,8 +18,9 @@ import { latestWorkerReport, type WorkerReport, type WorkerReportStatus } from '
 import { withConcurrencyLimit } from '../concurrency.js';
 import { getEnrichedConversationList } from '../overdeck/conversation-list.js';
 import { listLaneConversations, type LaneRole, type LegacyConversation } from '../overdeck/conversations.js';
-import { laneIterations } from './iteration.js';
+import { laneIterations, localIterationRow } from './iteration.js';
 import { judgedIteration, pairBuilder, type CriticSummary, type PairingRow, type VerdictState } from './pairing.js';
+import type { LaneGitFacts } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -30,12 +31,7 @@ const GIT_BACKED_ROLES: ReadonlySet<LaneRole> = new Set(['builder', 'critic', 'v
 
 export type { LaneActivity };
 
-export interface LaneGitFacts {
-  branch: string | null;
-  head: string | null;
-  ahead: number | null;
-  dirty: boolean;
-}
+export type { LaneGitFacts };
 
 export interface LaneView {
   id: number;
@@ -143,7 +139,7 @@ async function buildLaneViews(filter: LaneViewFilter, deps: LaneViewDeps, now: n
   const liveness = new Map<string, EnrichedLiveness>();
   for (const entry of enriched as EnrichedLiveness[]) liveness.set(entry.name, entry);
   const context = laneGroupsOf(rows);
-  const iterations = laneIterations(context);
+  const iterations = laneIterations(context.map(localIterationRow));
   const latestReport = deps.latestReport ?? latestWorkerReport;
   const gitFacts = deps.gitFacts ?? readLaneGitFacts;
   const reports = new Map<string, WorkerReport | null>();

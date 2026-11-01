@@ -48,7 +48,7 @@ import {
 import type { RuntimeName } from '../runtimes/types.js';
 import { resolveLaneConfig, type LaneConfig } from './config.js';
 import { laneContract, type LaneAnswering } from './contract.js';
-import { distinctLaneCwds, laneIterations } from './iteration.js';
+import { distinctLaneCwds, laneIterations, localIterationRow } from './iteration.js';
 import { pairBuilder, type PairingRow } from './pairing.js';
 import { LaneLaunchError, type LaneLaunchRequest, type LaneLaunchResult } from './types.js';
 import { addBranchWorktree, addDetachedWorktree, applySparse, fetchBase, laneDirName, removeWorktree } from './worktree.js';
@@ -254,7 +254,7 @@ async function resolveCriticLink(
   if (!target) throw new LaneLaunchError(400, `no builder lane ${builderKey} in run ${run}`);
   if (request.at) return { key: builderKey, criticOf: target, judgedAt: null };
 
-  const iterations = laneIterations(builders);
+  const iterations = laneIterations(builders.map(localIterationRow));
   const iteration = iterations.get(target.name) ?? 1;
   let newest: WorkerReport | null = null;
   for (const row of builders.filter((candidate) => iterations.get(candidate.name) === iteration)) {
@@ -274,7 +274,7 @@ async function answeredVerdict(
   latestReport: (id: string) => Promise<WorkerReport | null>,
 ): Promise<LaneAnswering | null> {
   const rows = listLaneConversations({ run, key });
-  const iterations = laneIterations(rows);
+  const iterations = laneIterations(rows.map(localIterationRow));
   const pairingRows: PairingRow[] = [];
   for (const row of rows) {
     const report = await latestReport(`conv-${row.name}`);
@@ -399,7 +399,7 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
     }
 
     // 8. Iteration and target directory (D7, D8, FR-7).
-    const cwds = distinctLaneCwds(rows);
+    const cwds = distinctLaneCwds(rows.map(localIterationRow));
     let iteration: number;
     let target: string;
     if (request.reuse) {
