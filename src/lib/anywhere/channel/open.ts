@@ -22,7 +22,17 @@ import { encodeFrame, encodePreamble, FrameReader, type Refusal, REFUSAL_CODES, 
 
 export const DEFAULT_OPEN_TIMEOUT_MS = 10_000;
 
-export type TransportUrl = `tcp://${string}` | `wss://${string}`;
+export type TransportUrl = `tcp://${string}` | `wss://${string}` | `rtc://${string}` | `rtc+turn://${string}`;
+
+/** Opens a WebRTC data channel to `rtc://<id>` or `rtc+turn://<id>` (PAN-2356 WI-11). */
+export type RtcDialer = (url: `rtc://${string}` | `rtc+turn://${string}`, signal: AbortSignal) => Promise<Duplex>;
+
+let rtcDialer: RtcDialer | null = null;
+
+/** The dashboard registers the directory's WebRTC dialer here; null when signed out. */
+export function setRtcDialer(dialer: RtcDialer | null): void {
+  rtcDialer = dialer;
+}
 
 export type ChannelOpenErrorCode =
   | 'unreachable'
@@ -250,6 +260,16 @@ function parseTransportUrl(url: TransportUrl): { kind: 'tcp'; host: string; port
 }
 
 function connectTransport(url: TransportUrl, signal: AbortSignal): Promise<Duplex> {
+  if (url.startsWith('rtc://') || url.startsWith('rtc+turn://')) {
+    const rtcUrl = url as `rtc://${string}` | `rtc+turn://${string}`;
+    if (!rtcDialer) {
+      return Promise.reject(new ChannelOpenError('unreachable', 'Direct connections need an overdeck.ai sign-in'));
+    }
+    if (signal.aborted) return Promise.reject(toOpenError(signal.reason, url));
+    return rtcDialer(rtcUrl, signal).catch((error: unknown) => {
+      throw toOpenError(signal.aborted ? signal.reason : error, url);
+    });
+  }
   const target = parseTransportUrl(url);
   return new Promise<Duplex>((resolve, reject) => {
     const fail = (error: unknown): void => reject(toOpenError(error, url));

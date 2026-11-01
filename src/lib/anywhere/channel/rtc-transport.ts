@@ -131,6 +131,12 @@ export class RtcTransport {
     return { entry, channel };
   }
 
+  /** Fails the connection behind one signalling session (the directory said the peer is offline). */
+  abortSession(session: string): void {
+    const entry = this.bySession.get(session);
+    if (entry) this.closeEntry(entry);
+  }
+
   /** Closes the peer connections to one machine, or all of them. */
   close(peerEnvironmentId?: string): void {
     for (const entry of [...this.byKey.values()]) {

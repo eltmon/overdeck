@@ -84,9 +84,26 @@ export function closeAllChannels(): number {
   return closed;
 }
 
+/** The installed listener's `accept`, kept so WebRTC data channels (PAN-2356 WI-11) reach it too. */
+let acceptRaw: ((raw: Duplex) => Promise<void>) | null = null;
+
+/**
+ * Run the responder handshake on a raw transport that arrived some other way (a `direct` or
+ * `relay` WebRTC data channel) and hand the channel to HTTP. Without an installed listener (a peer
+ * dashboard), the transport is destroyed.
+ */
+export function acceptRawChannel(raw: Duplex): Promise<void> {
+  if (!acceptRaw) {
+    raw.destroy();
+    return Promise.resolve();
+  }
+  return acceptRaw(raw);
+}
+
 export function _resetChannelListenerForTests(): void {
   closeAllChannels();
   pending = 0;
+  acceptRaw = null;
 }
 
 export function installChannelListener(nodeServer: HttpServer, deps: ChannelListenerDeps): void {
@@ -141,6 +158,11 @@ export function installChannelListener(nodeServer: HttpServer, deps: ChannelList
     }
   };
 
+  acceptRaw = (raw) => {
+    raw.pause();
+    return accept(raw, () => raw.resume());
+  };
+
   nodeServer.on('connection', (socket: Socket) => {
     const onPreDispatchError = (): void => undefined;
     socket.on('error', onPreDispatchError);
@@ -185,6 +207,7 @@ export function installChannelListener(nodeServer: HttpServer, deps: ChannelList
   nodeServer.once('close', () => {
     closeAllChannels();
     wss.close();
+    acceptRaw = null;
   });
 }
 

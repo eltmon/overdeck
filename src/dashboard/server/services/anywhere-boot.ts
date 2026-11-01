@@ -18,6 +18,7 @@ import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js'
 import { setLinkStatusSource, setPeerUnlinkNotifier } from '../routes/machines.js';
 import { getOverdeckVersion } from '../routes/misc/shared.js';
 import { DirectoryClient, defaultOpenSocket, setDirectoryClient } from './directory-client.js';
+import { startDirectoryRtc, stopDirectoryRtc } from './directory-rtc.js';
 import { setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
 
@@ -64,6 +65,9 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   });
   setDirectoryClient(directory);
   await directory.start();
+  // WI-11: `rtc://` and `rtc+turn://` routes dial through the directory; incoming data channels
+  // run the same secure-channel handshake as TCP.
+  startDirectoryRtc(directory);
 
   supervisor = new LinkSupervisor(defaultLinkSupervisorDeps(serverVersion));
   supervisor.start();
@@ -88,6 +92,7 @@ export function stopAnywhere(): void {
   reconcileTimer = null;
   supervisor?.stop();
   supervisor = null;
+  stopDirectoryRtc();
   directory?.stop();
   directory = null;
   setDirectoryClient(null);

@@ -293,6 +293,10 @@ export async function handleAddRoute(idOrEnvOrLabel: string, bodyText: string): 
   } catch (error) {
     return jsonResponse({ error: (error as Error).message }, { status: 400 });
   }
+  if (parsed.transport === 'rtc') {
+    // Direct and relay routes come from the overdeck.ai directory and are never stored (PAN-2356 D-2356-7).
+    return jsonResponse({ error: 'rtc routes come from the overdeck.ai directory and cannot be added by hand' }, { status: 400 });
+  }
   if (link.routes.some((route) => route.url === parsed.url)) {
     return jsonResponse({ error: `${parsed.url} is already a route of ${link.label}`, link: machineLinkView(link, null, statusSource ?? undefined) }, { status: 409 });
   }

@@ -145,6 +145,10 @@ export class DirectoryClient {
     };
   }
 
+  isOnline(): boolean {
+    return this.state === 'online';
+  }
+
   /** Whether the account's plan includes the relay, as the last `welcome` said. */
   relayEntitled(): boolean {
     return this.state === 'online' && this.relayAllowed;
