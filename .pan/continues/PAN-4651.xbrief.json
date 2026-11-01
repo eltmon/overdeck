@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:43:19.818Z",
+  "updated": "2026-11-01T21:43:35.740Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -538,6 +538,10 @@
     "wi24-fleet-usage.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T21:43:19.817Z"
+    },
+    "wi25-resolved-settings.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:43:35.740Z"
     }
   }
 }
