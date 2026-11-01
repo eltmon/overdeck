@@ -219,14 +219,14 @@ function constantTimeTokenEqual(provided: string | undefined, expected: string):
 }
 
 async function readInternalTokenForRequest(): Promise<string | null> {
-  const fromEnv = process.env.OVERDECK_INTERNAL_TOKEN;
-  if (fromEnv && fromEnv.length > 0) return fromEnv;
   try {
     const token = (await readFile(join(getOverdeckHome(), 'internal-token'), 'utf8')).trim();
-    return token.length > 0 ? token : null;
+    if (token.length > 0) return token;
   } catch {
-    return null;
+    // no file: fall back to env
   }
+  const fromEnv = process.env.OVERDECK_INTERNAL_TOKEN;
+  return fromEnv && fromEnv.length > 0 ? fromEnv : null;
 }
 
 export async function validateAgentRuntimeEventAuth(

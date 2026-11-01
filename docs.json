@@ -60,6 +60,7 @@
               "configuration/session-vault",
               "configuration/remote-access",
               "configuration/triggers",
+              "configuration/phone",
               "configuration/push-notifications",
               "cli/vault",
               "cli/pair",

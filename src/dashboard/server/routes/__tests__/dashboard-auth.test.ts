@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Option } from 'effect';
 
+import { rmSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } from '../../../../lib/access-tokens.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 import type { NetworkInterfaceInfo } from 'node:os';
 
 import {
@@ -45,6 +47,7 @@ describe('dashboard session token persistence', () => {
   beforeEach(() => {
     delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
     process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
   });
@@ -96,6 +99,7 @@ describe('dashboard CSRF token persistence', () => {
   beforeEach(() => {
     delete process.env.OVERDECK_DASHBOARD_CSRF_TOKEN;
     process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
   });
@@ -137,6 +141,7 @@ describe('dashboard CSRF token persistence', () => {
 describe('dashboard session mint auth gate', () => {
   beforeEach(() => {
     process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
   });
   afterEach(() => {

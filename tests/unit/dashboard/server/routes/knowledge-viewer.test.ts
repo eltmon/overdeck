@@ -1,10 +1,13 @@
 import http from 'node:http';
+import { rmSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { _resetInternalTokenCacheForTests } from '../../../../../src/lib/internal-token.js';
+import { getOverdeckHome } from '../../../../../src/lib/paths.js';
 import {
   createKnowledgeViewerRouteHandlers,
   filterKnowledgeViewerRequestHeaders,
@@ -94,6 +97,7 @@ beforeEach(() => {
   process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = 'test-session-token';
   process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
   process.env.DASHBOARD_URL = 'https://overdeck.localhost';
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
   _resetTrustedOriginsForTests();

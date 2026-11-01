@@ -490,4 +490,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `sizing attach refused` at launch. Streams now spawn with
   `herdrSearchDirs()` (exported from `select.ts`) as `PATH`. Any new `herdr`
   spawn must do the same or use the probe's resolved absolute path.
+- **The internal token file wins over `OVERDECK_INTERNAL_TOKEN`** (PAN-4628) —
+  Herdr and tmux servers are long-lived and every pane inherits their env, so
+  an env token can be stale. Readers must read `<OVERDECK_HOME>/internal-token`
+  first and use env only when no file exists; `ensureInternalToken()` seeds a
+  missing file from env. PAN-4628 converts the seven readers
+  (`src/lib/internal-token.ts`, `routes/agents/shared.ts`, the caveman hook
+  script, four shell hooks). Never inject the token into a
+  pane's env, and never add a reader that checks env first.
 <!-- last-verified: 2026-11-01 -->

@@ -10,7 +10,12 @@ defend, and what they do not. User-facing guide:
 - **Internal token** — the root secret at `~/.overdeck/internal-token` (mode
   `0600`), read by `getInternalToken()` (`src/lib/internal-token.ts`). Sent as
   the header `x-overdeck-internal-token` or `Authorization: Bearer <token>`.
-  Generated once, on first server start, and never rotated automatically.
+  Resolution order: the file first; `OVERDECK_INTERNAL_TOKEN` only when no
+  file exists, and the first `ensureInternalToken()` (dashboard boot,
+  `pan serve`, or a CLI sender) writes that value, or a random one, to the
+  file. A pane can inherit a stale `OVERDECK_INTERNAL_TOKEN` from a
+  long-lived Herdr or tmux server, so the env value never overrides the
+  file (PAN-4628). Never rotated automatically.
 - **Session cookie** — `overdeck_session`
   (`DASHBOARD_SESSION_COOKIE`, `src/dashboard/server/routes/dashboard-auth.ts`).
   Its value is an HMAC of the internal token (context

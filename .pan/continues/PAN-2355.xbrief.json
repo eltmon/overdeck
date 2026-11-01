@@ -1,0 +1,246 @@
+{
+  "version": "1",
+  "issueId": "PAN-2355",
+  "created": "2026-11-01T05:47:25.756Z",
+  "updated": "2026-11-01T08:53:16.776Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T07:58Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T07:58:17.171Z"
+    }
+  ],
+  "items": {
+    "answer-transport-extract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T05:47:25.756Z",
+      "doneAt": "2026-11-01T05:56:24.756Z"
+    },
+    "pwa-manifest": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T05:56:36.022Z",
+      "doneAt": "2026-11-01T05:58:24.114Z"
+    },
+    "service-worker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T05:58:29.435Z",
+      "doneAt": "2026-11-01T05:59:26.632Z"
+    },
+    "mobile-shell": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T05:59:28.485Z",
+      "doneAt": "2026-11-01T06:05:28.040Z"
+    },
+    "mobile-needs-you": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T06:05:42.043Z",
+      "doneAt": "2026-11-01T06:12:06.664Z"
+    },
+    "mobile-conversations": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T06:12:08.327Z",
+      "doneAt": "2026-11-01T06:16:53.645Z"
+    },
+    "mobile-pair-screen": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T06:16:55.968Z",
+      "doneAt": "2026-11-01T06:52:39.025Z"
+    },
+    "setup-phone-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T06:52:48.558Z",
+      "doneAt": "2026-11-01T07:07:37.487Z"
+    },
+    "mobile-uat-spec": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T07:07:39.210Z",
+      "doneAt": "2026-11-01T07:27:48.253Z"
+    },
+    "ci-test-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T07:27:54.618Z",
+      "doneAt": "2026-11-01T07:28:30.273Z"
+    },
+    "docs-phone": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T07:28:32.166Z",
+      "doneAt": "2026-11-01T07:29:36.263Z"
+    },
+    "answer-transport-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:37:52.955Z"
+    },
+    "answer-transport-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:38:14.277Z"
+    },
+    "answer-transport-extract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:38:35.159Z"
+    },
+    "answer-transport-extract.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:38:52.558Z"
+    },
+    "answer-transport-extract.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:39:10.887Z"
+    },
+    "pwa-manifest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:39:30.055Z"
+    },
+    "pwa-manifest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:39:50.075Z"
+    },
+    "pwa-manifest.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:40:11.598Z"
+    },
+    "service-worker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:40:34.373Z"
+    },
+    "service-worker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:40:54.388Z"
+    },
+    "service-worker.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:41:16.229Z"
+    },
+    "mobile-shell.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:41:40.985Z"
+    },
+    "mobile-shell.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:42:03.712Z"
+    },
+    "mobile-shell.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:42:22.846Z"
+    },
+    "mobile-shell.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:42:43.927Z"
+    },
+    "mobile-needs-you.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:02.847Z"
+    },
+    "mobile-needs-you.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:20.445Z"
+    },
+    "mobile-needs-you.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:40.013Z"
+    },
+    "mobile-needs-you.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:58.148Z"
+    },
+    "mobile-conversations.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:44:19.666Z"
+    },
+    "mobile-conversations.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:44:37.398Z"
+    },
+    "mobile-conversations.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:44:53.974Z"
+    },
+    "mobile-conversations.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:45:13.432Z"
+    },
+    "mobile-pair-screen.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:45:34.703Z"
+    },
+    "mobile-pair-screen.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:45:56.654Z"
+    },
+    "mobile-pair-screen.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:46:19.374Z"
+    },
+    "mobile-pair-screen.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:46:41.148Z"
+    },
+    "setup-phone-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:46:59.487Z"
+    },
+    "setup-phone-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:47:17.027Z"
+    },
+    "setup-phone-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:47:34.678Z"
+    },
+    "setup-phone-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:47:50.632Z"
+    },
+    "mobile-uat-spec.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:48:10.971Z"
+    },
+    "mobile-uat-spec.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:48:30.280Z"
+    },
+    "mobile-uat-spec.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:48:46.478Z"
+    },
+    "mobile-uat-spec.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:49:04.212Z"
+    },
+    "ci-test-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:49:22.062Z"
+    },
+    "ci-test-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:49:42.808Z"
+    },
+    "docs-phone.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:50:01.608Z"
+    },
+    "docs-phone.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:50:25.371Z"
+    },
+    "docs-phone.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:50:47.410Z"
+    }
+  },
+  "feedback": []
+}

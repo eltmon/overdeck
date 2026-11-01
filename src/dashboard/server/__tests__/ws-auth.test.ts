@@ -9,6 +9,7 @@ import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../.
 import { _resetDashboardSessionTokenForTests, dashboardSessionCookieHeader } from '../routes/dashboard-auth.js';
 import { _resetTrustedOriginsForTests } from '../routes/origin-validation.js';
 import { authorizeDashboardUpgrade } from '../ws-auth.js';
+import { getOverdeckHome } from '../../../lib/paths.js';
 
 const TRUSTED_ORIGIN = 'http://localhost:3011';
 
@@ -21,6 +22,9 @@ describe('authorizeDashboardUpgrade', () => {
   beforeEach(() => {
     delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
     process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    // The token file wins over env (PAN-4628); delete any file a sibling
+    // test in this worker's shared OVERDECK_HOME left behind.
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
     _resetTrustedOriginsForTests();
