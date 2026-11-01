@@ -58,6 +58,10 @@ export interface AnywhereStatus {
   tailscale: { nextStep: AnywhereTailscaleStep; serveUrl: string | null; magicDnsName: string | null };
   /** Who is asking (PAN-4455 D-3); null when no credential resolves. */
   viewer: { kind: 'root-session' | 'device' | 'token' | 'internal-token' | 'machine' | null };
+  /** The overdeck.ai directory (PAN-2356); null when signed out; absent on older servers. */
+  directory?: { state: 'off' | 'connecting' | 'online' | 'refused'; plan: 'free' | 'tester' | null; url: string | null; refusal: string | null } | null;
+  /** The relay add-on (PAN-2356); null when the plan has no relay; absent on older servers. */
+  relay?: { using: boolean; bytesUsed: number; capBytes: number; stopped: boolean } | null;
 }
 
 export interface PairingLinkBody {

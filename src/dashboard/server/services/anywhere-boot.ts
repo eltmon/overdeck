@@ -15,6 +15,7 @@ import { setLinkRouteSource, linkFetch, closeLinkAgent } from '../../../lib/anyw
 import { linksSnapshot, MACHINE_LINKS_REFRESH_MS, startLinkStoreRefresh, stopLinkStoreRefresh } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey } from '../../../lib/anywhere/machine-key.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import { setDirectoryStatusSource, setRelayStatusSource } from '../../../lib/remote-access/anywhere-status.js';
 import { setLinkStatusSource, setPeerUnlinkNotifier } from '../routes/machines.js';
 import { getOverdeckVersion } from '../routes/misc/shared.js';
 import { defaultApprovalDeps, DirectoryApprovalService, setApprovalService } from './directory-approval.js';
@@ -81,6 +82,20 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   relay.start();
   setRelayClient(relay);
   startDirectoryRtc(directory, relay);
+  // WI-18: the status card's directory and relay lines.
+  setDirectoryStatusSource(() => {
+    const status = directory?.status();
+    if (!status?.signedIn) return null;
+    return { state: status.state, plan: status.plan, url: status.url, refusal: status.refusal };
+  });
+  setRelayStatusSource(() => {
+    // Only a plan with the relay (tester until billing) has relay lines; the plan is the last welcome's.
+    const status = directory?.status();
+    if (!status?.signedIn || status.plan !== 'tester') return null;
+    const current = relay?.relayStatus();
+    if (!current?.status) return null;
+    return { using: current.using, bytesUsed: current.status.bytesUsed, capBytes: current.status.capBytes, stopped: current.status.stopped };
+  });
   // WI-14: two-screen approvals; their views ride in GET /api/directory.
   approvals = new DirectoryApprovalService(defaultApprovalDeps(directory, () => advertiser?.current() ?? []));
   setApprovalService(approvals);
@@ -128,6 +143,8 @@ export function stopAnywhere(): void {
   approvals?.stop();
   approvals = null;
   setApprovalService(null);
+  setDirectoryStatusSource(null);
+  setRelayStatusSource(null);
   stopDirectoryRtc();
   relay?.stop();
   relay = null;

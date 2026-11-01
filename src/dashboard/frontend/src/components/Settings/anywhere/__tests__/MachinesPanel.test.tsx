@@ -86,6 +86,19 @@ describe('MachinesPanel (PAN-4645 WI-20)', () => {
     expect(screen.getByText(/This machine: studio/)).toHaveTextContent('1111-2222-3333-4444-5555');
   });
 
+  it('names the current route by its kind, so a relay route reads "via relay" (PAN-2356)', async () => {
+    const relayed = {
+      ...DESK,
+      currentRoute: 'rtc+turn://0b5c9e7a-4c1d-4f2e-9a3b-6d7e8f901234',
+      routes: [...DESK.routes, { url: 'rtc+turn://0b5c9e7a-4c1d-4f2e-9a3b-6d7e8f901234', kind: 'relay', source: 'directory', status: 'current' }],
+    };
+    fetchMock.mockImplementation((input: string | URL | Request) =>
+      Promise.resolve(input.toString() === '/api/machines' ? jsonResponse(200, { ...MACHINES, links: [relayed] }) : jsonResponse(404, { error: 'not found' })));
+    renderWithProviders(<MachinesPanel />);
+    const row = await screen.findByTestId('machine-link-link-1');
+    expect(within(row).getByText(/via/)).toHaveTextContent('via relay · rtc+turn://0b5c9e7a-4c1d-4f2e-9a3b-6d7e8f901234');
+  });
+
   it('shows Reconnect only for the offline link, posts the reconnect, and lists inbound access', async () => {
     const user = userEvent.setup();
     renderWithProviders(<MachinesPanel />);
