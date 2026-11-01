@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4681",
   "created": "2026-11-01T07:25:21.124Z",
-  "updated": "2026-11-01T07:46:53.026Z",
+  "updated": "2026-11-01T07:47:15.157Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-01T07:46:48.500Z"
     },
     "register-messagerows-test.ac2": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4681",
-      "claimedAt": "2026-11-01T07:46:53.026Z"
+      "claimedAt": "2026-11-01T07:46:53.026Z",
+      "doneAt": "2026-11-01T07:47:15.157Z"
     }
   }
 }
