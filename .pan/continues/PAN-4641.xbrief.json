@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4641",
   "created": "2026-11-01T05:00:29.700Z",
-  "updated": "2026-11-01T07:00:08.522Z",
+  "updated": "2026-11-01T07:00:47.636Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -174,6 +174,10 @@
     "scheduled-routes.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T07:00:08.521Z"
+    },
+    "scheduled-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:00:47.635Z"
     }
   }
 }
