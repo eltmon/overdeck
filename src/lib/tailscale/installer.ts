@@ -27,9 +27,20 @@ export interface InstallPlanInput {
   hasBrew: boolean;
   userspace: boolean;
   port: number;
+  /** Defaults to {@link USERSPACE_MODE_AVAILABLE}. */
+  userspaceAvailable?: boolean;
 }
 
 export const LINUX_INSTALL_COMMAND = 'curl -fsSL https://tailscale.com/install.sh | sh';
+
+/**
+ * Whether the plan offers the userspace install (`src/lib/tailscale/userspace.ts`).
+ * Off under the PRD's C-1 fallback: whether other tailnet devices can reach a
+ * userspace-networking dashboard (plain tailnet IP and Serve HTTPS) has not
+ * been checked live on a signed-in tailnet. Turn it on only after that check
+ * passes; the install code itself is complete and tested.
+ */
+export const USERSPACE_MODE_AVAILABLE = false;
 
 /** POSIX user names only, so the name is safe to place in a shell command. */
 const USERNAME_PATTERN = /^[a-z_][a-z0-9_.-]*\$?$/i;
@@ -44,7 +55,16 @@ export function installPlan(input: InstallPlanInput): InstallPlan {
   switch (input.platform) {
     case 'linux': {
       if (input.uid === 0) return { kind: 'pane', command: LINUX_INSTALL_COMMAND };
-      if (!input.hasSudo || input.userspace) return { kind: 'userspace' };
+      const userspaceAvailable = input.userspaceAvailable ?? USERSPACE_MODE_AVAILABLE;
+      if (userspaceAvailable && (!input.hasSudo || input.userspace)) return { kind: 'userspace' };
+      if (!input.hasSudo) {
+        return {
+          kind: 'manual',
+          message: 'Tailscale needs an administrator to install it on Linux. Run the installer as root (or ask an administrator), make your user the Tailscale operator with `tailscale set --operator=$USER`, then press Check again.',
+          url: 'https://tailscale.com/download/linux',
+          command: LINUX_INSTALL_COMMAND,
+        };
+      }
       const operator = operatorCommand(input.username);
       if (!operator) {
         return {

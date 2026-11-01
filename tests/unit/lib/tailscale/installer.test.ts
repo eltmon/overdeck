@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   LINUX_INSTALL_COMMAND,
+  USERSPACE_MODE_AVAILABLE,
   installPlan,
   operatorCommand,
   resolveInstallPlan,
@@ -23,9 +24,22 @@ describe('installPlan (D-9)', () => {
     });
   });
 
-  it('uses the userspace install with no sudo or when requested', () => {
-    expect(installPlan(input({ hasSudo: false }))).toEqual({ kind: 'userspace' });
-    expect(installPlan(input({ userspace: true }))).toEqual({ kind: 'userspace' });
+  it('uses the userspace install with no sudo or when requested, once userspace mode is available', () => {
+    expect(installPlan(input({ hasSudo: false, userspaceAvailable: true }))).toEqual({ kind: 'userspace' });
+    expect(installPlan(input({ userspace: true, userspaceAvailable: true }))).toEqual({ kind: 'userspace' });
+  });
+
+  it('does not offer userspace while the C-1 live check is outstanding', () => {
+    expect(USERSPACE_MODE_AVAILABLE).toBe(false);
+    expect(installPlan(input({ hasSudo: false }))).toMatchObject({
+      kind: 'manual',
+      url: 'https://tailscale.com/download/linux',
+      command: LINUX_INSTALL_COMMAND,
+    });
+    expect(installPlan(input({ userspace: true }))).toEqual({
+      kind: 'pane',
+      command: `${LINUX_INSTALL_COMMAND} && sudo tailscale set --operator=op`,
+    });
   });
 
   it('uses Homebrew on macOS when it is on PATH', () => {
@@ -94,10 +108,10 @@ describe('resolveInstallPlan', () => {
     expect(plan).toMatchObject({ kind: 'pane', command: 'brew install --cask tailscale-app && open -a Tailscale' });
   });
 
-  it('chooses userspace when no sudo is found', async () => {
+  it('returns the manual installer plan when no sudo is found', async () => {
     const plan = await resolveInstallPlan({ userspace: false, port: 3011 }, {
       platform: 'linux', uid: 1000, username: 'op', access: accessFor([]), pathEnv: '/usr/bin',
     });
-    expect(plan).toEqual({ kind: 'userspace' });
+    expect(plan).toMatchObject({ kind: 'manual', command: LINUX_INSTALL_COMMAND });
   });
 });
