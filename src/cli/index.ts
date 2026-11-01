@@ -505,6 +505,7 @@ await groups.register('knowledge');
 await groups.register('swarm'); await groups.register('task');
 await groups.register('workspace');
 await groups.register('vault');
+await groups.register('account');
 await groups.register('test');
 await groups.register('tts');
 
