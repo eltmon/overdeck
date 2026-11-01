@@ -6,6 +6,7 @@ import { ConversationRow } from '../ConversationRow';
 import type { Conversation } from '../ConversationList';
 import type { ConversationMutations } from '../useConversationMutations';
 import { useContinueOnDeviceStore } from '../../chat/continueOnDevice/continueOnDeviceStore';
+import styles from '../styles/command-deck.module.css';
 
 vi.mock('../../../lib/wsTransport', () => ({
   dashboardMutationJsonHeaders: vi.fn(async () => ({ 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'test' })),
@@ -46,6 +47,7 @@ const mutations: ConversationMutations = {
   archive: vi.fn(),
   isArchivePending: vi.fn(() => false),
   stop: vi.fn(),
+  isStopPending: vi.fn(() => false),
   rename: vi.fn(),
   retitle: vi.fn(),
   isRetitlePending: vi.fn(() => false),
@@ -462,28 +464,81 @@ describe('ConversationRow Check for new conversations (PAN-4455 WI-12)', () => {
   });
 });
 
-describe('ConversationRow archive pending (PAN-4584)', () => {
-  function renderRowWithMutations(overrides: Partial<ConversationMutations>) {
+describe('ConversationRow leaving state (PAN-4626)', () => {
+  function renderRowWithMutations(
+    overrides: Partial<ConversationMutations>,
+    convOverrides?: Partial<Conversation>,
+    variant?: 'flat' | 'nested',
+  ) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const rowMutations: ConversationMutations = { ...mutations, ...overrides };
+    const onSelect = vi.fn();
     render(
       <QueryClientProvider client={queryClient}>
         <ConversationRow
-          conv={conversation}
+          conv={{ ...conversation, ...convOverrides }}
           isSelected={false}
-          onSelect={vi.fn()}
+          onSelect={onSelect}
           mutations={rowMutations}
+          variant={variant}
         />
       </QueryClientProvider>,
     );
-    return rowMutations;
+    return { mutations: rowMutations, onSelect };
   }
 
-  it('shows the archiving spinner and marks the row busy while archive-pending', () => {
+  it('dims and marks the row busy while archive-pending, with no working spinner or title shimmer', () => {
     renderRowWithMutations({ isArchivePending: vi.fn(() => true) });
 
-    expect(screen.getByLabelText('Archiving test-conversation')).toBeInTheDocument();
-    expect(screen.getByText('Test conversation').closest('button')).toHaveAttribute('aria-busy', 'true');
+    const root = screen.getByText('Test conversation').closest('button');
+    expect(root).toHaveClass(styles.conversationRowLeaving);
+    expect(root).toHaveAttribute('aria-busy', 'true');
+    expect(root?.querySelector(`.${styles.conversationWorkingSpinner}`)).toBeNull();
+    expect(screen.getByText('Test conversation')).not.toHaveClass(styles.titleRegenerating);
+  });
+
+  it('dims the row and shows an inert stop spinner while stop-pending', () => {
+    const { mutations: rowMutations } = renderRowWithMutations(
+      { isStopPending: vi.fn(() => true) },
+      { sessionAlive: true },
+    );
+
+    const root = screen.getByText('Test conversation').closest('button');
+    expect(root).toHaveClass(styles.conversationRowLeaving);
+
+    const stopSpan = screen.getByLabelText('Stopping agent for test-conversation');
+    expect(stopSpan).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(stopSpan);
+    fireEvent.keyDown(stopSpan, { key: 'Enter' });
+    expect(rowMutations.stop).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Stop agent for test-conversation')).toBeNull();
+  });
+
+  it('does nothing on click while leaving', () => {
+    const { onSelect } = renderRowWithMutations({ isArchivePending: vi.fn(() => true) });
+
+    fireEvent.click(screen.getByText('Test conversation').closest('button')!);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('flat row: replaces the meta line with "Archiving…" while archive-pending', () => {
+    renderRowWithMutations({ isArchivePending: vi.fn(() => true) });
+
+    expect(screen.getByText('Archiving…')).toBeInTheDocument();
+    expect(screen.queryByTitle(/^Harness:/)).toBeNull();
+  });
+
+  it('flat row: shows "Stopping…" while stop-pending', () => {
+    renderRowWithMutations({ isStopPending: vi.fn(() => true) }, { sessionAlive: true });
+
+    expect(screen.getByText('Stopping…')).toBeInTheDocument();
+  });
+
+  it('nested row: appends "Archiving…" after the title while archive-pending', () => {
+    renderRowWithMutations({ isArchivePending: vi.fn(() => true) }, undefined, 'nested');
+
+    expect(screen.getByText('Archiving…')).toBeInTheDocument();
+    expect(screen.getByText('Test conversation')).toBeInTheDocument();
   });
 
   it('shows a disabled, "Archiving…" menu item while archive-pending', () => {
