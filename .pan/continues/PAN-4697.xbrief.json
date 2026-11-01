@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4697",
   "created": "2026-11-01T09:15:31.379Z",
-  "updated": "2026-11-01T09:36:22.426Z",
+  "updated": "2026-11-01T09:36:37.329Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "docs-subset-list.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T09:36:22.425Z"
+    },
+    "docs-subset-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:36:37.329Z"
     }
   }
 }
