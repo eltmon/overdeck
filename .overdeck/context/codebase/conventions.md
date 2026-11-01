@@ -52,5 +52,9 @@
 - Issue actions: every menu/overflow surface renders from `ISSUE_ACTIONS`
   (`src/dashboard/frontend/src/lib/issueActions.ts`) via `useIssueActions`; removing a key needs a
   `RETIREMENT_AUDIT` row in `issueActions.parity.test.tsx`.
+- Frontend Vitest resolves `*.module.css` keys to stable hashed names (`_conversationItem_10de07`),
+  even for keys the stylesheet lacks: import `styles` and assert `toHaveClass(styles.x)`, but prove
+  a rule exists by grep, not by a test. A mutation test that needs `invalidateQueries` to wait must
+  mount a `useQuery` observer on that key; with no observer it resolves at once.
 
-<!-- last-verified: 2026-10-02 -->
+<!-- last-verified: 2026-10-25 -->
