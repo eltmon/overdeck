@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4299",
   "created": "2026-11-01T05:05:33.847Z",
-  "updated": "2026-11-01T05:33:26.840Z",
+  "updated": "2026-11-01T05:33:45.583Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "wire-install-sync.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T05:33:26.839Z"
+    },
+    "wire-up-dev.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:33:45.583Z"
     }
   }
 }
