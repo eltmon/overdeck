@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T13:55:58.409Z",
+  "updated": "2026-11-01T13:58:22.637Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-11-01T13:55:52.997Z"
     },
     "wi9-machines-routes-boot": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4404",
-      "claimedAt": "2026-11-01T13:55:58.409Z"
+      "claimedAt": "2026-11-01T13:55:58.409Z",
+      "doneAt": "2026-11-01T13:58:22.637Z"
     }
   }
 }
