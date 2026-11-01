@@ -4,17 +4,17 @@
     "created": "2026-11-01T21:45:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4296: Fly remote: run Codex/GPT agents on remote workspaces",
-    "updated": "2026-11-01T21:42:53.215Z"
+    "updated": "2026-11-01T21:43:37.932Z"
   },
   "plan": {
     "id": "pan-4296",
     "title": "Fly remote: run Codex/GPT agents on remote workspaces",
-    "status": "proposed",
+    "status": "running",
     "uid": "2a0a58d6-ee59-480c-bd0a-be3d74adfcaf",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T21:45:00Z",
-    "updated": "2026-11-01T21:42:53.215Z",
+    "updated": "2026-11-01T21:43:37.932Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4296",
@@ -812,5 +812,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
