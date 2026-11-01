@@ -4,17 +4,17 @@
     "created": "2026-11-01T20:17:56Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4730: gstack pack: opt-in browser/design/PDF runtime so qa, browse and design skills can mount",
-    "updated": "2026-11-01T20:25:00.313Z"
+    "updated": "2026-11-01T20:48:09.475Z"
   },
   "plan": {
     "id": "pan-4730",
     "title": "gstack pack: opt-in browser/design/PDF runtime so qa, browse and design skills can mount",
-    "status": "proposed",
+    "status": "running",
     "uid": "311049f3-297f-44c2-9f69-b894e4f7028d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-01T20:17:56Z",
-    "updated": "2026-11-01T20:25:00.313Z",
+    "updated": "2026-11-01T20:48:09.475Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4730",
@@ -1422,5 +1422,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
