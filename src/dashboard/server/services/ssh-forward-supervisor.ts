@@ -26,9 +26,16 @@
  */
 import type { SshForwardState } from '@overdeck/contracts';
 
-import type { MachineLink } from '../../../lib/anywhere/link-store.js';
+import { getLink, type MachineLink, setLinkRoutes } from '../../../lib/anywhere/link-store.js';
 import type { LinkRoute } from '../../../lib/anywhere/routes.js';
-import type { SshMachinePatch, SshMachineRecord } from '../../../lib/anywhere/ssh/machine-store.js';
+import {
+  listSshMachines,
+  removeSshMachine,
+  type SshMachinePatch,
+  type SshMachineRecord,
+  updateSshMachine,
+} from '../../../lib/anywhere/ssh/machine-store.js';
+import { commandLineOf, pickFreeLoopbackPort, spawnSshForward, waitForLocalPort } from '../../../lib/anywhere/ssh/run.js';
 import { classifySshFailure, SshMachineError } from '../../../lib/anywhere/ssh/target.js';
 
 export const FORWARD_READY_TIMEOUT_MS = 15_000;
@@ -64,6 +71,26 @@ export interface SshForwardSupervisorDeps {
   random: () => number;
   log: (message: string) => void;
 }
+
+/** Production dependencies; `updateLinkRoutes` is the link supervisor's `updateRoutes`. */
+export const defaultSshForwardSupervisorDeps = (
+  updateLinkRoutes: (linkId: string, routes: LinkRoute[]) => void,
+): SshForwardSupervisorDeps => ({
+  spawnForward: (record) => spawnSshForward(record.destination, record.localPort, record.remotePort),
+  pickPort: pickFreeLoopbackPort,
+  waitForPort: waitForLocalPort,
+  listRecords: listSshMachines,
+  removeRecord: removeSshMachine,
+  updateRecord: updateSshMachine,
+  getLink,
+  setLinkRoutes,
+  updateLinkRoutes,
+  commandLineOf,
+  kill: (pid, signal) => process.kill(pid, signal),
+  now: () => Date.now(),
+  random: () => Math.random(),
+  log: (message) => console.warn(`[ssh-machines] ${message}`),
+});
 
 interface Entry {
   record: SshMachineRecord;
