@@ -1,19 +1,151 @@
 /**
- * Operator-side machine-link routes (PAN-4645 WI-12).
+ * Operator-side machine-link routes (PAN-4645 WI-12, WI-13).
  *
- * `POST /api/machines/link` takes a `pan pair` link from another machine and
- * creates the link (and, by default, the reverse one). Admin only, never from
- * a channel: no link may create or use another machine's links (FR-4).
+ * - `POST /api/machines/link` takes a `pan pair` link from another machine and
+ *   creates the link (and, by default, the reverse one).
+ * - `GET /api/machines` lists this machine, its links and the machines that
+ *   link to it (inbound machine tokens). Views never carry a token or hash.
+ * - `DELETE /api/machines/:id` unlinks: tells the peer (best effort, 2.5 s,
+ *   through the link supervisor once WI-18 provides it), revokes the reverse
+ *   token we issued the peer (closing its channels here) and removes the link.
+ * - `DELETE /api/machines/self` lets a linked machine revoke its own token.
+ * - `DELETE /api/machines/inbound/:tokenId` removes a machine that links to us.
+ *
+ * Admin only (except `self`, which takes exactly a machine credential), and
+ * never from a channel: no link may create, list or use another machine's links
+ * (FR-4).
  */
 import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
+import type { InboundMachineView, MachinesResponse } from '@overdeck/contracts';
 
-import { MACHINE_ACCESS_LEVELS } from '../../../lib/access-tokens.js';
+import {
+  listActiveRecordsOfKind,
+  MACHINE_ACCESS_LEVELS,
+  type PublicAccessTokenRecord,
+  revokeAccessToken,
+} from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
+import { getLink, listLinks, type MachineLink, removeLink } from '../../../lib/anywhere/link-store.js';
+import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
+import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import { closeChannelsForPeer } from '../channel-listener.js';
 import { channelOfRequest } from '../channel-peer.js';
+import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
-import { createMachineLink, MachineLinkError } from '../services/machine-link-service.js';
-import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { createMachineLink, type LinkStatusSource, MachineLinkError, machineLinkView } from '../services/machine-link-service.js';
+import { type DashboardCredential, rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
+
+/** Tell the peer we are unlinking: `DELETE /api/machines/self` through its link. Resolves true when the peer answered. */
+export type PeerUnlinkNotifier = (link: MachineLink) => Promise<boolean>;
+
+const NOTIFY_TIMEOUT_MS = 2_500;
+
+/**
+ * Until the link supervisor (WI-18) installs a real notifier there is no open
+ * channel to a peer, so the default reports `peerNotified: false` and the
+ * reverse-token revoke does the enforcing.
+ */
+let peerUnlinkNotifier: PeerUnlinkNotifier = async () => false;
+let statusSource: LinkStatusSource | null = null;
+
+export function setPeerUnlinkNotifier(notifier: PeerUnlinkNotifier | null): void {
+  peerUnlinkNotifier = notifier ?? (async () => false);
+}
+
+/** WI-18 registers the supervisor here so `GET /api/machines` reports live state. */
+export function setLinkStatusSource(source: LinkStatusSource | null): void {
+  statusSource = source;
+}
+
+function inboundView(record: PublicAccessTokenRecord): InboundMachineView {
+  return {
+    tokenId: record.id,
+    environmentId: record.environmentId ?? '',
+    label: record.name.replace(/^machine:/, ''),
+    fingerprint: record.machineKey ? machineKeyFingerprint(record.machineKey) : '',
+    access: record.access ?? 'operator',
+    createdAt: record.createdAt,
+    lastUsedAt: record.lastUsedAt,
+  };
+}
+
+export async function buildMachinesResponse(): Promise<MachinesResponse> {
+  const [identity, key, links] = await Promise.all([ensureEnvironmentIdentity(), ensureMachineKey(), listLinks()]);
+  return {
+    self: { environmentId: identity.environmentId, label: identity.label, fingerprint: machineKeyFingerprint(key.publicKey) },
+    links: links.map((link) => (statusSource ? machineLinkView(link, null, statusSource) : machineLinkView(link, null))),
+    inbound: listActiveRecordsOfKind('machine').map(inboundView),
+  };
+}
+
+async function notifyPeerWithin(link: MachineLink, notifier: PeerUnlinkNotifier): Promise<boolean> {
+  let timer: NodeJS.Timeout | null = null;
+  const deadline = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(false), NOTIFY_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([notifier(link).catch(() => false), deadline]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Unlink by link id, environment id or label. */
+export async function handleMachinesUnlink(
+  idOrEnvOrLabel: string,
+  notifier: PeerUnlinkNotifier = peerUnlinkNotifier,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  const link = await getLink(idOrEnvOrLabel);
+  if (!link) return jsonResponse({ error: `no machine link matches ${idOrEnvOrLabel}` }, { status: 404 });
+  const peerNotified = await notifyPeerWithin(link, notifier);
+  if (link.reverseTokenId) {
+    await revokeAccessToken(link.reverseTokenId);
+    closeDeviceConnections(link.reverseTokenId);
+  }
+  closeChannelsForPeer(link.machineKey);
+  await removeLink(link.id);
+  emitActivityEntry({
+    source: 'dashboard',
+    level: 'info',
+    message: `Unlinked machine "${link.label}"`,
+    details: JSON.stringify({ linkId: link.id, environmentId: link.environmentId, peerNotified }),
+  });
+  return jsonResponse({ ok: true, peerNotified });
+}
+
+/** A linked machine revokes its own token (the peer unlinked us). Exactly a machine credential may call this. */
+export async function handleMachinesSelfRevoke(credential: DashboardCredential | null): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'machine') {
+    return jsonResponse({ error: 'only a linked machine may revoke itself' }, { status: 403 });
+  }
+  const revoked = await revokeAccessToken(credential.tokenId);
+  closeDeviceConnections(credential.tokenId);
+  if (revoked?.machineKey) closeChannelsForPeer(revoked.machineKey);
+  emitActivityEntry({
+    source: 'dashboard',
+    level: 'info',
+    message: `Machine "${revoked?.name.replace(/^machine:/, '') ?? credential.environmentId}" unlinked itself`,
+    details: JSON.stringify({ tokenId: credential.tokenId, environmentId: credential.environmentId }),
+  });
+  return jsonResponse({ ok: true });
+}
+
+/** The operator removes a machine that links to us: revoke its inbound token and close its channels. */
+export async function handleInboundRevoke(tokenId: string): Promise<HttpServerResponse.HttpServerResponse> {
+  const target = listActiveRecordsOfKind('machine').find((record) => record.id === tokenId);
+  if (!target) return jsonResponse({ error: `no inbound machine token with id ${tokenId}` }, { status: 404 });
+  const revoked = await revokeAccessToken(tokenId);
+  closeDeviceConnections(tokenId);
+  const closedChannels = target.machineKey ? closeChannelsForPeer(target.machineKey) : 0;
+  emitActivityEntry({
+    source: 'dashboard',
+    level: 'info',
+    message: `Removed inbound machine "${target.name.replace(/^machine:/, '')}"`,
+    details: JSON.stringify({ tokenId, environmentId: target.environmentId, closedChannels }),
+  });
+  return jsonResponse({ ok: true, inbound: revoked ? inboundView(revoked) : null, closedChannels });
+}
 
 const ERROR_STATUS: Record<MachineLinkError['code'], number> = {
   'bad-pairing-url': 400,
@@ -80,4 +212,56 @@ const linkRoute = HttpRouter.add(
   }),
 );
 
-export const machinesRouteLayer = Layer.mergeAll(linkRoute);
+function refuseChannel(request: HttpServerRequest.HttpServerRequest): HttpServerResponse.HttpServerResponse | null {
+  return channelOfRequest(request) !== null
+    ? jsonResponse({ error: 'a linked machine cannot manage links here' }, { status: 403 })
+    : null;
+}
+
+const listRoute = HttpRouter.add(
+  'GET',
+  '/api/machines',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = refuseChannel(request) ?? rejectUnauthorizedDashboardRequest(request);
+    if (refused) return refused;
+    return jsonResponse(yield* Effect.promise(() => buildMachinesResponse()));
+  }),
+);
+
+const selfRevokeRoute = HttpRouter.add(
+  'DELETE',
+  '/api/machines/self',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.promise(() => handleMachinesSelfRevoke(resolveRequestCredential(request)));
+  }),
+);
+
+const unlinkRoute = HttpRouter.add(
+  'DELETE',
+  '/api/machines/:id',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    // Whichever route the router matched first, `self` is the peer's own revoke.
+    if (id === 'self') return yield* Effect.promise(() => handleMachinesSelfRevoke(resolveRequestCredential(request)));
+    const refused = refuseChannel(request) ?? rejectUnauthorizedDashboardRequest(request);
+    if (refused) return refused;
+    return yield* Effect.promise(() => handleMachinesUnlink(id));
+  }),
+);
+
+const inboundRevokeRoute = HttpRouter.add(
+  'DELETE',
+  '/api/machines/inbound/:tokenId',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = refuseChannel(request) ?? rejectUnauthorizedDashboardRequest(request);
+    if (refused) return refused;
+    const tokenId = (yield* HttpRouter.params)['tokenId'] ?? '';
+    return yield* Effect.promise(() => handleInboundRevoke(tokenId));
+  }),
+);
+
+export const machinesRouteLayer = Layer.mergeAll(linkRoute, listRoute, selfRevokeRoute, unlinkRoute, inboundRevokeRoute);
