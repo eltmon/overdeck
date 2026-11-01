@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:34:39.212Z",
+  "updated": "2026-11-01T14:34:56.540Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -280,9 +280,10 @@
       "doneAt": "2026-11-01T14:28:34.082Z"
     },
     "wi14-approval-service": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2356",
-      "claimedAt": "2026-11-01T14:34:39.212Z"
+      "claimedAt": "2026-11-01T14:34:39.212Z",
+      "doneAt": "2026-11-01T14:34:56.539Z"
     }
   }
 }
