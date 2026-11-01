@@ -35,6 +35,8 @@ const mocks = vi.hoisted(() => {
     listLowerLevelPackOverrides: vi.fn(),
     gcMounts: vi.fn(),
     removePackFromMounts: vi.fn(),
+    gcPackRenders: vi.fn(),
+    packsHome: vi.fn(() => '/h/.overdeck/packs'),
     listSkillStates: vi.fn(),
     setSkillOverride: vi.fn(),
     resolveLaunchDisabledSkills: vi.fn(),
@@ -83,6 +85,7 @@ vi.mock('../../../lib/skill-packs/sources.js', () => ({
   syncPack: mocks.syncPack,
   listPacks: mocks.listPacks,
   packUpdateAvailable: mocks.packUpdateAvailable,
+  packsHome: mocks.packsHome,
   writePackEntry: mocks.writePackEntry,
   getPack: mocks.getPack,
 }));
@@ -115,6 +118,7 @@ vi.mock('../../../lib/skill-overrides/launch.js', async importOriginal => ({
   launchMountsDeft: mocks.launchMountsDeft,
 }));
 
+vi.mock('../../../lib/skill-packs/render.js', () => ({ gcPackRenders: mocks.gcPackRenders }));
 vi.mock('../../../lib/skill-packs/mount.js', () => ({
   writeCodexPackBlock: mocks.writeCodexPackBlock,
   gcMounts: mocks.gcMounts,
@@ -645,9 +649,19 @@ describe('pan skills pack', () => {
 
   it('collects garbage with the default age', async () => {
     mocks.gcMounts.mockResolvedValue({ removedMounts: ['/m/1'], removedLinks: [] });
+    mocks.listPacks.mockResolvedValue([{ id: 'gstack', commit: COMMIT }]);
+    mocks.gcPackRenders.mockResolvedValue({ removedRenders: ['/r/1', '/r/2'], removedStates: ['/s/1'] });
     await run('pack', 'gc');
-    expect(mocks.gcMounts).toHaveBeenCalledWith({ maxAgeMs: 7 * 24 * 60 * 60 * 1000 });
-    expect(logs.join('\n')).toContain('Removed 1 mount(s) and 0 dangling launch link(s).');
+    const maxAgeMs = 7 * 24 * 60 * 60 * 1000;
+    expect(mocks.gcMounts).toHaveBeenCalledWith({ maxAgeMs });
+    expect(mocks.gcPackRenders).toHaveBeenCalledWith({
+      packsHome: '/h/.overdeck/packs',
+      registered: new Map([['gstack', COMMIT]]),
+      maxAgeMs,
+    });
+    expect(logs.join('\n')).toContain(
+      'Removed 1 mount(s), 0 dangling launch link(s), 2 stale render(s) and 1 orphaned pack state dir(s).',
+    );
   });
 });
 

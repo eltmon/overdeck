@@ -10,7 +10,7 @@
  * call isRenderReady.
  */
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, rm } from 'node:fs/promises';
+import { lstat, mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { GSTACK_PACK_MODE_FILE, GSTACK_PACK_MODE_VERSION, GSTACK_RENDER_MARKER } from './gstack.js';
@@ -92,4 +92,71 @@ export async function renderRuntimePack(opts: {
     await rm(opts.renderDir, { recursive: true, force: true });
     throw new RenderError(`pack gstack: render wrote no ${GSTACK_RENDER_MARKER}`);
   }
+}
+
+async function childNames(dir: string): Promise<string[]> {
+  try {
+    return await readdir(dir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
+async function isDir(path: string): Promise<boolean> {
+  try {
+    return (await lstat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * PAN-4727 D10: under `packsHome` (one dir per pack id, plus `mounts`), remove
+ * `<id>/render/<commit>` dirs that are not the trusted commit and are older
+ * than `maxAgeMs` (a running agent's render survives the same age as its
+ * mount), and `render/` and `state/` of ids that are not registered (left by
+ * an interrupted remove). Never touches the trusted render or a registered
+ * pack's state. `registered` maps id → trusted commit.
+ */
+export async function gcPackRenders(opts: {
+  packsHome: string;
+  registered: ReadonlyMap<string, string>;
+  maxAgeMs: number;
+  now?: number;
+}): Promise<{ removedRenders: string[]; removedStates: string[] }> {
+  const now = opts.now ?? Date.now();
+  const removedRenders: string[] = [];
+  const removedStates: string[] = [];
+  for (const id of await childNames(opts.packsHome)) {
+    if (id === 'mounts') continue;
+    const renderRoot = join(opts.packsHome, id, 'render');
+    const trusted = opts.registered.get(id);
+    if (trusted === undefined) {
+      if (await isDir(renderRoot)) {
+        await rm(renderRoot, { recursive: true, force: true });
+        removedRenders.push(renderRoot);
+      }
+      const stateDir = join(opts.packsHome, id, 'state');
+      if (await isDir(stateDir)) {
+        await rm(stateDir, { recursive: true, force: true });
+        removedStates.push(stateDir);
+      }
+      continue;
+    }
+    for (const commit of await childNames(renderRoot)) {
+      if (commit === trusted) continue;
+      const dir = join(renderRoot, commit);
+      let mtimeMs: number;
+      try {
+        mtimeMs = (await lstat(dir)).mtimeMs;
+      } catch {
+        continue;
+      }
+      if (now - mtimeMs <= opts.maxAgeMs) continue;
+      await rm(dir, { recursive: true, force: true });
+      removedRenders.push(dir);
+    }
+  }
+  return { removedRenders, removedStates };
 }

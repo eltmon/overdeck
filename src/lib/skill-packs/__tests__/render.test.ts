@@ -2,11 +2,11 @@
  * PAN-4727 WI-O3: the gstack render runner, against a fixture extraction whose
  * `setup` is a fake bash script (no real gstack, no bun install, no network).
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { assertRenderable, isRenderReady, RenderError, renderCommand, renderRuntimePack } from '../render.js';
+import { assertRenderable, gcPackRenders, isRenderReady, RenderError, renderCommand, renderRuntimePack } from '../render.js';
 
 const COMMIT = 'b'.repeat(40);
 const dirs: string[] = [];
@@ -127,5 +127,53 @@ describe('isRenderReady', () => {
     expect(await isRenderReady(root)).toBe(false);
     writeFileSync(join(root, '.gstack-pack.json'), '{"packMode":1}');
     expect(await isRenderReady(root)).toBe(true);
+  });
+});
+
+describe('gcPackRenders', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = Date.parse('2026-11-01T12:00:00Z');
+  const OLD = 'c'.repeat(40);
+  const YOUNG = 'd'.repeat(40);
+
+  function home() {
+    const packsHome = mkdtempSync(join(tmpdir(), 'skill-pack-render-gc-'));
+    dirs.push(packsHome);
+    const make = (path: string, ageDays: number) => {
+      const dir = join(packsHome, path);
+      mkdirSync(dir, { recursive: true });
+      const when = new Date(now - ageDays * DAY);
+      utimesSync(dir, when, when);
+      return dir;
+    };
+    return { packsHome, make };
+  }
+
+  it('keeps the trusted render at any age, removes old non-trusted renders, and keeps young ones', async () => {
+    const { packsHome, make } = home();
+    const trusted = make(`gstack/render/${COMMIT}`, 90);
+    const old = make(`gstack/render/${OLD}`, 30);
+    const young = make(`gstack/render/${YOUNG}`, 1);
+    const state = make('gstack/state', 90);
+    const result = await gcPackRenders({ packsHome, registered: new Map([['gstack', COMMIT]]), maxAgeMs: 7 * DAY, now });
+    expect(result).toEqual({ removedRenders: [old], removedStates: [] });
+    expect([existsSync(trusted), existsSync(old), existsSync(young), existsSync(state)]).toEqual([true, false, true, true]);
+  });
+
+  it('removes render and state of an unregistered id and leaves its other files and mounts alone', async () => {
+    const { packsHome, make } = home();
+    make(`gstack/render/${COMMIT}`, 0);
+    make('gstack/state/sessions', 0);
+    const extraction = make(`gstack/${COMMIT}`, 0);
+    const mounts = make('mounts/abc', 90);
+    const result = await gcPackRenders({ packsHome, registered: new Map(), maxAgeMs: 7 * DAY, now });
+    expect(result).toEqual({ removedRenders: [join(packsHome, 'gstack', 'render')], removedStates: [join(packsHome, 'gstack', 'state')] });
+    expect(existsSync(extraction)).toBe(true);
+    expect(existsSync(mounts)).toBe(true);
+  });
+
+  it('does nothing when the packs home does not exist', async () => {
+    const result = await gcPackRenders({ packsHome: join(tmpdir(), 'no-such-packs-home-pan-4727'), registered: new Map(), maxAgeMs: 0, now });
+    expect(result).toEqual({ removedRenders: [], removedStates: [] });
   });
 });

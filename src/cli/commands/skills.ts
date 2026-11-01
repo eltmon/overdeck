@@ -463,9 +463,19 @@ export async function skillsPackGcCommand(options: PackGcOptions): Promise<void>
     console.error(chalk.red('--max-age-days must be a number of days, 0 or more'));
     process.exit(1);
   }
-  const { gcMounts } = await import('../../lib/skill-packs/mount.js');
-  const { removedMounts, removedLinks } = await gcMounts({ maxAgeMs: days * 24 * 60 * 60 * 1000 });
-  console.log(`Removed ${removedMounts.length} mount(s) and ${removedLinks.length} dangling launch link(s).`);
+  const [{ gcMounts }, { gcPackRenders }, { listPacks, packsHome }] = await Promise.all([
+    import('../../lib/skill-packs/mount.js'),
+    import('../../lib/skill-packs/render.js'),
+    import('../../lib/skill-packs/sources.js'),
+  ]);
+  const maxAgeMs = days * 24 * 60 * 60 * 1000;
+  const { removedMounts, removedLinks } = await gcMounts({ maxAgeMs });
+  const registered = new Map((await listPacks()).map(pack => [pack.id, pack.commit]));
+  const { removedRenders, removedStates } = await gcPackRenders({ packsHome: packsHome(), registered, maxAgeMs });
+  console.log(
+    `Removed ${removedMounts.length} mount(s), ${removedLinks.length} dangling launch link(s), ` +
+      `${removedRenders.length} stale render(s) and ${removedStates.length} orphaned pack state dir(s).`,
+  );
 }
 
 // ── pan skills pack sageox (PAN-2444) ───────────────────────────────────
@@ -554,7 +564,7 @@ export function registerSkillsCommands(program: Command): void {
     .action(skillsPackRemoveCommand);
   pack.command('sync [id]').description('Re-fetch packs and extract their trusted commits (all packs when omitted)')
     .action(skillsPackSyncCommand);
-  pack.command('gc').description('Remove unused skill pack mounts and dangling launch links')
+  pack.command('gc').description('Remove unused skill pack mounts, dangling launch links, stale renders and orphaned pack state')
     .option('--max-age-days <n>', 'Keep unused mounts younger than this', '7').action(skillsPackGcCommand);
 
   const sageox = pack.command('sageox').description('SageOx pack state and per-project upload opt-in (PAN-2444)');
