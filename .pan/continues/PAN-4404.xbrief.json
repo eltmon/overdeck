@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:30:27.735Z",
+  "updated": "2026-11-01T14:30:43.478Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "wi2-ssh-target.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:30:27.735Z"
+    },
+    "wi2-ssh-target.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:30:43.478Z"
     }
   }
 }
