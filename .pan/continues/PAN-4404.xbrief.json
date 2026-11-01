@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:32:44.225Z",
+  "updated": "2026-11-01T14:32:58.954Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "wi4-ssh-helper.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T14:32:44.225Z"
+    },
+    "wi5-forward-supervisor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:32:58.954Z"
     }
   }
 }
