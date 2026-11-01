@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T06:46:51.540Z",
+  "updated": "2026-11-01T06:47:27.559Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
       "claimedBy": "agent-pan-1254",
       "claimedAt": "2026-11-01T06:34:25.212Z",
       "doneAt": "2026-11-01T06:46:51.540Z"
+    },
+    "ts-peers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:47:27.558Z"
     }
   }
 }
