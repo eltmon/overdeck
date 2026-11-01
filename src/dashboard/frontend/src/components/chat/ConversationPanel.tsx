@@ -32,6 +32,7 @@ import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
 import { PanOpenInPicker } from '../PanOpenInPicker';
+import { acceptsInput, ConversationMachineBanner, ConversationMachineChip, conversationHeaderStatus, conversationMachineState, isLiveMachineState, runsHere } from './ConversationMachineBanner';
 import { ConversationBranchMeta } from './ConversationBranchMeta';
 import { ConversationPullRequestProvider } from './TranscriptPullRequestLink';
 import { ConversationBookmarksProvider } from './bookmarks/ConversationBookmarks';
@@ -674,16 +675,8 @@ export function ConversationPanel({
   const isForkFailedHeader = conversation.forkStatus === 'failed';
   const isSpawnFailed = !!conversation.spawnError;
   const isSpawningHeader = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && isWithinSpawnWindow(conversation.createdAt);
-  // v1.2 signal law: blue = machine activity (forking/starting/alive),
-  // red = failed, neutral = ended. Amber is reserved for human-action states.
-  const statusColor = isForkingHeader || isSpawningHeader
-    ? 'var(--info)'
-    : isForkFailedHeader || isSpawnFailed
-    ? 'var(--destructive)'
-    : conversation.sessionAlive
-    ? 'var(--info)'
-    : 'var(--muted-foreground)';
-  const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
+  const { color: statusColor, label: statusLabel, hollow: statusHollow } = conversationHeaderStatus(conversation, { forking: isForkingHeader, spawning: isSpawningHeader, failed: isForkFailedHeader || isSpawnFailed });
+  const machineState = conversationMachineState(conversation); // PAN-4650: which machine runs it (D-6 title bar states)
   const showPiAbort = isWorking && (conversation.harness === 'ohmypi' || conversation.harness === 'pi');
   return (
     <ConversationPullRequestProvider conversation={conversation}><ConversationBookmarksProvider conversationName={conversation.name}><div className={styles.conversationTerminal}>
@@ -692,7 +685,7 @@ export function ConversationPanel({
           metadata, long-tail/config/destructive actions live in the ⋮ menu. */}
       {!embedded && (
         <div
-          className={`${styles.conversationHeaderShell} ${styles.conversationHeaderContainer}`}
+          className={`${styles.conversationHeaderShell} ${styles.conversationHeaderContainer}`} data-machine-state={machineState}
           onContextMenu={(e) => {
             // Right-click the header → open the ⋮ menu. Skip while renaming so
             // the native copy/paste menu still works in the title input.
@@ -741,7 +734,7 @@ export function ConversationPanel({
                     </span>
                   )}
                   <button
-                    className={styles.conversationTitleEditBtn}
+                    className={styles.conversationTitleEditBtn} hidden={!isLiveMachineState(machineState)}
                     onClick={startEditingTitle}
                     title="Rename conversation"
                     aria-label={`Rename ${conversation.name}`}
@@ -754,7 +747,7 @@ export function ConversationPanel({
 
             <div className={styles.conversationHeaderActions}>
               {/* View toggle — only when session is live */}
-              {showTerminal && (
+              {showTerminal && isLiveMachineState(machineState) && (
                 <ViewToggle
                   ariaLabel="Conversation view"
                   value={effectiveViewMode}
@@ -912,7 +905,7 @@ export function ConversationPanel({
                         <Download size={14} />
                         Export transcript
                       </MenuItemButton>
-                      {conversation.origin !== 'vault' && (
+                      {runsHere(conversation) && (
                         <MenuItemButton onClick={() => { openContinueOnDevice(continueTargetOf(conversation, viewMode === 'terminal' ? 'terminal' : 'conversation')); setMenuOpen(false); }}>
                           <MonitorSmartphone size={14} />
                           Continue on another device
@@ -982,10 +975,11 @@ export function ConversationPanel({
           {/* Row 2 — read-only metadata */}
           <div className={styles.conversationMetaRow}>
             <span className={styles.conversationTerminalStatus}>
-              <Circle size={7} style={{ fill: statusColor, color: statusColor }} />
+              <Circle size={7} style={{ fill: statusHollow ? 'transparent' : statusColor, color: statusColor }} />
               {statusLabel}
             </span>
             <ConversationBranchMeta conversation={conversation} />
+            <ConversationMachineChip conversation={conversation} />
             <span className={styles.conversationMetaSep} aria-hidden>·</span>
             <PanOpenInPicker openInCwd={conversation.cwd} />
             {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
@@ -1003,6 +997,7 @@ export function ConversationPanel({
           </div>
         </div>
       )}
+      {!embedded && <ConversationMachineBanner conversation={conversation} />}
 
       {/* "About this conversation" drawer — collapsible summary beneath the header */}
       {!embedded && aboutOpen && (
@@ -1037,7 +1032,7 @@ export function ConversationPanel({
           ) : (
             <ConversationView
               conversation={conversation}
-              onResume={conversation.origin === 'vault' ? undefined : onEmbeddedResume ?? (!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined)}
+              onResume={!acceptsInput(conversation) ? undefined : onEmbeddedResume ?? (!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined)}
               onArchive={!embedded ? handleArchive : undefined}
               archivePending={archivePending}
               resumePending={resumeMutation.isPending}
@@ -1470,7 +1465,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           targetMessageNonce={targetMessageNonce}
           onTargetMessageHandled={onTargetMessageHandled}
           bookmarksEnabled
-          citationsEnabled={!hideComposer && !onResume && !isForking && !conversation.clearedToConvId && conversation.origin !== 'vault'}
+          citationsEnabled={!hideComposer && !onResume && !isForking && !conversation.clearedToConvId && acceptsInput(conversation)}
           history={olderHistory}
           onLoadOlder={olderHistory.loadOlder}
           onLoadOlderUntil={olderHistory.loadOlderUntil}

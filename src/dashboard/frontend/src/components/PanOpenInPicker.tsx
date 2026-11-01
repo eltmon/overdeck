@@ -105,7 +105,7 @@ export function PanOpenInPicker({ openInCwd, compact = false }: PanOpenInPickerP
       <button
         onClick={() => handleOpen(primaryEditor)}
         disabled={disabled}
-        className={`flex items-center gap-1 py-0.5 text-[10px] rounded-l transition-colors bg-card text-primary hover:text-primary/80 border border-border disabled:opacity-50 disabled:cursor-not-allowed ${compact ? 'px-1' : 'px-1.5'}`}
+        className={`flex items-center gap-1 py-0.5 text-[10px] rounded-l transition-colors bg-transparent text-primary hover:text-primary/80 border border-border disabled:opacity-50 disabled:cursor-not-allowed ${compact ? 'px-1' : 'px-1.5'}`}
         title={`Open ${tooltipCwd} in ${EDITOR_LABELS[primaryEditor]} (${EDITOR_OPEN_FAVORITE_KEY_LABEL})`}
         aria-label={compact ? `Open in ${EDITOR_LABELS[primaryEditor]}` : undefined}
       >
@@ -116,7 +116,7 @@ export function PanOpenInPicker({ openInCwd, compact = false }: PanOpenInPickerP
         <button
           onClick={() => setOpen(!open)}
           disabled={disabled}
-          className="flex items-center px-0.5 py-0.5 text-[10px] rounded-r transition-colors bg-card text-muted-foreground hover:text-foreground border border-l-0 border-border disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center px-0.5 py-0.5 text-[10px] rounded-r transition-colors bg-transparent text-muted-foreground hover:text-foreground border border-l-0 border-border disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Choose editor"
         >
           <ChevronDown className="w-2.5 h-2.5" />

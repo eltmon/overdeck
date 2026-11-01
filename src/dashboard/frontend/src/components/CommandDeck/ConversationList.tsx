@@ -21,6 +21,8 @@ import type { LinkedConversationFields, PullRequestLink } from '@overdeck/contra
 type LinkedRowFields = Partial<Omit<LinkedConversationFields, 'origin'>> & {
   gitOrigin?: string | null;
   pullable?: boolean;
+  /** Where the owner pulled this conversation from (finds a released copy's continuation). */
+  pulledFrom?: { environmentId: string; nativeSessionId: string } | null;
 };
 
 export interface Conversation extends LinkedRowFields {

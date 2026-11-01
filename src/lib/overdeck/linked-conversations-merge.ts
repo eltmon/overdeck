@@ -71,6 +71,7 @@ function linkedListRow(
     ...EMPTY_CONVERSATION_TRIAGE,
     gitOrigin: row.gitOrigin,
     pullable: row.pullable,
+    pulledFrom: row.pulledFrom ?? null,
     origin: 'linked',
     environmentId: record.environmentId,
     remoteName: row.name,
