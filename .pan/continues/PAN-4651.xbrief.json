@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:25:01.898Z",
+  "updated": "2026-11-01T21:25:16.542Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,6 +242,10 @@
     "wi4-work-door-conversations.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T21:25:01.898Z"
+    },
+    "wi4-work-door-conversations.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:25:16.541Z"
     }
   }
 }
