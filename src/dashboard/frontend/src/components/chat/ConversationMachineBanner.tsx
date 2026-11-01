@@ -13,6 +13,7 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 import { reconnectMachine } from '../Settings/anywhere/machinesApi';
 import { MenuItemButton } from '../shared/ContextMenu';
 import { conversationMachineState, lastSeenText } from './conversationMachineState';
+import { OpenPreviewPopover } from './OpenPreviewPopover';
 import { openPullHereDialog } from './PullHereDialog';
 
 export { acceptsInput, conversationHeaderStatus, conversationMachineState, isLiveMachineState, runsHere } from './conversationMachineState';
@@ -135,6 +136,17 @@ export function PullHereButton({ conversation, menu = false, onDone }: { convers
       <ArrowDownToLine size={14} />
       <span>Pull here</span>
     </button>
+  );
+}
+
+/** The title-bar actions of a conversation an online linked machine runs: Preview and Pull here. */
+export function RemoteHeaderActions({ conversation }: { conversation: Conversation }) {
+  if (conversationMachineState(conversation) !== 'remote') return null;
+  return (
+    <>
+      <OpenPreviewPopover conversation={conversation} />
+      <PullHereButton conversation={conversation} />
+    </>
   );
 }
 
