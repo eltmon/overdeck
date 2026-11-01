@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { EventRouter } from '../EventRouter';
 import { useConnectionState } from '../../lib/connectionState';
+import { TurnOnNotificationsButton } from '../push/TurnOnNotificationsButton';
 import { MobileNeedsYou } from './MobileNeedsYou';
 import { MobileConversations } from './MobileConversations';
 import { MobilePairScreen } from './MobilePairScreen';
@@ -158,7 +159,11 @@ export default function MobileApp() {
           {!fullScreenConversation && (
             <header className="flex min-h-11 items-center justify-between gap-3 border-b border-border px-4 pt-[env(safe-area-inset-top)]">
               <h1 className="text-base font-medium">Overdeck</h1>
-              <InstallAffordance />
+              {/* PAN-2354's control, sized up to the phone's 44 px tap target from here. */}
+              <div className="flex items-center gap-2 [&_button]:min-h-11 [&_button]:min-w-11">
+                <InstallAffordance />
+                <TurnOnNotificationsButton compact />
+              </div>
             </header>
           )}
           <main className="min-h-0 flex-1 overflow-y-auto">

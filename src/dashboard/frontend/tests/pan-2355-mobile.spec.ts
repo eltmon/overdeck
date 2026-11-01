@@ -143,7 +143,7 @@ test('the phone shell installs, answers a question in two taps and pairs', async
     const notification = await worker.evaluate(() => (self as unknown as {
       overdeckNotificationFromPush: (text: string) => { options: { data: { url: string } } };
     }).overdeckNotificationFromPush(JSON.stringify({ title: 'T', body: 'B', url: 'https://evil.example/x' })));
-    expect(notification.options.data.url).toBe(`${baseUrl}/m`);
+    expect(notification.options.data.url).toBe('/m');
 
     // 4. A ?subject= deep link opens that card, not the first one.
     await page.goto(`${baseUrl}/m?subject=pan-2355-docs`, { waitUntil: 'domcontentloaded' });

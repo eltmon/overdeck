@@ -8,6 +8,7 @@ vi.mock('../../EventRouter', () => ({ EventRouter: () => null }));
 // The shell is under test here; the screens have their own suites.
 vi.mock('../MobileNeedsYou', () => ({ MobileNeedsYou: () => <h2>Needs you</h2> }));
 vi.mock('../MobileConversations', () => ({ MobileConversations: () => <h2>Conversations</h2> }));
+vi.mock('../../push/TurnOnNotificationsButton', () => ({ TurnOnNotificationsButton: () => null }));
 
 const decodeQr = vi.fn<(data: Uint8ClampedArray, width: number, height: number) => { data: string } | null>(() => null);
 vi.mock('jsqr', () => ({ default: (data: Uint8ClampedArray, width: number, height: number) => decodeQr(data, width, height) }));
