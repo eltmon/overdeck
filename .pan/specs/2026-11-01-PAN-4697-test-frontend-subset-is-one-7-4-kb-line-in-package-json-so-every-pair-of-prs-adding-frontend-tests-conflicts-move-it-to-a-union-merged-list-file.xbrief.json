@@ -1,0 +1,421 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T08:23:26Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4697: test:frontend-subset is one 7.4 KB line in package.json, so every pair of PRs adding frontend tests conflicts; move it to a union-merged list file",
+    "updated": "2026-11-01T09:15:11.511Z"
+  },
+  "plan": {
+    "id": "pan-4697",
+    "title": "test:frontend-subset is one 7.4 KB line in package.json, so every pair of PRs adding frontend tests conflicts; move it to a union-merged list file",
+    "status": "running",
+    "uid": "4f6b51f8-21b9-431b-b621-342627288039",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T08:23:26Z",
+    "updated": "2026-11-01T09:15:11.511Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4697",
+        "label": "PAN-4697",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4697.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "ci",
+      "frontend-tests",
+      "merge-conflicts",
+      "gitattributes"
+    ],
+    "narratives": {
+      "Problem": "package.json line 141 holds test:frontend-subset as one 7,431-character line listing 126 frontend test files. Every PR that adds a frontend test appends to that line, so any two such PRs conflict; on 2026-11-01 five open PRs went CONFLICTING at once on it.",
+      "Proposal": "Move the 126 paths into scripts/frontend-test-subset.txt (one per line, sorted, # comments allowed), add scripts/run-frontend-test-subset.mjs that reads the list, dedupes it and spawns the same npm --prefix ./src/dashboard/frontend run test -- <paths> command (with --dry-run and --list flags for tests), point the package.json script at the runner, mark the list merge=union in .gitattributes with a git merge-tree test and negative control, and update the three docs that point agents at the package.json line. Full detail in .pan/drafts/PAN-4697.md.",
+      "NonGoals": "- Running the whole frontend suite on CI (PAN-3532)\n- Adding or removing any test from the subset\n- Changing .github/workflows/ci.yml or src/dashboard/frontend/package.json\n- A CI check that enforces sorted order or no duplicates in the list file\n- The runner checking that listed files exist (the integrity test does that)\n- Editing historical records under .pan/specs/, .pan/continues/, .pan/notes/, or evals/fixtures/\n- Editing the operator's harness-native memory file\n- Making GitHub mergeable honor merge=union, or a fallback for GitHub-only same-gap conflicts (PAN-4616)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The runner is a node script (scripts/run-frontend-test-subset.mjs), not inline $(grep ...) in package.json.",
+        "rationale": "Matches the scripts/*.mjs convention, avoids sh-only command substitution, and gives tests a behavior surface (--dry-run) that clears lint:source-introspection."
+      },
+      {
+        "summary": "List paths stay relative to src/dashboard/frontend, committed in LC_ALL=C sort order; the runner dedupes and ignores order.",
+        "rationale": "Keeps the spawned command identical to today; a union merge can leave lines unsorted or duplicated, so runtime must tolerate both."
+      },
+      {
+        "summary": "The integrity test asserts only that every listed file exists; no order or duplicate assertion.",
+        "rationale": "A clean union merge can produce unsorted or duplicate lines; asserting on them would turn main red after a merge git reported clean. Existence catches the real defect (vitest silently ignores a stale path)."
+      },
+      {
+        "summary": "The merge proof is git merge-tree --write-tree in a temp repo whose worktree carries the real .gitattributes rule, plus a negative control without it.",
+        "rationale": "Probed with git 2.43.0 during planning: same-spot inserts merge cleanly with the rule (exit 0) and conflict without it (exit 1). merge-tree reads attributes from the worktree, which the test setup satisfies."
+      },
+      {
+        "summary": "The operator's stale harness-native memory is flagged in the PR body, not edited.",
+        "rationale": "It lives outside the repo and managed sessions must not write harness-native memory."
+      },
+      {
+        "summary": "Critique response: FR-4 is narrowed to local git merges; new FR-7 proves different-gap inserts merge cleanly with no merge driver; the GitHub-only same-gap conflict is a known limitation owned by PAN-4616.",
+        "rationale": "Planning probe: plain 3-way merge conflicts only on same-gap inserts. docs/MERGE-WORKFLOW.md already records the GitHub caveat and PAN-4616 (open) owns it. A live GitHub check would push throwaway PRs to the real repo."
+      }
+    ],
+    "items": [
+      {
+        "id": "subset-runner",
+        "title": "Add scripts/run-frontend-test-subset.mjs that reads a list file and spawns the frontend vitest command",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T08:23:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4697",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/run-frontend-test-subset.mjs",
+            "tests/unit/scripts/run-frontend-test-subset.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/run-frontend-test-subset.test.ts",
+            "npm run lint:source-introspection"
+          ],
+          "expected_outputs": [
+            "run-frontend-test-subset.test.ts passes all five named tests",
+            "lint:source-introspection reports no new offender"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 and Decision 6. Create scripts/run-frontend-test-subset.mjs (Node built-ins only): parse argv for --list <path> (resolved against cwd; default <repoRoot>/scripts/frontend-test-subset.txt) and --dry-run; forward every other arg after the paths. Read the list, trim each line, drop blank and #-prefixed lines, dedupe with first occurrence winning. Missing file -> stderr message naming the path, exit 1. Empty list -> stderr 'run-frontend-test-subset: <list path> lists no test files', exit 1. args = ['--prefix','./src/dashboard/frontend','run','test','--',...paths,...extra]. --dry-run prints JSON.stringify({command:'npm',args}) plus newline and exits 0. Otherwise spawnSync('npm', args, {cwd: repoRoot, stdio:'inherit', shell: process.platform==='win32'}) and exit with its status (1 if null). Write tests/unit/scripts/run-frontend-test-subset.test.ts that executes the runner with execFileSync('node', [runner, '--list', fixture, '--dry-run', ...]) against fixtures in mkdtempSync(join(tmpdir(),'frontend-subset-')); never read the runner's source."
+        },
+        "items": [
+          {
+            "id": "subset-runner.ac1",
+            "title": "Given a list file with comment lines, blank lines and two paths, when the runner runs with --list <file> --dry-run, then it prints {\"command\":\"npm\",\"args\":[\"--prefix\",\"./src/dashboard/frontend\",\"run\",\"test\",\"--\",<path1>,<path2>]} and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subset-runner.ac2",
+            "title": "Given a list that names the same path twice, when the runner runs with --dry-run, then args contains that path once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subset-runner.ac3",
+            "title": "Given extra arguments such as --reporter=dot, when the runner runs with --dry-run, then args ends with those arguments after the paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subset-runner.ac4",
+            "title": "Given a list with only comments or a --list path that does not exist, when the runner runs, then it exits 1 and stderr names the list path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "subset-list-file",
+        "title": "Create scripts/frontend-test-subset.txt with the 126 current paths sorted, plus an existence test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T08:23:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4697",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/frontend-test-subset.txt",
+            "tests/unit/scripts/frontend-test-subset-list.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/frontend-test-subset-list.test.ts",
+            "grep -vc '^#' scripts/frontend-test-subset.txt"
+          ],
+          "expected_outputs": [
+            "frontend-test-subset-list.test.ts passes 'every listed frontend test file exists'",
+            "126 non-comment lines (or the current origin/main count)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Generate the paths with node -e 'const s=require(\"./package.json\").scripts[\"test:frontend-subset\"].split(\" \").slice(6);process.stdout.write(s.join(\"\\n\")+\"\\n\")' | LC_ALL=C sort and write scripts/frontend-test-subset.txt as the six-line # header from the PRD followed by those sorted paths (no blank lines between paths). Do NOT edit package.json in this item. Write tests/unit/scripts/frontend-test-subset-list.test.ts that reads the real list via new URL('../../../scripts/frontend-test-subset.txt', import.meta.url), drops comment and blank lines, asserts the list is non-empty, and asserts expect(missing).toEqual([]) where missing = entries for which existsSync(src/dashboard/frontend/<entry>) is false. No order or duplicate assertion."
+        },
+        "items": [
+          {
+            "id": "subset-list-file.ac1",
+            "title": "scripts/frontend-test-subset.txt contains 126 non-comment lines, each a path relative to src/dashboard/frontend, in LC_ALL=C sort order (sort -c succeeds on the non-comment lines)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subset-list-file.ac2",
+            "title": "Given the committed list, when npx vitest run tests/unit/scripts/frontend-test-subset-list.test.ts runs, then 'every listed frontend test file exists' passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subset-list-file.ac3",
+            "title": "Given a list entry whose file does not exist (checked by temporarily adding a bogus line locally, not committed), when the list test runs, then it fails and the failure output names the missing path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "package-script-flip",
+        "title": "Point package.json test:frontend-subset at the runner and prove the path set is unchanged",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T08:23:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4697",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "the WI-3 equivalence node -e script from .pan/drafts/PAN-4697.md",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "equivalence script prints 'IDENTICAL <n> paths' and exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Change only package.json's test:frontend-subset value to exactly \"node scripts/run-frontend-test-subset.mjs\". Leave \"test\" and .github/workflows/ci.yml unchanged. Before committing, git fetch origin main and run the PRD's equivalence script, which compares the command prefix and sorted path set of origin/main's package.json line with the runner's --dry-run output. If origin/main gained paths, add them to scripts/frontend-test-subset.txt in sorted position and re-run. Paste the IDENTICAL line into the commit body. Do not run npm run test:frontend-subset or npm test on the host."
+        },
+        "items": [
+          {
+            "id": "package-script-flip.ac1",
+            "title": "When package.json is parsed, scripts[\"test:frontend-subset\"] returns exactly \"node scripts/run-frontend-test-subset.mjs\", and package.json no longer contains any of the 126 frontend test paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "package-script-flip.ac2",
+            "title": "Given origin/main's package.json, when the PRD equivalence script runs, then it prints 'IDENTICAL <n> paths' with n equal to origin/main's path count and exits 0, and the commit body records that line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "package-script-flip.ac3",
+            "title": "git diff origin/main -- .github/workflows/ci.yml src/dashboard/frontend/package.json produces no output (CI still calls npm run test:frontend-subset)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "union-merge-rule",
+        "title": "Mark scripts/frontend-test-subset.txt merge=union in .gitattributes with merge-tree tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T08:23:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4697",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".gitattributes",
+            "tests/unit/scripts/frontend-test-subset-merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/frontend-test-subset-merge.test.ts",
+            "git check-attr merge -- scripts/frontend-test-subset.txt"
+          ],
+          "expected_outputs": [
+            "frontend-test-subset-merge.test.ts passes all four named tests",
+            "scripts/frontend-test-subset.txt: merge: union"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. Append the four-line comment block and 'scripts/frontend-test-subset.txt merge=union' to .gitattributes after the concerns.md block (PAN-4614 style). Write tests/unit/scripts/frontend-test-subset-merge.test.ts with three tests: (1) git check-attr merge -- scripts/frontend-test-subset.txt at the repo root prints 'merge: union'; (2) in a mkdtempSync temp repo (git init -b main, user.email/user.name set), copy only the scripts/frontend-test-subset.txt line from the real .gitattributes into the temp .gitattributes, commit a base list (a.test.ts, c.test.ts), branch x inserts b1.test.ts between them and branch y inserts b2.test.ts at the same spot, keep the worktree on a branch that contains .gitattributes (merge-tree reads attributes from the worktree), run git merge-tree --write-tree x y and assert exit 0 and that git cat-file -p <tree>:scripts/frontend-test-subset.txt contains both b1.test.ts and b2.test.ts; (3) the same setup without .gitattributes makes git merge-tree exit 1. (4) FR-7: with no .gitattributes, base list a.test.ts c.test.ts e.test.ts, branch p inserts b.test.ts and branch q inserts d.test.ts (different gaps); git merge-tree --write-tree p q exits 0 and the merged list contains both lines. This proves the GitHub worst case (no union) still merges different-gap inserts. GitHub mergeable is out of scope (PAN-4616)."
+        },
+        "items": [
+          {
+            "id": "union-merge-rule.ac1",
+            "title": "git check-attr merge -- scripts/frontend-test-subset.txt at the repo root prints 'scripts/frontend-test-subset.txt: merge: union'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "union-merge-rule.ac2",
+            "title": "Given two branches that each insert a different line at the same spot in the list, when git merge-tree --write-tree merges them with the repo's rule in .gitattributes, then it exits 0 and the merged list contains both lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "union-merge-rule.ac3",
+            "title": "Given the same two branches with no .gitattributes, when git merge-tree --write-tree merges them, then it exits 1 (negative control)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "union-merge-rule.ac4",
+            "title": "Given no .gitattributes and two branches that insert lines into different gaps of the sorted list, when git merge-tree --write-tree merges them, then it exits 0 and the merged list contains both lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-subset-list",
+        "title": "Point the docs that name the package.json line or the union-merged files at scripts/frontend-test-subset.txt",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T08:23:26Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4697",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            ".overdeck/context/codebase/conventions.md",
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n 'test:frontend-subset' -- docs .overdeck/context sync-sources roles CLAUDE.md configuration reference",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "every hit names scripts/frontend-test-subset.txt and none tells a reader to add tests to package.json",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 verbatim. docs/ISSUE-VIEW.md lines 152-153, docs/DASHBOARD-ARCHITECTURE.md line 651 (anchor 'Render-count tests.'), and .overdeck/context/codebase/conventions.md lines 50-51 get the replacement sentences given in the PRD. Set conventions.md's single <!-- last-verified: --> footer to the commit date and keep exactly one footer line. Do not edit .pan/specs/, .pan/continues/, .pan/notes/ or evals/fixtures/. Also edit docs/MERGE-WORKFLOW.md lines 305-313 exactly as PRD WI-5 says: list scripts/frontend-test-subset.txt as the third union-merged file, keep the PAN-4616 GitHub caveat sentence unchanged, and add the same-gap sentence after it."
+        },
+        "items": [
+          {
+            "id": "docs-subset-list.ac1",
+            "title": "Given docs/ISSUE-VIEW.md and docs/DASHBOARD-ARCHITECTURE.md, when a reader opens them, then each contains a sentence saying npm run test:frontend-subset runs the files listed in scripts/frontend-test-subset.txt, and ISSUE-VIEW.md tells readers to add must-run frontend tests to that file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-subset-list.ac2",
+            "title": "Given .overdeck/context/codebase/conventions.md, when a reader opens it, then the Testing section contains scripts/frontend-test-subset.txt (paths relative to src/dashboard/frontend, merge=union) as the CI frontend list with no package.json mention for it, and the file contains exactly one <!-- last-verified: --> line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-subset-list.ac3",
+            "title": "git grep -n 'test:frontend-subset' -- docs .overdeck/context sync-sources roles CLAUDE.md configuration reference returns no line that tells a reader to add tests to package.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-subset-list.ac4",
+            "title": "When a reader opens docs/MERGE-WORKFLOW.md, the union-merge paragraph contains scripts/frontend-test-subset.txt as one of three union-merged files and still contains the PAN-4616 GitHub mergeable caveat",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "subset-runner",
+        "to": "package-script-flip",
+        "type": "blocks"
+      },
+      {
+        "from": "subset-list-file",
+        "to": "package-script-flip",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One small, inseparable change: 11 files, but the 8 subsystems are just the top-level homes of a list file, its runner, three test files, package.json, .gitattributes and four docs. Splitting into sibling issues would ship a list file nothing reads or a package.json pointing at a missing runner.",
+      "canonicalFilename": "2026-11-01-PAN-4697-test-frontend-subset-is-one-7-4-kb-line-in-package-json-so-every-pair-of-prs-adding-frontend-tests-conflicts-move-it-to-a-union-merged-list-file.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

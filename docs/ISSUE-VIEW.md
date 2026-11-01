@@ -149,8 +149,10 @@ disclosure rather than an always-open "This session" section.
 
 `src/dashboard/frontend/src/lib/__tests__/issueActions.menu-by-state.test.ts`
 pins the exact key set for ten derived states and holds every one at or under
-ten actions. It runs in CI through the root `test:frontend-subset`; add new
-must-run frontend tests there or CI will not see them.
+ten actions. It runs in CI through
+`npm run test:frontend-subset`, which reads `scripts/frontend-test-subset.txt`; add new
+must-run frontend tests to that file (one path per line, relative to `src/dashboard/frontend`)
+or CI will not see them.
 
 ### Retired keys (PAN-4198)
 
