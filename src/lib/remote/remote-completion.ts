@@ -134,7 +134,7 @@ async function captureRemoteForensics(agentId: string, vmName: string, details: 
       let copied = 0;
       for (const remotePath of files) {
         try {
-          await fly.copyFromVm(vmName, remotePath, join(destDir, basename(remotePath)));
+          await Effect.runPromise(fly.copyFromVm(vmName, remotePath, join(destDir, basename(remotePath))));
           copied++;
         } catch {
           details.push(`Failed to copy ${remotePath}`);
@@ -353,11 +353,11 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
         const config = loadConfigSync();
         const fly = createFlyProviderFromConfig(config.remote);
         mkdirSync(join(workspacePath, PAN_DIRNAME), { recursive: true });
-        await fly.copyFromVm(
+        await Effect.runPromise(fly.copyFromVm(
           vmName,
           `/workspace/${PAN_DIRNAME}/${PAN_CONTINUE_FILENAME}`,
           join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME),
-        );
+        ));
         details.push('Copied continue.json back from VM');
       } catch {
         details.push('No continue.json retrieved from VM (skipped)');

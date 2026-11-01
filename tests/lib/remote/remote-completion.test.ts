@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => {
     killRemoteAgent: vi.fn(),
     exec: vi.fn(),
     requestReviewThroughRoute: vi.fn(),
+    copiesRun: [] as string[],
     deleteWorkspaceMetadata: vi.fn(),
   };
 });
@@ -122,7 +123,10 @@ describe('reapCompletedRemoteAgents classification', () => {
     mocks.fly.ssh.mockReset();
     mocks.fly.stopVm.mockReset().mockReturnValue(Effect.succeed(undefined));
     mocks.fly.deleteVm.mockReset().mockReturnValue(Effect.succeed(undefined));
-    mocks.fly.copyFromVm.mockReset().mockResolvedValue(undefined);
+    // copyFromVm returns an Effect; copiesRun counts only copies that actually ran.
+    mocks.copiesRun.length = 0;
+    mocks.fly.copyFromVm.mockReset().mockImplementation((_vm: string, remotePath: string) =>
+      Effect.sync(() => { mocks.copiesRun.push(remotePath); }));
     mocks.saveRemoteAgentState.mockReset();
     mocks.getRemoteAgentOutput.mockReset().mockResolvedValue('');
     mocks.sendToRemoteAgent.mockReset();
@@ -234,6 +238,27 @@ describe('reapCompletedRemoteAgents classification', () => {
     expect(mocks.requestReviewThroughRoute.mock.invocationCallOrder[0])
       .toBeGreaterThan(mocks.deleteWorkspaceMetadata.mock.invocationCallOrder[0]);
     expect(results[0].details).toContain('Requested review through the dashboard review route');
+  });
+
+  it('runs the continue.json and session JSONL copies instead of only building them', async () => {
+    mocks.states.set('agent-pan-10', remoteState('PAN-10'));
+    mocks.fly.ssh.mockImplementation((_vm: string, command: string) => {
+      if (command.includes('has-session')) return Effect.succeed({ stdout: 'exists\n', stderr: '', exitCode: 0 });
+      if (command.includes('REMOTE_DONE')) return Effect.succeed({ stdout: 'present\n', stderr: '', exitCode: 0 });
+      if (command.includes('.jsonl')) {
+        return Effect.succeed({ stdout: '/root/.claude/projects/-workspace/s1.jsonl\n', stderr: '', exitCode: 0 });
+      }
+      return Effect.succeed({ stdout: '', stderr: '', exitCode: 0 });
+    });
+
+    const results = await reapCompletedRemoteAgents();
+
+    expect(results[0].status).toBe('handed-off');
+    expect(mocks.copiesRun).toEqual([
+      '/workspace/.pan/continue.json',
+      '/root/.claude/projects/-workspace/s1.jsonl',
+    ]);
+    expect(results[0].details).toContain('Copied 1/1 session JSONL(s) to remote-sessions/');
   });
 
   it('still reports handed-off when the review route cannot be reached', async () => {
