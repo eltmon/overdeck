@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:10:05.651Z",
+  "updated": "2026-11-01T14:10:26.001Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,9 +170,10 @@
       "doneAt": "2026-11-01T14:05:11.364Z"
     },
     "wi9-directory-client": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2356",
-      "claimedAt": "2026-11-01T14:10:05.651Z"
+      "claimedAt": "2026-11-01T14:10:05.651Z",
+      "doneAt": "2026-11-01T14:10:26.001Z"
     }
   }
 }
