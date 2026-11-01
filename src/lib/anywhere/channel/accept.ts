@@ -10,11 +10,12 @@
  * the initiator learns why. A responder that cannot decrypt an IK message 1
  * (the initiator pinned a different key) says nothing and drops the connection.
  */
+import { timingSafeEqual } from 'node:crypto';
 import type { Duplex } from 'node:stream';
 
 import type { MachineKeyPair } from '../machine-key.js';
 import { type ChannelMarker, type ChannelSocket, createChannelSocket } from './channel-socket.js';
-import { approvalSas, type Handshake, ikResponder, NOISE_LINK_PROTOCOL, prologueFor, xxPskResponder, xxResponder } from './noise.js';
+import { APPROVAL_NONCE_BYTES, approvalCommitment, approvalNonce, approvalSas, type Handshake, ikResponder, NOISE_LINK_PROTOCOL, prologueFor, xxPskResponder, xxResponder } from './noise.js';
 import {
   encodeFrame,
   encodeRefusal,
@@ -145,7 +146,21 @@ export async function acceptChannel(raw: Duplex, opts: AcceptChannelOptions): Pr
         throw new ChannelAcceptError('handshake-failed', 'Approval handshake message 3 did not verify');
       }
       const remoteKeyHex = handshake.remoteKey().toString('hex');
-      const sas = approvalSas(handshake.result().hash);
+      // Commit-then-reveal (D-2356-10 amended): take the initiator's commitment, send our nonce,
+      // and show a code only if the revealed nonce matches the commitment.
+      const hash = handshake.result().hash;
+      const commitment = await readMessage(reader);
+      const nonce = approvalNonce();
+      raw.write(encodeFrame(nonce));
+      const initiatorNonce = await readMessage(reader);
+      if (
+        commitment.length !== 32
+        || initiatorNonce.length !== APPROVAL_NONCE_BYTES
+        || !timingSafeEqual(approvalCommitment(hash, initiatorNonce), commitment)
+      ) {
+        throw new ChannelAcceptError('handshake-failed', 'Approval nonce did not match its commitment');
+      }
+      const sas = approvalSas(hash, initiatorNonce, nonce);
       return finish(raw, reader, handshake, false, null, { mode: 'approval', remoteKeyHex, pairingId: null, requestId, approvalSas: sas });
     }
 

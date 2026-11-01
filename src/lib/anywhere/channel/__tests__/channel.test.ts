@@ -2,9 +2,10 @@
  * PAN-4645 WI-2: secure channel core over real loopback TCP between two
  * in-process endpoints, plus the wire-format encoders.
  */
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { createServer as createHttpServer, request as httpRequest, type Server as HttpServer } from 'node:http';
-import { createServer as createNetServer, type Server as NetServer, type Socket } from 'node:net';
+import { connect as netConnect, createServer as createNetServer, type Server as NetServer, type Socket } from 'node:net';
 import { duplexPair, type Duplex } from 'node:stream';
 
 import { WebSocket as WsClient, WebSocketServer } from 'ws';
@@ -13,7 +14,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MachineKeyPair } from '../../machine-key.js';
 import { acceptChannel, type AcceptChannelOptions } from '../accept.js';
 import { type ChannelSocket, isChannelSocket } from '../channel-socket.js';
-import { approvalSas, pairingSecrets } from '../noise.js';
+import { approvalCommitment, approvalNonce, approvalSas, pairingSecrets, prologueFor, xxInitiator } from '../noise.js';
 import { openChannel } from '../open.js';
 import {
   encodeFrame,
@@ -430,13 +431,82 @@ describe('approval channel (PAN-2356 WI-13)', () => {
     await expect(openChannel(responder.url, { mode: 'approval', localKey: freshKey(), requestId: REQUEST_ID })).rejects.toMatchObject({ code: 'pairing-refused' });
   });
 
-  it('derives the SAS per D-2356-10', () => {
+  it('derives the SAS per D-2356-10 (amended) from the hash and both nonces', () => {
     const hash = Buffer.alloc(64, 7);
-    const sas = approvalSas(hash);
+    const ni = Buffer.alloc(32, 1);
+    const nr = Buffer.alloc(32, 2);
+    const sas = approvalSas(hash, ni, nr);
     expect(sas).toMatch(/^\d{3} \d{3}$/);
-    expect(approvalSas(hash)).toBe(sas);
-    expect(approvalSas(Buffer.alloc(64, 8))).not.toBe(sas);
+    expect(approvalSas(hash, ni, nr)).toBe(sas);
+    expect(approvalSas(Buffer.alloc(64, 8), ni, nr)).not.toBe(sas);
+    expect(approvalSas(hash, ni, Buffer.alloc(32, 3))).not.toBe(sas);
+    expect(approvalCommitment(hash, ni)).not.toEqual(approvalCommitment(hash, nr));
   });
+
+  it('refuses a man in the middle that grinds its revealed nonce to match the other leg\'s code', async () => {
+    const approver = freshKey();
+    const requester = freshKey();
+    const mitm = freshKey();
+    // Leg 1, approver -> man in the middle: completes first, so the attacker knows its target code.
+    const front = await startResponder({
+      localKey: mitm,
+      isPinnedPeer: () => false,
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+      takeApproval: () => true,
+    });
+    const approverSide = await openChannel(front.url, { mode: 'approval', localKey: approver, requestId: REQUEST_ID });
+    cleanups.push(() => approverSide.destroy());
+    const target = approverSide.channel.approvalSas!;
+
+    // Leg 2, man in the middle -> requester, driven by hand so the attacker can reveal any nonce.
+    let taken = false;
+    const real = await startResponder({
+      localKey: requester,
+      isPinnedPeer: () => false,
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+      takeApproval: (id) => {
+        if (id !== REQUEST_ID || taken) return false;
+        taken = true;
+        return true;
+      },
+    });
+    const raw = netConnect(real.port, '127.0.0.1');
+    cleanups.push(() => { raw.destroy(); });
+    const reader = new FrameReader(raw);
+    const next = async (): Promise<Buffer> => {
+      const frame = await reader.readFrame();
+      if (frame.kind !== 'message') throw new Error(`refusal ${frame.refusal.code}`);
+      return frame.payload;
+    };
+    raw.write(encodePreamble({ linkProtocol: 1, mode: 'approval', pairingId: REQUEST_ID }));
+    const handshake = xxInitiator(mitm, prologueFor('approval', REQUEST_ID));
+    raw.write(encodeFrame(handshake.send()));
+    handshake.recv(await next());
+    raw.write(encodeFrame(handshake.send()));
+    const hash = handshake.result().hash;
+    const committed = approvalNonce();
+    raw.write(encodeFrame(approvalCommitment(hash, committed)));
+    const responderNonce = await next();
+
+    // The grind: search for a nonce whose code matches leg 1. The committed nonce cannot be changed.
+    const prefix = createHash('sha256').update('overdeck-approve-sas/2').update(Buffer.from([0])).update(hash);
+    const candidate = Buffer.alloc(32);
+    let ground: Buffer | null = null;
+    for (let i = 0; i < 1 << 21 && !ground; i += 1) {
+      candidate.writeUInt32BE(i, 0);
+      const code = (prefix.copy().update(candidate).update(responderNonce).digest().readUInt32BE(0) % 1_000_000).toString().padStart(6, '0');
+      if (`${code.slice(0, 3)} ${code.slice(3)}` === target) ground = Buffer.from(candidate);
+    }
+    if (ground) expect(approvalSas(hash, ground, responderNonce)).toBe(target);
+    raw.write(encodeFrame(ground ?? candidate));
+
+    await vi.waitFor(() => expect(real.acceptErrors[0]).toMatchObject({ code: 'handshake-failed', message: 'Approval nonce did not match its commitment' }));
+    expect(real.accepted).toEqual([]);
+    // The request id is spent: the attacker cannot start the leg again for a new nonce.
+    await expect(openChannel(real.url, { mode: 'approval', localKey: mitm, requestId: REQUEST_ID })).rejects.toMatchObject({ code: 'pairing-refused' });
+  }, 30_000);
 
   it('round-trips the approval preamble with its request id', () => {
     const preamble = encodePreamble({ linkProtocol: 1, mode: 'approval', pairingId: REQUEST_ID });

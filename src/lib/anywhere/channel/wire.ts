@@ -12,6 +12,9 @@
  *  3. A frame whose length is `0` followed by one code byte is a refusal
  *     ({@link REFUSAL_CODES}). Code `02` is followed by the responder's link
  *     protocol (`uint8`) and a `uint8`-length-prefixed UTF-8 server version.
+ *  4. Approval mode only, after message 3 and in the same frame format: the
+ *     initiator's 32-byte nonce commitment, the responder's 32-byte nonce, then
+ *     the initiator's 32-byte nonce (commit-then-reveal, D-2356-10 amended).
  *
  * After the handshake, bytes belong to `@hyperswarm/secret-stream`. Nothing
  * here carries application data.

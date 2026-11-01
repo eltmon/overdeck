@@ -11,13 +11,16 @@
  *    exchange, and each side learns the other's key during the handshake.
  *  - `Noise_XX`: approval (PAN-2356 D-2356-9). No pre-shared secret: each side
  *    learns the other's key, and the operators authenticate the exchange by
- *    comparing the six-digit SAS derived from the handshake hash on both screens.
+ *    comparing a six-digit SAS on both screens. The SAS mixes the handshake hash
+ *    with two nonces exchanged by commit-then-reveal after the handshake
+ *    ({@link approvalCommitment}, {@link approvalSas}), so a man in the middle
+ *    cannot grind one leg's code to match the other's.
  *
  * Nothing is hand-rolled on raw primitives; this module only drives the
  * library and copies its outputs. The static key pair is never zeroed by the
  * library (only ephemerals are), so the long-term machine key can be passed in.
  */
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
 
 import type { MachineKeyPair } from '../machine-key.js';
@@ -109,14 +112,48 @@ export function prologueFor(mode: ChannelMode, pairingId: string | null): Buffer
   ]);
 }
 
+/** Length of each approval nonce in bytes. */
+export const APPROVAL_NONCE_BYTES = 32;
+
+/** A fresh approval nonce. */
+export function approvalNonce(): Buffer {
+  return randomBytes(APPROVAL_NONCE_BYTES);
+}
+
 /**
- * The six-digit short authentication string of an approval channel (D-2356-10):
- * `uint32BE(SHA-256("overdeck-approve-sas/1" || 0x00 || handshakeHash)[0..4]) mod 1_000_000`,
- * zero-padded and shown as `123 456`. A man in the middle runs two handshakes with two different
- * hashes, so the two screens show different codes.
+ * The initiator's commitment to its approval nonce (D-2356-10, amended after review):
+ * `SHA-256("overdeck-approve-commit/1" || 0x00 || handshakeHash || initiatorNonce)`.
+ *
+ * After Noise XX completes, the initiator sends this commitment, the responder answers with its
+ * own nonce, and only then does the initiator reveal its nonce, which the responder checks against
+ * the commitment. A man in the middle is the responder on one leg and the initiator on the other:
+ * on the first it must send its nonce before the honest initiator reveals, and on the second it
+ * must commit before the honest responder's nonce arrives. Either way it fixes its input before it
+ * can know the code that input yields, so it cannot steer one leg's code to match the other's.
  */
-export function approvalSas(handshakeHash: Buffer): string {
-  const digest = createHash('sha256').update('overdeck-approve-sas/1').update(Buffer.from([0])).update(handshakeHash).digest();
+export function approvalCommitment(handshakeHash: Buffer, initiatorNonce: Buffer): Buffer {
+  return createHash('sha256')
+    .update('overdeck-approve-commit/1')
+    .update(Buffer.from([0]))
+    .update(handshakeHash)
+    .update(initiatorNonce)
+    .digest();
+}
+
+/**
+ * The six-digit short authentication string of an approval channel (D-2356-10, amended):
+ * `uint32BE(SHA-256("overdeck-approve-sas/2" || 0x00 || handshakeHash || initiatorNonce || responderNonce)[0..4]) mod 1_000_000`,
+ * zero-padded and shown as `123 456`. Computed only after the initiator's reveal matched its
+ * commitment ({@link approvalCommitment}).
+ */
+export function approvalSas(handshakeHash: Buffer, initiatorNonce: Buffer, responderNonce: Buffer): string {
+  const digest = createHash('sha256')
+    .update('overdeck-approve-sas/2')
+    .update(Buffer.from([0]))
+    .update(handshakeHash)
+    .update(initiatorNonce)
+    .update(responderNonce)
+    .digest();
   const code = (digest.readUInt32BE(0) % 1_000_000).toString().padStart(6, '0');
   return `${code.slice(0, 3)} ${code.slice(3)}`;
 }

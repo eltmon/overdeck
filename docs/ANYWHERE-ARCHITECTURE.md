@@ -127,7 +127,9 @@ WebRTC data channel (`rtc://<environment id>`, `rtc+turn://<environment id>`; PA
 
 1. The initiator sends the preamble `00 4F 56 44 4C <linkProtocol=01> <mode>`; mode
    `01` is link (IK), `02` is pairing (XXpsk0), `03` is approval (XX, PAN-2356); pairing
-   appends the 16-byte pairing id and approval the 16-byte approval request id.
+   appends the 16-byte pairing id and approval the 16-byte approval request id. Approval mode
+   then exchanges three more frames after message 3: A's nonce commitment, R's nonce and A's
+   nonce (see "Approval").
 2. Handshake messages travel as `uint24le length` + message, at most 1024 bytes. A frame
    of length 0 followed by one code byte is a refusal: `01` unknown peer key, `02`
    unsupported link protocol (then a `uint8` responder protocol and a length-prefixed
@@ -286,10 +288,18 @@ Linking two machines of one account with no pairing code, confirmed on both scre
    approval-mode channel (mode `03`, Noise XX, the request id in the preamble). R's listener
    accepts it once, only for R's own live request id (`takeApproval`). A refuses a channel
    whose key differs from the one the request named.
-3. Both derive the SAS: `uint32BE(SHA-256("overdeck-approve-sas/1" || 0x00 || handshakeHash)[0..4]) mod 1_000_000`,
-   shown as `123 456`, with the other machine's fingerprint from the handshake key, never
-   from the directory. A man in the middle runs two handshakes with two hashes, so the two
-   screens differ.
+3. Commit-then-reveal, then the SAS (D-2356-10 as amended after review). After message 3,
+   A sends `C = SHA-256("overdeck-approve-commit/1" || 0x00 || handshakeHash || n_A)` for a
+   fresh 32-byte nonce, R answers with its own 32-byte nonce `n_R`, and A reveals `n_A`; R
+   refuses the channel unless `C` matches. Both then show
+   `uint32BE(SHA-256("overdeck-approve-sas/2" || 0x00 || handshakeHash || n_A || n_R)[0..4]) mod 1_000_000`
+   as `123 456`, with the other machine's fingerprint from the handshake key, never from the
+   directory. A man in the middle runs two legs; on each it fixes its input before it can know
+   the code that input gives (it answers A before A reveals, and commits to R before `n_R`
+   arrives), so it cannot grind the two codes to match. One channel per request id stops it
+   from restarting the R leg for a new nonce. The commit-then-reveal is needed because six
+   digits collide after about 10^6 tries: without it an attacker can vary its own leg (for
+   example its message-3 static key) until the codes match.
 4. A's operator approves and R's accepts. A mints its machine token for R and posts
    `POST /api/machines/approval-exchange` over the approval channel (the request gate admits
    only that and `GET /api/environment` on an approval channel, and refuses the exchange on

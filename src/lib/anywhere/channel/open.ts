@@ -17,7 +17,7 @@ import { createWebSocketStream, WebSocket as WsClient } from 'ws';
 
 import type { MachineKeyPair } from '../machine-key.js';
 import { type ChannelMarker, type ChannelSocket, createChannelSocket } from './channel-socket.js';
-import { approvalSas, type Handshake, ikInitiator, NOISE_LINK_PROTOCOL, pairingSecrets, prologueFor, xxInitiator, xxPskInitiator } from './noise.js';
+import { APPROVAL_NONCE_BYTES, approvalCommitment, approvalNonce, approvalSas, type Handshake, ikInitiator, NOISE_LINK_PROTOCOL, pairingSecrets, prologueFor, xxInitiator, xxPskInitiator } from './noise.js';
 import { type ChannelMode, encodeFrame, encodePreamble, FrameReader, type Refusal, REFUSAL_CODES, WireError } from './wire.js';
 
 export const DEFAULT_OPEN_TIMEOUT_MS = 10_000;
@@ -183,10 +183,18 @@ async function handshakeAsInitiator(
     } catch {
       throw new ChannelOpenError('protocol', `${label} sent an approval handshake message that did not verify`);
     }
-    const message3 = handshake.send();
+    raw.write(encodeFrame(handshake.send()));
     const remoteKeyHex = handshake.remoteKey().toString('hex');
-    const sas = approvalSas(handshake.result().hash);
-    return finish(raw, reader, handshake, message3, { mode: 'approval', remoteKeyHex, pairingId: null, requestId: opts.requestId, approvalSas: sas });
+    // Commit-then-reveal (D-2356-10 amended): commit to our nonce, take the responder's, reveal ours.
+    const hash = handshake.result().hash;
+    const nonce = approvalNonce();
+    raw.write(encodeFrame(approvalCommitment(hash, nonce)));
+    const responderNonce = await readMessage(reader, 'approval');
+    if (responderNonce.length !== APPROVAL_NONCE_BYTES) {
+      throw new ChannelOpenError('protocol', `${label} sent an approval nonce of ${responderNonce.length} bytes`);
+    }
+    const sas = approvalSas(hash, nonce, responderNonce);
+    return finish(raw, reader, handshake, nonce, { mode: 'approval', remoteKeyHex, pairingId: null, requestId: opts.requestId, approvalSas: sas });
   }
 
   const { psk, pairingId } = pairingSecrets(opts.pairingCode);
