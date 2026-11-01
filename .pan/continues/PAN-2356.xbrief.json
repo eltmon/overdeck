@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:10:44.594Z",
+  "updated": "2026-11-01T14:11:00.655Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,10 @@
     "wi9-directory-client.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T14:10:44.594Z"
+    },
+    "wi9-directory-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:11:00.655Z"
     }
   }
 }
