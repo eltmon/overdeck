@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T06:55:10Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-01T06:59:41Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -320,7 +320,7 @@ _Last sequenced: 2026-11-01T06:55:10Z · model: claude-opus-5-5 · open: 869_
 | 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
 | 320 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
-| 322 | PAN-4330 | M | medium | ok |  | PAN-4297 | Sign-in client: pan account, Settings → Anywhere, device token; entry point for shared sessions and cross-machine continue |
+| 322 | PAN-4330 | M | medium | ok |  |  | Sign-in client: pan account, Settings → Anywhere, device token; entry point for shared sessions and cross-machine continue |
 | 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 324 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
 | 325 | PAN-4473 | M | medium | ok |  | PAN-4330 | Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service |
@@ -1204,7 +1204,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T06:55:10Z",
+  "generatedAt": "2026-11-01T06:59:41Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 869,
@@ -5233,9 +5233,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "importance": "medium",
       "score": 62,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4297"
-      ],
+      "dependsOn": [],
       "why": "Sign-in client: pan account, Settings → Anywhere, device token; entry point for shared sessions and cross-machine continue",
       "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
       "gate": "auto",
@@ -13047,13 +13045,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "from": "PAN-2350",
       "to": "PAN-4332",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4297",
-      "to": "PAN-4330",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
