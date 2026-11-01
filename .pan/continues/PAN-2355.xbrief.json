@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2355",
   "created": "2026-11-01T05:47:25.756Z",
-  "updated": "2026-11-01T07:48:10.971Z",
+  "updated": "2026-11-01T07:48:30.281Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "mobile-uat-spec.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:48:10.971Z"
+    },
+    "mobile-uat-spec.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:48:30.280Z"
     }
   }
 }
