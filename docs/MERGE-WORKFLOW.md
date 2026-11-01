@@ -368,6 +368,13 @@ workspaces accumulate and eventually block new workspace creation ("all
 predefined address pools have been fully subnetted" — Docker's default pool
 supports ~31 bridge networks). NEVER remove this cleanup step.
 
+An Overdeck workspace stack creates one bridge network (`_devnet`); before
+PAN-4663 the template's `init-perms` service also created an empty `_default`
+network, which halved how many stacks fit in the pool. Existing `_default`
+networks are removed on the stack's next rebuild (its `down` runs against the
+old compose file) or by teardown's `removeComposeProjectNetworks`;
+`pan workspace reap` leaves them alone while the workspace directory exists.
+
 Every workspace teardown path removes the stack's compose networks, not only
 its containers (PAN-3900). `docker compose down` alone leaks the network when
 shared infra (overdeck-traefik) is still attached or the compose files are
