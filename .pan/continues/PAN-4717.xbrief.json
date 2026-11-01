@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4717",
   "created": "2026-11-01T14:07:20.462Z",
-  "updated": "2026-11-01T14:54:46.286Z",
+  "updated": "2026-11-01T14:55:01.383Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "docs-absent-issue-links.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T14:54:46.286Z"
+    },
+    "docs-absent-issue-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:55:01.383Z"
     }
   }
 }
