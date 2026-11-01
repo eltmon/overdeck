@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T16:21:33.615660Z · model: claude-opus-5-5 · open: 860_
+_Last sequenced: 2026-11-01T16:24:08.788821Z · model: claude-opus-5-5 · open: 859_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -492,7 +492,6 @@ _Last sequenced: 2026-11-01T16:21:33.615660Z · model: claude-opus-5-5 · open: 
 | 493 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
 | 494 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
 | 495 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 496 | PAN-4404 | L | medium | ok |  |  | Desktop-managed SSH launch and loopback forward for remote environments; PAN-4402 closed, still waits on PAN-4645 |
 | 497 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
 | 498 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
 | 499 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
@@ -519,7 +518,7 @@ _Last sequenced: 2026-11-01T16:21:33.615660Z · model: claude-opus-5-5 · open: 
 | 520 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
 | 521 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
 | 522 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 523 | PAN-3863 | L | medium | ok |  | PAN-4404 | Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 (PAN-4402 catalog has closed) |
+| 523 | PAN-3863 | L | medium | ok |  |  | Orca-style SSH Hosts onboarding; its SSH launch stack (PAN-4404) has now closed, so it is unblocked |
 | 524 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
 | 525 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
 | 526 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
@@ -1195,10 +1194,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T16:21:33.615660Z",
+  "generatedAt": "2026-11-01T16:24:08.788821Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 860,
+  "openCount": 859,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -7210,19 +7209,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "planning": "auto"
     },
     {
-      "issue": "PAN-4404",
-      "rank": 496,
-      "size": "L",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Desktop-managed SSH launch and loopback forward for remote environments; PAN-4402 closed, still waits on PAN-4645",
-      "rationale": "Rank held; PAN-4402 closed as completed, but PAN-4645 is still open and still blocks this issue.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-863",
       "rank": 497,
       "size": "M",
@@ -7549,11 +7535,9 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "importance": "medium",
       "score": 45,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4404"
-      ],
-      "why": "Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 (PAN-4402 catalog has closed)",
-      "rationale": "Rank held; PAN-4402 closed as completed, but the PAN-4404 SSH stack this builds on is still open.",
+      "dependsOn": [],
+      "why": "Orca-style SSH Hosts onboarding; its SSH launch stack (PAN-4404) has now closed, so it is unblocked",
+      "rationale": "Rank held; PAN-4404 closed as completed, which removes this issue's last open dependency.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12770,13 +12754,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "from": "PAN-2350",
-      "to": "PAN-4404",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
       "to": "PAN-4405",
       "type": "contains",
       "source": "github-ref",
@@ -12862,13 +12839,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     {
       "from": "PAN-4475",
       "to": "PAN-4481",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4404",
-      "to": "PAN-3863",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
