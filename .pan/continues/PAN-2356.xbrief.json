@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T13:53:27.988Z",
+  "updated": "2026-11-01T13:53:41.348Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "wi6-do-signaling.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T13:53:27.987Z"
+    },
+    "wi6-do-signaling.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:53:41.348Z"
     }
   }
 }
