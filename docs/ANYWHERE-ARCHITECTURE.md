@@ -6,7 +6,9 @@ own Overdeck link their dashboards server to server over an end-to-end encrypted
 channel, learn how to reach each other, and watch each other's health. Sibling
 issues build the conversation views, the relay and the desktop flows on top of
 these pieces. User-facing pages: `configuration/linked-machines.mdx` and
-`cli/machines.mdx`.
+`cli/machines.mdx`. PAN-2356 adds the overdeck.ai directory, `direct` and `relay`
+routes, two-screen approval and the webhook inbox (sections below; the Worker is
+`docs/CONNECT-SERVICE.md`).
 
 ## Running the two-machine smoke
 
@@ -50,6 +52,36 @@ Exit 0 on success, exit 1 with `FAILED at step <name>: <why>` otherwise.
 failure path can be checked (it then fails at `no-http`). The work agent runs the
 script before `pan done` and pastes the output into the PR description.
 
+## Running the directory smoke
+
+The live check for the directory (PAN-2356) is `scripts/anywhere/directory-smoke.mjs`, also
+run by hand after a build:
+
+```bash
+npm run build
+node scripts/anywhere/directory-smoke.mjs
+```
+
+It bundles `services/connect` with `wrangler deploy --dry-run` and runs it in Miniflare on a
+free loopback port (state in `.tmp/directory-smoke/state`), with an inline `AccountRpc` stub:
+two `tester` device tokens and four `free` ones, and no TURN secrets, so relay requests answer
+`turn_unavailable`. It starts dashboards A (port 3051, `.tmp/directory-a`) and B (port 3052,
+`.tmp/directory-b`) in peer mode with `anywhere.directory_url` pointing at it and
+`OVERDECK_ANYWHERE_NO_ADVERTISE=1`, so the only route between them is `direct`.
+
+| Step | What it asserts |
+| --- | --- |
+| `connect` | the directory answers `/healthz` |
+| `start` | both dashboards answer `GET /api/environment` |
+| `register` | both `pan machines directory --json` show `online` and list both machines |
+| `approve` | B runs `pan machines join --to <A>`, A runs `pan machines approve <id> --yes`; both print the same code; B accepts; both links are online over `rtc://` within 60 s |
+| `limit` | four `free` sockets: the fourth gets "The free account includes 3 machines" and close 4009 |
+| `inbox` | B adds an inbox trigger and stops; a POSTed marker body gets 202 and appears in no storage file; after B restarts it runs the event through the trigger core and the Worker logs `inbox-ack` |
+| `logs` | no Worker log line carries the marker or SDP text |
+| `stop` | the directory and both dashboards stopped; nothing outside `.tmp/` touched |
+
+Exit 0 on success, exit 1 with `FAILED at step <name>: <why>` otherwise.
+
 ## Server to server, over a secure channel (D-1, D-2 of pan-2350)
 
 A browser only ever talks to its own machine's dashboard. That dashboard holds the
@@ -81,20 +113,28 @@ reach `sodium-native` prebuilt binaries. Two patterns:
   responder looks the pairing id up in its live `pan pair` credentials and consumes it
   on success.
 
-The Noise prologue binds the mode and the pairing id: `overdeck-link/1\0<mode byte>\0<pairing id hex or empty>`.
+- **XX** for an approval (PAN-2356, see "Approval"): no pre-shared key and no pinned key; the
+  two operators authenticate the exchange by comparing the six-digit SAS. `noise-handshake@4.2.0`
+  accepts the plain `XX` pattern, so the PRD's `XXpsk0` fallback was not needed.
+
+The Noise prologue binds the mode and the pairing id (or approval request id): `overdeck-link/1\0<mode byte>\0<pairing id or request id hex, or empty>`.
 
 ## Wire format (D-4645-5)
 
 The same bytes travel over raw TCP (`tcp://host:port`, routes `lan`, `tailnet`,
-`public`) and as the binary payload of a `/ws/link` WebSocket (`wss://host/ws/link`).
+`public`), as the binary payload of a `/ws/link` WebSocket (`wss://host/ws/link`), and over a
+WebRTC data channel (`rtc://<environment id>`, `rtc+turn://<environment id>`; PAN-2356).
 
 1. The initiator sends the preamble `00 4F 56 44 4C <linkProtocol=01> <mode>`; mode
-   `01` is link (IK), `02` is pairing (XXpsk0), and pairing appends the 16-byte pairing id.
+   `01` is link (IK), `02` is pairing (XXpsk0), `03` is approval (XX, PAN-2356); pairing
+   appends the 16-byte pairing id and approval the 16-byte approval request id. Approval mode
+   then exchanges three more frames after message 3: A's nonce commitment, R's nonce and A's
+   nonce (see "Approval").
 2. Handshake messages travel as `uint24le length` + message, at most 1024 bytes. A frame
    of length 0 followed by one code byte is a refusal: `01` unknown peer key, `02`
    unsupported link protocol (then a `uint8` responder protocol and a length-prefixed
-   UTF-8 server version), `03` unknown or expired pairing id, `04` busy (the responder
-   has 32 handshakes pending).
+   UTF-8 server version), `03` unknown or expired pairing id (or, in approval mode, no live
+   approval request with that id), `04` busy (the responder has 32 handshakes pending).
 3. After the last handshake message both ends build the `SecretStream` synchronously in
    the same tick; leftover bytes are handed to the stream.
 
@@ -205,6 +245,98 @@ or token credential gets the group with every tag omitted whose `RPC_METHOD_SCOP
 outside the credential's scopes. Revoking the credential closes its sockets with code 4401,
 the raw socket found through the request's `IncomingMessage`, for `net.Socket` and
 `ChannelSocket` alike.
+
+## Directory and direct connections (D-3)
+
+PAN-2356 adds the overdeck.ai directory (`services/connect`, `docs/CONNECT-SERVICE.md`): one
+Cloudflare Durable Object per account that knows the account's machines and introduces them.
+
+- **Directory client** (`src/dashboard/server/services/directory-client.ts`): on the primary
+  dashboard of a signed-in machine (`account.json`), one WebSocket to
+  `<anywhere.directory_url>/v1/directory` (read raw from `config.yaml` by
+  `src/lib/anywhere/directory-config.ts`; `https:`, or `http:` to loopback). It sends `hello`
+  (environment id, label, machine key, advertised endpoints), keeps the account's machine list,
+  pings every 30 s, reconnects with 1 s → 300 s back-off, and stops on a refusal (401/403,
+  closes 4001/4003/4009/4010/4011/4012) until `account.json` changes. A signed-out machine
+  opens nothing. `GET /api/directory` returns its `status()`.
+- **WebRTC transport** (`src/lib/anywhere/channel/rtc-transport.ts`, `rtc-duplex.ts`, werift
+  0.25.1, bundled): one peer connection per (peer, relay, purpose), shared by every dial; each
+  dial opens an ordered `ovdl` data channel wrapped as a `Duplex` (16 KiB messages, backpressure
+  above 1 MiB). Either side may open channels on an existing connection, so both accept them.
+  The offer, answer and ICE candidates ride the directory socket as `signal` frames; the
+  Durable Object stamps `from` from the sender's socket.
+- **Routes** (`directory-rtc.ts`, `directory-routes.ts`): `rtc://<id>` (kind `direct`) and
+  `rtc+turn://<id>` (kind `relay`) are transport URLs `openChannel` hands to the registered
+  dialer; incoming data channels run the channel listener's handshake (`acceptRawChannel`).
+  The supervisor gets them from `dynamicRoutes(link)` only while the directory lists the peer
+  online with the pinned key, with source `directory`; they are never written to
+  `machine-links.json` (`mergeAdvertised` and **Add route** refuse them), because an older
+  `pan` would reject the whole file.
+- **Phased probing** (D-2356-8, `link-supervisor.ts`): stored-kind routes at 2.5 s; `direct`
+  at 10 s only if that found no channel and no `unknown-peer`; `relay` at 10 s last. With no
+  relay plan the detail is "No direct path; install Tailscale or use the relay plan".
+- `OVERDECK_ANYWHERE_NO_ADVERTISE=1` makes a dashboard advertise no endpoints (the directory
+  smoke uses it so only `direct` can link two dashboards on one host).
+
+## Approval (D-2356-9/10)
+
+Linking two machines of one account with no pairing code, confirmed on both screens
+(`directory-approval.ts`, routes in `routes/directory-approval.ts`):
+
+1. The requester R sends `approval-request` through the directory (`POST /api/directory/join`).
+2. The approver A opens it: A dials R over `direct` with purpose `approval` and runs an
+   approval-mode channel (mode `03`, Noise XX, the request id in the preamble). R's listener
+   accepts it once, only for R's own live request id (`takeApproval`). A refuses a channel
+   whose key differs from the one the request named.
+3. Commit-then-reveal, then the SAS (D-2356-10 as amended after review). After message 3,
+   A sends `C = SHA-256("overdeck-approve-commit/1" || 0x00 || handshakeHash || n_A)` for a
+   fresh 32-byte nonce, R answers with its own 32-byte nonce `n_R`, and A reveals `n_A`; R
+   refuses the channel unless `C` matches. Both then show
+   `uint32BE(SHA-256("overdeck-approve-sas/2" || 0x00 || handshakeHash || n_A || n_R)[0..4]) mod 1_000_000`
+   as `123 456`, with the other machine's fingerprint from the handshake key, never from the
+   directory. A man in the middle runs two legs; on each it fixes its input before it can know
+   the code that input gives (it answers A before A reveals, and commits to R before `n_R`
+   arrives), so it cannot grind the two codes to match. One channel per request id stops it
+   from restarting the R leg for a new nonce. The commit-then-reveal is needed because six
+   digits collide after about 10^6 tries: without it an attacker can vary its own leg (for
+   example its message-3 static key) until the codes match.
+4. A's operator approves and R's accepts. A mints its machine token for R and posts
+   `POST /api/machines/approval-exchange` over the approval channel (the request gate admits
+   only that and `GET /api/environment` on an approval channel, and refuses the exchange on
+   every other socket). R answers `202` until its operator decides, then mints its token for
+   A through `grantMachineLink` (shared with the pairing exchange) and stores its link back;
+   A stores its link with routes from R's descriptor. Both links are operator-level. A reject
+   or the 10-minute expiry revokes A's minted token and stores nothing.
+
+## Relay and metering (D-2356-12)
+
+A relay-plan account (`tester` until billing) may dial `rtc+turn://`: the initiator asks the
+directory for TURN credentials (`ice-servers { relay: true }`, Cloudflare Realtime, 600 s TTL)
+and sets `iceTransportPolicy: 'relay'`. The directory refuses with `relay_not_allowed` (free),
+`relay_cap_reached` (month total at 50 GB) or `turn_unavailable` (no TURN secrets), and the
+dialer fails with `ChannelOpenError('unreachable', …)`. `relay-client.ts` meters every relay
+data channel this machine dialed (the responder never reports, so each channel counts once)
+and sends `relay-usage` deltas every 60 s and on close. Each report broadcasts the month's
+`relay-status` to every machine, so the status card's traffic line stays current. The report
+that reaches the cap broadcasts `relay-status { stopped: true }`; every machine closes its relay channels and the
+status card shows the cap message with **Add 50 GB**. Over-run is bounded by one report
+interval plus the credential TTL. Counts are self-reported by the account's own machines.
+
+## Webhook inbox (D-20)
+
+A trigger may have a directory inbox, `https://connect.overdeck.ai/h/<doId>.<secret>`
+(`POST /api/triggers { inbox: true }`, `pan triggers add --inbox`). The Worker rebuilds the
+Durable Object id from the URL (no global index) and hands it only the secret's SHA-256. The
+Durable Object seals `{ v, eventId, inboxId, receivedAt, headers, body }` to the owning
+machine's key with `crypto_box_seal` (`services/connect/src/seal.ts`, pure JS on `@noble/*`)
+and stores only the sealed bytes; the plaintext exists only in the request handler. The
+machine opens events with sodium-native's `crypto_box_seal_open`
+(`src/lib/anywhere/sealed-box.ts`), handles them one at a time in arrival order
+(`inbox-client.ts`, `src/lib/triggers/inbox.ts`), skips ids it already delivered
+(`inbox-delivered.json`), refuses events older than 24 h 5 min, and runs steps 2-6 of the
+trigger core (`deliverInboxEvent`; a Stripe signature is checked against `receivedAt`).
+2xx and terminal 4xx answers send `inbox-ack`; `503` and `429` send `inbox-nack`, re-sent after
+`max(retryAfter, 60 s)`. The Durable Object alarm deletes events after 24 hours.
 
 ## SSH machines (PAN-4404)
 
@@ -414,4 +546,3 @@ section here when it ships.
 
 - #4650: D-5, D-8, D-22.
 - #4651: D-19, D-21.
-- #2356: D-3, D-20.

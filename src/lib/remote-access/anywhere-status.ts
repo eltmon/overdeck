@@ -41,6 +41,48 @@ export interface AnywhereStatus {
   tailscale: { nextStep: TailscaleNextStep | 'not-installed'; serveUrl: string | null; magicDnsName: string | null };
   /** Who is asking (PAN-4455 D-3); null when no credential resolves (a loopback peer with no session). */
   viewer: { kind: AnywhereViewerKind | null };
+  /** The overdeck.ai directory (PAN-2356); null when this machine is signed out or runs no directory client. */
+  directory: AnywhereDirectoryStatus | null;
+  /** The relay add-on (PAN-2356 FR-21); null when the plan has no relay or there is no directory. */
+  relay: AnywhereRelayStatus | null;
+}
+
+export interface AnywhereDirectoryStatus {
+  state: 'off' | 'connecting' | 'online' | 'refused';
+  plan: 'free' | 'tester' | null;
+  url: string | null;
+  refusal: string | null;
+}
+
+export interface AnywhereRelayStatus {
+  /** A relay channel is open now. */
+  using: boolean;
+  bytesUsed: number;
+  capBytes: number;
+  stopped: boolean;
+}
+
+type Source<T> = () => T | null;
+
+let directorySource: Source<AnywhereDirectoryStatus> = () => null;
+let relaySource: Source<AnywhereRelayStatus> = () => null;
+
+/** The dashboard registers the directory client here, so this module never imports the server. */
+export function setDirectoryStatusSource(source: Source<AnywhereDirectoryStatus> | null): void {
+  directorySource = source ?? (() => null);
+}
+
+/** The dashboard registers the relay client here. */
+export function setRelayStatusSource(source: Source<AnywhereRelayStatus> | null): void {
+  relaySource = source ?? (() => null);
+}
+
+export function readDirectoryStatus(): AnywhereDirectoryStatus | null {
+  return directorySource();
+}
+
+export function readRelayStatus(): AnywhereRelayStatus | null {
+  return relaySource();
 }
 
 const REMOTE_ACCESS_DOCS = 'https://overdeck.ai/configuration/remote-access';

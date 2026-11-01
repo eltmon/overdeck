@@ -31,6 +31,7 @@ pan triggers add <name> (--conversation <name-or-id> | --project <key>) [options
 | `--model <id>` | Model for conversations a project trigger starts. |
 | `--harness <name>` | Harness for conversations a project trigger starts. |
 | `--effort <level>` | Reasoning effort for conversations a project trigger starts. |
+| `--inbox` | Also create an overdeck.ai directory inbox that holds events while this machine is offline (Anywhere plan; needs the running dashboard and `pan account login`). Prints the inbox URL instead of the Funnel lines. |
 | `--json` | Print `{ trigger, hookPath, url, localUrl, funnelCommand, generatedSigningSecret }` as JSON. `url` is `null` when no `.ts.net` address is saved. |
 
 Pass exactly one of `--conversation` and `--project`; otherwise it exits 1. An unknown
@@ -43,6 +44,20 @@ any generated signing secret, the Funnel command, and then:
 ```
 The URL is shown once. Save it now.
 ```
+
+With `--inbox`, the trigger is created through the dashboard, which asks the directory for the
+inbox. It prints the inbox URL instead of the Funnel lines:
+
+```
+Created trigger trg_3f9a1c2b7d4e ("deploys") with an overdeck.ai inbox
+  inbox URL:  https://connect.overdeck.ai/h/<id>
+
+The inbox holds events for 24 hours while this machine is offline. The URL is shown once. Save it now.
+```
+
+On a free account, signed out, or when the directory does not answer within 10 seconds, it
+creates nothing and exits 1 with the reason. See
+[Hold events with the directory inbox](/configuration/triggers#hold-events-with-the-directory-inbox).
 
 ## list
 

@@ -105,3 +105,35 @@ describe('route model (PAN-4645 WI-11)', () => {
     expect(mergeAdvertised(merged, [])).toEqual(merged.filter((entry) => entry.source !== 'advertised'));
   });
 });
+
+describe('WebRTC routes (PAN-2356 WI-11)', () => {
+  const ENV = '0b5c9e7a-4c1d-4f2e-9a3b-6d7e8f901234';
+
+  it('parses rtc:// as direct and rtc+turn:// as relay', () => {
+    expect(parseRouteUrl(`rtc://${ENV}`)).toEqual({ transport: 'rtc', host: ENV, port: 0, url: `rtc://${ENV}`, kind: 'direct' });
+    expect(parseRouteUrl(`rtc+turn://${ENV}`)).toEqual({ transport: 'rtc', host: ENV, port: 0, url: `rtc+turn://${ENV}`, kind: 'relay' });
+  });
+
+  it('rejects an rtc URL without an environment id', () => {
+    expect(() => parseRouteUrl('rtc://not-a-uuid')).toThrow(/environment id/);
+    expect(() => parseRouteUrl(`rtc://${ENV.toUpperCase()}`)).toThrow();
+    expect(() => parseRouteUrl(`rtc://${ENV}/path`)).toThrow();
+  });
+
+  it('never stores an advertised rtc route', () => {
+    const merged = mergeAdvertised([], [
+      { kind: 'lan', url: 'tcp://192.168.5.5:3011' },
+      { kind: 'direct', url: `rtc://${ENV}` },
+    ]);
+    expect(merged.map((route) => route.url)).toEqual(['tcp://192.168.5.5:3011']);
+  });
+
+  it('ranks direct and relay after the stored kinds', () => {
+    const ranked = rankRoutes([
+      { url: `rtc+turn://${ENV}`, kind: 'relay', source: 'manual' },
+      { url: `rtc://${ENV}`, kind: 'direct', source: 'manual' },
+      { url: 'tcp://203.0.113.4:3011', kind: 'public', source: 'manual' },
+    ] as const);
+    expect(ranked.map((route) => route.kind)).toEqual(['public', 'direct', 'relay']);
+  });
+});

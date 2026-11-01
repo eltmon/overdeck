@@ -140,3 +140,47 @@ describe('AnywhereStatusCard (PAN-4445)', () => {
     expect(onAction).toHaveBeenCalledWith({ kind: 'tailscale-setup' });
   });
 });
+
+describe('AnywhereStatusCard relay and directory (PAN-2356 WI-18)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows Using relay and this month\'s traffic', async () => {
+    renderCard(baseStatus({
+      directory: { state: 'online', plan: 'tester', url: 'https://connect.overdeck.ai', refusal: null },
+      relay: { using: true, bytesUsed: 12_345_000_000, capBytes: 50_000_000_000, stopped: false },
+    }));
+    const relay = await screen.findByTestId('anywhere-relay');
+    expect(relay).toHaveTextContent('Using relay');
+    expect(relay).toHaveTextContent('12.3 of 50 GB relay traffic this month');
+  });
+
+  it('shows the cap message and an Add 50 GB link once the allowance is used', async () => {
+    renderCard(baseStatus({
+      directory: { state: 'online', plan: 'tester', url: 'https://connect.overdeck.ai', refusal: null },
+      relay: { using: false, bytesUsed: 50_000_000_000, capBytes: 50_000_000_000, stopped: true },
+    }));
+    const cap = await screen.findByTestId('anywhere-relay-cap');
+    expect(cap).toHaveTextContent('Relay allowance used; install Tailscale or add 50 GB');
+    const link = within(cap).getByRole('link', { name: 'Add 50 GB' });
+    expect(link).toHaveAttribute('href', 'https://overdeck.ai/anywhere');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('shows no relay text without a relay status', async () => {
+    renderCard(baseStatus({ directory: null, relay: null }));
+    await screen.findByText('desk');
+    expect(screen.queryByTestId('anywhere-relay')).toBeNull();
+    expect(screen.queryByTestId('anywhere-relay-cap')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/relay/i);
+  });
+
+  it('shows a refused directory as a problem line', async () => {
+    renderCard(baseStatus({
+      directory: { state: 'refused', plan: 'free', url: 'https://connect.overdeck.ai', refusal: 'The free account includes 3 machines' },
+      relay: null,
+    }));
+    expect(await screen.findByTestId('anywhere-directory-refusal')).toHaveTextContent('The free account includes 3 machines');
+  });
+});

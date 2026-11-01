@@ -39,6 +39,7 @@ import { setupAutoPresoWebSocket } from './ws-autopreso.js';
 import { installChannelListener } from './channel-listener.js';
 import { plainHttpNavigationGuard } from './plain-http-guard.js';
 import { recordPairingExchangeFailure, takePairingById } from './pairing-credentials.js';
+import { currentApprovalService } from './services/directory-approval.js';
 import { getOverdeckVersion } from './routes/misc/shared.js';
 import { hostsMachineLinks } from '../../lib/boot-gates.js';
 import { ensureMachineKey } from '../../lib/anywhere/machine-key.js';
@@ -70,6 +71,8 @@ import { machinesSshRouteLayer } from './routes/machines-ssh.js'
 import { versionsSelfRouteLayer } from './routes/versions-self.js'
 import { machinesFleetRouteLayer } from './routes/machines-fleet.js'
 import { machinesPeerRouteLayer } from './routes/machines-peer.js'
+import { directoryRouteLayer } from './routes/directory.js'
+import { directoryApprovalRouteLayer } from './routes/directory-approval.js'
 import { pushRouteLayer } from './routes/push.js'
 import { tailscaleRouteLayer } from './routes/tailscale.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
@@ -166,6 +169,9 @@ const HttpServerLive = Layer.unwrap(
         },
         onPairingFailure: recordPairingExchangeFailure,
         serverVersion: getOverdeckVersion,
+        // PAN-2356: an approval channel only for this machine's own live join request.
+        takeApproval: (requestId) => currentApprovalService()?.takeApproval(requestId) ?? false,
+        onApprovalChannel: (channel) => currentApprovalService()?.onIncomingChannel(channel),
       });
       return nodeServer;
     }, {
@@ -406,6 +412,8 @@ export const makeRoutesLayer = Layer.mergeAll(
   versionsSelfRouteLayer,
   machinesFleetRouteLayer,
   machinesPeerRouteLayer,
+  directoryRouteLayer,
+  directoryApprovalRouteLayer,
   pushRouteLayer,
   tailscaleRouteLayer,
   accessTokensRouteLayer,

@@ -95,7 +95,19 @@ type VerifyResult =
 interface AccountDataHolder { deleteAccountData(userId: string): Promise<{ deleted: true }> }
 ```
 
-`verifyDevice` is one D1 lookup per call (no cache), so revocation is immediate. `entitlement` is `{ plan: 'tester', storageBytesCap, maxDevices: null }` from `entitlementFor(grant)`; the owner gets the default cap.
+`verifyDevice` is one D1 lookup per call (no cache), so revocation is immediate. `entitlement` comes from `entitlementFor(grant)`: a grant whose `entitlement` column is `free` gives `{ plan: 'free', storageBytesCap, maxDevices: 3 }`; any other grant, and the owner, gives `{ plan: 'tester', storageBytesCap, maxDevices: null }`. The owner gets the default cap.
+
+### The free entitlement (PAN-2356)
+
+Until billing (PAN-4294) ships, every allowlisted account is `tester`, which carries the paid Anywhere tiers (unlimited directory machines, the relay add-on and the webhook inbox). A **free** account is an allowlisted GitHub id whose grant row has `entitlement = 'free'`; the connect service (`docs/CONNECT-SERVICE.md`) then limits it to 3 directory machines and refuses the relay and the inbox. Sign-up stays invite-only. Set or clear it with Wrangler (operator only):
+
+```bash
+cd services/account
+npx wrangler d1 execute overdeck-account --remote --command "UPDATE grants SET entitlement = 'free' WHERE github_id = 12345"
+npx wrangler d1 execute overdeck-account --remote --command "UPDATE grants SET entitlement = 'tester' WHERE github_id = 12345"
+```
+
+The change applies on the account's next `verifyDevice`, so a connected machine sees it when its directory socket next reconnects.
 
 ## Hosted vault contract
 

@@ -261,7 +261,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 MIT License - see [LICENSE](LICENSE) for details.
 
-The hosted-service code in [`services/`](services/) (the overdeck.ai account service and the Shared Sessions share service) is licensed separately under the [Functional Source License, Version 1.1, MIT Future License](services/LICENSE.md) (FSL-1.1-MIT). You can read, run, modify and self-host it, including inside your company; you cannot offer it as a competing commercial service. Each release becomes MIT two years after it is made available.
+The hosted-service code in [`services/`](services/) (the overdeck.ai account service, the Shared Sessions share service and the Anywhere connect service) is licensed separately under the [Functional Source License, Version 1.1, MIT Future License](services/LICENSE.md) (FSL-1.1-MIT). You can read, run, modify and self-host it, including inside your company; you cannot offer it as a competing commercial service. Each release becomes MIT two years after it is made available.
 
 ---
 

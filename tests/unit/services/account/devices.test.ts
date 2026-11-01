@@ -158,6 +158,24 @@ describe('verifyDeviceToken (FR-5, FR-6)', () => {
     expect(await verifyDeviceToken(rc, owner.token)).toMatchObject({ ok: true, entitlement: { storageBytesCap: 5368709120 } });
   });
 
+  it('a free grant verifies as the free plan with maxDevices 3; tester and owner stay unlimited (PAN-2356)', async () => {
+    const { rc, db } = setup();
+    await seedUser(rc, 'u-free', 300);
+    await addGrant(rc, 300, 'free-user', {}, 'admin-add');
+    await db.prepare("UPDATE grants SET entitlement = 'free' WHERE github_id = ?").bind(300).run();
+    const free = await mintDevice(rc, 'u-free', 'linux-x64', ENV_A);
+    expect(await verifyDeviceToken(rc, free.token)).toMatchObject({ ok: true, entitlement: { plan: 'free', maxDevices: 3 } });
+
+    await seedUser(rc, 'u-tester', 100);
+    await addGrant(rc, 100, 'tester', {}, 'admin-add');
+    const tester = await mintDevice(rc, 'u-tester', 'linux-x64', ENV_A);
+    expect(await verifyDeviceToken(rc, tester.token)).toMatchObject({ ok: true, entitlement: { plan: 'tester', maxDevices: null } });
+
+    await seedUser(rc, 'u-owner', TEST_OWNER_GITHUB_ID);
+    const owner = await mintDevice(rc, 'u-owner', 'linux-x64', ENV_A);
+    expect(await verifyDeviceToken(rc, owner.token)).toMatchObject({ ok: true, entitlement: { plan: 'tester', maxDevices: null } });
+  });
+
   it('reflects a changed github_login on the next verify (AC2)', async () => {
     const { rc, db } = setup();
     await seedUser(rc, 'u-tester', 100);

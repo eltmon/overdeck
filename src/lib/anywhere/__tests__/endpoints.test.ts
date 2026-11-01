@@ -63,6 +63,17 @@ describe('advertised endpoints (PAN-4645 WI-19)', () => {
     expect(d.fetch).not.toHaveBeenCalled();
   });
 
+  it('advertises nothing under OVERDECK_ANYWHERE_NO_ADVERTISE=1 (PAN-2356 directory smoke)', async () => {
+    vi.stubEnv('OVERDECK_ANYWHERE_NO_ADVERTISE', '1');
+    try {
+      const d = deps();
+      await expect(discoverEndpoints(d)).resolves.toEqual([]);
+      expect(d.execFile).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('ac2: Tailscale Serve is advertised only when the self-check answers with our environment id', async () => {
     const matching = deps({ execFile: vi.fn(async () => tailscaleStatus) });
     const found = await discoverEndpoints(matching);

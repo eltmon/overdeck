@@ -172,7 +172,9 @@ function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged:
             <LinkStateBadge state={link.state} />
           </div>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            {link.currentRoute ? <>via <span className="font-mono">{link.currentRoute}</span></> : 'no route in use'}
+            {link.currentRoute ? (
+              <>via {link.routes.find((route) => route.url === link.currentRoute)?.kind ?? 'route'} · <span className="font-mono">{link.currentRoute}</span></>
+            ) : 'no route in use'}
             {' · '}{ACCESS_LABEL[link.access]}
             {link.peerVersion ? <>{' · '}Overdeck {link.peerVersion}</> : null}
             {link.lastHeartbeatAt ? <>{' · '}heartbeat {formatRelativeTime(link.lastHeartbeatAt)}</> : null}

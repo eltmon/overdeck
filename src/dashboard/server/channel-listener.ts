@@ -50,6 +50,10 @@ export interface ChannelListenerDeps {
   onPairingFailure: () => void;
   /** Reported inside refusal `02`. */
   serverVersion?: () => Promise<string>;
+  /** Approval mode (PAN-2356): accept one channel for this machine's own live request id. */
+  takeApproval?: (requestId: string) => boolean;
+  /** Approval mode: the accepted channel, so the requester can show its SAS. */
+  onApprovalChannel?: (channel: ChannelSocket) => void;
   maxPending?: number;
   log?: (message: string) => void;
 }
@@ -84,9 +88,26 @@ export function closeAllChannels(): number {
   return closed;
 }
 
+/** The installed listener's `accept`, kept so WebRTC data channels (PAN-2356 WI-11) reach it too. */
+let acceptRaw: ((raw: Duplex) => Promise<void>) | null = null;
+
+/**
+ * Run the responder handshake on a raw transport that arrived some other way (a `direct` or
+ * `relay` WebRTC data channel) and hand the channel to HTTP. Without an installed listener (a peer
+ * dashboard), the transport is destroyed.
+ */
+export function acceptRawChannel(raw: Duplex): Promise<void> {
+  if (!acceptRaw) {
+    raw.destroy();
+    return Promise.resolve();
+  }
+  return acceptRaw(raw);
+}
+
 export function _resetChannelListenerForTests(): void {
   closeAllChannels();
   pending = 0;
+  acceptRaw = null;
 }
 
 export function installChannelListener(nodeServer: HttpServer, deps: ChannelListenerDeps): void {
@@ -126,11 +147,13 @@ export function installChannelListener(nodeServer: HttpServer, deps: ChannelList
         isPinnedPeer: deps.isPinnedPeer,
         takePairing: deps.takePairing,
         onPairingFailure: deps.onPairingFailure,
+        takeApproval: deps.takeApproval,
         serverVersion,
       });
       resume();
       const channel = await channelPromise;
       track(channel);
+      if (channel.channel.mode === 'approval') deps.onApprovalChannel?.(channel);
       toHttp(channel);
     } catch (error) {
       const code = (error as { code?: string }).code ?? 'error';
@@ -139,6 +162,11 @@ export function installChannelListener(nodeServer: HttpServer, deps: ChannelList
     } finally {
       pending -= 1;
     }
+  };
+
+  acceptRaw = (raw) => {
+    raw.pause();
+    return accept(raw, () => raw.resume());
   };
 
   nodeServer.on('connection', (socket: Socket) => {
@@ -185,6 +213,7 @@ export function installChannelListener(nodeServer: HttpServer, deps: ChannelList
   nodeServer.once('close', () => {
     closeAllChannels();
     wss.close();
+    acceptRaw = null;
   });
 }
 

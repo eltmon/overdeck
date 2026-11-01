@@ -42,6 +42,7 @@ const KEY_B = 'b2'.repeat(32);
 const LINK: ChannelMarker = { mode: 'link', remoteKeyHex: KEY_A, pairingId: null };
 const OTHER_LINK: ChannelMarker = { mode: 'link', remoteKeyHex: KEY_B, pairingId: null };
 const PAIRING: ChannelMarker = { mode: 'pairing', remoteKeyHex: KEY_A, pairingId: 'cd'.repeat(16) };
+const APPROVAL: ChannelMarker = { mode: 'approval', remoteKeyHex: KEY_A, pairingId: null, requestId: 'ef'.repeat(16), approvalSas: '123 456' };
 const originalHome = process.env.OVERDECK_HOME;
 
 let home: string;
@@ -163,6 +164,23 @@ describe('remote request gate with channels', () => {
     expect(remoteGateRejection(request('POST', '/api/machines/exchange', { 'x-overdeck-internal-token': INTERNAL }, '127.0.0.1'), null))
       .toEqual({ status: 401 });
     expect(remoteGateRejection(request('POST', '/api/machines/exchange', bearer(machineToken)), LINK)).toEqual({ status: 401 });
+  });
+
+  it('admits an approval channel to exactly GET /api/environment and POST /api/machines/approval-exchange (PAN-2356)', () => {
+    expect(remoteGateRejection(request('GET', '/api/environment'), APPROVAL)).toBeNull();
+    expect(remoteGateRejection(request('POST', '/api/machines/approval-exchange'), APPROVAL)).toBeNull();
+    expect(remoteGateRejection(request('GET', '/api/machines'), APPROVAL)).toEqual({ status: 401 });
+    expect(remoteGateRejection(request('POST', '/api/machines/exchange'), APPROVAL)).toEqual({ status: 401 });
+    // A machine token on an approval channel does not widen it.
+    expect(remoteGateRejection(request('GET', '/api/issues', bearer(machineToken)), APPROVAL)).toEqual({ status: 401 });
+  });
+
+  it('refuses POST /api/machines/approval-exchange from every non-approval socket (PAN-2356)', () => {
+    expect(remoteGateRejection(request('POST', '/api/machines/approval-exchange', {}, '127.0.0.1'), null)).toEqual({ status: 401 });
+    expect(remoteGateRejection(request('POST', '/api/machines/approval-exchange', { 'x-overdeck-internal-token': INTERNAL }, '127.0.0.1'), null))
+      .toEqual({ status: 401 });
+    expect(remoteGateRejection(request('POST', '/api/machines/approval-exchange', bearer(machineToken)), LINK)).toEqual({ status: 401 });
+    expect(remoteGateRejection(request('POST', '/api/machines/approval-exchange'), PAIRING)).toEqual({ status: 401 });
   });
 
   it('never treats a link channel as a trusted local caller, and judges it by its machine credential', () => {
