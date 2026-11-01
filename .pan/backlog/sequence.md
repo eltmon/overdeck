@@ -1,13 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T08:05:41Z · model: claude-opus-5-5 · open: 872_
+_Last sequenced: 2026-11-01T08:18:54Z · model: claude-opus-5-5 · open: 872_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
 | 2 | PAN-4639 | L | medium | ok |  |  | In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions. |
-| 3 | PAN-4677 | XS | low | ok |  |  | In pipeline: throwaway one-line task for the PAN-4295 live Fly smoke test; PR closed unmerged, never merge. |
 | 4 | PAN-4663 | XS | critical | ok |  |  | In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts |
 | 5 | PAN-4670 | S | high | ok |  |  | In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs. |
 | 6 | PAN-4672 | S | high | ok |  |  | In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout. |
@@ -279,6 +278,7 @@ _Last sequenced: 2026-11-01T08:05:41Z · model: claude-opus-5-5 · open: 872_
 | 271 | PAN-4654 | M | medium | needs-refinement |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
 | 272 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 273 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 274 | PAN-4696 | XS | medium | ok |  | PAN-4295 | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 275 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650, PAN-4649 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
 | 276 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
 | 277 | PAN-4649 | M | medium | ok |  |  | Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending. |
@@ -888,10 +888,6 @@ New in-pipeline follow-up to the merged #4584 with a decided design, so it is pi
 
 New in-pipeline issue with a live workspace, so it is pinned near the top beside PAN-4626 per the in-pipeline rule; it also offers a non-destructive path for the idle cleanup asked in PAN-1485.
 
-### PAN-4677 (rank 3)
-
-New in-pipeline issue pinned at the free rank 3; it exists only to exercise PAN-4295 Fly remote execution end to end.
-
 ### PAN-4663 (rank 4)
 
 New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.
@@ -1200,6 +1196,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
+### PAN-4213 (rank 80)
+
+Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1207,7 +1207,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T08:05:41Z",
+  "generatedAt": "2026-11-01T08:18:54Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 872,
@@ -1235,19 +1235,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions.",
       "rationale": "New in-pipeline issue with a live workspace, so it is pinned near the top beside PAN-4626 per the in-pipeline rule; it also offers a non-destructive path for the idle cleanup asked in PAN-1485.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4677",
-      "rank": 3,
-      "size": "XS",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: throwaway one-line task for the PAN-4295 live Fly smoke test; PR closed unmerged, never merge.",
-      "rationale": "New in-pipeline issue pinned at the free rank 3; it exists only to exercise PAN-4295 Fly remote execution end to end.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12125,6 +12112,21 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4696",
+      "rank": 274,
+      "size": "XS",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4295"
+      ],
+      "why": "Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build.",
+      "rationale": "New verification-only follow-up; it cannot run until PAN-4295 merges and deploys, so it ranks directly behind PAN-4295 in the Fly cluster.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13753,13 +13755,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 0.5
     },
     {
-      "from": "PAN-4677",
-      "to": "PAN-4295",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4671",
       "to": "PAN-4681",
       "type": "informs",
@@ -13821,6 +13816,27 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-4295",
+      "to": "PAN-4696",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4682",
+      "to": "PAN-4696",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4683",
+      "to": "PAN-4696",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
