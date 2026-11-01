@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4641",
   "created": "2026-11-01T05:00:29.700Z",
-  "updated": "2026-11-01T07:14:45.992Z",
+  "updated": "2026-11-01T07:15:47.240Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -310,6 +310,10 @@
     "docs.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T07:14:45.991Z"
+    },
+    "frontend-test-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:15:47.239Z"
     }
   }
 }
