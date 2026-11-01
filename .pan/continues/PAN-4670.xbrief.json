@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4670",
   "created": "2026-11-01T11:02:32.150Z",
-  "updated": "2026-11-01T11:17:58.008Z",
+  "updated": "2026-11-01T11:18:10.961Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "plan-ready-gate.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T11:17:58.008Z"
+    },
+    "plan-ready-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:18:10.961Z"
     }
   }
 }
