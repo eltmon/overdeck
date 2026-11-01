@@ -12,12 +12,22 @@ import { readEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { getConversationListWithVaultCopies } from '../../../lib/overdeck/conversation-list.js';
 import { listLinkedConversations } from '../../../lib/overdeck/linked-conversations.js';
 import { type LinkPresence, mergeConversationRows } from '../../../lib/overdeck/linked-conversations-merge.js';
-import { currentLinkSupervisor } from './anywhere-boot.js';
 
 type ListRow = Record<string, unknown> & { name: string; origin?: string; claudeSessionId?: string | null };
 
+/** A link's live status; the link supervisor, set by anywhere-boot (a setter, so this module never imports the boot module). */
+export interface LinkPresenceSource {
+  status(linkId: string): { state: LinkPresence['state']; lastHeartbeatAt: string | null } | null;
+}
+
+let presenceSource: LinkPresenceSource | null = null;
+
+export function setLinkPresenceSource(source: LinkPresenceSource | null): void {
+  presenceSource = source;
+}
+
 function presenceOf(link: MachineLink): LinkPresence {
-  const status = currentLinkSupervisor()?.status(link.id);
+  const status = presenceSource?.status(link.id);
   return status ? { state: status.state, lastSeenAt: status.lastHeartbeatAt } : { state: 'offline', lastSeenAt: null };
 }
 

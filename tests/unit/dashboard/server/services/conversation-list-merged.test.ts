@@ -24,7 +24,6 @@ vi.mock('../../../../../src/lib/anywhere/link-store.js', () => ({
 vi.mock('../../../../../src/lib/environment-identity.js', () => ({
   readEnvironmentIdentity: async () => ({ v: 1, environmentId: 'env-laptop', label: 'laptop', createdAt: '2026-11-01T00:00:00.000Z' }),
 }));
-vi.mock('../../../../../src/dashboard/server/services/anywhere-boot.js', () => ({ currentLinkSupervisor: () => null }));
 
 const { getMergedConversationList } = await import('../../../../../src/dashboard/server/services/conversation-list-merged.js');
 

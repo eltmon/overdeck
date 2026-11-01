@@ -32,6 +32,7 @@ import { RelayClient, setRelayClient } from './relay-client.js';
 import { setHeartbeatConversationsHashSource, setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
 import { startTransferSweep } from './conversation-release-service.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
+import { setLinkPresenceSource } from './conversation-list-merged.js';
 import { createLinkedConversationsSync } from './linked-conversations-sync.js';
 import { stopForwardsWithoutLink } from './port-forwards.js';
 import { defaultSshForwardSupervisorDeps, SshForwardSupervisor } from './ssh-forward-supervisor.js';
@@ -133,6 +134,7 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   });
   supervisor.start();
   setLinkStatusSource(supervisor);
+  setLinkPresenceSource(supervisor);
   setLinkRouteSource(supervisor);
   setPeerUnlinkNotifier(async (link) => {
     try {
@@ -168,6 +170,7 @@ export function stopAnywhere(): void {
   sshForwards?.stop();
   sshForwards = null;
   setSshForwardSupervisor(null);
+  setLinkPresenceSource(null);
   supervisor?.stop();
   supervisor = null;
   inbox?.stop();
