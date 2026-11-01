@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T08:48:37Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-01T08:49:38Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1206,7 +1206,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T08:48:37Z",
+  "generatedAt": "2026-11-01T08:49:38Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 871,
@@ -4715,7 +4715,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
         "PAN-4295"
       ],
       "why": "Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build.",
-      "rationale": "Body edit only restates setup notes; PAN-4295 still open and PAN-4682/PAN-4683 edges already recorded, so rank holds.",
+      "rationale": "Body re-read on this pass: still a post-merge smoke for PAN-4295 with workaround notes for PAN-4682/PAN-4683, so rank holds.",
       "gate": "auto",
       "planning": "auto"
     },
