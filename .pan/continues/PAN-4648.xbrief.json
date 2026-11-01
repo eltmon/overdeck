@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4648",
   "created": "2026-11-01T05:50:45.229Z",
-  "updated": "2026-11-01T06:21:05.449Z",
+  "updated": "2026-11-01T06:30:27.184Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-01T06:20:15.544Z"
     },
     "triggers-admin-routes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4648",
-      "claimedAt": "2026-11-01T06:21:05.449Z"
+      "claimedAt": "2026-11-01T06:21:05.449Z",
+      "doneAt": "2026-11-01T06:30:27.184Z"
     }
   }
 }
