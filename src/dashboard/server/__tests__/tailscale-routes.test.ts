@@ -153,6 +153,8 @@ describe('GET /api/tailscale/status (PAN-1254)', () => {
     expect(res.json.install.kind).toBe('pane');
     expect(res.json.operatorCommand).toMatch(/^sudo tailscale set --operator=/);
     expect(res.json.port).toBe(3999);
+    expect(res.json.platform).toBe(process.platform);
+    expect(res.json.userspaceAvailable).toBe(false);
     expect(resolveInstallPlan).toHaveBeenCalledWith({ userspace: false, port: 3999 });
   });
 

@@ -2,8 +2,9 @@
  * Tailscale routes for Overdeck Anywhere (PAN-1254 FR-11).
  *
  * - `GET /api/tailscale/status` returns `readTailscaleState()` plus how to
- *   install Tailscale here (`resolveInstallPlan`), the operator command, and
- *   the dashboard port. `?userspace=1` asks for the userspace plan on Linux.
+ *   install Tailscale here (`resolveInstallPlan`), the operator command, the
+ *   dashboard port, the server platform and whether the userspace install is
+ *   offered (the setup dialog picks its panels from these). `?userspace=1` asks for the userspace plan on Linux.
  *   Any dashboard credential may read it (default `admin` scope).
  *
  * - `GET /api/tailscale/peers` lists the online tailnet peers, each with its
@@ -69,7 +70,14 @@ const tailscaleStatusRoute = HttpRouter.add(
     const body = yield* Effect.promise(async () => {
       const state = await readTailscaleState();
       const install = await resolveInstallPlan({ userspace, port: state.port });
-      return { state, install, operatorCommand: operatorCommand(currentUsername()), port: state.port };
+      return {
+        state,
+        install,
+        operatorCommand: operatorCommand(currentUsername()),
+        port: state.port,
+        platform: process.platform,
+        userspaceAvailable: USERSPACE_MODE_AVAILABLE,
+      };
     });
     return noStore(jsonResponse(body));
   }),
