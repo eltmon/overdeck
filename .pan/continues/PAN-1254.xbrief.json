@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T09:11:44.957Z",
+  "updated": "2026-11-01T09:12:27.592Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -438,6 +438,10 @@
       "claimedBy": "agent-pan-1254",
       "claimedAt": "2026-11-01T09:10:48.316Z",
       "doneAt": "2026-11-01T09:11:44.957Z"
+    },
+    "docs-remote-access.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:12:27.591Z"
     }
   }
 }
