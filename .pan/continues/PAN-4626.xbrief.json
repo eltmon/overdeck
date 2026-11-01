@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4626",
   "created": "2026-11-01T05:58:08.711Z",
-  "updated": "2026-11-01T07:07:21.240Z",
+  "updated": "2026-11-01T07:07:39.785Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "docs-leaving-state.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:07:21.239Z"
+    },
+    "docs-leaving-state.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:07:39.784Z"
     }
   }
 }
