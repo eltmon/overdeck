@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4295",
   "created": "2026-11-01T05:48:47.966Z",
-  "updated": "2026-11-01T08:13:53.188Z",
+  "updated": "2026-11-01T08:14:21.987Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "restore-credential-refresh.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T08:13:53.187Z"
+    },
+    "heartbeat-exit-code.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:14:21.987Z"
     }
   }
 }
