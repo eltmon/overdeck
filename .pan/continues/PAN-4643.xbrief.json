@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4643",
   "created": "2026-11-01T04:53:44.765Z",
-  "updated": "2026-11-01T06:16:08.549Z",
+  "updated": "2026-11-01T06:17:46.392Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,9 +64,10 @@
       "doneAt": "2026-11-01T06:15:56.331Z"
     },
     "diagnose-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4643",
-      "claimedAt": "2026-11-01T06:16:08.549Z"
+      "claimedAt": "2026-11-01T06:16:08.549Z",
+      "doneAt": "2026-11-01T06:17:46.391Z"
     }
   }
 }
