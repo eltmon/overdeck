@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:49:55.403Z",
+  "updated": "2026-11-01T23:50:11.212Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -210,6 +210,10 @@
     "lane-cli-machine.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T23:49:55.402Z"
+    },
+    "lane-cli-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T23:50:11.211Z"
     }
   }
 }
