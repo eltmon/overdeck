@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4640",
   "created": "2026-11-01T04:51:29.241Z",
-  "updated": "2026-11-01T05:30:28.734Z",
+  "updated": "2026-11-01T05:45:16.997Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
       "claimedBy": "agent-pan-4640",
       "claimedAt": "2026-11-01T05:28:03.386Z",
       "doneAt": "2026-11-01T05:30:28.734Z"
+    },
+    "schedule-recurrence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:45:16.997Z"
     }
   }
 }
