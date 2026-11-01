@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4642",
   "created": "2026-11-01T04:49:54.715Z",
-  "updated": "2026-11-01T05:48:44.071Z",
+  "updated": "2026-11-01T05:49:02.107Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "citation-chips.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T05:48:44.071Z"
+    },
+    "citation-chips.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:49:02.106Z"
     }
   }
 }
