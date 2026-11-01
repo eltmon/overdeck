@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4299",
   "created": "2026-11-01T05:05:33.847Z",
-  "updated": "2026-11-01T05:18:20.394Z",
+  "updated": "2026-11-01T05:30:11.316Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
       "claimedBy": "agent-pan-4299",
       "claimedAt": "2026-11-01T05:17:31.495Z",
       "doneAt": "2026-11-01T05:18:20.394Z"
+    },
+    "template-loopback-ports.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:30:11.315Z"
     }
   }
 }
