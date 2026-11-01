@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T20:36:00.239Z",
+  "updated": "2026-11-01T20:36:12.671Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,10 @@
     "wi7-provision-vm.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T20:36:00.238Z"
+    },
+    "wi7-provision-vm.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:36:12.671Z"
     }
   }
 }
