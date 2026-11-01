@@ -17,9 +17,19 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 | `roles/` | Prompt sources for pipeline roles (plan/work/review/test + review sub-roles). |
 | `sync-sources/rules/` | Bundled context rules distributed by `pan sync`. |
 | `services/account/` | The overdeck.ai account service: a Cloudflare Worker (D1) for GitHub sign-in, device tokens, the invite-only allowlist and its admin screen. Own Bun workspace and `typecheck:account` lane; Web APIs only; unit tests on a `node:sqlite` D1 shim, one Miniflare integration test. Deploy is operator-only. See `docs/ACCOUNT-SERVICE.md`. |
+| `services/connect/` | The overdeck.ai directory (PAN-2356): a Cloudflare Worker with one `AccountDirectory` SQLite Durable Object per account (machine presence and the free 3-machine limit, WebRTC signalling, two-screen approval requests, relay TURN credentials and monthly metering, the sealed webhook inbox), checking device tokens through `AccountRpc`. Own `typecheck:connect` lane; tests under `tests/{unit,integration}/services/connect/`; `scripts/anywhere/directory-smoke.mjs` runs it end to end. See `docs/CONNECT-SERVICE.md`. |
+| `services/share/` | Shared Sessions rendezvous: a Cloudflare Worker with one `ShareRoom` Durable Object per room (hibernating sockets, WebRTC signalling, Cloudflare Realtime TURN credentials), checking device tokens through the `ACCOUNT` service binding (`AccountRpc`). Own `typecheck:share` lane; tests under `tests/{unit,integration}/services/share/`. See `docs/SHARED-SESSIONS.md`. |
 
 ## Key src/lib modules
 
+- `anywhere/` (PAN-4645) — machine links: the X25519 machine key (`machine-key.ts`), the Noise
+  secure channel (`channel/`: `wire.ts` preamble and modes, `noise.ts`, `open.ts`/`accept.ts`,
+  `ChannelSocket`), route parsing and ranking (`routes.ts`), the link store (`link-store.ts`,
+  `machine-links.json`) and `linkFetch` pooling (`link-client.ts`). The supervisor and boot live in
+  `src/dashboard/server/services/{link-supervisor,anywhere-boot}.ts`. PAN-2356 adds the WebRTC
+  transport (`channel/rtc-transport.ts`, `rtc-duplex.ts`), approval mode `03`, `sealed-box.ts` and
+  `directory-config.ts`; the directory client, approvals, relay meter and inbox client are
+  `src/dashboard/server/services/{directory-*,relay-client,inbox-client}.ts`. See `docs/ANYWHERE-ARCHITECTURE.md`.
 - `agents.ts` is now a thin barrel over `src/lib/agents/` — `spawn.ts` (`spawnAgent`,
   `spawnRun`), `spawn-prep.ts` (`buildAgentLaunchConfig`, tier spawn params),
   `staffing.ts` (the single staffing resolver, PAN-2397), `resolve-tier.ts` +
@@ -92,7 +102,9 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   claude-code, `ohmypi-parser.ts`, `codex-parser.ts`, legacy `pi-parser.ts`),
   `cost.ts` (pricing table, `getPricing`), `overdeck/cost.ts` (the two-door
   CostWriter: `record()` dedupes by requestId/sourceFile → append-only archive →
-  `cost_events` SQLite; `reconcile({source})` sweeps per-agent session dirs).
+  `cost_events` SQLite; `reconcile({source})` sweeps per-agent session dirs),
+  `overdeck/cost-issue-rollup.ts` (trigger-maintained `cost_issue_rollup` table read by
+  `getCostsByIssue`, PAN-4724).
   Live triggers: claude via WAL/transcript sync, ohmypi via
   `cloister/pi-cost-reconciler.ts` (gated on a running ohmypi agent), plus
   `POST /api/costs/reconcile` (`dashboard/server/routes/costs.ts`).

@@ -58,6 +58,10 @@ export interface AnywhereStatus {
   tailscale: { nextStep: AnywhereTailscaleStep; serveUrl: string | null; magicDnsName: string | null };
   /** Who is asking (PAN-4455 D-3); null when no credential resolves. */
   viewer: { kind: 'root-session' | 'device' | 'token' | 'internal-token' | 'machine' | null };
+  /** The overdeck.ai directory (PAN-2356); null when signed out; absent on older servers. */
+  directory?: { state: 'off' | 'connecting' | 'online' | 'refused'; plan: 'free' | 'tester' | null; url: string | null; refusal: string | null } | null;
+  /** The relay add-on (PAN-2356); null when the plan has no relay; absent on older servers. */
+  relay?: { using: boolean; bytesUsed: number; capBytes: number; stopped: boolean } | null;
 }
 
 export interface PairingLinkBody {
@@ -96,6 +100,8 @@ export interface TriggerRow {
   verify: 'none' | 'github' | 'stripe';
   signingSecretSet: boolean;
   createdAt: string;
+  /** The overdeck.ai inbox that holds events while this machine is offline (PAN-2356). */
+  inbox?: { id: string; createdAt: string } | null;
 }
 
 export interface TriggersList {
@@ -209,6 +215,8 @@ export interface CreateTriggerInput {
   template: string | null;
   verify: TriggerRow['verify'];
   signingSecret: string | null;
+  /** Ask the overdeck.ai directory for an inbox (PAN-2356). */
+  inbox?: boolean;
 }
 
 /** The create response: the only time the URL secret and a generated signing secret are shown. */
@@ -218,6 +226,8 @@ export interface CreatedTriggerBody {
   url: string | null;
   urlSecretShownOnce: true;
   generatedSigningSecret: string | null;
+  /** The inbox URL, shown once, when the trigger was created with `inbox: true`. */
+  inboxUrl?: string | null;
 }
 
 export async function createTrigger(input: CreateTriggerInput): Promise<ApiResult<CreatedTriggerBody>> {

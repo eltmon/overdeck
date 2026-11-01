@@ -15,10 +15,13 @@ so changing only the migration leaves existing installations behind. Runtime
 top-ups silence duplicate DDL, log missing-table and other unexpected failures,
 and continue so later top-ups and startup can still complete.
 
-Startup runs the report-only audit in `src/lib/overdeck/schema-audit.ts` after
-the top-ups. It reads SQLite schema metadata, never mutates the database, and
-writes one `[schema-audit]` warning for each missing expected table, index, or
-column; extra artifacts are allowed because other modules add their own tables.
+Derived tables whose creation must be atomic with a backfill are the exception.
+`cost_issue_rollup` and its `_v1` index and triggers
+(`src/lib/overdeck/cost-issue-rollup.ts`, PAN-4724) are created by their module
+from `ensureRuntimeIndexesSync`, in one transaction with the backfill, and not
+by the init SQL, so they stay outside `OVERDECK_TABLE_COUNT`. Changing the grain
+or the aggregated columns means new `_v2` object names whose install drops the
+`_v1` objects and rebuilds the table.
 
 `overdeck.db` uses this init-plus-top-up model and does not use
 `PRAGMA user_version`. The legacy `panopticon.db` migration ladder in

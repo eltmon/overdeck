@@ -315,6 +315,8 @@ export interface LinkStatusSource {
   reconcile?(): void;
   /** A link's route list changed (Add route): re-rank and re-check. */
   updateRoutes?(linkId: string, routes: LinkRoute[]): void;
+  /** Routes the overdeck.ai directory offers right now (PAN-2356 D-2356-7); never stored. */
+  dynamicRoutes?(linkId: string): LinkRoute[];
 }
 
 export const connectingStatusSource: LinkStatusSource = {
@@ -333,7 +335,8 @@ export function machineLinkView(link: MachineLink, peerVersion: string | null, s
     state: link.revokedAt ? 'revoked' : live.state,
     stateDetail: live.stateDetail,
     currentRoute: live.currentRoute,
-    routes: link.routes.map((route) => ({ url: route.url, kind: route.kind, source: route.source, status: live.routeStatus(route.url) })),
+    routes: [...link.routes, ...(source.dynamicRoutes?.(link.id) ?? []).filter((route) => !link.routes.some((stored) => stored.url === route.url))]
+      .map((route) => ({ url: route.url, kind: route.kind, source: route.source, status: live.routeStatus(route.url) })),
     lastHeartbeatAt: live.lastHeartbeatAt,
     incident: live.incident,
     peerVersion: live.peerVersion ?? peerVersion,

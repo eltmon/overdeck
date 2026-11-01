@@ -1,7 +1,7 @@
 /**
  * `pan triggers` — manage webhook triggers (PAN-4648).
  *
- *   pan triggers add <name> (--conversation <name-or-id> | --project <key>) [options]
+ *   pan triggers add <name> (--conversation <name-or-id> | --project <key>) [--inbox] [options]
  *   pan triggers list [--json]
  *   pan triggers remove <id>
  *   pan triggers set-secret <id> [--secret <value>]
@@ -12,6 +12,10 @@
  * once, with the Tailscale Funnel command that publishes `/hooks`. No verb
  * prints a signing secret except a generated one, once, from `add`. See
  * configuration/triggers.mdx.
+ *
+ * `add --inbox` (PAN-2356) goes through the running dashboard instead, because only the dashboard
+ * holds the overdeck.ai directory socket that creates the inbox; it prints the inbox URL in place
+ * of the Funnel lines.
  *
  * `src/cli/index.ts` imports this module at startup to register the verbs, so
  * it imports only Commander types and chalk statically. Everything else loads
@@ -32,6 +36,7 @@ export interface TriggersAddOptions {
   model?: string;
   harness?: string;
   effort?: string;
+  inbox?: boolean;
   json?: boolean;
 }
 
@@ -65,6 +70,7 @@ export async function runTriggersAdd(name: string, options: TriggersAddOptions):
     : { kind: 'project', projectKey: options.project, model: options.model, harness: options.harness, effort: options.effort };
   const resolved = setup.resolveTriggerTarget(requested);
   if (!resolved.ok) return fail(resolved.error);
+  if (options.inbox) return addWithInbox(name, requested, template, options);
 
   const { createTrigger } = await import('../../lib/triggers/store.js');
   let created: Awaited<ReturnType<typeof createTrigger>>;
@@ -101,6 +107,42 @@ export async function runTriggersAdd(name: string, options: TriggersAddOptions):
   }
   console.log(`\nPublish /hooks with Tailscale Funnel:\n  ${funnelCommand}`);
   console.log('\nThe URL is shown once. Save it now.');
+}
+
+/** `add --inbox`: create through the dashboard, which asks the directory for the inbox. */
+async function addWithInbox(name: string, target: Record<string, unknown>, template: string | null, options: TriggersAddOptions): Promise<void> {
+  const { callDashboard, errorText, isDashboardUnreachable } = await import('./dashboard-call.js');
+  let response: Response;
+  try {
+    response = await callDashboard('/api/triggers', {
+      method: 'POST',
+      body: { name, target, template, verify: options.verify ?? 'none', signingSecret: options.signingSecret ?? null, inbox: true },
+    });
+  } catch (error) {
+    if (isDashboardUnreachable(error)) return fail('--inbox needs the running dashboard. Start it with pan up, then retry.');
+    throw error;
+  }
+  if (!response.ok) return fail(`Could not create the trigger with an inbox: ${await errorText(response)}`);
+  const created = (await response.json()) as {
+    trigger: { id: string; name: string; verify: string; signingSecretSet: boolean };
+    hookPath: string;
+    inboxUrl: string;
+    generatedSigningSecret: string | null;
+  };
+  if (options.json) {
+    console.log(JSON.stringify(created));
+    return;
+  }
+  const { trigger, inboxUrl, generatedSigningSecret } = created;
+  console.log(`Created trigger ${trigger.id} ("${trigger.name}") with an overdeck.ai inbox`);
+  console.log(`  inbox URL:  ${inboxUrl}`);
+  if (generatedSigningSecret) {
+    console.log(`  signing secret (paste into the GitHub webhook form): ${generatedSigningSecret}`);
+  }
+  if (trigger.verify === 'stripe' && !trigger.signingSecretSet) {
+    console.log(`  Stripe: run \`pan triggers set-secret ${trigger.id}\` with the endpoint's whsec_ secret before events can arrive.`);
+  }
+  console.log('\nThe inbox holds events for 24 hours while this machine is offline. The URL is shown once. Save it now.');
 }
 
 export async function runTriggersList(options: { json?: boolean }): Promise<void> {
@@ -193,6 +235,7 @@ export function registerTriggersCommands(program: Command): void {
     .option('--model <id>', 'Model for conversations a project trigger starts')
     .option('--harness <name>', 'Harness for conversations a project trigger starts')
     .option('--effort <level>', 'Reasoning effort for conversations a project trigger starts')
+    .option('--inbox', 'Hold events while this machine is offline in an overdeck.ai inbox (Anywhere plan; needs the dashboard)')
     .option('--json', 'Print { trigger, hookPath, url, localUrl, funnelCommand, generatedSigningSecret } as JSON')
     .action((name: string, options: TriggersAddOptions) => runTriggersAdd(name, options));
   triggers

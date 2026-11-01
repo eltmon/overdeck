@@ -105,8 +105,13 @@ export async function tailscaleServeEndpoint(deps: Pick<DiscoverEndpointsDeps, '
   }
 }
 
-/** Everything this machine advertises, deduplicated and sorted by URL. */
+/**
+ * Everything this machine advertises, deduplicated and sorted by URL. `OVERDECK_ANYWHERE_NO_ADVERTISE=1`
+ * advertises nothing (PAN-2356): the directory smoke uses it so two dashboards on one host can only
+ * reach each other over the `direct` route.
+ */
 export async function discoverEndpoints(deps: DiscoverEndpointsDeps): Promise<AdvertisedEndpoint[]> {
+  if (process.env['OVERDECK_ANYWHERE_NO_ADVERTISE'] === '1') return [];
   const found = interfaceEndpoints(deps.port, deps.networkInterfaces());
   const serve = await tailscaleServeEndpoint(deps);
   if (serve) found.push(serve);

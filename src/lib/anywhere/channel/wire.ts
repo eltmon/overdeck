@@ -4,20 +4,24 @@
  * Everything on the wire before the Noise handshake completes:
  *
  *  1. Preamble, sent by the initiator: `00 4F 56 44 4C <linkProtocol> <mode>`
- *     (`\0OVDL`), mode `01` = link (Noise IK), `02` = pairing (Noise XXpsk0).
- *     Pairing mode appends the 16-byte pairing id.
+ *     (`\0OVDL`), mode `01` = link (Noise IK), `02` = pairing (Noise XXpsk0),
+ *     `03` = approval (Noise XX, PAN-2356 D-2356-9). Pairing mode appends the
+ *     16-byte pairing id; approval mode appends the 16-byte approval request id.
  *  2. Handshake messages, each `uint24le length` + message, at most
  *     {@link MAX_HANDSHAKE_FRAME} bytes.
  *  3. A frame whose length is `0` followed by one code byte is a refusal
  *     ({@link REFUSAL_CODES}). Code `02` is followed by the responder's link
  *     protocol (`uint8`) and a `uint8`-length-prefixed UTF-8 server version.
+ *  4. Approval mode only, after message 3 and in the same frame format: the
+ *     initiator's 32-byte nonce commitment, the responder's 32-byte nonce, then
+ *     the initiator's 32-byte nonce (commit-then-reveal, D-2356-10 amended).
  *
  * After the handshake, bytes belong to `@hyperswarm/secret-stream`. Nothing
  * here carries application data.
  */
 import type { Duplex } from 'node:stream';
 
-export type ChannelMode = 'link' | 'pairing';
+export type ChannelMode = 'link' | 'pairing' | 'approval';
 
 export const PREAMBLE_MAGIC = Buffer.from([0x00, 0x4f, 0x56, 0x44, 0x4c]);
 /** Magic (5) + link protocol (1) + mode (1). */
@@ -28,14 +32,14 @@ export const MAX_HANDSHAKE_FRAME = 1024;
 /** Hard cap on bytes buffered while waiting for one handshake frame. */
 const MAX_BUFFERED = 4096;
 
-export const MODE_BYTES: Record<ChannelMode, number> = { link: 0x01, pairing: 0x02 };
+export const MODE_BYTES: Record<ChannelMode, number> = { link: 0x01, pairing: 0x02, approval: 0x03 };
 
 export const REFUSAL_CODES = {
   /** IK initiator's static key is not pinned here. */
   unknownPeer: 0x01,
   /** Preamble link protocol differs from ours. */
   unsupported: 0x02,
-  /** Pairing id unknown, expired, or the pairing code did not match. */
+  /** Pairing id unknown, expired, or the pairing code did not match; or no live approval request has this id. */
   pairingRefused: 0x03,
   /** Too many handshakes pending. */
   busy: 0x04,
@@ -53,7 +57,7 @@ export interface Refusal {
 export interface Preamble {
   linkProtocol: number;
   mode: ChannelMode;
-  /** 32 lowercase hex characters; pairing mode only. */
+  /** 32 lowercase hex characters: the pairing id (pairing mode) or the approval request id (approval mode). */
   pairingId: string | null;
 }
 
@@ -76,16 +80,16 @@ export function encodePreamble(preamble: Preamble): Buffer {
   PREAMBLE_MAGIC.copy(head, 0);
   head[5] = preamble.linkProtocol & 0xff;
   head[6] = MODE_BYTES[preamble.mode];
-  if (preamble.mode !== 'pairing') return head;
+  if (preamble.mode === 'link') return head;
   if (preamble.pairingId === null || !/^[0-9a-f]{32}$/.test(preamble.pairingId)) {
-    throw new WireError('bad-preamble', 'Pairing preamble needs a 16-byte pairing id');
+    throw new WireError('bad-preamble', `${preamble.mode === 'pairing' ? 'Pairing' : 'Approval'} preamble needs a 16-byte id`);
   }
   return Buffer.concat([head, Buffer.from(preamble.pairingId, 'hex')]);
 }
 
 /**
  * Parse the fixed 7-byte head of a preamble. The caller reads the 16-byte
- * pairing id afterwards when `mode === 'pairing'`.
+ * pairing id (or approval request id) afterwards when `mode !== 'link'`.
  */
 export function parsePreambleHead(head: Buffer): Omit<Preamble, 'pairingId'> {
   if (head.length !== PREAMBLE_LENGTH || !head.subarray(0, 5).equals(PREAMBLE_MAGIC)) {
@@ -93,7 +97,8 @@ export function parsePreambleHead(head: Buffer): Omit<Preamble, 'pairingId'> {
   }
   const linkProtocol = head[5]!;
   const modeByte = head[6]!;
-  const mode = modeByte === MODE_BYTES.link ? 'link' : modeByte === MODE_BYTES.pairing ? 'pairing' : null;
+  const mode: ChannelMode | null =
+    modeByte === MODE_BYTES.link ? 'link' : modeByte === MODE_BYTES.pairing ? 'pairing' : modeByte === MODE_BYTES.approval ? 'approval' : null;
   if (mode === null) throw new WireError('bad-preamble', `Unknown channel mode byte ${modeByte}`);
   return { linkProtocol, mode };
 }

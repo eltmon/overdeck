@@ -1,0 +1,244 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T15:07:01Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4723: Flaky create-workspace-row test turned main red: an unmocked git call fails in the non-git temp dir",
+    "updated": "2026-11-01T15:14:13.287Z"
+  },
+  "plan": {
+    "id": "pan-4723",
+    "title": "Flaky create-workspace-row test turned main red: an unmocked git call fails in the non-git temp dir",
+    "status": "running",
+    "uid": "c193e7ef-0bbe-4bf0-853e-81c0a0eaac36",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T15:07:01Z",
+    "updated": "2026-11-01T15:14:13.287Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4723",
+        "label": "PAN-4723",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flaky-test",
+      "ci",
+      "workspace-manager",
+      "test"
+    ],
+    "metadata": {
+      "docsJustification": "Test-only fix: no CLI, config, route, or user/developer doc describes these test files or their mocks. The testing hazard is recorded in the codebase map (.overdeck/context/codebase/conventions.md, Testing) by the planning session.",
+      "canonicalFilename": "2026-11-01-PAN-4723-flaky-create-workspace-row-test-turned-main-red-an-unmocked-git-call-fails-in-the-non-git-temp-dir.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "main CI went red (run 41317624589 attempt 1): create-workspace-row.test.ts failed 9 of 10 tests. The issue blamed an unmocked git call; the log shows every failure was 'Only 9.3 GiB free on the filesystem holding /tmp/pan-1990-create-row-…'. createWorkspace() calls checkDiskFloor(projectConfig.path) at src/lib/workspace-manager/create.ts:202, which reads real free space with statfs (node:fs/promises). The tests mock util.promisify (all git/npm/docker) but not statfs, so they fail whenever the runner's /tmp has under 10 GiB free. Runner free disk varies near 10 GiB, hence intermittent. Reproduced locally with TMPDIR on a 6.3 GiB tmpfs: create-workspace-row 9 failed, create-resume-setup 4 failed, tests/lib/workspace-manager.test.ts 1 failed. The 'git branch --show-current' log line comes from handoff-context.ts:166 during the unrelated, passing continue-readers-plan-home.test.ts.",
+      "Proposal": "Mock src/lib/disk-floor.js (checkDiskFloor -> hoisted vi.fn resolving null) in the three test files that run the real createWorkspace, and add one regression test in create-workspace-row.test.ts proving the disk-floor refusal returns success=false, creates no row, and runs no subprocess. No production code change.",
+      "NonGoals": "- Changing checkDiskFloor, the 10 GiB floor, or any file under src/\n- Silencing the 'Error capturing git state' log in handoff-context.ts or its test\n- Changing the CI workflow or freeing runner disk space\n- Adding skip, skipIf, .only, retry, or timeout changes to any test\n- Mocking the disk floor in test files that never run the real createWorkspace"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the tests, not create.ts or disk-floor.ts",
+        "rationale": "The disk floor correctly guards real project paths against ENOSPC (PAN-1674); the defect is unit tests that mock every subprocess but let one real filesystem probe through. The issue allows 'fix the test or the code, whichever is wrong'."
+      },
+      {
+        "summary": "Mock checkDiskFloor via vi.mock of disk-floor.js with importOriginal, not statfs or readAvailableBytes",
+        "rationale": "checkDiskFloor's default reader is bound inside disk-floor.ts, so mocking the exported readAvailableBytes would not take effect; mocking node:fs/promises statfs would be broader than needed."
+      },
+      {
+        "summary": "Extend scope from the one named file to all three files with the same exposure",
+        "rationale": "The low-disk repro fails create-resume-setup.test.ts and tests/lib/workspace-manager.test.ts the same way; fixing only one would leave main exposed to the identical flake. 21 transitive-caller files passed under the repro, so the set is exactly three."
+      },
+      {
+        "summary": "Add one disk-floor refusal regression test in create-workspace-row.test.ts",
+        "rationale": "Once mocked, createWorkspace's disk-floor gate has no test; a deterministic refusal test covers it and proves the mock is wired."
+      },
+      {
+        "summary": "Use a docsJustification instead of a docs item",
+        "rationale": "No documented surface describes these tests; the hazard goes in the codebase map conventions.md written by planning."
+      }
+    ],
+    "items": [
+      {
+        "id": "mock-disk-floor-create-workspace-row",
+        "title": "Mock checkDiskFloor in create-workspace-row.test.ts and add a disk-floor refusal test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T15:07:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4723",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/workspace-manager/create-workspace-row.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace-manager/create-workspace-row.test.ts",
+            "for i in $(seq 1 50); do npx vitest run tests/unit/lib/workspace-manager/create-workspace-row.test.ts || exit 1; done"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/workspace-manager/create-workspace-row.test.ts: 11 passed, 0 failed",
+            "the new disk-floor refusal test passes",
+            "50-run loop exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4723.md). In tests/unit/lib/workspace-manager/create-workspace-row.test.ts: (1) extend the vi.hoisted block at line 7 to also return `mockCheckDiskFloor: vi.fn()`; (2) after the `vi.mock('util', ...)` block (lines 16-19) add `vi.mock('../../../../src/lib/disk-floor.js', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../../../src/lib/disk-floor.js')>()), checkDiskFloor: mockCheckDiskFloor }))` with a one-line comment citing PAN-4723 and the statfs read; (3) in beforeEach (line 35) add `mockCheckDiskFloor.mockReset(); mockCheckDiskFloor.mockResolvedValue(null);`; (4) in the first test ('creates a kind=issue row via the writer…') add `expect(mockCheckDiskFloor).toHaveBeenCalledWith(tempDir);` after the existing success assertion, proving the real statfs check is replaced; (5) add the test 'refuses before creating the row or running git when the disk floor refuses (PAN-4723)' exactly as in the PRD WI-1 step 4. Root cause for the PR description: create.ts:202 `checkDiskFloor(projectConfig.path)` reads real free space via statfs (node:fs/promises, not covered by the promisify mock); CI runner /tmp had 9.3 GiB < 10 GiB floor (run 41317624589 attempt 1: 9/10 tests failed with 'Only 9.3 GiB free'); intermittent because runner free disk varies around 10 GiB; the 'Error capturing git state' line is handoff-context.ts:166 logging from the unrelated passing continue-readers-plan-home.test.ts. Do not touch src/. No skip/skipIf/.only/retry."
+        },
+        "items": [
+          {
+            "id": "mock-disk-floor-create-workspace-row.ac1",
+            "title": "Given checkDiskFloor is replaced by the hoisted mockCheckDiskFloor (resolving null in beforeEach), when `npx vitest run tests/unit/lib/workspace-manager/create-workspace-row.test.ts` runs, then it exits 0 with 11 passed and 0 failed, and the first test asserts mockCheckDiskFloor was called with tempDir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mock-disk-floor-create-workspace-row.ac2",
+            "title": "Given mockCheckDiskFloor resolves an 'Only 1.0 GiB free' string, when createWorkspace runs for pan-4723, then it returns success=false with that message, getWorkspaceForIssue('PAN-4723') returns null, and mockExecAsync records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mock-disk-floor-create-workspace-row.ac3",
+            "title": "The issue's 50-iteration loop over tests/unit/lib/workspace-manager/create-workspace-row.test.ts exits 0 with no failing run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mock-disk-floor-create-workspace-row.ac4",
+            "title": "The PR description contains the name of checkDiskFloor's statfs read at src/lib/workspace-manager/create.ts:202 as the unmocked call, contains runner free disk near 10 GiB as the intermittency cause, and attributes the git branch --show-current log line to continue-readers-plan-home.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mock-disk-floor-create-resume-setup",
+        "title": "Mock checkDiskFloor in create-resume-setup.test.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T15:07:01Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4723",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/workspace-manager/create-resume-setup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace-manager/create-resume-setup.test.ts"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/workspace-manager/create-resume-setup.test.ts: 0 failed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "acJustification": "Mechanical one-mock change in a single test file; the low-disk run and the no-skip diff check are the only observable outcomes."
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In tests/unit/lib/workspace-manager/create-resume-setup.test.ts: extend the vi.hoisted block at line 7 with `mockCheckDiskFloor: vi.fn()`; after the `vi.mock('util', ...)` block (lines 16-19) add `vi.mock('../../../../src/lib/disk-floor.js', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../../../src/lib/disk-floor.js')>()), checkDiskFloor: mockCheckDiskFloor }))` with a PAN-4723 comment; in beforeEach (line 41) add `mockCheckDiskFloor.mockReset(); mockCheckDiskFloor.mockResolvedValue(null);`. No new test, no src/ change, no skip/retry. Optional checkpoint (only if a writable mount with under 10 GiB free exists, see continue.json H2): the low-disk TMPDIR run fails 4 tests before the fix and 0 after."
+        },
+        "items": [
+          {
+            "id": "mock-disk-floor-create-resume-setup.ac1",
+            "title": "Given checkDiskFloor is replaced by the hoisted mockCheckDiskFloor resolving null, when `npx vitest run tests/unit/lib/workspace-manager/create-resume-setup.test.ts` runs, then it exits 0 with 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mock-disk-floor-create-resume-setup.ac2",
+            "title": "`git diff origin/main -- tests/unit/lib/workspace-manager/create-resume-setup.test.ts` contains an added vi.mock of src/lib/disk-floor.js and produces no added skip, skipIf, .only, or retry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mock-disk-floor-workspace-manager-test",
+        "title": "Mock checkDiskFloor in tests/lib/workspace-manager.test.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T15:07:01Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4723",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/lib/workspace-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/workspace-manager.test.ts"
+          ],
+          "expected_outputs": [
+            "tests/lib/workspace-manager.test.ts: 0 failed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "acJustification": "Mechanical one-mock change in a single test file; the low-disk run and the no-skip diff check are the only observable outcomes."
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In tests/lib/workspace-manager.test.ts: extend the vi.hoisted block at line 6 with `mockCheckDiskFloor: vi.fn()`; after the `vi.mock('os', ...)` block (lines 33-39) add `vi.mock('../../src/lib/disk-floor.js', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../src/lib/disk-floor.js')>()), checkDiskFloor: mockCheckDiskFloor }))` with a PAN-4723 comment; in the `describe('createWorkspace')` beforeEach (line 227) add `mockCheckDiskFloor.mockReset(); mockCheckDiskFloor.mockResolvedValue(null);`. The file calls vi.resetModules() and imports workspace-manager.js dynamically; vi.mock registrations survive resetModules. No new test, no src/ change, no skip/retry. Optional checkpoint (only if a writable mount with under 10 GiB free exists, see continue.json H2): the low-disk TMPDIR run fails 'createWorkspace > stages metadata-only…' before the fix and passes after."
+        },
+        "items": [
+          {
+            "id": "mock-disk-floor-workspace-manager-test.ac1",
+            "title": "Given checkDiskFloor is replaced by the hoisted mockCheckDiskFloor resolving null, when `npx vitest run tests/lib/workspace-manager.test.ts` runs, then the 'stages metadata-only workspace directories before git worktree add and restores records' test passes and vitest exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mock-disk-floor-workspace-manager-test.ac2",
+            "title": "`git diff origin/main -- tests/lib/workspace-manager.test.ts` contains an added vi.mock of src/lib/disk-floor.js and produces no added skip, skipIf, .only, or retry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}

@@ -68,6 +68,10 @@
   only, no `node:` imports; `cloudflare:workers` imported only in its `index.ts`).
   wrangler and Miniflare are dev-only devDependencies of that workspace (local
   `wrangler dev --local`, `--dry-run` bundles, real-workerd tests); deploying is
-  operator-only. See `docs/ACCOUNT-SERVICE.md`.
+  operator-only. See `docs/ACCOUNT-SERVICE.md`. `services/connect/` (PAN-2356, the
+  overdeck.ai directory, relay credentials and webhook inbox) follows the same rules
+  with one SQLite Durable Object per account and pure-JS `@noble/*` sealing; see
+  `docs/CONNECT-SERVICE.md`. The machine side adds `werift` (WebRTC, bundled) and
+  `sodium-native` (sealed-box open) as root dependencies.
 
 <!-- last-verified: 2026-11-01 -->

@@ -15,8 +15,19 @@ vi.mock('../../../src/cli/exit.js', () => ({
 }));
 
 const {
-  fleetVersionsTable, formatAgo, formatFleetUpdateCell, formatLinkState, runMachinesLink, runMachinesList, runMachinesUnlink,
-  runMachinesUpdate, runMachinesVersions,
+  fleetVersionsTable,
+  formatAgo,
+  formatFleetUpdateCell,
+  formatLinkState,
+  runMachinesApprove,
+  runMachinesDirectory,
+  runMachinesForget,
+  runMachinesJoin,
+  runMachinesLink,
+  runMachinesList,
+  runMachinesUnlink,
+  runMachinesUpdate,
+  runMachinesVersions,
 } = await import('../../../src/cli/commands/machines.js');
 
 const FINGERPRINT = '1a2b-3c4d-5e6f-7a8b-9c0d';
@@ -144,6 +155,65 @@ describe('pan machines (PAN-4645 WI-14)', () => {
     await expect(runMachinesUnlink('desk', {})).rejects.toThrow('exit 1');
     expect(stderr).toHaveLength(3);
     for (const line of stderr) expect(line).toContain('Start the dashboard with pan up');
+  });
+});
+
+describe('pan machines directory verbs (PAN-2356 WI-16)', () => {
+  const REQUEST_ID = 'ab'.repeat(16);
+  const directory = (joins: unknown[] = []) => ({
+    signedIn: true, state: 'online', url: 'https://connect.overdeck.ai', plan: 'tester', refusal: null,
+    machines: [{ environmentId: 'env-vps', label: 'vps', publicKeyHex: 'b'.repeat(64), fingerprint: 'bbbb-bbbb-bbbb-bbbb-bbbb', online: true, lastSeenAt: '2026-11-01T11:59:00.000Z', serverVersion: '0.73.0', endpoints: [], linked: false }],
+    approvals: [], joins, relay: null,
+  });
+  const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const routes = (handler: (path: string, method: string) => Response) => {
+    fetchMock.mockImplementation(async (url: string, init: RequestInit) => handler(new URL(url).pathname, init.method ?? 'GET'));
+  };
+  const deps = { isTTY: () => false, ask: async () => true, sleep: async () => undefined, now: () => NOW };
+
+  it('join off a TTY prints the code and the accept hint, and exits 0', async () => {
+    let polls = 0;
+    routes((path, method) => {
+      if (path === '/api/machines') return json(200, { self: { environmentId: 'env-self', label: 'desk', fingerprint: FINGERPRINT }, links: [], inbound: [] });
+      if (path === '/api/directory/join' && method === 'POST') return json(200, { requestId: REQUEST_ID });
+      if (path === '/api/directory') {
+        polls += 1;
+        const open = polls > 1;
+        return json(200, directory([{ requestId: REQUEST_ID, to: null, expiresAt: NOW + 600_000, sas: open ? '123 456' : null, fingerprint: open ? 'bbbb-bbbb-bbbb-bbbb-bbbb' : null, state: open ? 'open' : 'waiting' }]));
+      }
+      return json(404, { error: 'not found' });
+    });
+    await runMachinesJoin({}, deps);
+    expect(stdout).toEqual([
+      `Requested approval (request ${REQUEST_ID}). This machine's fingerprint: ${FINGERPRINT}`,
+      'Code: 123 456 · approver vps bbbb-bbbb-bbbb-bbbb-bbbb',
+      `Confirm with: pan machines accept ${REQUEST_ID}`,
+    ]);
+  });
+
+  it('approve --yes calls open then approve, in that order', async () => {
+    const calls: string[] = [];
+    routes((path, method) => {
+      calls.push(`${method} ${path}`);
+      if (path.endsWith('/open')) return json(200, { sas: '123 456', fingerprint: 'bbbb-bbbb-bbbb-bbbb-bbbb' });
+      return json(202, { approving: true });
+    });
+    await runMachinesApprove(REQUEST_ID, { yes: true }, deps);
+    expect(calls).toEqual([`POST /api/directory/approvals/${REQUEST_ID}/open`, `POST /api/directory/approvals/${REQUEST_ID}/approve`]);
+    expect(stdout[0]).toBe('Code: 123 456 · fingerprint bbbb-bbbb-bbbb-bbbb-bbbb');
+  });
+
+  it('directory --json prints the response unchanged', async () => {
+    const body = directory();
+    routes(() => json(200, body));
+    await runMachinesDirectory({ json: true });
+    expect(JSON.parse(stdout[0] ?? '')).toEqual(body);
+  });
+
+  it('forget with a label the directory does not list exits 1 with the dashboard error text', async () => {
+    routes(() => json(404, { error: 'unknown', message: 'The directory does not list a machine "ghost"' }));
+    await expect(runMachinesForget('ghost')).rejects.toThrow('exit 1');
+    expect(stderr.join('\n')).toContain('The directory does not list a machine "ghost"');
   });
 });
 
