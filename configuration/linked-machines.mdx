@@ -39,6 +39,20 @@ tokens, and the new link shows up as **Online** on both sides.
 Both servers on one host (for a test) need `--allow-loopback`, because a `localhost`
 pairing link only works on the machine that printed it.
 
+## Link a fresh server
+
+To link a server you reach over SSH, one command on the server does everything: it
+installs Overdeck as a service that survives logout and reboot, starts it, and prints the
+link.
+
+```bash
+# on the server, over SSH
+npx @overdeck/core connect
+```
+
+Then run the `pan machines link '…'` line it prints on your laptop. See
+[`pan connect`](/cli/machines#connect) for lingering, macOS, firewalls and removal.
+
 ## Access levels
 
 | Level | What this machine may do on the other | Flag |

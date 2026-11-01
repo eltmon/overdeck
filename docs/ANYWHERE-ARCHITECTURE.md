@@ -251,6 +251,42 @@ state (D-3).
   these paths, since every machine token holds `read:state` and `operate`. Update all
   treats only `403 fleet-update-forbidden` as an agent-fenced link.
 
+## pan connect (W-LINK9, FR-25)
+
+`pan connect` (`src/cli/commands/connect.ts`, registered lazily from `pair.ts`) turns a
+machine reached over SSH into a lasting linked machine: durable runtime, primary dashboard,
+service, lingering, then one pairing link (`.pan/drafts/PAN-4656.md`).
+
+- **D-1 The supervisor unit, no dashboard unit.** The service is the existing
+  `overdeck-supervisor.service`; its watchdog restarts the dashboard through the same
+  `pan restart --dashboard` path as every other restart. A `Restart=always` dashboard unit
+  would fight `pan restart`, `pan reload` and the watchdog for the port.
+- **D-2 `[Install]` always rendered, enabled only by `pan connect`.**
+  `renderSupervisorUnit()` ends with `[Install]\nWantedBy=default.target`, so `pan up`'s
+  re-render keeps the text stable. `pan up` never runs `systemctl --user enable`, so a
+  machine that never ran `pan connect` still does not start the supervisor at boot (PAN-2253).
+  `explainSystemdUserUnavailable()` (`src/lib/systemd.ts`) names why the user manager is
+  unusable; `systemdUserAvailable()` is that reason being null.
+- **D-3 Boot path.** Lingering starts the user manager at boot ⇒ the enabled supervisor unit
+  starts ⇒ the watchdog waits out its 5-minute boot grace ⇒ `pan restart --dashboard`
+  starts the dashboard. The dashboard answers within about 6 minutes of boot.
+- **D-4 Durable runtime.** Under npx, `ensureDurableRuntime()`
+  (`src/lib/anywhere/connect-runtime.ts`) runs `npm install --prefix <home>/runtime` of the
+  exact running version (never `--global`, which needs sudo on a system Node).
+- **D-5 Re-exec.** `pan connect` then re-runs itself from the runtime with
+  `OVERDECK_CONNECT_REEXEC=1`, so the unit's `ExecStart`, its `WorkingDirectory`, the
+  dashboard bundle and the primary identity all point into the runtime and the watchdog
+  never sees the dashboard as foreign. A process with that variable never re-execs.
+- **D-8 PATH for the user manager.** `persistUserManagerPath()`
+  (`src/lib/systemd-user-session.ts`) writes `~/.config/environment.d/60-overdeck.conf`
+  and runs `systemctl --user set-environment PATH=…` before the unit starts, minus any
+  `/git-guard` shim directory. The unit itself carries no `PATH`, because `pan up`
+  re-renders it from whatever shell runs it.
+- **D-10 macOS.** `src/lib/launchd.ts` writes `~/Library/LaunchAgents/ai.overdeck.supervisor.plist`
+  (`RunAtLoad`, `KeepAlive`) and bootstraps it into `gui/<uid>`, falling back to
+  `user/<uid>`; a changed plist is booted out first. The agent starts at login only. `pan up`
+  on a Mac with the agent loaded does not start a second supervisor.
+
 ## Decisions added by sibling issues
 
 Placeholder headings for the decisions that land with the follow-up issues; each adds its

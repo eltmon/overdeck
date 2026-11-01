@@ -167,8 +167,80 @@ describe('systemdUserAvailable', () => {
   });
 });
 
+describe('explainSystemdUserUnavailable (PAN-4656)', () => {
+  it('returns null when systemdUserAvailable() is true', async () => {
+    const { explainSystemdUserUnavailable, systemdUserAvailable } = await import('../systemd.js');
+
+    await expect(explainSystemdUserUnavailable()).resolves.toBeNull();
+    await expect(systemdUserAvailable()).resolves.toBe(true);
+  });
+
+  it("returns 'not-linux' off Linux", async () => {
+    setPlatform('darwin');
+    const { explainSystemdUserUnavailable } = await import('../systemd.js');
+
+    await expect(explainSystemdUserUnavailable()).resolves.toBe('not-linux');
+  });
+
+  it("returns 'ci' in CI", async () => {
+    process.env.CI = 'true';
+    const { explainSystemdUserUnavailable } = await import('../systemd.js');
+
+    await expect(explainSystemdUserUnavailable()).resolves.toBe('ci');
+  });
+
+  it("returns 'container' when /.dockerenv exists, and systemdUserAvailable() is false", async () => {
+    accessMock.mockImplementation(async (path: string) => {
+      if (path === '/run/.containerenv') throw new Error('missing');
+      return undefined;
+    });
+    const { explainSystemdUserUnavailable, systemdUserAvailable } = await import('../systemd.js');
+
+    await expect(explainSystemdUserUnavailable()).resolves.toBe('container');
+    await expect(systemdUserAvailable()).resolves.toBe(false);
+    expect(execAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 'no-runtime-dir' when XDG_RUNTIME_DIR is unset outside a container", async () => {
+    delete process.env.XDG_RUNTIME_DIR;
+    const { explainSystemdUserUnavailable } = await import('../systemd.js');
+
+    await expect(explainSystemdUserUnavailable()).resolves.toBe('no-runtime-dir');
+    expect(execAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 'no-session-bus' when XDG_RUNTIME_DIR is set but no session bus exists", async () => {
+    delete process.env.DBUS_SESSION_BUS_ADDRESS;
+    accessMock.mockImplementation(async (path: string) => {
+      if (path === '/run/user/1000/bus' || path === '/.dockerenv' || path === '/run/.containerenv') throw new Error('missing');
+      return undefined;
+    });
+    const { explainSystemdUserUnavailable } = await import('../systemd.js');
+
+    await expect(explainSystemdUserUnavailable()).resolves.toBe('no-session-bus');
+    expect(execAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 'systemctl-unusable' when systemctl --user --version fails", async () => {
+    execAsyncMock.mockRejectedValueOnce(new Error('systemctl not found'));
+    const { explainSystemdUserUnavailable } = await import('../systemd.js');
+
+    await expect(explainSystemdUserUnavailable()).resolves.toBe('systemctl-unusable');
+  });
+
+  it("returns 'manager-not-running' for an offline user manager", async () => {
+    execAsyncMock.mockImplementation(async (command: string) => {
+      if (command === 'systemctl --user is-system-running') throw exitError('offline\n');
+      return managerAnswer(command);
+    });
+    const { explainSystemdUserUnavailable } = await import('../systemd.js');
+
+    await expect(explainSystemdUserUnavailable()).resolves.toBe('manager-not-running');
+  });
+});
+
 describe('supervisor systemd unit helpers', () => {
-  it('renders the supervisor unit with bounded restart policy and no boot install section', async () => {
+  it('renders the supervisor unit with bounded restart policy and an [Install] section (PAN-4656)', async () => {
     const { renderSupervisorUnit } = await import('../systemd.js');
 
     const unit = renderSupervisorUnit({
@@ -194,10 +266,12 @@ describe('supervisor systemd unit helpers', () => {
       Environment="OVERDECK_SUPERVISOR_PORT=3012" "OVERDECK_HOME=/home/dev/.overdeck"
       Restart=on-failure
       RestartSec=5
+
+      [Install]
+      WantedBy=default.target
       "
     `);
-    expect(unit).not.toContain('[Install]');
-    expect(unit).not.toContain('WantedBy=');
+    expect(unit.endsWith('[Install]\nWantedBy=default.target\n')).toBe(true);
   });
 
   it('defaults the supervisor CPUWeight to resources.dashboard_cpu_weight (PAN-4311)', async () => {
@@ -275,6 +349,34 @@ describe('supervisor systemd unit helpers', () => {
       expect(readFileSync(join(unitDir, 'overdeck-supervisor.service'), 'utf-8')).toBe(unitText);
       expect(execAsyncMock).toHaveBeenCalledWith('systemctl --user daemon-reload', expect.any(Object));
       expect(execAsyncMock).toHaveBeenCalledWith('systemctl --user start overdeck-supervisor.service', expect.any(Object));
+    } finally {
+      rmSync(unitDir, { recursive: true, force: true });
+    }
+  });
+
+  it('never enables the unit on the pan up path (PAN-2253, PAN-4656)', async () => {
+    const unitDir = mkdtempSync(join(tmpdir(), 'overdeck-systemd-start-test-'));
+    execAsyncMock.mockImplementation(async (command: string) => {
+      if (command.includes('is-active')) throw new Error('inactive');
+      return managerAnswer(command);
+    });
+    const { installSupervisorUnit, renderSupervisorUnit, startSupervisorUnitIfAvailable } = await import('../systemd.js');
+    const unitText = renderSupervisorUnit({
+      nodePath: '/usr/bin/node',
+      supervisorBundle: '/opt/overdeck/dist/supervisor/server.js',
+      supervisorPort: 3012,
+      workingDirectory: '/opt/overdeck',
+      overdeckHome: '/home/dev/.overdeck',
+      cpuWeight: 1000,
+    });
+
+    try {
+      await installSupervisorUnit({ unitDir, unitText });
+      await expect(startSupervisorUnitIfAvailable({ unitDir, unitText })).resolves.toBe(true);
+
+      const commands = execAsyncMock.mock.calls.map((call) => String(call[0]));
+      expect(commands).toContain('systemctl --user start overdeck-supervisor.service');
+      expect(commands.filter((command) => command.includes('enable'))).toEqual([]);
     } finally {
       rmSync(unitDir, { recursive: true, force: true });
     }

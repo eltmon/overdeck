@@ -113,12 +113,30 @@ export async function startPostLaunchSidecars(config: {
   // The Herdr session server is ensured before the dashboard starts:
   // ensureHerdrBeforeDashboard (called from `pan up`).
 
+  await startSupervisorSidecar();
+
+  try {
+    const logPath = await spawnDeferredSync({ selfCli: config.selfCli });
+    console.log(chalk.dim(`Context and Herdr sync running in background — output in ${logPath}`));
+  } catch (error: unknown) {
+    console.log(chalk.yellow('⚠ Could not start deferred context sync (non-fatal):'), errorMessage(error));
+  }
+}
+
+/**
+ * The supervisor: the systemd user unit when available, else the launchd agent
+ * `pan connect` loaded on a Mac (PAN-4656), else a plain process. Never throws.
+ */
+export async function startSupervisorSidecar(): Promise<void> {
   try {
     const { startSupervisorProcess, getSupervisorPort } = await import('../lib/supervisor.js');
     const { startSupervisorUnitIfAvailable, SUPERVISOR_UNIT_NAME } = await import('../lib/systemd.js');
+    const { isSupervisorAgentLoaded, SUPERVISOR_AGENT_LABEL } = await import('../lib/launchd.js');
     const onWarning = (message: string) => console.log(chalk.dim(`  ⚠ ${message}`));
     if (await startSupervisorUnitIfAvailable({ onWarning })) {
       console.log(chalk.green(`✓ Supervisor managed by ${SUPERVISOR_UNIT_NAME}`));
+    } else if (process.platform === 'darwin' && (await isSupervisorAgentLoaded()).loaded) {
+      console.log(chalk.green(`✓ Supervisor managed by launchd agent ${SUPERVISOR_AGENT_LABEL}`));
     } else {
       startSupervisorProcess();
       console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPort()}`));
@@ -126,12 +144,5 @@ export async function startPostLaunchSidecars(config: {
   } catch (error: unknown) {
     console.log(chalk.yellow('⚠ Failed to start supervisor:'), errorMessage(error));
     console.log(chalk.dim('  Force Restart will only work via the Electron bridge or while dashboard is responding.'));
-  }
-
-  try {
-    const logPath = await spawnDeferredSync({ selfCli: config.selfCli });
-    console.log(chalk.dim(`Context and Herdr sync running in background — output in ${logPath}`));
-  } catch (error: unknown) {
-    console.log(chalk.yellow('⚠ Could not start deferred context sync (non-fatal):'), errorMessage(error));
   }
 }
