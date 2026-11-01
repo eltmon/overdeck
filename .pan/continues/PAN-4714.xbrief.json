@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4714",
   "created": "2026-11-01T12:30:39.191Z",
-  "updated": "2026-11-01T12:55:33.584Z",
+  "updated": "2026-11-01T12:58:15.237Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,10 @@
       "claimedBy": "agent-pan-4714",
       "claimedAt": "2026-11-01T12:49:07.375Z",
       "doneAt": "2026-11-01T12:55:33.584Z"
+    },
+    "contracts-tracker-issue-ref.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T12:58:15.237Z"
     }
   }
 }
