@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:41:04.394Z",
+  "updated": "2026-11-01T14:41:17.490Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -324,6 +324,10 @@
       "claimedBy": "agent-pan-2356",
       "claimedAt": "2026-11-01T14:40:45.085Z",
       "doneAt": "2026-11-01T14:41:04.394Z"
+    },
+    "wi19-inbox-delivery.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:41:17.490Z"
     }
   }
 }
