@@ -111,7 +111,7 @@ describe('/api/triggers (PAN-4648)', () => {
     expect(listed.body.funnel).toEqual({
       port: 8443,
       baseUrl: null,
-      command: expect.stringMatching(/^tailscale funnel --bg --https=8443 --set-path=\/hooks http:\/\/127\.0\.0\.1:\d+\/hooks$/),
+      command: `tailscale funnel --bg --https=8443 --set-path=/hooks http://127.0.0.1:${process.env.API_PORT ?? process.env.PORT ?? '3011'}/hooks`,
     });
   });
 
@@ -149,6 +149,9 @@ describe('/api/triggers (PAN-4648)', () => {
     const updated = await call('PUT', `/api/triggers/${id}/signing-secret`, { secret: 'whsec_rolled_secret' });
     expect(updated).toMatchObject({ status: 200, body: { trigger: { id, signingSecretSet: true } } });
     expect(updated.text).not.toContain('whsec_rolled_secret');
+    const listed = await call('GET', '/api/triggers');
+    expect(listed.body.triggers[0]).toMatchObject({ id, signingSecretSet: true });
+    expect(listed.text).not.toContain('whsec_rolled_secret');
     expect(JSON.parse(await readFile(join(home, 'triggers.json'), 'utf8')).triggers[0].signingSecret).toBe('whsec_rolled_secret');
     expect((await call('PUT', `/api/triggers/${id}/signing-secret`, { secret: 'has space' })).status).toBe(400);
     expect((await call('PUT', '/api/triggers/trg_000000000000/signing-secret', { secret: 'whsec_rolled_secret' })).status).toBe(404);

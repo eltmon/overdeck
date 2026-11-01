@@ -118,5 +118,7 @@ describe('TriggersPanel (PAN-4648)', () => {
     expect(
       await screen.findByText('No triggers. A trigger is a secret URL that sends a message to a conversation or starts one in a project.'),
     ).toBeInTheDocument();
+    expect(screen.getByText(/Events reach this machine directly through Tailscale Funnel; overdeck\.ai never sees them\./)).toBeInTheDocument();
+    expect(screen.getByTestId('trigger-funnel-command')).toHaveTextContent(FUNNEL_COMMAND);
   });
 });
