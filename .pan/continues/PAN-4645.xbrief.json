@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T09:43:16.286Z",
+  "updated": "2026-11-01T09:43:34.307Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -297,6 +297,10 @@
       "claimedBy": "agent-pan-4645",
       "claimedAt": "2026-11-01T09:38:27.915Z",
       "doneAt": "2026-11-01T09:43:16.286Z"
+    },
+    "wi13-machines-list-unlink.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:43:34.307Z"
     }
   }
 }
