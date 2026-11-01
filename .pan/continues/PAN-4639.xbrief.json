@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T09:42:17.938Z",
+  "updated": "2026-11-01T09:42:35.237Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "bulk-select.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T09:42:17.937Z"
+    },
+    "docs-and-ci.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:42:35.236Z"
     }
   }
 }
