@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T21:45:20.462512Z · model: claude-opus-5-5 · open: 859_
+_Last sequenced: 2026-11-01T22:04:18.233977Z · model: claude-opus-5-5 · open: 860_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -322,6 +322,7 @@ _Last sequenced: 2026-11-01T21:45:20.462512Z · model: claude-opus-5-5 · open: 
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
+| 324 | PAN-4743 | M | medium | ok |  | PAN-4651 | Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; gap left by PAN-4651/4652 PRDs. Follows PAN-4651. |
 | 325 | PAN-4473 | M | medium | ok |  |  | Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
@@ -1194,10 +1195,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T21:45:20.462512Z",
+  "generatedAt": "2026-11-01T22:04:18.233977Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 859,
+  "openCount": 860,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -11895,6 +11896,21 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "why": "Fly machine advertises unreachable private 172.19.x lan routes ranked before its public route; every reconnect probes dead routes first.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4743",
+      "rank": 324,
+      "size": "M",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4651"
+      ],
+      "why": "Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; gap left by PAN-4651/4652 PRDs. Follows PAN-4651.",
+      "rationale": "New issue: closes the ownership gap between PAN-4651 and PAN-4652 for Fly VMs in the Machine field; ranked just behind the Anywhere work queue because it needs PAN-4651 merged first.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13164,6 +13180,13 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4651",
+      "to": "PAN-4743",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.95
     }
   ]
 }
