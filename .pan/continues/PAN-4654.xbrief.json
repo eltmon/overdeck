@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4654",
   "created": "2026-11-01T13:26:56.845Z",
-  "updated": "2026-11-01T14:19:10.964Z",
+  "updated": "2026-11-01T14:19:24.922Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "extract-dashboard-restart.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T14:19:10.964Z"
+    },
+    "extract-dashboard-restart.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:19:24.922Z"
     }
   }
 }
