@@ -522,6 +522,8 @@ export async function addPack(
  * Fetch the pack's ref (or a new one), preview the difference from the
  * trusted commit, and move the trusted commit only when `confirm` resolves
  * true. Nothing is asked or written when the commit and ref are unchanged.
+ * With browser consent recorded, the new commit's browser runtime is built too,
+ * and the commit moves only when both the render and the build succeed.
  */
 export async function updatePack(
   id: string,
@@ -537,8 +539,10 @@ export async function updatePack(
   const dir = await gitStep(id, () => extractCommit(id, commit, pluginRootOf(id)));
   const oldDir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
   const adapter = await packAdapter(id, dir, entry.adapter);
-  const manifest = await manifestAt(id, dir, adapter);
-  const oldManifest = await manifestAt(id, oldDir, adapter);
+  // With browser consent recorded, both sides list the browser skills that mount.
+  const browser = adapter === 'gstack-runtime' && entry.browser === true;
+  const manifest = await manifestAt(id, dir, adapter, browser);
+  const oldManifest = await manifestAt(id, oldDir, adapter, browser);
 
   const oldByName = new Map(oldManifest.skills.map((skill) => [skill.name, skill]));
   const newNames = new Set(manifest.skills.map((skill) => skill.name));
@@ -570,8 +574,11 @@ export async function updatePack(
   // Checked only when there is something to move to, so an up-to-date pack needs no bun.
   const runtime = adapter === 'gstack-runtime' ? await runtimePreview(id, dir, commit) : undefined;
   if (runtime) preview.runtime = runtime;
+  // PAN-4730 D10: consent is recorded, so the new commit's browser runtime joins the same preview and confirmation.
+  if (browser) preview.browser = await browserPreview(id, dir, commit);
   if (!(await confirm(preview))) return { written: false, preview };
   if (runtime) await renderPack(id, dir, commit);
+  if (browser && !(await isBrowserReady(packRenderDir(id, commit)))) await buildPackBrowser(id, dir, commit);
   await writePackEntry({ ...entry, ref, commit });
   return { written: true, preview };
 }
@@ -651,7 +658,7 @@ export async function removePack(id: string): Promise<{ removed: boolean }> {
 
 /**
  * Re-fetch a registered pack and make sure its trusted commit is extracted, and for a runtime pack
- * rendered. Never moves the commit.
+ * rendered (and, with browser consent, its browser runtime built). Never moves the commit.
  */
 export async function syncPack(id: string): Promise<{ commit: string; dir: string }> {
   const entry = await requirePack(id);
@@ -660,6 +667,10 @@ export async function syncPack(id: string): Promise<{ commit: string; dir: strin
     await resolveRef(id, entry.commit);
     return extractCommit(id, entry.commit, pluginRootOf(id));
   });
-  if ((entry.adapter ?? KNOWN_PACKS[id]?.adapter) === 'gstack-runtime') await renderPack(id, dir, entry.commit);
+  if ((entry.adapter ?? KNOWN_PACKS[id]?.adapter) === 'gstack-runtime') {
+    await renderPack(id, dir, entry.commit);
+    // PAN-4730 D8: consent is recorded, so sync builds a missing browser runtime without asking.
+    if (entry.browser && !(await isBrowserReady(packRenderDir(id, entry.commit)))) await buildPackBrowser(id, dir, entry.commit);
+  }
   return { commit: entry.commit, dir };
 }

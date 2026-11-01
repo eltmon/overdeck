@@ -29,6 +29,8 @@ import {
   packRenderDir,
   packsHome,
   PackSourceError,
+  syncPack,
+  updatePack,
 } from '../sources.js';
 
 // args: --pack-root R --pack-state-root S, or --pack-browser R --pack-browser-cache C
@@ -79,6 +81,7 @@ function createUpstream() {
 let up: ReturnType<typeof createUpstream>;
 let good = '';
 let browserFails = '';
+let goodAgain = '';
 let noBrowser = '';
 const accept = vi.fn(async () => true);
 const decline = vi.fn(async () => false);
@@ -91,7 +94,7 @@ beforeAll(() => {
   up.commitFile('qa/SKILL.md', skillMd('qa'), 'qa');
   good = up.commitFile('setup', SETUP(GOOD_BROWSER), 'good setup');
   browserFails = up.commitFile('setup', SETUP(FAILING_BROWSER), 'failing browser step');
-  up.commitFile('setup', SETUP(GOOD_BROWSER), 'good setup again');
+  goodAgain = up.commitFile('setup', SETUP(GOOD_BROWSER), 'good setup again');
   noBrowser = up.commitFile('pack-mode.json', '{"packMode": 1}\n', 'no browser step');
 });
 
@@ -192,5 +195,53 @@ describe('disablePackBrowser', () => {
     expect(existsSync(packBrowserDir('gstack'))).toBe(false);
 
     expect(await disablePackBrowser('gstack')).toEqual({ changed: false });
+  });
+});
+
+describe('updatePack and syncPack with browser consent', () => {
+  it('update adds the browser rows to the one preview, builds the new render, and moves the commit', async () => {
+    await addAt(good);
+    await enablePackBrowser('gstack', accept);
+    accept.mockClear();
+    const result = await updatePack('gstack', { ref: goodAgain }, accept);
+    expect(result.written).toBe(true);
+    expect(accept).toHaveBeenCalledOnce();
+    expect(result.preview.browser?.command).toEqual([
+      'bash', 'setup', '--pack-browser', packRenderDir('gstack', goodAgain), '--pack-browser-cache', packBrowserDir('gstack'),
+    ]);
+    expect(result.preview.manifest.skills.map((s) => s.name)).toEqual(['qa', 'review']);
+    expect(existsSync(browserMarker(goodAgain))).toBe(true);
+    expect(await getPack('gstack')).toEqual({ id: 'gstack', url: up.url, ref: goodAgain, commit: goodAgain, browser: true });
+  });
+
+  it('a failed browser build on update leaves the trusted commit unchanged', async () => {
+    await addAt(good);
+    await enablePackBrowser('gstack', accept);
+    const error = await updatePack('gstack', { ref: browserFails }, accept).catch((e: unknown) => e);
+    expect((error as PackSourceError).code).toBe('render');
+    expect(await getPack('gstack')).toEqual({ id: 'gstack', url: up.url, ref: good, commit: good, browser: true });
+  });
+
+  it('update without consent shows and builds no browser runtime', async () => {
+    await addAt(good);
+    const result = await updatePack('gstack', { ref: goodAgain }, accept);
+    expect(result.written).toBe(true);
+    expect(result.preview.browser).toBeUndefined();
+    expect(existsSync(browserMarker(goodAgain))).toBe(false);
+  });
+
+  it('sync rebuilds a missing browser runtime when consent is recorded', async () => {
+    await addAt(good);
+    await enablePackBrowser('gstack', accept);
+    rmSync(browserMarker(good));
+    await syncPack('gstack');
+    expect(existsSync(browserMarker(good))).toBe(true);
+  });
+
+  it('sync without consent never runs the browser step', async () => {
+    await addAt(good);
+    await syncPack('gstack');
+    expect(existsSync(browserMarker(good))).toBe(false);
+    expect(existsSync(packBrowserDir('gstack'))).toBe(false);
   });
 });
