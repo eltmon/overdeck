@@ -125,3 +125,182 @@ $ gh pr view --repo eltmon/gstack overdeck/pack-browser --json baseRefName,headR
 PR: https://github.com/eltmon/gstack/pull/2
 
 **Pack-browser SHA** (used by the live acceptance): `fb781f7177b9edc8bca724ea6180611462e9f6fd`
+
+## Live acceptance
+
+Run 2026-11-01 from this workspace's build (`bun install` then `npm run typecheck` rc 0 and `npm run build` rc 0), `P=node /home/eltmon/Projects/overdeck/workspaces/feature-pan-4730/dist/cli/index.js`, with `OVERDECK_HOME=/tmp/pan-4730-live/overdeck-home` on every `$P` command. No `pan up`, `pan start` or dashboard command used the isolated home. Fork commit: the pack-browser SHA `fb781f7177b9edc8bca724ea6180611462e9f6fd`. Host bun 1.3.14 (the fork's floor is 1.3.3; it reports `untested` below 1.4.2). `bun install --frozen-lockfile` accepted the lockfile, so **no `bun upgrade` was needed** and the host bun is unchanged.
+
+Deviations and findings:
+
+- **ffmpeg download.** `bun x playwright install chromium` also downloaded `ffmpeg-1011` next to `chromium-1234` and `chromium_headless_shell-1234`. The consent preview's last line did not name it; commit "fix(cli): name ffmpeg in the gstack browser consent preview" fixes the line (D13 requires every download).
+- **SIGTERM is ignored.** gstack's headless browse daemon ignores SIGTERM (fork `browse/src/server.ts:1410-1421`: `Received SIGTERM (ignoring — use /stop or Ctrl+C for intentional shutdown)`). The plan's daemon hint `kill <n>` left it running; `kill -INT <n>` stopped the daemon, its terminal agent and Chromium in 2 s. Commit "fix(cli): tell operators to stop a gstack browse daemon with SIGINT" changes the hint.
+- **Order of steps 6-8.** The daemon was left running through step 8 so that `browser off` could show the live daemon report; it was then stopped with `kill -INT` instead of `$B stop` (the `off` re-render had already removed the compiled `browse`).
+- **`~/.bun` changed, not by gstack.** The after-snapshot found 9 new files in `~/.bun/install/cache` (16:34:37). They are npm registry manifests for `@types/node`, `tsdown`, `typescript`, `vitest`, `conf`, `electron-builder`, `electron-updater`, `@electron/notarize`, `@electron/rebuild`: Overdeck's own `apps/desktop` dependency set (gstack's `package.json` names none of them). Another Overdeck workspace's `bun install` wrote them while this run was in progress (three agents were running). The pack's own bun cache went to `C/bun-cache`.
+- **Blocked postinstalls.** `bun pm untrusted` in `R` lists `onnxruntime-node@1.30.0` and `protobufjs@7.6.6` (their lifecycle scripts were blocked); `sharp` is not listed. They were not trusted. The QA run below did not need them.
+- `/tmp/browse-no-sfx-*` dirs exist from 15:51, before this run started (16:31); the run wrote none.
+
+### Steps 1-3
+
+```
+$ cat /tmp/pan-4730-live/project/index.html        # git init + commit "init"
+<!doctype html><title>Live QA</title><h1>Hello</h1><button id=b onclick="document.title='clicked'">Go</button>
+$ cat $OVERDECK_HOME/projects.yaml
+projects:
+  live:
+    name: live
+    path: /tmp/pan-4730-live/project
+    issue_prefix: LIVE
+$ python3 -m http.server 8765 --bind 127.0.0.1 --directory /tmp/pan-4730-live/project &   # port 8765 was free
+$ cat /tmp/pan-4730-live/before.txt
+6306dc702170a848544c7d47e02483a42cb0aec999709bd7c38db33c349b8471  /home/eltmon/.claude/settings.json
+c9a73c3e3290bd83596ef7353204e605640e0e6526da45fe1ff4ac39e36aa6ee  -        (ls -la ~/.cache/ms-playwright)
+0                                                                        (files in ~/.bun newer than start)
+no-gstack
+```
+
+### Step 4: add --browser
+
+```
+$ $P skills pack add gstack https://github.com/eltmon/gstack --ref fb781f7177b9edc8bca724ea6180611462e9f6fd --browser --yes
+Pack gstack
+  Source       https://github.com/eltmon/gstack @ fb781f7177b9edc8bca724ea6180611462e9f6fd (fb781f7)
+  Skills       36 (14 opt-in: …)
+  Not mounted  27: benchmark (Needs the browser runtime: pan skills pack browser gstack on); browse (…); …
+  Runs         bash setup --pack-root …/render/fb781f71… --pack-state-root …/packs/gstack/state
+  Executables  233 files the mounted skills can run:
+  …
+Trusted gstack @ fb781f7.
+Pack gstack                                   (second preview: the browser runtime)
+  Skills       54 (23 opt-in: autoplan, benchmark-models, canary, captain, careful, codex, cso, design-consultation, …)
+  Not mounted  9: connect-chrome (…); gstack-upgrade (…); open-gstack-browser (Opens a visible browser …); …
+  Runs         bash setup --pack-browser /tmp/pan-4730-live/overdeck-home/packs/gstack/render/fb781f7177b9edc8bca724ea6180611462e9f6fd --pack-browser-cache /tmp/pan-4730-live/overdeck-home/packs/gstack/browser
+  Downloads    15 lines, every package and file the build fetches:
+                @anthropic-ai/sdk@^0.78.0
+                @huggingface/transformers@^4.3.1
+                @ngrok/ngrok@^1.7.0
+                cross-spawn@^7.0.6
+                diff@^9.0.0
+                html-to-docx@1.8.0
+                html-to-vdom@0.7.0
+                marked@^18.1.1
+                playwright@^1.62.1
+                sharp@^0.35.4
+                socks@^2.8.10
+                xterm@^5.3.0
+                xterm-addon-fit@^0.8.0
+                + their locked dependencies from bun.lock (registry.npmjs.org)
+                Chromium and Chromium headless shell for playwright ^1.62.1 (Playwright CDN, ~115 MiB download)   (before the ffmpeg fix)
+  Writes       6 paths: …/node_modules, …/browse/dist, …/design/dist, …/make-pdf/dist, …/browser/bun-cache, …/browser/playwright
+  Size         about 1 GB on disk
+Trusting runs the command above once now and downloads the listed packages and Chromium.
+Browser runtime for gstack is on. Browser skills mount at the next launch.
+rc=0
+$ cat $R/.gstack-pack-browser.json
+{"packBrowser":1,"browsersPath":"/tmp/pan-4730-live/overdeck-home/packs/gstack/browser/playwright","version":"1.92.33.0"}
+$ ls $C/playwright
+chromium-1234  chromium_headless_shell-1234  ffmpeg-1011
+$ du -sh $R/node_modules $C
+576M  …/render/fb781f71…/node_modules
+675M  …/packs/gstack/browser
+$ ls -la $R/browse/dist/browse $R/browse/dist/find-browse $R/design/dist/design $R/make-pdf/dist/pdf $R/bin/gstack-global-discover
+-rwxr-xr-x (≈95 MB each, all five present)
+$ (cd $R && BUN_INSTALL_CACHE_DIR=$C/bun-cache bun pm untrusted)
+./node_modules/onnxruntime-node @1.30.0  » [postinstall]: node ./script/install
+./node_modules/protobufjs @7.6.6          » [postinstall]: node scripts/postinstall
+$ $R/bin/gstack-browser-ensure --check --quiet
+BROWSER_OK node 151.0.7922.34
+$ grep -c "~/.gstack/" $R/design-shotgun/SKILL.md
+0
+```
+
+### Step 5: on for the project
+
+```
+$ $P skills set --pack gstack on --project live
+gstack (pack): on at project live
+$ $P skills launch-settings --harness claude-code --cwd /tmp/pan-4730-live/project --plugin-link /tmp/pan-4730-live/link
+[launcher] deft: pack off; project not directive; read-only
+$ ls /tmp/pan-4730-live/link/gstack/skills
+benchmark browse context-restore context-save design-motion deslop-shared-libs devex-review diagram health investigate ios-clean ios-design-review ios-fix ios-qa ios-sync landing-report learn make-pdf plan-ceo-review plan-devex-review plan-eng-review qa qa-only retro review scrape skillify spec test-audit verify write-skill
+   (qa, qa-only, browse present; ship and pair-agent absent)
+```
+
+### Step 6: /gstack:qa-only runs against the local page
+
+```
+$ cd /tmp/pan-4730-live/project && env -u CLAUDECODE -u CLAUDE_CODE_* -u CLAUDE_PID -u CLAUDE_EFFORT -u CLAUDE_PLUGIN_DATA … GSTACK_SESSION_KIND=spawned \
+    claude -p "/gstack:qa-only Test http://127.0.0.1:8765/ — click the Go button and confirm the title changes; report only, do not edit files." \
+    --plugin-dir /tmp/pan-4730-live/link --output-format stream-json --verbose --allowedTools "Bash Read Grep Glob Write" > qa.jsonl
+result: {'subtype': 'success', 'is_error': False, 'num_turns': 60, 'duration_ms': 275937, 'total_cost_usd': 1.95}
+result text (start): "The Go button works: clicking it changes the browser tab title from "Live QA" to "clicked". I checked it again after reloading the page and got the same result. …"
+qa.jsonl: BROWSER_OK node 151.0.7922.34
+qa.jsonl: 138 calls of /tmp/pan-4730-live/overdeck-home/packs/gstack/render/fb781f7177b9edc8bca724ea6180611462e9f6fd/browse/dist/browse
+init: 31 gstack:* slash commands, including gstack:qa, gstack:qa-only, gstack:browse, gstack:make-pdf (no ship, no pair-agent)
+$ find $OVERDECK_HOME/packs/gstack/state/projects -type f
+…/state/projects/project/timeline.jsonl
+…/state/projects/project/Edward-Becker-master-test-outcome-20261101T213608Z.md      (the report copy under S)
+$ ls /tmp/pan-4730-live/project/.gstack
+browse-audit.jsonl browse-daemon.log browse-network.log browse.json claude-available.json qa-reports terminal-agent-pid terminal-internal-token terminal-port
+```
+
+The daemon found the markers with no launch env (the `fork-pack-env` proof):
+
+```
+$ tr '\0' '\n' < /proc/<browse.json pid>/environ | grep -E 'GSTACK_STATE_ROOT|PLAYWRIGHT_BROWSERS_PATH|BUN_RUNTIME_TRANSPILER'
+GSTACK_STATE_ROOT=/tmp/pan-4730-live/overdeck-home/packs/gstack/state
+PLAYWRIGHT_BROWSERS_PATH=/tmp/pan-4730-live/overdeck-home/packs/gstack/browser/playwright
+BUN_RUNTIME_TRANSPILER_CACHE_PATH=0
+$ tr '\0' ' ' < /proc/<pid>/cmdline
+bun run --no-env-file --config=/dev/null /tmp/pan-4730-live/overdeck-home/packs/gstack/render/fb781f71…/browse/src/server.ts
+```
+
+### Step 7: nothing written outside the pack
+
+```
+$ diff before.txt after.txt
+3c3
+< 0
+---
+> 10        (~/.bun/install/cache: Overdeck apps/desktop manifests from another workspace's bun install; see Deviations)
+   (line 1 ~/.claude/settings.json and line 2 ~/.cache/ms-playwright unchanged; line 4 no-gstack unchanged)
+$ find ~/.claude -newer start -path '*gstack*' -not -path '*/.claude/plugins/*' -not -path '*/.claude/projects/*'
+(no output)
+$ ls $OVERDECK_HOME/packs/gstack/browser/playwright
+chromium-1234  chromium_headless_shell-1234  ffmpeg-1011
+```
+
+### Step 8: browser off
+
+```
+$ $P skills pack browser gstack off
+Browser runtime for gstack is off; /tmp/pan-4730-live/overdeck-home/packs/gstack/render/fb781f7177b9edc8bca724ea6180611462e9f6fd was rendered again without it and /tmp/pan-4730-live/overdeck-home/packs/gstack/browser was removed.
+Browse daemon still running in /tmp/pan-4730-live/project: pid 1196474 — stop with: kill 1196474      (hint before the SIGINT fix)
+$ test ! -e $R/node_modules; test ! -e $OVERDECK_HOME/packs/gstack/browser; test -f $R/.gstack-pack.json; test ! -e $R/.gstack-pack-browser.json
+no node_modules / no browser dir / render ready / no browser marker
+$ grep -A4 'gstack:' $OVERDECK_HOME/config.yaml          # no browser key
+    gstack:
+      url: https://github.com/eltmon/gstack
+      ref: fb781f7177b9edc8bca724ea6180611462e9f6fd
+      commit: fb781f7177b9edc8bca724ea6180611462e9f6fd
+$ kill 1196474   → still alive after 12 s; daemon log: "Received SIGTERM (ignoring — use /stop or Ctrl+C for intentional shutdown)"
+$ kill -INT 1196474   → "Shutting down…", stopped after 2 s; terminal agent and Chromium gone
+$ $P skills launch-settings --harness claude-code --cwd /tmp/pan-4730-live/project --plugin-link /tmp/pan-4730-live/link
+$ ls /tmp/pan-4730-live/link/gstack/skills | grep -cE '^(qa|qa-only|browse)$'
+0          (22 default skills remain)
+```
+
+### Step 9: remove leaves nothing
+
+```
+$ $P skills pack remove gstack
+Removed pack gstack, its cache, 2 mount(s) and 0 Codex cache(s).
+Project files gstack skills wrote (not removed): /tmp/pan-4730-live/project/.gstack  — remove with: rm -rf /tmp/pan-4730-live/project/.gstack
+1 project or issue toggle(s) for gstack remain; they do nothing unless gstack is added again.
+$ find $OVERDECK_HOME -path '*gstack*'
+(no output)
+$ test ! -e ~/.gstack && echo no-gstack
+no-gstack
+$ (~/.claude/settings.json and ~/.cache/ms-playwright listing hashes equal before.txt)
+```
+
+The http server was stopped and `/tmp/pan-4730-live` removed.
