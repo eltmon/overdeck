@@ -41,6 +41,7 @@ import { initDeployProgress } from './services/deploy-progress.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { ensureInternalToken } from '../../lib/internal-token.js';
 import { refreshAccessTokens, startAccessTokenRefresh } from '../../lib/access-tokens.js';
+import { registerRevocationClosers } from './ws-rpc-auth.js';
 import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
 import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
@@ -143,6 +144,7 @@ ensureInternalToken();
 // corrupt registry is already logged loudly and accepts no token.
 await refreshAccessTokens().catch(() => undefined);
 startAccessTokenRefresh();
+registerRevocationClosers(); // PAN-4645 D-4645-16: revokes (any process) close live sockets and channels.
 
 // PAN-785 prepared the managed tmux context here, before any code path could spawn
 // tmux. Since PAN-1379 made that boot hook an Effect, the `await` here returned

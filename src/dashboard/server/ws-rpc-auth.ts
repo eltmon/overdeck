@@ -10,16 +10,26 @@
  * that connection, so calling it fails before any handler runs. The upgrade
  * needs `read:events` or `read:conversations` (else 403).
  *
- * `withRpcRevocation` keeps the PAN-3762 behaviour: revoking the credential
- * interrupts the connection's handler. WI-7 replaces it with a 4401 close.
+ * `withRpcRevocation` closes the connection with code 4401 when its credential
+ * is revoked (D-4645-15): the `ws` WebSocket Effect's server created on
+ * upgrade is stored on the raw socket under the symbol described `websocket`
+ * (`ws/lib/constants.js`), and its `close(4401)` is frame-safe. If the symbol
+ * is not found (upgrade not done yet, or a `ws` change), the raw socket is
+ * destroyed instead and the client's reconnect gets 401.
+ *
+ * `registerRevocationClosers` (D-4645-16) is the one dashboard listener on
+ * `onAccessTokensRevoked`: it closes the record's live device connections and,
+ * for a machine record, every secure channel bound to its key, so a revoke
+ * written by another process lands within one refresh (5 s).
  */
-import { Deferred, Effect } from 'effect';
+import { Effect } from 'effect';
 import type { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import type { Rpc, RpcGroup } from 'effect/unstable/rpc';
 import { PanRpcGroup } from '@overdeck/contracts';
 
-import { scopeSatisfies } from '../../lib/access-tokens.js';
-import { registerDeviceConnection, revocableCredentialId } from './device-connections.js';
+import { onAccessTokensRevoked, scopeSatisfies } from '../../lib/access-tokens.js';
+import { closeChannelsForPeer } from './channel-listener.js';
+import { closeDeviceConnections, registerDeviceConnection, revocableCredentialId } from './device-connections.js';
 import { jsonResponse } from './http-helpers.js';
 import { allowedRpcTags, WS_RPC_UPGRADE_SCOPES } from './route-scopes.js';
 import { credentialScopes, type DashboardCredential } from './routes/dashboard-auth.js';
@@ -82,24 +92,68 @@ export function selectRpcHandler<A, E, R>(credential: DashboardCredential, sourc
   return source.build(omit).pipe(Effect.tap((built) => Effect.sync(() => { restrictedHandlers.set(key, built); })));
 }
 
+interface ClosableWebSocket {
+  close(code?: number, reason?: string): void;
+}
+
+interface RawSocketLike {
+  destroy?: () => void;
+}
+
+/** The `ws` WebSocket that `handleUpgrade` stored on the raw socket, if any. */
+export function websocketOfRawSocket(socket: unknown): ClosableWebSocket | null {
+  if (typeof socket !== 'object' || socket === null) return null;
+  const symbol = Object.getOwnPropertySymbols(socket).find((entry) => entry.description === 'websocket');
+  if (!symbol) return null;
+  const candidate = (socket as Record<symbol, unknown>)[symbol];
+  return typeof candidate === 'object' && candidate !== null && typeof (candidate as ClosableWebSocket).close === 'function'
+    ? (candidate as ClosableWebSocket)
+    : null;
+}
+
+/** Close the WebSocket behind a Node-backed upgrade request with 4401, or drop the raw socket. */
+export function closeRpcSocketRevoked(request: HttpServerRequest.HttpServerRequest): 'closed-4401' | 'destroyed' | 'no-socket' {
+  const source = (request as { source?: { socket?: unknown } }).source;
+  const socket = typeof source === 'object' && source !== null ? source.socket : undefined;
+  const ws = websocketOfRawSocket(socket);
+  if (ws) {
+    ws.close(4401, 'device revoked');
+    return 'closed-4401';
+  }
+  if (typeof (socket as RawSocketLike | undefined)?.destroy === 'function') {
+    (socket as RawSocketLike).destroy!();
+    return 'destroyed';
+  }
+  return 'no-socket';
+}
+
 /**
- * Revoking the device or token interrupts this socket's handler, which closes
- * the socket (Effect's release closes it without a code, so this one cannot
- * send 4401). The client's reconnect then gets 401. Root credentials are not
- * revocable and pass through.
+ * Register this connection under its revocable credential so a revoke closes
+ * it with 4401 (D-4645-15). Root credentials are not revocable and pass through.
  */
 export function withRpcRevocation<E, R>(
   rpcHttp: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>,
   credential: DashboardCredential,
-  empty: () => HttpServerResponse.HttpServerResponse,
+  request: HttpServerRequest.HttpServerRequest,
 ): Effect.Effect<HttpServerResponse.HttpServerResponse, E, R> {
   const revocableId = revocableCredentialId(credential);
   if (revocableId === null) return rpcHttp;
-  const revoked = Deferred.makeUnsafe<void>();
   const unregister = registerDeviceConnection(revocableId, () => {
-    Deferred.doneUnsafe(revoked, Effect.void);
+    closeRpcSocketRevoked(request);
   });
-  return Effect.raceFirst(rpcHttp, Deferred.await(revoked).pipe(Effect.as(empty()))).pipe(Effect.ensuring(Effect.sync(unregister)));
+  return rpcHttp.pipe(Effect.ensuring(Effect.sync(unregister)));
+}
+
+/**
+ * The dashboard's one `onAccessTokensRevoked` listener (D-4645-16): close the
+ * record's live connections and, for a machine record, its channels. Returns
+ * the unsubscribe function.
+ */
+export function registerRevocationClosers(): () => void {
+  return onAccessTokensRevoked((record) => {
+    closeDeviceConnections(record.id);
+    if (record.kind === 'machine' && record.machineKey) closeChannelsForPeer(record.machineKey);
+  });
 }
 
 export function _resetRpcHandlerMemoForTests(): void {

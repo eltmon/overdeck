@@ -11,7 +11,7 @@ import { readPrimeAgentSessionFile } from '../../lib/runtimes/storage/prime-agen
 import { Effect, Layer, Queue, Schedule, Schema, Scope, Stream } from 'effect';
 import { existsSync, watch as fsWatch } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { DomainEvent as DomainEventSchema, isAgentSessionName, PanRpcGroup, PanRpcError, WS_METHODS } from '@overdeck/contracts';
 import { PanOpen } from './services/open.js';
@@ -1130,7 +1130,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
       const auth = authorizeRpcUpgrade(request);
       if (!auth.ok) return jsonResponse({ error: auth.message }, { status: auth.status });
       const rpcHttp = yield* selectRpcHandler(auth.credential, { full: rpcWebSocketHttp, build: buildRestricted });
-      return yield* withRpcRevocation(rpcHttp, auth.credential, () => HttpServerResponse.empty());
+      return yield* withRpcRevocation(rpcHttp, auth.credential, request);
     }));
   }),
 );
