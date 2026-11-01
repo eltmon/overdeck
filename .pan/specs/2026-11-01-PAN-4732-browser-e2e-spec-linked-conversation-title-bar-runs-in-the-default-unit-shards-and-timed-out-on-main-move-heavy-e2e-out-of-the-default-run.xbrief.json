@@ -4,17 +4,17 @@
     "created": "2026-11-01T18:26:53Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4732: Browser e2e spec (linked-conversation-title-bar) runs in the default unit shards and timed out on main; move heavy e2e out of the default run",
-    "updated": "2026-11-01T18:34:37.033Z"
+    "updated": "2026-11-01T18:35:20.130Z"
   },
   "plan": {
     "id": "pan-4732",
     "title": "Browser e2e spec (linked-conversation-title-bar) runs in the default unit shards and timed out on main; move heavy e2e out of the default run",
-    "status": "proposed",
+    "status": "running",
     "uid": "b9d28670-fdc5-42d7-9ae0-ca133d5b1464",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T18:26:53Z",
-    "updated": "2026-11-01T18:34:37.033Z",
+    "updated": "2026-11-01T18:35:20.130Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4732",
@@ -199,5 +199,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
