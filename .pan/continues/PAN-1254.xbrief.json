@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T06:16:27.087Z",
+  "updated": "2026-11-01T06:16:47.983Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "ts-userspace.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T06:16:27.087Z"
+    },
+    "ts-userspace.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:16:47.983Z"
     }
   }
 }
