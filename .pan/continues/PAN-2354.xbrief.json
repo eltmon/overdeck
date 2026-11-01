@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2354",
   "created": "2026-11-01T05:46:47.920Z",
-  "updated": "2026-11-01T07:28:53.474Z",
+  "updated": "2026-11-01T07:29:12.803Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -204,6 +204,10 @@
     "webpush.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T07:28:53.474Z"
+    },
+    "ntfy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:29:12.802Z"
     }
   }
 }
