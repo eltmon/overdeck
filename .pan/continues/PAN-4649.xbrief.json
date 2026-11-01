@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T07:49:54.508Z",
+  "updated": "2026-11-01T07:50:15.788Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -256,6 +256,10 @@
     "copy-mcp-url.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T07:49:54.507Z"
+    },
+    "access-tokens-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:50:15.787Z"
     }
   }
 }
