@@ -142,4 +142,21 @@ describe('createMachineLink (PAN-4645 WI-12)', () => {
     expect(replaced.calls).toContain('revoke reverse-old');
     expect(replaced.calls).not.toContain('revoke reverse-1');
   });
+
+  it('PAN-4404: a prepared ssh transport opens the channel on that URL and stores a first route of kind ssh', async () => {
+    const { deps, calls, stored } = harness();
+    const { link } = await createMachineLink({ transport: { url: 'tcp://127.0.0.1:41234', kind: 'ssh', pairingCode: 'odp_x' } }, deps);
+    expect(calls[1]).toBe('openChannel');
+    expect(vi.mocked(deps.openChannel).mock.calls[0]![0]).toBe('tcp://127.0.0.1:41234');
+    expect(vi.mocked(deps.openChannel).mock.calls[0]![1]).toMatchObject({ mode: 'pairing', pairingCode: 'odp_x' });
+    expect(stored).toHaveLength(1);
+    expect(link.routes[0]).toEqual({ url: 'tcp://127.0.0.1:41234', kind: 'ssh', source: 'pairing', addedAt: '2026-11-01T00:00:00.000Z' });
+  });
+
+  it('PAN-4404: a transport without an odp_ code, or no pairing link and no transport, is bad-pairing-url', async () => {
+    const { deps, calls } = harness();
+    await expect(createMachineLink({ transport: { url: 'tcp://127.0.0.1:41234', kind: 'ssh', pairingCode: 'nope' } }, deps)).rejects.toMatchObject({ code: 'bad-pairing-url' });
+    await expect(createMachineLink({}, deps)).rejects.toMatchObject({ code: 'bad-pairing-url' });
+    expect(calls).toEqual([]);
+  });
 });
