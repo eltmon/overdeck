@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { formatRelativeTime } from '../../../lib/dashboard-utils';
 import { useConfirm } from '../../DialogProvider';
+import { AddTriggerDialog, SetSigningSecretDialog } from './AddTriggerDialog';
 import {
   ANYWHERE_TRIGGERS_QUERY_KEY,
   apiError,
@@ -24,7 +26,7 @@ function verifyText(trigger: TriggerRow): string {
   return `${kind} signature · ${trigger.signingSecretSet ? 'signing secret set' : 'signing secret not set'}`;
 }
 
-/** Webhook triggers on this machine; remove one after an in-app confirmation (PAN-4648 FR-8). */
+/** Webhook triggers on this machine: add one, set its signing secret, or remove it after an in-app confirmation (PAN-4648 FR-8). */
 export function TriggersPanel() {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
@@ -33,6 +35,8 @@ export function TriggersPanel() {
     queryFn: loadTriggers,
   });
   const triggers = data?.triggers ?? [];
+  const [adding, setAdding] = useState(false);
+  const [secretFor, setSecretFor] = useState<TriggerRow | null>(null);
 
   const handleRemove = async (trigger: TriggerRow) => {
     const confirmed = await confirm({
@@ -53,7 +57,16 @@ export function TriggersPanel() {
 
   return (
     <div data-component="anywhere-triggers-panel">
-      <h3 className="text-sm font-medium text-foreground mb-2">Triggers</h3>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-medium text-foreground">Triggers</h3>
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/40 transition-colors"
+        >
+          Add trigger
+        </button>
+      </div>
       {isLoading ? (
         <p className="text-xs text-muted-foreground px-4 py-3">Loading triggers…</p>
       ) : error ? (
@@ -78,13 +91,24 @@ export function TriggersPanel() {
                   {' · '}created {formatRelativeTime(trigger.createdAt)}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => void handleRemove(trigger)}
-                className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                Remove
-              </button>
+              <div className="flex shrink-0 gap-2">
+                {trigger.verify !== 'none' && (
+                  <button
+                    type="button"
+                    onClick={() => setSecretFor(trigger)}
+                    className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/40 transition-colors"
+                  >
+                    Set signing secret
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void handleRemove(trigger)}
+                  className="rounded-md border border-border px-2.5 py-1 text-xs text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -100,6 +124,8 @@ export function TriggersPanel() {
           {data.funnel.command}
         </code>
       ) : null}
+      <AddTriggerDialog open={adding} onClose={() => setAdding(false)} />
+      <SetSigningSecretDialog trigger={secretFor} onClose={() => setSecretFor(null)} />
     </div>
   );
 }

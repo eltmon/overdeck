@@ -146,6 +146,39 @@ export async function removeTrigger(id: string): Promise<ApiResult<{ removed: tr
   }));
 }
 
+export interface CreateTriggerInput {
+  name: string;
+  target: { kind: 'conversation'; conversation: string } | { kind: 'project'; projectKey: string };
+  template: string | null;
+  verify: TriggerRow['verify'];
+  signingSecret: string | null;
+}
+
+/** The create response: the only time the URL secret and a generated signing secret are shown. */
+export interface CreatedTriggerBody {
+  trigger: TriggerRow;
+  hookPath: string;
+  url: string | null;
+  urlSecretShownOnce: true;
+  generatedSigningSecret: string | null;
+}
+
+export async function createTrigger(input: CreateTriggerInput): Promise<ApiResult<CreatedTriggerBody>> {
+  return readResult(await fetch('/api/triggers', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(input),
+  }));
+}
+
+export async function setTriggerSigningSecret(id: string, secret: string): Promise<ApiResult<{ trigger: TriggerRow }>> {
+  return readResult(await fetch(`/api/triggers/${encodeURIComponent(id)}/signing-secret`, {
+    method: 'PUT',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ secret }),
+  }));
+}
+
 /** Query function for `['anywhere-triggers']`: the triggers and Funnel facts, or a thrown error. */
 export async function loadTriggers(): Promise<TriggersList> {
   const result = await fetchTriggers();
