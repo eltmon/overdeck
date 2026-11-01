@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T15:04:39.008Z",
+  "updated": "2026-11-01T15:04:58.627Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -434,6 +434,10 @@
     "wi21-directory-smoke.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T15:04:39.008Z"
+    },
+    "wi21-directory-smoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:04:58.627Z"
     }
   }
 }
