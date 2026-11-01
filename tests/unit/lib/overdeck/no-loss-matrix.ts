@@ -435,6 +435,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'DELETE /api/machines/inbound/:tokenId',      kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (inbound machine) (PAN-4645)' },
   { surface: 'GET /api/machines/heartbeat',                kind: 'http', disposition: 'READ',        door: 'link-heartbeat.startHeartbeatSource (event-loop stall record) (PAN-4645)' },
   { surface: 'POST /api/machines/:id/reconnect',           kind: 'http', disposition: 'WRITE',       door: 'link-supervisor.reconnect (PAN-4645)' },
+  { surface: 'POST /api/machines/:id/routes',              kind: 'http', disposition: 'WRITE',       door: 'link-store.setLinkRoutes (manual route) (PAN-4645, closes #4403)' },
   { surface: 'GET /api/anywhere/status',                  kind: 'http', disposition: 'AGGREGATE',   door: 'environment-identity + trusted origins + access-tokens + vault config (PAN-4445)' },
   { surface: 'GET /api/access-tokens',                    kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind token)' },
   { surface: 'POST /api/access-tokens',                   kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (kind token)' },

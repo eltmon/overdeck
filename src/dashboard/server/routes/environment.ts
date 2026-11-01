@@ -16,6 +16,7 @@ import { Effect, Schema } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import { ENVIRONMENT_PROTOCOL_VERSION, EnvironmentDescriptor, LINK_PROTOCOL_VERSION } from '@overdeck/contracts';
 
+import { currentAdvertisedEndpoints } from '../../../lib/anywhere/endpoints.js';
 import { ensureMachineKey, publicKeyHex } from '../../../lib/anywhere/machine-key.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -43,6 +44,7 @@ export async function buildEnvironmentDescriptor(): Promise<EnvironmentDescripto
     },
     machineKey: publicKeyHex(machineKey),
     linkProtocol: LINK_PROTOCOL_VERSION,
+    endpoints: currentAdvertisedEndpoints(),
   });
 }
 

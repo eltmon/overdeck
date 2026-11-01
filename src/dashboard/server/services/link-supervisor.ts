@@ -31,7 +31,7 @@ import { ChannelOpenError, openChannel, type TransportUrl } from '../../../lib/a
 import type { LinkRouteInfo, LinkRouteSource } from '../../../lib/anywhere/link-client.js';
 import { linksSnapshot, type MachineLink, markLinkRevoked, setLinkRoutes } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey, type MachineKeyPair } from '../../../lib/anywhere/machine-key.js';
-import { type LinkRoute, rankRoutes } from '../../../lib/anywhere/routes.js';
+import { type LinkRoute, mergeAdvertised, rankRoutes } from '../../../lib/anywhere/routes.js';
 import { channelRequest, type LinkStatusSource } from './machine-link-service.js';
 import { type HeartbeatHandle, type HeartbeatHandlers, type HeartbeatPayload, openHeartbeatOverChannel } from './link-heartbeat.js';
 
@@ -247,10 +247,9 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     for (const url of [...entry.routeStatus.keys()]) {
       if (!routes.some((route) => route.url === url)) entry.routeStatus.delete(url);
     }
-    if (entry.currentRoute && !routes.some((route) => route.url === entry.currentRoute)) {
-      // The route we are on vanished from the link: keep the channel until it fails, but re-probe soon.
-      this.scheduleBetter(entry, 0);
-    }
+    // Probe at once when a better route was added or the route we are on vanished
+    // (the channel stays until it fails); a no-op when we are already on the best.
+    if (entry.state === 'online') this.scheduleBetter(entry, 0);
   }
 
   // ── internals ──────────────────────────────────────────────────────────────
@@ -544,9 +543,28 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     entry.lastHeartbeatAt = this.deps.now();
     this.clearTimer(entry, 'retryTimer');
     this.armWatchdog(entry);
+    void this.applyDescriptor(entry, descriptor);
     this.scheduleBetter(entry);
     this.settleWaiters(entry, true);
     void this.deps.onDescriptor?.(entry.link, descriptor);
+  }
+
+  /** WI-19: merge the peer's advertised endpoints into the link's routes and persist when they changed. */
+  private async applyDescriptor(entry: Entry, descriptor: EnvironmentDescriptor): Promise<void> {
+    const merged = mergeAdvertised(entry.link.routes, descriptor.endpoints ?? []);
+    const before = entry.link.routes.map((route) => `${route.source}:${route.url}`).sort().join('|');
+    const after = merged.map((route) => `${route.source}:${route.url}`).sort().join('|');
+    if (before === after) return;
+    entry.link = { ...entry.link, routes: merged };
+    for (const url of [...entry.routeStatus.keys()]) {
+      if (!merged.some((route) => route.url === url)) entry.routeStatus.delete(url);
+    }
+    try {
+      await this.deps.setLinkRoutes(entry.link.id, merged);
+    } catch (error) {
+      this.deps.log(`could not persist routes for ${entry.link.label}: ${(error as Error).message}`);
+    }
+    if (entry.state === 'online') this.scheduleBetter(entry);
   }
 
   private onHeartbeat(entry: Entry, channel: ChannelSocket, payload: HeartbeatPayload): void {
@@ -567,10 +585,12 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       this.settleWaiters(entry, true);
     }
     this.armWatchdog(entry);
-    if (entry.lastEndpointsHash !== null && entry.lastEndpointsHash !== payload.endpointsHash && this.deps.onDescriptor) {
+    if (entry.lastEndpointsHash !== null && entry.lastEndpointsHash !== payload.endpointsHash) {
+      // The peer's advertised endpoints changed: refetch the descriptor and re-merge (WI-19).
       void this.deps.channelRequest(channel, 'GET', '/api/environment').then((response) => {
         const decoded = decodeDescriptor(response.json);
         if (response.status === 200 && decoded._tag === 'Some' && entry.channel === channel) {
+          void this.applyDescriptor(entry, decoded.value);
           void this.deps.onDescriptor?.(entry.link, decoded.value);
         }
       }).catch(() => undefined);

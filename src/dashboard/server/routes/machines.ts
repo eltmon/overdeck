@@ -26,8 +26,9 @@ import {
   revokeAccessToken,
 } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
-import { getLink, listLinks, type MachineLink, removeLink } from '../../../lib/anywhere/link-store.js';
+import { getLink, listLinks, type MachineLink, removeLink, setLinkRoutes } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
+import { classifyHost, parseRouteUrl } from '../../../lib/anywhere/routes.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
 import { channelOfRequest } from '../channel-peer.js';
@@ -275,6 +276,46 @@ const reconnectRoute = HttpRouter.add(
   }),
 );
 
+/** WI-19 Add route: a `manual` route the operator knows reaches the machine. */
+export async function handleAddRoute(idOrEnvOrLabel: string, bodyText: string): Promise<HttpServerResponse.HttpServerResponse> {
+  const link = await getLink(idOrEnvOrLabel);
+  if (!link) return jsonResponse({ error: `no machine link matches ${idOrEnvOrLabel}` }, { status: 404 });
+  let url: unknown;
+  try {
+    url = (JSON.parse(bodyText || '{}') as { url?: unknown }).url;
+  } catch {
+    return jsonResponse({ error: 'body is not JSON' }, { status: 400 });
+  }
+  if (typeof url !== 'string') return jsonResponse({ error: 'body must be { url: string } (tcp://host:port or wss://host[:port])' }, { status: 400 });
+  let parsed;
+  try {
+    parsed = parseRouteUrl(url);
+  } catch (error) {
+    return jsonResponse({ error: (error as Error).message }, { status: 400 });
+  }
+  if (link.routes.some((route) => route.url === parsed.url)) {
+    return jsonResponse({ error: `${parsed.url} is already a route of ${link.label}`, link: machineLinkView(link, null, statusSource ?? undefined) }, { status: 409 });
+  }
+  const routes = [...link.routes, { url: parsed.url, kind: classifyHost(parsed.host), source: 'manual' as const, addedAt: new Date().toISOString() }];
+  const updated = await setLinkRoutes(link.id, routes);
+  statusSource?.updateRoutes?.(link.id, routes);
+  emitActivityEntry({ source: 'dashboard', level: 'info', message: `Added route ${parsed.url} to machine "${link.label}"`, details: JSON.stringify({ linkId: link.id }) });
+  return jsonResponse(machineLinkView(updated ?? { ...link, routes }, null, statusSource ?? undefined));
+}
+
+const addRouteRoute = HttpRouter.add(
+  'POST',
+  '/api/machines/:id/routes',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = refuseChannel(request) ?? rejectUnsafeDashboardMutationRequest(request);
+    if (refused) return refused;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const text = yield* request.text;
+    return yield* Effect.promise(() => handleAddRoute(id, text));
+  }),
+);
+
 const inboundRevokeRoute = HttpRouter.add(
   'DELETE',
   '/api/machines/inbound/:tokenId',
@@ -287,4 +328,4 @@ const inboundRevokeRoute = HttpRouter.add(
   }),
 );
 
-export const machinesRouteLayer = Layer.mergeAll(linkRoute, listRoute, selfRevokeRoute, unlinkRoute, reconnectRoute, inboundRevokeRoute);
+export const machinesRouteLayer = Layer.mergeAll(linkRoute, listRoute, selfRevokeRoute, unlinkRoute, reconnectRoute, addRouteRoute, inboundRevokeRoute);

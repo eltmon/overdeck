@@ -36,6 +36,7 @@ import {
 
 import { createAccessToken, MACHINE_TOKEN_SCOPES, revokeAccessToken } from '../../../lib/access-tokens.js';
 import type { ChannelSocket } from '../../../lib/anywhere/channel/channel-socket.js';
+import { currentAdvertisedEndpoints } from '../../../lib/anywhere/endpoints.js';
 import { ChannelOpenError, openChannel, type TransportUrl } from '../../../lib/anywhere/channel/open.js';
 import { type MachineLink, upsertLink } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
@@ -150,7 +151,7 @@ const defaultDeps: MachineLinkServiceDeps = {
   createAccessToken,
   revokeAccessToken,
   upsertLink,
-  currentEndpoints: async () => [],
+  currentEndpoints: async () => currentAdvertisedEndpoints(),
   localIdentity: async () => {
     const identity = await ensureEnvironmentIdentity();
     return { environmentId: identity.environmentId, label: identity.label };
@@ -283,6 +284,8 @@ export interface LinkStatusSource {
   reconnect?(linkId: string): boolean;
   /** Pick up links the store gained or lost. */
   reconcile?(): void;
+  /** A link's route list changed (Add route): re-rank and re-check. */
+  updateRoutes?(linkId: string, routes: LinkRoute[]): void;
 }
 
 export const connectingStatusSource: LinkStatusSource = {

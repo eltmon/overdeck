@@ -19,7 +19,7 @@ const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAcce
 const { _resetLinkStoreForTests, _settleLinkStoreWritesForTests, listLinks, upsertLink } = await import('../../../../lib/anywhere/link-store.js');
 const { openChannel } = await import('../../../../lib/anywhere/channel/open.js');
 const { _resetChannelListenerForTests, installChannelListener, liveChannelCount } = await import('../../channel-listener.js');
-const { buildMachinesResponse, handleInboundRevoke, handleMachinesSelfRevoke, handleMachinesUnlink } = await import('../machines.js');
+const { buildMachinesResponse, handleAddRoute, handleInboundRevoke, handleMachinesSelfRevoke, handleMachinesUnlink } = await import('../machines.js');
 const { resolveDashboardCredential } = await import('../dashboard-auth.js');
 type MachineKeyPair = import('../../../../lib/anywhere/machine-key.js').MachineKeyPair;
 
@@ -152,5 +152,28 @@ describe('machine link routes (PAN-4645 WI-13)', () => {
     expect(liveChannelCount()).toBe(0);
     expect(listActiveRecordsOfKind('machine')).toEqual([]);
     expect((await read(await handleInboundRevoke(record.id))).status).toBe(404);
+  });
+});
+
+describe('POST /api/machines/:id/routes (PAN-4645 WI-19 Add route)', () => {
+  it('adds a validated manual route once, refusing bad URLs and duplicates', async () => {
+    const { link } = await upsertLink({
+      environmentId: 'env-peer', label: 'peer', machineKey: PEER_KEY, token: `odk_${'9'.repeat(64)}`, access: 'operator',
+      reverseTokenId: null,
+      routes: [{ url: 'tcp://100.101.1.2:3011', kind: 'tailnet', source: 'pairing', addedAt: '2026-11-01T00:00:00.000Z' }],
+    });
+    const added = await read(await handleAddRoute('peer', JSON.stringify({ url: 'tcp://192.168.1.5:3011' })));
+    expect(added.status).toBe(200);
+    expect((added.json as { routes: Array<Record<string, unknown>> }).routes.map((route) => [route.url, route.kind, route.source])).toEqual([
+      ['tcp://100.101.1.2:3011', 'tailnet', 'pairing'],
+      ['tcp://192.168.1.5:3011', 'lan', 'manual'],
+    ]);
+    expect((await listLinks()).find((row) => row.id === link.id)?.routes.map((route) => route.url)).toEqual(['tcp://100.101.1.2:3011', 'tcp://192.168.1.5:3011']);
+
+    expect((await read(await handleAddRoute(link.id, JSON.stringify({ url: 'tcp://192.168.1.5:3011' })))).status).toBe(409);
+    expect((await read(await handleAddRoute(link.id, JSON.stringify({ url: 'http://192.168.1.5:3011' })))).status).toBe(400);
+    expect((await read(await handleAddRoute(link.id, JSON.stringify({ url: 'tcp://192.168.1.6' })))).status).toBe(400);
+    expect((await read(await handleAddRoute(link.id, '{'))).status).toBe(400);
+    expect((await read(await handleAddRoute('nobody', JSON.stringify({ url: 'tcp://192.168.1.6:3011' })))).status).toBe(404);
   });
 });
