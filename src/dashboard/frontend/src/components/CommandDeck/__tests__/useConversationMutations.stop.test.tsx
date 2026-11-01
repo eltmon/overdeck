@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 vi.mock('sonner', () => ({
@@ -127,5 +127,31 @@ describe('useConversationMutations — stop (PAN-4626)', () => {
     act(() => { view.result.current.stop('a'); });
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to stop conversation', { duration: 6000 }));
+  });
+
+  it('stays pending until the conversations refetch resolves, then deselects', async () => {
+    const target = conv({ name: 'a', title: 'Alpha' });
+    let resolveRefetch: ((rows: Conversation[]) => void) | null = null;
+    const queryFn = vi.fn(() => new Promise<Conversation[]>((resolve) => { resolveRefetch = resolve; }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['conversations'], [target]);
+    const onSelect = vi.fn();
+    const view = renderHook(() => {
+      useQuery({ queryKey: ['conversations'], queryFn, staleTime: Infinity });
+      return useConversationMutations('a', onSelect);
+    }, { wrapper: wrapper(client) });
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+
+    act(() => { view.result.current.stop('a'); });
+    await waitFor(() => expect(queryFn).toHaveBeenCalledTimes(1));
+
+    expect(view.result.current.isStopPending('a')).toBe(true);
+    expect(onSelect).not.toHaveBeenCalled();
+
+    act(() => { resolveRefetch?.([]); });
+
+    await waitFor(() => expect(view.result.current.isStopPending('a')).toBe(false));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(null);
   });
 });

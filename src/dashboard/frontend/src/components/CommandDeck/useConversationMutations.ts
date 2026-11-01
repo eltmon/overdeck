@@ -144,8 +144,10 @@ export function useConversationMutations(
         ?.find((c) => c.name === name)?.title ?? name;
       return { title };
     },
-    onSuccess: (_data, name, ctx) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    onSuccess: async (_data, name, ctx) => {
+      // Awaited so the mutation stays pending (row dimmed) until the
+      // refetched list drops the row (PAN-4626).
+      await queryClient.invalidateQueries({ queryKey: ['conversations'] });
       // An archived conversation leaves the list — close its deck tab(s) too.
       closeConversationPanes(name);
       if (selectedConversation === name) {
@@ -166,8 +168,10 @@ export function useConversationMutations(
   const stopMutation = useMutation({
     mutationKey: STOP_MUTATION_KEY,
     mutationFn: stopConversation,
-    onSuccess: (_data, name) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    onSuccess: async (_data, name) => {
+      // Awaited so the mutation stays pending (row dimmed) until the
+      // refetched list reflects the stopped session (PAN-4626).
+      await queryClient.invalidateQueries({ queryKey: ['conversations'] });
       if (selectedConversation === name) {
         onSelectConversation(null);
       }
