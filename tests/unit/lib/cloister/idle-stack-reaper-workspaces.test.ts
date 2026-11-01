@@ -3,7 +3,7 @@
  * primary path, never a `feature-<issue>` worktree, so today's naming
  * convention already excludes it from UI_CONTAINER_RE/FEATURE_PROJECT_RE —
  * but only incidentally. These tests cover the explicit isMainWorkspaceIssue
- * guard added on top of the existing container/tmux-name discovery (the
+ * guard added on top of the existing container/agent-id discovery (the
  * reaper's core discovery mechanism is intentionally NOT replaced with a
  * full resolver join in this item — that's a materially larger, separate
  * risk given this file's production role stopping live Docker stacks; see
@@ -30,7 +30,7 @@ function makeDeps(over: Partial<IdleStackReaperDeps> & {
   const deps: Partial<IdleStackReaperDeps> = {
     listContainerNames: async () => over.containers ?? [],
     listComposeContainers: async () => over.composeContainers ?? [],
-    listSessions: async () => over.sessions ?? [],
+    listLiveAgentIds: async () => over.sessions ?? [],
     stopContainers: async (names) => { stopped.push(names); },
     now: over.now ?? (() => 1_000_000),
     graceMs: over.graceMs ?? 10_000,
