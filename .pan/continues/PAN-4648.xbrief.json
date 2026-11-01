@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4648",
   "created": "2026-11-01T05:50:45.229Z",
-  "updated": "2026-11-01T07:59:08.278Z",
+  "updated": "2026-11-01T07:59:25.638Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "funnel-gate.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T07:59:08.278Z"
+    },
+    "cli-triggers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:59:25.638Z"
     }
   }
 }
