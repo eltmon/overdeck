@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T07:40:26.962Z",
+  "updated": "2026-11-01T07:40:47.283Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "workers-route.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T07:40:26.962Z"
+    },
+    "workers-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:40:47.283Z"
     }
   }
 }
