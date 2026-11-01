@@ -36,7 +36,7 @@ The wire protocol is `packages/contracts/src/connect.ts` (runtime-import-free so
 - **Machines:** a `free` account holds at most 3 (`hello` for a fourth environment id → `error machine_limit` "The free account includes 3 machines", close 4009). `tester` (every allowlisted account until billing) has no limit.
 - **Sockets:** one per machine; a newer socket for the same machine closes the older with 4011. `forget` closes with 4012. `ping`/`pong` is a runtime auto-response, so an idle socket never wakes the object.
 - **Approvals:** 1 pending request per requesting machine, 5 per account, 10-minute expiry.
-- **Relay:** 50 GB (`RELAY_MONTHLY_CAP_BYTES`) per account per UTC calendar month; the report that reaches it broadcasts `relay-status { stopped: true }` and later credential requests answer `relay_cap_reached`.
+- **Relay:** 50 GB (`RELAY_MONTHLY_CAP_BYTES`) per account per UTC calendar month; each `relay-usage` report broadcasts the month's `relay-status` to every machine, the report that reaches the cap broadcasts `relay-status { stopped: true }`, and later credential requests answer `relay_cap_reached`.
 - **Inbox:** bodies up to 256 KiB, 200 pending events per inbox, 64 MiB of sealed bytes per account, 120 events per minute per inbox (`INBOX_LIMIT`), 24-hour hold.
 - **Connects:** 30 directory upgrades per minute per device (`CONNECT_LIMIT`).
 

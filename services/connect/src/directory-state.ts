@@ -407,9 +407,12 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
       const { usage, reachedCap } = addUsage(state.relay, f.bytes, ctx.now, ctx.relayCapBytes);
       const next: DirectoryState = { ...state, relay: usage };
       const effects: DirectoryEffect[] = [{ kind: 'put-relay-usage', usage }];
-      if (reachedCap) {
-        // Every machine closes its relay channels; no new credentials until the next month.
-        effects.push({ kind: 'send', to: 'all', frame: { type: 'relay-status', ...relayStatusOf(usage, ctx.now, ctx.relayCapBytes) } });
+      const status = relayStatusOf(usage, ctx.now, ctx.relayCapBytes);
+      if (reachedCap || !status.stopped) {
+        // Every machine's status card shows the month's traffic, so each report refreshes it. At the
+        // cap every machine closes its relay channels (no new credentials until the next month);
+        // later reports in a stopped month send nothing, since the stop was already broadcast.
+        effects.push({ kind: 'send', to: 'all', frame: { type: 'relay-status', ...status } });
       }
       effects.push({ kind: 'log', type: f.type, environmentId: self, outcome: reachedCap ? 'cap_reached' : 'counted' });
       return { state: next, effects };

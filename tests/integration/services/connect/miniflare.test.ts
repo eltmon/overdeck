@@ -306,9 +306,12 @@ describe('connect service on real workerd (PAN-2356 WI-3)', () => {
 
     a.send({ type: 'relay-usage', bytes: 600 });
     a.send({ type: 'relay-usage', bytes: 500 });
-    const stopped = await b.waitFor(isType('relay-status'));
+    // Each report refreshes every machine's month total; the one that crosses the cap stops the relay.
+    expect(await b.waitFor(isType('relay-status'))).toMatchObject({ bytesUsed: 600, capBytes: RELAY_CAP, stopped: false });
+    const isStopped = (f: Frame) => f['type'] === 'relay-status' && f['stopped'] === true;
+    const stopped = await b.waitFor(isStopped);
     expect(stopped).toMatchObject({ bytesUsed: 1_100, capBytes: RELAY_CAP, stopped: true });
-    await a.waitFor(isType('relay-status'));
+    await a.waitFor(isStopped);
     const before = a.frames.length;
     a.send({ type: 'ice-servers', requestId: 'r-2', relay: true });
     expect(await a.waitFor(isType('error'), before)).toMatchObject({

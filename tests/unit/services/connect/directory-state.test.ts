@@ -289,10 +289,12 @@ describe('directory reducer: relay credentials and metering (PAN-2356 WI-7)', ()
     expect(sends(effects)[0]).toMatchObject({ frame: { code: 'turn_unavailable' } });
   });
 
-  it('broadcasts stopped once when usage crosses the cap, then refuses with relay_cap_reached', () => {
+  it('broadcasts the month total after each report and stopped once at the cap, then refuses with relay_cap_reached', () => {
     let state = register(1, TESTER);
     const first = report(state, 600);
-    expect(sends(first.effects)).toEqual([]);
+    expect(sends(first.effects)).toEqual([
+      { kind: 'send', to: 'all', frame: { type: 'relay-status', month: '2026-11', bytesUsed: 600, capBytes: CAP, stopped: false } },
+    ]);
     state = first.state;
     const second = report(state, 500);
     expect(sends(second.effects)).toEqual([

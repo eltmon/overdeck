@@ -316,8 +316,9 @@ and sets `iceTransportPolicy: 'relay'`. The directory refuses with `relay_not_al
 `relay_cap_reached` (month total at 50 GB) or `turn_unavailable` (no TURN secrets), and the
 dialer fails with `ChannelOpenError('unreachable', …)`. `relay-client.ts` meters every relay
 data channel this machine dialed (the responder never reports, so each channel counts once)
-and sends `relay-usage` deltas every 60 s and on close. The report that reaches the cap
-broadcasts `relay-status { stopped: true }`; every machine closes its relay channels and the
+and sends `relay-usage` deltas every 60 s and on close. Each report broadcasts the month's
+`relay-status` to every machine, so the status card's traffic line stays current. The report
+that reaches the cap broadcasts `relay-status { stopped: true }`; every machine closes its relay channels and the
 status card shows the cap message with **Add 50 GB**. Over-run is bounded by one report
 interval plus the credential TTL. Counts are self-reported by the account's own machines.
 
