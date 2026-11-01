@@ -1,20 +1,22 @@
 import type { spawn as spawnType } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-let tempRoot: string;
+// vi.mock factories are hoisted — define TEMP_ROOT via vi.hoisted so it's
+// available before the factory runs (matches project-registration.test.ts).
+const { TEMP_ROOT } = vi.hoisted(() => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { join: j } = require('node:path') as typeof import('node:path');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { tmpdir: t } = require('node:os') as typeof import('node:os');
+  return { TEMP_ROOT: j(t(), `pan-serve-test-${process.pid}`) };
+});
 
 vi.mock('../../../src/lib/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/lib/paths.js')>();
-  return {
-    ...actual,
-    get packageRoot() {
-      return tempRoot;
-    },
-  };
+  return { ...actual, packageRoot: TEMP_ROOT };
 });
 
 import { serveCommand } from '../../../src/cli/commands/serve.js';
@@ -35,10 +37,9 @@ function fakeSpawn(): { spawn: typeof spawnType; calls: Array<{ command: string;
 }
 
 beforeEach(() => {
-  tempRoot = mkdtempSync(join(tmpdir(), 'pan-serve-test-'));
-  mkdirSync(join(tempRoot, 'dist', 'dashboard', 'public'), { recursive: true });
-  writeFileSync(join(tempRoot, 'dist', 'dashboard', 'server.js'), '');
-  writeFileSync(join(tempRoot, 'dist', 'dashboard', 'public', 'index.html'), '');
+  mkdirSync(join(TEMP_ROOT, 'dist', 'dashboard', 'public'), { recursive: true });
+  writeFileSync(join(TEMP_ROOT, 'dist', 'dashboard', 'server.js'), '');
+  writeFileSync(join(TEMP_ROOT, 'dist', 'dashboard', 'public', 'index.html'), '');
 
   _resetInternalTokenCacheForTests();
   rmSync(tokenFilePath(), { force: true });
@@ -49,7 +50,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  rmSync(tempRoot, { recursive: true, force: true });
+  rmSync(TEMP_ROOT, { recursive: true, force: true });
 });
 
 describe('serveCommand', () => {

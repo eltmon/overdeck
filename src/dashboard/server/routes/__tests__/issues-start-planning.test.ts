@@ -6,6 +6,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+// Captured before vi.useFakeTimers() fakes setImmediate, so tests can yield a
+// real event-loop turn for the real fs.readFile() in the internal-token
+// file-first auth check (PAN-4628) without disturbing Effect's own scheduler,
+// which also relies on setImmediate (see warm-idle-reap.test.ts for the same
+// pattern). Two turns, not one: under a loaded host the thread-pool
+// dispatch and the promise-resolution chain can each need their own tick.
+const realSetImmediate = globalThis.setImmediate;
+async function yieldToRealEventLoop(): Promise<void> {
+  await new Promise((resolve) => realSetImmediate(resolve));
+  await new Promise((resolve) => realSetImmediate(resolve));
+}
+
 // PAN-3917 W6: the record plane is deleted by W3; these route trees still reach
 // it transitively (config-yaml → tier-table → record, workspaces/resolver →
 // overdeck/infra → record). Stub the chain entry so the route under test loads.
@@ -267,6 +279,10 @@ describe('POST /api/issues/:id/start-planning GitHub hydration', () => {
       }));
 
     const resultPromise = postStartPlanning('PAN-1993');
+    // Let the real event loop's poll phase complete the auth check's real
+    // fs.readFile() (PAN-4628) before advancing the fake clock — advancing
+    // fake timers alone never yields to pending real I/O.
+    await yieldToRealEventLoop();
     await vi.advanceTimersByTimeAsync(250);
     await vi.advanceTimersByTimeAsync(500);
     const result = await resultPromise;
@@ -362,6 +378,8 @@ describe('POST /api/issues/:id/start-planning GitHub hydration', () => {
     mockGitHubGetIssue.mockReturnValue(Effect.fail(new IssueNotFound({ id: 'PAN-1993' })));
 
     const resultPromise = postStartPlanning('PAN-1993');
+    // See the comment on the equivalent line in the retry-then-succeed test.
+    await yieldToRealEventLoop();
     await vi.advanceTimersByTimeAsync(250 + 500 + 750 + 1000);
     const result = await resultPromise;
 
