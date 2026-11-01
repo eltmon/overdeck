@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:49:21.733Z",
+  "updated": "2026-11-01T22:04:56.723Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T22:04Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T22:04:56.723Z"
+    }
+  ],
   "items": {
     "wi1-provenance-fence": {
       "status": "completed",
@@ -635,5 +641,14 @@
       "status": "completed",
       "doneAt": "2026-11-01T21:49:21.733Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T22:04:56Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4651\n\nPull request: https://github.com/eltmon/overdeck/pull/4744 (head `d8637395`)\n\nSource: check_run:test-shard (2/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (2/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124992602032/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41354840482/job/124992602032  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/__tests__/machines-conversations.test.ts\u001b[2m > \u001b[22mGET /api/machines/conversations (PAN-4650 WI-2)\u001b[2m > \u001b[22mreads the sharing switch from anywhere.json, on by default\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/__tests__/machines-conversations.test.ts\u001b[2m > \u001b[22mGET /api/machines/conversations (PAN-4650 WI-2)\u001b[2m > \u001b[22mreads the sharing switch from anywhere.json, on by default\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected { shareConversations: true, …(1) } to deeply equal { shareConversations: true }\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[2m  {\u001b[22m\n\u001b[31m+   \"combineRepositories\": true,\u001b[39m\n\u001b[2m    \"shareConversations\": true,\u001b[22m\n\u001b[2m  }\u001b[22m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/__tests__/machines-conversations.test.ts:\u001b[2m154:42\u001b[22m\u001b[39m\n    \u001b[90m152|\u001b[39m\n    \u001b[90m153|\u001b[39m   it('reads the sharing switch from anywhere.json, on by default', asy…\n    \u001b[90m154|\u001b[39m     expect(await readAnywhereSettings()).toEqual({ shareConversations:…\n    \u001b[90m   |\u001b[39m                                          \u001b[31m^\u001b[39m\n    \u001b[90m155|\u001b[39m     \u001b[35mawait\u001b[39m \u001b[34mwriteAnywhereSettings\u001b[39m({ shareConversations\u001b[33m:\u001b[39m \u001b[35mfalse\u001b[39m })\u001b[33m;\u001b[39m\n    \u001b[90m156|\u001b[39m     expect(await readAnywhereSettings()).toEqual({ shareConversations:…\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m541 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (543)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
