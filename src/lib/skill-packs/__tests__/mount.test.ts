@@ -38,6 +38,7 @@ import {
   linkClaudeMount,
   mountHash,
   mountsDir,
+  removePackFromMounts,
   writeCodexPackBlock,
   type MountPack,
 } from '../mount.js';
@@ -360,5 +361,44 @@ describe('gcMounts', () => {
     const result = await gcMounts({ maxAgeMs: 7 * DAY, now: Date.now() });
     expect(result.removedMounts).toEqual([]);
     expect(existsSync(mount.path)).toBe(true);
+  });
+});
+
+describe('removePackFromMounts (PAN-4727)', () => {
+  const launchRoot = join(overdeckHome, 'launch');
+  const agentsRoot = join(overdeckHome, 'agents');
+
+  beforeEach(() => {
+    rmSync(launchRoot, { recursive: true, force: true });
+    rmSync(agentsRoot, { recursive: true, force: true });
+  });
+
+  it('removes mounts holding the pack, the links they leave dangling and its Codex caches', async () => {
+    const withGstack = await buildMount({ packs: [gstack(), alpha()] });
+    const without = await buildMount({ packs: [alpha()] });
+    if (!withGstack || !without) throw new Error('expected mounts');
+    const gstackLink = join(launchRoot, 'a1', 'skill-packs');
+    const alphaLink = join(launchRoot, 'a2', 'skill-packs');
+    await linkClaudeMount(gstackLink, withGstack);
+    await linkClaudeMount(alphaLink, without);
+    const cache = (agent: string, home: string, id: string) =>
+      join(agentsRoot, agent, home, 'plugins', 'cache', CODEX_PACK_MARKETPLACE, id);
+    for (const dir of [cache('x', 'codex-home-v2', 'gstack'), cache('x', 'codex-home-v2', 'alpha'), cache('y', 'codex-home', 'gstack')]) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const result = await removePackFromMounts('gstack');
+    expect(result.removedMounts).toEqual([withGstack.path]);
+    expect(result.removedLinks).toEqual([gstackLink]);
+    expect(result.removedCodexCaches.sort()).toEqual([cache('x', 'codex-home-v2', 'gstack'), cache('y', 'codex-home', 'gstack')].sort());
+    expect(existsSync(withGstack.path)).toBe(false);
+    expect(existsSync(without.path)).toBe(true);
+    expect(() => lstatSync(gstackLink)).toThrow();
+    expect(readlinkSync(alphaLink)).toBe(join(without.path, 'plugins'));
+    expect(existsSync(cache('x', 'codex-home-v2', 'alpha'))).toBe(true);
+  });
+
+  it('rejects an invalid pack id', async () => {
+    await expect(removePackFromMounts('../x')).rejects.toThrow(/invalid pack id/);
   });
 });

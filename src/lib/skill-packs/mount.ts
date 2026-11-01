@@ -285,13 +285,10 @@ async function realpathOrNull(path: string): Promise<string | null> {
 }
 
 /**
- * PD-12: remove launch plugin links whose target is gone, then mounts that no
- * link references and whose mtime is older than `maxAgeMs`, plus stray
- * `.tmp-*` build dirs of the same age. Reusing a mount touches it, so a mount
- * in active use stays young.
+ * Remove launch plugin links whose target is gone; return them and the mounts
+ * the remaining links reference.
  */
-export async function gcMounts(opts: { maxAgeMs: number; now?: number }): Promise<{ removedMounts: string[]; removedLinks: string[] }> {
-  const now = opts.now ?? Date.now();
+async function sweepLaunchLinks(): Promise<{ removedLinks: string[]; referenced: Set<string> }> {
   const removedLinks: string[] = [];
   const referenced = new Set<string>();
   const launchRoot = join(getOverdeckHome(), 'launch');
@@ -312,6 +309,18 @@ export async function gcMounts(opts: { maxAgeMs: number; now?: number }): Promis
       referenced.add(dirname(target));
     }
   }
+  return { removedLinks, referenced };
+}
+
+/**
+ * PD-12: remove launch plugin links whose target is gone, then mounts that no
+ * link references and whose mtime is older than `maxAgeMs`, plus stray
+ * `.tmp-*` build dirs of the same age. Reusing a mount touches it, so a mount
+ * in active use stays young.
+ */
+export async function gcMounts(opts: { maxAgeMs: number; now?: number }): Promise<{ removedMounts: string[]; removedLinks: string[] }> {
+  const now = opts.now ?? Date.now();
+  const { removedLinks, referenced } = await sweepLaunchLinks();
 
   const removedMounts: string[] = [];
   const root = mountsDir();
@@ -332,4 +341,40 @@ export async function gcMounts(opts: { maxAgeMs: number; now?: number }): Promis
     removedMounts.push(path);
   }
   return { removedMounts, removedLinks };
+}
+
+/**
+ * PAN-4727 D8: remove every trace of a pack outside its cache dir: each mount
+ * that holds `plugins/<id>`, the launch links that left dangling, and
+ * `plugins/cache/overdeck-packs/<id>` in every Codex home under
+ * `<OVERDECK_HOME>/agents/<agent>/codex-home*`. A running agent that used a
+ * removed mount loses the pack's skills until its next launch.
+ */
+export async function removePackFromMounts(
+  id: string,
+): Promise<{ removedMounts: string[]; removedLinks: string[]; removedCodexCaches: string[] }> {
+  if (!PACK_ID_PATTERN.test(id)) throw new Error(`invalid pack id: ${JSON.stringify(id)}`);
+  const removedMounts: string[] = [];
+  const root = mountsDir();
+  for (const name of await listDirNames(root)) {
+    if (name.startsWith('.tmp-')) continue;
+    const path = join(root, name);
+    if (!(await exists(join(path, 'plugins', id)))) continue;
+    await rm(path, { recursive: true, force: true });
+    removedMounts.push(path);
+  }
+  const { removedLinks } = await sweepLaunchLinks();
+
+  const removedCodexCaches: string[] = [];
+  const agentsRoot = join(getOverdeckHome(), 'agents');
+  for (const agent of await listDirNames(agentsRoot)) {
+    for (const child of await listDirNames(join(agentsRoot, agent))) {
+      if (!child.startsWith('codex-home')) continue;
+      const cache = join(agentsRoot, agent, child, 'plugins', 'cache', CODEX_PACK_MARKETPLACE, id);
+      if (!(await exists(cache))) continue;
+      await rm(cache, { recursive: true, force: true });
+      removedCodexCaches.push(cache);
+    }
+  }
+  return { removedMounts, removedLinks, removedCodexCaches };
 }

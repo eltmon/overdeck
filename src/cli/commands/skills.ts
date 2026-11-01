@@ -388,9 +388,28 @@ export async function skillsPackListCommand(options: PackListOptions): Promise<v
   }
 }
 
+/** gstack skills write `.gstack/` and `.gstack-worktrees/` in the projects they run in (PAN-4727 D9); remove never deletes them. */
+async function projectGstackDirs(): Promise<string[]> {
+  const [{ listProjectsAsync }, { lstat }, { join }] = await Promise.all([
+    import('../../lib/projects.js'),
+    import('node:fs/promises'),
+    import('node:path'),
+  ]);
+  const dirs: string[] = [];
+  for (const { config } of await listProjectsAsync()) {
+    if (!config.path) continue;
+    for (const name of ['.gstack', '.gstack-worktrees']) {
+      const dir = join(config.path, name);
+      if (await lstat(dir).then(() => true, () => false)) dirs.push(dir);
+    }
+  }
+  return dirs;
+}
+
 export async function skillsPackRemoveCommand(id: string): Promise<void> {
-  const [{ removePack }, { listLowerLevelPackOverrides }] = await Promise.all([
+  const [{ removePack }, { removePackFromMounts }, { listLowerLevelPackOverrides }] = await Promise.all([
     import('../../lib/skill-packs/sources.js'),
+    import('../../lib/skill-packs/mount.js'),
     import('../../lib/skill-overrides/store.js'),
   ]);
   let result;
@@ -399,11 +418,21 @@ export async function skillsPackRemoveCommand(id: string): Promise<void> {
   } catch (error) {
     return failOnPackError(error);
   }
+  // Mounts, dangling launch links and Codex caches hold copies of the pack outside its cache (PAN-4727 D8).
+  // The sweep lives here because mount.ts imports sources.ts.
+  const swept = await removePackFromMounts(id);
   if (!result.removed) {
     console.error(chalk.red(`pack ${id} is not registered`));
     process.exit(1);
   }
-  console.log(`Removed pack ${id} and its cache.`);
+  console.log(
+    `Removed pack ${id}, its cache, ${swept.removedMounts.length} mount(s) and ${swept.removedCodexCaches.length} Codex cache(s).`,
+  );
+  if (id === 'gstack') {
+    for (const dir of await projectGstackDirs()) {
+      console.log(`Project files gstack skills wrote (not removed): ${dir}  — remove with: rm -rf ${dir}`);
+    }
+  }
   const below = (await listLowerLevelPackOverrides())[id];
   const remaining = below ? below.projects.length + below.issues.length : 0;
   if (remaining > 0) {

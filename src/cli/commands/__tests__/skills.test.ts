@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => {
     listPackCatalog: vi.fn(),
     listLowerLevelPackOverrides: vi.fn(),
     gcMounts: vi.fn(),
+    removePackFromMounts: vi.fn(),
     listSkillStates: vi.fn(),
     setSkillOverride: vi.fn(),
     resolveLaunchDisabledSkills: vi.fn(),
@@ -114,7 +115,11 @@ vi.mock('../../../lib/skill-overrides/launch.js', async importOriginal => ({
   launchMountsDeft: mocks.launchMountsDeft,
 }));
 
-vi.mock('../../../lib/skill-packs/mount.js', () => ({ writeCodexPackBlock: mocks.writeCodexPackBlock, gcMounts: mocks.gcMounts }));
+vi.mock('../../../lib/skill-packs/mount.js', () => ({
+  writeCodexPackBlock: mocks.writeCodexPackBlock,
+  gcMounts: mocks.gcMounts,
+  removePackFromMounts: mocks.removePackFromMounts,
+}));
 
 import { registerSkillsCommands } from '../skills.js';
 
@@ -600,9 +605,31 @@ describe('pan skills pack', () => {
 
   it('removes a pack and reports inert lower-level toggles', async () => {
     mocks.removePack.mockResolvedValue({ removed: true });
+    mocks.removePackFromMounts.mockResolvedValue({ removedMounts: [], removedLinks: [], removedCodexCaches: [] });
     mocks.listLowerLevelPackOverrides.mockResolvedValue({ mattpocock: { projects: ['tst'], issues: ['TST-1'] } });
     await run('pack', 'remove', 'mattpocock');
     expect(logs.join('\n')).toContain('2 project or issue toggle(s) for mattpocock remain');
+  });
+
+  it('removes gstack mounts and Codex caches and names project .gstack dirs without deleting them (PAN-4727)', async () => {
+    const root = fs.mkdtempSync(path.join(tmpdir(), 'gstack-remove-'));
+    try {
+      fs.mkdirSync(path.join(root, '.gstack', 'tmp'), { recursive: true });
+      mocks.listProjectsAsync.mockResolvedValue([{ key: 'tst', config: { name: 'Test', path: root } }]);
+      mocks.removePack.mockResolvedValue({ removed: true });
+      mocks.removePackFromMounts.mockResolvedValue({ removedMounts: ['/m/1', '/m/2'], removedLinks: ['/l/1'], removedCodexCaches: ['/c/1'] });
+      mocks.listLowerLevelPackOverrides.mockResolvedValue({});
+      await run('pack', 'remove', 'gstack');
+      expect(mocks.removePackFromMounts).toHaveBeenCalledWith('gstack');
+      const out = logs.join('\n');
+      expect(out).toContain('Removed pack gstack, its cache, 2 mount(s) and 1 Codex cache(s).');
+      const dir = path.join(root, '.gstack');
+      expect(out).toContain(`Project files gstack skills wrote (not removed): ${dir}  — remove with: rm -rf ${dir}`);
+      expect(out).not.toContain('.gstack-worktrees');
+      expect(fs.existsSync(dir)).toBe(true);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('syncs every registered pack and fails when one fails', async () => {
