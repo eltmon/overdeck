@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MachineLinkView } from '@overdeck/contracts';
 
 import { _resetFlyMachineStoreForTests, _settleFlyMachineWritesForTests, listFlyMachines, upsertFlyMachine } from '../../../../lib/anywhere/fly/machine-store.js';
-import type { FlyCreatedMachine, FlyProvisionResult } from '../../../../lib/anywhere/fly/provision.js';
+import { type FlyCreatedMachine, FlyMachineError, type FlyProvisionResult } from '../../../../lib/anywhere/fly/provision.js';
 import type { MachineLink } from '../../../../lib/anywhere/link-store.js';
 import { _resetFlyMachineServiceForTests, addFlyMachine, type FlyMachineServiceDeps, removeFlyMachineForLink, startFlyConversation } from '../fly-machine-service.js';
 import { MachineLinkError } from '../machine-link-service.js';
@@ -146,6 +146,15 @@ describe('Codex on a Fly machine (PAN-4296 WI-5)', () => {
     const deps = fakes();
     await expect(addFlyMachine({ harness: 'codex', projectKey: 'overdeck', message: 'hi' }, deps))
       .rejects.toMatchObject({ code: 'bad-request', message: expect.stringContaining('--model') });
+    await refusedBeforeProvision(deps);
+  });
+
+  it('refuses a Codex request with an unknown model id as bad-request', async () => {
+    const deps = fakes();
+    const error = await addFlyMachine({ harness: 'codex', model: 'gpt-6.1-sl' }, deps).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(FlyMachineError);
+    expect(error).toMatchObject({ code: 'bad-request', message: expect.stringContaining('Unknown model "gpt-6.1-sl"'), detail: { harness: 'codex', model: 'gpt-6.1-sl' } });
+    expect(deps.checkCodexPolicy).not.toHaveBeenCalled();
     await refusedBeforeProvision(deps);
   });
 

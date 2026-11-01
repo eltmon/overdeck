@@ -58,7 +58,7 @@ import {
   provisionFlyMachine,
 } from '../../../lib/anywhere/fly/provision.js';
 import { loadConfig, type RemoteConfig } from '../../../lib/config.js';
-import { getProviderForModel } from '../../../lib/providers.js';
+import { getProviderForModel, UnknownModelError } from '../../../lib/providers.js';
 import { createFlyApiClient } from '../../../lib/remote/fly-api.js';
 import { checkRemoteSpendCap } from '../../../lib/remote/remote-agents.js';
 import { createMachineLink, MachineLinkError } from './machine-link-service.js';
@@ -197,7 +197,14 @@ async function refuseCodex(model: string | undefined, deps: FlyMachineServiceDep
   if (!model) {
     throw new FlyMachineError('bad-request', 'A Codex conversation needs a model: pass --model with an OpenAI model id.');
   }
-  if (getProviderForModel(model).name !== 'openai') {
+  let provider: string;
+  try {
+    provider = getProviderForModel(model).name;
+  } catch (error) {
+    if (!(error instanceof UnknownModelError)) throw error;
+    throw new FlyMachineError('bad-request', `${error.message} Pass --model with an OpenAI model id.`, { harness: 'codex', model });
+  }
+  if (provider !== 'openai') {
     throw new FlyMachineError('harness-unsupported', `The codex harness runs OpenAI models; ${model} is not one. Pass --model with an OpenAI model id.`, { harness: 'codex', model });
   }
   const policy = await deps.checkCodexPolicy(model);
