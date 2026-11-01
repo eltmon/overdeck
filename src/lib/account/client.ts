@@ -11,7 +11,7 @@
 export const DEFAULT_ACCOUNT_BASE_URL = 'https://account.overdeck.ai';
 
 const PLATFORM_ARCH_RE = /^(linux|darwin|win32)-(x64|arm64)$/;
-const LOCAL_HTTP_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
+const LOCAL_HTTP_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
 
 export class AccountClientError extends Error {}
 
@@ -194,7 +194,7 @@ export async function pollForToken(
       case 'expired_token':
         return { ok: false, reason: 'expired_token', detail: 'expired_token' };
       default:
-        return { ok: false, reason: 'failed', detail: `Sign-in failed: ${body.error ?? `HTTP ${res.status}`}` };
+        return { ok: false, reason: 'failed', detail: body.error ?? `HTTP ${res.status}` };
     }
   }
 }

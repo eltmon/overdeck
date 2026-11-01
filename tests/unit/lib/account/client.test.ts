@@ -108,6 +108,13 @@ describe('pollForToken (D-5)', () => {
     await expect(expiredPromise).resolves.toEqual({ ok: false, reason: 'expired_token', detail: 'expired_token' });
   });
 
+  it('returns the bare error code, not a prefixed message, for an unmapped error', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(errorResponse('invalid_request'));
+    const promise = pollForToken(BASE_URL, makeCode({ interval: 5 }), { fetch: fetchMock });
+    await vi.advanceTimersByTimeAsync(5000);
+    await expect(promise).resolves.toEqual({ ok: false, reason: 'failed', detail: 'invalid_request' });
+  });
+
   it('returns unreachable after three consecutive thrown fetches (ac2)', async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error('network down'));
     const promise = pollForToken(BASE_URL, makeCode({ interval: 5 }), { fetch: fetchMock });
@@ -141,6 +148,11 @@ describe('resolveBaseUrl (D-2, ac3)', () => {
 
   it('accepts http://127.0.0.1:8787 for local dev', () => {
     expect(resolveBaseUrl('http://127.0.0.1:8787', {} as NodeJS.ProcessEnv)).toBe('http://127.0.0.1:8787');
+  });
+
+  it('accepts http://localhost:8787 and http://[::1]:8787 for local dev', () => {
+    expect(resolveBaseUrl('http://localhost:8787', {} as NodeJS.ProcessEnv)).toBe('http://localhost:8787');
+    expect(resolveBaseUrl('http://[::1]:8787', {} as NodeJS.ProcessEnv)).toBe('http://[::1]:8787');
   });
 
   it('rejects a non-loopback http URL, a URL with a path, and a URL with a query', () => {
