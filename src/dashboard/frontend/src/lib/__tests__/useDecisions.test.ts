@@ -11,6 +11,7 @@ function renderDecisions(convRows: unknown[] = []) {
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   queryClient.setQueryData(['conv-ask-user-question'], convRows);
+  queryClient.setQueryData(['fleet-needs-you'], []); // PAN-4651: no linked machines
 
   return renderHook(() => useDecisions(), {
     wrapper: ({ children }: { children: ReactNode }) =>

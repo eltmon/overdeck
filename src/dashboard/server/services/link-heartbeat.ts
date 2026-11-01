@@ -4,7 +4,7 @@
  * Server side: `GET /api/machines/heartbeat` (machine credential only) is a
  * `text/event-stream` with one `heartbeat` event at once, one every 15 s and one
  * right after an event-loop stall of 2 s or more. Data:
- * `{ seq, lastStall: { durationMs, endedAgoMs } | null, endpointsHash, serverVersion, conversationsHash?, load?, tags?, placement?, projectsHash? }`.
+ * `{ seq, lastStall: { durationMs, endedAgoMs } | null, endpointsHash, serverVersion, conversationsHash?, load?, tags?, placement?, projectsHash?, needsYouHash? }`.
  * Client side: `openHeartbeatOverChannel` sends the request through a secure
  * channel and parses the events; the supervisor consumes them. Both halves share
  * the payload shape and the pure SSE parser here.
@@ -36,10 +36,12 @@ export interface HeartbeatPayload {
   placement?: MachinePlacementMode;
   /** PAN-4651 D-4651-11: hash of this machine's project list (`GET /api/machines/projects`). */
   projectsHash?: string;
+  /** PAN-4651 D-4651-15: hash of this machine's Needs-You feed (`GET /api/machines/needs-you`). */
+  needsYouHash?: string;
 }
 
 /** The machine facts a beat carries; every field optional (absent until first sampled). */
-export type HeartbeatMachineFacts = Pick<HeartbeatPayload, 'load' | 'tags' | 'placement' | 'projectsHash'>;
+export type HeartbeatMachineFacts = Pick<HeartbeatPayload, 'load' | 'tags' | 'placement' | 'projectsHash' | 'needsYouHash'>;
 
 let endpointsHashSource: () => string = () => '';
 let machineFactsSource: () => HeartbeatMachineFacts = () => ({});

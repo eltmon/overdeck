@@ -37,6 +37,8 @@ import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js'
 import { setLinkPresenceSource } from './conversation-list-merged.js';
 import { createLinkedConversationsSync, setLinkedConversationsSync } from './linked-conversations-sync.js';
 import { createLinkedProjectsSync, setLinkedProjectsSync } from './linked-projects-sync.js';
+import { createLinkedNeedsYouSync, setLinkedNeedsYouSync } from './linked-needs-you-sync.js';
+import { needsYouHashForHeartbeat } from './needs-you-feed.js';
 import { currentMachineLoad, startMachineLoadSampler, stopMachineLoadSampler } from './machine-load.js';
 import { defaultRemoteWorkerFollowerDeps, RemoteWorkerFollower, setRemoteWorkerFollower } from './remote-worker-follower.js';
 import { stopForwardsWithoutLink } from './port-forwards.js';
@@ -82,10 +84,12 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
     const load = currentMachineLoad();
     const profile = currentMachineProfile();
     const projectsHash = machineProjectsHashForHeartbeat();
+    const needsYouHash = needsYouHashForHeartbeat();
     return {
       ...(load ? { load } : {}),
       ...(profile ? { tags: profile.tags, placement: profile.placement } : {}),
       ...(projectsHash ? { projectsHash } : {}),
+      ...(needsYouHash ? { needsYouHash } : {}),
     };
   });
   await advertiser.start();
@@ -142,6 +146,9 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   // PAN-4651 WI-3: linked machines' project lists, same trigger rule (connect + changed hash).
   const linkedProjects = createLinkedProjectsSync();
   setLinkedProjectsSync(linkedProjects);
+  // PAN-4651 WI-20: linked machines' Needs-You feeds, same trigger rule.
+  const linkedNeedsYou = createLinkedNeedsYouSync();
+  setLinkedNeedsYouSync(linkedNeedsYou);
   supervisor = new LinkSupervisor({
     ...defaultLinkSupervisorDeps(serverVersion),
     // WI-12: direct, relay and directory-reported routes, offered while the directory lists the peer.
@@ -152,8 +159,8 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
         relayEntitled: () => relay?.relayEntitled() ?? false,
       }),
     relayEntitled: () => relay?.relayEntitled() ?? false,
-    onDescriptor: (link) => Promise.all([linkedConversations.onConnect(link), linkedProjects.onConnect(link)]).then(() => undefined),
-    onHeartbeat: (link, payload) => Promise.all([linkedConversations.onHeartbeat(link, payload), linkedProjects.onHeartbeat(link, payload)]).then(() => undefined),
+    onDescriptor: (link) => Promise.all([linkedConversations, linkedProjects, linkedNeedsYou].map((sync) => sync.onConnect(link))).then(() => undefined),
+    onHeartbeat: (link, payload) => Promise.all([linkedConversations, linkedProjects, linkedNeedsYou].map((sync) => sync.onHeartbeat(link, payload))).then(() => undefined),
   });
   supervisor.start();
   // PAN-4651 WI-12: follow workers delegated to linked machines; resumes running stand-ins from disk.
@@ -179,6 +186,7 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
     const active = linksSnapshot().filter((link) => link.revokedAt === null).map((link) => link.environmentId);
     linkedConversations.prune(active);
     linkedProjects.prune(active);
+    linkedNeedsYou.prune(active);
     // PAN-4650 WI-18: a forward closes when its link goes away.
     stopForwardsWithoutLink(active);
   }, MACHINE_LINKS_REFRESH_MS);
@@ -227,6 +235,7 @@ export function stopAnywhere(): void {
   setHeartbeatConversationsHashSource(null);
   setHeartbeatMachineFactsSource(null);
   setLinkedProjectsSync(null);
+  setLinkedNeedsYouSync(null);
   setLinkedConversationsSync(null);
   stopMachineLoadSampler();
   stopMachineCapabilities();

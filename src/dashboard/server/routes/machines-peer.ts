@@ -21,6 +21,7 @@ import { endStreamOnDeviceRevocation } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import { currentApprovalService } from '../services/directory-approval.js';
 import { startHeartbeatSource } from '../services/link-heartbeat.js';
+import { buildNeedsYou } from '../services/needs-you-feed.js';
 import { grantMachineLink, GrantMachineLinkError } from '../services/machine-link-grant.js';
 import { type DashboardCredential, resolveRequestCredential } from './dashboard-auth.js';
 import { buildEnvironmentDescriptor } from './environment.js';
@@ -243,4 +244,33 @@ const machineProjectsRoute = HttpRouter.add(
   }),
 );
 
-export const machinesPeerRouteLayer = Layer.mergeAll(exchangeRoute, approvalExchangeRoute, heartbeatRoute, sharedConversationsRoute, machineProjectsRoute);
+/**
+ * `GET /api/machines/needs-you` (PAN-4651 WI-20, D-4651-15): this machine's
+ * conversations and agents waiting on the operator, for a linked machine's
+ * Needs-You list. Machine credential only.
+ */
+export async function handleNeedsYou(
+  credential: DashboardCredential | null,
+  build: typeof buildNeedsYou = buildNeedsYou,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'machine') {
+    return jsonResponse({ error: 'the Needs-You feed is for linked machines only' }, { status: 403 });
+  }
+  try {
+    return jsonResponse(await build());
+  } catch (error) {
+    console.error('[machines] Needs-You feed failed:', error instanceof Error ? error.message : String(error));
+    return jsonResponse({ error: 'the Needs-You feed could not be built' }, { status: 500 });
+  }
+}
+
+const needsYouRoute = HttpRouter.add(
+  'GET',
+  '/api/machines/needs-you',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.promise(() => handleNeedsYou(resolveRequestCredential(request)));
+  }),
+);
+
+export const machinesPeerRouteLayer = Layer.mergeAll(exchangeRoute, approvalExchangeRoute, heartbeatRoute, sharedConversationsRoute, machineProjectsRoute, needsYouRoute);

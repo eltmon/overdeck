@@ -61,10 +61,18 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
         <p className={styles.prompt}>{prompt}</p>
         <div className={styles.meta}>
           <span className={styles.mono}>{decision.id}</span>
+          {decision.machineLabel && <span>· on {decision.machineLabel}</span>}
           {decision.since && <span>· waiting {formatRelativeTime(decision.since, now)}</span>}
         </div>
       </div>
-      {heldOnly ? (
+      {decision.remote ? (
+        // PAN-4651 D-4651-15 — a linked machine's conversation opens through the proxy; its agents are answered there.
+        decision.source === 'conversation' && (
+          <button type="button" className={styles.answer} title={`Go to the conversation on ${decision.machineLabel}`} onClick={() => navigateToDecisionSubject(decision)}>
+            Open
+          </button>
+        )
+      ) : heldOnly ? (
         <button
           type="button"
           className={styles.answer}
@@ -83,7 +91,7 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
           Open
         </button>
       )}
-      {!heldOnly && (
+      {!heldOnly && !decision.remote && (
         <button type="button" className={styles.answer} onClick={() => requestReopen(decision.id)}>
           Answer
         </button>

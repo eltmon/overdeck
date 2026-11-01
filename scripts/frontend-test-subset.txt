@@ -169,6 +169,7 @@ src/lib/__tests__/simple-derive.test.ts
 src/lib/__tests__/simple-feed.test.ts
 src/lib/__tests__/syntaxTheme.test.ts
 src/lib/__tests__/telemetry.test.ts
+src/lib/__tests__/useDecisions.fleet.test.tsx
 src/lib/__tests__/useDecisions.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts
 src/lib/sessionOutcome.test.ts

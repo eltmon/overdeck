@@ -466,6 +466,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/fleet/projects/add-there',          kind: 'http', disposition: 'WRITE',       door: 'fleet-add-project.addProjectThere -> linkFetch POST /api/machines/work/projects (PAN-4651)' },
   { surface: 'POST /api/machines/work/projects',            kind: 'http', disposition: 'WRITE',       door: 'fleet-add-project.startAddProject (project create job + writeProjectFileExclusive) (PAN-4651 work door)' },
   { surface: 'GET /api/machines/work/projects/:jobId',      kind: 'http', disposition: 'READ',        door: 'fleet-add-project.getAddProjectJob (PAN-4651 work door)' },
+  { surface: 'GET /api/machines/needs-you',                 kind: 'http', disposition: 'READ',        door: 'needs-you-feed.buildNeedsYou (pending-input conversations + read-model agents) (PAN-4651, closes PAN-4405)' },
+  { surface: 'GET /api/fleet/needs-you',                    kind: 'http', disposition: 'AGGREGATE',   door: 'linked-needs-you-sync cache for online links (PAN-4651)' },
   { surface: 'GET /api/machines/projects/:key/source',      kind: 'http', disposition: 'READ',        door: 'projects/ignored-files.listIgnoredFiles + projectCloneUrl (operator-level link, operator actor) (PAN-4651)' },
   { surface: 'GET /api/machines/projects/:key/file',        kind: 'http', disposition: 'READ',        door: 'projects/ignored-files.readProjectFile (operator-level link, operator actor) (PAN-4651)' },
   { surface: 'GET /api/workers/:id/status',                kind: 'http', disposition: 'READ',        door: 'agents/liveness.isAlive + agents/worker/report.listWorkerReports (PAN-4651)' },
