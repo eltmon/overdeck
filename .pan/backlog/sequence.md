@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T11:03:18Z · model: claude-opus-5-5 · open: 874_
+_Last sequenced: 2026-11-01T11:05:36Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -15,6 +15,7 @@ _Last sequenced: 2026-11-01T11:03:18Z · model: claude-opus-5-5 · open: 874_
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
+| 10 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 11 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 12 | PAN-4669 | S | critical | ok |  |  | Herdr hosts: idle-stack reaper checks tmux only, so it stops server/frontend containers of every live agent after 10m; needs-handoff |
 | 13 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
@@ -922,6 +923,10 @@ New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup fa
 
 New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.
 
+### PAN-4710 (rank 10)
+
+New issue, ranked into the rank-10 slot beside PAN-4554. When pan start --plan auto finishes planning while the pipeline is busy, the deferred hand-off retries without the agent_count_high/memory_tight acknowledgement the first attempt sends, so it is refused below the ceiling until the attempt cap gives up with no operator signal; PAN-4663 and PAN-4670 sat three hours without work agents. It is substrate work with a precise root cause and testable ACs, but it carries needs-handoff (TENET-10), so it lands through a supervised handoff, and a manual second pan start is a working fallback, so it ranks high rather than critical.
+
 ### PAN-4666 (rank 11)
 
 New substrate bug in the Flywheel's own status read model: a second liveness rule in derive-status.ts hides live agents, so the loop or operator may respawn running work; small fix with clear ACs, ranked beside PAN-4636 as critical but labeled needs-handoff (TENET-10), so it goes through a supervised pan handoff.
@@ -1198,10 +1203,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
-### PAN-3118 (rank 78)
-
-Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1209,10 +1210,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T11:03:18Z",
+  "generatedAt": "2026-11-01T11:05:36Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 874,
+  "openCount": 875,
   "nodes": [
     {
       "issue": "PAN-4639",
@@ -12153,6 +12154,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "New substrate-improvement issue, the second hot-file conflict source after in-pipeline PAN-4697; on 2026-11-01 it forced merge-main cycles and fresh head reviews on three PRs. It takes the free rank 27 beside its sibling so no other node moves, and it stays needs-refinement because the body asks for a decision among three fixes (frontmatter-generated nav, per-group fragments, JSON merge driver) before work starts.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4710",
+      "rank": 10,
+      "size": "S",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff",
+      "rationale": "New issue, ranked into the rank-10 slot beside PAN-4554. When pan start --plan auto finishes planning while the pipeline is busy, the deferred hand-off retries without the agent_count_high/memory_tight acknowledgement the first attempt sends, so it is refused below the ceiling until the attempt cap gives up with no operator signal; PAN-4663 and PAN-4670 sat three hours without work agents. It is substrate work with a precise root cause and testable ACs, but it carries needs-handoff (TENET-10), so it lands through a supervised handoff, and a manual second pan start is a working fallback, so it ranks high rather than critical.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13905,6 +13919,13 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-4710",
+      "to": "PAN-4554",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
