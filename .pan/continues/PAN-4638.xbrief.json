@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:18:55.971Z",
+  "updated": "2026-11-01T23:19:14.351Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
       "claimedBy": "agent-pan-4638",
       "claimedAt": "2026-11-01T23:09:31.282Z",
       "doneAt": "2026-11-01T23:18:55.971Z"
+    },
+    "home-remote-launch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T23:19:14.350Z"
     }
   }
 }
