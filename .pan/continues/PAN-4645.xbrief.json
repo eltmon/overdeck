@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T10:38:32.244Z",
+  "updated": "2026-11-01T10:38:45.691Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -412,6 +412,10 @@
       "claimedBy": "agent-pan-4645",
       "claimedAt": "2026-11-01T10:27:26.314Z",
       "doneAt": "2026-11-01T10:38:32.243Z"
+    },
+    "wi19-advertised-endpoints.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:38:45.691Z"
     }
   }
 }
