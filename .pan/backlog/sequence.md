@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T12:17:23Z · model: claude-opus-5-5 · open: 876_
+_Last sequenced: 2026-11-01T12:13:31Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -12,7 +12,6 @@ _Last sequenced: 2026-11-01T12:17:23Z · model: claude-opus-5-5 · open: 876_
 | 5 | PAN-4670 | S | high | ok |  |  | In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs. |
 | 6 | PAN-4672 | S | high | ok |  |  | In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout. |
 | 7 | PAN-4697 | S | critical | ok |  |  | In pipeline: one 7.4 KB test:frontend-subset line in package.json makes every two frontend-test PRs conflict; move to union-merged file. |
-| 7 | PAN-4714 | S | medium | ok |  |  | In pipeline: plain click on an issue link in a conversation opens the dashboard issue drawer; Ctrl/Cmd-click keeps the tracker tab. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -912,10 +911,6 @@ New in-pipeline substrate-improvement bug filed after the prior run; pinned in t
 
 New in-pipeline substrate-improvement bug: five open PRs went CONFLICTING at once on this line, so each costs a work cycle and re-review; pinned in the in-pipeline top tier at rank 7.
 
-### PAN-4714 (rank 7)
-
-New in-pipeline issue with a live workspace, so it is pinned at rank 7 beside the other in-pipeline items without shifting any prior rank; it is a small, well-specified operator UX request that reuses the PAN-3822 link renderer and registers its test in the PAN-4697 frontend subset.
-
 ### PAN-4690 (rank 8)
 
 New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).
@@ -1204,6 +1199,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
+### PAN-3205 (rank 77)
+
+New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1211,10 +1210,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T12:17:23Z",
+  "generatedAt": "2026-11-01T12:13:31Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 876,
+  "openCount": 875,
   "nodes": [
     {
       "issue": "PAN-4639",
@@ -12168,19 +12167,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "rationale": "New issue, ranked into the rank-10 slot beside PAN-4554. When pan start --plan auto finishes planning while the pipeline is busy, the deferred hand-off retries without the agent_count_high/memory_tight acknowledgement the first attempt sends, so it is refused below the ceiling until the attempt cap gives up with no operator signal; PAN-4663 and PAN-4670 sat three hours without work agents. It is substrate work with a precise root cause and testable ACs, but it carries needs-handoff (TENET-10), so it lands through a supervised handoff, and a manual second pan start is a working fallback, so it ranks high rather than critical.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4714",
-      "rank": 7,
-      "size": "S",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: plain click on an issue link in a conversation opens the dashboard issue drawer; Ctrl/Cmd-click keeps the tracker tab.",
-      "rationale": "New in-pipeline issue with a live workspace, so it is pinned at rank 7 beside the other in-pipeline items without shifting any prior rank; it is a small, well-specified operator UX request that reuses the PAN-3822 link renderer and registers its test in the PAN-4697 frontend subset.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13940,20 +13926,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-3822",
-      "to": "PAN-4714",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4697",
-      "to": "PAN-4714",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
     }
   ]
 }
