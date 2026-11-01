@@ -4,17 +4,17 @@
     "created": "2026-11-01T04:52:58Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4641: Let the operator queue a message that sends when rate limits reset",
-    "updated": "2026-11-01T04:59:00.894Z"
+    "updated": "2026-11-01T05:00:24.720Z"
   },
   "plan": {
     "id": "pan-4641",
     "title": "Let the operator queue a message that sends when rate limits reset",
-    "status": "proposed",
+    "status": "running",
     "uid": "50de3005-3cbd-4972-a348-44166961bfe6",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T04:52:58Z",
-    "updated": "2026-11-01T04:59:00.894Z",
+    "updated": "2026-11-01T05:00:24.720Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4641",
@@ -1249,5 +1249,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
