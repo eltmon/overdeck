@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T17:59:04.722986Z · model: claude-opus-5-5 · open: 857_
+_Last sequenced: 2026-11-01T18:00:27.736244Z · model: claude-opus-5-5 · open: 857_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1192,7 +1192,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T17:59:04.722986Z",
+  "generatedAt": "2026-11-01T18:00:27.736244Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 857,
