@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T13:48:07.317Z",
+  "updated": "2026-11-01T13:48:12.374Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4404",
       "claimedAt": "2026-11-01T13:44:16.657Z",
       "doneAt": "2026-11-01T13:48:07.317Z"
+    },
+    "wi6-link-transport": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:48:12.374Z"
     }
   }
 }
