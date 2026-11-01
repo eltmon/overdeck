@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4651",
+  "created": "2026-11-01T18:35:52.116Z",
+  "updated": "2026-11-01T18:35:52.116Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-provenance-fence": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T18:35:52.116Z"
+    }
+  }
+}
