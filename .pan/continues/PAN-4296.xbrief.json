@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4296",
   "created": "2026-11-01T21:43:56.125Z",
-  "updated": "2026-11-01T22:01:54.049Z",
+  "updated": "2026-11-01T22:02:10.941Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-4296",
       "claimedAt": "2026-11-01T21:59:54.975Z",
       "doneAt": "2026-11-01T22:01:54.049Z"
+    },
+    "wi8-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4296",
+      "claimedAt": "2026-11-01T22:02:10.941Z"
     }
   }
 }
