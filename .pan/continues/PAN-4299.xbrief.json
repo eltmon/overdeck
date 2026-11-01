@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4299",
   "created": "2026-11-01T05:05:33.847Z",
-  "updated": "2026-11-01T05:32:39.429Z",
+  "updated": "2026-11-01T05:32:54.934Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "compose-migration-helper.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T05:32:39.429Z"
+    },
+    "wire-install-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:32:54.934Z"
     }
   }
 }
