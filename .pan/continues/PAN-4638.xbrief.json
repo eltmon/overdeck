@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:39:03.265Z",
+  "updated": "2026-11-01T23:39:22.096Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,11 @@
     "lane-views-remote.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T23:39:03.265Z"
+    },
+    "lane-stop-reap-remote": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4638",
+      "claimedAt": "2026-11-01T23:39:22.095Z"
     }
   }
 }
