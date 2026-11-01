@@ -690,7 +690,8 @@ async function main() {
   });
 
   await step('stop', cleanup);
-  log('OK: two dashboards linked, updated both machines\' CLIs with Update all, survived a restart, and spoke only the secure channel on the pairing route');
+  const updated = LIVE_CLAUDE ? 'shared and pulled a live conversation' : 'updated both machines\' CLIs with Update all';
+  log(`OK: two dashboards linked, ${updated}, survived a restart, and spoke only the secure channel on the pairing route`);
 }
 
 let exitCode = 0;
