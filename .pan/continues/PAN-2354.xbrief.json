@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2354",
   "created": "2026-11-01T05:46:47.920Z",
-  "updated": "2026-11-01T06:55:17.462Z",
+  "updated": "2026-11-01T06:55:20.004Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,11 @@
       "claimedBy": "agent-pan-2354",
       "claimedAt": "2026-11-01T06:52:29.578Z",
       "doneAt": "2026-11-01T06:55:17.462Z"
+    },
+    "mobile-mount": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2354",
+      "claimedAt": "2026-11-01T06:55:20.004Z"
     }
   }
 }
