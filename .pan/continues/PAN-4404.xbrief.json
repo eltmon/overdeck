@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T13:44:16.657Z",
+  "updated": "2026-11-01T13:48:07.317Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-01T13:41:51.107Z"
     },
     "wi5-forward-supervisor": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4404",
-      "claimedAt": "2026-11-01T13:44:16.657Z"
+      "claimedAt": "2026-11-01T13:44:16.657Z",
+      "doneAt": "2026-11-01T13:48:07.317Z"
     }
   }
 }
