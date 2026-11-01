@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T07:44:49.220Z",
+  "updated": "2026-11-01T07:45:07.753Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "mcp-approve-tools.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T07:44:49.220Z"
+    },
+    "mcp-http-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:45:07.753Z"
     }
   }
 }
