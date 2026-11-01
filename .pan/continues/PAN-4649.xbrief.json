@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T07:48:24.574Z",
+  "updated": "2026-11-01T07:48:41.099Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -236,6 +236,10 @@
     "mcp-acceptance.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T07:48:24.573Z"
+    },
+    "mcp-acceptance.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:48:41.098Z"
     }
   }
 }
