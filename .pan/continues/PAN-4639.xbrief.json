@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T07:31:35.483Z",
+  "updated": "2026-11-01T07:31:49.926Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-4639",
       "claimedAt": "2026-11-01T06:55:38.380Z",
       "doneAt": "2026-11-01T07:31:35.483Z"
+    },
+    "snooze-menu": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4639",
+      "claimedAt": "2026-11-01T07:31:49.926Z"
     }
   }
 }
