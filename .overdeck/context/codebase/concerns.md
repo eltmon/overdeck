@@ -498,4 +498,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`src/lib/internal-token.ts`, `routes/agents/shared.ts`, the caveman hook
   script, four shell hooks). Never inject the token into a
   pane's env, and never add a reader that checks env first.
+- **Docker's bridge pool caps live workspace stacks** (PAN-4663) — the host fits
+  ~31 bridge networks (`DEFAULT_DOCKER_BRIDGE_POOL_LIMIT`, `docker-bridge-pool.ts`);
+  past that, every stack create/rebuild fails "all predefined address pools have been
+  fully subnetted". A compose service with neither `networks:` nor `network_mode:`
+  makes Compose add an extra `<project>_default` network, so `init-perms` in
+  `infra/.devcontainer-template/` sets `network_mode: none`. The renderer reads the
+  template from the primary checkout (`devcontainer-renderer.ts`), so a branch's
+  template edit reaches workspace stacks only after merge.
 <!-- last-verified: 2026-11-01 -->
