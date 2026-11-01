@@ -6,6 +6,7 @@ import { AnywhereStatusCard } from '../anywhere/AnywhereStatusCard';
 import type { AnywhereAction } from '../anywhere/anywhereApi';
 import { DevicesPanel } from '../anywhere/DevicesPanel';
 import { PairDeviceDialog } from '../anywhere/PairDeviceDialog';
+import { TriggersPanel } from '../anywhere/TriggersPanel';
 
 interface AnywhereSectionProps {
   /** Controlled open state for the pair dialog, so the status card can open it. */
@@ -44,6 +45,7 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
       <div className="space-y-4">
         <AnywhereStatusCard onAction={handleAction} />
         <DevicesPanel />
+        <TriggersPanel />
       </div>
       <PairDeviceDialog open={open} onClose={() => setOpen(false)} />
     </SettingsSection>

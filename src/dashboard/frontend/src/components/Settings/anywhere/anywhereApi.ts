@@ -1,7 +1,8 @@
 /**
  * Client for the Overdeck Anywhere routes (PAN-4445): paired devices, pairing
  * links, trusted addresses and the Anywhere status. These call the same server
- * routes as `pan pair` and `pan devices`.
+ * routes as `pan pair` and `pan devices`. Webhook triggers (PAN-4648) use
+ * `/api/triggers`, the routes behind `pan triggers`.
  *
  * Every fetcher returns `{ status, body }` so a caller can branch on 403 (a
  * paired device's session cannot create pairing links or add addresses).
@@ -54,6 +55,25 @@ export interface ApiResult<T> {
 
 export const ANYWHERE_DEVICES_QUERY_KEY = ['anywhere-devices'] as const;
 export const ANYWHERE_STATUS_QUERY_KEY = ['anywhere-status'] as const;
+export const ANYWHERE_TRIGGERS_QUERY_KEY = ['anywhere-triggers'] as const;
+
+/** Mirrors `PublicTrigger` in src/lib/triggers/store.ts. No secret ever reaches the client in a list. */
+export interface TriggerRow {
+  id: string;
+  name: string;
+  target:
+    | { kind: 'conversation'; conversation: string }
+    | { kind: 'project'; projectKey: string; model?: string; harness?: string; effort?: string };
+  template: string | null;
+  verify: 'none' | 'github' | 'stripe';
+  signingSecretSet: boolean;
+  createdAt: string;
+}
+
+export interface TriggersList {
+  triggers: TriggerRow[];
+  funnel: { port: number; baseUrl: string | null; command: string };
+}
 
 async function readResult<T>(response: Response): Promise<ApiResult<T>> {
   const body = (await response.json().catch(() => null)) as T | { error?: string } | null;
@@ -113,4 +133,22 @@ export async function loadAnywhereStatus(): Promise<AnywhereStatus> {
   const result = await fetchAnywhereStatus();
   if (!isOk(result)) throw new Error(apiError(result));
   return result.body;
+}
+
+export async function fetchTriggers(): Promise<ApiResult<TriggersList>> {
+  return readResult(await fetch('/api/triggers'));
+}
+
+export async function removeTrigger(id: string): Promise<ApiResult<{ removed: true }>> {
+  return readResult(await fetch(`/api/triggers/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: await dashboardMutationJsonHeaders(),
+  }));
+}
+
+/** Query function for `['anywhere-triggers']`: the triggers and Funnel facts, or a thrown error. */
+export async function loadTriggers(): Promise<TriggersList> {
+  const result = await fetchTriggers();
+  if (!isOk(result)) throw new Error(apiError(result));
+  return { ...result.body, triggers: result.body.triggers ?? [] };
 }
