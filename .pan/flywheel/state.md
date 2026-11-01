@@ -354,3 +354,11 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   dashboard not restarted since 2026-10-26). Operator also asked: deploy
   #4637 (7c97ec4ddaa) via `pan reload` on green main CI and verify
   buildCommit; track PAN-4626 (agent started by the operator).
+- 2026-11-01 06:10 UTC: the PAN-4643 "Start work" + "Invalid CSRF token" was
+  the simple-mode issue page: `postJson` in `lib/simple/useSimpleActions.ts`
+  sends no CSRF header (every simple action 403s), and `isPlanReadyToStart`
+  (`lib/simple/derive.ts`) lets an idle, finished planner override a running
+  work agent. Filed and started PAN-4670. `pan reload` builds into the idle
+  generation, then waits for `pan restart approve` from the operator; the
+  reload process exits after the build, so check `/api/health` buildCommit
+  with `git merge-base --is-ancestor` before calling it deployed.
