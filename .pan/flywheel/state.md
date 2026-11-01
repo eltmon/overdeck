@@ -345,3 +345,12 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - PAN-4666 (needs-handoff): flywheel status drops agents whose Herdr pane says
   `done` (turn finished, process alive). Confirm liveness with
   `pan show <id> --health`, never the status list, before any respawn.
+- 2026-11-01 06:15 UTC: PAN-4669 (needs-handoff): `idle-stack-reaper.ts`
+  line 166 checks tmux sessions only, so on Herdr it stops every running
+  agent's server/frontend containers after 10 min. Same class as PAN-4666
+  (liveness decided outside `liveness.ts`). The dashboard offered "Start" on
+  PAN-4643 while agent-pan-4643 was working, and the click failed with
+  "Invalid CSRF token"; cause not yet found (token derivation is stable,
+  dashboard not restarted since 2026-10-26). Operator also asked: deploy
+  #4637 (7c97ec4ddaa) via `pan reload` on green main CI and verify
+  buildCommit; track PAN-4626 (agent started by the operator).
