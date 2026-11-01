@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   patrolMemoryPressure: vi.fn(async () => [] as string[]),
   refreshHostHeartbeatForEphemeralVms: vi.fn(async () => [] as string[]),
   refreshClaudeCredentialsForActiveRemoteAgents: vi.fn(async () => [] as string[]),
+  heartbeatFlyMachines: vi.fn(async () => [] as string[]),
+  sweepFlyMachines: vi.fn(async () => [] as string[]),
   loadCloisterConfigSync: vi.fn(() => ({ retention: { transcript_days: 30 } })),
 }));
 
@@ -55,6 +57,10 @@ vi.mock('../../../../src/lib/remote/remote-agents.js', () => ({
 }));
 vi.mock('../../../../src/lib/remote/remote-credential-refresh.js', () => ({
   refreshClaudeCredentialsForActiveRemoteAgents: mocks.refreshClaudeCredentialsForActiveRemoteAgents,
+}));
+vi.mock('../../../../src/lib/remote/fly-machine-loops.js', () => ({
+  heartbeatFlyMachines: mocks.heartbeatFlyMachines,
+  sweepFlyMachines: mocks.sweepFlyMachines,
 }));
 vi.mock('../../../../src/lib/cloister/config.js', () => ({
   loadCloisterConfigSync: mocks.loadCloisterConfigSync,
@@ -100,6 +106,8 @@ describe('hygiene-scheduler', () => {
     expect(mocks.patrolMemoryPressure).toHaveBeenCalledTimes(1);
     expect(mocks.refreshHostHeartbeatForEphemeralVms).toHaveBeenCalledTimes(1);
     expect(mocks.refreshClaudeCredentialsForActiveRemoteAgents).toHaveBeenCalledTimes(1);
+    expect(mocks.heartbeatFlyMachines).toHaveBeenCalledTimes(1);
+    expect(mocks.sweepFlyMachines).toHaveBeenCalledTimes(1);
   });
 
   it('fires the 60s-cadence routines on their own interval', async () => {
@@ -123,6 +131,11 @@ describe('hygiene-scheduler', () => {
     expect(mocks.refreshHostHeartbeatForEphemeralVms).toHaveBeenCalledWith();
     expect(mocks.refreshClaudeCredentialsForActiveRemoteAgents).toHaveBeenCalledTimes(1);
     expect(mocks.refreshClaudeCredentialsForActiveRemoteAgents).toHaveBeenCalledWith();
+    // PAN-4652: the Fly machine heartbeat and sweep, also every 60 s.
+    expect(mocks.heartbeatFlyMachines).toHaveBeenCalledTimes(1);
+    expect(mocks.heartbeatFlyMachines).toHaveBeenCalledWith();
+    expect(mocks.sweepFlyMachines).toHaveBeenCalledTimes(1);
+    expect(mocks.sweepFlyMachines).toHaveBeenCalledWith();
     // ~10-minute-cadence routines must not have fired yet.
     expect(mocks.reapOrphanedDashboardServers).not.toHaveBeenCalled();
     expect(mocks.reapLeftoverPlaywrightBrowsers).not.toHaveBeenCalled();

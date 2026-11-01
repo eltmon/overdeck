@@ -178,7 +178,7 @@ export function detached(script: string): string {
 }
 
 /** Destroy a Fly machine. A 404 means it is already gone. */
-export async function destroyFlyVm(appName: string, machineId: string, deps: Partial<Pick<FlyProvisionDeps, 'api'>> = {}): Promise<void> {
+export async function destroyFlyVm(appName: string, machineId: string, deps: { api?: Pick<FlyApiClient, 'destroyMachine'> } = {}): Promise<void> {
   const api = deps.api ?? await loadFlyApi();
   try {
     await api.destroyMachine(appName, machineId);
