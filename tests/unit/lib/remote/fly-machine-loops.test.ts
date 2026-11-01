@@ -243,6 +243,17 @@ describe('syncFlyCodexAuth (PAN-4296 WI-7)', () => {
     expect(JSON.stringify(deps.activity.mock.calls)).not.toContain('rt-vm');
   });
 
+  it('rereads home before a pull and skips it when home signed in again during the pass', async () => {
+    const { deps, scripts } = sync([ready()], { stdout: NEWER_VM, exit_code: 0 });
+    const relogin = signIn('rt-relogin', '2026-11-01T12:00:00.000Z');
+    deps.readHomeAuth.mockResolvedValueOnce(HOME).mockResolvedValueOnce(relogin);
+    expect(await syncFlyCodexAuth(deps)).toEqual(["Codex sign-in sync skipped on fly-m1: this machine's sign-in changed during the pass"]);
+    expect(deps.readHomeAuth).toHaveBeenCalledTimes(2);
+    expect(deps.writeHomeAuth).not.toHaveBeenCalled();
+    expect(deps.activity).not.toHaveBeenCalled();
+    expect(scripts()).toHaveLength(1);
+  });
+
   it('compares a later machine against the pulled sign-in, not the stale home copy', async () => {
     const { deps, scripts } = sync([ready(), ready({ id: 'rec-2', machineId: 'm2', label: 'fly-m2' })], { stdout: NEWER_VM, exit_code: 0 });
     expect(await syncFlyCodexAuth(deps)).toEqual(['Codex sign-in refreshed on fly-m1 copied home']);

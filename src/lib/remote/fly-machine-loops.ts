@@ -229,6 +229,15 @@ export async function syncFlyCodexAuth(overrides: Partial<FlyCodexSyncDeps> = {}
         await pushVmCodexAuth(exec, path, home!.raw);
         lines.push(`Codex sign-in copied to ${record.label}`);
       } else if (action === 'pull') {
+        // Home may have refreshed or signed in again since this pass read it; decide again on a
+        // fresh read so an older VM copy never overwrites a newer home sign-in.
+        const freshRaw = await deps.readHomeAuth();
+        const fresh = freshRaw === null ? null : parseCodexAuthSnapshot(freshRaw);
+        if (decideCodexAuthSync(fresh, vm) !== 'pull') {
+          home = fresh;
+          lines.push(`Codex sign-in sync skipped on ${record.label}: this machine's sign-in changed during the pass`);
+          continue;
+        }
         await deps.writeHomeAuth(vm!.raw);
         home = parseCodexAuthSnapshot(vm!.raw);
         deps.activity(`Codex sign-in refreshed on Fly machine ${record.label} copied home`, { machineId: record.machineId, appName: record.appName, linkId: record.linkId });

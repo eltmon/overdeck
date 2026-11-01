@@ -735,8 +735,11 @@ non-Claude harness stays `false`.
   | 5 | anything else | push (home decides which account is signed in) |
 
   A pull writes home's file atomically (temp file in the same directory, then rename, mode
-  0600), and through a symlinked `auth.json` to its target. A read that exits non-zero or
-  throws is indeterminate and does nothing. A refresh on both sides inside one 60 s window
+  0600), and through a symlinked `auth.json` to its target. Just before a pull, home's
+  file is read again and the decision is made again, so a home sign-in that changed during
+  the pass is never overwritten by an older VM copy. Only one pass runs at a time: the
+  scheduler skips a tick while the previous pass is still running. A read that exits
+  non-zero or throws is indeterminate and does nothing. A refresh on both sides inside one 60 s window
   still signs one side out; `codex login` at home fixes it on the next push.
 - **D-4 The VM path comes from the exec shell.** `printf %s "$HOME/.codex"` prints
   `//.codex` in Fly's exec shell (`HOME=/`); `//` collapses to `/`, and the result must be
