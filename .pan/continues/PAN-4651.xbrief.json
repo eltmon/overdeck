@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:40:56.930Z",
+  "updated": "2026-11-01T21:41:12.411Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -498,6 +498,10 @@
     "wi21-fleet-search.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T21:40:56.930Z"
+    },
+    "wi22-which-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:41:12.411Z"
     }
   }
 }
