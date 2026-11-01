@@ -446,3 +446,15 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   Still gated: PAN-4651 (4650), PAN-4652 (4650), PAN-4296 (4652), PAN-4638
   (4651, 4652). Every other Anywhere prerequisite (4330, 4648, 4628, 4649, 4295)
   is merged. Watch the five hand-offs for PAN-4710 give-ups.
+- 2026-11-01 18:10 UTC: PAN-4650 merged (#4731). Launched PAN-4651 and
+  PAN-4652 (`pan start --plan auto`). Anywhere remaining: PAN-4296 (waits on
+  4652), PAN-4638 (waits on 4651 and 4652). Every other wave issue is merged
+  and closed. PAN-4724 (cost rollup) is confirmed live: the
+  getCostsByIssueSnapshot slow warning stopped at the 17:48 deploy.
+- 2026-11-01 18:30 UTC: main red after PAN-4650 merge (run #12451). Not a
+  flake: the re-run failed identically. `tests/e2e/linked-conversation-title-bar.spec.ts`
+  starts a Vite dev server and a browser inside the default unit shards; the
+  cold page load times out at 180 s on main (it passed on the PR). Fix
+  PAN-4732 started, told to plan the smallest unblock first (slow convention
+  or CI quarantine via `readQuarantineList`). A re-run that fails the same way
+  means stop treating it as a flake. Hold merges and deploys until green.
