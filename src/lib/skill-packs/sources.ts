@@ -462,6 +462,7 @@ async function browserPreview(id: string, dir: string, commit: string): Promise<
       `${renderDir}/make-pdf/dist`,
       `${cacheDir}/bun-cache`,
       `${cacheDir}/playwright`,
+      `${cacheDir}/xdg-cache`,
     ],
   };
 }

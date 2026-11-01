@@ -68,7 +68,7 @@ const DOWNLOADS = [
   '+ their locked dependencies from bun.lock (registry.npmjs.org)',
   'Chromium, Chromium headless shell and ffmpeg for playwright ^1.62.1 (Playwright CDN, ~115 MiB download)',
 ];
-const WRITES = [`${R}/node_modules`, `${R}/browse/dist`, `${R}/design/dist`, `${R}/make-pdf/dist`, `${C}/bun-cache`, `${C}/playwright`];
+const WRITES = [`${R}/node_modules`, `${R}/browse/dist`, `${R}/design/dist`, `${R}/make-pdf/dist`, `${C}/bun-cache`, `${C}/playwright`, `${C}/xdg-cache`];
 const capabilities = {
   hooks: true, mcpServers: false, commands: false, agents: false, contextInjection: false, gitHooks: false,
   executables: ['bin/gstack-config'], projectMutatingSkills: ['codex', 'ship'], requiresCli: ['bun'], runtime: true,

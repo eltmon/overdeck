@@ -137,6 +137,7 @@ describe('enablePackBrowser', () => {
         `${packRenderDir('gstack', good)}/make-pdf/dist`,
         `${packBrowserDir('gstack')}/bun-cache`,
         `${packBrowserDir('gstack')}/playwright`,
+        `${packBrowserDir('gstack')}/xdg-cache`,
       ],
     });
     // The preview shows the skills the runtime mounts.
