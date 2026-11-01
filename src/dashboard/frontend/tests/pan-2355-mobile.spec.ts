@@ -9,8 +9,12 @@
  * Needs you, Conversations and the pair screen land in test-results/pan-2355/.
  */
 
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { createConversation } from '../../../lib/overdeck/conversations.js';
+import { closeOverdeckDatabase } from '../../../lib/overdeck/infra.js';
 import { startIsolatedDashboard, type IsolatedDashboard } from './fixtures/isolated-dashboard.js';
 
 const SHOT_DIR = 'test-results/pan-2355';
@@ -51,6 +55,19 @@ const CONVERSATIONS = [
   { id: 12, name: 'pan-2355-docs', title: 'Write the phone docs', status: 'active', issueId: null, createdAt: '2026-10-31T08:00:00.000Z', lastAttachedAt: null, lastActivityAt: '2026-11-01T05:10:00.000Z', sessionAlive: true, tmuxSession: 'conv-pan-2355-docs', cwd: '/tmp', endedAt: null },
 ];
 
+/** Seed one managed conversation into the temp home before the server opens it. */
+function seedConversation(home: string): void {
+  const saved = process.env.OVERDECK_HOME;
+  process.env.OVERDECK_HOME = home;
+  try {
+    createConversation({ name: 'pan-2355-real', tmuxSession: 'conv-pan-2355-real', cwd: home, harness: 'claude-code', title: 'Phone conversation view', workspaceId: null });
+  } finally {
+    closeOverdeckDatabase();
+    if (saved === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = saved;
+  }
+}
+
 async function phoneContext(browser: Browser, baseUrl: string): Promise<BrowserContext> {
   const context = await browser.newContext({ ...PHONE });
   await context.grantPermissions(['notifications'], { origin: baseUrl });
@@ -75,7 +92,9 @@ async function expectTapTargets(page: Page): Promise<void> {
 
 test('the phone shell installs, answers a question in two taps and pairs', async ({ browser }) => {
   mkdirSync(SHOT_DIR, { recursive: true });
-  dashboard = await startIsolatedDashboard();
+  const home = mkdtempSync(join(tmpdir(), 'pan-2355-'));
+  seedConversation(home);
+  dashboard = await startIsolatedDashboard({ home });
   const baseUrl = dashboard.baseUrl;
 
   // 1. PWA files.
@@ -143,7 +162,30 @@ test('the phone shell installs, answers a question in two taps and pairs', async
     await context.close();
   }
 
-  // 6. With the session mint refused, the shell asks to pair.
+  // 6. A real conversation opens full screen in ConversationPanel without widening the page.
+  const viewer = await phoneContext(browser, baseUrl);
+  try {
+    const page = await viewer.newPage();
+    const listed = await page.request.get(`${baseUrl}/api/conversations`);
+    const rows = await listed.json() as Array<{ id: number; name: string }>;
+    const id = rows.find((row) => row.name === 'pan-2355-real')?.id;
+    expect(id, 'the seeded conversation is listed').toBeDefined();
+    await page.goto(`${baseUrl}/m?conversation=${id}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'Phone conversation view' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'Back' })).toBeVisible();
+    await page.waitForTimeout(1_000);
+    expect(await page.evaluate(() => [window.innerWidth, window.scrollX, window.scrollY])).toEqual([390, 0, 0]);
+    // Every header control stays on screen (the wrapper lets the desktop header wrap).
+    const offscreen = await page.evaluate(() => Array.from(document.querySelectorAll('[data-component="mobile-app"] button'))
+      .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.right > window.innerWidth + 1; })
+      .map((el) => el.getAttribute('aria-label') ?? el.textContent?.trim() ?? el.tagName));
+    expect(offscreen).toEqual([]);
+    await page.screenshot({ path: `${SHOT_DIR}/conversation.png` });
+  } finally {
+    await viewer.close();
+  }
+
+  // 7. With the session mint refused, the shell asks to pair.
   const unpaired = await phoneContext(browser, baseUrl);
   try {
     const page = await unpaired.newPage();

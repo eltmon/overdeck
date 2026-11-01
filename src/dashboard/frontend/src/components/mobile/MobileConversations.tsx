@@ -81,7 +81,10 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
           {conversation ? conversation.title?.trim() || conversation.name : 'Conversation'}
         </h2>
       </header>
-      <div className="min-h-0 flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)]">
+      {/* The desktop header row is one line; at phone width its actions would run
+          off-screen, so let the row and its action group wrap (D-14: the panel
+          itself is never edited). */}
+      <div className="min-h-0 flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)] [&_[class*=conversationHeaderPrimary]]:flex-wrap [&_[class*=conversationHeaderActions]]:flex-wrap">
         {isLoading && conversation === undefined ? (
           <p className="px-4 py-6 text-sm text-muted-foreground">Loading conversation…</p>
         ) : isError || conversation === undefined ? (
