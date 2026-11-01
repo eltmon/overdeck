@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4641",
   "created": "2026-11-01T05:00:29.700Z",
-  "updated": "2026-11-01T07:15:47.240Z",
+  "updated": "2026-11-01T07:37:16.072Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T07:37Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T07:37:16.072Z"
+    }
+  ],
   "items": {
     "reset-text-parser": {
       "status": "completed",
@@ -315,5 +321,14 @@
       "status": "completed",
       "doneAt": "2026-11-01T07:15:47.239Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T07:37:16Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4641\n\nPull request: https://github.com/eltmon/overdeck/pull/4686 (head `7a2f48ac`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124785036503/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41285217477/job/124785036503  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/memory/provider-policy.test.ts\u001b[2m > \u001b[22mmemory extraction provider policy\u001b[2m > \u001b[22mreads today's memory-extraction spend from persisted cost events\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/memory/provider-policy.test.ts\u001b[2m > \u001b[22mmemory extraction provider policy\u001b[2m > \u001b[22mreads today's memory-extraction spend from persisted cost events\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/memory/provider-policy.test.ts\u001b[2m > \u001b[22mmemory extraction provider policy\u001b[2m > \u001b[22mskips extraction when today's memory-extraction spend is at the cap\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/memory/provider-policy.test.ts\u001b[2m > \u001b[22mmemory extraction provider policy\u001b[2m > \u001b[22mskips extraction when today's memory-extraction spend is at the cap\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/memory/provider-policy.test.ts\u001b[2m > \u001b[22mmemory extraction provider policy\u001b[2m > \u001b[22mtries one fallback provider after the primary provider fails\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/memory/provider-policy.test.ts\u001b[2m > \u001b[22mmemory extraction provider policy\u001b[2m > \u001b[22mtries one fallback provider after the primary provider fails\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/memory/provider-policy.test.ts\u001b[2m > \u001b[22mmemory extraction provider policy\u001b[2m > \u001b[22mdrops extraction after primary and fallback both fail\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/memory/provider-policy.test.ts\u001b[2m > \u001b[22mmemory extraction provider policy\u001b[2m > \u001b[22mdrops extraction after primary and fallback both fail\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/memory/provider-policy.test.ts\u001b[2m > \u001b[22mmemory extraction provider policy\u001b[2m > \u001b[22mrecords health reason provider-auth-faile\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m26 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m465 passed\u001b[39m\u001b[22m\u001b[90m (491)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
