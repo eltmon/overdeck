@@ -21,6 +21,8 @@ export interface FlyMachineConfig {
   restart?: { policy: 'no' | 'always' | 'on-failure'; max_retries?: number };
   metadata?: Record<string, string>;
   mounts?: FlyMount[];
+  /** Fly proxy services (PAN-4652): e.g. 443 tls+http → internal 3011. */
+  services?: Array<{ protocol: 'tcp'; internal_port: number; ports: Array<{ port: number; handlers: string[] }> }>;
 }
 
 export interface FlyMount {
@@ -146,6 +148,7 @@ export class FlyApiClient {
       config: {
         image: config.image,
         env: config.env,
+        services: config.services,
         guest: config.size
           ? { cpu_kind: 'shared', cpus, memory_mb: config.memory ?? 1024 }
           : undefined,

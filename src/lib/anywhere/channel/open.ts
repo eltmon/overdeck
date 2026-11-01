@@ -22,6 +22,9 @@ import { type ChannelMode, encodeFrame, encodePreamble, FrameReader, type Refusa
 
 export const DEFAULT_OPEN_TIMEOUT_MS = 10_000;
 
+/** wss route query parameter naming one Fly machine; sent as `fly-force-instance-id` (PAN-4652 D-3). */
+export const FLY_INSTANCE_PARAM = 'fly-instance';
+
 export type TransportUrl = `tcp://${string}` | `wss://${string}` | `rtc://${string}` | `rtc+turn://${string}`;
 
 /** Opens a WebRTC data channel to `rtc://<id>` or `rtc+turn://<id>` (PAN-2356 WI-11). */
@@ -273,7 +276,11 @@ function toOpenError(error: unknown, url: string): ChannelOpenError {
   return new ChannelOpenError('unreachable', `${url}: ${(error as Error)?.message ?? String(error)}`);
 }
 
-function parseTransportUrl(url: TransportUrl): { kind: 'tcp'; host: string; port: number } | { kind: 'wss'; url: string } {
+type TransportTarget =
+  | { kind: 'tcp'; host: string; port: number }
+  | { kind: 'wss'; url: string; headers?: Record<string, string> };
+
+function parseTransportUrl(url: TransportUrl): TransportTarget {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -287,7 +294,13 @@ function parseTransportUrl(url: TransportUrl): { kind: 'tcp'; host: string; port
     }
     return { kind: 'tcp', host: parsed.hostname.replace(/^\[|\]$/g, ''), port };
   }
-  if (parsed.protocol === 'wss:') return { kind: 'wss', url };
+  if (parsed.protocol === 'wss:') {
+    // Many Fly machines share `<app>.fly.dev`; the Fly proxy pins one by this header.
+    const instance = parsed.searchParams.get(FLY_INSTANCE_PARAM);
+    if (!instance) return { kind: 'wss', url };
+    parsed.searchParams.delete(FLY_INSTANCE_PARAM);
+    return { kind: 'wss', url: parsed.toString(), headers: { 'fly-force-instance-id': instance } };
+  }
   throw new ChannelOpenError('protocol', `Unsupported transport scheme in ${url}`);
 }
 
@@ -327,7 +340,7 @@ function connectTransport(url: TransportUrl, signal: AbortSignal): Promise<Duple
       });
       return;
     }
-    const ws = new WsClient(target.url);
+    const ws = new WsClient(target.url, target.headers ? { headers: target.headers } : undefined);
     const onAbort = (): void => {
       ws.terminate();
       fail(signal.reason);

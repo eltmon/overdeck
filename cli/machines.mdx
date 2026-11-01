@@ -102,6 +102,54 @@ Reached desk: pan 0.73.0 (matches this machine)
 A failure prints the same messages as `add-ssh` and exits 1. `--json` prints
 `{ reachable, panVersion, localVersion, versionMatches, error, message }`.
 
+## add-fly
+
+```bash
+pan machines add-fly [--project <key>] [--message <text>] [--model <id>] [--effort <level>]
+  [--region <code>] [--image <ref>] [--json]
+```
+
+Starts a Fly.io VM that runs Overdeck, links it one way from this machine and, optionally,
+clones a project and starts a Claude Code conversation on it. The dashboard does the whole
+flow in one request, which takes a few minutes (longer with a large clone); the command
+waits for it. See [Fly machines](/configuration/linked-machines#fly-machines) for setup,
+lifetime and cost.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Clone this project onto the VM into `/workspace/<key>` and register it there. GitHub projects only. |
+| `--message <text>` | Start a Claude Code conversation with this first message. Needs `--project`. |
+| `--model <id>` | Model for the conversation. |
+| `--effort <level>` | Reasoning effort for the conversation. |
+| `--region <code>` | Fly region. Default: `[remote.fly] region`, else `iad`. |
+| `--image <ref>` | Image. Default: `[remote.fly] image`, else `registry.fly.io/pan-workspace:latest`. |
+| `--json` | Print `{ link, record, conversation? }` as JSON. |
+
+```
+Starting a Fly machine; this takes a few minutes (longer with a project clone)...
+Linked fly-148e21ea7e1689 (Fly app pan-workspaces, region iad; docker: yes)
+Open: http://localhost:3011/conv/@3f2c1b7e-9a4d-4c2b-8e1f-0a1b2c3d4e5f/conv-fly-1
+`pan machines list` shows its state; `pan machines unlink` destroys it.
+```
+
+Every failure after the VM exists destroys it again, removes any link it made and prints
+the server's message, then exits 1:
+
+| Error | Remedy |
+| --- | --- |
+| `remote-disabled` | Set `remote.enabled = true` in `~/.overdeck/config.toml`. |
+| `no-fly-token` | Run `fly auth login`, or set `FLY_API_TOKEN` (or the variable `[remote.fly] api_token_env` names). |
+| `harness-unsupported` | Fly machines run Claude Code only. |
+| `bad-request` | `--message` needs `--project`, or a field was empty. |
+| `cap-reached` | `remote.max_concurrent_agents` is full. Unlink a Fly machine, stop a remote agent, or raise the cap. |
+| `credentials-failed` | This machine's Claude Code credentials did not reach the VM. Log in to Claude Code here (`~/.claude/.credentials.json`), then try again. |
+| `version-mismatch` | The VM could not install this machine's Overdeck version; the message names both. |
+| `server-not-ready` | Overdeck on the VM did not answer within 2 minutes. The message carries the last lines of its log. |
+| `pairing-failed` | Overdeck on the VM issued no pairing code. |
+| `unreachable` | This machine could not reach the VM. Give the Fly app public IPs once: `fly ips allocate-v4 --shared -a <app>` and `fly ips allocate-v6 -a <app>`. |
+| `project-failed` | The project is not a GitHub project here, or the clone on the VM failed; the message carries the clone's last lines. |
+| `conversation-failed` | The VM refused the conversation; the message carries its answer. |
+
 ## list
 
 ```bash
@@ -217,7 +265,15 @@ Unlinked "desk"; the other machine was told and its token here was revoked.
 
 When the other machine cannot be reached it prints that it will see the link as revoked
 when it next connects. An unknown target prints `No machine link matches "<target>"` and
-exits 1. `--json` prints `{ ok, peerNotified, ssh }`.
+exits 1. `--json` prints `{ ok, peerNotified, ssh, fly }`.
+
+A Fly machine is destroyed unless you pass `--keep-server`, and its record here is deleted
+either way. With `--keep-server` nothing heartbeats the machine any more, so it stops itself
+within about 5 minutes and loses its disk:
+
+```
+Destroyed the Fly machine behind fly-148e21ea7e1689.
+```
 
 For an SSH machine, unlink also stops its port forward. When this machine started the
 host's server (`managed`), unlink stops that server too, unless you pass `--keep-server`.
@@ -239,8 +295,8 @@ Left the Overdeck server on vps running (in-use).
 
 | Flag | Effect |
 | --- | --- |
-| `--keep-server` | For an SSH machine this dashboard started: leave its Overdeck server running. |
-| `--json` | Print `{ ok, peerNotified, ssh }` as JSON. |
+| `--keep-server` | For an SSH machine this dashboard started: leave its Overdeck server running. For a Fly machine: do not destroy it now; with no heartbeat from here it stops itself within about 5 minutes. |
+| `--json` | Print `{ ok, peerNotified, ssh, fly }` as JSON. |
 
 ## forward
 

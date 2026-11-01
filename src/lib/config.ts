@@ -76,6 +76,8 @@ export interface RemoteFlyConfig {
   auto_stop_timeout?: number;
   /** Env var name for API token (default: FLY_API_TOKEN) */
   api_token_env?: string;
+  /** Minutes a Fly machine may run with no active linked conversation before home destroys it (default 30, 0 disables; PAN-4652) */
+  machine_idle_minutes?: number;
 }
 
 export interface RemoteConfig {

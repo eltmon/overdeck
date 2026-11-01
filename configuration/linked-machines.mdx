@@ -115,6 +115,73 @@ npx @overdeck/core connect
 Then run the `pan machines link '…'` line it prints on your laptop. See
 [`pan connect`](/cli/machines#connect) for lingering, macOS, firewalls and removal.
 
+## Fly machines
+
+A Fly machine is a [Fly.io](https://fly.io) VM that runs Overdeck (`pan serve`) and is
+linked one way from this machine over `wss://<app>.fly.dev`. Everything between the two
+travels inside the same end-to-end encrypted channel as any other link; Fly's proxy sees
+only ciphertext. Use it to run a conversation on a fresh machine without tying up this one:
+
+```bash
+pan machines add-fly --project overdeck --message "Fix the flaky retry test"
+```
+
+This one command, which takes a few minutes:
+
+1. Starts a Fly VM from the `pan-workspace` image and makes its `pan` version equal this
+   machine's.
+2. Copies your Claude and GitHub credentials to it (no SSH key ever reaches the VM).
+3. Starts Overdeck there and links to it. Its chip reads `fly-<machineId>`.
+4. With `--project`, clones that project onto the VM (GitHub projects only).
+5. With `--message`, starts a Claude Code conversation there and prints its URL.
+
+The conversation then streams in this dashboard like any linked conversation: use
+[Remote control](#remote-control) to steer it, or [Pull here](#pull-here) to bring it home.
+
+### Setup
+
+Fly machines use the same `[remote]` and `[remote.fly]` settings as remote work agents
+(`pan start --remote`):
+
+- `remote.enabled = true` in `~/.overdeck/config.toml`.
+- A Fly token: `fly auth login`, or `FLY_API_TOKEN` (or the variable that
+  `[remote.fly] api_token_env` names).
+- Once per Fly app, give it public IPs, because `https://<app>.fly.dev` needs them and the
+  Machines API cannot allocate them:
+
+```bash
+fly ips allocate-v4 --shared -a <app>   # default app: pan-workspaces
+fly ips allocate-v6 -a <app>
+```
+
+A Fly machine gets at least 2 GB of memory (`[remote.fly] vm_memory`, raised to 2048 when
+lower).
+
+### Lifetime and cost
+
+A Fly machine is destroyed, never stopped, because a Fly VM loses its disk when it stops.
+That happens when:
+
+- you unlink it (`pan machines unlink fly-<machineId>`). With `--keep-server` it is not destroyed at once, but nothing heartbeats it any more, so it stops itself within about 5 minutes;
+- no linked conversation on it has been active for `[remote.fly] machine_idle_minutes`
+  (default 30; 0 turns the idle check off);
+- this machine stops sending its heartbeat for 5 minutes (the VM stops itself, and this
+  machine destroys it once it sees it stopped).
+
+Its conversations go with it. [Pull here](#pull-here) first to keep one.
+
+Fly machines count toward `remote.max_concurrent_agents`, the same cap as remote work
+agents; `add-fly` refuses with `cap-reached` when it is full (0 or unset means no cap).
+
+### Limits
+
+- Claude Code only. Other harnesses on Fly are tracked in
+  [#4296](https://github.com/eltmon/overdeck/issues/4296).
+- Docker: the VM runs Docker with the `vfs` storage driver, because the VM's disk cannot
+  host the default overlay driver. Containers run, but images take more disk and start
+  more slowly than on your own machine. `add-fly --json` reports `record.docker` as `true`
+  or `false` for each machine.
+
 ## Access levels
 
 | Level | What this machine may do on the other | Flag |
@@ -452,5 +519,11 @@ connections.
   route answered but none proved the expected key. Either the other machine's key changed
   (its `machine-key.json` was replaced) or a proxy answered for a dead peer. Unlink and
   link again if the key really changed.
+- **`add-fly` fails with `unreachable`**: the Fly app has no public IPs. Run
+  `fly ips allocate-v4 --shared -a <app>` and `fly ips allocate-v6 -a <app>` once, then
+  try again. The failed VM was already destroyed.
+- **`add-fly` fails with `version-mismatch`**: the VM could not install this machine's
+  Overdeck version from npm. The message names both versions; a development build that is
+  not published on npm cannot be installed there.
 - The link exists but `require_token_mint` turned itself on: that is expected. Any remote
   access turns it on; see [Remote access](/configuration/remote-access#local-reverse-proxies-require_token_mint).

@@ -1194,6 +1194,7 @@ program
   .command('serve')
   .description('Start the dashboard server and open it in the default browser (npx launcher)')
   .option('--port <port>', 'Port to listen on', '3011')
+  .option('--no-open', 'Do not open a browser')
   .action(lazyAction(() => import('./commands/serve.js'), 'serveCommand'));
 
 await groups.finish();

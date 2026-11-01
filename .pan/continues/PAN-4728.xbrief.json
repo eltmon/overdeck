@@ -1,0 +1,204 @@
+{
+  "version": "1",
+  "issueId": "PAN-4728",
+  "created": "2026-11-01T17:45:22.507Z",
+  "updated": "2026-11-01T19:10:37.955Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T19:05Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T19:05:10.708Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T19:10Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-01T19:10:37.955Z"
+    }
+  ],
+  "items": {
+    "manifest-plugin-root": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4728",
+      "claimedAt": "2026-11-01T17:45:22.507Z",
+      "doneAt": "2026-11-01T17:55:28.342Z"
+    },
+    "known-pack-pstack": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4728",
+      "claimedAt": "2026-11-01T17:55:45.023Z",
+      "doneAt": "2026-11-01T18:05:13.115Z"
+    },
+    "sources-plugin-root": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4728",
+      "claimedAt": "2026-11-01T18:05:25.806Z",
+      "doneAt": "2026-11-01T18:15:48.345Z"
+    },
+    "mount-extras": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4728",
+      "claimedAt": "2026-11-01T18:15:55.553Z",
+      "doneAt": "2026-11-01T18:24:28.235Z"
+    },
+    "launch-pstack-mount": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4728",
+      "claimedAt": "2026-11-01T18:24:34.231Z",
+      "doneAt": "2026-11-01T18:33:05.377Z"
+    },
+    "cli-pack-add-defaults": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4728",
+      "claimedAt": "2026-11-01T18:33:11.832Z",
+      "doneAt": "2026-11-01T18:41:54.880Z"
+    },
+    "live-checkpoint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4728",
+      "claimedAt": "2026-11-01T18:42:36.190Z",
+      "doneAt": "2026-11-01T18:44:27.338Z"
+    },
+    "docs-pstack": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4728",
+      "claimedAt": "2026-11-01T18:44:32.393Z",
+      "doneAt": "2026-11-01T18:47:46.913Z"
+    },
+    "manifest-plugin-root.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:50:49.400Z"
+    },
+    "manifest-plugin-root.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:51:03.504Z"
+    },
+    "manifest-plugin-root.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:51:16.965Z"
+    },
+    "manifest-plugin-root.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:51:30.138Z"
+    },
+    "known-pack-pstack.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:51:47.102Z"
+    },
+    "known-pack-pstack.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:52:01.704Z"
+    },
+    "known-pack-pstack.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:52:16.112Z"
+    },
+    "sources-plugin-root.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:52:33.691Z"
+    },
+    "sources-plugin-root.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:52:48.672Z"
+    },
+    "sources-plugin-root.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:53:02.580Z"
+    },
+    "sources-plugin-root.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:53:17.474Z"
+    },
+    "mount-extras.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:53:35.370Z"
+    },
+    "mount-extras.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:53:51.576Z"
+    },
+    "mount-extras.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:54:06.065Z"
+    },
+    "launch-pstack-mount.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:54:22.756Z"
+    },
+    "launch-pstack-mount.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:54:36.708Z"
+    },
+    "launch-pstack-mount.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:54:51.103Z"
+    },
+    "cli-pack-add-defaults.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:55:08.359Z"
+    },
+    "cli-pack-add-defaults.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:55:23.243Z"
+    },
+    "cli-pack-add-defaults.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:55:37.443Z"
+    },
+    "cli-pack-add-defaults.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:55:52.101Z"
+    },
+    "live-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:56:09.581Z"
+    },
+    "live-checkpoint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:56:24.253Z"
+    },
+    "live-checkpoint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:56:37.809Z"
+    },
+    "live-checkpoint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:56:52.006Z"
+    },
+    "docs-pstack.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:57:08.671Z"
+    },
+    "docs-pstack.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:57:21.807Z"
+    },
+    "docs-pstack.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:57:36.068Z"
+    },
+    "docs-pstack.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:57:49.555Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T19:05:10Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4728\n\nPull request: https://github.com/eltmon/overdeck/pull/4737 (head `5b382b05`)\n\nSource: check_run:lint-group (core)\n\n## Failing checks (1)\n\n### lint-group (core)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124946611853/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41339606595/job/124946611853  \n```\n],\"display\":\"/pan skills pack remove\",\"description\":\"Unregister a pack, clear its global toggles, and delete its cache\",\"args\":[{\"name\":\"id\",\"required\":true,\"variadic\":false}],\"options\":[],\"aliases\":[],\"category\":\"Core\"},\ncomposer-command manifest has drifted from the CLI registry — run 'npm run generate:slash-commands' and commit the result\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.0\nTemporarily overriding HOME='/home/runner/work/_temp/4a5f5541-3e4f-4930-bbc8-d77d34646260' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-01T19:10:37Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4728\n\n# Review — PAN-4728\n## Verdict: CHANGES REQUESTED — CI `lint-group (core)` is red: `pan skills pack add` changed but `packages/contracts/src/composer-commands.generated.ts` was not regenerated\n\n## Context\n- Run ID: agent-pan-4728-review-5b382b05\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4728/.pan/review/agent-pan-4728-review-5b382b05/context.json\n- Branch / workspace: feature/pan-4728 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4728\n- PR: https://github.com/eltmon/overdeck/pull/4737 (head 5b382b05 matches)\n- HEAD reviewed: 5b382b053cdf3e84e4751613cbc448bdaffe1c67\n- Base / prior cycle SHA: efee700bbcd (merge-base with origin/main); no prior review cycle\n\n## Blocking Findings\n\n### [correctness] Composer-command manifest not regenerated after the `pack add` CLI change — `src/cli/commands/skills.ts:508`\n- Severity: ! (MUST)\n- Classification / requirement scope: implementation defect; in_pr_scope (AC-9 \"`npm run lint` passes\")\n- Trigger and changed-code connection: the PR changes `pack.command('add <id> <url>')` to `add <id> [url]`, the description, and `--ref` from `requiredOption` to `option` (`src/cli/commands/skills.ts:508-512`). `scripts/lint-slash-commands.sh` compares the CLI registry against the committed `packages/contracts/src/composer-commands.generated.ts`, which this branch does not touch.\n- Expected / observed / impact: expected the generated manifest to carry the new `pan-skills-pack-add` entry. Observed on CI run 41339606595, job `lint-group (core)` (https://github.com/eltmon/overdeck/actions/runs/41339606595/job/124946611853): the diff shows the old entry (`url` required, old description, old `--ref` text) vs. the new one, then `composer-command manifest has drifted from the CLI registry — run 'npm run generate:slash-commands' and commit the result`, exit 1. The required CI check is red, so the PR cannot merge, and until it is fixed the dashboard composer would keep advertising `url` as required.\n- Evidence: CI job log (step \"Lint (core)\", `npm run lint:slash-commands`). `git diff efee700 HEAD --stat` lists no change to `packages/contracts/src/composer-commands.generated.ts`.\n- Fix: the generator reads the CLI registry from the built `dist/cli/index.js` (`scripts/lint-slash-commands.sh`), so rebuild first: `npm run build:contracts && npm run build:cli`, then `npm run generate:slash-commands`, then commit `packages/contracts/src/composer-commands.generated.ts`. Regenerating against a stale dist leaves CI red for the same reason. This does not conflict with non-goal 5 (\"No dashboard changes\"): the manifest is a required generated artifact of the CLI change, not a dashboard behavior change, and the dashboard's mattpocock add-command hint stays as-is.\n\n## Non-blocking Findings\n- `?` `extractCommit` (`src/lib/skill-packs/sources.ts:240-243`) removes a root-less cached extraction and rebuilds it. If another process is reading that extraction at the same moment (for example, a launch building a mount), the read can fail. This happens only once, when a cache made by older code lacks the plugin root, and pstack had no older extractions. This is a hypothesis with no demonstrated trigger.\n- `?` `assertMountPack` (`src/lib/skill-packs/mount.ts:94-105`) validates `extras` but not `pluginRoot`. Both values come only from the `KNOWN_PACKS` constant (a non-goal forbids a CLI/registry field), so nothing attacker-controlled reaches them. This is optional hardening.\n- Hazard H1 (documented in the PRD): the deployed 0.72.0 `pan`/dashboard reads the now-registered `skills.packs.pstack` without `KNOWN_PACKS.pstack` and shows 0 skills until this merges and `pan reload` runs. Nothing is on, so no launch changes. This is expected.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| src/lib/skill-packs/adapters.ts | Reviewed: `KnownPack.pluginRoot/ref/mountExtras`, `KNOWN_PACKS.pstack` matches FR-4 exactly, `readPackManifest` reads under `base` and returns repo-relative `dir`/executables via `posix.join(prefix, …)`, `toRepoRelative` rejects empty/absolute/`.`/`..`/`../` (FR-2); with `pluginRoot` unset `prefix=''`, `base=root` → identical output (FR-3). |\n| src/lib/skill-packs/sources.ts | Reviewed: `extractCommit` passes `-- <pluginRoot>` to `git archive` after `assertOperand` (no option injection), reuses a cache containing the root, rebuilds a root-less one; add/update/sync all pass `pluginRootOf(id)`; `PackPreview.pluginRoot` set only when defined. Registry entry still has no pluginRoot (non-goal 1). |\n| src/lib/skill-packs/mount.ts | Reviewed: extras validated (escape, collision with `skills`/`.claude-plugin`/`.codex-plugin`); copied with `copyWithoutSymlinks` (the `fs.cp` filter also applies to the top-level src, so a symlinked extra is skipped); missing extras skipped; `mountHash` adds extras entries only for packs with extras, so existing hashes are unchanged and `MOUNT_FORMAT_VERSION` stays 2. |\n| src/lib/skill-overrides/catalog.ts | Reviewed: passes `pluginRoot` to `readPackManifest` (FR-6). |\n| src/lib/skill-overrides/launch.ts | Reviewed: adds `pluginRoot` and `extras` from `KNOWN_PACKS` only when defined (FR-8); skill dirs come from the catalog manifest (repo-relative), joined to `packExtractDir` in the mount. |\n| src/cli/commands/skills.ts | Reviewed: url/ref defaults, exact FR-9 error texts, `Root` row only when set (FR-10). Source of the blocking manifest drift. |\n| src/**/__tests__/{adapters,sources,mount,launch,skills}.test.ts | Reviewed: 17 new cases; no `.only`/`skipIf`, no source-grep tests; existing cases unchanged. |\n| features/skills.mdx, changelog.mdx, .overdeck/context/codebase/architecture.md | Reviewed: FR-11/AC-8 content present (pstack section, opt-in list, `docs/harness/claude-code.md`, `pstack:poteto-agent`, Upcoming v0.73.0 entry, `pluginRoot` in the architecture map). |\n| .pan/drafts/PAN-4728.md, PAN-4728-live-checkpoint.md, .pan/continues/…, .pan/specs/… | Planning artifacts, reviewed for requirements; the live checkpoint was cross-checked against host state (below). |\n\n### Dimensions\n- Correctness: traced every path (add/update/sync → extract → manifest → catalog → launch → mount). The only defect is the manifest drift.\n- Security: `pluginRoot`/`mountExtras` are constants; `git archive` operand guarded and placed after `--`; extras escape/collision checks plus symlink skipping keep pack content inside the mount. No new trust boundary.\n- Performance: scoping `git archive` to the subtree reduces blob fetches in the blobless clone. Extras copying is bounded and runs once per mount hash. All I/O stays async (`fs/promises`, `execFile`), so NFR-1 is met.\n- Requirements/UX: see the AC matrix. Non-goals hold: no CLI/registry `pluginRoot`, no agents/hooks/MCP/commands mounted, no dashboard or skillsRoot change, and other packs behave as before (their tests pass).\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 (WI-1) | Met | adapters.test.ts `plugin root` cases pass (local run) |\n| AC-2 (WI-2) | Met | `KNOWN_PACKS.pstack` toEqual test passes; other entries unchanged in diff |\n| AC-3 (WI-3) | Met | sources.test.ts four `plugin root packs` cases pass |\n| AC-4 (WI-4) | Met | mount.test.ts extras/hash/rejection cases pass; `MOUNT_FORMAT_VERSION = 2` |\n| AC-5 (WI-5) | Met | launch.test.ts pstack mount case passes; catalog passes `pluginRoot` |\n| AC-6 (WI-6) | Met | skills.test.ts new `pack add` cases pass; registration shows `add <id> [url]`, `--ref` optional |\n| AC-7 (WI-7) | Met | live checkpoint records the 58-skill preview, Root/Not applied rows, 51 skills plus the adapter doc, the invocation reply, and cleanup. `~/.overdeck/config.yaml` shows pstack registered at `ae5650f` with no toggle; projects.yaml has no pstack override |\n| AC-8 (WI-8) | Met | docs diff contains every required string |\n| AC-9 (all) | **Unmet** | CI `lint-group (core)` fails on `lint:slash-commands` (blocking finding) |\n\n## Verification\n- `npx vitest run` on the five touched test files: 5 files, 163 tests passed (local, HEAD 5b382b05).\n- `npm run lint:effect-diagnostics`: passed, 227 known findings and none new (local, HEAD 5b382b05).\n- CI for head 5b382b05 (run 41339606595): `lint-group (core)` **fail** (manifest drift). Passed: build (22), test-shard 1/4 and 3/4, lint-group skills/state, clean install smoke, prompt-trailer gate, flake lane. Still pending at review time, so unverified: test-shard 2/4 and 4/4, test-e2e, lint-group (effect). `overdeck/test` (local gate: typecheck plus lint subset) passed.\n- Full test suite not run (per role policy).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4728/.pan/review/agent-pan-4728-review-5b382b05/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4728 -m \"Fixed review issues\"`"
+    }
+  ]
+}

@@ -45,6 +45,7 @@ import { call, fail, NEEDS_PAN_UP, NOT_RUNNING } from './machines-call.js';
 import { registerMachinesAddProjectCommand } from './machines-add-project.js';
 import { registerMachinesWhoCommand } from './machines-who.js';
 import { registerMachinesSshCommands } from './machines-ssh.js';
+import { registerMachinesFlyCommands } from './machines-fly.js';
 
 export { NOT_RUNNING } from './machines-call.js';
 
@@ -156,7 +157,7 @@ export async function runMachinesUnlink(target: string, options: { json?: boolea
   if (response.status === 404) return fail(`No machine link matches "${target}" (by label, environment id or link id). \`pan machines list\` shows the links.`);
   if (response.status === 401) return fail(NEEDS_PAN_UP);
   if (!response.ok) return fail(`pan machines unlink failed: ${await errorText(response)}`);
-  const result = await response.json() as { ok: boolean; peerNotified: boolean; ssh?: { stopped: boolean; reason: string } | null };
+  const result = await response.json() as { ok: boolean; peerNotified: boolean; ssh?: { stopped: boolean; reason: string } | null; fly?: { destroyed: boolean } | null };
   if (options.json) {
     console.log(JSON.stringify(result));
     return;
@@ -168,6 +169,11 @@ export async function runMachinesUnlink(target: string, options: { json?: boolea
     console.log(result.ssh.stopped
       ? `Stopped the Overdeck server on ${target}.`
       : `Left the Overdeck server on ${target} running (${result.ssh.reason}).`);
+  }
+  if (result.fly) {
+    console.log(result.fly.destroyed
+      ? `Destroyed the Fly machine behind ${target}.`
+      : `Left the Fly machine behind ${target} running (--keep-server). Nothing here heartbeats it any more, so it stops itself within about 5 minutes and loses its disk.`);
   }
 }
 
@@ -454,8 +460,8 @@ export function registerMachinesCommands(program: Command): void {
   machines
     .command('unlink <target>')
     .description('Remove a link by label, environment id or link id, revoking the token the other machine holds')
-    .option('--keep-server', 'For an SSH machine this dashboard started: leave its Overdeck server running')
-    .option('--json', 'Print { ok, peerNotified, ssh } as JSON')
+    .option('--keep-server', 'For an SSH machine this dashboard started: leave its Overdeck server running; for a Fly machine: do not destroy it')
+    .option('--json', 'Print { ok, peerNotified, ssh, fly } as JSON')
     .action((target: string, options: { json?: boolean; keepServer?: boolean }) => runMachinesUnlink(target, options));
   machines
     .command('forward [machine] [port]')
@@ -508,4 +514,5 @@ export function registerMachinesCommands(program: Command): void {
   registerMachinesSshCommands(machines);
   registerMachinesAddProjectCommand(machines);
   registerMachinesWhoCommand(machines);
+  registerMachinesFlyCommands(machines);
 }

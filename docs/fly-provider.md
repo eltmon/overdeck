@@ -156,11 +156,21 @@ Every Fly Machine runs the `pan-workspace` image defined in
 - Node.js 22
 - pnpm
 - Claude Code CLI (`@anthropic-ai/claude-code`)
+- Overdeck (`@overdeck/core`, so `pan` runs on the VM), pinned by the
+  `OVERDECK_VERSION` build argument (default `latest`)
+- Docker (`docker.io` and `iptables`), started by Fly machine provisioning, not by
+  the image
 - flyctl
 - git, tmux, build-essential, python3, jq
 
 The image runs no sshd: Fly's hallpass provides `fly ssh console`, sftp and the
-Machines exec API.
+Machines exec API. Its `CMD` stays `sleep infinity`: a Fly machine (below) starts
+`pan serve` by exec after it writes the machine's identity, and a remote work agent
+VM starts no server at all.
+
+To pin the Overdeck version in the image, pass the build argument:
+`docker build --build-arg OVERDECK_VERSION=0.72.0 …`. Provisioning a Fly machine
+reinstalls home's exact version anyway when the VM's differs.
 
 ### Build and push
 
@@ -182,6 +192,47 @@ update the config and recreate workspaces to pick it up.
 > The Fly app (`pan-workspaces` by default) must exist before you can push to its
 > registry. `pan remote setup` or `pan workspace create --remote` will create the app
 > automatically using the Machines API (`POST /apps`).
+
+---
+
+## Fly machines (linked)
+
+A **Fly machine** (PAN-4652) is a Fly VM that runs `pan serve` and is linked one way
+from home, so its conversations stream into home's dashboard like any linked machine's.
+It is not a remote work agent: a remote work agent VM (`pan start --remote`, the rest of
+this page) runs Claude Code in raw tmux and no Overdeck server. Start one with
+`pan machines add-fly`; the operator guide is the `## Fly machines` section of
+`configuration/linked-machines.mdx`, and the design is `## Fly machines (PAN-4652)` in
+`docs/ANYWHERE-ARCHITECTURE.md`.
+
+| | Remote work agent VM | Fly machine |
+|---|---|---|
+| Started by | `pan start --remote` | `pan machines add-fly`, `POST /api/machines/fly` |
+| Runs | Claude Code in tmux | `pan serve`, then Claude Code conversations through it |
+| Reached by | Machines exec API | a secure channel over `wss://<app>.fly.dev/ws/link` |
+| State on home | `agents/agent-<issue>/remote-state.json` | `fly-machines.json` plus a machine link |
+| Removed by | the reap, after hand-off | unlink, the idle sweep, the stopped-machine sweep (always destroyed) |
+
+**Server environment (D-4).** The VM's `pan serve --port 3011 --no-open` runs with
+`OVERDECK_TERMINAL_BACKEND=tmux`, `IS_SANDBOX=1`, `OVERDECK_PUBLIC_LINK_ONLY=1` and
+`PORT=3011`, set on the command line so remote work agent VMs are unchanged.
+
+**Memory (D-12).** Fly machines get `max(remote.fly.vm_memory ?? 1024, 2048)` MB; the
+dashboard server and Claude Code do not fit in 1 GB.
+
+**Public IPs (D-10).** `https://<app>.fly.dev` needs the app to hold a shared IPv4 and an
+IPv6, and the Machines API cannot allocate them. Run once per app:
+
+```bash
+fly ips allocate-v4 --shared -a <app>
+fly ips allocate-v6 -a <app>
+```
+
+**Lifetime.** Home heartbeats every Fly machine every 60 s, and a VM whose heartbeat is
+300 s old stops itself. Home destroys a Fly machine that is stopped or gone, that has had
+no active linked conversation for `[remote.fly] machine_idle_minutes` (default 30, 0
+disables), or that provisioning never linked within 30 minutes. Fly machines count toward
+`remote.max_concurrent_agents`.
 
 ---
 
@@ -288,6 +339,15 @@ loops (PAN-4295). With no active remote agent, none of them calls the Fly API.
 | Host heartbeat | every 60 s, ephemeral tier only | Writes the current time to `/workspace/.pan/host-heartbeat`. The VM watchdog stops the machine when the file is older than 300 s, so an ephemeral machine stops itself about 5 minutes after the host goes away. | keeps running |
 | Credential refresh | checked every 60 s | Copies host Claude credentials to each active VM when the host credentials file changes, or every 15 min at most. A failed copy is retried on the next check. | keeps running |
 | Reap | every 60 s deacon-lite tick | On `REMOTE_DONE`, materializes `workspaces/feature-<id>`, opens the PR, destroys the machine and requests review. On a crash (no session, no sentinel, or a stopped machine), salvages unpushed work, stops the machine and marks the agent `error`. An unreachable Fly API or a failed exec leaves the agent alone until the next tick. `starting` agents are skipped. | skipped |
+
+Fly machines (PAN-4652, `## Fly machines (linked)` above) have two more loops of their
+own in `src/lib/remote/fly-machine-loops.ts`, and the credential refresh covers them too.
+With no Fly machine record, neither calls the Fly API.
+
+| Loop | Cadence | What it does | Deacon frozen |
+|---|---|---|---|
+| `heartbeatFlyMachines` | every 60 s | Writes `/workspace/.pan/host-heartbeat` on every Fly machine, so its watchdog keeps it running while home is up. A failed exec is reported as a failure, never as refreshed. | keeps running |
+| `sweepFlyMachines` | every 60 s | Destroys the machine, removes its link and deletes its record when the Fly API reports it `stopped`, `destroyed` or `failed` or answers 404; when no unreleased linked conversation on it has been active for `[remote.fly] machine_idle_minutes` (default 30, 0 disables); or when provisioning never linked it within 30 min. Any other API error leaves it alone. | keeps running |
 
 The heartbeat and credential refresh run in `src/lib/cloister/hygiene-scheduler.ts`;
 the reap runs last in `runDeaconLite()` through `src/lib/cloister/remote-reap-routine.ts`.
@@ -420,3 +480,59 @@ re-plans a planned issue, and the post-planning auto-start runs locally).
 The automatic 60 s tick, the `remote-reap` journal source and the heartbeat
 file are checked after deploy in
 [#4696](https://github.com/eltmon/overdeck/issues/4696).
+
+## Live verification (PAN-4652)
+
+Fly machines were tested live on 2026-11-01, before merge, against app
+`pan-workspaces` (region `iad`), with this branch's own build: a test home dashboard
+from the branch's `dist/` (peer mode, `OVERDECK_DISABLE_DEACON=1` plus
+`OVERDECK_ANYWHERE_SUPERVISOR=1`, its own `OVERDECK_HOME` and port 3941) and a test
+image `registry.fly.io/pan-workspaces:pan-4652` (the `pan-workspace` image with the
+branch's packed `@overdeck/core` 0.72.0 installed, so the VM ran the branch's
+`pan serve --no-open` and public-link-only gate). Because the test home ran no deacon, a
+shell loop wrote the host heartbeat every 60 s in place of `heartbeatFlyMachines`. The
+app got its public IPs first: a shared IPv4 (66.241.124.218) and an IPv6.
+
+**Run 1, machine `862102ae249718`** (`add-fly --project overdeck --message "List the
+top-level files and stop." --model claude-sonnet-5-5`): 20:02:08 to 20:04:55 UTC
+(2 min 47 s, clone included).
+
+| Check | Result |
+|---|---|
+| Link over the pinned route | The link came online on `wss://pan-workspaces.fly.dev/ws/link?fly-instance=862102ae249718` (status `current`); the handshake proved the expected key, so Fly honors `fly-force-instance-id` on the upgrade. |
+| O1: conversation streams home | The test home listed the conversation (project `overdeck`, Claude Code, Sonnet 5.5) and its transcript showed Claude's file listing of `/workspace/overdeck`. The first message was lost (below); a turn sent through the link as the operator was answered and streamed home. |
+| O2: Pull here | `POST /api/linked-conversations/pull` finished `done` (online mode) as `20261101-948d`; a new turn to the VM's copy then answered 409 `conversation-released` ("Continued on d457a684; this copy is read-only"). |
+| O3: Docker | `docker run --rm hello-world` exited 125: the default overlay driver cannot mount on the VM's root filesystem ("invalid argument"). Restarted with `--storage-driver=vfs`, it printed "Hello from Docker!" and exited 0. |
+| O4: unlink | Removed the link and the record. Its destroy first got 403 because the test home held a copy of a Fly token that flyctl later rotated (a test-setup artifact: without `FLY_API_TOKEN` set, the client reads flyctl's current token); a failed destroy kept the link and record as designed, and the unlink completed once the test home read the current token. |
+
+Run 1 found two defects, fixed in this branch:
+
+- The chip read the bare machine id. Fly's exec shell runs with `HOME=/`, so `pan serve`
+  used `/.overdeck` and never read the identity provisioning had written to
+  `/root/.overdeck`. Provisioning now reads `${OVERDECK_HOME:-$HOME/.overdeck}` from the
+  exec shell.
+- Docker could not run containers on the overlay driver; provisioning now starts
+  `dockerd --storage-driver=vfs`.
+
+**Run 2, machine `7817612a669d98`** (`add-fly`, no project or message, with the fixes):
+20:25:30 to 20:26:32 UTC (62 s). The link label and the identity file read
+`fly-7817612a669d98`; the record had `docker: true`; `dockerd --storage-driver=vfs` was
+running and `docker run --rm hello-world` exited 0 (O3 settled: Docker works, the D-8
+fallback is not needed). `pan machines unlink fly-7817612a669d98` destroyed the machine,
+deleted the record and left `fly machines list -a pan-workspaces` empty (O4).
+
+Recorded, not fixed here:
+
+- The first message of a new conversation was lost to Claude Code's "Make auto mode your
+  default permission mode?" startup dialog
+  ([#4738](https://github.com/eltmon/overdeck/issues/4738)).
+- The VM's conversation-lifecycle patrol marks the live conversation ended on every tick,
+  which can make the idle sweep see a working machine as idle
+  ([#4739](https://github.com/eltmon/overdeck/issues/4739)).
+- The first linked request after an idle spell failed with `socket hang up`; an
+  immediate retry succeeded ([#4740](https://github.com/eltmon/overdeck/issues/4740)).
+- The VM advertises its private Fly addresses as `lan` routes, which home tries before
+  the public route ([#4741](https://github.com/eltmon/overdeck/issues/4741)).
+- A test that pulls a conversation must not register the workspace being tested as the
+  project's checkout: **Pull here** restores the conversation's code into that checkout.
+

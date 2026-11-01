@@ -7,12 +7,14 @@
  * copy fresh host credentials to every active remote agent's VM.
  *
  * Restored from PAN-1778 after PAN-3917 dropped its patrol and PAN-4014
- * deleted it as dead code.
+ * deleted it as dead code. PAN-4652 (FR-15): Fly machines (linked VMs running
+ * `pan serve`) are refreshed the same way, by machine name.
  */
 
 import { existsSync, statSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { listFlyMachines } from '../anywhere/fly/machine-store.js';
 import { loadConfigSync } from '../config.js';
 import { createFlyProviderFromConfig } from './index.js';
 import { listActiveRemoteAgentStates } from './remote-agents.js';
@@ -32,6 +34,11 @@ interface RemoteClaudeCredentialRefreshDeps {
   credentialFingerprint?: () => string | null;
   loadConfig?: typeof loadConfigSync;
   createFlyProvider?: typeof createFlyProviderFromConfig;
+  listFlyMachineNames?: () => Promise<string[]>;
+}
+
+async function listFlyMachineNames(): Promise<string[]> {
+  return (await listFlyMachines()).map((record) => record.machineName);
 }
 
 function getHostClaudeCredentialFingerprint(): string | null {
@@ -51,13 +58,14 @@ export function resetRemoteClaudeCredentialRefreshForTests(): void {
 }
 
 /**
- * Proactively copy fresh host Claude credentials to active remote agents.
+ * Proactively copy fresh host Claude credentials to active remote agents and
+ * Fly machines.
  *
  * Host OAuth refresh rotates refresh tokens, so a long-running Fly VM can be
  * left with an orphaned copy. The host credentials file mtime is the precise
  * trigger on Linux; platforms without that file fall back to a bounded 15 min
- * refresh cadence. The active-agent scan runs first so the common zero-remote
- * case never constructs a Fly provider or makes Fly API calls.
+ * refresh cadence. The active-agent and Fly machine scans run first so the
+ * common zero-remote case never constructs a Fly provider or makes Fly API calls.
  *
  * Refresh state is tracked per VM (keyed by vmName), not globally. A failed
  * or newly started VM must be retried on the next patrol regardless of whether
@@ -66,8 +74,20 @@ export function resetRemoteClaudeCredentialRefreshForTests(): void {
 export async function refreshClaudeCredentialsForActiveRemoteAgents(
   deps: RemoteClaudeCredentialRefreshDeps = {},
 ): Promise<string[]> {
+  const actions: string[] = [];
   const activeStates = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)();
-  const activeVmNames = new Set(activeStates.map((state) => state.vmName));
+  let flyMachineNames: string[] = [];
+  try {
+    flyMachineNames = await (deps.listFlyMachineNames ?? listFlyMachineNames)();
+  } catch (err) {
+    // A corrupt fly-machines.json must not stop the refresh for remote agents.
+    actions.push(`Fly machine credentials refresh skipped: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  const targets = [
+    ...activeStates.map((state) => ({ vmName: state.vmName, who: state.issueId.toUpperCase() })),
+    ...flyMachineNames.map((vmName) => ({ vmName, who: 'Fly machine' })),
+  ];
+  const activeVmNames = new Set(targets.map((target) => target.vmName));
 
   // Drop state for VMs that are no longer active so a future machine reusing
   // the same vmName starts with a clean watermark. Do this before the empty
@@ -78,15 +98,14 @@ export async function refreshClaudeCredentialsForActiveRemoteAgents(
     }
   }
 
-  if (activeStates.length === 0) return [];
+  if (targets.length === 0) return actions;
 
   const nowMs = (deps.nowMs ?? Date.now)();
   const currentFingerprint = (deps.credentialFingerprint ?? getHostClaudeCredentialFingerprint)();
   const config = (deps.loadConfig ?? loadConfigSync)();
-  const fly = (deps.createFlyProvider ?? createFlyProviderFromConfig)(config.remote);
-  const actions: string[] = [];
+  const fly = (deps.createFlyProvider ?? createFlyProviderFromConfig)(config.remote, 'ephemeral');
 
-  for (const state of activeStates) {
+  for (const state of targets) {
     const last = perVmCredentialRefreshState.get(state.vmName);
     const credentialChanged = currentFingerprint !== null && currentFingerprint !== last?.fingerprint;
     const refreshDue = !last ||
@@ -105,12 +124,12 @@ export async function refreshClaudeCredentialsForActiveRemoteAgents(
       }
       actions.push(
         synced
-          ? `Remote credentials refreshed for ${state.issueId.toUpperCase()} on ${state.vmName}`
-          : `Remote credentials refresh skipped for ${state.issueId.toUpperCase()} on ${state.vmName} (no host credentials)`,
+          ? `Remote credentials refreshed for ${state.who} on ${state.vmName}`
+          : `Remote credentials refresh skipped for ${state.who} on ${state.vmName} (no host credentials)`,
       );
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      actions.push(`Remote credentials refresh failed for ${state.issueId.toUpperCase()} on ${state.vmName}: ${reason}`);
+      actions.push(`Remote credentials refresh failed for ${state.who} on ${state.vmName}: ${reason}`);
     }
   }
 

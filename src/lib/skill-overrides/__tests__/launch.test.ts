@@ -23,7 +23,7 @@ vi.mock('node:child_process', async importOriginal => {
   return { ...actual, execFile: vi.fn(actual.execFile), spawn: vi.fn(actual.spawn) };
 });
 
-import { packExtractDir } from '../../skill-packs/sources.js';
+import { packExtractDir, packRenderDir, writePackEntry } from '../../skill-packs/sources.js';
 import {
   applyClaudePacks,
   applyCodexPacks,
@@ -395,10 +395,98 @@ describe('skill pack launch (PAN-4334)', () => {
     expect(await applyClaudePacks(ctx, link, new Set(['mattpocock']))).toEqual([]);
   });
 
+  it('mounts pstack skills with the Claude Code adapter doc (PAN-4728)', async () => {
+    const root = packExtractDir('pstack', COMMIT);
+    mkdirSync(join(root, 'harness', 'pstack', 'claude-code', 'skills', 'tdd'), { recursive: true });
+    writeFileSync(join(root, 'harness', 'pstack', 'claude-code', 'skills', 'tdd', 'SKILL.md'), '---\nname: tdd\ndescription: x\n---\n');
+    mkdirSync(join(root, 'harness', 'pstack', 'claude-code', 'docs', 'harness'), { recursive: true });
+    writeFileSync(join(root, 'harness', 'pstack', 'claude-code', 'docs', 'harness', 'claude-code.md'), '# Adapter\n');
+    const base = catalogEntry(true);
+    listPackCatalog.mockResolvedValue([
+      {
+        ...base,
+        id: 'pstack',
+        adapter: 'claude-plugin',
+        manifest: {
+          ...base.manifest!,
+          skills: [skill('tdd', 'harness/pstack/claude-code/skills/tdd')],
+          pluginName: 'pstack',
+        },
+      },
+    ]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { pstack: true } } });
+    expect(await applyClaudePacks(ctx, link)).toEqual([]);
+    expect(existsSync(join(link, 'pstack', 'skills', 'tdd', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(link, 'pstack', 'docs', 'harness', 'claude-code.md'))).toBe(true);
+  });
+
   it('stays quiet about an uncached pack that nothing turns on', async () => {
     listPackCatalog.mockResolvedValue([catalogEntry(false)]);
     loadSkillOverrideLayers.mockResolvedValue({ global: {} });
     expect(await applyClaudePacks(ctx, link)).toEqual([]);
+  });
+
+  describe('gstack-runtime pack (PAN-4727)', () => {
+    const GSTACK_COMMIT = 'e'.repeat(40);
+    const renderRoot = packRenderDir('gstack', GSTACK_COMMIT);
+    const gstackEntry = (cached: boolean) => {
+      const base = catalogEntry(true);
+      return {
+        ...base,
+        id: 'gstack',
+        url: 'https://github.com/eltmon/gstack',
+        ref: 'main',
+        commit: GSTACK_COMMIT,
+        adapter: 'gstack-runtime',
+        cached,
+        manifest: cached ? { ...base.manifest!, skills: [skill('review', 'review')], pluginName: null } : null,
+      };
+    };
+
+    beforeEach(() => {
+      // The extraction and the render hold different text, so the mount shows which one it copied.
+      mkdirSync(join(packExtractDir('gstack', GSTACK_COMMIT), 'review'), { recursive: true });
+      writeFileSync(join(packExtractDir('gstack', GSTACK_COMMIT), 'review', 'SKILL.md'), '---\nname: review\n---\nextraction copy\n');
+      mkdirSync(join(renderRoot, 'review'), { recursive: true });
+      writeFileSync(join(renderRoot, 'review', 'SKILL.md'), `---\nname: review\n---\nrender copy: ${renderRoot}/bin/gstack-skill-start\n`);
+    });
+
+    it('mounts gstack skills from the render when the pack is on for the project', async () => {
+      listPackCatalog.mockResolvedValue([gstackEntry(true)]);
+      loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { gstack: true } } });
+      expect(await applyClaudePacks(ctx, link)).toEqual([]);
+      const text = await readFile(join(link, 'gstack', 'skills', 'review', 'SKILL.md'), 'utf8');
+      expect(text).toContain(`render copy: ${renderRoot}/bin/gstack-skill-start`);
+      expect(text).not.toContain('extraction copy');
+    });
+
+    it('skips gstack with the sync warning when its render is not ready', async () => {
+      listPackCatalog.mockResolvedValue([gstackEntry(false)]);
+      loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { gstack: true } } });
+      expect(await applyClaudePacks(ctx, link)).toEqual([
+        '[launcher] WARNING: skill pack gstack not cached; run pan skills pack sync gstack',
+      ]);
+      expect(() => lstatSync(link)).toThrow();
+    });
+
+    it('lists gstack in the Codex pack block when on', async () => {
+      const codexHome = join(overdeckHome, 'codex-gstack');
+      listPackCatalog.mockResolvedValue([gstackEntry(true)]);
+      loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { gstack: true } } });
+      await applyCodexPacks(ctx, codexHome);
+      expect(await readFile(join(codexHome, 'config.toml'), 'utf8')).toContain('[plugins."gstack@overdeck-packs"]');
+    });
+
+    it('catalog reports gstack cached only once the trusted commit is rendered', async () => {
+      const { listPackCatalog: realListPackCatalog } = await vi.importActual<typeof import('../catalog.js')>('../catalog.js');
+      await writePackEntry({ id: 'gstack', url: 'https://github.com/eltmon/gstack', ref: 'main', commit: GSTACK_COMMIT });
+      const gstackRow = async () => (await realListPackCatalog()).find((pack) => pack.id === 'gstack');
+      expect(await gstackRow()).toMatchObject({ adapter: 'gstack-runtime', cached: false, manifest: null });
+      writeFileSync(join(renderRoot, '.gstack-pack.json'), '{"packMode":1}\n');
+      const ready = await gstackRow();
+      expect(ready).toMatchObject({ adapter: 'gstack-runtime', cached: true });
+      expect(ready?.manifest?.skills.map((s) => s.name)).toEqual(['review']);
+    });
   });
 
   it('writes the Codex pack block for the same selection', async () => {

@@ -28,6 +28,12 @@ vi.mock('../../services/ssh-machine-service.js', async (importOriginal) => ({
   sshInfoForLink: sshMocks.sshInfoForLink,
   reconnectSshMachine: sshMocks.reconnectSshMachine,
 }));
+// PAN-4652 WI-8: the Fly VM itself is never touched; these tests see only the destroy call.
+const flyMocks = vi.hoisted(() => ({ destroyFlyVm: vi.fn(async () => undefined) }));
+vi.mock('../../../../lib/anywhere/fly/provision.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/anywhere/fly/provision.js')>()),
+  destroyFlyVm: flyMocks.destroyFlyVm,
+}));
 vi.mock('../dashboard-auth.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../dashboard-auth.js')>()),
   rejectUnauthorizedDashboardRequest: () => null,
@@ -40,6 +46,7 @@ const { openChannel } = await import('../../../../lib/anywhere/channel/open.js')
 const { _resetChannelListenerForTests, installChannelListener, liveChannelCount } = await import('../../channel-listener.js');
 const { buildMachinesResponse, handleAddRoute, handleInboundRevoke, handleMachinesSelfRevoke, handleMachinesUnlink, machinesRouteLayer } = await import('../machines.js');
 const { resolveDashboardCredential } = await import('../dashboard-auth.js');
+const { _resetFlyMachineStoreForTests, _settleFlyMachineWritesForTests, listFlyMachines, upsertFlyMachine } = await import('../../../../lib/anywhere/fly/machine-store.js');
 type MachineKeyPair = import('../../../../lib/anywhere/machine-key.js').MachineKeyPair;
 
 const _require = createRequire(import.meta.url);
@@ -114,7 +121,7 @@ describe('machine link routes (PAN-4645 WI-13)', () => {
     });
     const { status, json } = await read(await handleMachinesUnlink(link.id, async () => { throw new Error('ECONNREFUSED'); }));
     expect(status).toBe(200);
-    expect(json).toEqual({ ok: true, peerNotified: false, ssh: null });
+    expect(json).toEqual({ ok: true, peerNotified: false, ssh: null, fly: null });
     expect(await listLinks()).toEqual([]);
     expect(verifyAccessToken(reverse)).toEqual({ ok: false });
 
@@ -123,7 +130,7 @@ describe('machine link routes (PAN-4645 WI-13)', () => {
     // By label, with a peer that answers.
     await upsertLink({ environmentId: 'env-lab', label: 'lab', machineKey: 'c3'.repeat(32), token: `odk_${'8'.repeat(64)}`, access: 'agent-fenced', reverseTokenId: null, routes: [] });
     const byLabel = await read(await handleMachinesUnlink('lab', async () => true));
-    expect(byLabel.json).toEqual({ ok: true, peerNotified: true, ssh: null });
+    expect(byLabel.json).toEqual({ ok: true, peerNotified: true, ssh: null, fly: null });
     expect(await listLinks()).toEqual([]);
   });
 
@@ -230,7 +237,7 @@ describe('SSH-backed links (PAN-4404 WI-9)', () => {
     });
     const { status, json } = await read(await handleMachinesUnlink(link.id, async () => true));
     expect(status).toBe(200);
-    expect(json).toEqual({ ok: true, peerNotified: true, ssh: { stopped: true, reason: 'stopped' } });
+    expect(json).toEqual({ ok: true, peerNotified: true, ssh: { stopped: true, reason: 'stopped' }, fly: null });
     expect(sshMocks.removeSshMachineForLink).toHaveBeenCalledWith(expect.objectContaining({ id: link.id }), { keepServer: false });
     expect(await listLinks()).toEqual([]);
   });
@@ -252,5 +259,66 @@ describe('SSH-backed links (PAN-4404 WI-9)', () => {
     const byLabel = Object.fromEntries(response.links.map((l) => [l.label, l]));
     expect(byLabel['desk']!.ssh).toEqual(SSH_INFO);
     expect('ssh' in byLabel['plain']!).toBe(false);
+  });
+});
+
+describe('Fly machine unlink (PAN-4652 WI-8)', () => {
+  async function route(method: string, path: string): Promise<{ status: number; json: Record<string, unknown> }> {
+    const req = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, { method }));
+    const response = await Effect.runPromise(
+      Effect.scoped(Effect.flatMap(HttpRouter.toHttpEffect(machinesRouteLayer), (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, req))),
+    );
+    return read(response);
+  }
+
+  async function flyLink() {
+    const { link } = await upsertLink({
+      environmentId: '3f2c1b7e-9a4d-4c2b-8e1f-0a1b2c3d4e5f', label: 'fly-148e21ea7e1689', machineKey: 'f6'.repeat(32), token: `odk_${'5'.repeat(64)}`,
+      access: 'operator', reverseTokenId: null,
+      routes: [{ url: 'wss://overdeck-ws.fly.dev/ws/link?fly-instance=148e21ea7e1689', kind: 'public', source: 'pairing', addedAt: '2026-11-01T00:00:00.000Z' }],
+    });
+    await upsertFlyMachine({
+      id: 'rec-1', linkId: link.id, environmentId: link.environmentId, machineId: '148e21ea7e1689', machineName: 'overdeck-machine-1a2b3c4d',
+      appName: 'overdeck-ws', region: 'iad', label: 'fly-148e21ea7e1689', projectKey: null, docker: true, createdAt: '2026-11-01T00:00:00.000Z',
+    });
+    return link;
+  }
+
+  beforeEach(() => {
+    flyMocks.destroyFlyVm.mockReset().mockResolvedValue(undefined);
+    _resetFlyMachineStoreForTests();
+  });
+
+  afterEach(async () => {
+    await _settleFlyMachineWritesForTests();
+  });
+
+  it('DELETE /api/machines/:id destroys the Fly machine and deletes its record', async () => {
+    const link = await flyLink();
+    const { status, json } = await route('DELETE', `/api/machines/${link.id}`);
+    expect(status).toBe(200);
+    expect(json).toMatchObject({ ok: true, ssh: null, fly: { destroyed: true } });
+    expect(flyMocks.destroyFlyVm).toHaveBeenCalledWith('overdeck-ws', '148e21ea7e1689');
+    expect(await listFlyMachines()).toEqual([]);
+    expect(await listLinks()).toEqual([]);
+  });
+
+  it('DELETE /api/machines/:id?keepServer=1 leaves the Fly machine running and still deletes the record', async () => {
+    const link = await flyLink();
+    const { status, json } = await route('DELETE', `/api/machines/${link.id}?keepServer=1`);
+    expect(status).toBe(200);
+    expect(json).toMatchObject({ ok: true, fly: { destroyed: false } });
+    expect(flyMocks.destroyFlyVm).not.toHaveBeenCalled();
+    expect(await listFlyMachines()).toEqual([]);
+  });
+
+  it('keeps the link and record and answers 502 when the destroy fails', async () => {
+    const link = await flyLink();
+    flyMocks.destroyFlyVm.mockRejectedValue(new Error('Fly API error 500'));
+    const { status, json } = await route('DELETE', `/api/machines/${link.id}`);
+    expect(status).toBe(502);
+    expect(json).toMatchObject({ error: 'unreachable' });
+    expect(await listFlyMachines()).toHaveLength(1);
+    expect((await listLinks()).map((l) => l.id)).toEqual([link.id]);
   });
 });

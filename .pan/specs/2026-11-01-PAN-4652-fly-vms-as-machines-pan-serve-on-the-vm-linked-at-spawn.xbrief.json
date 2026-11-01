@@ -1,0 +1,1255 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T18:34:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4652: Fly VMs as machines: pan serve on the VM, linked at spawn",
+    "updated": "2026-11-01T18:39:49.540Z"
+  },
+  "plan": {
+    "id": "pan-4652",
+    "title": "Fly VMs as machines: pan serve on the VM, linked at spawn",
+    "status": "running",
+    "uid": "880b756a-cd3e-46cd-9b85-924253f0d34a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T18:34:37Z",
+    "updated": "2026-11-01T18:39:49.540Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4652",
+        "label": "PAN-4652",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4734",
+        "label": "PAN-4734 (split: work agents, closes PAN-1775)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4652.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "fly",
+      "remote",
+      "machine-links",
+      "W-FLY2"
+    ],
+    "metadata": {
+      "sizeJustification": "W-FLY2's Done-when (a conversation started on Fly streams home with a fly-<id> chip and is pulled home) needs image, VM provisioning, the channel route parameter, the VM gate mode, linking, the conversation door and the spend loops together; none is observable alone. The separable part (work agents, PAN-1775) is already split to PAN-4734. Files are exact and items are vertical; the surface spans src/lib, src/cli, src/dashboard, docker, tests and four doc trees.",
+      "canonicalFilename": "2026-11-01-PAN-4652-fly-vms-as-machines-pan-serve-on-the-vm-linked-at-spawn.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "FR-18/D-12 make a Fly VM an ordinary linked machine, but the pan-workspace image has no pan, Fly VMs expose no port, the channel client cannot pin one machine behind <app>.fly.dev, a VM would label itself with its bare machine id, the heartbeat/credential/cap loops only see VMs with remote-state.json, and home cannot start a conversation on a linked machine.",
+      "Proposal": "Ship pan and Docker in the image; add a Fly machine service (mirroring SSH machines) that creates a VM with a 443 tls/http service, pins pan --version to home's, writes a fly-<machineId> identity, syncs credentials, starts `pan serve --no-open` detached in public-link-only mode with the tmux backend, arms the PAN-4295 watchdog, reads a pairing code from `pan pair --json` over Machines exec and links one way over wss://<app>.fly.dev/ws/link?fly-instance=<id>. With --project it clones and registers the project on the VM; with --message it starts a Claude Code conversation there through the link. Unlink destroys the VM; the deacon child heartbeats, refreshes credentials and destroys stopped or idle Fly machines; the cap counts them. `pan machines add-fly` and POST /api/machines/fly are the door #4651 and #4638 build on. A live, operator-consented checkpoint proves the chip, Pull here and Docker (OD-4).",
+      "NonGoals": "- Moving `pan start --remote` work agents onto the linked path, session rows for them, and closing PAN-1775 — PAN-4734; this PR says `Refs #1775`, never `Closes #1775`\n- The Machine field, Fly (new VM) in the new-conversation dialog, and `--machine fly` on pan start / pan worker run / pan lane start — #4651 (W-WORK1)\n- Workers and gauntlet lanes placed on Fly machines and `gauntlet.fly.max_vms` — #4651 and #4638\n- A new `docker` capability field or tags in the environment descriptor, and `--needs` placement — #4651 (W-WORK6, FR-23)\n- Codex or any harness other than Claude Code on a Fly machine — #4296\n- Joining Fly VMs to the tailnet — #1254\n- A dashboard UI button to add a Fly machine\n- Restarting a stopped Fly machine (rootfs resets; it is destroyed instead)\n- Durable-tier volumes for Fly machines\n- GitLab-hosted projects on a Fly machine\n- Automatic allocation of the Fly app's public IPs\n- Any change to the remote work-agent spawn, reap, tell or kill paths beyond the FR-12 cap count\n- Changing the image CMD or the build-workspace-image CI workflow\n- Copying any operator SSH private key to a VM"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The VM issues the pairing code via `pan pair --json` over Machines exec; home links (D-1)",
+        "rationale": "Codes exist only in the issuing server's memory and no import path exists; the SSH-machine flow already does this and keeps the code off the network route being paired."
+      },
+      {
+        "summary": "Split the work-agent conversion and the PAN-1775 closure into PAN-4734 (D-15)",
+        "rationale": "It rewrites the reap/tell/kill contract PAN-4295 restored and live-tested today and would double this PR; the W-FLY2 Done-when tests a conversation, which this plan delivers."
+      },
+      {
+        "summary": "Public route is wss://<app>.fly.dev/ws/link with a fly-instance parameter lifted into the fly-force-instance-id header (D-3)",
+        "rationale": "Machines in an app share <app>.fly.dev; raw TCP cannot be pinned to a machine and needs a dedicated IPv4; /ws/link already exists for TLS-terminating proxies."
+      },
+      {
+        "summary": "OD-4 fallback adds no descriptor field; the docker tag belongs to #4651 W-WORK6 (D-8)",
+        "rationale": "FR-23 assigns docker detection (`docker info` succeeds) and --needs placement to #4651; a second field here would conflict with it."
+      },
+      {
+        "summary": "Version equality by npm install at provisioning, not per-release image tags (D-7)",
+        "rationale": "Avoids a CI workflow change (workflow pushes need SSH) and guarantees the SSH-machine equality rule; home's package version is always a published release."
+      },
+      {
+        "summary": "Fly machines are destroyed, never stopped or restarted; idle after 30 min with no active linked conversation (D-9, FR-16)",
+        "rationale": "The rootfs resets on start, so a stopped machine is useless; FR-18 requires spend to be bounded."
+      },
+      {
+        "summary": "`pan machines add-fly` + `POST /api/machines/fly` is this issue's door; --machine fly stays with #4651",
+        "rationale": "#4651's body says its Fly (new VM) choice and --machine fly need this issue; owning the flag here would collide with W-WORK1."
+      },
+      {
+        "summary": "Public-link-only mode on the VM server (OVERDECK_PUBLIC_LINK_ONLY=1)",
+        "rationale": "The VM's port is on the public internet through Fly's proxy; only the /ws/link channel needs to be reachable from outside."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-image-pan-docker",
+        "title": "pan-workspace image installs @overdeck/core and Docker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docker/pan-workspace/Dockerfile*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "docker build -f docker/pan-workspace/Dockerfile -t pan-workspace:pan-4652 .",
+            "docker run --rm pan-workspace:pan-4652 pan --version",
+            "docker run --rm pan-workspace:pan-4652 dockerd --version"
+          ],
+          "expected_outputs": [
+            "docker build exits 0",
+            "pan --version prints a semver",
+            "dockerd --version exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. After the `RUN npm install -g @anthropic-ai/claude-code` line add `ARG OVERDECK_VERSION=latest` + `RUN npm install -g @overdeck/core@${OVERDECK_VERSION}`, then `apt-get install -y docker.io iptables`. Update the header comment to list pan and Docker and to state CMD stays `sleep infinity` because Fly machines start `pan serve` by exec (D-5). Do not change CMD and do not edit the CI workflow."
+        },
+        "items": [
+          {
+            "id": "wi1-image-pan-docker.ac1",
+            "title": "Given the built image, when `docker run --rm pan-workspace:pan-4652 pan --version` runs, then it prints a semver and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-image-pan-docker.ac2",
+            "title": "Given the built image, when `docker run --rm pan-workspace:pan-4652 dockerd --version` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-image-pan-docker.ac3",
+            "title": "Given the Dockerfile, when grepped, then it contains `CMD [\"sleep\", \"infinity\"]` as its last instruction and its header comment contains `@overdeck/core` and Docker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-serve-no-open",
+        "title": "pan serve accepts --no-open",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/serve.ts",
+            "src/cli/index.ts",
+            "src/cli/commands/__tests__/serve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/serve.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "serve.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add `.option('--no-open', 'Do not open a browser')` to the `serve` registration in src/cli/index.ts (near `.option('--port <port>', 'Port to listen on', '3011')`). In serve.ts skip the 1.5 s browser-open timer when `options.open === false` and print the URL once."
+        },
+        "items": [
+          {
+            "id": "wi2-serve-no-open.ac1",
+            "title": "Given `pan serve --no-open`, when the server child starts, then the browser opener is never called (unit test with the opener mocked)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-serve-no-open.ac2",
+            "title": "Given `pan serve` without the flag, when 1.5 s pass (fake timers), then the opener is called exactly once as today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-serve-no-open.ac3",
+            "title": "Given `--no-open`, the server child is still spawned with env `PORT` equal to the `--port` value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-fly-machine-services",
+        "title": "FlyApiClient.createMachine passes services",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote/fly-api.ts",
+            "tests/lib/remote/fly-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/remote/fly-api.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fly-api.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add the optional `services` array type to `FlyMachineConfig` and pass `services: config.services` inside the `config` object of `createMachine`, next to `env: config.env`."
+        },
+        "items": [
+          {
+            "id": "wi3-fly-machine-services.ac1",
+            "title": "Given a FlyMachineConfig with `services` and `env`, when createMachine runs, then the POST body's `config.services` and `config.env` equal the inputs verbatim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-fly-machine-services.ac2",
+            "title": "Given a config without services, when createMachine runs, then the POST body carries no services value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-fly-instance-route-param",
+        "title": "Channel client lifts fly-instance into fly-force-instance-id",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4652",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/open.ts",
+            "src/lib/anywhere/channel/__tests__/channel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/channel/__tests__/channel.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "channel.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "foundationFor": [
+            "wi7-provision-vm",
+            "wi8-add-fly-machine-service"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (D-3). In `parseTransportUrl`, for a `wss:` URL whose `fly-instance` query parameter is non-empty, delete the parameter, and return `{ kind: 'wss', url: <url without it>, headers: { 'fly-force-instance-id': <value> } }`. In `connectTransport` dial `new WsClient(target.url, target.headers ? { headers: target.headers } : undefined)`. Export `FLY_INSTANCE_PARAM = 'fly-instance'`. Every other URL is dialled exactly as today."
+        },
+        "items": [
+          {
+            "id": "wi4-fly-instance-route-param.ac1",
+            "title": "Given a wss route URL with `?fly-instance=abc`, when the channel dials it against a local ws server, then the upgrade request carries header `fly-force-instance-id: abc` and its URL has no `fly-instance` parameter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-fly-instance-route-param.ac2",
+            "title": "Given a wss route URL without the parameter, when dialled, then the upgrade request carries no `fly-force-instance-id` header and the URL is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-fly-instance-route-param.ac3",
+            "title": "Given a test that imports open.ts, when it reads `FLY_INSTANCE_PARAM`, then it returns the string `fly-instance`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-public-link-only-gate",
+        "title": "OVERDECK_PUBLIC_LINK_ONLY makes the gate refuse non-channel remote requests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4652",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/remote-request-gate.ts",
+            "src/dashboard/server/__tests__/remote-request-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/remote-request-gate.test.ts src/dashboard/server/__tests__/remote-request-gate-auto-mint.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both gate test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-7"
+          ],
+          "foundationFor": [
+            "wi7-provision-vm",
+            "wi14-live-checkpoint"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add rule 0b after the Funnel rule (header comment and code): when `OVERDECK_PUBLIC_LINK_ONLY === '1'` (read through a `publicLinkOnly(env = process.env)` helper) and the request is neither a channel request (`channelOfRequest`) nor a trusted local caller (loopback peer without a proxy forwarding header, the rule-4 test), respond 404 `{ \"error\": \"not_found\" }` for every path, including the static SPA. The `/ws/link` upgrade is handled before the gate and is unaffected."
+        },
+        "items": [
+          {
+            "id": "wi5-public-link-only-gate.ac1",
+            "title": "Given OVERDECK_PUBLIC_LINK_ONLY=1, when a non-loopback non-channel peer requests `GET /`, `GET /api/environment` or `POST /api/pairing/exchange`, then each returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-public-link-only-gate.ac2",
+            "title": "Given OVERDECK_PUBLIC_LINK_ONLY=1, when a loopback peer requests `GET /api/health`, then it passes the gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-public-link-only-gate.ac3",
+            "title": "Given OVERDECK_PUBLIC_LINK_ONLY=1, when a link-mode channel request carries a machine credential, then it is judged by scopes exactly as today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-public-link-only-gate.ac4",
+            "title": "Given the flag unset, when the existing gate tests run, then every one passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-fly-machine-store",
+        "title": "fly-machines.json record store",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/fly/machine-store.ts",
+            "src/lib/anywhere/fly/__tests__/machine-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/fly/__tests__/machine-store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machine-store.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Mirror src/lib/anywhere/ssh/machine-store.ts: `${OVERDECK_HOME}/fly-machines.json`, `{ v: 1, machines: FlyMachineRecord[] }`, mode 0600, temp-file + rename. Record fields exactly as the PRD lists. Exports: listFlyMachines, getFlyMachineByLinkId, upsertFlyMachine, updateFlyMachine, removeFlyMachine, countFlyMachines. Missing file reads empty; corrupt file throws and is never rewritten."
+        },
+        "items": [
+          {
+            "id": "wi6-fly-machine-store.ac1",
+            "title": "Given an upserted record, when listFlyMachines runs, then it returns the record with every field equal, and the file mode is 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-fly-machine-store.ac2",
+            "title": "Given no fly-machines.json, when listFlyMachines runs, then it returns [] and countFlyMachines returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-fly-machine-store.ac3",
+            "title": "Given a corrupt fly-machines.json, when listFlyMachines runs, then it throws and the file content is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-fly-machine-store.ac4",
+            "title": "Given an unknown id, when removeFlyMachine runs, then it returns without error and the file is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-provision-vm",
+        "title": "provisionFlyMachine starts pan serve on a new Fly VM and issues a pairing code",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4652",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/anywhere/fly/provision.ts",
+            "src/lib/anywhere/fly/__tests__/provision.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/fly/__tests__/provision.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "provision.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-3",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "wi8-add-fly-machine-service",
+            "wi9-project-and-conversation",
+            "wi11-heartbeat-and-sweep",
+            "wi14-live-checkpoint"
+          ],
+          "parallelSafeReason": "Touches only two new files under src/lib/anywhere/fly/; no other item edits them."
+        },
+        "narrative": {
+          "Action": "PRD WI-7 steps 1-11 exactly, with every dependency injectable (Fly API client via createFlyApiClient, provider via createFlyProviderFromConfig for syncAllCredentials/configureClaudeCode/writeRemoteFile, clock, sleep, getOverdeckVersion, randomUUID). Long steps run detached (`setsid nohup … &`) and are polled through execCommand with 60 s timeouts. Serve command: `setsid nohup env OVERDECK_TERMINAL_BACKEND=tmux IS_SANDBOX=1 OVERDECK_PUBLIC_LINK_ONLY=1 PORT=3011 pan serve --port 3011 --no-open > /root/.overdeck/fly-serve.log 2>&1 < /dev/null &`. Identity JSON `{v:1, environmentId, label: 'fly-<machineId>', createdAt}` written before the server starts. Watchdog from generateEphemeralWatchdogScript. Also export destroyFlyVm (404 = already gone) and the FlyMachineError class with the PRD's code list."
+        },
+        "items": [
+          {
+            "id": "wi7-provision-vm.ac1",
+            "title": "Given a fake Fly API and provider, when provisionFlyMachine succeeds, then createMachine receives the D-3 services entry and memory >= 2048, and the result carries a `wss://<app>.fly.dev/ws/link?fly-instance=<machineId>` routeUrl and an odp_ pairing code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-provision-vm.ac2",
+            "title": "Given a fake exec log, when the server step runs, then the command contains `OVERDECK_TERMINAL_BACKEND=tmux IS_SANDBOX=1 OVERDECK_PUBLIC_LINK_ONLY=1` and `pan serve --port 3011 --no-open`, and the identity file written before it has label `fly-<machineId>` and `v: 1`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-provision-vm.ac3",
+            "title": "Given the VM reports a different `pan --version` twice, when provisioning runs, then it starts the detached npm install and then rejects with FlyMachineError code `version-mismatch`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-provision-vm.ac4",
+            "title": "Given the health probe never succeeds, when 120 s pass under fake timers, then provisioning rejects with code `server-not-ready` including fly-serve.log lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-provision-vm.ac5",
+            "title": "Given `pan pair --json` prints unparseable output, when provisioning runs, then it rejects with code `pairing-failed`; given `docker info` never succeeds, then it resolves with `docker: false`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-add-fly-machine-service",
+        "title": "addFlyMachine links the VM, writes the record, rolls back, and unlink destroys it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/fly-machine-service.ts",
+            "src/dashboard/server/services/__tests__/fly-machine-service.test.ts",
+            "src/dashboard/server/routes/machines.ts",
+            "src/dashboard/server/routes/__tests__/machines-unlink.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/fly-machine-service.test.ts src/dashboard/server/routes/__tests__/machines-unlink.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-12",
+            "FR-13"
+          ],
+          "parallelSafeReason": "Its files are new except routes/machines.ts (one call added in handleMachinesUnlink), which no other item edits; wi9 follows it through a blocks edge for the shared service file."
+        },
+        "narrative": {
+          "Action": "PRD WI-8. addFlyMachine: early refusals (remote-disabled, no-fly-token, harness-unsupported, message without projectKey, cap-reached via checkRemoteSpendCap(await loadConfig())), provisionFlyMachine, provisional record, createMachineLink({ transport: { url: routeUrl, kind: 'public', pairingCode }, bothWays: false, access: 'operator' }), patch record, notifyLinksChanged. Rollback on any failure after provisioning: destroyFlyVm, removeLink if created, removeFlyMachine, rethrow. Export removeFlyMachineForLink(link, { keepServer }) and call it in handleMachinesUnlink right after `removeSshMachineForLink`, adding `fly` to the response. Every dependency injectable."
+        },
+        "items": [
+          {
+            "id": "wi8-add-fly-machine-service.ac1",
+            "title": "Given a fake provisioner and link creator, when addFlyMachine succeeds, then createMachineLink receives kind `public`, bothWays false, access `operator`, and fly-machines.json holds a record with the returned linkId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-add-fly-machine-service.ac2",
+            "title": "Given remote.enabled false, a non-claude-code harness, or a full cap, when addFlyMachine runs, then it rejects with the matching code and createMachine is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-add-fly-machine-service.ac3",
+            "title": "Given createMachineLink rejects, when addFlyMachine runs, then destroyFlyVm is called once and fly-machines.json holds no record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-add-fly-machine-service.ac4",
+            "title": "Given a Fly-machine link, when DELETE /api/machines/:id runs (machines-unlink.test.ts), then destroyFlyVm is called and the response carries `fly.destroyed: true`; with keepServer=1 destroyFlyVm is not called and the record is still deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-project-and-conversation",
+        "title": "Clone and register the project on the VM and start a conversation through the link",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/fly/project.ts",
+            "src/lib/anywhere/fly/__tests__/project.test.ts",
+            "src/dashboard/server/services/fly-machine-service.ts",
+            "src/dashboard/server/services/__tests__/fly-machine-service.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/fly/__tests__/project.test.ts src/dashboard/server/services/__tests__/fly-machine-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. ensureFlyProject: getProjectSync(projectKey) → github_repo (none ⇒ project-failed before any exec), detached `pan project clone https://github.com/<repo>.git --parent /workspace --name <key> --issue-prefix <prefix>` polled every 5 s up to 20 min, then verify `pan project list --json` contains the key. startFlyConversation: linkFetch POST /api/conversations with body `{ message, projectKey, harness: 'claude-code', model, effort }` and actor `operator`; non-201 ⇒ conversation-failed; return `{ environmentId, name, path: '/conv/@<env>/<name>' }`. Wire both into addFlyMachine step 7. Hazard: `pan project clone` on the VM runs finishProjectSetup (pre-trust, git hooks, github_repo inference); a failure there is `project-failed` with the tail of /tmp/pan-project.log."
+        },
+        "items": [
+          {
+            "id": "wi9-project-and-conversation.ac1",
+            "title": "Given a home project with github_repo `eltmon/overdeck`, when ensureFlyProject runs, then the exec log contains a detached `pan project clone https://github.com/eltmon/overdeck.git --parent /workspace --name <key>` and polling stops when the exit file reads 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-project-and-conversation.ac2",
+            "title": "Given a project with only gitlab_repo, when ensureFlyProject runs, then it rejects with code `project-failed` and no exec is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-project-and-conversation.ac3",
+            "title": "Given a link, when startFlyConversation runs, then linkFetch receives method POST, path /api/conversations, actor operator and body harness `claude-code`, and the result path is `/conv/@<environmentId>/<name>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-project-and-conversation.ac4",
+            "title": "Given the VM answers 409, when startFlyConversation runs, then it rejects with code `conversation-failed` carrying the response body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-cap-counts-fly-machines",
+        "title": "checkRemoteSpendCap counts Fly machines",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote/remote-agents.ts",
+            "tests/lib/remote/remote-agents.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/remote/remote-agents.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "remote-agents.test.ts passes",
+            "typecheck completes without errors",
+            "file-size lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Add `countFlyMachines?: () => number` to CheckRemoteSpendCapDeps (default from the WI-6 store); compare activeStates.length + flyCount against the cap; message says 'active remote agents and Fly machines'. Net growth at most 10 lines."
+        },
+        "items": [
+          {
+            "id": "wi10-cap-counts-fly-machines.ac1",
+            "title": "Given cap 2, one active remote agent and one Fly machine record, when checkRemoteSpendCap runs, then it returns allowed false with a message naming Fly machines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-cap-counts-fly-machines.ac2",
+            "title": "Given cap 0, when checkRemoteSpendCap runs with any counts, then it returns allowed true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-cap-counts-fly-machines.ac3",
+            "title": "Given the change, when `bash scripts/lint-file-size.sh` runs, then it exits 0 and remote-agents.ts grows by at most 10 lines against origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-heartbeat-and-sweep",
+        "title": "Deacon child heartbeats Fly machines and removes stopped or idle ones",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote/fly-machine-loops.ts",
+            "tests/unit/lib/remote/fly-machine-loops.test.ts",
+            "src/lib/cloister/hygiene-scheduler.ts",
+            "tests/unit/lib/cloister/hygiene-scheduler.test.ts",
+            "src/lib/config.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/remote/fly-machine-loops.test.ts tests/unit/lib/cloister/hygiene-scheduler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-16",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Its files (a new loop module, hygiene-scheduler.ts, config.ts RemoteFlyConfig) are edited by no other item."
+        },
+        "narrative": {
+          "Action": "PRD WI-11. heartbeatFlyMachines writes the host heartbeat by exec per record (non-zero exit = failure line). sweepFlyMachines removes a record when getMachine shows stopped/destroyed/failed or 404 (API errors = skip), or when no linked_conversations row for its environmentId is active — releasedTo null AND (row.status === 'active' OR row.lastActivityAt within the idle window) — for at least `[remote.fly] machine_idle_minutes` (default 30, 0 disables; idle-since kept in memory), or when linkId is null for 30 min. Remove = destroyFlyVm + removeLink + removeFlyMachine + one cloister activity entry. Zero records ⇒ return [] before constructing any client. Register both in startHygieneScheduler at REMOTE_HEARTBEAT_INTERVAL_MS, not behind the freeze. Add `machine_idle_minutes?: number` to RemoteFlyConfig."
+        },
+        "items": [
+          {
+            "id": "wi11-heartbeat-and-sweep.ac1",
+            "title": "Given zero Fly machine records, when either loop runs, then no Fly API client is constructed and it returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-heartbeat-and-sweep.ac2",
+            "title": "Given a record whose machine reports `stopped`, when sweepFlyMachines runs, then destroyFlyVm, removeLink and removeFlyMachine are each called once; given an API 500, then none is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-heartbeat-and-sweep.ac3",
+            "title": "Given a record whose only linked conversation is unreleased but has status `ended` and lastActivityAt older than the window, when 29 minutes pass under fake timers, then it is kept, and at 30 minutes it is removed; a row with status `active` in between resets the timer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-heartbeat-and-sweep.ac4",
+            "title": "Given machine_idle_minutes = 0, when any idle time passes, then the record is never removed for idleness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-heartbeat-and-sweep.ac5",
+            "title": "Given startHygieneScheduler runs, then routines named heartbeatFlyMachines and sweepFlyMachines are registered at a 60 s interval",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-credential-refresh-fly",
+        "title": "Credential refresh covers Fly machines",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote/remote-credential-refresh.ts",
+            "tests/lib/remote/remote-credential-refresh.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/remote/remote-credential-refresh.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "remote-credential-refresh.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. Add `listFlyMachineNames?: () => string[]` to RemoteClaudeCredentialRefreshDeps (default from the WI-6 store); the target set is the union of active remote-agent vmNames and Fly machine names; watermark logic unchanged; construct the provider with createFlyProviderFromConfig(loadConfigSync().remote, 'ephemeral')."
+        },
+        "items": [
+          {
+            "id": "wi12-credential-refresh-fly.ac1",
+            "title": "Given one Fly machine record and no remote agents, when the refresh runs for the first time, then exactly one credential sync targets that machine name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-credential-refresh-fly.ac2",
+            "title": "Given a failed sync, when the next tick runs, then the same machine is synced again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-credential-refresh-fly.ac3",
+            "title": "Given zero agents and zero Fly machines, when the refresh runs, then no provider is constructed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-route-and-cli",
+        "title": "POST /api/machines/fly and pan machines add-fly",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines-fly.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/cli/commands/machines-fly.ts",
+            "src/cli/commands/machines.ts",
+            "src/dashboard/server/routes/__tests__/machines-fly.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/machines-fly.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machines-fly.test.ts and the no-loss matrix test pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. Route POST /api/machines/fly: refuse channel callers with 403 (copy routes/machines-ssh.ts), validate the body (message ≤ 50,000 chars), call addFlyMachine, map FlyMachineError codes to statuses (cap-reached 409). Mount next to machinesSshRouteLayer in server.ts. No-loss row next to 'POST /api/machines/ssh'. No route-scopes row (default admin, D-14). CLI `pan machines add-fly` with --project, --message, --model, --effort, --region, --image, --json, registered next to registerMachinesSshCommands; it POSTs with the internal token and no request timeout, and prints label, region, docker yes/no and the conversation URL."
+        },
+        "items": [
+          {
+            "id": "wi13-route-and-cli.ac1",
+            "title": "Given a request arriving over a secure channel, when POST /api/machines/fly runs, then it returns 403 and addFlyMachine is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-route-and-cli.ac2",
+            "title": "Given a message longer than 50,000 characters, when POST /api/machines/fly runs, then it returns 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-route-and-cli.ac3",
+            "title": "Given addFlyMachine rejects with cap-reached, when the route runs, then it returns 409 with the cap message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-route-and-cli.ac4",
+            "title": "Given addFlyMachine resolves with a conversation, when the route runs, then it returns 201 with `conversation.path`, and the no-loss matrix test passes with the new row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-live-checkpoint",
+        "title": "Live Fly checkpoint: conversation on Fly streams home, Pull here, Docker check (operator-consented)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n 'Live verification (PAN-4652)' docs/fly-provider.md"
+          ],
+          "expected_outputs": [
+            "the section exists with O1-O4 results, or the PR body records the operator's refusal"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-13",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. Ask the operator first with one self-contained AskUserQuestion (it spends Fly money and flips remote.enabled) and `pan tell flywheel-orchestrator` that it waits. Then: build+push registry.fly.io/pan-workspace:pan-4652; check `fly ips list` (allocate per D-10 with approval); with the workspace build run `pan machines add-fly --image registry.fly.io/pan-workspace:pan-4652 --project overdeck --message \"List the top-level files and stop.\"`; observe O1 (fly-<id> chip, live transcript, Playwright screenshot in an isolated browser profile), O2 (Pull here brings it home; VM answers 409 conversation-released), O3 (`docker run --rm hello-world` exits 0, else apply the D-8 fallback in this branch), O4 (unlink destroys the machine). Record results under 'Live verification (PAN-4652)' in docs/fly-provider.md. If fly-force-instance-id is not honored, stop and escalate (no improvised route design)."
+        },
+        "items": [
+          {
+            "id": "wi14-live-checkpoint.ac1",
+            "title": "Given operator consent, when `pan machines add-fly --project overdeck --message …` runs against the test image, then the home dashboard lists the conversation with a `fly-<machineId>` chip and its transcript updates live (screenshot recorded)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-live-checkpoint.ac2",
+            "title": "Given that conversation, when Pull here runs, then it resumes at home and the VM rejects a new turn with 409 conversation-released",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-live-checkpoint.ac3",
+            "title": "Given the Fly machine, when `docker run --rm hello-world` runs through exec, then its exit code and the resulting Docker decision (installed, or D-8 fallback applied) are recorded in docs/fly-provider.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-live-checkpoint.ac4",
+            "title": "Given `pan machines unlink fly-<machineId>`, when it completes, then `fly machines list` no longer shows the machine and docs/fly-provider.md records O1-O4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi15-user-docs",
+        "title": "User docs: Fly machines in linked-machines.mdx and add-fly in cli/machines.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/linked-machines.mdx",
+            "cli/machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '^## Fly machines' configuration/linked-machines.mdx",
+            "grep -n '^## add-fly' cli/machines.mdx"
+          ],
+          "expected_outputs": [
+            "both headings are found"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-11",
+            "FR-13",
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15. linked-machines.mdx: new `## Fly machines` after `## Link a fresh server` covering what it is, setup (remote.enabled, Fly token, `fly ips allocate-v4 --shared` / `allocate-v6`), `pan machines add-fly`, chip/remote control/Pull here, lifetime (unlink, `[remote.fly] machine_idle_minutes` default 30, 5 min without home heartbeat), the cap, Docker per WI-14 O3 (if not yet recorded: installed in the image, live check pending), Claude Code only; two Troubleshooting rows (unreachable, version-mismatch). cli/machines.mdx: new `## add-fly` after `## test-ssh` with every option, JSON shape and error codes; one line in `## unlink` that a Fly machine is destroyed unless --keep-server."
+        },
+        "items": [
+          {
+            "id": "wi15-user-docs.ac1",
+            "title": "Given configuration/linked-machines.mdx, when grepped, then it contains a `## Fly machines` section naming `pan machines add-fly`, `machine_idle_minutes` and `fly ips allocate-v4 --shared`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-user-docs.ac2",
+            "title": "Given cli/machines.mdx, when grepped, then it contains a `## add-fly` section listing --project, --message, --model, --effort, --region, --image and --json, and its `## unlink` section contains the sentence that a Fly machine is destroyed unless --keep-server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi16-dev-docs",
+        "title": "Developer docs: Fly machines in ANYWHERE-ARCHITECTURE.md and fly-provider.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T18:34:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "docs/fly-provider.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '^## Fly machines (PAN-4652)' docs/ANYWHERE-ARCHITECTURE.md",
+            "grep -n '@overdeck/core' docs/fly-provider.md"
+          ],
+          "expected_outputs": [
+            "both greps match"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-14",
+            "FR-15",
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16. ANYWHERE-ARCHITECTURE.md: new `## Fly machines (PAN-4652)` after `## pan connect (W-LINK9, FR-25)` covering D-1..D-4, D-9, the fly-instance route parameter, public-link-only mode, fly-machines.json, the WI-7 provisioning steps, the WI-11/WI-12 loops and the split to PAN-4734. fly-provider.md: image section lists @overdeck/core, Docker and the OVERDECK_VERSION build arg; new `## Fly machines (linked)` contrasting them with remote work agents (D-4 env, D-12 memory floor, D-10 IPs); `## Automatic loops` adds heartbeatFlyMachines and sweepFlyMachines."
+        },
+        "items": [
+          {
+            "id": "wi16-dev-docs.ac1",
+            "title": "Given docs/ANYWHERE-ARCHITECTURE.md, when grepped, then it contains `## Fly machines (PAN-4652)` naming `fly-instance`, `OVERDECK_PUBLIC_LINK_ONLY` and PAN-4734",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-dev-docs.ac2",
+            "title": "Given docs/fly-provider.md, when grepped, then the image section contains `@overdeck/core`, a `## Fly machines (linked)` section exists, and `## Automatic loops` contains heartbeatFlyMachines and sweepFlyMachines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi2-serve-no-open",
+        "to": "wi7-provision-vm",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-fly-machine-services",
+        "to": "wi7-provision-vm",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-fly-instance-route-param",
+        "to": "wi7-provision-vm",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-fly-machine-store",
+        "to": "wi8-add-fly-machine-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-fly-machine-store",
+        "to": "wi10-cap-counts-fly-machines",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-fly-machine-store",
+        "to": "wi11-heartbeat-and-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-fly-machine-store",
+        "to": "wi12-credential-refresh-fly",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-provision-vm",
+        "to": "wi8-add-fly-machine-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-provision-vm",
+        "to": "wi11-heartbeat-and-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-add-fly-machine-service",
+        "to": "wi9-project-and-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-project-and-conversation",
+        "to": "wi13-route-and-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-image-pan-docker",
+        "to": "wi14-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-public-link-only-gate",
+        "to": "wi14-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-cap-counts-fly-machines",
+        "to": "wi14-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-heartbeat-and-sweep",
+        "to": "wi14-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-credential-refresh-fly",
+        "to": "wi14-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-route-and-cli",
+        "to": "wi14-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-dev-docs",
+        "to": "wi14-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-live-checkpoint",
+        "to": "wi15-user-docs",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "active"
+}

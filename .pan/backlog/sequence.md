@@ -1,14 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T18:32:48.648294Z · model: claude-opus-5-5 · open: 860_
+_Last sequenced: 2026-11-01T21:45:20.462512Z · model: claude-opus-5-5 · open: 859_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 2 | PAN-4732 | S | critical | ok |  |  | Browser+Vite e2e spec in default unit shards timed out and turned main red; move heavy e2e to slow lane, keep fast component test. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
-| 7 | PAN-4733 | M | high | ok |  | PAN-4732 | Follow-up to PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
+| 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -148,7 +147,7 @@ _Last sequenced: 2026-11-01T18:32:48.648294Z · model: claude-opus-5-5 · open: 
 | 143 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
 | 144 | PAN-4302 | M | high | ok |  |  | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
 | 145 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
-| 146 | PAN-4734 | L | high | ok |  | PAN-4652 | pan start --remote work agents launch as linked conversations on the Fly VM, live at home; closes PAN-1775. After PAN-4652. |
+| 146 | PAN-4734 | L | high | ok |  |  | pan start --remote work agents launch as linked conversations on the Fly VM, live at home; closes PAN-1775. Unblocked. |
 | 147 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
 | 148 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
 | 149 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
@@ -225,12 +224,9 @@ _Last sequenced: 2026-11-01T18:32:48.648294Z · model: claude-opus-5-5 · open: 
 | 220 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 221 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 222 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 223 | PAN-4727 | L | medium | ok |  |  | In pipeline: gstack skill pack with full runtime via eltmon/gstack fork pack mode; on/off per scope, clean removal. |
-| 224 | PAN-4650 | XL | medium | ok |  | PAN-4646 | Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
 | 227 | PAN-4646 | S | medium | needs-refinement |  |  | Interactive mockup for machine-aware conversation UI (title bar, chips, offline banner); D-6 needs it approved first. Body pending. |
-| 228 | PAN-4728 | S | medium | ok |  |  | In pipeline: pstack skill pack from eltmon/plugins fork; needs a subfolder plugin root for the claude-plugin adapter. |
 | 229 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 230 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
 | 231 | PAN-4348 | S | medium | ok |  |  | Verification emits warn-first evidence of changed files outside every item's files_scope, so scope creep is visible |
@@ -274,12 +270,13 @@ _Last sequenced: 2026-11-01T18:32:48.648294Z · model: claude-opus-5-5 · open: 
 | 269 | PAN-4696 | XS | medium | ok |  |  | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 272 | PAN-4739 | M | high | needs-refinement |  |  | Fly VM patrol marks a live conversation ended each tick; idle sweep may destroy a used VM. Root cause probe not yet found. |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
-| 276 | PAN-4651 | L | medium | ok |  | PAN-4650, PAN-4652 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
+| 276 | PAN-4651 | L | medium | ok |  |  | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
 | 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
-| 278 | PAN-4730 | L | medium | needs-refinement |  | PAN-4727 | Opt-in gstack browser/design/PDF runtime so 21 needs-binary skills (qa, browse) mount; blocked on PAN-4727; scope open for PRD |
+| 278 | PAN-4730 | L | medium | ok |  |  | Opt-in gstack browser/design/PDF runtime so 21 needs-binary skills (qa, browse) mount; blocked on PAN-4727; scope open for PRD |
 | 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
@@ -295,6 +292,7 @@ _Last sequenced: 2026-11-01T18:32:48.648294Z · model: claude-opus-5-5 · open: 
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
 | 292 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
 | 293 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
+| 294 | PAN-4738 | S | medium | ok |  |  | First message to a Fly-machine conversation is pasted into Claude Code's auto-mode dialog and lost; pre-answer it in configureClaudeCode. |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
 | 296 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
 | 297 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
@@ -312,6 +310,7 @@ _Last sequenced: 2026-11-01T18:32:48.648294Z · model: claude-opus-5-5 · open: 
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
 | 311 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
+| 312 | PAN-4740 | S | medium | ok |  |  | Pooled link channel reused after the Fly proxy closes the idle socket: first request fails with 'socket hang up', retry works. |
 | 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
@@ -494,6 +493,7 @@ _Last sequenced: 2026-11-01T18:32:48.648294Z · model: claude-opus-5-5 · open: 
 | 493 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
 | 494 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
 | 495 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
+| 496 | PAN-4741 | S | low | ok |  |  | Fly machine advertises unreachable private 172.19.x lan routes ranked before its public route; every reconnect probes dead routes first. |
 | 497 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
 | 498 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
 | 499 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
@@ -564,7 +564,6 @@ _Last sequenced: 2026-11-01T18:32:48.648294Z · model: claude-opus-5-5 · open: 
 | 564 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
 | 565 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
 | 566 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 567 | PAN-4652 | L | medium | ok |  | PAN-4650 | Fly VMs as machines: pan serve on the VM, linked at spawn; link foundation PAN-4645 merged, so W-FLY2 is unblocked. Body pending. |
 | 568 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 569 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
 | 570 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
@@ -600,7 +599,7 @@ _Last sequenced: 2026-11-01T18:32:48.648294Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 603 | PAN-4296 | L | medium | needs-refinement |  | PAN-1676, PAN-4652 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
+| 603 | PAN-4296 | L | medium | ok |  | PAN-1676 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
 | 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -661,7 +660,7 @@ _Last sequenced: 2026-11-01T18:32:48.648294Z · model: claude-opus-5-5 · open: 
 | 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 666 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651, PAN-4652 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
+| 666 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
@@ -872,17 +871,13 @@ _Last sequenced: 2026-11-01T18:32:48.648294Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
-### PAN-4732 (rank 2)
-
-New substrate bug with a verified root cause: vitest.config.ts includes tests/e2e/*.spec.ts in the default shards, so PAN-4650's linked-conversation-title-bar spec cold-compiles the app under shard load and timed out on main (run 41335061342). A red main empties the merge gate for every approved PR, and this is the third flaky turn-red today, so it takes the free rank-2 slot ahead of routine work. It is already in the pipeline with a live workspace.
-
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
 ### PAN-4733 (rank 7)
 
-New issue split from in-pipeline PAN-4732 (rank 2). The quarantine turns main green but hides a deterministic browser-spec failure and leaves Vite/Chromium specs in the loaded unit shards; this restores the coverage behind a gating lane. Slotted at the free rank just after its parent so it is picked as soon as PAN-4732 merges.
+Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.
 
 ### PAN-4690 (rank 8)
 
@@ -1188,6 +1183,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 
 New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
 
+### PAN-3084 (rank 83)
+
+Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1195,10 +1194,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T18:32:48.648294Z",
+  "generatedAt": "2026-11-01T21:45:20.462512Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 860,
+  "openCount": 859,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -3929,21 +3928,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "planning": "auto"
     },
     {
-      "issue": "PAN-4650",
-      "rank": 224,
-      "size": "XL",
-      "importance": "medium",
-      "score": 54,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4646"
-      ],
-      "why": "Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending.",
-      "rationale": "New Anywhere child covering the W-CONV2 to W-CONV5 conversation items; it is the core user-facing outcome and several revision 5 items (MCP server, work items) follow W-CONV3. Body is still a placeholder.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3510",
       "rank": 225,
       "size": "S",
@@ -4545,10 +4529,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4650",
-        "PAN-4652"
-      ],
+      "dependsOn": [],
       "why": "Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending.",
       "rationale": "Rank held: dependency PAN-4645 closed as completed on 2026-11-01; PAN-4650 still gates this issue, so order is unchanged.",
       "gate": "auto",
@@ -5015,7 +4996,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Epic rebaselined 2026-09-28; account service and share-service slice 1 built 2026-10-02. Children carry the order.",
-      "rationale": "Rank and operator gate held. Children PAN-4645 (foundation) and PAN-4654 (fleet Update all) closed as completed on 2026-11-01; remaining children keep their order.",
+      "rationale": "Rank and operator gate held. Children PAN-4645, PAN-4654 and PAN-4650 (conversations across machines) closed as completed on 2026-11-01; remaining children keep their order.",
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
@@ -8069,21 +8050,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "planning": "auto"
     },
     {
-      "issue": "PAN-4652",
-      "rank": 567,
-      "size": "L",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4650"
-      ],
-      "why": "Fly VMs as machines: pan serve on the VM, linked at spawn; link foundation PAN-4645 merged, so W-FLY2 is unblocked. Body pending.",
-      "rationale": "Rank held: its only dependency PAN-4645 closed as completed on 2026-11-01, so it is now unblocked, but the body is still a placeholder (needs-refinement).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1754",
       "rank": 568,
       "size": "M",
@@ -8513,10 +8479,9 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "size": "L",
       "importance": "medium",
       "score": 34,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
-        "PAN-1676",
-        "PAN-4652"
+        "PAN-1676"
       ],
       "why": "Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time",
       "rationale": "Rank held; gained dependsOn PAN-1676 from the build order in PAN-2350's 2026-09-28 rebaseline.",
@@ -9266,11 +9231,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "score": 38,
       "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-4651",
-        "PAN-4652"
+        "PAN-4651"
       ],
       "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
-      "rationale": "Rank 668->670: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
+      "rationale": "Rank held: dependency PAN-4652 closed as completed on 2026-11-01; PAN-4651 still gates this issue, so order is unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11843,56 +11807,15 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "planning": "auto"
     },
     {
-      "issue": "PAN-4727",
-      "rank": 223,
-      "size": "L",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: gstack skill pack with full runtime via eltmon/gstack fork pack mode; on/off per scope, clean removal.",
-      "rationale": "New issue already in planning, so it is pinned in a free mid-tier slot next to the other in-pipeline medium work. It is self-contained feature work on the skill-pack system with clear operator decisions and acceptance criteria, but needs a fork-side pack mode first, so it sizes L.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4728",
-      "rank": 228,
-      "size": "S",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: pstack skill pack from eltmon/plugins fork; needs a subfolder plugin root for the claude-plugin adapter.",
-      "rationale": "New issue already in planning, pinned in a free mid-tier slot beside PAN-4727. The change is small and well scoped (a pluginRoot field on KnownPack plus a KNOWN_PACKS entry and docs), with verified facts and checkable acceptance criteria.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4730",
       "rank": 278,
       "size": "L",
       "importance": "medium",
       "score": 45,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4727"
-      ],
-      "why": "Opt-in gstack browser/design/PDF runtime so 21 needs-binary skills (qa, browse) mount; blocked on PAN-4727; scope open for PRD",
-      "rationale": "New issue: follow-up to in-pipeline PAN-4727 (blocked by it), slotted into a free rank among comparable medium features.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4732",
-      "rank": 2,
-      "size": "S",
-      "importance": "critical",
-      "score": 87,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Browser+Vite e2e spec in default unit shards timed out and turned main red; move heavy e2e to slow lane, keep fast component test.",
-      "rationale": "New substrate bug with a verified root cause: vitest.config.ts includes tests/e2e/*.spec.ts in the default shards, so PAN-4650's linked-conversation-title-bar spec cold-compiles the app under shard load and timed out on main (run 41335061342). A red main empties the merge gate for every approved PR, and this is the third flaky turn-red today, so it takes the free rank-2 slot ahead of routine work. It is already in the pipeline with a live workspace.",
+      "why": "Opt-in gstack browser/design/PDF runtime so 21 needs-binary skills (qa, browse) mount; blocked on PAN-4727; scope open for PRD",
+      "rationale": "New issue: follow-up to in-pipeline PAN-4727 (blocked by it), slotted into a free rank among comparable medium features.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11903,11 +11826,9 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "importance": "high",
       "score": 78,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4732"
-      ],
-      "why": "Follow-up to PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it.",
-      "rationale": "New issue split from in-pipeline PAN-4732 (rank 2). The quarantine turns main green but hides a deterministic browser-spec failure and leaves Vite/Chromium specs in the loaded unit shards; this restores the coverage behind a gating lane. Slotted at the free rank just after its parent so it is picked as soon as PAN-4732 merges.",
+      "dependsOn": [],
+      "why": "Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it.",
+      "rationale": "Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11918,11 +11839,60 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "importance": "high",
       "score": 76,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4652"
-      ],
-      "why": "pan start --remote work agents launch as linked conversations on the Fly VM, live at home; closes PAN-1775. After PAN-4652.",
-      "rationale": "New issue split from in-pipeline PAN-4652 that takes over PAN-1775's outcome (remote work agents visible live in the issue tree), so it inherits PAN-1775's rank slot. Blocked on PAN-4652, which is being worked now.",
+      "dependsOn": [],
+      "why": "pan start --remote work agents launch as linked conversations on the Fly VM, live at home; closes PAN-1775. Unblocked.",
+      "rationale": "Rank held: its only dependency PAN-4652 (Fly VMs as machines) closed as completed on 2026-11-01, so this issue is now unblocked and ready to plan.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4739",
+      "rank": 272,
+      "size": "M",
+      "importance": "high",
+      "score": 62,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Fly VM patrol marks a live conversation ended each tick; idle sweep may destroy a used VM. Root cause probe not yet found.",
+      "rationale": "New bug from the PAN-4652 live check: the VM's conversation-lifecycle patrol disagrees with the live tmux session, and sweepFlyMachines reads that status, so an active Fly machine can be reaped. Ranked beside the other Fly remote correctness bugs (PAN-4682, PAN-4685) because it can destroy live work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4738",
+      "rank": 294,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "First message to a Fly-machine conversation is pasted into Claude Code's auto-mode dialog and lost; pre-answer it in configureClaudeCode.",
+      "rationale": "New bug from the PAN-4652 live check with a located fix site (FlyProvider.configureClaudeCode); every conversation started with --message loses its opening turn, so it sits just behind PAN-4739.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4740",
+      "rank": 312,
+      "size": "S",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pooled link channel reused after the Fly proxy closes the idle socket: first request fails with 'socket hang up', retry works.",
+      "rationale": "New bug from the PAN-4652 live check; a retry succeeds, so impact is a flaky first request after idle rather than lost work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4741",
+      "rank": 496,
+      "size": "S",
+      "importance": "low",
+      "score": 35,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fly machine advertises unreachable private 172.19.x lan routes ranked before its public route; every reconnect probes dead routes first.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13085,21 +13055,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "from": "PAN-2350",
-      "to": "PAN-4650",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
       "to": "PAN-4651",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4652",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -13112,43 +13068,8 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "confidence": 1
     },
     {
-      "from": "PAN-4646",
-      "to": "PAN-4650",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4650",
-      "to": "PAN-4651",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4651",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4651",
       "to": "PAN-4638",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4638",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4296",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
@@ -13180,13 +13101,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4685",
-      "to": "PAN-4652",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-4685",
@@ -13231,51 +13145,9 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "confidence": 0.6
     },
     {
-      "from": "PAN-4728",
-      "to": "PAN-4727",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-4727",
-      "to": "PAN-4730",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4650",
-      "to": "PAN-4652",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4651",
       "to": "PAN-4405",
       "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4650",
-      "to": "PAN-4732",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4732",
-      "to": "PAN-4733",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4734",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13285,6 +13157,13 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4740",
+      "to": "PAN-4741",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }

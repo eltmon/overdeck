@@ -28,7 +28,9 @@ export interface ServeDeps {
 
 /**
  * `pan serve` — the npx launcher command. Starts the bundled dashboard
- * server and opens the browser to it.
+ * server and opens the browser to it. `--no-open` (`options.open === false`)
+ * skips the browser and only prints the URL: a headless host such as a Fly
+ * machine has no browser to open (PAN-4652).
  *
  * Resolves the internal token with `ensureInternalToken()` rather than
  * minting one and passing it through the child's env: the file it writes
@@ -36,7 +38,7 @@ export interface ServeDeps {
  * terminal-backend server spawned from this dashboard never captures a
  * throwaway env token that would go stale on the next launch (PAN-4628).
  */
-export async function serveCommand(options: { port: string }, deps: ServeDeps = {}): Promise<void> {
+export async function serveCommand(options: { port: string; open?: boolean }, deps: ServeDeps = {}): Promise<void> {
   const spawn = deps.spawn ?? spawnChildProcess;
   const openBrowser = deps.openBrowser ?? openServeUrlInBrowser;
   const openDelayMs = deps.openDelayMs ?? 1_500;
@@ -71,6 +73,11 @@ export async function serveCommand(options: { port: string }, deps: ServeDeps = 
     console.error(chalk.red('Failed to start dashboard:'), err.message);
     return exitCli(1);
   });
+
+  if (options.open === false) {
+    console.log(`  ${chalk.cyan(url)}`);
+    return;
+  }
 
   // Open browser after server has had a moment to start
   setTimeout(async () => {

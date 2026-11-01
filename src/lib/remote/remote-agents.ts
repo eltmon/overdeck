@@ -24,6 +24,7 @@ import {
   runSsh,
   shellQuote,
 } from './remote-tmux.js';
+import { countFlyMachines } from '../anywhere/fly/machine-store.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { getClaudePermissionFlags, getClaudePermissionFlagsString } from '../claude-permissions.js';
 import {
@@ -38,7 +39,7 @@ export { sendToRemoteAgentKeyed } from './remote-keyed-delivery.js';
 export type { RemoteKeyedDeliveryOutcome, RemoteKeyedExec } from './remote-keyed-delivery.js';
 
 const AGENTS_DIR = join(homedir(), '.overdeck', 'agents');
-const REMOTE_HOST_HEARTBEAT_PATH = `${REMOTE_PAN_DIR}/host-heartbeat`;
+export const REMOTE_HOST_HEARTBEAT_PATH = `${REMOTE_PAN_DIR}/host-heartbeat`;
 
 const PUSH_DAEMON_INTERVAL_SECONDS = 300;
 const EPHEMERAL_WATCHDOG_INTERVAL_SECONDS = 60;
@@ -401,6 +402,8 @@ export interface RemoteSpendCapResult {
 
 export interface CheckRemoteSpendCapDeps {
   listActiveRemoteAgentStates?: typeof listActiveRemoteAgentStates;
+  /** Fly machines count toward the same cap (PAN-4652 FR-12). */
+  countFlyMachines?: () => number;
 }
 
 /**
@@ -412,23 +415,29 @@ export function checkRemoteSpendCap(
   config: { remote?: { max_concurrent_agents?: number } },
   deps: CheckRemoteSpendCapDeps = {},
 ): RemoteSpendCapResult {
-  const activeStates = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)();
   const cap = config.remote?.max_concurrent_agents ?? 0;
+  let flyMachines = 0;
+  try {
+    flyMachines = (deps.countFlyMachines ?? countFlyMachines)();
+  } catch (error) {
+    if (cap > 0) throw error; // fail closed only when a cap applies
+  }
+  const current = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)().length + flyMachines;
 
   if (!cap || cap <= 0) {
-    return { allowed: true, current: activeStates.length, cap: 0 };
+    return { allowed: true, current, cap: 0 };
   }
 
-  if (activeStates.length >= cap) {
+  if (current >= cap) {
     return {
       allowed: false,
-      current: activeStates.length,
+      current,
       cap,
-      message: `Remote agent cap reached: ${activeStates.length}/${cap} active remote agents. Stop an existing remote agent or raise remote.max_concurrent_agents.`,
+      message: `Remote agent cap reached: ${current}/${cap} active remote agents and Fly machines. Stop an existing remote agent, remove a Fly machine, or raise remote.max_concurrent_agents.`,
     };
   }
 
-  return { allowed: true, current: activeStates.length, cap };
+  return { allowed: true, current, cap };
 }
 
 export interface RemoteDurabilityPreflightResult {

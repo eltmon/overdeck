@@ -10,6 +10,16 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.73.0" description="Unreleased" tags={["Upcoming"]}>
+  ## Upcoming release
+
+  Drafted from the changes merged to `main` since v0.72.0. The date is set when the release is tagged.
+
+  #### New
+
+  - **pstack skill pack:** `pan skills pack add pstack` registers poteto's pstack from the `eltmon/plugins` fork (Cursor's Claude Code build, 58 skills, 7 opt-in). Turn it on with `pan skills set --pack pstack on [--project <key>|--issue <id>]` and invoke skills as `/pstack:<name>`. Known packs no longer need a url in `pan skills pack add`. ([#4728](https://github.com/eltmon/overdeck/issues/4728))
+</Update>
+
 <Update label="v0.72.0" description="2026-10-26">
   #### New
 

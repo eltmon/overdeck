@@ -20,7 +20,8 @@ import {
   type PackAdapterId,
   type PackManifest,
 } from '../skill-packs/adapters.js';
-import { listPacks, packExtractDir } from '../skill-packs/sources.js';
+import { isRenderReady } from '../skill-packs/render.js';
+import { listPacks, packExtractDir, packRenderDir } from '../skill-packs/sources.js';
 
 export type SkillOrigin = 'overdeck' | 'personal' | 'project';
 
@@ -85,8 +86,9 @@ export interface PackCatalogEntry {
   ref: string;
   commit: string;
   adapter: PackAdapterId;
+  /** The trusted commit is extracted, and for a `gstack-runtime` pack also rendered. */
   cached: boolean;
-  /** Null when the trusted commit is not extracted (or its manifest cannot be read). */
+  /** Null when the pack is not cached (or its manifest cannot be read). */
   manifest: PackManifest | null;
 }
 
@@ -104,13 +106,20 @@ export async function listPackCatalog(): Promise<PackCatalogEntry[]> {
   return Promise.all(
     packs.map(async (entry): Promise<PackCatalogEntry> => {
       const dir = packExtractDir(entry.id, entry.commit);
-      const cached = await isDirectory(dir);
+      const extracted = await isDirectory(dir);
       const known = KNOWN_PACKS[entry.id];
-      const adapter = entry.adapter ?? known?.adapter ?? (cached ? await detectAdapter(dir) : 'plain');
+      const adapter = entry.adapter ?? known?.adapter ?? (extracted ? await detectAdapter(dir) : 'plain');
+      // A runtime pack mounts from its render, so it is usable only once the render is ready (PAN-4727).
+      const cached =
+        extracted && (adapter !== 'gstack-runtime' || (await isRenderReady(packRenderDir(entry.id, entry.commit))));
       let manifest: PackManifest | null = null;
       if (cached) {
         try {
-          manifest = await readPackManifest(dir, adapter, { optIn: known?.optIn ?? [], skillsRoot: known?.skillsRoot });
+          manifest = await readPackManifest(dir, adapter, {
+            optIn: known?.optIn ?? [],
+            skillsRoot: known?.skillsRoot,
+            pluginRoot: known?.pluginRoot,
+          });
         } catch {
           manifest = null;
         }

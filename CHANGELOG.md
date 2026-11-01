@@ -14,6 +14,13 @@ The public, per-release changelog is [`changelog.mdx`](changelog.mdx). Session V
 - **Continue here** for those rows (#4454, PAN-4437).
 - **Continue on another device** from a conversation: open it on another screen (QR code, optional pairing) or hand it off through the Session Vault (PAN-4455).
 
+### Added: gstack skill pack
+
+- `pan skills pack add gstack https://github.com/eltmon/gstack --ref main` adds gstack as a runtime pack. The eltmon fork's pack mode renders the skills and their bash/bun runtime into `~/.overdeck/packs/gstack/render/<commit>/` and keeps gstack's state in `~/.overdeck/packs/gstack/state/`; it never writes `~/.claude` or `~/.gstack` and never calls the network (PAN-4727).
+- The consent preview shows the exact render command, every script the mounted skills can run, and the skills that are not mounted. Trusting renders the commit once; `update` and `sync` render again when needed, and launches never render.
+- gstack skills are classified as default, opt-in (code sent to OpenAI, paid or cloud APIs, pushes, blocking hooks), excluded, or needs-binary. The browser, design and PDF skills wait for PAN-4730.
+- `pan skills pack remove gstack` also removes every mount, launch link and Codex plugin cache that holds gstack, and lists project `.gstack/` dirs without deleting them; `pan skills pack gc` removes stale renders and orphaned pack state.
+
 ### Breaking changes
 
 **Removed public exports.** `src/index.ts` (the `@overdeck/core` main entry) is an internal entry point, not a supported library API, so names can be removed in any release. These 38 names are gone with no bare-name replacement:

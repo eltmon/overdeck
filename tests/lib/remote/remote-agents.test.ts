@@ -265,6 +265,34 @@ describe('checkRemoteSpendCap', () => {
     expect(result.allowed).toBe(false);
     expect(result.current).toBe(1);
   });
+
+  it('counts Fly machines against the same cap (PAN-4652 FR-12)', () => {
+    const active = [
+      { id: 'agent-pan-1', issueId: 'PAN-1', vmName: 'vm-1', model: 'claude-sonnet-4-6', status: 'running', startedAt: '2026-01-01T00:00:00Z', location: 'remote' as const },
+    ];
+    const result = checkRemoteSpendCap(
+      { remote: { max_concurrent_agents: 2 } },
+      { listActiveRemoteAgentStates: () => active, countFlyMachines: () => 1 },
+    );
+    expect(result).toMatchObject({ allowed: false, current: 2, cap: 2 });
+    expect(result.message).toContain('Fly machines');
+  });
+
+  it('ignores an unreadable Fly machine store when no cap applies, and fails closed when one does', () => {
+    const corrupt = () => { throw new Error('Fly machine store /x/fly-machines.json has an unexpected shape'); };
+    expect(checkRemoteSpendCap({ remote: {} }, { listActiveRemoteAgentStates: () => [], countFlyMachines: corrupt }))
+      .toMatchObject({ allowed: true, cap: 0 });
+    expect(() => checkRemoteSpendCap({ remote: { max_concurrent_agents: 2 } }, { listActiveRemoteAgentStates: () => [], countFlyMachines: corrupt }))
+      .toThrow('unexpected shape');
+  });
+
+  it('allows any count of agents and Fly machines when the cap is zero', () => {
+    const result = checkRemoteSpendCap(
+      { remote: { max_concurrent_agents: 0 } },
+      { listActiveRemoteAgentStates: () => [], countFlyMachines: () => 5 },
+    );
+    expect(result).toMatchObject({ allowed: true, current: 5, cap: 0 });
+  });
 });
 
 describe('checkRemoteDurabilityPreflight', () => {

@@ -17,30 +17,52 @@
 import { createHash } from 'node:crypto';
 import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, posix } from 'node:path';
+import { removeCodexPluginCaches } from '../agents/state-dir-removal.js';
 import { getOverdeckHome } from '../paths.js';
 import { applyDeftHostNotice, DEFT_HOST_NOTICE_VERSION } from './deft.js';
+import { GSTACK_RENDER_VERSION } from './gstack.js';
 import { PACK_ID_PATTERN, packsHome } from './sources.js';
 
 export const MOUNT_FORMAT_VERSION = 2;
 export const CODEX_PACK_MARKETPLACE = 'overdeck-packs';
 export const CODEX_PACK_BLOCK_BEGIN = '# overdeck:skill-packs:begin';
 export const CODEX_PACK_BLOCK_END = '# overdeck:skill-packs:end';
+/**
+ * Written into `plugins/<pack>/` of a mount built from a `gstack-runtime` render: the render
+ * root its skills call by absolute path, so gc keeps that render while the mount is linked.
+ */
+export const MOUNT_RENDER_ROOT_FILE = '.overdeck-render-root';
 /** Name of the per-launch Claude plugin link under `<OVERDECK_HOME>/launch/<launchKey>/`. */
 export const CLAUDE_PLUGIN_LINK_NAME = 'skill-packs';
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 
-/** `deft-readonly`: rename each SKILL.md to the stripped name and insert the Deft host notice. */
-export type MountTransform = 'deft-readonly';
+/**
+ * `deft-readonly`: rename each SKILL.md to the stripped name and insert the Deft host notice.
+ * `gstack-runtime`: copy verbatim from the gstack render root (PAN-4727); the tag keys the hash on
+ * GSTACK_RENDER_VERSION.
+ */
+export type MountTransform = 'deft-readonly' | 'gstack-runtime';
+
+/** The transform's part of a mount hash entry, versioned so a contract change yields new mounts. */
+function transformTag(transform: MountTransform | undefined): string {
+  if (transform === 'deft-readonly') return `deft-readonly.${DEFT_HOST_NOTICE_VERSION}`;
+  if (transform === 'gstack-runtime') return `gstack-runtime.${GSTACK_RENDER_VERSION}`;
+  return '';
+}
 
 export interface MountPack {
   id: string;
   commit: string;
-  /** Extraction dir of the pack at `commit`. */
+  /** Extraction dir of the pack at `commit` (the render dir for `gstack-runtime`). */
   root: string;
   transform?: MountTransform;
   skills: Array<{ name: string; dir: string }>;
+  /** Repo-relative plugin root the extras are read from (default: the repo root). */
+  pluginRoot?: string;
+  /** Plugin-root-relative files or dirs copied to plugins/<pack>/<extra>. */
+  extras?: string[];
 }
 
 export interface MountSelection {
@@ -60,9 +82,11 @@ export function mountsDir(): string {
 export function mountHash(selection: MountSelection): string {
   const entries = selection.packs
     .flatMap((pack) =>
-      pack.skills.map(
-        (skill) =>
-          `${pack.id}@${pack.commit}:${skill.name}:${pack.transform ? `${pack.transform}.${DEFT_HOST_NOTICE_VERSION}` : ''}`,
+      pack.skills.map((skill) => `${pack.id}@${pack.commit}:${skill.name}:${transformTag(pack.transform)}`),
+    )
+    .concat(
+      selection.packs.flatMap((pack) =>
+        (pack.extras ?? []).map((extra) => `${pack.id}@${pack.commit}:+${pack.pluginRoot ?? ''}/${extra}`),
       ),
     )
     .sort();
@@ -72,7 +96,7 @@ export function mountHash(selection: MountSelection): string {
 function assertMountPack(pack: MountPack): void {
   if (!PACK_ID_PATTERN.test(pack.id)) throw new Error(`invalid pack id: ${JSON.stringify(pack.id)}`);
   if (!COMMIT_PATTERN.test(pack.commit)) throw new Error(`invalid pack commit: ${JSON.stringify(pack.commit)}`);
-  if (pack.transform !== undefined && pack.transform !== 'deft-readonly') {
+  if (pack.transform !== undefined && pack.transform !== 'deft-readonly' && pack.transform !== 'gstack-runtime') {
     throw new Error(`invalid pack transform: ${JSON.stringify(pack.transform)}`);
   }
   for (const skill of pack.skills) {
@@ -80,6 +104,18 @@ function assertMountPack(pack: MountPack): void {
     const normalized = posix.normalize(skill.dir);
     if (isAbsolute(skill.dir) || normalized === '..' || normalized.startsWith('../')) {
       throw new Error(`skill dir escapes pack ${pack.id}: ${JSON.stringify(skill.dir)}`);
+    }
+  }
+  for (const extra of pack.extras ?? []) {
+    const normalized = posix.normalize(extra);
+    if (isAbsolute(extra) || normalized === '..' || normalized.startsWith('../')) {
+      throw new Error(`mount path escapes pack ${pack.id}: ${JSON.stringify(extra)}`);
+    }
+    if (normalized === 'skills' || normalized === '.claude-plugin' || normalized === '.codex-plugin') {
+      throw new Error(`mount extra collides with generated content in pack ${pack.id}: ${JSON.stringify(extra)}`);
+    }
+    if (normalized.startsWith('skills/') || normalized.startsWith('.claude-plugin/') || normalized.startsWith('.codex-plugin/')) {
+      throw new Error(`mount extra collides with generated content in pack ${pack.id}: ${JSON.stringify(extra)}`);
     }
   }
 }
@@ -140,6 +176,19 @@ async function populateMount(dir: string, packs: MountPack[], hash: string): Pro
         await writeFile(skillMd, applyDeftHostNotice(await readFile(skillMd, 'utf8'), skill.name), 'utf8');
       }
     }
+    for (const extra of pack.extras ?? []) {
+      const src = join(pack.root, pack.pluginRoot ?? '', extra);
+      if (!(await exists(src))) continue;
+      await copyWithoutSymlinks(src, join(pluginDir, extra));
+    }
+    if (pack.transform === 'gstack-runtime') await writeFile(join(pluginDir, MOUNT_RENDER_ROOT_FILE), `${pack.root}\n`, 'utf8');
+  }
+}
+
+/** A runtime pack's render ages like its mount: using the mount touches the render too. */
+async function touchRenderRoots(packs: MountPack[]): Promise<void> {
+  for (const pack of packs) {
+    if (pack.transform === 'gstack-runtime') await touch(pack.root).catch(() => undefined);
   }
 }
 
@@ -151,6 +200,7 @@ export async function buildMount(selection: MountSelection): Promise<Mount | nul
   const hash = mountHash({ packs });
   const path = join(mountsDir(), hash);
   const mount: Mount = { path, hash, packIds: packs.map((pack) => pack.id) };
+  await touchRenderRoots(packs);
   if (await exists(path)) {
     await touch(path);
     return mount;
@@ -276,13 +326,10 @@ async function realpathOrNull(path: string): Promise<string | null> {
 }
 
 /**
- * PD-12: remove launch plugin links whose target is gone, then mounts that no
- * link references and whose mtime is older than `maxAgeMs`, plus stray
- * `.tmp-*` build dirs of the same age. Reusing a mount touches it, so a mount
- * in active use stays young.
+ * Remove launch plugin links whose target is gone; return them and the mounts
+ * the remaining links reference.
  */
-export async function gcMounts(opts: { maxAgeMs: number; now?: number }): Promise<{ removedMounts: string[]; removedLinks: string[] }> {
-  const now = opts.now ?? Date.now();
+async function sweepLaunchLinks(): Promise<{ removedLinks: string[]; referenced: Set<string> }> {
   const removedLinks: string[] = [];
   const referenced = new Set<string>();
   const launchRoot = join(getOverdeckHome(), 'launch');
@@ -303,6 +350,20 @@ export async function gcMounts(opts: { maxAgeMs: number; now?: number }): Promis
       referenced.add(dirname(target));
     }
   }
+  return { removedLinks, referenced };
+}
+
+/**
+ * PD-12: remove launch plugin links whose target is gone, then mounts that no
+ * link references and whose mtime is older than `maxAgeMs`, plus stray
+ * `.tmp-*` build dirs of the same age. Reusing a mount touches it, so a mount
+ * in active use stays young.
+ */
+export async function gcMounts(
+  opts: { maxAgeMs: number; now?: number },
+): Promise<{ removedMounts: string[]; removedLinks: string[]; referencedMounts: string[] }> {
+  const now = opts.now ?? Date.now();
+  const { removedLinks, referenced } = await sweepLaunchLinks();
 
   const removedMounts: string[] = [];
   const root = mountsDir();
@@ -322,5 +383,66 @@ export async function gcMounts(opts: { maxAgeMs: number; now?: number }): Promis
     await rm(path, { recursive: true, force: true });
     removedMounts.push(path);
   }
-  return { removedMounts, removedLinks };
+  return { removedMounts, removedLinks, referencedMounts: [...referenced] };
+}
+
+/**
+ * PAN-4727 D8: remove every trace of a pack outside its cache dir: each mount
+ * that holds `plugins/<id>`, the launch links that left dangling, and
+ * `plugins/cache/overdeck-packs/<id>` in every Codex home under
+ * `<OVERDECK_HOME>/agents/<agent>/codex-home*`. A running agent that used a
+ * removed mount loses the pack's skills until its next launch.
+ */
+export async function removePackFromMounts(
+  id: string,
+): Promise<{ removedMounts: string[]; removedLinks: string[]; removedCodexCaches: string[]; failures: string[] }> {
+  if (!PACK_ID_PATTERN.test(id)) throw new Error(`invalid pack id: ${JSON.stringify(id)}`);
+  // One failed removal must not stop the rest of the sweep; failures are reported, and rerunning remove retries them.
+  const failures: string[] = [];
+  const describe = (path: string, error: unknown) => `${path}: ${error instanceof Error ? error.message : String(error)}`;
+  const removedMounts: string[] = [];
+  const root = mountsDir();
+  for (const name of await listDirNames(root)) {
+    if (name.startsWith('.tmp-')) continue;
+    const path = join(root, name);
+    if (!(await exists(join(path, 'plugins', id)))) continue;
+    try {
+      await rm(path, { recursive: true, force: true });
+      removedMounts.push(path);
+    } catch (error) {
+      failures.push(describe(path, error));
+    }
+  }
+  let removedLinks: string[] = [];
+  try {
+    ({ removedLinks } = await sweepLaunchLinks());
+  } catch (error) {
+    failures.push(describe(join(getOverdeckHome(), 'launch'), error));
+  }
+
+  // Agent dirs have one deletion door (PAN-3357), which also refuses symlinks and escapes.
+  const agentsRoot = join(getOverdeckHome(), 'agents');
+  let removedCodexCaches: string[] = [];
+  try {
+    removedCodexCaches = await removeCodexPluginCaches(CODEX_PACK_MARKETPLACE, id, agentsRoot);
+  } catch (error) {
+    failures.push(describe(agentsRoot, error));
+  }
+  return { removedMounts, removedLinks, removedCodexCaches, failures };
+}
+
+/** Render roots that the given mounts' runtime packs call into (read from MOUNT_RENDER_ROOT_FILE). */
+export async function renderRootsUsedBy(mounts: readonly string[]): Promise<Set<string>> {
+  const roots = new Set<string>();
+  for (const mount of mounts) {
+    for (const id of await listDirNames(join(mount, 'plugins'))) {
+      try {
+        const root = (await readFile(join(mount, 'plugins', id, MOUNT_RENDER_ROOT_FILE), 'utf8')).trim();
+        if (root) roots.add(root);
+      } catch {
+        // Not a runtime pack.
+      }
+    }
+  }
+  return roots;
 }

@@ -551,6 +551,156 @@ service, lingering, then one pairing link (`.pan/drafts/PAN-4656.md`).
   `user/<uid>`; a changed plist is booted out first. The agent starts at login only. `pan up`
   on a Mac with the agent loaded does not start a second supervisor.
 
+## Fly machines (PAN-4652)
+
+A Fly machine is a Fly.io VM that runs `pan serve` and is linked one way from home
+(W-FLY2, epic FR-18, D-12; issue PRD `.pan/drafts/PAN-4652.md`). It is an ordinary linked
+machine: its conversations stream into home's list with a `fly-<machineId>` chip and come
+home with **Pull here**. It is a different thing from a remote work agent VM
+(`pan start --remote`, `src/lib/remote/remote-agents.ts`), which runs Claude Code in raw
+tmux and no Overdeck server; moving those onto this path is
+[PAN-4734](https://github.com/eltmon/overdeck/issues/4734). User-facing pages: the
+`## Fly machines` section of `configuration/linked-machines.mdx` and `add-fly` in
+`cli/machines.mdx`.
+
+| Piece | Where |
+| --- | --- |
+| Provisioning, `destroyFlyVm`, `FlyMachineError` and its status map | `src/lib/anywhere/fly/provision.ts` |
+| Project clone on the VM | `src/lib/anywhere/fly/project.ts` |
+| `${OVERDECK_HOME}/fly-machines.json` (0600, atomic; a corrupt file throws and is never rewritten) | `src/lib/anywhere/fly/machine-store.ts` |
+| `addFlyMachine`, `startFlyConversation`, `removeFlyMachineForLink` (unlink hook) | `src/dashboard/server/services/fly-machine-service.ts` |
+| `POST /api/machines/fly` | `src/dashboard/server/routes/machines-fly.ts` |
+| `pan machines add-fly` | `src/cli/commands/machines-fly.ts` |
+| Heartbeat and sweep loops | `src/lib/remote/fly-machine-loops.ts` (registered in `src/lib/cloister/hygiene-scheduler.ts`) |
+| Credential refresh | `src/lib/remote/remote-credential-refresh.ts` (Fly machine names join the remote agents' VMs) |
+| Spend cap | `checkRemoteSpendCap` in `src/lib/remote/remote-agents.ts` counts Fly machine records |
+
+### Decisions
+
+- **D-1 The VM issues the pairing code; home links.** Codes are held only by the server that
+  issued them, so home runs `pan pair --json` on the VM through the Machines exec API and
+  links with the `credential` it prints. The code travels only over the Fly-authenticated
+  exec channel, never over the route being paired (the same property SSH machines have).
+- **D-2 One-way link.** Home links to the VM (`bothWays: false`, access `operator`). The VM
+  cannot reach home's LAN or tailnet, and home's dashboard needs nothing from the VM.
+- **D-3 Public route = WSS on 443 with instance pinning.** The machine config carries
+  `services: [{ protocol: 'tcp', internal_port: 3011, ports: [{ port: 443, handlers: ['tls', 'http'] }] }]`.
+  The route is `wss://<app>.fly.dev/ws/link?fly-instance=<machineId>`, kind `public`, source
+  `pairing`. Every machine in an app shares `<app>.fly.dev`, so the route pins one.
+- **D-4 The VM server's environment.** `pan serve --port 3011 --no-open` runs detached with
+  `OVERDECK_TERMINAL_BACKEND=tmux` (no Herdr on the image), `IS_SANDBOX=1` (Claude Code runs
+  as root), `OVERDECK_PUBLIC_LINK_ONLY=1` and `PORT=3011`. It never sets
+  `OVERDECK_DISABLE_DEACON`, which would make it a peer that hosts no machine links. The env
+  is on the command line, not in the image, so remote work agent VMs are unchanged.
+- **D-9 Destroy, never stop.** Unlink, the idle sweep and the stopped-machine sweep all
+  destroy the machine. Its rootfs resets on every start, so a stopped Fly machine has
+  already lost its server state and conversations.
+
+### The `fly-instance` route parameter
+
+`FLY_INSTANCE_PARAM` (`src/lib/anywhere/channel/open.ts`) names a reserved query parameter
+on a `wss://` route. `parseTransportUrl` removes it from the URL it dials and sends its value
+as the `fly-force-instance-id` header on the WebSocket upgrade, which the Fly proxy honors.
+Every other URL is dialled unchanged. `parseRouteUrl` (`src/lib/anywhere/routes.ts`) keeps
+that one parameter when it canonicalizes a `wss` route, so the stored route still pins the
+machine and two machines in one app keep distinct route URLs; any other query is dropped.
+
+### Public-link-only mode
+
+With `OVERDECK_PUBLIC_LINK_ONLY=1`, rule 0b of the remote request gate
+(`src/dashboard/server/remote-request-gate.ts`) answers 404 to every HTTP request that is
+neither inside a secure channel nor from a loopback peer without a proxy forwarding header,
+on every path including the static SPA. The `/ws/link` upgrade is handled before the gate,
+so home still links in, and a link-mode channel request is judged by its machine credential
+as before. On a Fly machine this makes the public URL answer nothing but the link.
+
+### The record file
+
+`fly-machines.json` holds `{ v: 1, machines: FlyMachineRecord[] }`, one record per Fly
+machine: `id`, `linkId` (null while provisioning), `environmentId`, `machineId`,
+`machineName` (`overdeck-machine-<8 hex>`, unique in the app because the Fly provider
+resolves machines by name), `appName`, `region`, `label` (`fly-<machineId>`), `projectKey`,
+`docker` and `createdAt`. It is a separate file from `machine-links.json` because
+`upsertLink` rebuilds link records field by field. Unlike `ssh-machines.json`, a corrupt
+file makes every read throw: the cap and the sweep must not act on an empty list that is
+not really empty. `countFlyMachines()` is synchronous because `checkRemoteSpendCap` and its
+callers are.
+
+### Provisioning (`provisionFlyMachine`)
+
+Each remote step runs through `FlyApiClient.execCommand` with a 60 s deadline; anything
+longer runs detached (`setsid nohup … &`) and is polled.
+
+1. `ensureApp`, and a fresh `overdeck-machine-<8 hex>` name.
+2. `createMachine` with the D-3 service, `restart: no`, `metadata.overdeck = machine` and
+   `max(remote.fly.vm_memory ?? 1024, 2048)` MB (the server plus Claude Code do not fit in 1 GB).
+3. `waitForState(started, 300 s)`.
+4. Version equality: when the VM's `pan --version` differs from home's `package.json`
+   version, `npm install -g @overdeck/core@<home>` runs detached and is polled every 5 s for
+   at most 5 min; a second mismatch fails with `version-mismatch`.
+5. Identity: `<home>/environment-id.json` with `{ v: 1, environmentId, label:
+   "fly-<machineId>", createdAt }`, mode 0600, before the server first starts (the label is
+   fixed at link time). `<home>` is read from the exec shell
+   (`${OVERDECK_HOME:-$HOME/.overdeck}`), never assumed: Fly's exec shell runs with `HOME=/`,
+   so the server, `pan pair` and the project clone all use `/.overdeck`, and an identity
+   written to `/root/.overdeck` is never read.
+6. `syncAllCredentials` and `configureClaudeCode` through the Fly provider (Claude OAuth file
+   and `gh auth token`; no SSH key reaches the VM).
+7. Docker: when `command -v dockerd` succeeds, `dockerd --storage-driver=vfs` starts
+   detached and `docker info` is polled every 2 s for 60 s; the result is the record's
+   `docker` field and a failure never fails provisioning. The default overlay driver cannot
+   mount on the VM's root filesystem ("invalid argument"); `vfs` runs containers, at the
+   cost of speed and disk.
+8. Server: `pan serve` with the D-4 env, then `curl /api/health` every 2 s for 120 s, or
+   `server-not-ready` with the last 40 lines of `<home>/fly-serve.log`.
+9. Watchdog: the PAN-4295 ephemeral watchdog at `/workspace/.pan/fly-machine-watchdog.js`
+   and the first heartbeat; the VM stops itself 300 s after home stops heartbeating.
+10. `pan pair --json`; its `credential` must match `odp_` + 64 hex, else `pairing-failed`.
+11. The D-3 route URL.
+
+A failure after `createMachine` destroys the machine before rethrowing, because the caller
+never learns the id of a failed provision.
+
+### Adding (`addFlyMachine`)
+
+The early refusals create nothing: `remote.enabled` not true (`remote-disabled`), no Fly token
+(`no-fly-token`), a harness other than Claude Code (`harness-unsupported`, #4296), a message
+without a project (`bad-request`), and the spend cap (`cap-reached`). Then it provisions,
+writes a provisional record, links (`createMachineLink` with the public route; an
+`unreachable` link names the one-time `fly ips allocate-v4 --shared` / `allocate-v6` fix),
+patches the record, wakes the link supervisor, clones the project (`pan project clone
+https://github.com/<repo>.git --parent /workspace --name <key>`, detached, up to 20 min, then
+`pan project list --json` must list it) and starts the conversation (`POST
+/api/conversations` through the link as the operator). Any failure after provisioning
+destroys the machine, removes the link if one was made and deletes the record.
+`notifyLinksChanged` is a required argument because its module (`routes/machines.ts`)
+imports this service for the unlink hook. The route runs the whole flow in one request; the
+CLI sends it with `node:http` because Node's fetch gives up on response headers after 300 s.
+
+### The loops
+
+The deacon child's hygiene scheduler runs both every 60 s, outside the deacon freeze. With
+zero records neither builds a Fly client.
+
+- `heartbeatFlyMachines` writes `/workspace/.pan/host-heartbeat` on every machine by
+  machine id. A failed exec is a failure line, never "refreshed".
+- `sweepFlyMachines` destroys the machine, removes the link and deletes the record when the
+  API reports `stopped`, `destroyed` or `failed`, or answers 404 (any other API error does
+  nothing); when no unreleased linked conversation on it is `active` or had activity inside
+  the window for `remote.fly.machine_idle_minutes` (default 30, 0 disables); or when its
+  record still has no link 30 minutes after creation. The idle clock is in memory, and the
+  sweep reads the linked-conversation cache read-only. A failed destroy keeps the link and
+  record for the next tick.
+- The credential refresh copies fresh Claude credentials to Fly machines by name with the
+  same per-VM watermark as remote agents.
+
+### Split
+
+`pan start --remote` work agents moving onto this path, and their session rows (closing
+PAN-1775), are [PAN-4734](https://github.com/eltmon/overdeck/issues/4734). The Machine
+field, **Fly (new VM)** and `--machine fly` are #4651; lanes on Fly are #4638; other
+harnesses on Fly are #4296.
+
 ## Decisions added by sibling issues
 
 Placeholder headings for the decisions that land with the follow-up issues; each adds its

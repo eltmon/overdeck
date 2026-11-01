@@ -302,7 +302,9 @@ Pack mattpocock
 Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack mattpocock on
 ```
 
-Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly` to choose. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
+Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly|gstack-runtime` to choose. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
+
+For a known pack (`mattpocock`, `deft`, `sageox`, `pstack`) the url is optional; `pstack` also has a default ref, so `pan skills pack add pstack` is enough.
 
 ### Pinning and updates
 
@@ -331,6 +333,55 @@ pan skills set --pack mattpocock inherit --project <key>          # project: und
 pan skills set --pack mattpocock on --issue <id>                  # issue: on
 pan skills set --pack mattpocock inherit --issue <id>              # issue: undo
 ```
+
+### pstack
+
+`pstack` is poteto's (Lauren Tan's) skill pack for Cursor — `principle-*`, `unslop`, `tdd`, `architect`, `poteto-mode`, and more — mounted from the operator's fork `https://github.com/eltmon/plugins`, pinned to `ae5650f`. Overdeck mounts Cursor's generated Claude Code build at `harness/pstack/claude-code`, not the Cursor source tree; the `KNOWN_PACKS.pstack` entry carries that subfolder as its `pluginRoot`, so the manifest, skill scan, and capability probes all read from inside it. Re-pin with `pan skills pack update pstack --ref <commit-or-branch>`.
+
+```bash
+pan skills pack add pstack
+```
+
+```
+Pack pstack
+  Source       https://github.com/eltmon/plugins @ ae5650febf4320793844c12c4adaa937f417f8da (ae5650f)
+  Root         harness/pstack/claude-code
+  Adapter      claude-plugin
+  License      MIT
+  Skills       58 (7 opt-in: automate-me, create-formal-verification-skill, create-verification-skill, maintain-verification-skill, make-bot-ui, reflect, setup-pstack)
+  Not applied  agents, executables (6), project-mutating skills (7)
+Trusted pstack @ ae5650f.
+```
+
+```bash
+pan skills set --pack pstack on                              # global: on
+pan skills set --pack pstack off                             # global: undo
+
+pan skills set --pack pstack on --project <key>               # project: on
+pan skills set --pack pstack inherit --project <key>          # project: undo
+
+pan skills set --pack pstack on --issue <id>                  # issue: on
+pan skills set --pack pstack inherit --issue <id>              # issue: undo
+```
+
+Most pstack skills set `disable-model-invocation: true`, so the agent picks them up only when you invoke them directly, e.g. `/pstack:principle-laziness-protocol`.
+
+Seven skills are opt-in — turning the pack on never turns them on:
+
+- `setup-pstack` — writes `~/.claude/rules/pstack-models.md`, which every Claude Code session on the host loads, including sessions outside Overdeck.
+- `automate-me` — writes a personal mode skill, then commits and opens a PR.
+- `reflect` — copies a skill folder into a skills dir and edits it.
+- `create-verification-skill`, `create-formal-verification-skill` — write a project-local skill under `.cursor/skills/` → `.claude/skills/`, an Overdeck sync target in workspaces.
+- `maintain-verification-skill` — opens at most one PR of proven corrections.
+- `make-bot-ui` — builds a webhook UI for a Grok bot and exposes it on Tailscale.
+
+The mount also copies the plugin's `docs/` and `README.md` next to `skills/` (`KnownPack.mountExtras`), so the skills' link to the Claude Code adapter doc (`docs/harness/claude-code.md`) resolves instead of dangling.
+
+A few pstack skills name Cursor model ids (`arena`, `architect`, `setup-pstack`); the adapter doc maps e.g. `claude-opus-5-5-xhigh` to `model: "opus"` with effort `xhigh` and runs `grok-*`/`gpt-*` roles on the session model. pstack's defaults spawn subagents at `xhigh`; the opt-in `/pstack:setup-pstack` can lower the budget.
+
+`agents/` is not applied, so `poteto-mode`'s delegations to `pstack:poteto-agent` and `pstack:comment-sicko` fall back to `general-purpose`. `poteto-mode`'s shipping and babysit playbooks open and merge PRs with `gh` and run `scripts/watch-pr/watch-pr`; Overdeck never runs these scripts, and inside an Overdeck issue the pipeline owns PRs and merges.
+
+Codex receives the same Claude Code build; the fork has no Codex-specific build.
 
 ### Names: `pack/skill` and `pack:skill`
 
@@ -362,6 +413,8 @@ For a pack skill, Overdeck checks the levels from narrowest to widest. At each l
 
 Overdeck mounts skill directories only. If a pack also carries hooks, MCP servers, commands, agents, context injection, git hooks, or scripts, the preview and the dashboard list them as **Not applied**, and none of them reach the agent. Scripts inside a skill directory are copied with the skill but never run by Overdeck.
 
+Runtime packs (gstack) are the exception: their scripts are mounted and run when you invoke a skill, after you trusted them at `add`.
+
 ### Where pack state is stored
 
 | What | Stored in |
@@ -371,8 +424,9 @@ Overdeck mounts skill directories only. If a pack also carries hooks, MCP server
 | Project pack toggle | `~/.overdeck/projects.yaml`, under `projects.<key>.skill_pack_overrides.<id>` |
 | Issue pack toggle | The issue's skill override file, under `packs.<id>` |
 | Single pack skills | The same `skills.overrides`, `skill_overrides`, and issue `skills:` maps, with `pack/skill` keys |
+| gstack runtime and state | `~/.overdeck/packs/gstack/render/<commit>/` and `~/.overdeck/packs/gstack/state/` |
 
-The cache lives in `~/.overdeck/packs/` and can be rebuilt at any time: `pan skills pack sync [id]` re-fetches it, and `pan skills pack gc [--max-age-days <n>]` removes mounts no launch uses. `pan skills pack remove <id>` unregisters a pack, clears its global toggle and global skill values, and deletes its cache; project and issue values stay but do nothing until the pack is added again.
+The cache lives in `~/.overdeck/packs/` and can be rebuilt at any time, except the gstack `state/` dir, which holds gstack's own config, sessions and learnings: `pan skills pack sync [id]` re-fetches the cache, and `pan skills pack gc [--max-age-days <n>]` removes mounts no launch uses. `pan skills pack remove <id>` unregisters a pack, clears its global toggle and global skill values, and deletes its cache; project and issue values stay but do nothing until the pack is added again.
 
 ### When pack changes apply
 
@@ -452,6 +506,79 @@ These hooks come from Overdeck, not from the pack; the pack's own capabilities a
 #### What `pan doctor` checks
 
 When the `sageox` pack is registered, `pan doctor` adds a **SageOx (ox)** row. It is `ok` when `ox` answers the `overdeck-host/1` contract and was built from the pack's trusted commit. It warns, with the build command as the fix, when `ox` is missing, is upstream `ox` without the host contract, or was built from a different commit. Without the pack, there is no row.
+
+### gstack
+
+[gstack](https://github.com/garrytan/gstack) is Garry Tan's skill collection. Its skills call gstack's own bash and bun scripts by absolute path and keep state in a directory of their own, so Overdeck cannot mount them like other packs, and a normal gstack install writes `~/.claude` settings, harness skill dirs and `~/.gstack`. Overdeck uses the operator's fork [eltmon/gstack](https://github.com/eltmon/gstack), which adds a **pack mode**: `bash setup --pack-root <render> --pack-state-root <state>` copies the skills and their runtime into a directory Overdeck chooses, rewrites every skill to call scripts there, keeps all gstack state in a second directory, and writes nothing else. It never runs `bun install` or a build, never writes `~/.claude` or `~/.gstack`, and never calls the network. The `gstack-runtime` adapter runs pack mode once per trusted commit and mounts the skills from its output.
+
+#### Adding gstack
+
+gstack needs [bun](https://bun.sh) on `PATH`.
+
+```bash
+pan skills pack add gstack https://github.com/eltmon/gstack --ref main
+```
+
+Before it asks, Overdeck checks that the commit has `pack-mode.json` and that bun runs. The preview shows the command trusting runs, every script the mounted skills can run (one per line, never shortened), and the skills it will not mount. Shortened here with `…`:
+
+```
+Pack gstack
+  Source       https://github.com/eltmon/gstack @ main (541f968)
+  Adapter      gstack-runtime
+  License      MIT
+  Skills       36 (14 opt-in: autoplan, benchmark-models, captain, careful, codex, cso, document-generate, document-release, eval-plan, freeze, guard, modernize, ubicloud, unfreeze)
+  Not mounted  27: benchmark (Calls $B, $D or $P, which pack mode does not build (PAN-4730).); …
+  Runs         bash setup --pack-root /home/you/.overdeck/packs/gstack/render/<commit> --pack-state-root /home/you/.overdeck/packs/gstack/state
+  Executables  232 files the mounted skills can run:
+  Not applied  hooks, agents, project-mutating skills (14), requires CLI (bun)
+  Requires     bun
+                bin/gstack-config
+                bin/gstack-paths
+                …
+Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack gstack on
+Trusting runs the command above once now; skills run the listed scripts when you invoke them.
+```
+
+After you confirm, Overdeck renders the commit and only then registers it. If the render fails, nothing is registered and the error shows the last lines of gstack's output. `pan skills pack update gstack` renders the new commit before it moves the trusted commit, and `pan skills pack sync gstack` renders the trusted commit again when its render is missing. A launch never renders: if the render is missing, the launch skips gstack and prints `run pan skills pack sync gstack`.
+
+#### Which skills mount
+
+Each gstack skill is in one of four classes, fixed in Overdeck's skill map (reviewed against fork commit `1cac25cb`). A skill a later gstack commit adds is not mounted until the map is reviewed.
+
+| Class | Skills | Mounted |
+|-------|--------|---------|
+| default | context-restore, context-save, deslop-shared-libs, design-motion, diagram, health, investigate, ios-clean, ios-design-review, ios-fix, ios-qa, ios-sync, landing-report, learn, plan-ceo-review, plan-devex-review, plan-eng-review, retro, review, test-audit, verify, write-skill | On with the pack toggle |
+| opt-in | autoplan, benchmark-models, captain, careful, codex, cso, document-generate, document-release, eval-plan, freeze, guard, modernize, ubicloud, unfreeze | Only with a per-skill `on`: they send code to OpenAI (`codex`), call paid or cloud APIs, push, or install hooks that block tool calls |
+| excluded | connect-chrome, gstack-upgrade, plan-tune, setup-deploy, setup-gbrain, sync-gbrain | Never: they upgrade the install in place, need setup's hooks, or edit `CLAUDE.md` |
+| needs-binary | benchmark, browse, canary, design-consultation, design-html, design-review, design-shotgun, devex-review, land-and-deploy, make-pdf, office-hours, open-gstack-browser, pair-agent, plan-design-review, qa, qa-only, scrape, setup-browser-cookies, ship, skillify, spec | Never: they call gstack's browser, design or PDF binaries, which pack mode does not build |
+
+```bash
+pan skills set --pack gstack on                           # every default skill, globally
+pan skills set --pack gstack on --project <key>           # one project
+pan skills set --pack gstack on --issue <id>              # one issue
+pan skills set gstack/codex on --project <key>            # an opt-in skill
+```
+
+The agent sees the skills as `gstack:<skill>`, for example `/gstack:test-audit`.
+
+#### Where gstack keeps state
+
+Each trusted commit is rendered into `~/.overdeck/packs/gstack/render/<commit>/`. gstack's state (its `config.yaml`, sessions, learnings, project reports and plans) lives in `~/.overdeck/packs/gstack/state/`, shared across commits. The render holds a marker that points gstack's scripts at that state dir, so no environment variable is needed and nothing goes to `~/.gstack`. Pack mode starts the config with `telemetry: off`, `update_check: false` and `auto_upgrade: false`. When you invoke a skill in a project, it may write `.gstack/` (temporary files and reports) in that project.
+
+#### Removing gstack
+
+```bash
+pan skills pack remove gstack
+```
+
+`remove` deletes `~/.overdeck/packs/gstack/` (renders, state, extractions and the git cache), every mount that contains gstack, the launch links that leaves dangling, and the gstack copy in every Codex agent's plugin cache. A running agent that used gstack loses its gstack skills until its next launch. `remove` does not delete the `.gstack/` or `.gstack-worktrees/` dirs that skills wrote in your projects; it prints each one it finds under a registered project, with the `rm -rf` command. `pan skills pack gc` also removes renders of commits other than the trusted one once no linked launch uses them and they are older than `--max-age-days` (using a render resets its age), and the `render/` and `state/` dirs of packs that are no longer registered once both are older than `--max-age-days`. If `config.yaml` cannot be read or parsed, gc removes nothing and exits 1, because it cannot tell which packs are registered. If removing a mount or cache fails, `remove` names it and exits 1; run it again to retry.
+
+#### Limits
+
+- The browser, design and PDF skills (the `needs-binary` class) are not available until [PAN-4730](https://github.com/eltmon/overdeck/issues/4730) adds an opt-in build of gstack's binaries.
+- Codex launches mount the same render as Claude Code. Skills that ask Claude-only questions fall back to gstack's plain-text path in Codex.
+- Pack mode does not install setup's settings hooks (question tuning, the timeline Stop hook, auto-update, the verify gate), and gstack skills cannot upgrade themselves; update through `pan skills pack update gstack`.
+- Commits of upstream `garrytan/gstack` fail the pack-mode check until pack mode is merged there; use the eltmon fork.
 
 ### Deft
 

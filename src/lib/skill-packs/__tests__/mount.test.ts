@@ -4,6 +4,7 @@
  * OVERDECK_HOME.
  */
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -38,6 +39,9 @@ import {
   linkClaudeMount,
   mountHash,
   mountsDir,
+  MOUNT_RENDER_ROOT_FILE,
+  removePackFromMounts,
+  renderRootsUsedBy,
   writeCodexPackBlock,
   type MountPack,
 } from '../mount.js';
@@ -82,6 +86,34 @@ const deft = (): MountPack => ({
   skills: [{ name: 'glossary', dir: 'content/skills/deft-directive-glossary' }],
 });
 const beta = (): MountPack => ({ id: 'beta', commit: COMMIT_B, root: rootB, skills: [{ name: 'three', dir: 'skills/three' }] });
+const COMMIT_G = 'c'.repeat(40);
+const rootGstack = join(scratch, 'gstack-render');
+mkdirSync(join(rootGstack, 'review'), { recursive: true });
+const GSTACK_REVIEW_MD = `---\nname: review\ndescription: Review.\n---\nRun ${rootGstack}/bin/gstack-skill-start --skill "review"\n`;
+writeFileSync(join(rootGstack, 'review', 'SKILL.md'), GSTACK_REVIEW_MD);
+const gstack = (): MountPack => ({
+  id: 'gstack',
+  commit: COMMIT_G,
+  root: rootGstack,
+  transform: 'gstack-runtime',
+  skills: [{ name: 'review', dir: 'review' }],
+});
+
+const COMMIT_P = 'c'.repeat(40);
+const rootP = join(scratch, 'p');
+mkdirSync(join(rootP, 'harness', 'p', 'claude-code', 'skills', 'a'), { recursive: true });
+writeFileSync(join(rootP, 'harness', 'p', 'claude-code', 'skills', 'a', 'SKILL.md'), '---\nname: a\ndescription: A.\n---\n');
+mkdirSync(join(rootP, 'harness', 'p', 'claude-code', 'docs', 'harness'), { recursive: true });
+writeFileSync(join(rootP, 'harness', 'p', 'claude-code', 'docs', 'harness', 'claude-code.md'), '# Adapter\n');
+writeFileSync(join(rootP, 'harness', 'p', 'claude-code', 'README.md'), '# p\n');
+const pWithExtras = (extras: string[] = ['docs', 'README.md']): MountPack => ({
+  id: 'p',
+  commit: COMMIT_P,
+  root: rootP,
+  pluginRoot: 'harness/p/claude-code',
+  skills: [{ name: 'a', dir: 'harness/p/claude-code/skills/a' }],
+  extras,
+});
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -170,6 +202,44 @@ describe('buildMount', () => {
     expect(mountHash({ packs: [deft()] })).not.toBe(mountHash({ packs: [plain] }));
   });
 
+  it('mounts gstack-runtime skills verbatim from the render root', async () => {
+    const mount = await buildMount({ packs: [gstack()] });
+    if (!mount) throw new Error('expected a mount');
+    expect(readFileSync(join(mount.path, 'plugins', 'gstack', 'skills', 'review', 'SKILL.md'), 'utf8')).toBe(GSTACK_REVIEW_MD);
+  });
+
+  it('records the render root in a gstack mount and touches the render on build and reuse', async () => {
+    const old = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    utimesSync(rootGstack, old, old);
+    const mount = await buildMount({ packs: [gstack(), alpha()] });
+    if (!mount) throw new Error('expected a mount');
+    expect(readFileSync(join(mount.path, 'plugins', 'gstack', MOUNT_RENDER_ROOT_FILE), 'utf8')).toBe(`${rootGstack}\n`);
+    expect(existsSync(join(mount.path, 'plugins', 'alpha', MOUNT_RENDER_ROOT_FILE))).toBe(false);
+    expect(statSync(rootGstack).mtimeMs).toBeGreaterThan(old.getTime() + 1000);
+    expect(await renderRootsUsedBy([mount.path])).toEqual(new Set([rootGstack]));
+    utimesSync(rootGstack, old, old);
+    await buildMount({ packs: [gstack(), alpha()] });
+    expect(statSync(rootGstack).mtimeMs).toBeGreaterThan(old.getTime() + 1000);
+  });
+
+  it('covers the gstack-runtime transform and its render version in the hash', async () => {
+    const { transform: _transform, ...plain } = gstack();
+    const hash = mountHash({ packs: [gstack()] });
+    expect(hash).not.toBe(mountHash({ packs: [plain] }));
+    vi.resetModules();
+    vi.doMock('../gstack.js', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('../gstack.js')>()),
+      GSTACK_RENDER_VERSION: 99,
+    }));
+    try {
+      const fresh = await import('../mount.js');
+      expect(fresh.mountHash({ packs: [gstack()] })).not.toBe(hash);
+    } finally {
+      vi.doUnmock('../gstack.js');
+      vi.resetModules();
+    }
+  });
+
   it('rejects an unknown transform', async () => {
     await expect(buildMount({ packs: [{ ...deft(), transform: 'other' as 'deft-readonly' }] })).rejects.toThrow(
       /invalid pack transform/,
@@ -179,6 +249,30 @@ describe('buildMount', () => {
   it('rejects skill dirs that escape the pack', async () => {
     await expect(buildMount({ packs: [{ ...alpha(), skills: [{ name: 'one', dir: '../beta/skills/three' }] }] })).rejects.toThrow(
       /escapes pack/,
+    );
+  });
+
+  it('copies extras from the plugin root next to skills', async () => {
+    const mount = await buildMount({ packs: [pWithExtras(['docs', 'README.md', 'missing'])] });
+    if (!mount) throw new Error('expected a mount');
+    expect(readFileSync(join(mount.path, 'plugins', 'p', 'docs', 'harness', 'claude-code.md'), 'utf8')).toBe('# Adapter\n');
+    expect(readFileSync(join(mount.path, 'plugins', 'p', 'README.md'), 'utf8')).toBe('# p\n');
+    expect(existsSync(join(mount.path, 'plugins', 'p', 'missing'))).toBe(false);
+    expect(existsSync(join(mount.path, 'plugins', 'p', 'skills', 'a', 'SKILL.md'))).toBe(true);
+  });
+
+  it('covers extras in the hash and leaves extra-free hashes unchanged', () => {
+    const withExtras = pWithExtras(['docs']);
+    const { extras: _extras, ...noExtrasField } = withExtras;
+    expect(mountHash({ packs: [withExtras] })).not.toBe(mountHash({ packs: [noExtrasField] }));
+    expect(mountHash({ packs: [pWithExtras([])] })).toBe(mountHash({ packs: [noExtrasField] }));
+  });
+
+  it('rejects extras that escape or collide', async () => {
+    await expect(buildMount({ packs: [pWithExtras(['../x'])] })).rejects.toThrow(/escapes pack/);
+    await expect(buildMount({ packs: [pWithExtras(['skills'])] })).rejects.toThrow(/collides with generated content/);
+    await expect(buildMount({ packs: [pWithExtras(['.claude-plugin/plugin.json'])] })).rejects.toThrow(
+      /collides with generated content/,
     );
   });
 });
@@ -309,6 +403,7 @@ describe('gcMounts', () => {
 
     const result = await gcMounts({ maxAgeMs: 7 * DAY, now });
     expect(result.removedLinks).toEqual([danglingLink]);
+    expect(result.referencedMounts).toEqual([referenced.path]);
     expect(result.removedMounts.sort()).toEqual([oldUnused.path, staleTmp].sort());
     expect(existsSync(referenced.path)).toBe(true);
     expect(existsSync(freshUnused.path)).toBe(true);
@@ -324,5 +419,62 @@ describe('gcMounts', () => {
     const result = await gcMounts({ maxAgeMs: 7 * DAY, now: Date.now() });
     expect(result.removedMounts).toEqual([]);
     expect(existsSync(mount.path)).toBe(true);
+  });
+});
+
+describe('removePackFromMounts (PAN-4727)', () => {
+  const launchRoot = join(overdeckHome, 'launch');
+  const agentsRoot = join(overdeckHome, 'agents');
+
+  beforeEach(() => {
+    rmSync(launchRoot, { recursive: true, force: true });
+    rmSync(agentsRoot, { recursive: true, force: true });
+  });
+
+  it('removes mounts holding the pack, the links they leave dangling and its Codex caches', async () => {
+    const withGstack = await buildMount({ packs: [gstack(), alpha()] });
+    const without = await buildMount({ packs: [alpha()] });
+    if (!withGstack || !without) throw new Error('expected mounts');
+    const gstackLink = join(launchRoot, 'a1', 'skill-packs');
+    const alphaLink = join(launchRoot, 'a2', 'skill-packs');
+    await linkClaudeMount(gstackLink, withGstack);
+    await linkClaudeMount(alphaLink, without);
+    const cache = (agent: string, home: string, id: string) =>
+      join(agentsRoot, agent, home, 'plugins', 'cache', CODEX_PACK_MARKETPLACE, id);
+    for (const dir of [cache('x', 'codex-home-v2', 'gstack'), cache('x', 'codex-home-v2', 'alpha'), cache('y', 'codex-home', 'gstack')]) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const result = await removePackFromMounts('gstack');
+    expect(result.removedMounts).toEqual([withGstack.path]);
+    expect(result.removedLinks).toEqual([gstackLink]);
+    expect(result.removedCodexCaches.sort()).toEqual([cache('x', 'codex-home-v2', 'gstack'), cache('y', 'codex-home', 'gstack')].sort());
+    expect(existsSync(withGstack.path)).toBe(false);
+    expect(existsSync(without.path)).toBe(true);
+    expect(() => lstatSync(gstackLink)).toThrow();
+    expect(readlinkSync(alphaLink)).toBe(join(without.path, 'plugins'));
+    expect(existsSync(cache('x', 'codex-home-v2', 'alpha'))).toBe(true);
+  });
+
+  it('keeps sweeping after a mount it cannot remove and reports the failure', async () => {
+    const stuck = await buildMount({ packs: [gstack()] });
+    if (!stuck) throw new Error('expected a mount');
+    const cache = join(agentsRoot, 'x', 'codex-home', 'plugins', 'cache', CODEX_PACK_MARKETPLACE, 'gstack');
+    mkdirSync(cache, { recursive: true });
+    chmodSync(mountsDir(), 0o555);
+    try {
+      const result = await removePackFromMounts('gstack');
+      expect(result.removedMounts).toEqual([]);
+      expect(result.failures).toHaveLength(1);
+      expect(result.failures[0]).toContain(stuck.path);
+      expect(result.removedCodexCaches).toEqual([cache]);
+    } finally {
+      chmodSync(mountsDir(), 0o755);
+    }
+    expect(existsSync(stuck.path)).toBe(true);
+  });
+
+  it('rejects an invalid pack id', async () => {
+    await expect(removePackFromMounts('../x')).rejects.toThrow(/invalid pack id/);
   });
 });
