@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T07:10:32.392Z",
+  "updated": "2026-11-01T07:10:40.615Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
       "claimedBy": "agent-pan-4649",
       "claimedAt": "2026-11-01T07:03:59.064Z",
       "doneAt": "2026-11-01T07:10:32.391Z"
+    },
+    "access-tokens-panel": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T07:10:40.615Z"
     }
   }
 }
