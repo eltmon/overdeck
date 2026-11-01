@@ -67,6 +67,7 @@ import { pairingRouteLayer } from './routes/pairing.js'
 import { anywhereRouteLayer } from './routes/anywhere.js'
 import { machinesRouteLayer } from './routes/machines.js'
 import { machinesPeerRouteLayer } from './routes/machines-peer.js'
+import { directoryRouteLayer } from './routes/directory.js'
 import { pushRouteLayer } from './routes/push.js'
 import { tailscaleRouteLayer } from './routes/tailscale.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
@@ -400,6 +401,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   anywhereRouteLayer,
   machinesRouteLayer,
   machinesPeerRouteLayer,
+  directoryRouteLayer,
   pushRouteLayer,
   tailscaleRouteLayer,
   accessTokensRouteLayer,

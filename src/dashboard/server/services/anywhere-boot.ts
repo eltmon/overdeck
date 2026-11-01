@@ -8,18 +8,22 @@
  * notification) and into the link client. `main.ts` calls `startAnywhere` once
  * after the dashboard listens; `stopAnywhere` closes every channel.
  */
+import { readAccount } from '../../../lib/account/store.js';
+import { readDirectoryUrl } from '../../../lib/anywhere/directory-config.js';
 import { defaultDiscoverDeps, EndpointAdvertiser, setAdvertisedEndpointsSource } from '../../../lib/anywhere/endpoints.js';
 import { setLinkRouteSource, linkFetch, closeLinkAgent } from '../../../lib/anywhere/link-client.js';
-import { MACHINE_LINKS_REFRESH_MS, startLinkStoreRefresh, stopLinkStoreRefresh } from '../../../lib/anywhere/link-store.js';
+import { linksSnapshot, MACHINE_LINKS_REFRESH_MS, startLinkStoreRefresh, stopLinkStoreRefresh } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey } from '../../../lib/anywhere/machine-key.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { setLinkStatusSource, setPeerUnlinkNotifier } from '../routes/machines.js';
 import { getOverdeckVersion } from '../routes/misc/shared.js';
+import { DirectoryClient, defaultOpenSocket, setDirectoryClient } from './directory-client.js';
 import { setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
 
 let supervisor: LinkSupervisor | null = null;
 let advertiser: EndpointAdvertiser | null = null;
+let directory: DirectoryClient | null = null;
 let reconcileTimer: NodeJS.Timeout | null = null;
 
 /** The port this dashboard listens on, by the same rule as ServerConfig. */
@@ -44,7 +48,24 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   setHeartbeatEndpointsHashSource(() => advertiser?.hash() ?? '');
   await advertiser.start();
 
-  supervisor = new LinkSupervisor(defaultLinkSupervisorDeps(await getOverdeckVersion()));
+  // WI-9: the overdeck.ai directory socket; a signed-out machine opens none (FR-2356-2).
+  const serverVersion = await getOverdeckVersion();
+  directory = new DirectoryClient({
+    readAccount,
+    readDirectoryUrl,
+    identity: ensureEnvironmentIdentity,
+    machineKey: ensureMachineKey,
+    endpoints: () => advertiser?.current() ?? [],
+    endpointsHash: () => advertiser?.hash() ?? '',
+    serverVersion,
+    linkedEnvironmentIds: () => new Set(linksSnapshot().filter((l) => l.revokedAt === null).map((l) => l.environmentId)),
+    openSocket: defaultOpenSocket,
+    random: Math.random,
+  });
+  setDirectoryClient(directory);
+  await directory.start();
+
+  supervisor = new LinkSupervisor(defaultLinkSupervisorDeps(serverVersion));
   supervisor.start();
   setLinkStatusSource(supervisor);
   setLinkRouteSource(supervisor);
@@ -67,6 +88,9 @@ export function stopAnywhere(): void {
   reconcileTimer = null;
   supervisor?.stop();
   supervisor = null;
+  directory?.stop();
+  directory = null;
+  setDirectoryClient(null);
   advertiser?.stop();
   advertiser = null;
   setAdvertisedEndpointsSource(null);
