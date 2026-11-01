@@ -1,14 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T12:25:42Z · model: claude-opus-5-5 · open: 862_
+_Last sequenced: 2026-11-01T12:26:22Z · model: claude-opus-5-5 · open: 860_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
-| 4 | PAN-4663 | XS | critical | ok |  |  | In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts |
-| 5 | PAN-4670 | S | high | ok |  |  | In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs. |
 | 6 | PAN-4714 | S | medium | ok |  |  | In pipeline: an issue link in a conversation opens the issue drawer, not a GitHub tab; modifier clicks keep the tracker link. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
@@ -878,14 +876,6 @@ New substrate bug in the merge door: on 2026-11-01 it refused three approved, gr
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
-### PAN-4663 (rank 4)
-
-New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.
-
-### PAN-4670 (rank 5)
-
-New in-pipeline substrate bug (live workspace) with a decided two-part fix and clear tests, so it is pinned with the other in-pipeline items at the top; ranks 5-9 shift down one into the former gap at 10.
-
 ### PAN-4714 (rank 6)
 
 New in-pipeline issue with a live workspace, so it is pinned near the top in the slot freed by the closed PAN-4672. It is a small, well-specified frontend change with clear component-test acceptance criteria.
@@ -1190,6 +1180,14 @@ New this pass. The test role evaluates the workspace working tree rather than th
 
 Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
 
+### PAN-3096 (rank 82)
+
+New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
+
+### PAN-3084 (rank 83)
+
+Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1197,10 +1195,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T12:25:42Z",
+  "generatedAt": "2026-11-01T12:26:22Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 862,
+  "openCount": 860,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -1212,32 +1210,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "dependsOn": [],
       "why": "Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently.",
       "rationale": "New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4663",
-      "rank": 4,
-      "size": "XS",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts",
-      "rationale": "New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4670",
-      "rank": 5,
-      "size": "S",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs.",
-      "rationale": "New in-pipeline substrate bug (live workspace) with a decided two-part fix and clear tests, so it is pinned with the other in-pipeline items at the top; ranks 5-9 shift down one into the former gap at 10.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13341,20 +13313,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4663",
-      "to": "PAN-4645",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4663",
-      "to": "PAN-4295",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
     },
     {
       "from": "PAN-4666",
