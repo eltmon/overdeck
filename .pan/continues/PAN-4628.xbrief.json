@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4628",
   "created": "2026-11-01T05:04:21.139Z",
-  "updated": "2026-11-01T05:49:53.903Z",
+  "updated": "2026-11-01T05:50:53.157Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-01T05:49:47.476Z"
     },
     "docs-token-contract": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4628",
-      "claimedAt": "2026-11-01T05:49:53.903Z"
+      "claimedAt": "2026-11-01T05:49:53.903Z",
+      "doneAt": "2026-11-01T05:50:53.156Z"
     }
   }
 }
