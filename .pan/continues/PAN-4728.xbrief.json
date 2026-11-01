@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4728",
   "created": "2026-11-01T17:45:22.507Z",
-  "updated": "2026-11-01T18:05:25.806Z",
+  "updated": "2026-11-01T18:15:48.345Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-01T18:05:13.115Z"
     },
     "sources-plugin-root": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4728",
-      "claimedAt": "2026-11-01T18:05:25.806Z"
+      "claimedAt": "2026-11-01T18:05:25.806Z",
+      "doneAt": "2026-11-01T18:15:48.345Z"
     }
   }
 }
