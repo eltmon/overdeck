@@ -17,12 +17,14 @@ import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js'
 import { setLinkStatusSource, setPeerUnlinkNotifier } from '../routes/machines.js';
 import { getOverdeckVersion } from '../routes/misc/shared.js';
 import { setHeartbeatConversationsHashSource, setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
+import { startTransferSweep } from './conversation-release-service.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
 import { createLinkedConversationsSync } from './linked-conversations-sync.js';
 
 let supervisor: LinkSupervisor | null = null;
 let advertiser: EndpointAdvertiser | null = null;
 let reconcileTimer: NodeJS.Timeout | null = null;
+let stopTransferSweep: (() => void) | null = null;
 
 /** The port this dashboard listens on, by the same rule as ServerConfig. */
 function dashboardPort(): number {
@@ -72,11 +74,15 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
     linkedConversations.prune(linksSnapshot().filter((link) => link.revokedAt === null).map((link) => link.environmentId));
   }, MACHINE_LINKS_REFRESH_MS);
   reconcileTimer.unref?.();
+  // PAN-4650 WI-9: Pull here transfer directories live at most 15 minutes.
+  stopTransferSweep = startTransferSweep();
 }
 
 export function stopAnywhere(): void {
   if (reconcileTimer) clearInterval(reconcileTimer);
   reconcileTimer = null;
+  stopTransferSweep?.();
+  stopTransferSweep = null;
   supervisor?.stop();
   supervisor = null;
   advertiser?.stop();

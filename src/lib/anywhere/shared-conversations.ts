@@ -61,7 +61,7 @@ const defaultDeps: SharedConversationsDeps = {
   listProjects: listProjectsAsync,
   environmentId: async () => (await ensureEnvironmentIdentity()).environmentId,
   vaultLookup: () => loadVaultContinuityLookup(),
-  now: Date.now,
+  now: () => Date.now(),
 };
 
 /** First 16 hex of SHA-256 over the rows sorted by name. */
