@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-1254",
+  "created": "2026-11-01T05:46:21.371Z",
+  "updated": "2026-11-01T05:46:21.371Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "ts-cli-state": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1254",
+      "claimedAt": "2026-11-01T05:46:21.371Z"
+    }
+  }
+}
