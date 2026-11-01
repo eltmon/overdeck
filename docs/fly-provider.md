@@ -156,6 +156,8 @@ Every Fly Machine runs the `pan-workspace` image defined in
 - Node.js 22
 - pnpm
 - Claude Code CLI (`@anthropic-ai/claude-code`)
+- Codex CLI (`@openai/codex`). Provisioning a Fly machine reinstalls home's exact Codex
+  version when the VM's differs (PAN-4296).
 - Overdeck (`@overdeck/core`, so `pan` runs on the VM), pinned by the
   `OVERDECK_VERSION` build argument (default `latest`)
 - Docker (`docker.io` and `iptables`), started by Fly machine provisioning, not by
@@ -208,7 +210,7 @@ this page) runs Claude Code in raw tmux and no Overdeck server. Start one with
 | | Remote work agent VM | Fly machine |
 |---|---|---|
 | Started by | `pan start --remote` | `pan machines add-fly`, `POST /api/machines/fly` |
-| Runs | Claude Code in tmux | `pan serve`, then Claude Code conversations through it |
+| Runs | Claude Code in tmux | `pan serve`, then Claude Code or Codex conversations through it |
 | Reached by | Machines exec API | a secure channel over `wss://<app>.fly.dev/ws/link` |
 | State on home | `agents/agent-<issue>/remote-state.json` | `fly-machines.json` plus a machine link |
 | Removed by | the reap, after hand-off | unlink, the idle sweep, the stopped-machine sweep (always destroyed) |
@@ -317,6 +319,17 @@ GitLab projects are not supported on Fly: without an SSH key, a GitLab clone nee
 
 Overdeck never copies `~/.ssh/*` or `~/.overdeck/ssh/*` to a VM.
 
+Fly machines (`pan machines add-fly`) also get the Codex sign-in when home has the Codex
+CLI and a valid sign-in (PAN-4296):
+
+| Credential | Local source | Remote destination |
+|---|---|---|
+| Codex sign-in | `~/.codex/auth.json` | `$HOME/.codex/auth.json` in the VM's exec shell (`/.codex/auth.json`, because `HOME=/` there), mode 0600 |
+
+OpenAI replaces the refresh token on every refresh, so two copies of one sign-in cannot
+both stay valid. The Codex sign-in is therefore not copied one way like Claude's: the
+`syncFlyCodexAuth` loop (below) keeps home and each VM in step by newest refresh wins.
+
 Claude Code is also configured for autonomous operation: `~/.claude/settings.json` is
 written from your resolved Overdeck permission mode and onboarding is marked complete
 in `~/.claude.json`.
@@ -340,13 +353,14 @@ loops (PAN-4295). With no active remote agent, none of them calls the Fly API.
 | Credential refresh | checked every 60 s | Copies host Claude credentials to each active VM when the host credentials file changes, or every 15 min at most. A failed copy is retried on the next check. | keeps running |
 | Reap | every 60 s deacon-lite tick | On `REMOTE_DONE`, materializes `workspaces/feature-<id>`, opens the PR, destroys the machine and requests review. On a crash (no session, no sentinel, or a stopped machine), salvages unpushed work, stops the machine and marks the agent `error`. An unreachable Fly API or a failed exec leaves the agent alone until the next tick. `starting` agents are skipped. | skipped |
 
-Fly machines (PAN-4652, `## Fly machines (linked)` above) have two more loops of their
+Fly machines (PAN-4652, `## Fly machines (linked)` above) have three more loops of their
 own in `src/lib/remote/fly-machine-loops.ts`, and the credential refresh covers them too.
-With no Fly machine record, neither calls the Fly API.
+With no Fly machine record, none calls the Fly API.
 
 | Loop | Cadence | What it does | Deacon frozen |
 |---|---|---|---|
 | `heartbeatFlyMachines` | every 60 s | Writes `/workspace/.pan/host-heartbeat` on every Fly machine, so its watchdog keeps it running while home is up. A failed exec is reported as a failure, never as refreshed. | keeps running |
+| `syncFlyCodexAuth` | every 60 s | For each linked Fly machine whose record has a `codexAuthPath`, reads the VM's Codex `auth.json` and decides by newest refresh wins: copies a newer same-account VM refresh home (atomic write), otherwise copies home's sign-in to the VM when the two differ. A VM that does not answer is skipped until the next tick. With no such record it makes no Fly API call. | keeps running |
 | `sweepFlyMachines` | every 60 s | Destroys the machine, removes its link and deletes its record when the Fly API reports it `stopped`, `destroyed` or `failed` or answers 404; when no unreleased linked conversation on it has been active for `[remote.fly] machine_idle_minutes` (default 30, 0 disables); or when provisioning never linked it within 30 min. Any other API error leaves it alone. | keeps running |
 
 The heartbeat and credential refresh run in `src/lib/cloister/hygiene-scheduler.ts`;
@@ -536,3 +550,36 @@ Recorded, not fixed here:
 - A test that pulls a conversation must not register the workspace being tested as the
   project's checkout: **Pull here** restores the conversation's code into that checkout.
 
+
+## Live verification (PAN-4296)
+
+Codex on Fly machines was tested live on 2026-11-01, before merge, against app
+`pan-workspaces` (region `iad`), with this branch's own build: a test home dashboard from
+the branch's `dist/` (peer mode, `OVERDECK_DISABLE_DEACON=1` plus
+`OVERDECK_ANYWHERE_SUPERVISOR=1`, its own `OVERDECK_HOME`, port 3942) and a test image
+`registry.fly.io/pan-workspaces:pan-4296` (the `pan-workspace` image of this branch, which
+installs `@openai/codex`, plus the branch's packed `@overdeck/core` 0.72.0). Home ran
+`codex-cli 0.159.0` with a valid ChatGPT sign-in. Because the test home ran no deacon, a
+script called this branch's `heartbeatFlyMachines()` and `syncFlyCodexAuth()` every 60 s.
+
+**Run 1, machine `84eee59fe096e8`** (22:32 to 22:55 UTC): provisioning succeeded (the
+record had `codexAuthPath: "/.codex/auth.json"`), and the heartbeat and the Codex sync ran
+from 22:33 to 22:36. At 22:37 every Fly API call from the test home started to answer 403:
+the client read flyctl's stored token from `~/.fly/config.yml`, which had expired, and
+flyctl refreshes it only when it runs. The clone poll then timed out (`project-failed`
+after 20 min) and the rollback could not destroy the VM, which was destroyed by hand with
+`fly machines destroy`. Filed as [#4748](https://github.com/eltmon/overdeck/issues/4748).
+Run 2 set `FLY_API_TOKEN` to a 3-hour deploy token scoped to the app (revoked afterwards).
+
+**Run 2, machine `8576656cd2d548`** (`add-fly --project overdeck --harness codex --model
+gpt-6.1-sol --message "List the top-level files and stop."`): 22:57:08 to 23:04:03 UTC
+(6 min 55 s, clone included).
+
+| Check | Result |
+|---|---|
+| Codex prepared (D-2, D-4, D-6) | The image shipped `codex-cli 0.166.0`; provisioning re-pinned the VM to `0.159.0`. `/.codex/auth.json` existed with mode 600 and home's size; the record had `codexAuthPath: "/.codex/auth.json"` and `docker: true`. The conversation's managed `codex-home-v2/auth.json` was a symlink to `/.codex/auth.json`. |
+| O1: conversation streams home | The test home listed `@<env>/20261101-7040` with harness `codex`, model `gpt-6.1-sol`, machine `fly-8576656cd2d548` (online), and the conversation page showed the `fly-8576656cd2d548` chip, the Codex composer and the streamed file listing (Playwright screenshot, isolated browser). The first message was delivered; no retry was needed. |
+| O2: shell command (D-12) | Codex ran its `exec` tool in `/workspace/overdeck` with `sandbox_mode = "workspace-write"`; the command exited 0 and listed the top-level files. The rollout had no Landlock, seccomp or "operation not permitted" error, so the D-12 `full-access` fallback is not needed. |
+| Codex sign-in sync (D-3) | Every tick printed no action: home and VM held the same sign-in (identical SHA-256 before and after), so nothing was pushed or pulled. Home's `~/.codex/auth.json` was never rewritten. |
+| O4: Pull here | The first pull failed at `adopt` (`wip-failed`): the test home's checkout was an empty git repository without the snapshot's base commits, a test-setup artifact. With the checkout replaced by a shared clone of the repository, the second pull finished `done` (online mode) as `20261101-aa9b`, a home Codex conversation on `gpt-6.1-sol`; the VM copy read `ended`. |
+| O3: unlink | `pan machines unlink fly-8576656cd2d548` destroyed the machine in 5 s, emptied `fly-machines.json`, and left `fly machines list -a pan-workspaces` empty. |

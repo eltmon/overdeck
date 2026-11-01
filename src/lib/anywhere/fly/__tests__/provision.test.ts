@@ -74,6 +74,7 @@ function harness(respond: Responder = () => undefined): Harness {
       newId: () => ENV_ID,
       machineSuffix: () => '1a2b3c4d',
       log: () => undefined,
+      homeCodex: async () => null,
     },
   };
 }
@@ -103,6 +104,7 @@ describe('provisionFlyMachine (PAN-4652 WI-7)', () => {
       docker: true,
       pairingCode: PAIRING,
       routeUrl: `wss://overdeck-ws.fly.dev/ws/link?fly-instance=${MACHINE_ID}`,
+      codexAuthPath: null,
     });
     expect(h.createConfig().services).toEqual([{ protocol: 'tcp', internal_port: 3011, ports: [{ port: 443, handlers: ['tls', 'http'] }] }]);
     expect(h.createConfig().memory).toBeGreaterThanOrEqual(2048);
@@ -262,6 +264,119 @@ describe('onCreated hook (review of PR #4742)', () => {
   it('destroys the VM when the hook fails', async () => {
     const h = harness();
     await expect(provisionFlyMachine({}, h.deps, { onCreated: async () => { throw new Error('disk full'); } })).rejects.toThrow('disk full');
+    expect(h.destroyMachine).toHaveBeenCalledWith('overdeck-ws', MACHINE_ID);
+  });
+});
+
+describe('Codex on a Fly machine (PAN-4296 WI-4)', () => {
+  const CODEX_VERSION = '0.166.0';
+  const AUTH = JSON.stringify({ tokens: { access_token: 'a', id_token: 'i', refresh_token: 'r', account_id: 'acct-1' }, last_refresh: '2026-11-01T10:00:00.000Z' });
+  const homeCodex = async () => ({ binary: '/usr/bin/codex', version: CODEX_VERSION, authRaw: AUTH });
+  const codexVm = (vmVersion = CODEX_VERSION): Responder => (command) => {
+    if (command === 'printf %s "$HOME/.codex"') return { stdout: '//.codex' };
+    if (command === 'codex --version') return { stdout: `codex-cli ${vmVersion}\n` };
+    return undefined;
+  };
+  const isPush = (command: string) => command.includes('base64 -d');
+
+  it('probes $HOME/.codex, pushes the sign-in there and returns its path', async () => {
+    const h = harness(codexVm());
+    h.deps.homeCodex = homeCodex;
+    const result = await provisionFlyMachine({ harness: 'codex' }, h.deps);
+
+    expect(result.codexAuthPath).toBe('/.codex/auth.json');
+    const probe = h.execs.indexOf('printf %s "$HOME/.codex"');
+    const push = h.execs.findIndex(isPush);
+    expect(probe).toBeGreaterThanOrEqual(0);
+    expect(push).toBeGreaterThan(probe);
+    expect(h.execs[push]).toContain(`printf %s '${Buffer.from(AUTH).toString('base64')}' | base64 -d > '/.codex/auth.json.tmp'`);
+    expect(h.execs[push]).toContain("mv -f '/.codex/auth.json.tmp' '/.codex/auth.json'");
+    expect(h.events.indexOf('configureClaudeCode')).toBeLessThan(h.events.indexOf(`exec:${h.execs[push]}`));
+    expect(h.execs.some((command) => command.includes('@openai/codex@'))).toBe(false);
+  });
+
+  it('succeeds for a Codex machine when the Claude credentials did not reach it', async () => {
+    const h = harness(codexVm());
+    const log = vi.fn();
+    h.deps.homeCodex = homeCodex;
+    h.deps.log = log;
+    h.deps.syncAllCredentials = vi.fn(async () => ({ claude: false, github: true }));
+    await expect(provisionFlyMachine({ harness: 'codex' }, h.deps)).resolves.toMatchObject({ codexAuthPath: '/.codex/auth.json' });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Could not copy Claude Code credentials'));
+    expect(h.destroyMachine).not.toHaveBeenCalled();
+  });
+
+  it('skips Codex for a Claude Code machine when home has no Codex', async () => {
+    const h = harness(codexVm());
+    await expect(provisionFlyMachine({}, h.deps)).resolves.toMatchObject({ codexAuthPath: null, pairingCode: PAIRING });
+    expect(h.execs.some((command) => command.includes('.codex') || command.startsWith('codex'))).toBe(false);
+  });
+
+  it('fails a Codex machine with credentials-failed and destroys it when home has no Codex', async () => {
+    const h = harness(codexVm());
+    await expect(provisionFlyMachine({ harness: 'codex' }, h.deps)).rejects.toMatchObject({ code: 'credentials-failed' });
+    expect(h.execs.some((command) => command.includes('pan serve'))).toBe(false);
+    expect(h.destroyMachine).toHaveBeenCalledWith('overdeck-ws', MACHINE_ID);
+  });
+
+  it('installs home\'s Codex on a mismatch and fails a Codex machine when it still differs', async () => {
+    const h = harness((command) => {
+      if (command === 'cat /tmp/codex-install.exit') return { stdout: '1\n' };
+      return codexVm('0.150.0')(command);
+    });
+    h.deps.homeCodex = homeCodex;
+    const settled = provisionFlyMachine({ harness: 'codex' }, h.deps).catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(0);
+    const error = await settled;
+
+    expect(error).toBeInstanceOf(FlyMachineError);
+    expect(error).toMatchObject({ code: 'version-mismatch', detail: { home: CODEX_VERSION, vm: '0.150.0' } });
+    const install = h.execs.find((command) => command.includes('@openai/codex@'))!;
+    expect(install).toContain(`@openai/codex@${CODEX_VERSION}`);
+    expect(install.startsWith('rm -f /tmp/codex-install.exit && setsid nohup sh -c')).toBe(true);
+    expect(h.execs.filter((command) => command === 'codex --version')).toHaveLength(2);
+    expect(h.execs.some(isPush)).toBe(false);
+    expect(h.destroyMachine).toHaveBeenCalledWith('overdeck-ws', MACHINE_ID);
+  });
+
+  it('polls the detached install until it finishes, then pushes', async () => {
+    let installed = false;
+    const h = harness((command) => {
+      if (command.includes('@openai/codex@')) return undefined;
+      if (command === 'cat /tmp/codex-install.exit') {
+        installed = true;
+        return { stdout: '0\n' };
+      }
+      return codexVm(installed ? CODEX_VERSION : '0.150.0')(command);
+    });
+    h.deps.homeCodex = homeCodex;
+    await expect(provisionFlyMachine({ harness: 'codex' }, h.deps)).resolves.toMatchObject({ codexAuthPath: '/.codex/auth.json' });
+    expect(h.execs.some(isPush)).toBe(true);
+  });
+
+  it('keeps a Claude Code machine with codexAuthPath: null when the Codex version still differs', async () => {
+    const h = harness((command) => {
+      if (command === 'cat /tmp/codex-install.exit') return { stdout: '1\n' };
+      return codexVm('0.150.0')(command);
+    });
+    const log = vi.fn();
+    h.deps.homeCodex = homeCodex;
+    h.deps.log = log;
+    const pending = provisionFlyMachine({}, h.deps);
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(pending).resolves.toMatchObject({ codexAuthPath: null, pairingCode: PAIRING });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('@openai/codex@0.166.0 did not fix it'));
+    expect(h.execs.some(isPush)).toBe(false);
+    expect(h.destroyMachine).not.toHaveBeenCalled();
+  });
+
+  it('fails a Codex machine with credentials-failed when the push fails, naming no sign-in content', async () => {
+    const h = harness((command) => (isPush(command) ? { exit_code: 1, stderr: AUTH } : codexVm()(command)));
+    h.deps.homeCodex = homeCodex;
+    const error = await provisionFlyMachine({ harness: 'codex' }, h.deps).catch((caught: unknown) => caught as FlyMachineError);
+    expect(error).toMatchObject({ code: 'credentials-failed' });
+    expect(error.message).toContain('/.codex/auth.json');
+    expect(error.message).not.toContain('acct-1');
     expect(h.destroyMachine).toHaveBeenCalledWith('overdeck-ws', MACHINE_ID);
   });
 });

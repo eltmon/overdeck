@@ -41,6 +41,7 @@ function record(overrides: Partial<FlyMachineRecord> = {}): FlyMachineRecord {
     label: 'fly-148e21ea7e1689',
     projectKey: 'overdeck',
     docker: true,
+    codexAuthPath: null,
     createdAt: '2026-11-01T00:00:00.000Z',
     ...overrides,
   };
@@ -124,6 +125,28 @@ describe('Fly machine store (PAN-4652 WI-6)', () => {
   it('keeps every record when upserts run concurrently', async () => {
     await Promise.all(['a', 'b', 'c'].map((id) => store.upsertFlyMachine(record({ id, machineId: id, label: `fly-${id}` }))));
     expect((await store.listFlyMachines()).map((entry) => entry.id).sort()).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('codexAuthPath (PAN-4296 WI-2)', () => {
+  it('reads a PAN-4652 record without the field as codexAuthPath: null', async () => {
+    const { codexAuthPath: _omitted, ...legacy } = record();
+    await writeFile(join(home, 'fly-machines.json'), JSON.stringify({ v: 1, machines: [legacy] }), 'utf8');
+    expect(await store.listFlyMachines()).toEqual([record({ codexAuthPath: null })]);
+    expect(store.countFlyMachines()).toBe(1);
+    expect(await store.updateFlyMachine('rec-1', { docker: false })).toEqual(record({ docker: false, codexAuthPath: null }));
+  });
+
+  it('round-trips a record with a Codex auth path', async () => {
+    await store.upsertFlyMachine(record({ codexAuthPath: '/.codex/auth.json' }));
+    expect(await store.listFlyMachines()).toEqual([record({ codexAuthPath: '/.codex/auth.json' })]);
+    expect(await store.updateFlyMachine('rec-1', { codexAuthPath: null })).toEqual(record());
+  });
+
+  it('throws "unexpected shape" for a non-text codexAuthPath', async () => {
+    const path = join(home, 'fly-machines.json');
+    await writeFile(path, JSON.stringify({ v: 1, machines: [{ ...record(), codexAuthPath: 7 }] }), 'utf8');
+    await expect(store.listFlyMachines()).rejects.toThrow('unexpected shape');
   });
 });
 

@@ -1,0 +1,816 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T21:45:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4296: Fly remote: run Codex/GPT agents on remote workspaces",
+    "updated": "2026-11-01T21:43:37.932Z"
+  },
+  "plan": {
+    "id": "pan-4296",
+    "title": "Fly remote: run Codex/GPT agents on remote workspaces",
+    "status": "running",
+    "uid": "2a0a58d6-ee59-480c-bd0a-be3d74adfcaf",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T21:45:00Z",
+    "updated": "2026-11-01T21:43:37.932Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4296",
+        "label": "PAN-4296",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4652",
+        "label": "PAN-4652",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "fly",
+      "codex",
+      "credentials"
+    ],
+    "metadata": {
+      "sizeJustification": "W-FLY3's Done-when (a Codex conversation runs on a Fly VM) needs the image, provisioning, the service door, the CLI flag and the sign-in sync together; none is observable alone, and the sync is required for correctness because a copied Codex sign-in otherwise burns home's login. The surface is 20 exact files; the subsystem count is inflated because each top-level doc file (configuration/, cli/, docs/) and docker/ counts as its own subsystem. Work agents on Fly are already split to PAN-4734.",
+      "canonicalFilename": "2026-11-01-PAN-4296-fly-remote-run-codex-gpt-agents-on-remote-workspaces.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "After PAN-4652 a Fly machine runs only Claude Code conversations: refuseEarly rejects codex (CODEX_CAPABILITIES.runsOnFlyMachine is false), startFlyConversation hard-codes harness claude-code, the image has no Codex CLI, nothing copies or refreshes the Codex sign-in, Claude credentials are mandatory, a codex request without a model silently becomes Claude Code, and the CLI has no --harness. A naive home-to-VM copy of ~/.codex/auth.json would fork OpenAI's rotating refresh-token family and burn whichever side refreshes second.",
+      "Proposal": "Install the Codex CLI in the image; at provisioning pin the VM's Codex to home's version and push home's native sign-in to $HOME/.codex/auth.json (prepared on every machine when home can, fatal only for --harness codex); record codexAuthPath; accept harness codex in addFlyMachine with home-side checks (model required, openai provider, harness policy with home's Codex version, valid home sign-in) and pass the harness to the VM; add --harness to the CLI; add a 60 s deacon loop that syncs the sign-in both ways with newest-refresh-wins; document it; verify live with operator consent.",
+      "NonGoals": "- CLIProxy on the VM or tunnelled to home (Codex conversations call OpenAI directly)\n- GPT models through the claude-code harness on Fly, and any new provider check for claude-code requests\n- Other non-Claude harnesses on Fly (ohmypi, acp, kimi-code, opencode, muse) — runsOnFlyMachine stays false\n- Codex for pan start --remote work agents and Codex rollout forensics/salvage (PAN-4734)\n- The Machine field / --machine fly on pan start, worker run, lane start (#4651, #4638)\n- Codex rules/ and user skills on the VM\n- Fixing #4738, #4739, #4740, #4741 or the default image name #4682\n- Changing the Claude credential refresh loop, fly-provider.ts or remote-agents.ts\n- A dashboard UI for adding Fly machines\n- A default model for Codex conversations"
+    },
+    "autoDecisions": [
+      {
+        "summary": "No CLIProxy work: Codex conversations call OpenAI directly with the Codex CLI sign-in",
+        "rationale": "Codex launch code has no model_provider/base_url/8317; only the claude-code harness uses CLIProxy for GPT, so the issue body's provider-routing question has no work in it (PRD D-1)."
+      },
+      {
+        "summary": "Prepare Codex on every Fly machine when home has the Codex CLI and a valid sign-in; fatal only for --harness codex",
+        "rationale": "A Claude-first machine can then take a Codex conversation later (Pull here, #4651) without re-provisioning; the extra cost is one npm install only when versions differ (D-2)."
+      },
+      {
+        "summary": "Sync the Codex sign-in both ways, newest last_refresh wins, every 60 s",
+        "rationale": "The repo already treats a forked refresh-token family as a bug (PAN-2285); a home-wins push would re-burn a VM that refreshed and a VM refresh would silently sign home out (D-3)."
+      },
+      {
+        "summary": "A Codex conversation needs an explicit model; refuse without one",
+        "rationale": "resolveAllowedHarness turns a model-less request into Claude Code, and the repo forbids hardcoded model fallbacks (D-5)."
+      },
+      {
+        "summary": "Check provider, harness policy and home sign-in at home before creating any VM",
+        "rationale": "Refusing after provisioning wastes minutes and Fly money; home's Codex version predicts the VM's because the VM is pinned to it (D-5)."
+      },
+      {
+        "summary": "No claude-code provider check is added",
+        "rationale": "It would change PAN-4652 behavior outside this issue's scope (FR-4 retired)."
+      },
+      {
+        "summary": "Codex sandbox on Fly is settled by the live checkpoint with a full-access fallback",
+        "rationale": "workspace-write uses Landlock, unverified as root in a Firecracker VM; the VM is a disposable sandbox like IS_SANDBOX=1 for Claude (D-12)."
+      },
+      {
+        "summary": "Pull here of a Codex Fly conversation is best effort in the checkpoint",
+        "rationale": "The Done-when is that a Codex conversation runs on a Fly VM; Pull here already supports codex per vault/resumable.ts, and a failure becomes a follow-up issue rather than blocking this one."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-image-codex",
+        "title": "Install the Codex CLI in the pan-workspace image",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T21:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4296",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docker/pan-workspace/Dockerfile*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'npm install -g @openai/codex' docker/pan-workspace/Dockerfile"
+          ],
+          "expected_outputs": [
+            "grep prints the Codex install line placed after the Claude Code install line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. After `RUN npm install -g @anthropic-ai/claude-code` add a comment naming PAN-4296 and `RUN npm install -g @openai/codex`; add `# - Codex CLI (@openai/codex), re-pinned to home's version at provisioning` to the header list after `# - Claude Code CLI`. CMD stays `sleep infinity`."
+        },
+        "items": [
+          {
+            "id": "wi1-image-codex.ac1",
+            "title": "Given the Dockerfile, when grep runs for '@openai/codex', then it returns a RUN npm install -g @openai/codex line placed after the Claude Code install line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-image-codex.ac2",
+            "title": "Given the image is built with `docker build -f docker/pan-workspace/Dockerfile -t pan-workspace:pan-4296 docker/pan-workspace`, when `docker run --rm pan-workspace:pan-4296 codex --version` runs, then it prints codex-cli and a semver (checked in WI-9 if no local Docker)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-image-codex.ac3",
+            "title": "Given the Dockerfile, when grep runs for 'Codex CLI' and for 'CMD [\"sleep\", \"infinity\"]', then both return a matching line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-record-codex-path",
+        "title": "Fly machine record gains codexAuthPath, tolerant of PAN-4652 records",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T21:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4296",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/fly/machine-store.ts",
+            "src/lib/anywhere/fly/__tests__/machine-store.test.ts",
+            "src/dashboard/server/services/fly-machine-service.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/fly/__tests__/machine-store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machine-store.test.ts passes including the new codexAuthPath cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add `codexAuthPath: string | null` to FlyMachineRecord after `docker`. `isRecord` accepts undefined or nullable text for it; `parseMachines` maps a missing field to null so callers always see it. Update the header comment. Callers that construct records (fly-machine-service provisional record) are updated by wi5; until then typecheck may need `codexAuthPath: null` added at the one construction site in fly-machine-service.ts — if so, add exactly that literal and nothing else there."
+        },
+        "items": [
+          {
+            "id": "wi2-record-codex-path.ac1",
+            "title": "Given fly-machines.json written in the PAN-4652 shape without codexAuthPath, when listFlyMachines reads it, then each record returns codexAuthPath: null and no error is thrown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-record-codex-path.ac2",
+            "title": "Given a record upserted with codexAuthPath '/.codex/auth.json', when it is read back, then the same path is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-record-codex-path.ac3",
+            "title": "Given a record whose codexAuthPath is the number 7, when the store is read, then the read rejects with an 'unexpected shape' error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-codex-auth-core",
+        "title": "Codex auth core module: snapshot, newest-refresh-wins decision, VM read/push, atomic home write",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T21:45:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4296",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/anywhere/fly/codex-auth.ts",
+            "src/lib/anywhere/fly/__tests__/codex-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/fly/__tests__/codex-auth.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "codex-auth.test.ts passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-2",
+            "NFR-4",
+            "NFR-6",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "wi4-provision-codex",
+            "wi7-codex-sync-loop",
+            "wi5-service-codex"
+          ],
+          "acJustification": "Six ACs: the module is a security boundary with five independent behaviors (decision, whitespace-stable comparison, VM read states, secret-free errors, atomic symlink-safe home write, home readiness) that each need their own observable check.",
+          "parallelSafeReason": "It creates a new module and its new test file; no other wave-0 item touches either file."
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D-3, D-7, D-8, D-10. New module src/lib/anywhere/fly/codex-auth.ts exporting parseCodexAuthSnapshot, decideCodexAuthSync (the five ordered rules of D-3; rule 3 compares the parsed sign-in key — tokens + last_refresh, or OPENAI_API_KEY — never raw bytes), readVmCodexAuth (D-8: `if [ -f p ]; then cat p; else printf __MISSING__; fi`, non-zero exit or thrown exec = indeterminate), pushVmCodexAuth (D-7: base64 to auth.json.tmp, chmod 600, mv -f; error message names only path and exit code), writeHomeCodexAuth (realpath when the file exists, temp file in same dir mode 0600, rename), and readHomeCodexState (resolveHarnessBinary('codex'), readCodexCliVersion via dynamic import of ../../codex/app-server-manager.js, classifyNativeCodexAuth must be 'valid'; any miss returns null; all deps injectable). Quote every path with shellQuote from src/lib/remote/remote-tmux.ts. No auth content in any log, error or detail."
+        },
+        "items": [
+          {
+            "id": "wi3-codex-auth-core.ac1",
+            "title": "Given a complete chatgpt VM snapshot with the same account_id and a strictly newer last_refresh than home, when decideCodexAuthSync runs, then it returns 'pull'; with a different account_id, an incomplete VM copy, equal last_refresh, or an api-key home it returns 'push' or 'none' per D-3, never 'pull'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-codex-auth-core.ac2",
+            "title": "Given home and VM sign-ins with the same tokens and last_refresh but different JSON whitespace, when decideCodexAuthSync runs, then it returns 'none'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-codex-auth-core.ac3",
+            "title": "Given the VM exec prints __MISSING__ with exit 0, when readVmCodexAuth runs, then it returns state 'missing'; given exit 1 or a thrown exec it returns state 'indeterminate'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-codex-auth-core.ac4",
+            "title": "Given pushVmCodexAuth's exec exits non-zero, when it rejects, then the error message contains the path and exit code and does not contain the base64 payload or any token text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-codex-auth-core.ac5",
+            "title": "Given ~/.codex/auth.json is a symlink in a temp dir, when writeHomeCodexAuth writes new content, then the symlink still points at its target, the target holds the new content, and the target's mode is 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-codex-auth-core.ac6",
+            "title": "Given a native auth file classified 'expired' or no codex binary, when readHomeCodexState runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-provision-codex",
+        "title": "Provisioning prepares Codex (version pin + sign-in push) and requires only the requested harness's credentials",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T21:45:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4296",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/fly/provision.ts",
+            "src/lib/anywhere/fly/__tests__/provision.test.ts",
+            "src/lib/anywhere/fly/codex-auth.ts",
+            "src/lib/anywhere/fly/__tests__/codex-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/fly/__tests__/provision.test.ts src/lib/anywhere/fly/__tests__/codex-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "provision.test.ts and codex-auth.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-7",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "wi5-service-codex"
+          ],
+          "parallelSafeReason": "After wi3 lands it edits only provision.ts, codex-auth.ts and their tests; wi7 (same wave) touches fly-machine-loops.ts and hygiene-scheduler.ts only."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. provisionFlyMachine input gains harness?: 'claude-code' | 'codex' (default claude-code); FlyProvisionDeps gains homeCodex (default readHomeCodexState); FlyProvisionResult gains codexAuthPath. Step 6: credentials-failed on missing Claude only when harness is claude-code, else log. New step 6b after configureClaudeCode calls prepareFlyCodex (added to codex-auth.ts): home null => credentials-failed for codex / log+null otherwise; probe `printf %s \"$HOME/.codex\"` and collapse // to /, must start with /; compare parseCodexCliVersion of VM `codex --version` with home version, install `@openai/codex@<home>` detached via detached() and poll with pollUntil(INSTALL_POLL) on /tmp/codex-install.exit, re-check; remaining mismatch => version-mismatch for codex / log+null otherwise; pushVmCodexAuth to <dir>/auth.json (failure => credentials-failed for codex / log+null). Return codexAuthPath. Never use run() for the Codex read/push (it puts stdout in errors). Update the module header step list. Existing tests get homeCodex: async () => null in the harness defaults."
+        },
+        "items": [
+          {
+            "id": "wi4-provision-codex.ac1",
+            "title": "Given harness 'codex', a valid home Codex state and a probe printing //.codex, when provisionFlyMachine runs, then it pushes the sign-in to /.codex/auth.json and resolves with codexAuthPath '/.codex/auth.json'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-provision-codex.ac2",
+            "title": "Given harness 'codex' and syncAllCredentials returning claude: false, when provisioning runs, then it resolves instead of failing with credentials-failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-provision-codex.ac3",
+            "title": "Given harness 'codex' and homeCodex resolving null, when provisioning runs, then it rejects with FlyMachineError code credentials-failed and destroys the VM",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-provision-codex.ac4",
+            "title": "Given a VM codex version different from home before and after the detached install (fake timers), when provisioning runs, then harness 'codex' rejects with version-mismatch and harness 'claude-code' resolves with codexAuthPath null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-provision-codex.ac5",
+            "title": "Given harness 'claude-code' and homeCodex resolving null, when provisioning runs, then it resolves with codexAuthPath null and issues no Codex exec",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-service-codex",
+        "title": "addFlyMachine accepts Codex: capability flip, home-side refusals, harness passed through to the VM",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T21:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4296",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/harness-capabilities.ts",
+            "src/dashboard/server/services/fly-machine-service.ts",
+            "src/dashboard/server/services/__tests__/fly-machine-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/fly-machine-service.test.ts src/dashboard/server/routes/__tests__/machines-fly.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "fly-machine-service.test.ts and machines-fly route test pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Set CODEX_CAPABILITIES.runsOnFlyMachine true and update the field comment. In refuseEarly after the capability check (refusal text: 'Fly machines run Claude Code and Codex conversations; <harness> is not supported.'): codex without model => bad-request naming --model; codex with a non-openai model (getProviderForModel) => harness-unsupported; codex policy via new dep checkCodexPolicy (default: getProviderAuthMode + resolveCodexPolicyContext + canUseHarness, dynamic imports) denied => harness-unsupported with its reason; codex with homeCodex() null => credentials-failed. Claude Code requests get no new check. Pass harness into deps.provision; provisional record codexAuthPath null; patch codexAuthPath: vm.codexAuthPath with docker. startFlyConversation body sends harness: input.harness ?? 'claude-code'. Update the module header."
+        },
+        "items": [
+          {
+            "id": "wi5-service-codex.ac1",
+            "title": "Given harness 'codex' and no model, when addFlyMachine runs, then it rejects with bad-request naming --model and provision is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-service-codex.ac2",
+            "title": "Given harness 'codex' with model claude-opus-5-5, or a checkCodexPolicy that denies, when addFlyMachine runs, then it rejects with harness-unsupported (the policy reason in the message) before provision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-service-codex.ac3",
+            "title": "Given harness 'codex' and homeCodex resolving null, when addFlyMachine runs, then it rejects with credentials-failed before provision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-service-codex.ac4",
+            "title": "Given a valid codex request, when addFlyMachine completes, then provision receives harness 'codex', the record is patched with the returned codexAuthPath, and the linked POST /api/conversations body carries harness 'codex' and the model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-service-codex.ac5",
+            "title": "Given harness 'ohmypi', when addFlyMachine runs, then it rejects with harness-unsupported whose message reads 'Fly machines run Claude Code and Codex conversations; ohmypi is not supported.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-cli-harness",
+        "title": "pan machines add-fly --harness and codex: yes|no output",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T21:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4296",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/machines-fly.ts",
+            "src/cli/commands/__tests__/machines-fly.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/machines-fly.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machines-fly CLI test passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add `.option('--harness <name>', 'Harness for the conversation: claude-code (default) or codex')`, harness?: string on AddFlyOptions, and body.harness when set. --message help: 'Start a conversation with this first message (needs --project)'; --model help: 'Model for the conversation (required with --harness codex)'. The Linked line appends `; codex: yes|no` from record.codexAuthPath; AddFlyResponse record type gains codexAuthPath: string | null."
+        },
+        "items": [
+          {
+            "id": "wi6-cli-harness.ac1",
+            "title": "Given `pan machines add-fly --project overdeck --harness codex --model gpt-6.1-sol --message hi`, when the command runs against a stubbed dashboard, then the POST body contains harness 'codex' and model 'gpt-6.1-sol'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-cli-harness.ac2",
+            "title": "Given a 201 response whose record has codexAuthPath '/.codex/auth.json', when the command prints human output, then the Linked line contains 'codex: yes'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-cli-harness.ac3",
+            "title": "Given no --harness flag, when the command runs, then the POST body has no harness key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-codex-sync-loop",
+        "title": "syncFlyCodexAuth loop: newest-refresh-wins Codex sign-in sync every 60 s",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T21:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4296",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote/fly-machine-loops.ts",
+            "tests/unit/lib/remote/fly-machine-loops.test.ts",
+            "src/lib/cloister/hygiene-scheduler.ts",
+            "tests/unit/lib/cloister/hygiene-scheduler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/remote/fly-machine-loops.test.ts tests/unit/lib/cloister/hygiene-scheduler.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "fly-machine-loops and hygiene-scheduler tests pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Export syncFlyCodexAuth(overrides) from fly-machine-loops.ts with injectable listRecords, lazy api, readHomeAuth (ENOENT => null), writeHomeAuth (writeHomeCodexAuth), activity. Targets = records with linkId and codexAuthPath; none => return [] before api(). Read home once, then per target readVmCodexAuth via api.execCommand(appName, machineId, ['/bin/sh','-c',cmd], t); indeterminate => skip line; decide with decideCodexAuthSync; push => pushVmCodexAuth; pull => writeHomeAuth(vm raw), reparse home, one cloister activity entry with no token content; thrown push/write => failure line. Update module header. Register ['syncFlyCodexAuth', () => syncFlyCodexAuth(), REMOTE_HEARTBEAT_INTERVAL_MS] after sweepFlyMachines in startHygieneScheduler, outside the freeze, with a comment."
+        },
+        "items": [
+          {
+            "id": "wi7-codex-sync-loop.ac1",
+            "title": "Given zero records with a codexAuthPath, when syncFlyCodexAuth runs, then the api factory is never called and it returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-codex-sync-loop.ac2",
+            "title": "Given a target whose VM read returns __MISSING__, when the loop runs, then it pushes home's auth.json to the record's codexAuthPath and reports 'Codex sign-in copied to <label>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-codex-sync-loop.ac3",
+            "title": "Given a VM copy with the same account and a newer last_refresh, when the loop runs, then writeHomeAuth receives the VM content and nothing is pushed to the VM",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-codex-sync-loop.ac4",
+            "title": "Given the VM read exits 1, when the loop runs, then neither a push nor a home write happens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-codex-sync-loop.ac5",
+            "title": "Given startHygieneScheduler runs, when the routines are listed, then syncFlyCodexAuth is registered at the 60 s interval",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-docs",
+        "title": "Document Codex on Fly machines in user and developer docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T21:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4296",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/linked-machines.mdx",
+            "cli/machines.mdx",
+            "docs/fly-provider.md",
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### Codex' configuration/linked-machines.mdx",
+            "grep -n -- '--harness' cli/machines.mdx",
+            "grep -n 'syncFlyCodexAuth' docs/fly-provider.md",
+            "grep -n 'Codex (PAN-4296)' docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line",
+            "grep -c 'Claude Code only' configuration/linked-machines.mdx prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-6",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. configuration/linked-machines.mdx ## Fly machines: codex example command, credential step mentions Codex, step 5 'Claude Code or Codex conversation (--harness)', new ### Codex subsection (needs --model with an OpenAI id, needs Codex CLI + codex login here, VM pinned to this version, calls OpenAI directly without CLIProxy, sign-in synced both ways every 60 s newest refresh wins, same-minute double refresh can sign one side out and codex login here fixes it), Limits bullet 'Claude Code and Codex. Other harnesses cannot run on a Fly machine.', Troubleshooting rows for Codex credentials-failed and @openai/codex version-mismatch. cli/machines.mdx ## add-fly: --harness row, --message 'Start a conversation', --model required with codex, harness-unsupported and credentials-failed rows, record.codexAuthPath in JSON shape. docs/fly-provider.md: image section lists Codex CLI, Fly machines table Runs row, Credential Sync Codex paragraph, Automatic loops syncFlyCodexAuth row. docs/ANYWHERE-ARCHITECTURE.md: ### Codex (PAN-4296) under ## Fly machines (PAN-4652) covering D-1, D-2, D-3 table, D-4, D-6, codexAuthPath."
+        },
+        "items": [
+          {
+            "id": "wi8-docs.ac1",
+            "title": "Given configuration/linked-machines.mdx, when read, then it has a ### Codex subsection that names --harness codex, --model, 'newest refresh wins' and codex login, and grep -c 'Claude Code only' returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-docs.ac2",
+            "title": "Given cli/machines.mdx, when read, then the ## add-fly options table has a --harness row and the JSON shape lists record.codexAuthPath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-docs.ac3",
+            "title": "Given docs/fly-provider.md, when read, then the image section names the Codex CLI and the Automatic loops Fly table has a syncFlyCodexAuth row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-docs.ac4",
+            "title": "Given docs/ANYWHERE-ARCHITECTURE.md, when read, then it has a ### Codex (PAN-4296) section stating the five D-3 rules and the codexAuthPath record field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-live-checkpoint",
+        "title": "Live checkpoint: a Codex conversation runs on a Fly machine (operator-consented)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T21:45:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4296",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md",
+            "configuration/linked-machines.mdx",
+            "src/lib/anywhere/fly/provision.ts",
+            "src/lib/anywhere/fly/__tests__/provision.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n 'Live verification (PAN-4296)' docs/fly-provider.md"
+          ],
+          "expected_outputs": [
+            "docs/fly-provider.md prints the live verification heading with O1-O3 rows, or the PR body records the operator declined"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-6",
+            "FR-8",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Ask the operator once (self-contained AskUserQuestion) and `pan tell flywheel-orchestrator \"PAN-4296 live Fly checkpoint waiting for operator consent\"` before spending Fly money. Build and push a test image with the branch's npm-packed @overdeck/core installed (PAN-4652 recipe); always pass --image (default image is broken, #4682). Run a test home dashboard from this branch's dist with its own OVERDECK_HOME and port. Run add-fly --harness codex --model <allowed openai id> --project overdeck --message 'List the top-level files and stop.'. Observe O1 (linked row with fly-<id> chip and Codex harness streams; Playwright screenshot in an isolated profile), O2 (Codex ran a shell command; on a sandbox error apply the D-12 fallback in provision.ts: write ${overdeckHome}/config.yaml with codex.permissionMode full-access before pan serve, add a provision test, re-run), O4 best effort Pull here (failure => file a follow-up issue), O3 unlink destroys the machine. Record results in ## Live verification (PAN-4296) at the end of docs/fly-provider.md and the sandbox outcome in the linked-machines.mdx Limits list. Declined => leave pending, say so in the PR, tell the orchestrator. Codex cannot start at all => stop, record evidence in continue.json, tell the orchestrator."
+        },
+        "items": [
+          {
+            "id": "wi9-live-checkpoint.ac1",
+            "title": "Given operator consent, when add-fly --harness codex runs against a live Fly app, then the home dashboard renders the linked Codex conversation with a fly-<machineId> chip and its transcript shows the file listing (screenshot from an isolated Playwright profile)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-live-checkpoint.ac2",
+            "title": "Given the live Codex conversation, when its first turn runs, then a shell tool call succeeds on the VM, or the D-12 full-access fallback is applied with a provision test and the re-run succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-live-checkpoint.ac3",
+            "title": "Given the run finished, when pan machines unlink fly-<machineId> runs, then fly machines list for the app no longer shows the machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-live-checkpoint.ac4",
+            "title": "Given the checkpoint ran or was declined, when docs/fly-provider.md is read, then it has ## Live verification (PAN-4296) with O1-O4 results, or the PR body states the operator declined and the orchestrator was told",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi3-codex-auth-core",
+        "to": "wi4-provision-codex",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-codex-auth-core",
+        "to": "wi7-codex-sync-loop",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-codex-auth-core",
+        "to": "wi5-service-codex",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-record-codex-path",
+        "to": "wi5-service-codex",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-record-codex-path",
+        "to": "wi7-codex-sync-loop",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-provision-codex",
+        "to": "wi5-service-codex",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-image-codex",
+        "to": "wi9-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-provision-codex",
+        "to": "wi9-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-service-codex",
+        "to": "wi9-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-cli-harness",
+        "to": "wi9-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-codex-sync-loop",
+        "to": "wi9-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-docs",
+        "to": "wi9-live-checkpoint",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

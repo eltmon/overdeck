@@ -105,12 +105,12 @@ A failure prints the same messages as `add-ssh` and exits 1. `--json` prints
 ## add-fly
 
 ```bash
-pan machines add-fly [--project <key>] [--message <text>] [--model <id>] [--effort <level>]
-  [--region <code>] [--image <ref>] [--json]
+pan machines add-fly [--project <key>] [--message <text>] [--harness <name>] [--model <id>]
+  [--effort <level>] [--region <code>] [--image <ref>] [--json]
 ```
 
 Starts a Fly.io VM that runs Overdeck, links it one way from this machine and, optionally,
-clones a project and starts a Claude Code conversation on it. The dashboard does the whole
+clones a project and starts a Claude Code or Codex conversation on it. The dashboard does the whole
 flow in one request, which takes a few minutes (longer with a large clone); the command
 waits for it. See [Fly machines](/configuration/linked-machines#fly-machines) for setup,
 lifetime and cost.
@@ -118,16 +118,17 @@ lifetime and cost.
 | Flag | Effect |
 | --- | --- |
 | `--project <key>` | Clone this project onto the VM into `/workspace/<key>` and register it there. GitHub projects only. |
-| `--message <text>` | Start a Claude Code conversation with this first message. Needs `--project`. |
-| `--model <id>` | Model for the conversation. |
+| `--message <text>` | Start a conversation with this first message. Needs `--project`. |
+| `--harness <name>` | Harness for the conversation: `claude-code` (default) or `codex`. See [Codex](/configuration/linked-machines#codex). |
+| `--model <id>` | Model for the conversation. Required with `--harness codex`, and it must be an OpenAI model id. |
 | `--effort <level>` | Reasoning effort for the conversation. |
 | `--region <code>` | Fly region. Default: `[remote.fly] region`, else `iad`. |
 | `--image <ref>` | Image. Default: `[remote.fly] image`, else `registry.fly.io/pan-workspace:latest`. |
-| `--json` | Print `{ link, record, conversation? }` as JSON. |
+| `--json` | Print `{ link, record, conversation? }` as JSON. `record.codexAuthPath` is the path of the Codex sign-in on the VM, or `null` when Codex was not prepared there. |
 
 ```
 Starting a Fly machine; this takes a few minutes (longer with a project clone)...
-Linked fly-148e21ea7e1689 (Fly app pan-workspaces, region iad; docker: yes)
+Linked fly-148e21ea7e1689 (Fly app pan-workspaces, region iad; docker: yes; codex: yes)
 Open: http://localhost:3011/conv/@3f2c1b7e-9a4d-4c2b-8e1f-0a1b2c3d4e5f/conv-fly-1
 `pan machines list` shows its state; `pan machines unlink` destroys it.
 ```
@@ -139,11 +140,11 @@ the server's message, then exits 1:
 | --- | --- |
 | `remote-disabled` | Set `remote.enabled = true` in `~/.overdeck/config.toml`. |
 | `no-fly-token` | Run `fly auth login`, or set `FLY_API_TOKEN` (or the variable `[remote.fly] api_token_env` names). |
-| `harness-unsupported` | Fly machines run Claude Code only. |
-| `bad-request` | `--message` needs `--project`, or a field was empty. |
+| `harness-unsupported` | The harness cannot run on a Fly machine (only Claude Code and Codex can), or the model does not belong to the harness. |
+| `bad-request` | `--message` needs `--project`, `--harness codex` needs `--model`, or a field was empty. |
 | `cap-reached` | `remote.max_concurrent_agents` is full. Unlink a Fly machine, stop a remote agent, or raise the cap. |
-| `credentials-failed` | This machine's Claude Code credentials did not reach the VM. Log in to Claude Code here (`~/.claude/.credentials.json`), then try again. |
-| `version-mismatch` | The VM could not install this machine's Overdeck version; the message names both. |
+| `credentials-failed` | This machine's Claude Code credentials did not reach the VM. Log in to Claude Code here (`~/.claude/.credentials.json`), then try again. With `--harness codex`: this machine has no Codex CLI or no valid Codex sign-in, or the sign-in did not reach the VM. Run `codex login` here, then try again. |
+| `version-mismatch` | The VM could not install this machine's Overdeck version, or with `--harness codex` this machine's `@openai/codex` version; the message names both. |
 | `server-not-ready` | Overdeck on the VM did not answer within 2 minutes. The message carries the last lines of its log. |
 | `pairing-failed` | Overdeck on the VM issued no pairing code. |
 | `unreachable` | This machine could not reach the VM. Give the Fly app public IPs once: `fly ips allocate-v4 --shared -a <app>` and `fly ips allocate-v6 -a <app>`. |
