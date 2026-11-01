@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4330",
   "created": "2026-11-01T04:59:32.820Z",
-  "updated": "2026-11-01T06:11:54.150Z",
+  "updated": "2026-11-01T06:12:03.745Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -42,6 +42,11 @@
       "claimedBy": "agent-pan-4330",
       "claimedAt": "2026-11-01T06:09:26.046Z",
       "doneAt": "2026-11-01T06:11:54.149Z"
+    },
+    "account-cli-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4330",
+      "claimedAt": "2026-11-01T06:12:03.745Z"
     }
   }
 }
