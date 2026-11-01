@@ -47,7 +47,8 @@
 ## Testing
 - Vitest, unit tests under `tests/unit/**` mirroring `src/`, plus co-located
   `__tests__/` in some lib dirs (e.g. `src/lib/cloister/__tests__/`).
-- Frontend tests co-located under `components/**/__tests__/`. CI runs only the frontend files listed
+- Frontend tests co-located under `components/**/__tests__/` or beside the source file
+  (e.g. `chat/messagesTimeline/messageRows.test.tsx`). CI runs only the frontend files listed
   in `scripts/frontend-test-subset.txt` (one path per line, relative to `src/dashboard/frontend`,
   `merge=union`; run by `npm run test:frontend-subset`); add new must-run frontend tests there
   in sorted position.

@@ -46,6 +46,7 @@ describe('providerErrorFromTranscriptTail', () => {
       at: '2026-09-25T22:00:00.000Z',
       status: 402,
       code: 'billing_error',
+      usageLimit: null,
     });
   });
 
@@ -101,6 +102,67 @@ describe('providerErrorFromTranscriptTail', () => {
 
   it('returns null for an empty transcript', () => {
     expect(providerErrorFromTranscriptTail('', false)).toBeNull();
+  });
+});
+
+describe('providerErrorFromTranscriptTail usage limit (PAN-4641)', () => {
+  function limitRecord(overrides: Record<string, unknown>, text: string): Record<string, unknown> {
+    return {
+      type: 'assistant',
+      timestamp: '2026-08-31T20:00:00.000Z',
+      isApiErrorMessage: true,
+      apiErrorStatus: 429,
+      error: 'rate_limit',
+      message: { role: 'assistant', content: textOf(text) },
+      ...overrides,
+    };
+  }
+
+  it('reads a five-hour reset from quotaLimits', () => {
+    const record = limitRecord(
+      { quotaLimits: { status: 'rejected', resetsAt: 1788354000, rateLimitType: 'five_hour' } },
+      "You've hit your session limit · resets 9am (America/New_York)",
+    );
+    expect(providerErrorFromTranscriptTail(`${JSON.stringify(record)}\n`, false)?.usageLimit).toEqual({
+      resetsAt: '2026-09-02T13:00:00.000Z',
+      window: 'five_hour',
+      source: 'quota-limits',
+    });
+  });
+
+  it('reads a weekly reset from quotaLimits', () => {
+    const record = limitRecord(
+      { timestamp: '2026-09-24T12:00:00.000Z', quotaLimits: { status: 'rejected', resetsAt: 1790881200, rateLimitType: 'seven_day' } },
+      "You've hit your weekly limit · resets Oct 1, 3pm (America/New_York)",
+    );
+    expect(providerErrorFromTranscriptTail(`${JSON.stringify(record)}\n`, false)?.usageLimit).toEqual({
+      resetsAt: '2026-10-01T19:00:00.000Z',
+      window: 'seven_day',
+      source: 'quota-limits',
+    });
+  });
+
+  it('falls back to the resets text when quotaLimits is absent', () => {
+    const record = limitRecord({}, "You've hit your session limit · resets 9am (America/New_York)");
+    expect(providerErrorFromTranscriptTail(`${JSON.stringify(record)}\n`, false)?.usageLimit).toEqual({
+      resetsAt: '2026-09-01T13:00:00.000Z',
+      window: null,
+      source: 'message-text',
+    });
+  });
+
+  it('reports an unknown reset for a proxied 429', () => {
+    const record = limitRecord({}, 'API Error: Request rejected (429) · Provider returned error');
+    expect(providerErrorFromTranscriptTail(`${JSON.stringify(record)}\n`, false)?.usageLimit).toEqual({
+      resetsAt: null,
+      window: null,
+      source: null,
+    });
+  });
+
+  it('leaves usageLimit null for a non-limit 400 error', () => {
+    const record = { ...errorRecord, apiErrorStatus: 400, error: 'invalid_request' };
+    expect(providerErrorFromTranscriptTail(`${JSON.stringify(record)}\n`, false)?.usageLimit).toBeNull();
   });
 });
 

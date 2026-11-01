@@ -1,0 +1,1143 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T05:06:28Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4649: Overdeck MCP server: pan mcp serve, /mcp endpoint and Copy MCP URL",
+    "updated": "2026-11-01T05:49:32.624Z"
+  },
+  "plan": {
+    "id": "pan-4649",
+    "title": "Overdeck MCP server: pan mcp serve, /mcp endpoint and Copy MCP URL",
+    "status": "running",
+    "uid": "ed239f2f-0419-49d1-8a0d-7f87ca74cdab",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-01T05:06:28Z",
+    "updated": "2026-11-01T05:49:32.624Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4649",
+        "label": "PAN-4649",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4649.md",
+        "label": "PRD draft (.pan/drafts/pan-4649.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-2350.md",
+        "label": "Parent PRD: Overdeck Anywhere revision 5 (W-INT2, FR-27, D-21)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "anywhere",
+      "auth",
+      "scopes",
+      "dashboard",
+      "cli",
+      "settings"
+    ],
+    "narratives": {
+      "Problem": "Outside tools (another agent harness, a chat bot) cannot drive Overdeck: there is no MCP control surface, only the per-agent Channels bridge. Answering prompts has no scope narrower than admin.",
+      "Proposal": "One MCP tool module under src/lib/mcp/ that proxies the dashboard's existing REST routes with the caller's Bearer odk_ token, served over stdio by `pan mcp serve` and over stateless streamable HTTP at POST /mcp. A new approve scope guards the eight approval routes; three route-scope rows open search and the two spawn routes to MCP tokens; a new POST /api/workers route wraps startWorker(). Settings → Anywhere gains Copy MCP URL (mints a non-admin token, copies <address>/mcp and shows the header and client config) and an Access tokens panel with revoke. Docs: configuration/mcp.mdx plus the scope tables.",
+      "NonGoals": "- Fleet reach: MCP reaching linked machines' conversations (PAN-4651).\n- Any change to the Channels bridge (src/lib/channels/overdeck-bridge.ts).\n- Stateful MCP sessions, SSE streams, server-initiated notifications, MCP resources or prompts.\n- OAuth for MCP clients; the only credential is a Bearer odk_ token.\n- A token in the URL (query string or path).\n- MCP tools for pane-choice menus, pi asks, Codex approvals, plan approvals or agent questions (their routes still get the approve row).\n- Serving /mcp through the Vite dev server (pan dev).\n- A `pan mcp token` convenience verb.\n- Accepting root credentials, paired-device credentials or admin-scoped tokens on /mcp or pan mcp serve.\n- Changing what admin, operate or tell allow beyond the three new FR-3 rows."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The token travels in the Authorization header; Copy MCP URL copies <address>/mcp and offers the header and a client config.",
+        "rationale": "PAN-2351 D-10 forbids tokens in URLs and resolveDashboardCredential reads kind token credentials only from the Bearer header; 'with the token' in the parent PRD is met by the config block (D-4649-1)."
+      },
+      {
+        "summary": "/mcp runs the streamable HTTP transport in stateless JSON mode with GET/DELETE answering 405.",
+        "rationale": "No session bookkeeping, revocation is 'next request fails', and the tools need no server-initiated messages (D-4649-2)."
+      },
+      {
+        "summary": "Default MCP token scopes are read:state, read:conversations, operate; approve only via an unchecked-by-default checkbox; admin never.",
+        "rationale": "operate covers tell and the two spawn routes; D-21 says approve is off by default and MCP is always fenced (D-4649-3)."
+      },
+      {
+        "summary": "Both transports proxy the existing dashboard routes with the caller's Bearer token; the tool module never calls src/lib operation functions.",
+        "rationale": "Keeps the route-scope table the only scope authority, making D-21's 'no second path' true by construction."
+      },
+      {
+        "summary": "/mcp does its own credential check and refuses root credentials, device credentials and admin-scoped tokens.",
+        "rationale": "/mcp is outside the remote gate's prefixes; accepting admin would let MCP change settings, which D-21 forbids (D-4649-4)."
+      },
+      {
+        "summary": "answer_question enforces approve in the tool layer and serves Claude Code conversations only.",
+        "rationale": "The dashboard answers a Claude Code AskUserQuestion via the tell-scoped message route; the tool must add the approve check itself, and the docs state that send_message can still deliver text (D-4649-5, D-4649-6)."
+      },
+      {
+        "summary": "pan mcp serve takes its token only from OVERDECK_MCP_TOKEN and verifies it locally at start.",
+        "rationale": "An argv token shows in ps; an internal-token fallback would be admin and violate 'always fenced' (D-4649-7)."
+      },
+      {
+        "summary": "search_conversations uses GET /api/palette/search with a new read:conversations row and returns only the conversations array.",
+        "rationale": "It is the existing conversation search route; its other arrays are derived from conversations (D-4649-8)."
+      },
+      {
+        "summary": "Starting a worker gets a new POST /api/workers route that calls startWorker() in-process.",
+        "rationale": "No worker-start route exists; startWorker is the same core pan worker run uses, and the server already calls spawnRun in-process (D-4649-11)."
+      },
+      {
+        "summary": "Low-level SDK Server with hand-written JSON Schemas; no zod.",
+        "rationale": "zod is not a direct dependency and overdeck-bridge.ts already uses this pattern (D-4649-12)."
+      },
+      {
+        "summary": "machine accepts omitted, auto, this machine's label or id; everything else is a tool error.",
+        "rationale": "Fleet reach is PAN-4651's; this machine's half needs no links (D-4649-13)."
+      },
+      {
+        "summary": "Revocation from Settings → Anywhere is a general Access tokens panel over the existing GET/DELETE /api/access-tokens routes.",
+        "rationale": "The parent threat model requires revoking MCP tokens from Settings → Anywhere and today that page lists only paired devices; a general panel needs no new record field."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "This issue is already the per-machine slice of one epic work item (W-INT2). Its done criterion — an MCP client configured from Copy MCP URL lists and messages conversations and gets 403 on a settings change — needs the scope, the routes, both transports, the Settings UI and the docs together. The file count is inflated by one test file per source file, and the subsystem count by each docs page (configuration/*, docs/*, cli/*, docs.json, package.json) counting as its own subsystem. The work is still decomposed into 14 small items with real-dependency edges only.",
+      "canonicalFilename": "2026-11-01-PAN-4649-overdeck-mcp-server-pan-mcp-serve-mcp-endpoint-and-copy-mcp-url.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "approve-scope",
+        "title": "Add the approve access-token scope",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/access-tokens.ts",
+            "src/cli/commands/token.ts",
+            "tests/unit/lib/access-tokens.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/access-tokens.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/access-tokens.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-1. In src/lib/access-tokens.ts line 42 insert 'approve' between 'operate' and 'admin' in ACCESS_TOKEN_SCOPES; scopeSatisfies stays unchanged so only admin implies approve. Update the module header comment to list approve as an independent grant. In src/cli/commands/token.ts line 111 the --scopes help text becomes 'Comma-separated scopes: read:events, read:state, read:conversations, tell, operate, approve, admin'. Add the four W-1 assertions to tests/unit/lib/access-tokens.test.ts."
+        },
+        "items": [
+          {
+            "id": "approve-scope.ac1",
+            "title": "Given a token with scopes ['operate'], when scopeSatisfies(scopes, 'approve') runs, then it returns false; with ['admin'] or ['approve'] it returns true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "approve-scope.ac2",
+            "title": "Given the input 'read:state,approve', when parseAccessTokenScopes runs, then it returns ['read:state','approve'] instead of throwing an unknown-scope error.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "approve-scope.ac3",
+            "title": "Given `pan token create --help`, then the --scopes option text lists approve between operate and admin.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "approve-route-rows",
+        "title": "Map the eight approval routes to the approve scope",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route-scopes.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-2. Append the eight FR-2 rows to ROUTE_SCOPES in src/dashboard/server/route-scopes.ts after the bookmarks row under the comment '// PAN-4649: approvals need approve.', each with scope 'approve'. Append only; do not reorder existing rows (PAN-4645 also edits this table). Add requiredScopeFor assertions for all eight paths plus an unchanged admin case to src/dashboard/server/__tests__/route-scopes.test.ts."
+        },
+        "items": [
+          {
+            "id": "approve-route-rows.ac1",
+            "title": "Given each FR-2 route with sample segments (for example POST /api/conversations/conv-1/permission and POST /api/agents/agent-pan-1/permissions/req-1/respond), when requiredScopeFor runs, then it returns 'approve'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "approve-route-rows.ac2",
+            "title": "Given POST /api/conversations/conv-1/archive, when requiredScopeFor runs, then it still returns 'admin'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "approve-route-rows.ac3",
+            "title": "Given granted scopes ['operate'], when scopeSatisfies(granted, requiredScopeFor('POST', '/api/conversations/conv-1/permission')) runs, then it returns false; with ['approve'] it returns true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-route-rows",
+        "title": "Map search and the two spawn routes for MCP tokens",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "route-scopes.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-3. Append three rows after the W-2 block under '// PAN-4649: MCP tools.': GET /api/palette/search -> read:conversations, POST /api/conversations -> operate, POST /api/workers -> operate. Add the W-3 assertions to route-scopes.test.ts, including PUT /api/settings still admin."
+        },
+        "items": [
+          {
+            "id": "mcp-route-rows.ac1",
+            "title": "Given GET /api/palette/search, when requiredScopeFor runs, then it returns 'read:conversations'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-route-rows.ac2",
+            "title": "Given POST /api/conversations or POST /api/workers, when requiredScopeFor runs, then it returns 'operate'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-route-rows.ac3",
+            "title": "Given PUT /api/settings, when requiredScopeFor runs, then it still returns 'admin'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workers-route",
+        "title": "Add POST /api/workers over startWorker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workers.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/workers-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/workers-route.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workers-route.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-4. Create src/dashboard/server/routes/workers.ts exporting parseStartWorkerBody, startWorkerFromBody(body, start = startWorker) and workersRouteLayer. Auth via rejectUnsafeDashboardMutationRequest. Validate issueId and prompt (required), model, harness (the HARNESSES list in src/cli/commands/worker.ts line 51), effort (isEffortLevel), readOnly, name. Call startWorker with parentId null; a thrown Error becomes 400 { error: message }; success is 200 { id, cwd, branch }; emit one activity entry naming the worker id. Register workersRouteLayer in src/dashboard/server/server.ts next to workersRegisterRouteLayer (line 295). Add the no-loss-matrix row 'POST /api/workers' (WRITE). Tests in src/dashboard/server/__tests__/workers-route.test.ts with an injected start function. No execSync."
+        },
+        "items": [
+          {
+            "id": "workers-route.ac1",
+            "title": "Given a body missing issueId, an empty prompt, harness 'vim' or effort 'huge', when parseStartWorkerBody runs, then it returns ok:false with an error naming that field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workers-route.ac2",
+            "title": "Given a valid body and a fake start that resolves { id: 'agent-pan-1-worker-1', cwd: '/w', branch: 'b' }, when startWorkerFromBody runs, then it returns status 200 with that object and the fake received parentId null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workers-route.ac3",
+            "title": "Given a fake start that throws Error('PAN-1 has no workspace at /x'), when startWorkerFromBody runs, then it returns status 400 with error 'PAN-1 has no workspace at /x'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workers-route.ac4",
+            "title": "Given the no-loss matrix, then it contains a row whose surface is 'POST /api/workers'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-core-read",
+        "title": "Create the MCP tool module core with the four read tools",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4649",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/mcp/dashboard-api.ts",
+            "src/lib/mcp/server.ts",
+            "src/lib/mcp/tools-read.ts",
+            "tests/unit/lib/mcp/tools-read.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/tools-read.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "tools-read.test.ts passes",
+            "typecheck completes without errors",
+            "no new circular dependency reported"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "mcp-write-tools",
+            "mcp-approve-tools",
+            "mcp-http-route",
+            "mcp-stdio-command"
+          ],
+          "parallelSafeReason": "Creates only new files under src/lib/mcp/ and tests/unit/lib/mcp/; no other item touches them until its DAG successors run."
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-5. Create src/lib/mcp/dashboard-api.ts (DashboardApi, createFetchDashboardApi with Bearer token), src/lib/mcp/server.ts (McpToolContext, OverdeckTool, MCP_SERVER_NAME, MCP_DEFAULT_SCOPES, ALL_TOOLS, createOverdeckMcpServer using the low-level SDK Server with ListTools/CallTool handlers and hand-written JSON Schemas, routeErrorResult) and src/lib/mcp/tools-read.ts (READ_TOOLS: list_machines, list_conversations with the key projection and default limit 50, search_conversations returning only conversations, read_conversation pass-through; plus resolveMachine for FR-6). ALL_TOOLS = [...READ_TOOLS] in this item. The module imports only Node built-ins, the SDK, ../access-tokens.js and ../config.js; never dashboard server code; never calls src/lib operation functions (every tool proxies a route). Tests in tests/unit/lib/mcp/tools-read.test.ts via SDK Client + InMemoryTransport.createLinkedPair and a recording fake DashboardApi. Honor the list_conversations key-name implementation checkpoint and its fallback."
+        },
+        "items": [
+          {
+            "id": "mcp-core-read.ac1",
+            "title": "Given an SDK client connected through InMemoryTransport, when it calls tools/list, then the names are exactly list_machines, list_conversations, search_conversations, read_conversation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-core-read.ac2",
+            "title": "Given a fake API, when list_conversations runs with no arguments, then it calls GET /api/conversations?limit=50 and returns rows that carry only the projected keys.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-core-read.ac3",
+            "title": "Given a fake API that answers 403 { error: 'insufficient_scope', missingScope: 'read:conversations' }, when a read tool runs, then the result has isError true and its text contains missingScope read:conversations.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-core-read.ac4",
+            "title": "Given this machine's descriptor, when resolveMachine runs with undefined, 'auto', the label or the environmentId, then it returns ok:true; with 'laptop' it returns ok:false with the 'Unknown machine' error text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-write-tools",
+        "title": "Add send_message, start_conversation and start_worker tools",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-write.ts",
+            "src/lib/mcp/server.ts",
+            "tests/unit/lib/mcp/tools-write.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/tools-write.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tools-write.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-6. Create src/lib/mcp/tools-write.ts exporting WRITE_TOOLS: send_message (POST /api/conversations/<encoded name>/message { message }), start_conversation (resolveMachine first, then POST /api/conversations with only the given keys among message, projectKey, model, harness, effort, issueId; never cwd), start_worker (resolveMachine first, then POST /api/workers with issueId, prompt and the given optional keys). Set ALL_TOOLS = [...READ_TOOLS, ...WRITE_TOOLS] in src/lib/mcp/server.ts. Tests in tests/unit/lib/mcp/tools-write.test.ts."
+        },
+        "items": [
+          {
+            "id": "mcp-write-tools.ac1",
+            "title": "Given send_message with conversation 'conv a' and message 'hi', when it runs, then the fake API receives POST /api/conversations/conv%20a/message with body { message: 'hi' }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-write-tools.ac2",
+            "title": "Given start_conversation with machine 'laptop', when it runs, then the result has isError true and the fake API records no POST.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-write-tools.ac3",
+            "title": "Given start_conversation called with an extra cwd argument, when it runs, then the POST /api/conversations body has no cwd key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-write-tools.ac4",
+            "title": "Given start_worker with issueId and prompt, when it runs, then the fake API receives POST /api/workers with those fields.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-approve-tools",
+        "title": "Add list_pending_input, answer_question and answer_permission tools",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-approve.ts",
+            "src/lib/mcp/server.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/tools-approve.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tools-approve.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-7 and decisions D-4649-5/D-4649-6. Create src/lib/mcp/tools-approve.ts exporting APPROVE_TOOLS. answer_question checks scopeSatisfies(ctx.scopes, 'approve') before any request, then GET /api/conversations/<name>, refuses a harness other than claude-code/null/absent, then posts the composed 'Operator answered the pending question' message exactly as the PRD snippet. answer_permission validates choice in allow-once/allow-always/deny before posting { signature, choice } to POST /api/conversations/<name>/permission. Set ALL_TOOLS = [...READ_TOOLS, ...WRITE_TOOLS, ...APPROVE_TOOLS]. Tests in tests/unit/lib/mcp/tools-approve.test.ts."
+        },
+        "items": [
+          {
+            "id": "mcp-approve-tools.ac1",
+            "title": "Given scopes ['read:conversations','operate'], when answer_question runs, then the result has isError true naming the approve scope and the fake API records zero calls.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-approve-tools.ac2",
+            "title": "Given scopes including approve and a conversation whose harness is claude-code, when answer_question runs with answers ['yes'] and questions ['Ship it?'], then the fake API receives a message body starting 'Operator answered the pending question:' and containing 'Q: Ship it?\\nA: yes'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-approve-tools.ac3",
+            "title": "Given scopes including approve and a conversation whose harness is codex, when answer_question runs, then it returns the Claude-Code-only error and posts nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-approve-tools.ac4",
+            "title": "Given answer_permission with choice 'maybe', when it runs, then it returns isError true and posts nothing; with 'allow-once' it posts { signature, choice } to the permission route.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-http-route",
+        "title": "Serve the tool module at POST /mcp in stateless JSON mode",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-4649",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/routes/mcp.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/mcp-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/mcp-route.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "mcp-route.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "mcp-acceptance"
+          ],
+          "parallelSafeReason": "Its only shared files (server.ts, no-loss-matrix.ts) are serialized by the workers-route edge; routes/mcp.ts and its test are new."
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-8 and decision D-4649-4. Create src/dashboard/server/routes/mcp.ts exporting McpRouteDeps, makeMcpRouteLayer(deps) and mcpRouteLayer (makeApi uses createFetchDashboardApi with getDashboardLoopbackApiUrl(), never getDashboardApiUrl()). POST /mcp runs: validateOriginHeaders, internal token configured, resolveDashboardCredential (null 401), kind !== 'token' 403, admin scope 403; then a fresh WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true }) and createOverdeckMcpServer({ api, scopes }). GET and DELETE /mcp answer 405 with Allow: POST. Cache-Control no-store everywhere. Register mcpRouteLayer in makeRoutesLayer before staticRouteLayer (server.ts line 355). Add no-loss-matrix rows for POST, GET and DELETE /mcp. Honor the toWeb/fromWeb implementation checkpoint and its fallback. Tests in src/dashboard/server/__tests__/mcp-route.test.ts following scoped-token-acceptance.test.ts."
+        },
+        "items": [
+          {
+            "id": "mcp-http-route.ac1",
+            "title": "Given POST /mcp with no credential, the internal token, an admin-scoped token, or a valid token plus Origin https://evil.example, when the route answers, then the statuses are 401, 403, 403 and 403 respectively.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-http-route.ac2",
+            "title": "Given GET /mcp, when the route answers, then it returns 405 with header Allow: POST and never the SPA index.html.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-http-route.ac3",
+            "title": "Given a token with read:conversations and Accept: application/json, text/event-stream, when it posts a tools/list JSON-RPC request, then the route returns 200 JSON whose result.tools names equal ALL_TOOLS names.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-http-route.ac4",
+            "title": "Given that token is revoked with revokeAccessToken, when the same request is sent again, then the route returns 401.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-stdio-command",
+        "title": "Add pan mcp serve over stdio",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/mcp.ts",
+            "src/cli/index.ts",
+            "tests/unit/cli/mcp.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/mcp.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/cli/mcp.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-9 and decision D-4649-7. Create src/cli/commands/mcp.ts exporting runMcpServe(deps) and registerMcpCommands(program) for `pan mcp serve`; static imports only Commander types and chalk, everything else loaded inside the handler. Token only from OVERDECK_MCP_TOKEN; verify with refreshAccessTokens() + verifyAccessToken(); refuse missing, unknown/revoked, non-token-kind and admin tokens with exit 1 and the stderr texts in the PRD. Serve createOverdeckMcpServer({ api: createFetchDashboardApi({ baseUrl: getDashboardApiUrl(), token }), scopes }) over new StdioServerTransport(stdin, stdout). Nothing in this path writes to stdout except the transport. Add one import line and registerMcpCommands(program) after line 227 in src/cli/index.ts. Tests in tests/unit/cli/mcp.test.ts with a temporary OVERDECK_HOME and PassThrough streams."
+        },
+        "items": [
+          {
+            "id": "mcp-stdio-command.ac1",
+            "title": "Given OVERDECK_MCP_TOKEN is unset, when runMcpServe runs, then it resolves 1 and stderr contains 'pan token create mcp --scopes read:state,read:conversations,operate'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-stdio-command.ac2",
+            "title": "Given an admin-scoped token or a revoked token in OVERDECK_MCP_TOKEN, when runMcpServe runs, then it resolves 1 and writes nothing to stdout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-stdio-command.ac3",
+            "title": "Given a valid read:conversations token and PassThrough streams, when an initialize line and a tools/list line are written to stdin, then every stdout line parses as JSON-RPC and the tools/list result names equal ALL_TOOLS names.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-acceptance",
+        "title": "Prove the done criterion end to end through /mcp and the real gate",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/__tests__/mcp-acceptance.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/mcp-acceptance.test.ts"
+          ],
+          "expected_outputs": [
+            "mcp-acceptance.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-10. Create src/dashboard/server/__tests__/mcp-acceptance.test.ts. App = remoteRequestGateLayer + makeMcpRouteLayer + stub routes for GET /api/environment, GET /api/conversations, POST /api/conversations/:name/message, POST /api/conversations, GET /api/conversations/:id, POST /api/conversations/:id/permission and PUT /api/settings. makeApi(token) dispatches back into the same app with Authorization: Bearer <token> and peer 127.0.0.1 so every tool call passes the real gate and route-scope table. Mint tokens with createAccessToken using MCP_DEFAULT_SCOPES (and a second one adding approve). Cover the six PRD cases."
+        },
+        "items": [
+          {
+            "id": "mcp-acceptance.ac1",
+            "title": "Given a token with MCP_DEFAULT_SCOPES, when an MCP client calls list_conversations then send_message through POST /mcp, then the result lists the stub's conversation names and the message stub records the sent text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-acceptance.ac2",
+            "title": "Given the same token, when PUT /api/settings is sent through the gate with it, then the response is 403 with error insufficient_scope and missingScope admin.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-acceptance.ac3",
+            "title": "Given the same token, when tools/list runs, then no tool name contains settings, pair, token, device or vault.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-acceptance.ac4",
+            "title": "Given the same token, when answer_permission runs, then the result has isError true with missingScope approve and the permission stub records no call; given a token that adds approve, then the stub records exactly one call.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-acceptance.ac5",
+            "title": "Given the same token, when start_conversation runs, then the POST /api/conversations stub records one call.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "copy-mcp-url",
+        "title": "Add the Copy MCP URL dialog to Settings → Anywhere",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/McpUrlDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "McpUrlDialog.test.tsx passes",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-11 and decisions D-4649-1, D-4649-3, D-4649-9, D-4649-10. In src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts add MCP_DEFAULT_SCOPES, CreatedAccessToken, createAccessToken (POST /api/access-tokens with dashboardMutationJsonHeaders) and mcpClientConfig. Create src/dashboard/frontend/src/components/Settings/anywhere/McpUrlDialog.tsx (name, reachable-address select preselecting the first https address, unchecked approve checkbox, Create and copy URL; on 200 copy <address>/mcp, show URL, Authorization header, client config and the claude mcp add line with Copy buttons and 'This token is shown once.'; on 403 'Only a browser on this machine can create MCP tokens.'). Add a 'Copy MCP URL' header button beside 'Pair a device' in src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx. Follow pan-style-guide. Tests in src/dashboard/frontend/src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx; append that path to test:frontend-subset in the root package.json."
+        },
+        "items": [
+          {
+            "id": "copy-mcp-url.ac1",
+            "title": "Given the dialog with the approve box unchecked, when the operator submits, then POST /api/access-tokens receives scopes ['read:state','read:conversations','operate']; when checked, the scopes also include 'approve'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "copy-mcp-url.ac2",
+            "title": "Given a 200 mint and the status fixture address https://desk.tailnet.ts.net, when creation finishes, then the clipboard receives https://desk.tailnet.ts.net/mcp with no odk_ in it and the header field renders 'Authorization: Bearer odk_test'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "copy-mcp-url.ac3",
+            "title": "Given a 403 from the mint, when creation finishes, then the dialog renders 'Only a browser on this machine can create MCP tokens.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "copy-mcp-url.ac4",
+            "title": "Given the root package.json, then test:frontend-subset includes src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "access-tokens-panel",
+        "title": "Add the Access tokens panel with revoke to Settings → Anywhere",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/AccessTokensPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "AccessTokensPanel.test.tsx passes",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-12. In anywhereApi.ts add ANYWHERE_ACCESS_TOKENS_QUERY_KEY, AccessTokenRow, loadAccessTokens (GET /api/access-tokens → body.tokens) and revokeAccessToken (DELETE /api/access-tokens/:id). Create src/dashboard/frontend/src/components/Settings/anywhere/AccessTokensPanel.tsx modelled on DevicesPanel.tsx (heading Access tokens, scopes, created, last used, Revoke behind useConfirm, refetchInterval 5000, empty text 'No access tokens. Copy MCP URL creates one.', a 403 list renders 'Only a browser on this machine can list access tokens.'). Render it after <DevicesPanel /> in AnywhereSection.tsx. Tests in src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx; append that path to test:frontend-subset in the root package.json."
+        },
+        "items": [
+          {
+            "id": "access-tokens-panel.ac1",
+            "title": "Given GET /api/access-tokens returns two tokens, when the panel renders, then both names and their scopes appear.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-tokens-panel.ac2",
+            "title": "Given the operator confirms Revoke on tok-1, then the panel sends DELETE /api/access-tokens/tok-1 and refetches the list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-tokens-panel.ac3",
+            "title": "Given a token with revokedAt set, when the panel renders, then its row shows 'Revoked' and no Revoke button.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-tokens-panel.ac4",
+            "title": "Given the root package.json, then test:frontend-subset includes src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-mcp-page",
+        "title": "Write configuration/mcp.mdx and add it to the docs nav",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-13. Create configuration/mcp.mdx with the seven sections the PRD lists (what it is, tools table with scopes, HTTP with Copy MCP URL and the header/config, stdio with OVERDECK_MCP_TOKEN and a Claude Desktop snippet, scopes and approve including the send_message caveat and the admin refusal, revoking, this-machine-only with a Fleet reach heading). Add \"configuration/mcp\" to the docs.json 'Overdeck Anywhere' group after \"configuration/remote-access\"."
+        },
+        "items": [
+          {
+            "id": "docs-mcp-page.ac1",
+            "title": "Given configuration/mcp.mdx, then it contains a table row for each of the ten tool names with the scope each needs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-mcp-page.ac2",
+            "title": "Given configuration/mcp.mdx, then it shows `pan mcp serve` with OVERDECK_MCP_TOKEN and a client config whose Authorization header carries the token, and states the token never goes in the URL.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-mcp-page.ac3",
+            "title": "Given configuration/mcp.mdx, then it explains that approve is off by default, that send_message can still reach a conversation waiting on a question, and that admin tokens are refused.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-mcp-page.ac4",
+            "title": "Given docs.json, then the 'Overdeck Anywhere' group lists configuration/mcp and `npm run lint:docs` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-scopes-auth",
+        "title": "Document the approve scope, the new rows and the /mcp exception",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4649",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-AUTH.md",
+            "configuration/remote-access.mdx",
+            "cli/token.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4649.md work item W-14. In docs/DASHBOARD-AUTH.md 'Scopes' add approve to the bullets and the table (FR-2 routes) plus the three FR-3 rows, and add a '/mcp' subsection describing D-4649-4. In configuration/remote-access.mdx add the approve row to the scope table and extend the read:conversations and operate rows. In cli/token.mdx line 24 add approve to the --scopes list."
+        },
+        "items": [
+          {
+            "id": "docs-scopes-auth.ac1",
+            "title": "Given docs/DASHBOARD-AUTH.md, then its scope table has an approve row naming the eight FR-2 routes and lists GET /api/palette/search, POST /api/conversations and POST /api/workers.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-scopes-auth.ac2",
+            "title": "Given docs/DASHBOARD-AUTH.md, then a /mcp subsection states it accepts only a non-admin kind token credential, is stateless and answers GET with 405.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-scopes-auth.ac3",
+            "title": "Given configuration/remote-access.mdx and cli/token.mdx, then each lists approve among the scopes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "approve-scope",
+        "to": "approve-route-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "approve-route-rows",
+        "to": "mcp-route-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "approve-scope",
+        "to": "mcp-approve-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-core-read",
+        "to": "mcp-write-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-write-tools",
+        "to": "mcp-approve-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-core-read",
+        "to": "mcp-http-route",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-core-read",
+        "to": "mcp-stdio-command",
+        "type": "blocks"
+      },
+      {
+        "from": "workers-route",
+        "to": "mcp-http-route",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-http-route",
+        "to": "mcp-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-approve-tools",
+        "to": "mcp-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-route-rows",
+        "to": "mcp-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "approve-scope",
+        "to": "copy-mcp-url",
+        "type": "blocks"
+      },
+      {
+        "from": "copy-mcp-url",
+        "to": "access-tokens-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-core-read",
+        "to": "mcp-approve-tools",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -1,0 +1,155 @@
+---
+title: Tailscale
+description: Install Tailscale, sign in, turn on protected HTTPS access to the dashboard, and find other Overdeck machines on your tailnet
+---
+
+# Tailscale
+
+[Tailscale](https://tailscale.com) is the recommended way to reach a machine's
+dashboard from your other devices. It puts your machines and phone on one
+private network (a **tailnet**), gives each machine a name such as
+`desk.tailnet-1234.ts.net` (its **MagicDNS name**), and can serve the dashboard
+over HTTPS at that name with **Tailscale Serve**.
+
+Overdeck sets this up for you in **Settings → Anywhere → Set up Tailscale**, or
+in a terminal with [`pan tailscale setup`](/cli/tailscale). Both walk the same
+steps. **Set up Tailscale** appears only in a browser on this machine (the root
+session); a paired device cannot change Tailscale settings.
+
+Overdeck stores nothing about Tailscale. Every step reads the live state from
+the `tailscale` command, so you can also make any change by hand and Overdeck
+picks it up.
+
+## What Set up Tailscale does
+
+Setup reads Tailscale's state and shows the first step that is not done yet:
+
+| Step | When it shows | What Overdeck does |
+| --- | --- | --- |
+| Install | No `tailscale` command is found. | Runs the installer for your platform (see [Per platform](#per-platform)). |
+| Start the daemon | The `tailscale` command cannot reach `tailscaled`. | Linux: runs `sudo systemctl enable --now tailscaled` in a terminal. macOS: asks you to open the Tailscale app. |
+| Operator | Linux, Tailscale installed as root, and this user is not the Tailscale operator. | Runs `sudo tailscale set --operator=<you>` in a terminal, so Overdeck can sign in and turn on Serve without `sudo`. |
+| Sign in | Tailscale is signed out or stopped. | Starts sign-in and shows **Open sign-in**. The step finishes when Tailscale reports `Running`. |
+| Turn on HTTPS | MagicDNS or HTTPS certificates are off for the tailnet. | Links to [the tailnet DNS settings](https://login.tailscale.com/admin/dns). |
+| Turn on HTTPS access | Serve does not yet send `https://<MagicDNS name>` to this dashboard. | Turns on protected Serve HTTPS (see [Serve HTTPS and token sign-in](#serve-https-and-token-sign-in)). |
+| Protect the dashboard | Serve already sends visitors here, but a token is not required to sign in. | Turns on token sign-in without changing Serve. |
+| Ready | Everything above is done. | Shows the Serve address, the phone app QR code and the other Overdeck machines on the tailnet. |
+
+Any command that may need an administrator password runs in a terminal inside
+the dialog (or in your own terminal for `pan tailscale setup`). You type the
+password there. Overdeck never asks for it, sees it or stores it.
+
+If the sign-in attempt says access is denied, this user is not the Tailscale
+operator. Setup then shows the operator step and tries sign-in again once.
+
+## Per platform
+
+| Platform | Condition | Install |
+| --- | --- | --- |
+| Linux | Running as root | `curl -fsSL https://tailscale.com/install.sh \| sh` in a terminal. |
+| Linux | `sudo` is available | `curl -fsSL https://tailscale.com/install.sh \| sh && sudo tailscale set --operator=<you>` in a terminal. |
+| Linux | No `sudo` | Overdeck shows the installer command and the [Linux download page](https://tailscale.com/download/linux). An administrator runs it. |
+| macOS | Homebrew is installed | `brew install --cask tailscale-app && open -a Tailscale` in a terminal. |
+| macOS | No Homebrew | Download and open the [Tailscale package](https://pkgs.tailscale.com/stable/#macos), open Tailscale, allow its VPN configuration, then press **Check again**. |
+| WSL2 | Always | Install Tailscale on Windows (not inside WSL) from the [Windows download page](https://tailscale.com/download/windows). Then run `tailscale serve --bg --https=443 http://127.0.0.1:<port>` in Windows PowerShell, where `<port>` is the dashboard port. |
+| Windows | Always | `winget install tailscale.tailscale`, or the [Windows download page](https://tailscale.com/download/windows). |
+
+If your user name contains characters that are unsafe in a shell command,
+Overdeck shows the Linux installer command and the operator step as text
+instead of running them.
+
+## Userspace mode
+
+Overdeck can also install Tailscale for one Linux user with no administrator
+password: it downloads the official static tarball, checks its published
+SHA-256 checksum, and runs `tailscaled --tun=userspace-networking` under a
+systemd user service, `overdeck-tailscaled.service`. The files live under
+`~/.overdeck/tailscale/`:
+
+| Path | Contents |
+| --- | --- |
+| `~/.overdeck/tailscale/bin/` | `tailscale` and `tailscaled` |
+| `~/.overdeck/tailscale/state/` | Tailscale's node state |
+| `~/.overdeck/tailscale/tailscaled.sock` | The daemon socket every Overdeck call uses |
+
+When that `bin/tailscale` exists, Overdeck uses it in preference to any other
+`tailscale` on the machine. A systemd user service stops when you log out
+unless lingering is on for your user (`loginctl enable-linger`); Overdeck does
+not turn lingering on.
+
+<Warning>
+Userspace mode is **off** in this release. Whether other tailnet devices can
+reach a dashboard served by a userspace `tailscaled`, at the plain tailnet
+address and through Serve HTTPS, has not been checked on a live tailnet yet. Until it
+has, setup offers the Linux installer instead, and `pan tailscale setup
+--userspace` stops with an explanation. Track it on
+[PAN-1254](https://github.com/eltmon/overdeck/issues/1254).
+</Warning>
+
+## Serve HTTPS and token sign-in
+
+**Turn on HTTPS access** runs, in this order:
+
+1. It turns on **Require a token to sign in** (`dashboard.require_token_mint`).
+2. It trusts `https://<MagicDNS name>` as an address of this dashboard.
+3. It runs `tailscale serve --bg --https=443 http://127.0.0.1:<port>`. Tailscale
+   gets an HTTPS certificate for the MagicDNS name and forwards to the
+   dashboard. `--bg` keeps the setting in Tailscale, so it survives restarts of
+   Tailscale and of Overdeck.
+4. It checks that `https://<MagicDNS name>/api/environment` answers with this
+   machine's identity. The first request can take a few seconds while
+   Tailscale gets the certificate.
+
+Turning on HTTPS access also turns on **Require a token to sign in**. Tailscale
+Serve connects to the dashboard from `127.0.0.1`, so without that setting every
+visitor on your tailnet would look like a local caller and could open the
+dashboard. A browser that already has a session keeps working. Every new
+browser, including one at the Serve address, must pair: run
+`pan pair --url https://<MagicDNS name>` or use **Pair a device**. If a later
+step fails, token sign-in stays on.
+
+While Serve forwards to this dashboard, Overdeck keeps **Require a token to sign
+in** on: a Settings save that turns it off keeps it on and logs a warning. To
+turn token sign-in off, turn Serve off first with
+`tailscale serve --https=443 off`.
+
+If Serve was turned on by hand while token sign-in was off, the **Anywhere**
+status card shows "Tailscale Serve sends tailnet visitors to this dashboard, but
+a token is not required to sign in" with a **Protect the dashboard** button.
+
+Overdeck never turns Serve off and never replaces another Serve handler. It
+refuses to continue when port 443 already serves something else, or when
+Tailscale Funnel publishes port 443 on the public internet. `tailscale serve
+status` shows what is there.
+
+Serve needs Tailscale 1.52 or later.
+
+## Tailnet settings
+
+Serve HTTPS needs two tailnet-wide settings, which only the tailnet's admin can
+change: **MagicDNS** and **HTTPS certificates**. Turn both on at
+[login.tailscale.com/admin/dns](https://login.tailscale.com/admin/dns), then
+press **Check again**. If Serve itself is not enabled for the tailnet,
+Tailscale prints a link to enable it, and Overdeck shows that link.
+
+## The phone app
+
+When setup is ready, it shows a QR code for
+[tailscale.com/download](https://tailscale.com/download). Install Tailscale on
+your phone and sign in with the same account shown under the code. Then press
+**Pair a device** to pair the phone's browser with this dashboard.
+
+## Discovering other machines
+
+When Tailscale is ready, **Settings → Anywhere** lists **Overdeck on your
+tailnet**: the other online tailnet machines whose dashboard answers. For each
+online peer, Overdeck asks `https://<peer MagicDNS name>/api/environment` and
+`http://<peer tailnet address>:<this dashboard's port>/api/environment` at the
+same time, 2.5 seconds each, and lists the peer when either answers with an
+Overdeck identity. It shows each machine's label, host name, Overdeck version
+and address, and counts the other tailnet devices. The list loads when the page
+opens and on **Refresh**. `pan tailscale status` prints the same list.
+
+Linking machines arrives with machine links
+([PAN-4645](https://github.com/eltmon/overdeck/issues/4645)). Until then the
+list has no **Link** action.

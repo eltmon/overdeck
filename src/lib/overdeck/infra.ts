@@ -126,6 +126,9 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_pull_requests_key` ON `conversation_pull_requests` (`host`, `repository`, `number`)');
   // PAN-4498: operator bookmarks on transcript messages. Mirrors the init migration.
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_bookmarks` (`conversation_id` text NOT NULL, `message_id` text NOT NULL, `label` text NOT NULL, `message_created_at` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, PRIMARY KEY(`conversation_id`, `message_id`), FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
+  // PAN-4641: operator messages held until a usage limit resets. Mirrors the init migration.
+  runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_scheduled_messages` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` text NOT NULL, `text` text NOT NULL, `status` text NOT NULL, `not_before` integer NOT NULL, `reset_source` text, `limit_window` text, `attempts` integer DEFAULT 0 NOT NULL, `last_error` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, `sent_at` integer, `delivered_at` integer, FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_scheduled_messages_status` ON `conversation_scheduled_messages` (`status`, `not_before`)');
   // PAN-4640: recurring scheduled prompts on conversations. Mirrors the init migration.
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_schedules` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` text NOT NULL, `prompt` text NOT NULL, `cron` text NOT NULL, `time_zone` text NOT NULL, `enabled` integer NOT NULL DEFAULT 1, `next_run_at` integer, `last_run_at` integer, `last_run_status` text, `last_run_error` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_schedules_due` ON `conversation_schedules` (`enabled`, `next_run_at`)');
@@ -143,6 +146,10 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // PAN-4436: Session Vault browse copies (`vault-<vaultId>` rows) are origin 'vault'.
   runSchemaTopUp(db, "ALTER TABLE `conversations` ADD COLUMN `origin` text NOT NULL DEFAULT 'local'");
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `vault_owner_label` text');
+  // PAN-4639: operator triage state (settle / snooze) for the conversation list.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `settled_at` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `settle_reason` text');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `snoozed_until` integer');
 }
 
 /** `app_settings` key recording that the pipeline-mirror drop already ran. */

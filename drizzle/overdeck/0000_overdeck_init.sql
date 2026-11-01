@@ -91,6 +91,24 @@ CREATE TABLE `conversation_bookmarks` (
 	FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
+CREATE TABLE `conversation_scheduled_messages` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`conversation_id` text NOT NULL,
+	`text` text NOT NULL,
+	`status` text NOT NULL,
+	`not_before` integer NOT NULL,
+	`reset_source` text,
+	`limit_window` text,
+	`attempts` integer DEFAULT 0 NOT NULL,
+	`last_error` text,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	`sent_at` integer,
+	`delivered_at` integer,
+	FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `idx_conversation_scheduled_messages_status` ON `conversation_scheduled_messages` (`status`, `not_before`);--> statement-breakpoint
 CREATE TABLE `conversation_schedules` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`conversation_id` text NOT NULL,
@@ -151,6 +169,9 @@ CREATE TABLE `conversations` (
 	`critic_of_conversation_id` text,
 	`origin` text NOT NULL DEFAULT 'local',
 	`vault_owner_label` text,
+	`settled_at` integer,
+	`settle_reason` text,
+	`snoozed_until` integer,
 	FOREIGN KEY (`handoff_target_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`cleared_to_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`parent_conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,

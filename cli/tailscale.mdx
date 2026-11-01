@@ -1,0 +1,100 @@
+---
+title: pan tailscale
+description: Show Tailscale state and set up protected HTTPS access to this machine's dashboard
+---
+
+# `pan tailscale`
+
+```bash
+pan tailscale status [--json]
+pan tailscale setup [--userspace]
+```
+
+Reach this machine over [Tailscale](/configuration/tailscale): see where
+Tailscale stands, walk the setup from a terminal, and list the other Overdeck
+machines on your tailnet. **Settings → Anywhere → Set up Tailscale** does the
+same in the dashboard. See [Tailscale](/configuration/tailscale) for what each
+step does.
+
+## `pan tailscale status`
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Print `{ state, peers }` as JSON. `peers` lists only the tailnet machines that answered as Overdeck. |
+
+Prints the mode (`system`, `app` or `userspace`), version, backend state,
+MagicDNS name, signed-in account, HTTPS certificates, the Serve address (or
+`off`), whether token sign-in is required, and the next setup step with what to
+do about it. When Tailscale is running it also lists the Overdeck machines on
+the tailnet.
+
+```
+Tailscale
+  Mode:               system
+  Version:            1.104.4
+  Backend:            Running
+  MagicDNS name:      desk.tailnet-1234.ts.net
+  Signed in as:       me@example.com
+  HTTPS certificates: on
+  Serve:              https://desk.tailnet-1234.ts.net
+  Token sign-in:      required
+  Next step:          ready — New browsers must pair: run `pan pair --url https://desk.tailnet-1234.ts.net`.
+
+Overdeck on your tailnet
+  HOST    LABEL   VERSION  URL
+  laptop  laptop  0.72.0   https://laptop.tailnet-1234.ts.net
+```
+
+When Tailscale is not installed it prints
+`` Tailscale is not installed. Run `pan tailscale setup`. `` and exits 0.
+`status` always exits 0; it only reads.
+
+## `pan tailscale setup`
+
+| Flag | Effect |
+| --- | --- |
+| `--userspace` | On Linux, install for this user without an administrator password. Off in this release; see below. |
+
+Reads Tailscale's state, acts on the next step, and repeats until Tailscale is
+ready (at most 8 steps):
+
+- **Install, start the daemon, operator:** runs the command in your terminal
+  with its output and input passed through, so you type any `sudo` password
+  yourself. A platform Overdeck cannot install on prints the instructions and a
+  link instead.
+- **Sign in:** prints `Open this link to sign in: <url>` and waits up to 10
+  minutes for the sign-in to finish. If sign-in is denied because this user is
+  not the Tailscale operator, setup runs `sudo tailscale set --operator=<you>`
+  and tries sign-in once more.
+- **Turn on HTTPS:** prints the link to the tailnet DNS settings and exits 1.
+  Run `pan tailscale setup` again after turning on MagicDNS and HTTPS
+  certificates.
+- **Turn on HTTPS access, protect the dashboard:** asks the running dashboard to
+  turn on protected Serve HTTPS (`POST /api/tailscale/serve`). That also turns
+  on **Require a token to sign in**; new browsers must pair.
+- **Ready:** prints the Serve address, the `pan pair --url` hint, and the
+  Overdeck machines on the tailnet, then exits 0.
+
+The Serve step goes through the dashboard because the token sign-in and
+trusted-address caches live in the dashboard process.
+
+`--userspace` stops with exit 1 and an explanation in this release, because
+userspace mode is off until it passes a live check (see
+[Userspace mode](/configuration/tailscale#userspace-mode)).
+
+## Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| 0 | `status` printed, or `setup` reached ready. |
+| 1 | `setup` stopped: a command failed, a step needs you (tailnet DNS settings, a manual install, opening the Tailscale app), a step did not move on after one retry, sign-in did not finish within 10 minutes, or the dashboard is not running. |
+
+## Errors
+
+- No running dashboard at the Serve step:
+  `` Overdeck dashboard is not running; start it with `pan up`. ``, exit 1.
+- A dashboard that rejects this machine's internal token (for example a
+  `pan serve` server): `` The dashboard rejected this machine's internal token.
+  `pan tailscale setup` needs a dashboard started by `pan up`. ``, exit 1.
+- A step that stays the same after its action and one retry:
+  `Setup is still at "<step>".` with what to do, exit 1.

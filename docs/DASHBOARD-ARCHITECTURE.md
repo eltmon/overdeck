@@ -506,9 +506,10 @@ door that does not exist; a real record read door would be a separate change.
   A pending user bubble's `deliveryState` renders one of: `pending` ("Sending…"),
   `unknown` ("Delivery not confirmed"), `accepted` ("Sent · waiting for transcript"), or
   `subagent` ("Delivered to subagent · `<description>`" — Claude Code routed the message
-  into a running subagent instead of this conversation; PAN-4247), or `held` ("Waiting:
+  into a running subagent instead of this conversation; PAN-4247), `held` ("Waiting:
   the agent needs a permission answer first"; see "Terminal permission prompts and held
-  messages" below, PAN-4278). Before pasting, the
+  messages" below, PAN-4278), or `scheduled` (a server-held message waiting for a usage
+  limit to reset; see "Scheduled messages: send when limits reset" below, PAN-4641). Before pasting, the
   composer route checks Claude Code's agent selector and switches input back to the main
   agent (PAN-4268); if that cannot be confirmed the route answers 409
   `input-target-not-main`, the toast shows the reason, and the draft stays in the editor.
@@ -562,7 +563,10 @@ door that does not exist; a real record read door would be a separate change.
   selection back to one when both ends land in the same tagged row. On send the
   pending list is consumed only after the message has committed to a delivery lane
   (bubble, hold, offline hold, or outbox) — so a failed send keeps the citation block
-  in the retry outbox instead of losing it.
+  in the retry outbox instead of losing it. `ConversationView` passes
+  `citationsEnabled` only when the composer branch of the footer chain renders
+  (`!hideComposer`, no `onResume`, not forking, no `clearedToConvId`, not a vault
+  copy) (PAN-4681).
 - Conversation timeline layout (PAN-4497): `MessagesTimeline.tsx` virtualizes all but
   the last 8 rows with `@tanstack/react-virtual`. Visible virtual rows render in normal
   flow inside one wrapper translated to the first visible row's offset, so rows cannot
@@ -827,6 +831,79 @@ One silent path remains by design: Herdr reports `agent_prompt_stalled`/`timeout
 `agent.prompt` wait as delivered, because it types the text and Enter before it watches, and
 its contract says never to re-send. The frontend's 4-minute "Not found in transcript" timer is
 the only cover for that case.
+
+## Scheduled messages: send when limits reset (PAN-4641)
+
+When a Claude Code conversation stops on a usage limit, the operator can queue a message on the
+server instead of waiting. The server holds it and sends it about a minute after the limit
+resets. Only Claude Code conversations support this; other harnesses, agents and vault browse
+copies are refused.
+
+**Reset time.** `providerErrorFromTranscriptTail` (`src/lib/overdeck/conversation-provider-error.ts`)
+sets `usageLimit` on an API-error record whose `error` is `rate_limit` or whose `apiErrorStatus`
+is 429. The reset time comes from, in order: `quotaLimits.resetsAt` (unix **seconds**, with
+`quotaLimits.rateLimitType` such as `five_hour` or `seven_day` as the window); the
+`resets 9am (America/New_York)` / `resets Oct 1, 3pm (…)` message text, parsed by
+`parseLimitResetText` (`limit-reset-text.ts`); otherwise unknown (a proxied 429).
+`readConversationUsageLimit` (`conversation-usage-limit.ts`) answers `limited` while the last
+main-chain turn is such a record and its reset is in the future or unknown.
+
+**Store.** The overdeck.db table `conversation_scheduled_messages` is read and written only by
+the door `src/lib/overdeck/conversation-scheduled-messages.ts`. A row's `not_before` is the
+reset plus a 60 s grace, `now + 15 min` when the reset is unknown, or `now` when no limit is
+active. A conversation holds at most 20 undelivered rows; text is limited to 50 000 characters,
+and `/pan` commands are refused.
+
+**Status machine.** `pending → sending → sent → delivered`. The tick
+(`tickScheduledMessages`, `src/lib/overdeck/scheduled-message-delivery.ts`) runs every 60 s and
+acts on each conversation's **head row** only (lowest id not delivered), so messages send in
+queue order and a `failed` or `unknown` head blocks the rows behind it until the operator
+dismisses it.
+
+- A due `pending` head whose conversation is still limited with a known future reset is re-armed
+  to that reset without counting an attempt.
+- Otherwise the row is claimed atomically (`pending → sending`). An ended conversation, or one
+  whose harness process is gone, is resumed first through `handleConversationResume`; a failed
+  resume puts the row back to `pending` for the next tick and counts an attempt. A blocking
+  choice menu in the pane defers the row; the pane is read through `resolveAgentPaneIo`, so the
+  check works on Herdr and tmux. A throw inside the claimed section never leaves the row in
+  `sending`: before the paste it returns to `pending`, after it the row becomes `unknown`.
+- The delivery door `handleConversationMessage` is called directly (not through the HTTP
+  receipt cache). 2xx → `sent`; 409 → back to `pending`; other 4xx → `failed`. A 5xx whose body
+  says `deliveryUnknown: false` (the terminal refused the paste, e.g. 502 `not-delivered`)
+  returns to `pending` and counts an attempt; any other 5xx or a thrown error → `unknown`. An
+  `unknown` row is never pasted again automatically.
+- A `sent` row's outcome is read from the transcript: a newer assistant reply → `delivered`; a
+  newer usage-limit error → re-armed to the new reset with `attempts + 1`; no newer assistant
+  record within the 10-minute outcome window → `delivered` with `last_error: no transcript
+  confirmation`. A re-arm past `MAX_SCHEDULED_ATTEMPTS` (24) marks the row `failed`.
+- Delivered rows are pruned after seven days. Each paste emits an `info` activity entry linked to
+  `/conv/<id>`; each re-arm, failure and unknown outcome emits a `warn` entry.
+
+**Patrol.** `src/dashboard/server/services/scheduled-message-patrol.ts` hosts the tick in the
+dashboard process, because the delivery and resume doors live there (the Deacon runs in a
+forked child). At start it marks rows a crash left in `sending` as `unknown`, then runs one tick
+and ticks every 60 s. It does not start on a peer dashboard or with
+`OVERDECK_DISABLE_SCHEDULED_MESSAGES=1`, skips ticks while the Deacon is frozen, and skips a
+tick while the previous one is still running. Archived conversations are skipped; their rows
+wait until the conversation is unarchived.
+
+**Routes.**
+
+| Route | Answer |
+| --- | --- |
+| `GET /api/conversations/:name/scheduled-messages` | 200 `{ supported, limit, messages }` (rows `pending`, `sending`, `failed`, `unknown`); 404 |
+| `POST /api/conversations/:name/scheduled-messages` `{ message }` | 201 `{ message, limit }`; 404; 422 `{ error, code }` (`empty`, `too-long`, `command-not-schedulable`, `limit-detection-unsupported`, `vault-browse-copy`); 409 `queue-full` |
+| `PATCH /api/conversations/:name/scheduled-messages/:id` `{ message }` | 200 `{ message }`; 404; 409 `not-editable` (row not `pending`); 400 |
+| `DELETE /api/conversations/:name/scheduled-messages/:id` | 200 `{ removed: true }`; 404; 409 `already-sent` (row `sending` or `sent`) |
+
+**Client.** `useScheduledMessages` (`components/chat/scheduledMessages.ts`) polls the GET every
+15 s through one shared poller per conversation. The composer offers **When limits reset** in
+the delivery selector and, while the conversation is limited, a notice with a **Send when limits
+reset** button. Queued rows render at the end of the timeline as dimmed user bubbles
+(`messagesTimeline/ScheduledMessageRow.tsx`) with the expected send time, Edit and Cancel
+(Dismiss for a failed or unconfirmed row). From a terminal: `pan tell <conv> --when-limit-resets
+"<msg>"` queues a message and `pan conv pending <conv>` lists the queue.
 
 ## Degraded mode (PAN-4279)
 

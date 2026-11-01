@@ -41,6 +41,23 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/conversations/:name/kickoff', scope: 'read:conversations' },
   { method: 'POST', path: '/api/conversations/:name/kickoff', scope: 'tell' },
   { method: 'GET', path: '/api/conversations/:name/bookmarks', scope: 'read:conversations' },
+  { method: 'GET', path: '/api/conversations/:name/scheduled-messages', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/conversations/:name/scheduled-messages', scope: 'tell' },
+  { method: 'PATCH', path: '/api/conversations/:name/scheduled-messages/:id', scope: 'tell' },
+  { method: 'DELETE', path: '/api/conversations/:name/scheduled-messages/:id', scope: 'tell' },
+  // PAN-4649: approvals need approve.
+  { method: 'POST', path: '/api/conversations/:id/permission', scope: 'approve' },
+  { method: 'POST', path: '/api/conversations/:id/pane-choice', scope: 'approve' },
+  { method: 'POST', path: '/api/conversations/:id/pi-ask-answer', scope: 'approve' },
+  { method: 'POST', path: '/api/conversations/:id/codex-approval', scope: 'approve' },
+  { method: 'POST', path: '/api/conversations/:name/plan-action', scope: 'approve' },
+  { method: 'POST', path: '/api/agents/:id/answer-question', scope: 'approve' },
+  { method: 'POST', path: '/api/agents/:id/plan-action', scope: 'approve' },
+  { method: 'POST', path: '/api/agents/:id/permissions/:requestId/respond', scope: 'approve' },
+  // PAN-4649: MCP tools.
+  { method: 'GET', path: '/api/palette/search', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/conversations', scope: 'operate' },
+  { method: 'POST', path: '/api/workers', scope: 'operate' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

@@ -278,6 +278,10 @@ example `/compact`) sends the bare command and leaves any pending citations
 untouched. You can only cite settled message text — not tool output, plan
 cards, choice cards, or a reply still streaming in.
 
+Cite is offered only when the conversation has a composer: it does not appear
+while the conversation shows the resume bar, is a read-only vault copy, was
+cleared into another conversation, or is still forking.
+
 ## Bookmarks
 
 Click the icon beside an assistant or user message to bookmark it, using its
@@ -732,6 +736,43 @@ change. It applies to the diff in every view, and the panel remembers it in this
 browser. A turn's file list can still name a file whose only change was
 whitespace; opening it then shows no net changes.
 
+## Settling and snoozing conversations
+
+The conversation list groups rows into four sections, top to bottom: **Needs
+you**, **Inbox**, **Snoozed**, and **Settled**. A group with any pending
+question, plan-mode prompt, or approval request always shows in Needs you,
+regardless of its stored settle or snooze state — the group returns to
+Snoozed or Settled once the question is answered. Inbox has no header.
+Snoozed and Settled each show a count and are collapsed by default; click
+the header to expand.
+
+**Settling** marks a conversation done for now without stopping it — the
+session keeps running, and nothing about it changes except where it sits in
+the list. This is different from [stopping or archiving](#stopping-or-archiving-a-conversation),
+which end the session. Settle (and Unsettle) are available from the row's
+checkbox, the row's overflow menu, and the tab menu.
+
+**Snoozing** hides a conversation until a chosen time, after which it moves
+back to Inbox on its own — there is no server timer and no dashboard restart
+can lose or delay it, since the wake check runs on the client against the
+stored time. Choose **Snooze** from either menu for presets (1 hour, this
+evening, tomorrow morning, next week) or **Custom…** for any future date and
+time; **Unsnooze** clears it early. A snoozed row shows when it comes back,
+such as "back tomorrow 09:00".
+
+Every settle, unsettle, snooze, and unsnooze shows a toast with an **Undo**
+action, and `Cmd+Z`/`Ctrl+Z` undoes the most recent one while focus is
+anywhere in the list (but not while typing in a text field).
+
+Shift-click and `Cmd`/`Ctrl`-click select multiple rows; with a selection
+active, a bulk bar above the list offers Settle, Unsettle, and Snooze for
+every selected conversation in one action.
+
+Auto-settle — settling a conversation automatically when its pull request
+merges, or when it has been idle for a while — is tracked separately:
+on merge in [PAN-4653](https://github.com/eltmon/overdeck/issues/4653), and
+on idle in [PAN-4655](https://github.com/eltmon/overdeck/issues/4655).
+
 ## Stopping or archiving a conversation
 
 Stop is the `X` on the row or "Stop agent" in the row menu, the tab menu, or
@@ -743,7 +784,9 @@ header shows the same status. The row stays dimmed until the conversation
 list has refreshed — then a stopped row shows its stopped (gray) dot, and an
 archived row leaves the list with a toast reading `Archived "<title>"` and
 its tab closes. On failure, an error toast shows the server's message and
-the row returns to normal.
+the row returns to normal. Both end the session; settling (above) does not
+— a settled conversation keeps running and can still be unsettled back to
+Inbox.
 
 ## See also
 
