@@ -36,6 +36,11 @@ import { setupTerminalWebSocket } from './ws-terminal.js';
 import { knowledgeViewerRouteLayer, setupKnowledgeViewerProxy } from './routes/knowledge-viewer.js';
 import { setupVoiceWebSocket } from './ws-voice.js';
 import { setupAutoPresoWebSocket } from './ws-autopreso.js';
+import { installChannelListener } from './channel-listener.js';
+import { recordPairingExchangeFailure } from './pairing-credentials.js';
+import { getOverdeckVersion } from './routes/misc/shared.js';
+import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
+import { ensureMachineKey } from '../../lib/anywhere/machine-key.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
 import { testRemovalWaiverRouteLayer } from './routes/test-removal-waiver.js'
@@ -129,6 +134,17 @@ const HttpServerLive = Layer.unwrap(
       setupKnowledgeViewerProxy(nodeServer);
       setupVoiceWebSocket(nodeServer);
       setupAutoPresoWebSocket(nodeServer);
+      // PAN-4645: secure machine channels on the dashboard port (primary only).
+      // Peer pinning (WI-4) and pairing credentials (WI-12) plug in here; until
+      // they land every handshake is refused, which is the fail-closed default.
+      installChannelListener(nodeServer, {
+        primary: !isPeerDashboardProcess(),
+        localKey: ensureMachineKey,
+        isPinnedPeer: () => false,
+        takePairing: () => 'unknown',
+        onPairingFailure: recordPairingExchangeFailure,
+        serverVersion: getOverdeckVersion,
+      });
       return nodeServer;
     }, {
       host: config.host,

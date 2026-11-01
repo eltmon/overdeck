@@ -65,69 +65,115 @@ export type OpenChannelOptions =
   | (CommonOpenOptions & { mode: 'pairing'; pairingCode: string });
 
 export async function openChannel(url: TransportUrl, opts: OpenChannelOptions): Promise<ChannelSocket> {
+  return withDeadline(url, opts, async (signal, track) => {
+    const raw = await connectTransport(url, signal);
+    track(raw);
+    return handshakeAsInitiator(raw, url, opts, track);
+  });
+}
+
+/**
+ * Run the initiator handshake over a transport that is already connected
+ * (for example a `/ws/link` WebSocket stream the caller opened itself).
+ * The same timeout and abort rules as {@link openChannel} apply.
+ */
+export async function openChannelOverTransport(raw: Duplex, opts: OpenChannelOptions, label = 'transport'): Promise<ChannelSocket> {
+  return withDeadline(label, opts, async (_signal, track) => {
+    track(raw);
+    return handshakeAsInitiator(raw, label, opts, track);
+  });
+}
+
+interface Tracked {
+  raw: Duplex | null;
+  reader: FrameReader | null;
+}
+
+/**
+ * Deadline + abort plumbing shared by both entry points: a timer and the
+ * caller's signal both abort an internal controller; aborting fails the
+ * pending frame read and destroys the transport.
+ */
+async function withDeadline(
+  label: string,
+  opts: OpenChannelOptions,
+  run: (signal: AbortSignal, track: (raw: Duplex, reader?: FrameReader) => void) => Promise<ChannelSocket>,
+): Promise<ChannelSocket> {
   const controller = new AbortController();
+  const tracked: Tracked = { raw: null, reader: null };
   let reason: ChannelOpenError | null = null;
   const abortWith = (error: ChannelOpenError): void => {
     if (reason) return;
     reason = error;
     controller.abort(error);
   };
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_OPEN_TIMEOUT_MS;
   const timer = setTimeout(
-    () => abortWith(new ChannelOpenError('timeout', `Secure channel to ${url} did not open within ${opts.timeoutMs ?? DEFAULT_OPEN_TIMEOUT_MS} ms`)),
-    opts.timeoutMs ?? DEFAULT_OPEN_TIMEOUT_MS,
+    () => abortWith(new ChannelOpenError('timeout', `Secure channel to ${label} did not open within ${timeoutMs} ms`)),
+    timeoutMs,
   );
-  const onExternalAbort = (): void => abortWith(new ChannelOpenError('aborted', `Secure channel open to ${url} was aborted`));
+  const onExternalAbort = (): void => abortWith(new ChannelOpenError('aborted', `Secure channel open to ${label} was aborted`));
   if (opts.signal?.aborted) onExternalAbort();
   else opts.signal?.addEventListener('abort', onExternalAbort, { once: true });
-
-  let raw: Duplex | null = null;
-  let reader: FrameReader | null = null;
   const onAbort = (): void => {
-    if (reason) reader?.fail(reason);
-    raw?.destroy();
+    if (reason) tracked.reader?.fail(reason);
+    tracked.raw?.destroy();
   };
   controller.signal.addEventListener('abort', onAbort, { once: true });
 
   try {
     if (reason) throw reason;
-    raw = await connectTransport(url, controller.signal);
-    reader = new FrameReader(raw);
-
-    if (opts.mode === 'link') {
-      raw.write(encodePreamble({ linkProtocol: NOISE_LINK_PROTOCOL, mode: 'link', pairingId: null }));
-      const handshake = ikInitiator(opts.localKey, Buffer.from(opts.remoteKeyHex, 'hex'), prologueFor('link', null));
-      raw.write(encodeFrame(handshake.send()));
-      const message2 = await readMessage(reader, 'link');
-      try {
-        handshake.recv(message2);
-      } catch {
-        throw new ChannelOpenError('identity-refused', `${url} did not prove the pinned machine key`);
-      }
-      return finish(raw, reader, handshake, null, { mode: 'link', remoteKeyHex: opts.remoteKeyHex, pairingId: null });
-    }
-
-    const { psk, pairingId } = pairingSecrets(opts.pairingCode);
-    raw.write(encodePreamble({ linkProtocol: NOISE_LINK_PROTOCOL, mode: 'pairing', pairingId }));
-    const handshake = xxPskInitiator(opts.localKey, psk, prologueFor('pairing', pairingId));
-    raw.write(encodeFrame(handshake.send()));
-    const message2 = await readMessage(reader, 'pairing');
-    try {
-      handshake.recv(message2);
-    } catch {
-      throw new ChannelOpenError('pairing-refused', `${url} did not accept the pairing code`);
-    }
-    const message3 = handshake.send();
-    const remoteKeyHex = handshake.remoteKey().toString('hex');
-    return finish(raw, reader, handshake, message3, { mode: 'pairing', remoteKeyHex, pairingId });
+    return await run(controller.signal, (raw, reader) => {
+      tracked.raw = raw;
+      if (reader) tracked.reader = reader;
+    });
   } catch (error) {
-    reader?.detach();
-    if (raw && !raw.destroyed) raw.destroy();
-    throw reason ?? toOpenError(error, url);
+    tracked.reader?.detach();
+    if (tracked.raw && !tracked.raw.destroyed) tracked.raw.destroy();
+    throw reason ?? toOpenError(error, label);
   } finally {
     clearTimeout(timer);
     controller.signal.removeEventListener('abort', onAbort);
     opts.signal?.removeEventListener('abort', onExternalAbort);
   }
+}
+
+async function handshakeAsInitiator(
+  raw: Duplex,
+  label: string,
+  opts: OpenChannelOptions,
+  track: (raw: Duplex, reader?: FrameReader) => void,
+): Promise<ChannelSocket> {
+  const reader = new FrameReader(raw);
+  // Register the reader with the deadline so an abort fails the pending read.
+  track(raw, reader);
+
+  if (opts.mode === 'link') {
+    raw.write(encodePreamble({ linkProtocol: NOISE_LINK_PROTOCOL, mode: 'link', pairingId: null }));
+    const handshake = ikInitiator(opts.localKey, Buffer.from(opts.remoteKeyHex, 'hex'), prologueFor('link', null));
+    raw.write(encodeFrame(handshake.send()));
+    const message2 = await readMessage(reader, 'link');
+    try {
+      handshake.recv(message2);
+    } catch {
+      throw new ChannelOpenError('identity-refused', `${label} did not prove the pinned machine key`);
+    }
+    return finish(raw, reader, handshake, null, { mode: 'link', remoteKeyHex: opts.remoteKeyHex, pairingId: null });
+  }
+
+  const { psk, pairingId } = pairingSecrets(opts.pairingCode);
+  raw.write(encodePreamble({ linkProtocol: NOISE_LINK_PROTOCOL, mode: 'pairing', pairingId }));
+  const handshake = xxPskInitiator(opts.localKey, psk, prologueFor('pairing', pairingId));
+  raw.write(encodeFrame(handshake.send()));
+  const message2 = await readMessage(reader, 'pairing');
+  try {
+    handshake.recv(message2);
+  } catch {
+    throw new ChannelOpenError('pairing-refused', `${label} did not accept the pairing code`);
+  }
+  const message3 = handshake.send();
+  const remoteKeyHex = handshake.remoteKey().toString('hex');
+  return finish(raw, reader, handshake, message3, { mode: 'pairing', remoteKeyHex, pairingId });
 }
 
 function finish(
