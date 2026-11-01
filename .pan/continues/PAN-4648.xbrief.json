@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4648",
   "created": "2026-11-01T05:50:45.229Z",
-  "updated": "2026-11-01T08:01:12.556Z",
+  "updated": "2026-11-01T08:01:33.776Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -206,6 +206,10 @@
     "settings-triggers-panel.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T08:01:12.556Z"
+    },
+    "settings-triggers-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:01:33.775Z"
     }
   }
 }
