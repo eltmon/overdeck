@@ -77,6 +77,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },
   { method: 'POST', path: '/api/conversations/:name/release/undo', scope: 'operate' },
   { method: 'POST', path: '/api/conversations/:name/release/complete', scope: 'operate' },
+  // PAN-4650 WI-17: the dev-server ports a linked machine may preview.
+  { method: 'GET', path: '/api/conversations/:name/preview-ports', scope: 'read:conversations' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

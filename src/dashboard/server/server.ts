@@ -34,6 +34,7 @@ import { OpenRouterServiceLive } from './services/openrouter-service.js';
 import { PanOpenLive } from './services/open.js';
 import { setupTerminalWebSocket } from './ws-terminal.js';
 import { setupLinkedWebSocket } from './ws-linked.js';
+import { setupForwardWebSocket } from './ws-forward.js';
 import { knowledgeViewerRouteLayer, setupKnowledgeViewerProxy } from './routes/knowledge-viewer.js';
 import { setupVoiceWebSocket } from './ws-voice.js';
 import { setupAutoPresoWebSocket } from './ws-autopreso.js';
@@ -87,6 +88,7 @@ import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { conversationKickoffRouteLayer } from './routes/conversation-kickoff.js';
 import { conversationPullRouteLayer } from './routes/conversation-pull.js';
+import { conversationPreviewPortsRouteLayer } from './routes/conversation-preview-ports.js';
 import { conversationBookmarksRouteLayer } from './routes/conversation-bookmarks.js';
 import { conversationTriageRouteLayer } from './routes/conversation-triage.js';
 import { conversationScheduledMessagesRouteLayer } from './routes/conversation-scheduled-messages.js';
@@ -150,6 +152,7 @@ const HttpServerLive = Layer.unwrap(
       holdRequestsUntilServed(nodeServer);
       setupTerminalWebSocket(nodeServer);
       setupLinkedWebSocket(nodeServer);
+      setupForwardWebSocket(nodeServer);
       setupKnowledgeViewerProxy(nodeServer);
       setupVoiceWebSocket(nodeServer);
       setupAutoPresoWebSocket(nodeServer);
@@ -362,6 +365,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   conversationsRouteLayer,
   conversationKickoffRouteLayer,
   conversationPullRouteLayer,
+  conversationPreviewPortsRouteLayer,
   conversationBookmarksRouteLayer,
   conversationTriageRouteLayer,
   conversationScheduledMessagesRouteLayer,
