@@ -91,3 +91,26 @@ $SP/home
 $ ls $SP/s
 analytics  config.yaml  projects  sessions
 ```
+
+## Fork: pack-mode test
+
+Fork commit: `541f9683409d7fd21e55beeb310c5bae7f0bdad1` — `test(pack-mode): pack mode writes only its two roots`.
+
+Files: `test/pack-mode.test.ts` (new), `docs/pack-mode.md` (new), `docs/state-root.md` (one added row: the pack marker in the chain table, so the state-root doc matches the resolvers changed in `fork-state-root-marker`).
+
+Notes on the plan:
+
+- Git stub: the PRD lists `remote` among the network subcommands. `gstack-skill-start` runs `git remote get-url origin`, which only reads local config, so a blanket `remote` rule logged a false network call. The stub treats only `remote update` and `remote show` as network. With that, the test also asserts that `net.log` is still absent after `gstack-skill-start`, which is stricter than the PRD's setup-only check.
+- Extra case beyond the PRD list: a non-empty `--pack-root` exits 2 and leaves its contents alone.
+
+```
+$ bun test test/pack-mode.test.ts
+bun test v1.3.14 (0d9b296a)
+
+ 4 pass
+ 0 fail
+ 26 expect() calls
+Ran 4 tests across 1 file. [643.00ms]
+```
+
+Registry ratchets for new test files also pass: `test/free-seed-ratchet.test.ts`, `test/test-free-shards.test.ts`, `test/free-fixtures.test.ts` (98 pass).
