@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4728",
   "created": "2026-11-01T17:45:22.507Z",
-  "updated": "2026-11-01T18:54:22.757Z",
+  "updated": "2026-11-01T18:54:36.709Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "launch-pstack-mount.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T18:54:22.756Z"
+    },
+    "launch-pstack-mount.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:54:36.708Z"
     }
   }
 }
