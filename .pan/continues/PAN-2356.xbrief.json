@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T13:36:05.723Z",
+  "updated": "2026-11-01T13:37:05.035Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-2356",
       "claimedAt": "2026-11-01T13:35:50.720Z",
       "doneAt": "2026-11-01T13:36:05.722Z"
+    },
+    "wi2-account-free-plan": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T13:37:05.035Z"
     }
   }
 }
