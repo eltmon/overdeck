@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4296",
   "created": "2026-11-01T21:43:56.125Z",
-  "updated": "2026-11-01T23:15:57.563Z",
+  "updated": "2026-11-01T23:16:11.612Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "wi4-provision-codex.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T23:15:57.563Z"
+    },
+    "wi5-service-codex.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T23:16:11.612Z"
     }
   }
 }
