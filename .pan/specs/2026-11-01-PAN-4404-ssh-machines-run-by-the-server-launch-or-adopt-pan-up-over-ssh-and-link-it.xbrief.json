@@ -4,17 +4,17 @@
     "created": "2026-11-01T13:22:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4404: SSH machines run by the server: launch or adopt pan up over SSH and link it",
-    "updated": "2026-11-01T13:28:28.031Z"
+    "updated": "2026-11-01T13:29:12.788Z"
   },
   "plan": {
     "id": "pan-4404",
     "title": "SSH machines run by the server: launch or adopt pan up over SSH and link it",
-    "status": "proposed",
+    "status": "running",
     "uid": "88f57875-2d1c-45c8-ab4d-da03ef32bdd3",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T13:22:00Z",
-    "updated": "2026-11-01T13:28:28.031Z",
+    "updated": "2026-11-01T13:29:12.788Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4404",
@@ -1147,5 +1147,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
