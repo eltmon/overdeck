@@ -8,7 +8,7 @@
  */
 import type { AgentSnapshot } from '@overdeck/contracts';
 import type { BackendPane, DerivedIssueState, Issue } from '../../types';
-import { derivePipelineState, type PipelineState } from '../issuePipelineState';
+import { derivePipelineState, hasLivePane, type PipelineState } from '../issuePipelineState';
 import { isAgentProblemStatus } from '../pipeline-state';
 import { phaseRailState, type PhaseRailState } from './phases';
 import { userFacingDisplay, type NeedsYouReason, type UserFacingDisplay } from './userFacingState';
@@ -20,7 +20,7 @@ export interface SimpleIssueDerivation {
   display: UserFacingDisplay;
   /** The agent the UI talks to (running work > plan > review > test > ship, else newest). */
   primaryAgent: AgentSnapshot | undefined;
-  /** First agent with an outstanding question/plan approval. */
+  /** First agent with an outstanding question/plan approval. Once a work agent exists, a planner idle at a bare turn end is not one (PAN-4670). */
   pendingInputAgent: AgentSnapshot | undefined;
   /** An agent is in a problem status — "Get it unstuck" recovers the agent. */
   agentStuck: boolean;
@@ -111,6 +111,44 @@ export function isBareTurnEnd(agent: AgentSnapshot): boolean {
   return kinds.length > 0 && kinds.every((k) => k === 'agentTurnEnded');
 }
 
+/** Pipeline states only a work agent can produce: it finished and the work moved on. */
+const POST_WORK_PIPELINE_STATES: ReadonlySet<PipelineState> = new Set<PipelineState>([
+  'in_review_reviewers_running',
+  'in_review_changes_requested',
+  'in_review_approved',
+  'ready_to_merge',
+  'merged',
+  'done',
+  'canceled',
+]);
+
+/**
+ * A work agent exists for the issue: its pane is live, or the pipeline has
+ * moved past work. `in_progress_work_idle` alone proves nothing — finalize
+ * commits the plan to the feature branch and any live pane (an idle planner
+ * included) reads as `working`, so a planned-but-unstarted issue lands there
+ * with no work agent at all.
+ */
+export function hasWorkAgent(pipelineState: PipelineState, panes: readonly BackendPane[]): boolean {
+  return hasLivePane(panes, 'work') || POST_WORK_PIPELINE_STATES.has(pipelineState);
+}
+
+/** States `derivePipelineState` returns without consulting a live work pane. */
+const PRE_WORK_PIPELINE_STATES: ReadonlySet<PipelineState> = new Set<PipelineState>([
+  'generic',
+  'planning_active',
+  'planning_done_awaiting_work',
+]);
+
+/**
+ * PAN-4670 — a live work pane outranks a derived state that has not caught
+ * up: missing (`generic`) or still `planned`. Without this the base display
+ * for those states offers Start work while the work agent runs.
+ */
+export function simplePipelineState(base: PipelineState, panes: readonly BackendPane[]): PipelineState {
+  return hasLivePane(panes, 'work') && PRE_WORK_PIPELINE_STATES.has(base) ? 'in_progress_work_running' : base;
+}
+
 /**
  * The plan exists and the plan agent has stopped talking without asking
  * anything: nothing will happen until a human starts the work.
@@ -120,9 +158,18 @@ export function isBareTurnEnd(agent: AgentSnapshot): boolean {
  * machine in `planning_active` — so process state answers "is it alive", never
  * "is it still planning". Mid-planning there is no plan yet, so a turn-end
  * there is a real question and stays one.
+ *
+ * PAN-4670 — the card is only for a plan with no work agent. A planner that
+ * stays alive at its prompt after finalize must not offer Start work while
+ * the work agent runs.
  */
-export function isPlanReadyToStart(issue: Issue, pendingInputAgent: AgentSnapshot | undefined): boolean {
+export function isPlanReadyToStart(
+  issue: Issue,
+  pendingInputAgent: AgentSnapshot | undefined,
+  workAgentExists: boolean,
+): boolean {
   if (issue.hasPlan !== true) return false;
+  if (workAgentExists) return false;
   if (!pendingInputAgent || pendingInputAgent.role !== 'plan') return false;
   return isBareTurnEnd(pendingInputAgent);
 }
@@ -134,16 +181,25 @@ export function deriveSimpleIssue(
   panes: readonly BackendPane[] = [],
 ): SimpleIssueDerivation {
   const primaryAgent = pickPrimaryAgent(agents);
-  const pendingInputAgent = agents.find(hasPendingInput);
   const agentStuck = agents.some((a) => isAgentProblemStatus(a.status));
   const reviewStuck = derived?.attention === 'stuck' || derived?.attention === 'api-error';
   const stuck = agentStuck || reviewStuck;
 
-  const pipelineState = derivePipelineState({
-    derived: derived ?? null,
+  const pipelineState = simplePipelineState(
+    derivePipelineState({
+      derived: derived ?? null,
+      panes,
+      issueCanonicalState: issue.state ?? issue.status ?? null,
+    }),
     panes,
-    issueCanonicalState: issue.state ?? issue.status ?? null,
-  });
+  );
+  const workAgentExists = hasWorkAgent(pipelineState, panes);
+  // PAN-4670 — once work exists, a planner idle at a bare turn end is a
+  // finished planner, not a question. Skip it so the display falls through
+  // to the real pipeline state and a later agent's real question is found.
+  const pendingInputAgent = agents.find(
+    (a) => hasPendingInput(a) && !(workAgentExists && a.role === 'plan' && isBareTurnEnd(a)),
+  );
 
   const costs = agents.map((a) => a.costSoFar).filter((c): c is number => typeof c === 'number');
   const lastAgentActivity = agents
@@ -159,7 +215,7 @@ export function deriveSimpleIssue(
     display: userFacingDisplay({
       pipelineState,
       pendingInput: !!pendingInputAgent,
-      planReadyToStart: isPlanReadyToStart(issue, pendingInputAgent),
+      planReadyToStart: isPlanReadyToStart(issue, pendingInputAgent, workAgentExists),
       stuck,
     }),
     primaryAgent,

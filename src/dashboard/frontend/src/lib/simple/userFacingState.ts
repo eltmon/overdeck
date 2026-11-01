@@ -19,8 +19,8 @@ export interface UserFacingInput {
   pendingInput?: boolean;
   /**
    * The plan is written and the plan agent has stopped talking without asking
-   * anything — so what this needs is the start button, whatever the raw
-   * pipeline state says. See `isPlanReadyToStart` in ./derive.ts.
+   * anything, and no work agent exists for the issue — so what this needs is
+   * the start button. See `isPlanReadyToStart` and `hasWorkAgent` in ./derive.ts.
    */
   planReadyToStart?: boolean;
   /** An agent is past the stuck threshold, or the issue's attention is stuck. */
