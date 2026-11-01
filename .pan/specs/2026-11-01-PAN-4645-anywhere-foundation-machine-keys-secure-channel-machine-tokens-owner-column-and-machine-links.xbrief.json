@@ -4,17 +4,17 @@
     "created": "2026-11-01T05:17:19Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4645: Anywhere foundation: machine keys, secure channel, machine tokens, owner column and machine links",
-    "updated": "2026-11-01T05:17:26.113Z"
+    "updated": "2026-11-01T05:43:58.457Z"
   },
   "plan": {
     "id": "pan-4645",
     "title": "Anywhere foundation: machine keys, secure channel, machine tokens, owner column and machine links",
-    "status": "proposed",
+    "status": "running",
     "uid": "6d1855e7-7544-4d7c-84f4-6b00bf9d0d40",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T05:17:19Z",
-    "updated": "2026-11-01T05:17:26.113Z",
+    "updated": "2026-11-01T05:43:58.457Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4645",
@@ -1915,5 +1915,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

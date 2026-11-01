@@ -146,6 +146,12 @@ export default defineConfig(async () => {
         '@lydell/node-pty',
         '@parcel/watcher',
         'ssh2',
+        // PAN-4645 (D-4645-2): the Noise stack resolves `sodium-native` prebuilds via
+        // `require-addon`; bundling any of the four breaks that lookup.
+        'noise-handshake',
+        '@hyperswarm/secret-stream',
+        'sodium-universal',
+        'sodium-native',
         // PAN-1645: playwright is loaded only via a runtime `await import('playwright')`
         // (artifact thumbnails). Bundling it pulls in playwright-core's prebundled
         // coreBundle.js, which has an internal `require("chromium-bidi/...")` for a
