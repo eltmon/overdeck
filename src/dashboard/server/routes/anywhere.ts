@@ -27,6 +27,8 @@ import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import {
   computeAnywhereProblems,
+  readDirectoryStatus,
+  readRelayStatus,
   readAnywhereVaultState,
   type AnywhereStatus,
   type AnywhereViewerKind,
@@ -135,6 +137,8 @@ async function buildAnywhereStatus(viewerKind: AnywhereViewerKind | null): Promi
       magicDnsName: tailscale.magicDnsName,
     },
     viewer: { kind: viewerKind },
+    directory: readDirectoryStatus(),
+    relay: readRelayStatus(),
   };
 }
 

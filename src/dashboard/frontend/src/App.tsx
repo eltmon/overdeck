@@ -10,6 +10,7 @@ import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
 import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
+import { IssueDrawerAvailableContext } from './components/drawer/issueDrawerAvailableContext';
 import { ConversationDock } from './components/dock/ConversationDock';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
@@ -798,6 +799,7 @@ export default function App() {
   }, [openIssue, setActiveTab]);
 
   return (
+    <IssueDrawerAvailableContext.Provider value>
     <div className="h-screen flex flex-row overflow-hidden bg-background">
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
@@ -931,5 +933,6 @@ export default function App() {
       {/* Toast Notifications */}
       <Toaster />
     </div>
+    </IssueDrawerAvailableContext.Provider>
   );
 }

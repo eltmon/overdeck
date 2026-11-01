@@ -39,15 +39,17 @@ The plan lives in the Overdeck Anywhere epic,
     <div style={{ fontSize: '1.75rem', fontWeight: 600, lineHeight: 1.2, margin: '0.25rem 0' }}>&#36;0, forever</div>
     Open source.
 
+    - No account needed
+    - Linked machines over LAN, Tailscale, SSH and Fly
     - Unlimited storage on your own backend
     - All of Session Vault Phase A
   </Card>
-  <Card title="Vault Free" icon="cloud">
+  <Card title="Free account" icon="cloud">
     <div style={{ fontSize: '1.75rem', fontWeight: 600, lineHeight: 1.2, margin: '0.25rem 0' }}>&#36;0</div>
-    Hosted.
+    Sign in to overdeck.ai.
 
-    - 1 GB of hosted vault storage
-    - 2 machines
+    - The directory and direct connections for up to 3 machines
+    - 1 GB of hosted vault storage, on 2 machines
     - End-to-end encrypted
   </Card>
   <Card title="Anywhere" icon="globe">
@@ -55,8 +57,8 @@ The plan lives in the Overdeck Anywhere epic,
     Billed &#36;96 a year, or &#36;10 month-to-month.
 
     - 100 GB of hosted vault storage
-    - Unlimited machines
-    - The relay and hosted push notifications as they ship
+    - Unlimited machines in the directory
+    - The webhook inbox, which holds events for 24 hours while a machine is offline
     - Hosted agent compute is billed separately by usage
   </Card>
   <Card title="Anywhere, founding price" icon="star">
@@ -65,9 +67,15 @@ The plan lives in the Overdeck Anywhere epic,
 
     - Everything in Anywhere
     - Stays at &#36;60 for as long as you stay subscribed
-    - Open to the first 500 subscribers, or until the relay ships, whichever comes first
+    - Open to the first 500 subscribers or 90 days after the Anywhere release, whichever comes first
+    - Add the relay at the normal &#36;30 a year
   </Card>
 </CardGroup>
+
+**Relay add-on:** +&#36;3 a month or +&#36;30 a year on the Anywhere subscription, billed in the
+same charge. When two of your machines find no direct path, the relay connects them, still
+end-to-end encrypted. It includes 50 GB of relay traffic a month; at 50 GB the relay stops until
+the next month, and an extra 50 GB is a one-time &#36;3 purchase. There is no per-gigabyte billing.
 
 **Extra storage:** +&#36;3 a month or +&#36;30 a year per 100 GB, for the few who pass 100 GB and
 prefer not to prune old records.
@@ -113,14 +121,15 @@ to add one.
 | --- | --- | --- |
 | Session Vault: `pan vault` setup, join, save, sync, list, show, resume, passphrase unlock, key rotation, code snapshots, eviction | v0.64.0 | [Session Vault](/configuration/session-vault) |
 | Pair a device from the terminal (`pan pair`, `pan devices`), machine identity (`GET /api/environment`) | v0.64.0 | [Remote access](/configuration/remote-access) |
-| Session Vault in the dashboard: Settings → Session Vault, automatic save and sync | next release (v0.65.0) | [Session Vault](/configuration/session-vault) |
-| Conversations from your other machines: "from `<machine>`" rows and **Continue here** | next release (v0.65.0) | [Conversations](/features/conversations) |
-| Settings → Anywhere: pair dialog, paired devices, status card | next release (v0.65.0) | [Remote access](/configuration/remote-access) |
-| Scoped API tokens (`pan token`, Settings → Access Tokens) | next release (v0.65.0) | [Remote access](/configuration/remote-access) |
-
-Setting up, joining and unlocking the vault from the dashboard is planned:
-[PAN-4446](https://github.com/eltmon/overdeck/issues/4446). Today you do these with
-`pan vault` in a terminal.
+| Session Vault in the dashboard: Settings → Session Vault, automatic save and sync | v0.65.0 | [Session Vault](/configuration/session-vault) |
+| Setting up, joining and unlocking the vault from the dashboard | v0.65.0 | [Session Vault](/configuration/session-vault) |
+| Conversations from your other machines: "from `<machine>`" rows and **Continue here** | v0.65.0 | [Conversations](/features/conversations) |
+| Settings → Anywhere: pair dialog, paired devices, status card | v0.65.0 | [Remote access](/configuration/remote-access) |
+| Scoped API tokens (`pan token`, Settings → Access Tokens) | v0.65.0 | [Remote access](/configuration/remote-access) |
+| The overdeck.ai directory: your machines in Settings → Anywhere → Directory, linking by two-screen approval, the free account's 3 machines | next release | [Remote access](/configuration/remote-access#find-your-machines-through-overdeck-ai) |
+| Direct connections between your machines with no Tailscale (`direct` routes) | next release | [Linked machines](/configuration/linked-machines) |
+| The relay add-on: relay routes, **Using relay**, the 50 GB monthly allowance | next release | [Remote access](/configuration/remote-access#find-your-machines-through-overdeck-ai) |
+| The webhook inbox: triggers that hold events for 24 hours while a machine is offline | next release | [Triggers](/configuration/triggers#hold-events-with-the-directory-inbox) |
 
 ## Roadmap
 
@@ -164,11 +173,11 @@ consists of hosted services.
     [PAN-1676](https://github.com/eltmon/overdeck/issues/1676)
   </Step>
   <Step title="Hosted services on overdeck.ai">
-    **Account service built (invite-only); the rest planned. This is the paid plan above.**
+    **Account service and directory built (invite-only); the rest planned. This is the paid plan above.**
 
-    An account, the subscription, the hosted Session Vault, then the relay (reach your
-    machines from anywhere, with hosted push notifications delivered through it), then shared
-    sessions. The account service is built and invite-only: testers are added by the
+    An account, the subscription, the hosted Session Vault, the directory with direct
+    connections, the relay add-on and the webhook inbox (built, in the next release), then
+    shared sessions. The account service is built and invite-only: testers are added by the
     operator, and the hosted vault cap is 5 GB per tester. A machine signs in with
     [`pan account login`](/cli/account), which runs once per machine and is optional.
 
@@ -308,7 +317,9 @@ The full reasoning, section by section. Open any one that interests you.
 
     At launch only the vault exists, so we would be charging a bundle price for one feature.
     The founding price addresses that: &#36;60 a year, locked for as long as you stay
-    subscribed, until the relay ships or 500 people have joined.
+    subscribed, for the first 500 subscribers or 90 days after the Anywhere release, whichever
+    comes first. (It used to end "when the relay ships", which would have ended it on launch
+    day, because the relay ships in the same release.)
   </Accordion>
 
   <Accordion title="7. Why self-hosting stays ungated" icon="lock-open">

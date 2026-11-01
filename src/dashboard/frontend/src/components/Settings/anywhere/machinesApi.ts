@@ -1,16 +1,30 @@
 /**
- * Client for the machine-link routes (PAN-4645 WI-20): the same routes
- * `pan machines link|list|unlink` call. Every fetcher returns `{ status, body }`
- * (see anywhereApi.ts) so the panel can show the server's error text.
+ * Client for the machine-link routes (PAN-4645 WI-20) and the fleet routes
+ * (PAN-4654 WI-9): the same routes `pan machines link|list|unlink|versions|update`
+ * call. Every fetcher returns `{ status, body }` (see anywhereApi.ts) so the
+ * panel can show the server's error text.
  */
-import type { LinkAccess, MachineLinkView, MachinesResponse } from '@overdeck/contracts';
+import type { FleetUpdateMode, FleetUpdateResponse, FleetVersionsResponse, LinkAccess, MachineLinkView, MachinesResponse } from '@overdeck/contracts';
 
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import { apiError, type ApiResult, isOk } from './anywhereApi';
 
-export type { InboundMachineView, LinkAccess, LinkState, MachineLinkView, MachinesResponse } from '@overdeck/contracts';
+export type {
+  FleetComponent,
+  FleetUpdateJob,
+  FleetUpdateResponse,
+  FleetVersionRow,
+  FleetVersionsResponse,
+  InboundMachineView,
+  LinkAccess,
+  LinkState,
+  MachineLinkView,
+  MachinesResponse,
+  SshLinkInfo,
+} from '@overdeck/contracts';
 
 export const MACHINES_QUERY_KEY = ['anywhere-machines'] as const;
+export const FLEET_VERSIONS_QUERY_KEY = ['anywhere-fleet-versions'] as const;
 
 /** The server's `error` is a code for the link route; `message` carries the sentence. */
 interface LinkErrorBody {
@@ -112,4 +126,26 @@ export function linkErrorText(result: ApiResult<unknown>): string {
   if (typeof body?.message === 'string' && body.message !== '') return body.message;
   if (typeof body?.error === 'string' && LINK_ERROR_TEXT[body.error]) return LINK_ERROR_TEXT[body.error]!;
   return apiError(result);
+}
+
+/** Query function for `['anywhere-fleet-versions']`: the fleet table, or a thrown error. */
+export async function loadFleetVersions(): Promise<FleetVersionsResponse> {
+  const result = await readResult<FleetVersionsResponse>(await fetch('/api/machines/versions'));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body;
+}
+
+export interface FleetUpdateInput {
+  mode?: FleetUpdateMode;
+  environmentIds?: string[];
+  cancel?: boolean;
+}
+
+/** Update all (or the listed machines), Update now, or Cancel. */
+export async function updateFleet(input: FleetUpdateInput): Promise<ApiResult<FleetUpdateResponse>> {
+  return readResult(await fetch('/api/machines/update', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(input),
+  }));
 }

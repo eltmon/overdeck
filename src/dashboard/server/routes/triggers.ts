@@ -2,8 +2,13 @@
  * Trigger management routes — Effect HttpRouter.Layer (PAN-4648 W-6).
  *
  * GET    /api/triggers                     → { triggers, funnel: { port, baseUrl, command } }
- * POST   /api/triggers                     → 201 { trigger, hookPath, url, urlSecretShownOnce, generatedSigningSecret }
+ * POST   /api/triggers                     → 201 { trigger, hookPath, url, urlSecretShownOnce, generatedSigningSecret, inboxUrl }
  * DELETE /api/triggers/:id                 → { removed: true } | 404
+ *
+ * PAN-2356: `inbox: true` also asks the overdeck.ai directory for an inbox that holds events while
+ * this machine is offline. Its URL is returned once as `inboxUrl`. A free plan, a signed-out
+ * machine or no answer within 10 s removes the new trigger and answers 409 with the reason.
+ * Removing a trigger deletes its inbox.
  * PUT    /api/triggers/:id/signing-secret  → { trigger } | 400 | 404
  *
  * These stay behind the remote request gate at the default `admin` scope. The
@@ -17,8 +22,18 @@ import { Effect, Layer, Result } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { resolveTriggerTarget, triggerFunnelBaseUrl, triggerFunnelCommand, TRIGGER_FUNNEL_PORT } from '../../../lib/triggers/setup.js';
-import { createTrigger, listPublicTriggers, removeTrigger, setTriggerSigningSecret, type TriggerVerifyKind } from '../../../lib/triggers/store.js';
+import {
+  createTrigger,
+  listPublicTriggers,
+  listTriggers,
+  removeTrigger,
+  setTriggerInbox,
+  setTriggerSigningSecret,
+  type TriggerVerifyKind,
+} from '../../../lib/triggers/store.js';
 import { jsonResponse } from '../http-helpers.js';
+import { currentDirectoryClient } from '../services/directory-client.js';
+import { type InboxDirectoryPort, requestInbox } from '../services/directory-inbox.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { getTrustedOrigins } from './origin-validation.js';
 
@@ -58,6 +73,50 @@ const listTriggersRoute = HttpRouter.add(
   }),
 );
 
+/**
+ * The create door's logic, taking the parsed body and the directory so tests need no Effect
+ * request mock. Returns the status and JSON body.
+ */
+export async function createTriggerFromBody(
+  body: Record<string, unknown>,
+  directory: InboxDirectoryPort | null,
+): Promise<{ status: number; json: Record<string, unknown> }> {
+  const resolved = resolveTriggerTarget(body.target);
+  if (!resolved.ok) return { status: 400, json: { error: resolved.error } };
+  if (body.inbox !== undefined && typeof body.inbox !== 'boolean') return { status: 400, json: { error: 'inbox must be a boolean' } };
+  let created: Awaited<ReturnType<typeof createTrigger>>;
+  try {
+    created = await createTrigger({
+      name: body.name as string,
+      target: resolved.target,
+      template: (body.template ?? null) as string | null,
+      verify: (body.verify ?? 'none') as TriggerVerifyKind,
+      signingSecret: (body.signingSecret ?? null) as string | null,
+    });
+  } catch (error) {
+    return { status: 400, json: { error: (error as Error).message } };
+  }
+  let { trigger } = created;
+  const { hookPath, generatedSigningSecret } = created;
+  let inboxUrl: string | null = null;
+  if (body.inbox === true) {
+    try {
+      const inbox = await requestInbox(directory);
+      trigger = (await setTriggerInbox(trigger.id, { id: inbox.inboxId, createdAt: new Date().toISOString() })) ?? trigger;
+      inboxUrl = inbox.url;
+    } catch (error) {
+      await removeTrigger(trigger.id).catch(() => false);
+      return { status: 409, json: { error: (error as Error).message } };
+    }
+  }
+  const baseUrl = triggerFunnelBaseUrl(getTrustedOrigins());
+  console.log(`[triggers] created ${trigger.id}${inboxUrl ? ' with inbox' : ''}`);
+  return {
+    status: 201,
+    json: { trigger, hookPath, url: baseUrl ? `${baseUrl}${hookPath}` : null, urlSecretShownOnce: true, generatedSigningSecret, inboxUrl },
+  };
+}
+
 const createTriggerRoute = HttpRouter.add(
   'POST',
   '/api/triggers',
@@ -67,25 +126,8 @@ const createTriggerRoute = HttpRouter.add(
     if (authError) return noStore(authError);
     const body = yield* readBody(request);
     if (!body) return noStore(jsonResponse({ error: 'invalid JSON body' }, { status: 400 }));
-
-    const resolved = resolveTriggerTarget(body.target);
-    if (!resolved.ok) return noStore(jsonResponse({ error: resolved.error }, { status: 400 }));
-    const created = yield* tryStore(() => createTrigger({
-      name: body.name as string,
-      target: resolved.target,
-      template: (body.template ?? null) as string | null,
-      verify: (body.verify ?? 'none') as TriggerVerifyKind,
-      signingSecret: (body.signingSecret ?? null) as string | null,
-    }));
-    if (Result.isFailure(created)) return noStore(jsonResponse({ error: created.failure }, { status: 400 }));
-
-    const { trigger, hookPath, generatedSigningSecret } = created.success;
-    const baseUrl = triggerFunnelBaseUrl(getTrustedOrigins());
-    console.log(`[triggers] created ${trigger.id}`);
-    return noStore(jsonResponse(
-      { trigger, hookPath, url: baseUrl ? `${baseUrl}${hookPath}` : null, urlSecretShownOnce: true, generatedSigningSecret },
-      { status: 201 },
-    ));
+    const answer = yield* Effect.promise(() => createTriggerFromBody(body, currentDirectoryClient()));
+    return noStore(jsonResponse(answer.json, { status: answer.status }));
   }),
 );
 
@@ -97,9 +139,13 @@ const removeTriggerRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return noStore(authError);
     const id = (yield* HttpRouter.params)['id'] ?? '';
+    const existing = yield* tryStore(() => listTriggers());
+    const inboxId = Result.isSuccess(existing) ? existing.success.find((record) => record.id === id)?.inbox?.id : undefined;
     const removed = yield* tryStore(() => removeTrigger(id));
     if (Result.isFailure(removed)) return noStore(jsonResponse({ error: removed.failure }, { status: 500 }));
     if (!removed.success) return noStore(jsonResponse({ error: `no trigger with id ${id}` }, { status: 404 }));
+    // The directory deletes the inbox and every event it held; offline, the inbox expires unused.
+    if (inboxId) currentDirectoryClient()?.send({ type: 'inbox-delete', inboxId });
     console.log(`[triggers] removed ${id}`);
     return noStore(jsonResponse({ removed: true }));
   }),

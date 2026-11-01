@@ -5,12 +5,18 @@
  * raw TCP to the dashboard port, or `wss://host[:port]/ws/link` inside HTTPS),
  * its kind (`lan < tailnet < ssh < public < direct < relay`, best first) and where
  * it came from (`pairing` URL, `manual` Add route, `advertised` by the peer's
- * descriptor). This issue creates `lan`, `tailnet` and `public` routes; `ssh`,
- * `direct` and `relay` arrive in #4404 and #2356.
+ * descriptor). This issue creates `lan`, `tailnet` and `public` routes. `ssh`
+ * routes are created by `src/lib/anywhere/ssh/` and the SSH machine service
+ * (#4404); `direct` and `relay` come from #2356, below.
+ *
+ * PAN-2356: `rtc://<environmentId>` (kind `direct`) and `rtc+turn://<environmentId>` (kind
+ * `relay`) are WebRTC routes through the overdeck.ai directory. They are dynamic: they exist only
+ * while the directory lists the peer, and are never stored in machine-links.json (D-2356-7), so
+ * `mergeAdvertised` and the manual add-route path refuse them.
  */
 import { ROUTE_KINDS, type RouteKind, type RouteSource } from '@overdeck/contracts';
 
-export type TransportKind = 'tcp' | 'wss';
+export type TransportKind = 'tcp' | 'wss' | 'rtc';
 
 export interface LinkRoute {
   url: string;
@@ -22,14 +28,20 @@ export interface LinkRoute {
 
 export interface ParsedRouteUrl {
   transport: TransportKind;
+  /** For `rtc`: the peer's environment id. */
   host: string;
+  /** For `rtc`: 0. */
   port: number;
-  /** The URL in its canonical form (`tcp://host:port` or `wss://host[:port]/ws/link`). */
+  /** The URL in its canonical form (`tcp://host:port`, `wss://host[:port]/ws/link`, `rtc://<id>`, `rtc+turn://<id>`). */
   url: string;
+  /** Set for `rtc` URLs, whose kind comes from the scheme; `tcp`/`wss` kinds come from `classifyHost`. */
+  kind?: 'direct' | 'relay';
 }
 
-const SOURCE_RANK: Record<RouteSource, number> = { manual: 0, pairing: 1, advertised: 2 };
-const TRANSPORT_RANK: Record<TransportKind, number> = { tcp: 0, wss: 1 };
+const RTC_ROUTE_RE = /^rtc(\+turn)?:\/\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/;
+
+const SOURCE_RANK: Record<RouteSource, number> = { manual: 0, pairing: 1, advertised: 2, directory: 3 };
+const TRANSPORT_RANK: Record<TransportKind, number> = { tcp: 0, wss: 1, rtc: 2 };
 
 function stripBrackets(host: string): string {
   return host.replace(/^\[|\]$/g, '');
@@ -37,6 +49,13 @@ function stripBrackets(host: string): string {
 
 /** Parse and canonicalise a transport URL. Throws on anything else. */
 export function parseRouteUrl(url: string): ParsedRouteUrl {
+  if (url.startsWith('rtc://') || url.startsWith('rtc+turn://')) {
+    const match = RTC_ROUTE_RE.exec(url);
+    if (!match) throw new Error(`rtc route needs a machine environment id: ${url}`);
+    const environmentId = match[2] as string;
+    const relay = match[1] !== undefined;
+    return { transport: 'rtc', host: environmentId, port: 0, url: `${relay ? 'rtc+turn' : 'rtc'}://${environmentId}`, kind: relay ? 'relay' : 'direct' };
+  }
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -55,7 +74,7 @@ export function parseRouteUrl(url: string): ParsedRouteUrl {
     if (!Number.isInteger(port) || port <= 0 || port > 65535) throw new Error(`wss:// route has a bad port: ${url}`);
     return { transport: 'wss', host, port, url: `wss://${parsed.hostname}${parsed.port ? `:${parsed.port}` : ''}/ws/link` };
   }
-  throw new Error(`Unsupported route scheme in ${url} (expected tcp:// or wss://)`);
+  throw new Error(`Unsupported route scheme in ${url} (expected tcp://, wss://, rtc:// or rtc+turn://)`);
 }
 
 function ipv4Octets(host: string): [number, number, number, number] | null {
@@ -135,7 +154,8 @@ export function routeFromPairingUrl(pairingUrl: string, options: { allowLoopback
 /** Best route first: kind rank, then `tcp` before `wss`, then `manual < pairing < advertised`, then URL. */
 export function rankRoutes<R extends Pick<LinkRoute, 'url' | 'kind' | 'source'>>(routes: readonly R[]): R[] {
   const kindRank = (kind: RouteKind): number => ROUTE_KINDS.indexOf(kind);
-  const transportRank = (url: string): number => (url.startsWith('wss://') ? TRANSPORT_RANK.wss : TRANSPORT_RANK.tcp);
+  const transportRank = (url: string): number =>
+    url.startsWith('wss://') ? TRANSPORT_RANK.wss : url.startsWith('rtc') ? TRANSPORT_RANK.rtc : TRANSPORT_RANK.tcp;
   return [...routes].sort((a, b) =>
     kindRank(a.kind) - kindRank(b.kind)
     || transportRank(a.url) - transportRank(b.url)
@@ -154,11 +174,13 @@ export function mergeAdvertised(
   endpoints: ReadonlyArray<{ kind: RouteKind; url: string }>,
   now: () => string = () => new Date().toISOString(),
 ): LinkRoute[] {
-  const advertisedUrls = new Set(endpoints.map((endpoint) => parseRouteUrl(endpoint.url).url));
+  // WebRTC routes are dynamic (D-2356-7): a peer cannot make this machine store one.
+  const storable = endpoints.filter((endpoint) => parseRouteUrl(endpoint.url).transport !== 'rtc');
+  const advertisedUrls = new Set(storable.map((endpoint) => parseRouteUrl(endpoint.url).url));
   const kept = routes.filter((route) => route.source !== 'advertised' || advertisedUrls.has(route.url));
   const known = new Set(kept.map((route) => route.url));
   const added: LinkRoute[] = [];
-  for (const endpoint of endpoints) {
+  for (const endpoint of storable) {
     const { url } = parseRouteUrl(endpoint.url);
     if (known.has(url)) continue;
     known.add(url);

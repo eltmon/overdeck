@@ -1,0 +1,103 @@
+{
+  "version": "1",
+  "issueId": "PAN-4717",
+  "created": "2026-11-01T14:07:20.462Z",
+  "updated": "2026-11-01T14:55:46.583Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "drawer-tracker-url-fallback": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4717",
+      "claimedAt": "2026-11-01T14:07:20.462Z",
+      "doneAt": "2026-11-01T14:15:33.487Z"
+    },
+    "transcript-link-passes-href": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4717",
+      "claimedAt": "2026-11-01T14:16:03.602Z",
+      "doneAt": "2026-11-01T14:18:20.038Z"
+    },
+    "drawer-absent-issue-hydration-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4717",
+      "claimedAt": "2026-11-01T14:18:24.910Z",
+      "doneAt": "2026-11-01T14:20:30.934Z"
+    },
+    "docs-absent-issue-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4717",
+      "claimedAt": "2026-11-01T14:20:35.704Z",
+      "doneAt": "2026-11-01T14:21:55.524Z"
+    },
+    "evidence-screenshot-and-coderabbit-reply": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4717",
+      "claimedAt": "2026-11-01T14:22:03.782Z",
+      "doneAt": "2026-11-01T14:51:13.776Z"
+    },
+    "drawer-tracker-url-fallback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:52:08.780Z"
+    },
+    "drawer-tracker-url-fallback.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:52:38.523Z"
+    },
+    "drawer-tracker-url-fallback.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:52:51.779Z"
+    },
+    "drawer-tracker-url-fallback.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:53:06.020Z"
+    },
+    "drawer-absent-issue-hydration-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:53:21.614Z"
+    },
+    "drawer-absent-issue-hydration-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:53:36.275Z"
+    },
+    "drawer-absent-issue-hydration-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:53:51.356Z"
+    },
+    "transcript-link-passes-href.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:54:05.042Z"
+    },
+    "transcript-link-passes-href.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:54:18.813Z"
+    },
+    "transcript-link-passes-href.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:54:32.670Z"
+    },
+    "docs-absent-issue-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:54:46.286Z"
+    },
+    "docs-absent-issue-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:55:01.383Z"
+    },
+    "evidence-screenshot-and-coderabbit-reply.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:55:16.850Z"
+    },
+    "evidence-screenshot-and-coderabbit-reply.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:55:31.631Z"
+    },
+    "evidence-screenshot-and-coderabbit-reply.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:55:46.582Z"
+    }
+  }
+}

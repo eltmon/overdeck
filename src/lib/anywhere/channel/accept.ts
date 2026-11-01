@@ -3,18 +3,19 @@
  *
  * Transport-agnostic: the caller hands in a raw duplex (a TCP socket whose
  * first byte was `0x00`, or a `/ws/link` WebSocket stream). `acceptChannel`
- * reads the preamble, runs Noise IK (link) or XXpsk0 (pairing), and resolves
+ * reads the preamble, runs Noise IK (link), XXpsk0 (pairing) or XX (approval, PAN-2356), and resolves
  * with a {@link ChannelSocket} the dashboard can treat as a connection.
  *
  * Refusals (D-4645-5 step 2) are written before the connection is closed so
  * the initiator learns why. A responder that cannot decrypt an IK message 1
  * (the initiator pinned a different key) says nothing and drops the connection.
  */
+import { timingSafeEqual } from 'node:crypto';
 import type { Duplex } from 'node:stream';
 
 import type { MachineKeyPair } from '../machine-key.js';
-import { type ChannelSocket, createChannelSocket } from './channel-socket.js';
-import { type Handshake, ikResponder, NOISE_LINK_PROTOCOL, prologueFor, xxPskResponder } from './noise.js';
+import { type ChannelMarker, type ChannelSocket, createChannelSocket } from './channel-socket.js';
+import { APPROVAL_NONCE_BYTES, approvalCommitment, approvalNonce, approvalSas, type Handshake, ikResponder, NOISE_LINK_PROTOCOL, prologueFor, xxPskResponder, xxResponder } from './noise.js';
 import {
   encodeFrame,
   encodeRefusal,
@@ -35,6 +36,7 @@ export type ChannelAcceptErrorCode =
   | 'unsupported'
   | 'unknown-peer'
   | 'pairing-refused'
+  | 'approval-refused'
   | 'handshake-failed'
   | 'closed';
 
@@ -62,6 +64,11 @@ export interface AcceptChannelOptions {
   takePairing: (pairingId: string) => PairingSecret | 'unknown';
   /** Called on every failed pairing attempt (unknown id or wrong code). */
   onPairingFailure: () => void;
+  /**
+   * Approval (PAN-2356 D-2356-9): accept an approval channel only for this machine's own live
+   * request id, once. Absent or false ⇒ refusal `03`.
+   */
+  takeApproval?: (requestId: string) => boolean;
   /** Whole handshake must finish within this; default 10 s (NFR-6). */
   timeoutMs?: number;
   /** Link protocol this responder speaks; default 1. */
@@ -124,6 +131,39 @@ export async function acceptChannel(raw: Duplex, opts: AcceptChannelOptions): Pr
       return finish(raw, reader, handshake, false, message2, { mode: 'link', remoteKeyHex, pairingId: null });
     }
 
+    if (head.mode === 'approval') {
+      const requestId = (await reader.readBytes(PAIRING_ID_LENGTH)).toString('hex');
+      if (!opts.takeApproval?.(requestId)) {
+        throw refuse('approval-refused', { code: REFUSAL_CODES.pairingRefused }, `No live approval request ${requestId}`);
+      }
+      const handshake = xxResponder(opts.localKey, prologueFor('approval', requestId));
+      handshake.recv(await readMessage(reader));
+      raw.write(encodeFrame(handshake.send()));
+      const message3 = await readMessage(reader);
+      try {
+        handshake.recv(message3);
+      } catch {
+        throw new ChannelAcceptError('handshake-failed', 'Approval handshake message 3 did not verify');
+      }
+      const remoteKeyHex = handshake.remoteKey().toString('hex');
+      // Commit-then-reveal (D-2356-10 amended): take the initiator's commitment, send our nonce,
+      // and show a code only if the revealed nonce matches the commitment.
+      const hash = handshake.result().hash;
+      const commitment = await readMessage(reader);
+      const nonce = approvalNonce();
+      raw.write(encodeFrame(nonce));
+      const initiatorNonce = await readMessage(reader);
+      if (
+        commitment.length !== 32
+        || initiatorNonce.length !== APPROVAL_NONCE_BYTES
+        || !timingSafeEqual(approvalCommitment(hash, initiatorNonce), commitment)
+      ) {
+        throw new ChannelAcceptError('handshake-failed', 'Approval nonce did not match its commitment');
+      }
+      const sas = approvalSas(hash, initiatorNonce, nonce);
+      return finish(raw, reader, handshake, false, null, { mode: 'approval', remoteKeyHex, pairingId: null, requestId, approvalSas: sas });
+    }
+
     const pairingId = (await reader.readBytes(PAIRING_ID_LENGTH)).toString('hex');
     const taken = opts.takePairing(pairingId);
     if (taken === 'unknown') {
@@ -176,7 +216,7 @@ function finish(
   handshake: Handshake,
   initiator: boolean,
   finalMessage: Buffer | null,
-  channel: { mode: 'link' | 'pairing'; remoteKeyHex: string; pairingId: string | null },
+  channel: ChannelMarker,
 ): ChannelSocket {
   const leftover = reader.detach();
   if (finalMessage) raw.write(encodeFrame(finalMessage));

@@ -21,6 +21,16 @@ const projectsMocks = vi.hoisted(() => ({
         path: '/unqueryable',
       },
     },
+    {
+      key: 'linear-with-repo',
+      config: {
+        name: 'Linear With Repo',
+        path: '/lwr',
+        issue_prefix: 'LWR',
+        tracker: 'linear',
+        github_repo: 'owner/lwr',
+      },
+    },
   ]),
   getIssuePrefix: vi.fn((config: { issue_prefix?: string }) => config.issue_prefix),
 }));
@@ -54,7 +64,7 @@ describe('GET /api/registered-projects', () => {
     });
   });
 
-  it('adds membershipQueryable without removing existing project fields', async () => {
+  it('adds membershipQueryable and tracker without removing existing project fields', async () => {
     await expect(requestRegisteredProjects()).resolves.toEqual({
       status: 200,
       body: [
@@ -65,6 +75,7 @@ describe('GET /api/registered-projects', () => {
           linearTeam: 'QUE',
           membershipQueryable: true,
           githubRepo: 'owner/queryable',
+          tracker: 'github',
           linearProject: 'linear-queryable',
         },
         {
@@ -74,6 +85,17 @@ describe('GET /api/registered-projects', () => {
           linearTeam: null,
           membershipQueryable: false,
           githubRepo: null,
+          tracker: null,
+          linearProject: null,
+        },
+        {
+          key: 'linear-with-repo',
+          name: 'Linear With Repo',
+          path: '/lwr',
+          linearTeam: 'LWR',
+          membershipQueryable: true,
+          githubRepo: 'owner/lwr',
+          tracker: 'linear',
           linearProject: null,
         },
       ],

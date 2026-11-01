@@ -6,6 +6,10 @@
  * closing the dialog unmounts it, so a backdrop click does not close it; only
  * Done or the close button does. `SetSigningSecretDialog` sets the secret of
  * a github or stripe trigger through `PUT /api/triggers/:id/signing-secret`.
+ *
+ * PAN-2356: when the overdeck.ai directory is connected on the Anywhere plan, the form offers to
+ * hold events in a directory inbox while this machine is offline; the result then shows the inbox
+ * URL, once, instead of the Funnel URL.
  */
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,6 +26,7 @@ import {
   type CreatedTriggerBody,
   type TriggerRow,
 } from './anywhereApi';
+import { DIRECTORY_QUERY_KEY, inboxAvailable, loadDirectory } from './directoryApi';
 
 const TEMPLATE_MAX_CHARS = 2000;
 const FUNNEL_PLACEHOLDER_BASE = 'https://<machine>.<tailnet>.ts.net:8443';
@@ -105,6 +110,8 @@ function AddTriggerDialogBody({ onClose }: { onClose: () => void }) {
   const titleId = useId();
   const queryClient = useQueryClient();
   const { data: projects } = useQuery({ queryKey: ['registered-projects'], queryFn: fetchRegisteredProjects, staleTime: 60000 });
+  const { data: directory } = useQuery({ queryKey: DIRECTORY_QUERY_KEY, queryFn: loadDirectory, staleTime: 30000, retry: false });
+  const canUseInbox = inboxAvailable(directory);
 
   const [name, setName] = useState('');
   const [targetKind, setTargetKind] = useState<'conversation' | 'project'>('conversation');
@@ -113,6 +120,7 @@ function AddTriggerDialogBody({ onClose }: { onClose: () => void }) {
   const [template, setTemplate] = useState('');
   const [verify, setVerify] = useState<TriggerRow['verify']>('none');
   const [signingSecret, setSigningSecret] = useState('');
+  const [inbox, setInbox] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState<CreatedTriggerBody | null>(null);
@@ -131,6 +139,7 @@ function AddTriggerDialogBody({ onClose }: { onClose: () => void }) {
         template: template === '' ? null : template,
         verify,
         signingSecret: signingSecret === '' ? null : signingSecret,
+        ...(canUseInbox && inbox ? { inbox: true } : {}),
       });
       if (!isOk(result)) {
         setError(apiError(result));
@@ -149,8 +158,17 @@ function AddTriggerDialogBody({ onClose }: { onClose: () => void }) {
     const url = created.url ?? `${FUNNEL_PLACEHOLDER_BASE}${created.hookPath}`;
     return (
       <DialogFrame title="Trigger created" titleId={titleId} onClose={onClose} closeOnBackdrop={false}>
-        <CopyField label="URL" value={url} testId="trigger-created-url" />
-        {created.url === null && (
+        {created.inboxUrl ? (
+          <>
+            <CopyField label="Inbox URL" value={created.inboxUrl} testId="trigger-created-inbox-url" />
+            <p className="text-xs text-muted-foreground">
+              overdeck.ai holds each event, sealed to this machine, for up to 24 hours while it is offline.
+            </p>
+          </>
+        ) : (
+          <CopyField label="URL" value={url} testId="trigger-created-url" />
+        )}
+        {!created.inboxUrl && created.url === null && (
           <p className="text-xs text-muted-foreground">
             Replace the placeholder host with this machine&apos;s Tailscale name once Funnel is on.
           </p>
@@ -236,6 +254,13 @@ function AddTriggerDialogBody({ onClose }: { onClose: () => void }) {
               Signing secret (optional{verify === 'github' ? '; one is generated when empty' : ''})
             </span>
             <input type="password" value={signingSecret} onChange={(e) => setSigningSecret(e.target.value)} autoComplete="off" className={`${fieldClass} font-mono`} />
+          </label>
+        )}
+
+        {canUseInbox && (
+          <label className="flex items-start gap-1.5 text-xs text-foreground">
+            <input type="checkbox" checked={inbox} onChange={(e) => setInbox(e.target.checked)} className="mt-0.5" />
+            Hold events while this machine is offline (overdeck.ai inbox, Anywhere plan)
           </label>
         )}
 

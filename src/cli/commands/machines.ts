@@ -1,10 +1,24 @@
 /**
  * `pan machines` — link this dashboard to another machine and manage links
- * (PAN-4645 WI-14, FR-1).
+ * (PAN-4645 WI-14, FR-1), and see and update versions across them (PAN-4654
+ * FR-11).
  *
  *   pan machines link <pairing-url> [--one-way] [--agent-fenced] [--allow-loopback] [--json]
  *   pan machines list [--json]
- *   pan machines unlink <label|environment-id|link-id> [--json]
+ *   pan machines unlink <label|environment-id|link-id> [--keep-server] [--json]
+ *   pan machines versions [--json]
+ *   pan machines update [--now] [--machine <label>]... [--cancel] [--json]
+ *
+ * Through the overdeck.ai directory (PAN-2356 WI-16):
+ *
+ *   pan machines directory [--json]
+ *   pan machines join [--to <label|environment-id>] [--json]
+ *   pan machines accept <request-id> | reject <request-id>
+ *   pan machines approve <request-id> [--yes]
+ *   pan machines forget <label|environment-id>
+ *
+ * The SSH verbs (`add-ssh`, `test-ssh`, the hidden `ssh-helper`) live in
+ * `machines-ssh.ts` (PAN-4404).
  *
  * Every verb talks to the running dashboard with the internal token; the
  * dashboard owns the keys, the channel and the link store. Registered from
@@ -12,34 +26,27 @@
  */
 import chalk from 'chalk';
 import type { Command } from 'commander';
-import type { MachineLinkView, MachinesResponse } from '@overdeck/contracts';
+import {
+  compareFleetBinaries,
+  type DirectoryResponse,
+  FLEET_UPDATE_STILL_WAITING_MS,
+  type FleetUpdateJob,
+  type FleetUpdateResponse,
+  type FleetVersionRow,
+  type FleetVersionsResponse,
+  type MachineLinkView,
+  type MachinesResponse,
+} from '@overdeck/contracts';
 
 import { callDashboard, errorText, isDashboardUnreachable } from './dashboard-call.js';
+import { call, fail, NEEDS_PAN_UP, NOT_RUNNING } from './machines-call.js';
+import { registerMachinesSshCommands } from './machines-ssh.js';
+
+export { NOT_RUNNING } from './machines-call.js';
 
 const DOCS_PAGE = 'configuration/linked-machines.mdx';
-export const NOT_RUNNING = 'Overdeck dashboard is not running. Start the dashboard with pan up, then retry.';
-const NEEDS_PAN_UP = 'The dashboard rejected this machine\'s internal token. Start the dashboard with pan up (a `pan serve` server does not share it).';
 
 export interface MachinesLinkOptions { oneWay?: boolean; agentFenced?: boolean; allowLoopback?: boolean; json?: boolean }
-
-async function fail(message: string): Promise<never> {
-  console.error(chalk.red(message));
-  const { exitCli } = await import('../exit.js');
-  return exitCli(1);
-}
-
-async function call(verb: string, path: string, init: { method: string; body?: unknown }): Promise<Response | never> {
-  let response: Response;
-  try {
-    response = await callDashboard(path, init);
-  } catch (error) {
-    if (isDashboardUnreachable(error)) return fail(NOT_RUNNING);
-    throw error;
-  }
-  if (response.status === 401) return fail(NEEDS_PAN_UP);
-  if (!response.ok) return fail(`pan machines ${verb} failed: ${await errorText(response)}`);
-  return response;
-}
 
 /** `5.0 s`, `850 ms`. */
 export function formatDuration(ms: number): string {
@@ -104,8 +111,15 @@ export async function runMachinesList(options: { json?: boolean }): Promise<void
   } else {
     console.log('');
     table(
-      ['LABEL', 'STATE', 'ROUTE', 'ACCESS', 'FINGERPRINT'],
-      machines.links.map((link) => [link.label, formatLinkState(link), link.currentRoute ?? link.routes[0]?.url ?? '-', link.access, link.fingerprint]),
+      ['LABEL', 'STATE', 'ROUTE', 'ACCESS', 'SSH', 'FINGERPRINT'],
+      machines.links.map((link) => [
+        link.label,
+        formatLinkState(link),
+        link.currentRoute ?? link.routes[0]?.url ?? '-',
+        link.access,
+        link.ssh ? `${link.ssh.destination} (${link.ssh.forward}, ${link.ssh.launch})` : '-',
+        link.fingerprint,
+      ]),
     );
   }
   console.log('');
@@ -120,10 +134,10 @@ export async function runMachinesList(options: { json?: boolean }): Promise<void
   }
 }
 
-export async function runMachinesUnlink(target: string, options: { json?: boolean }): Promise<void> {
+export async function runMachinesUnlink(target: string, options: { json?: boolean; keepServer?: boolean }): Promise<void> {
   let response: Response;
   try {
-    response = await callDashboard(`/api/machines/${encodeURIComponent(target)}`, { method: 'DELETE' });
+    response = await callDashboard(`/api/machines/${encodeURIComponent(target)}${options.keepServer ? '?keepServer=1' : ''}`, { method: 'DELETE' });
   } catch (error) {
     if (isDashboardUnreachable(error)) return fail(NOT_RUNNING);
     throw error;
@@ -131,7 +145,7 @@ export async function runMachinesUnlink(target: string, options: { json?: boolea
   if (response.status === 404) return fail(`No machine link matches "${target}" (by label, environment id or link id). \`pan machines list\` shows the links.`);
   if (response.status === 401) return fail(NEEDS_PAN_UP);
   if (!response.ok) return fail(`pan machines unlink failed: ${await errorText(response)}`);
-  const result = await response.json() as { ok: boolean; peerNotified: boolean };
+  const result = await response.json() as { ok: boolean; peerNotified: boolean; ssh?: { stopped: boolean; reason: string } | null };
   if (options.json) {
     console.log(JSON.stringify(result));
     return;
@@ -139,6 +153,243 @@ export async function runMachinesUnlink(target: string, options: { json?: boolea
   console.log(result.peerNotified
     ? `Unlinked "${target}"; the other machine was told and its token here was revoked.`
     : `Unlinked "${target}"; its token here was revoked. The other machine could not be reached and will see the link as revoked when it next connects.`);
+  if (result.ssh) {
+    console.log(result.ssh.stopped
+      ? `Stopped the Overdeck server on ${target}.`
+      : `Left the Overdeck server on ${target} running (${result.ssh.reason}).`);
+  }
+}
+
+// ── Directory verbs (PAN-2356) ─────────────────────────────────────────────
+
+export const JOIN_POLL_MS = 2_000;
+
+/** Prompting and waiting, injected so tests run without a TTY or a clock. */
+export interface DirectoryCliDeps {
+  isTTY: () => boolean;
+  ask: (question: string) => Promise<boolean>;
+  sleep: (ms: number) => Promise<void>;
+  now: () => number;
+}
+
+async function askYesNo(question: string): Promise<boolean> {
+  const { createInterface } = await import('node:readline/promises');
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return /^y(es)?$/i.test((await rl.question(question)).trim());
+  } finally {
+    rl.close();
+  }
+}
+
+const defaultDirectoryDeps: DirectoryCliDeps = {
+  isTTY: () => process.stdin.isTTY === true && process.stdout.isTTY === true,
+  ask: askYesNo,
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  now: () => Date.now(),
+};
+
+async function loadDirectoryState(verb: string): Promise<DirectoryResponse> {
+  const response = await call(verb, '/api/directory', { method: 'GET' });
+  return await response.json() as DirectoryResponse;
+}
+
+export async function runMachinesDirectory(options: { json?: boolean }): Promise<void> {
+  const directory = await loadDirectoryState('directory');
+  if (options.json) {
+    console.log(JSON.stringify(directory));
+    return;
+  }
+  if (!directory.signedIn) {
+    console.log('Sign in with pan account login to find your machines through overdeck.ai.');
+    return;
+  }
+  if (directory.refusal) console.log(chalk.yellow(directory.refusal));
+  if (directory.machines.length === 0) {
+    console.log('The directory lists no machines yet.');
+  } else {
+    table(['LABEL', 'FINGERPRINT', 'STATE', 'LINKED', 'ENVIRONMENT'], directory.machines.map((m) => [
+      m.label,
+      m.fingerprint,
+      m.online ? 'online' : `last seen ${formatAgo(m.lastSeenAt)}`,
+      m.linked ? 'linked' : '-',
+      m.environmentId,
+    ]));
+  }
+  for (const approval of directory.approvals) {
+    console.log(`\nApproval request ${approval.requestId} from ${approval.label} (${approval.fingerprint}): ${approval.state}${approval.sas ? `, code ${approval.sas}` : ''}${approval.error ? `: ${approval.error}` : ''}`);
+  }
+  for (const join of directory.joins) {
+    console.log(`\nJoin request ${join.requestId}: ${join.state}${join.sas ? `, code ${join.sas}` : ''}`);
+  }
+}
+
+export async function runMachinesJoin(options: { to?: string; json?: boolean }, deps: DirectoryCliDeps = defaultDirectoryDeps): Promise<void> {
+  let to: string | null = null;
+  if (options.to) {
+    const directory = await loadDirectoryState('join');
+    const target = directory.machines.find((m) => m.environmentId === options.to || m.label === options.to);
+    if (!target) return fail(`The directory does not list a machine "${options.to}". \`pan machines directory\` lists them.`);
+    to = target.environmentId;
+  }
+  const self = await (await call('join', '/api/machines', { method: 'GET' })).json() as MachinesResponse;
+  const { requestId } = await (await call('join', '/api/directory/join', { method: 'POST', body: to ? { to } : {} })).json() as { requestId: string };
+  if (!options.json) console.log(`Requested approval (request ${requestId}). This machine's fingerprint: ${self.self.fingerprint}`);
+
+  const deadline = deps.now() + 10 * 60_000;
+  for (;;) {
+    const directory = await loadDirectoryState('join');
+    const join = directory.joins.find((entry) => entry.requestId === requestId);
+    if (!join || join.state === 'rejected') return fail('The approval was rejected or expired.');
+    if (join.sas) {
+      const approver = directory.machines.find((m) => m.fingerprint === join.fingerprint);
+      if (options.json) {
+        console.log(JSON.stringify({ requestId, sas: join.sas, fingerprint: join.fingerprint, approver: approver?.label ?? null }));
+      } else {
+        console.log(`Code: ${join.sas} · approver ${approver?.label ?? 'unknown'} ${join.fingerprint ?? ''}`.trimEnd());
+      }
+      if (!deps.isTTY()) {
+        if (!options.json) console.log(`Confirm with: pan machines accept ${requestId}`);
+        return;
+      }
+      const accepted = await deps.ask('Accept? [y/N] ');
+      await call(accepted ? 'accept' : 'reject', `/api/directory/joins/${encodeURIComponent(requestId)}/${accepted ? 'accept' : 'reject'}`, { method: 'POST' });
+      console.log(accepted ? 'Accepted. The link appears in pan machines list when the approver finishes.' : 'Rejected.');
+      return;
+    }
+    if (deps.now() >= deadline) return fail('No machine opened the approval request within 10 minutes.');
+    await deps.sleep(JOIN_POLL_MS);
+  }
+}
+
+export async function runMachinesAccept(requestId: string): Promise<void> {
+  await call('accept', `/api/directory/joins/${encodeURIComponent(requestId)}/accept`, { method: 'POST' });
+  console.log('Accepted. The link appears in pan machines list when the approver finishes.');
+}
+
+/** Rejects an incoming approval request or this machine's own join request, whichever the id names. */
+export async function runMachinesReject(requestId: string): Promise<void> {
+  const directory = await loadDirectoryState('reject');
+  const path = directory.approvals.some((approval) => approval.requestId === requestId)
+    ? `/api/directory/approvals/${encodeURIComponent(requestId)}/reject`
+    : `/api/directory/joins/${encodeURIComponent(requestId)}/reject`;
+  await call('reject', path, { method: 'POST' });
+  console.log('Rejected.');
+}
+
+export async function runMachinesApprove(requestId: string, options: { yes?: boolean }, deps: DirectoryCliDeps = defaultDirectoryDeps): Promise<void> {
+  const id = encodeURIComponent(requestId);
+  const opened = await (await call('approve', `/api/directory/approvals/${id}/open`, { method: 'POST' })).json() as { sas: string; fingerprint: string };
+  console.log(`Code: ${opened.sas} · fingerprint ${opened.fingerprint}`);
+  console.log('Approve only if the other machine shows the same code.');
+  if (!options.yes) {
+    if (!deps.isTTY()) return fail('Pass --yes to approve without a prompt.');
+    if (!(await deps.ask('Approve? [y/N] '))) {
+      await call('reject', `/api/directory/approvals/${id}/reject`, { method: 'POST' });
+      console.log('Rejected.');
+      return;
+    }
+  }
+  await call('approve', `/api/directory/approvals/${id}/approve`, { method: 'POST' });
+  console.log('Approved. The link appears in pan machines list once the other machine accepts.');
+}
+
+export async function runMachinesForget(target: string): Promise<void> {
+  const result = await (await call('forget', '/api/directory/forget', { method: 'POST', body: { machine: target } })).json() as { label?: string };
+  console.log(`Removed ${result.label ?? target} from the directory.`);
+}
+
+/** The UPDATE cell: `waiting (2 turns)`, `waiting (2 turns, 31 min: use --now)`, `updating`, `failed: claude`, … */
+export function formatFleetUpdateCell(job: FleetUpdateJob | null, now: number = Date.now()): string {
+  if (!job) return '-';
+  if (job.phase === 'waiting') {
+    const turns = `${job.waitingTurns} turn${job.waitingTurns === 1 ? '' : 's'}`;
+    const waitedMs = job.waitingSince ? now - new Date(job.waitingSince).getTime() : 0;
+    return waitedMs >= FLEET_UPDATE_STILL_WAITING_MS
+      ? `waiting (${turns}, ${Math.floor(waitedMs / 60_000)} min: use --now)`
+      : `waiting (${turns})`;
+  }
+  if (job.phase === 'failed') {
+    const failed = job.components.find((component) => component.status === 'failed');
+    return failed ? `failed: ${failed.name}` : 'failed';
+  }
+  return job.phase;
+}
+
+/** A version cell: the version, or `before → after` once a component of the job changed it. */
+function versionCell(job: FleetUpdateJob | null, name: string, version: string | null | undefined): string {
+  const component = job?.components.find((entry) => entry.name === name);
+  if (component && component.status !== 'pending' && component.status !== 'running' && component.after !== null && component.after !== component.before) {
+    return `${component.before ?? '-'} → ${component.after}`;
+  }
+  return version ?? '-';
+}
+
+/** The `pan machines versions` table: header plus one row per machine. */
+export function fleetVersionsTable(rows: readonly FleetVersionRow[], now: number = Date.now()): { header: string[]; rows: string[][] } {
+  const binaries = [...new Set(rows.flatMap((row) => row.report?.harnesses.map((cli) => cli.binary) ?? []))].sort(compareFleetBinaries);
+  return {
+    header: ['MACHINE', 'STATE', 'OVERDECK', ...binaries.map((binary) => binary.toUpperCase()), 'UPDATE'],
+    rows: rows.map((row) => {
+      const job = row.report?.job ?? null;
+      return [
+        row.label,
+        row.self ? 'this machine' : row.state,
+        versionCell(job, 'overdeck', row.report?.overdeck.version ?? row.peerVersion),
+        ...binaries.map((binary) => versionCell(job, binary, row.report?.harnesses.find((cli) => cli.binary === binary)?.version)),
+        formatFleetUpdateCell(job, now),
+      ];
+    }),
+  };
+}
+
+export async function runMachinesVersions(options: { json?: boolean }): Promise<void> {
+  const response = await call('versions', '/api/machines/versions', { method: 'GET' });
+  const fleet = await response.json() as FleetVersionsResponse;
+  if (options.json) {
+    console.log(JSON.stringify(fleet));
+    return;
+  }
+  const { header, rows } = fleetVersionsTable(fleet.rows);
+  table(header, rows);
+  const notes = fleet.rows.flatMap((row) => {
+    if (row.install) return [`${row.label}: install Overdeck ${row.install.version} on ${row.install.on === 'this-machine' ? 'this machine' : row.label}: ${row.install.command}`];
+    return row.error ? [`${row.label}: ${row.error}`] : [];
+  });
+  if (notes.length > 0) {
+    console.log('');
+    for (const note of notes) console.log(note);
+  }
+}
+
+export interface MachinesUpdateOptions { now?: boolean; machine?: string[]; cancel?: boolean; json?: boolean }
+
+export async function runMachinesUpdate(options: MachinesUpdateOptions): Promise<void> {
+  let environmentIds: string[] | undefined;
+  if (options.machine && options.machine.length > 0) {
+    const fleet = await (await call('update', '/api/machines/versions', { method: 'GET' })).json() as FleetVersionsResponse;
+    environmentIds = [];
+    for (const label of options.machine) {
+      const row = fleet.rows.find((entry) => entry.label === label);
+      if (!row) return fail(`No machine named ${label}; \`pan machines versions\` lists them.`);
+      environmentIds.push(row.environmentId);
+    }
+  }
+  const body = {
+    ...(options.cancel ? { cancel: true } : { mode: options.now ? 'now' : 'when-idle' }),
+    ...(environmentIds ? { environmentIds } : {}),
+  };
+  const response = await call('update', '/api/machines/update', { method: 'POST', body });
+  const result = await response.json() as FleetUpdateResponse;
+  if (options.json) {
+    console.log(JSON.stringify(result));
+    return;
+  }
+  for (const entry of result.started) {
+    console.log(options.cancel ? `Cancelled on ${entry.label}` : `Started on ${entry.label} (${entry.job.mode})`);
+  }
+  for (const entry of result.skipped) console.log(`Skipped ${entry.label}: ${entry.reason}`);
+  console.log('Run `pan machines versions` to follow the update.');
 }
 
 export interface MachinesForwardOptions { json?: boolean; list?: boolean; stop?: string }
@@ -192,8 +443,9 @@ export function registerMachinesCommands(program: Command): void {
   machines
     .command('unlink <target>')
     .description('Remove a link by label, environment id or link id, revoking the token the other machine holds')
-    .option('--json', 'Print { ok, peerNotified } as JSON')
-    .action((target: string, options: { json?: boolean }) => runMachinesUnlink(target, options));
+    .option('--keep-server', 'For an SSH machine this dashboard started: leave its Overdeck server running')
+    .option('--json', 'Print { ok, peerNotified, ssh } as JSON')
+    .action((target: string, options: { json?: boolean; keepServer?: boolean }) => runMachinesUnlink(target, options));
   machines
     .command('forward [machine] [port]')
     .description('Forward a TCP port of a linked machine to 127.0.0.1 here and print the URL (for a dev-server preview)')
@@ -201,4 +453,46 @@ export function registerMachinesCommands(program: Command): void {
     .option('--stop <id>', 'Close a forward')
     .option('--json', 'Print JSON')
     .action((target: string | undefined, port: string | undefined, options: MachinesForwardOptions) => runMachinesForward(target, port, options));
+  machines
+    .command('directory')
+    .description("List this account's machines in the overdeck.ai directory, with pending approvals and joins")
+    .option('--json', 'Print the GET /api/directory response as JSON')
+    .action((options: { json?: boolean }) => runMachinesDirectory(options));
+  machines
+    .command('join')
+    .description('Ask your other machines (or one) to link with this one; confirm the code on both screens')
+    .option('--to <machine>', 'Ask only this machine (label or environment id)')
+    .option('--json', 'Print { requestId, sas, fingerprint, approver } as JSON once a machine opens the request')
+    .action((options: { to?: string; json?: boolean }) => runMachinesJoin(options));
+  machines
+    .command('accept <request-id>')
+    .description('Accept a join request after checking that both screens show the same code')
+    .action((requestId: string) => runMachinesAccept(requestId));
+  machines
+    .command('reject <request-id>')
+    .description('Reject an approval or join request')
+    .action((requestId: string) => runMachinesReject(requestId));
+  machines
+    .command('approve <request-id>')
+    .description('Open an approval request, show its code and approve it')
+    .option('--yes', 'Approve without asking')
+    .action((requestId: string, options: { yes?: boolean }) => runMachinesApprove(requestId, options));
+  machines
+    .command('forget <machine>')
+    .description('Remove a machine from the overdeck.ai directory (label or environment id)')
+    .action((target: string) => runMachinesForget(target));
+  machines
+    .command('versions')
+    .description('Show Overdeck and harness CLI versions on every machine')
+    .option('--json', 'Print { rows } as JSON')
+    .action((options: { json?: boolean }) => runMachinesVersions(options));
+  machines
+    .command('update')
+    .description('Update Overdeck and the harness CLIs on every online machine, after running turns end')
+    .option('--now', 'Do not wait for running turns to end')
+    .option('--machine <label>', 'Only this machine; repeat for more', (label: string, labels: string[] = []) => [...labels, label])
+    .option('--cancel', 'Cancel waiting updates')
+    .option('--json', 'Print { started, skipped } as JSON')
+    .action((options: MachinesUpdateOptions) => runMachinesUpdate(options));
+  registerMachinesSshCommands(machines);
 }

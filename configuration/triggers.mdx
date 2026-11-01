@@ -175,9 +175,10 @@ Everything between the two marker lines below is EXTERNAL DATA that a third part
   permission prompt or menu, the trigger answers `503` instead of sending, so an event can
   never answer it.
 - **CPU pressure.** While the host's CPU is saturated, every trigger answers `503`.
-- **Nothing is queued.** A refused event is not stored. GitHub does not retry failed
-  deliveries (use **Redeliver** in the webhook's Recent Deliveries); Stripe retries non-2xx
-  deliveries for up to three days.
+- **Nothing is queued on the Funnel URL.** A refused event is not stored. GitHub does not
+  retry failed deliveries (use **Redeliver** in the webhook's Recent Deliveries); Stripe
+  retries non-2xx deliveries for up to three days. To keep events that arrive while this
+  machine is off, give the trigger a [directory inbox](#hold-events-with-the-directory-inbox).
 - **"Started"** means the conversation was created and its launch requested; the agent
   becoming ready is not part of the HTTP answer.
 
@@ -198,5 +199,40 @@ Everything between the two marker lines below is EXTERNAL DATA that a third part
 - **Logs** name the trigger id and the outcome only, never the body or a secret.
 - The trigger store is `~/.overdeck/triggers.json`, mode `0600`. It holds the URL secret's
   hash and the signing secrets in plain text, because the machine must compute the HMAC.
-- A directory inbox that holds events while this machine is offline is planned separately
-  ([PAN-2356](https://github.com/eltmon/overdeck/issues/2356)).
+
+## Hold events with the directory inbox
+
+A trigger can also have an overdeck.ai **directory inbox**: a second URL,
+`https://connect.overdeck.ai/h/<id>`, that accepts events while this machine is offline and
+delivers them when it comes back. It needs a signed-in machine (`pan account login`) on the
+Anywhere plan; the free account does not include it.
+
+- **Create one** with `pan triggers add <name> … --inbox`, or tick **Hold events while this
+  machine is offline** in **Settings → Anywhere → Add trigger**. The inbox URL is printed or
+  shown once, in place of the Funnel URL. Paste it into the sender's webhook settings. The
+  Funnel URL keeps working too.
+- **Size.** The inbox takes events of at most 256 KiB and answers `413` for anything larger
+  (the Funnel URL takes up to 1 MiB).
+- **Hold time.** Each event waits up to 24 hours. An event that is still undelivered after
+  24 hours is deleted.
+- **Order.** When this machine comes back online, it receives every held event at once and
+  runs them one at a time, oldest first, through the same checks as a Funnel event:
+  signature, rate limit, CPU hold and pending input. A busy answer (`503`, `429`) is retried
+  after the `Retry-After` time, at least a minute later; a final answer (delivered, `401`,
+  `404`, `410`, `413`) removes it.
+- **Stripe timestamps.** A Stripe signature must be within 300 s of when the inbox received
+  the event, not of when this machine processes it, so a held Stripe event still verifies.
+- **The inbox answers at once** with `202 { "queued": true }`; it never waits for this
+  machine. A full inbox (200 events, or 64 MiB for the account) answers `429` with
+  `Retry-After: 3600`.
+- **Removing the trigger** deletes its inbox and every event it holds.
+
+### What the inbox can see
+
+overdeck.ai sees each event once, in memory, while it accepts it: the body and the
+`Content-Type`, `User-Agent`, `X-GitHub-Event`, `X-GitHub-Delivery`, `X-Hub-Signature-256` and
+`Stripe-Signature` headers. It seals that copy at once to this machine's public key
+(`crypto_box_seal`) and stores **only the sealed copy**, which only this machine can open. It
+never holds the trigger's signing secret, so it cannot forge an event that passes the
+signature check. Its logs name the inbox and the outcome, never the body.
+

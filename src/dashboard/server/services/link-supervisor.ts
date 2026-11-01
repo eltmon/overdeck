@@ -22,9 +22,24 @@
  * network (`diagnoseGap`, FR-9). Every 60 s a link not on its best route probes
  * the better ones and switches on success. Every dependency is injectable and
  * the loop runs on timers only, so tests drive it with fake timers.
+ *
+ * PAN-2356 (D-2356-7, D-2356-8): the overdeck.ai directory adds dynamic routes (`direct`,
+ * `relay`, and the addresses it reports), merged with the stored ones and never persisted.
+ * Probing runs in phases: every stored-kind route at 2.5 s; then `direct` at 10 s only when
+ * phase 1 found no channel and no `unknown-peer`; then `relay` at 10 s. When phases 1 and 2 fail
+ * and the plan has no relay, the detail is NO_DIRECT_PATH_MESSAGE.
  */
 import { Schema } from 'effect';
-import { EnvironmentDescriptor, LINK_PROTOCOL_VERSION, type LinkIncident, type LinkRouteStatus, type LinkState, type MachineLinkView } from '@overdeck/contracts';
+import {
+  EnvironmentDescriptor,
+  LINK_PROTOCOL_VERSION,
+  type LinkIncident,
+  type LinkRouteStatus,
+  type LinkState,
+  type MachineLinkView,
+  NO_DIRECT_PATH_MESSAGE,
+  overdeckInstallCommand,
+} from '@overdeck/contracts';
 
 import type { ChannelSocket } from '../../../lib/anywhere/channel/channel-socket.js';
 import { ChannelOpenError, openChannel, type TransportUrl } from '../../../lib/anywhere/channel/open.js';
@@ -32,13 +47,16 @@ import type { LinkRouteInfo, LinkRouteSource } from '../../../lib/anywhere/link-
 import { linksSnapshot, type MachineLink, markLinkRevoked, setLinkRoutes } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey, type MachineKeyPair } from '../../../lib/anywhere/machine-key.js';
 import { type LinkRoute, mergeAdvertised, rankRoutes } from '../../../lib/anywhere/routes.js';
-import { channelRequest, type LinkStatusSource } from './machine-link-service.js';
+import { channelRequest, type LinkStatusSource, type UnsupportedInstall } from './machine-link-service.js';
 import { type HeartbeatHandle, type HeartbeatHandlers, type HeartbeatPayload, openHeartbeatOverChannel } from './link-heartbeat.js';
 
 export const HEARTBEAT_INTERVAL_MS = 15_000;
 export const HEARTBEAT_LATE_MS = 17_500;
 export const HEARTBEAT_DEAD_MS = 20_000;
 export const PROBE_TIMEOUT_MS = 2_500;
+/** A WebRTC path needs signalling and ICE checks first (D-2356-8). */
+export const DIRECT_PROBE_TIMEOUT_MS = 10_000;
+export const RELAY_PROBE_TIMEOUT_MS = 10_000;
 export const BACKOFF_MIN_MS = 1_000;
 export const BACKOFF_CAP_MS = 45_000;
 export const IDENTITY_BACKOFF_CAP_MS = 300_000;
@@ -60,6 +78,10 @@ export interface LinkSupervisorDeps {
   onHeartbeat?: (link: MachineLink, payload: HeartbeatPayload) => void | Promise<void>;
   /** This machine's Overdeck version, for the "install …" detail. */
   serverVersion: string;
+  /** PAN-2356: routes the directory offers for this link right now; never persisted. */
+  dynamicRoutes?: (link: MachineLink) => LinkRoute[];
+  /** PAN-2356: whether the account's plan includes the relay. */
+  relayEntitled?: () => boolean;
   now: () => number;
   random: () => number;
   log: (message: string) => void;
@@ -101,14 +123,39 @@ export function diagnoseGap(
   return { kind: 'network', durationMs: Math.max(0, gapMs - HEARTBEAT_INTERVAL_MS), at: new Date(receivedAt).toISOString() };
 }
 
+export type { UnsupportedInstall };
+
+/**
+ * Which Overdeck to install where when link protocols differ (FR-1): the peer's
+ * version on this machine when the peer speaks a newer link protocol, this
+ * machine's version on the peer otherwise.
+ */
+export function unsupportedInstall(peerLinkProtocol: number | undefined, peerVersion: string | undefined, localVersion: string): UnsupportedInstall {
+  return (peerLinkProtocol ?? 0) > LINK_PROTOCOL_VERSION && peerVersion
+    ? { version: peerVersion, on: 'this-machine' }
+    : { version: localVersion, on: 'peer' };
+}
+
+export function unsupportedDetail(install: UnsupportedInstall, peerLabel: string): string {
+  return `Install Overdeck ${install.version} on ${install.on === 'this-machine' ? 'this machine' : peerLabel}: ${overdeckInstallCommand(install.version)}`;
+}
+
 type ProbeOutcome =
   | { ok: true; channel: ChannelSocket; route: LinkRoute }
-  | { ok: false; failure: 'unreachable' | 'identity-refused' | 'unknown-peer' | 'unsupported'; detail: string };
+  | { ok: false; failure: 'unsupported'; install: UnsupportedInstall }
+  | { ok: false; failure: 'unreachable' | 'identity-refused' | 'unknown-peer'; detail: string };
+
+/** A later phase's failure, prefixed with an earlier phase's detail when both carry one. */
+function joinFailures(earlier: ProbeOutcome | null, later: ProbeOutcome): ProbeOutcome {
+  if (!earlier || earlier.ok || earlier.failure === 'unsupported' || later.ok || later.failure === 'unsupported') return later;
+  return { ...later, detail: `${earlier.detail}; ${later.detail}` };
+}
 
 interface Entry {
   link: MachineLink;
   state: LinkState;
   stateDetail: string | null;
+  unsupported: UnsupportedInstall | null;
   currentRoute: string | null;
   channel: ChannelSocket | null;
   heartbeat: HeartbeatHandle | null;
@@ -129,6 +176,15 @@ interface Entry {
 }
 
 const decodeDescriptor = Schema.decodeUnknownOption(EnvironmentDescriptor);
+
+/** Phase-1 routes take 2.5 s; a WebRTC route needs signalling and ICE, so it gets 10 s. */
+function probeTimeoutFor(route: LinkRoute): number {
+  if (route.kind === 'direct') return DIRECT_PROBE_TIMEOUT_MS;
+  if (route.kind === 'relay') return RELAY_PROBE_TIMEOUT_MS;
+  return PROBE_TIMEOUT_MS;
+}
+
+const isWebRtc = (route: LinkRoute): boolean => route.kind === 'direct' || route.kind === 'relay';
 
 export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
   private readonly entries = new Map<string, Entry>();
@@ -183,6 +239,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     if (entry.state === 'unsupported') {
       entry.state = entry.channel ? 'online' : 'offline';
       entry.stateDetail = null;
+      entry.unsupported = null;
     }
     if (!entry.channel) void this.connect(entry);
     else void this.probeBetter(entry);
@@ -193,7 +250,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
   status(linkId: string): ReturnType<LinkStatusSource['status']> {
     const entry = this.entries.get(linkId);
     if (!entry) {
-      return { state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, routeStatus: () => 'untried' };
+      return { state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, unsupported: null, routeStatus: () => 'untried' };
     }
     return {
       state: entry.state,
@@ -202,6 +259,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       lastHeartbeatAt: entry.lastHeartbeatAt === null ? null : new Date(entry.lastHeartbeatAt).toISOString(),
       incident: entry.incident,
       peerVersion: entry.peerVersion,
+      unsupported: entry.unsupported,
       routeStatus: (url) => (url === entry.currentRoute && entry.state === 'online' ? 'current' : entry.routeStatus.get(url) ?? 'untried'),
     };
   }
@@ -254,7 +312,59 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     if (entry.state === 'online') this.scheduleBetter(entry, 0);
   }
 
+  /** The directory's routes for a link right now (the Machines view lists them). */
+  dynamicRoutes(linkId: string): LinkRoute[] {
+    const entry = this.entries.get(linkId);
+    return entry ? this.directoryRoutes(entry) : [];
+  }
+
   // ── internals ──────────────────────────────────────────────────────────────
+
+  private directoryRoutes(entry: Entry): LinkRoute[] {
+    try {
+      return this.deps.dynamicRoutes?.(entry.link) ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Stored routes plus the directory's dynamic ones, deduplicated by URL (stored first). */
+  private allRoutes(entry: Entry): LinkRoute[] {
+    const stored = entry.link.routes;
+    const known = new Set(stored.map((route) => route.url));
+    return [...stored, ...this.directoryRoutes(entry).filter((route) => !known.has(route.url))];
+  }
+
+  /**
+   * D-2356-8: stored-kind routes first; `direct` only when that found nothing and no peer refused
+   * our key; `relay` last. A failure with no relay to fall back on, because the plan has none, is
+   * reported as NO_DIRECT_PATH_MESSAGE.
+   */
+  private async probePhased(entry: Entry, signal: AbortSignal): Promise<ProbeOutcome> {
+    const routes = this.allRoutes(entry);
+    const phase1 = routes.filter((route) => !isWebRtc(route));
+    const direct = routes.filter((route) => route.kind === 'direct');
+    const relay = routes.filter((route) => route.kind === 'relay');
+    let outcome: ProbeOutcome | null = null;
+    if (phase1.length > 0 || (direct.length === 0 && relay.length === 0)) {
+      outcome = await this.probe(entry, phase1, signal);
+      if (outcome.ok || outcome.failure === 'unknown-peer' || outcome.failure === 'unsupported' || signal.aborted) return outcome;
+    }
+    if (direct.length > 0) {
+      const second = await this.probe(entry, direct, signal);
+      if (second.ok || second.failure === 'unknown-peer' || second.failure === 'unsupported' || signal.aborted) return second;
+      outcome = joinFailures(outcome, second);
+    }
+    if (relay.length > 0) {
+      const third = await this.probe(entry, relay, signal);
+      if (third.ok || third.failure === 'unsupported' || signal.aborted) return third;
+      return joinFailures(outcome, third);
+    }
+    if (direct.length > 0 && this.deps.relayEntitled?.() === false && outcome && !outcome.ok && outcome.failure === 'unreachable') {
+      return { ok: false, failure: 'unreachable', detail: NO_DIRECT_PATH_MESSAGE };
+    }
+    return outcome ?? { ok: false, failure: 'unreachable', detail: 'no routes' };
+  }
 
   private entryForEnvironment(environmentId: string): Entry | undefined {
     for (const entry of this.entries.values()) {
@@ -265,7 +375,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
 
   private makeEntry(link: MachineLink): Entry {
     return {
-      link, state: 'connecting', stateDetail: null, currentRoute: null, channel: null, heartbeat: null,
+      link, state: 'connecting', stateDetail: null, unsupported: null, currentRoute: null, channel: null, heartbeat: null,
       lastHeartbeatAt: null, lastEndpointsHash: null, incident: null, peerVersion: null, attempt: 0,
       backoffKind: 'network', retryTimer: null, lateTimer: null, deadTimer: null, betterTimer: null,
       probing: null, routeStatus: new Map(), onlineWaiters: new Set(), generation: 0,
@@ -310,9 +420,10 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     this.deps.log(`link to ${entry.link.label} revoked: ${detail}`);
   }
 
-  private markUnsupported(entry: Entry, detail: string): void {
+  private markUnsupported(entry: Entry, install: UnsupportedInstall): void {
     entry.state = 'unsupported';
-    entry.stateDetail = detail;
+    entry.unsupported = install;
+    entry.stateDetail = unsupportedDetail(install, entry.link.label);
     this.clearTimer(entry, 'retryTimer');
     this.clearTimer(entry, 'betterTimer');
     this.dropChannel(entry);
@@ -340,7 +451,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
 
   private scheduleBetter(entry: Entry, delay = BETTER_ROUTE_INTERVAL_MS): void {
     this.clearTimer(entry, 'betterTimer');
-    const ranked = rankRoutes(entry.link.routes);
+    const ranked = rankRoutes(this.allRoutes(entry));
     if (ranked.length === 0 || ranked[0]!.url === entry.currentRoute) return;
     entry.betterTimer = setTimeout(() => {
       entry.betterTimer = null;
@@ -393,7 +504,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     }
     const attempts = ranked.map((route) =>
       this.deps.openChannel(route.url as TransportUrl, {
-        mode: 'link', localKey, remoteKeyHex: entry.link.machineKey, timeoutMs: PROBE_TIMEOUT_MS, signal,
+        mode: 'link', localKey, remoteKeyHex: entry.link.machineKey, timeoutMs: probeTimeoutFor(route), signal,
       }).then(
         (channel) => ({ route, channel, error: null as ChannelOpenError | Error | null }),
         (error: ChannelOpenError | Error) => ({ route, channel: null as ChannelSocket | null, error }),
@@ -425,7 +536,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     const unsupported = failures.find((failure) => codeOf(failure.error) === 'unsupported');
     if (unsupported) {
       const detail = (unsupported.error as ChannelOpenError).detail;
-      return { ok: false, failure: 'unsupported', detail: `Install Overdeck ${detail.serverVersion ?? this.deps.serverVersion} on ${detail.linkProtocol !== undefined && detail.linkProtocol > LINK_PROTOCOL_VERSION ? 'this machine' : entry.link.label}` };
+      return { ok: false, failure: 'unsupported', install: unsupportedInstall(detail.linkProtocol, detail.serverVersion, this.deps.serverVersion) };
     }
     // A responder that cannot decrypt our pinned-key handshake drops the connection
     // without a word; so does a proxy or port forward whose peer is dead. Only when
@@ -445,7 +556,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     }
     const controller = new AbortController();
     entry.probing = controller;
-    const outcome = await this.probe(entry, entry.link.routes, controller.signal);
+    const outcome = await this.probePhased(entry, controller.signal);
     if (entry.probing === controller) entry.probing = null;
     if (entry.generation !== generation || controller.signal.aborted) {
       if (outcome.ok) outcome.channel.destroy();
@@ -453,7 +564,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     }
     if (!outcome.ok) {
       if (outcome.failure === 'unknown-peer') return this.markRevoked(entry, outcome.detail);
-      if (outcome.failure === 'unsupported') return this.markUnsupported(entry, outcome.detail);
+      if (outcome.failure === 'unsupported') return this.markUnsupported(entry, outcome.install);
       entry.backoffKind = outcome.failure === 'identity-refused' ? 'identity' : 'network';
       if (!entry.channel) {
         entry.state = 'offline';
@@ -504,10 +615,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     entry.peerVersion = descriptor.serverVersion;
     if (descriptor.capabilities.machineLinks !== true || descriptor.linkProtocol !== LINK_PROTOCOL_VERSION) {
       channel.destroy();
-      const peerNewer = (descriptor.linkProtocol ?? 0) > LINK_PROTOCOL_VERSION;
-      return this.markUnsupported(entry, peerNewer
-        ? `Install Overdeck ${descriptor.serverVersion} on this machine`
-        : `Install Overdeck ${this.deps.serverVersion} on ${entry.link.label}`);
+      return this.markUnsupported(entry, unsupportedInstall(descriptor.linkProtocol, descriptor.serverVersion, this.deps.serverVersion));
     }
 
     let heartbeat: HeartbeatHandle;
@@ -635,7 +743,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
   /** Try the routes ranked above the current one; switch on success. */
   private async probeBetter(entry: Entry): Promise<void> {
     if (this.stopped || entry.state !== 'online' || entry.probing) return;
-    const ranked = rankRoutes(entry.link.routes);
+    const ranked = rankRoutes(this.allRoutes(entry));
     const currentIndex = ranked.findIndex((route) => route.url === entry.currentRoute);
     const better = currentIndex <= 0 ? ranked.filter((route) => route.url !== entry.currentRoute) : ranked.slice(0, currentIndex);
     if (better.length === 0) return;

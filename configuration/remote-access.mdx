@@ -362,12 +362,54 @@ never cross the network in the clear; open the dashboard through an HTTPS addres
 (Tailscale Serve, a reverse proxy with a certificate). Browsers on the machine itself
 and linked machines (whose traffic is already inside the secure channel) are not affected.
 
+## Find your machines through overdeck.ai
+
+A machine signed in with `pan account login` registers in your account's **directory** at
+overdeck.ai and keeps one connection to it. From any signed-in machine you can then see all of
+your machines, link two of them without a pairing code, and reach a linked machine with no
+Tailscale. A machine that is not signed in opens no connection and nothing else changes.
+
+- **What the directory stores:** each machine's environment id, label, public machine key,
+  fingerprint, whether it is online (with the time it was last seen) and the LAN and Tailscale
+  addresses it advertises. It also passes the short connection setup messages between two of
+  your machines. It never carries your conversations and never vouches for a key.
+- **See your machines:** **Settings → Anywhere → Directory**, or `pan machines directory`.
+- **Link two machines (approval):** on the new machine, click **Link** on the other machine's
+  row (or run `pan machines join`). The other machine shows the request; click **Review** there
+  (or run `pan machines approve <id>`). Both screens now show the same six-digit code and the
+  other machine's fingerprint. Approve on one machine and accept on the other **only if the two
+  codes match**. A different code means something sits between them; reject it. Links made this
+  way are operator-level both ways.
+- **Direct connections:** once linked, the two machines open a peer-to-peer WebRTC path
+  through the directory's introduction when no LAN or Tailscale route answers. The link shows
+  the route as `direct` (`rtc://…`). The secure channel runs over it, so only ciphertext
+  crosses the network.
+- **The free account includes 3 machines.** A fourth machine is refused with "The free account
+  includes 3 machines". **Remove from directory** (or `pan machines forget`) frees a slot.
+- **The relay plan.** When no direct path exists (for example strict firewalls on both sides),
+  a relay plan connects the two machines through a Cloudflare TURN relay, still carrying the
+  same secure channel. Without it, the link says "No direct path; install Tailscale or use the
+  relay plan". Relay traffic counts against a 50 GB monthly allowance per account (UTC calendar
+  month). While a relay route is in use the Anywhere card shows **Using relay** and this
+  month's traffic; at 50 GB the relay stops until the next month, the card shows "Relay
+  allowance used; install Tailscale or add 50 GB" and an **Add 50 GB** button that opens
+  overdeck.ai.
+- **Self-hosting the directory:** run `services/connect` yourself and point
+  `anywhere.directory_url` in `~/.overdeck/config.yaml` at it:
+
+  ```yaml
+  anywhere:
+    directory_url: https://connect.example.org   # default https://connect.overdeck.ai
+  ```
+
+  It must be `https:`, or `http:` to a loopback host. It is read at every directory
+  (re)connect.
+
 ## What pairing is not
 
-- **The relay is optional reachability.** The Overdeck relay
-  ([PAN-2356](https://github.com/eltmon/overdeck/issues/2356)) is one way to
-  reach a machine. It is not where multi-machine state lives: each machine
-  keeps its own.
+- **The relay is optional reachability.** The overdeck.ai relay (see
+  [Find your machines through overdeck.ai](#find-your-machines-through-overdeck-ai)) is one way
+  to reach a machine. It is not where multi-machine state lives: each machine keeps its own.
 - **Moving a conversation to another machine is Session Vault.** Pairing lets a
   device use a machine's dashboard. To resume a conversation on a different
   machine, use [Session Vault](/configuration/session-vault).

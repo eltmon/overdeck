@@ -101,6 +101,7 @@ import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive, dropPipelineStateMirrorTables, dropDeadIssuesForeignKeys } from '../../lib/overdeck/infra.js';
 import { bootConversationEnvironmentOrWarn } from '../../lib/overdeck/conversation-environment.js';
 import { startAnywhere } from './services/anywhere-boot.js';
+import { fleetUpdateService } from './services/fleet-update-service.js';
 import { startServerBootTelemetry } from './telemetry.js';
 import { hostsMachineLinks, isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { isSmeeConfigured, startSmeeProcess } from '../../lib/smee.js';
@@ -222,6 +223,7 @@ if (typeof Bun !== 'undefined') {
 }
 await whenDashboardListening();
 void startAnywhere({ primary: hostsMachineLinks() }).catch((err) => console.warn('[anywhere] boot failed (non-fatal):', err)); // PAN-4645 D-4645-21
+if (hostsMachineLinks()) void fleetUpdateService().boot().catch((err) => console.warn('[fleet-update] boot failed (non-fatal):', err)); // PAN-4654 D-4
 startServerBootTelemetry();
 
 startEventLoopMonitor();

@@ -20,6 +20,12 @@ vi.mock('../../../src/lib/overdeck/conversations.js', () => ({
   getConversationById: mocks.byId,
 }));
 vi.mock('../../../src/lib/projects.js', () => ({ getProjectSync: mocks.project }));
+const dashboard = vi.hoisted(() => ({ call: vi.fn() }));
+vi.mock('../../../src/cli/commands/dashboard-call.js', () => ({
+  callDashboard: dashboard.call,
+  errorText: async (response: Response) => ((await response.json()) as { error: string }).error,
+  isDashboardUnreachable: () => false,
+}));
 vi.mock('../../../src/cli/exit.js', () => ({
   exitCli: async (code: number) => { throw new Error(`exit ${code}`); },
 }));
@@ -115,5 +121,34 @@ describe('pan triggers (PAN-4648)', () => {
     await runTriggersSetSecret(trigger.id, {}, async () => 'whsec_from_stdin\n');
     expect((await listPublicTriggers())[0].signingSecretSet).toBe(true);
     expect(stdout.join('\n')).not.toContain('whsec_from_stdin');
+  });
+});
+
+describe('pan triggers add --inbox (PAN-2356 WI-20)', () => {
+  const INBOX_URL = `https://connect.overdeck.ai/h/${'a'.repeat(64)}.${'b'.repeat(32)}`;
+
+  it('creates through the dashboard and prints the inbox URL, not the Funnel lines', async () => {
+    dashboard.call.mockResolvedValueOnce(new Response(JSON.stringify({
+      trigger: { id: 'trg_0123456789ab', name: 'held', verify: 'none', signingSecretSet: false },
+      hookPath: `/hooks/trg_0123456789ab/${'c'.repeat(64)}`,
+      inboxUrl: INBOX_URL,
+      generatedSigningSecret: null,
+    }), { status: 201 }));
+    await runTriggersAdd('held', { conversation: '20261101-0001', inbox: true });
+    expect(dashboard.call).toHaveBeenCalledWith('/api/triggers', expect.objectContaining({
+      method: 'POST',
+      body: expect.objectContaining({ name: 'held', inbox: true, target: { kind: 'conversation', conversation: '20261101-0001' } }),
+    }));
+    const out = stdout.join('\n');
+    expect(out).toContain(INBOX_URL);
+    expect(out).toContain('https://connect.overdeck.ai/h/');
+    expect(out).not.toContain('tailscale funnel');
+    expect(out).not.toContain('Funnel URL');
+  });
+
+  it('fails with the dashboard reason when the plan has no inbox', async () => {
+    dashboard.call.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'the inbox needs the Anywhere plan' }), { status: 409 }));
+    await expect(runTriggersAdd('held', { conversation: '20261101-0001', inbox: true })).rejects.toThrow('exit 1');
+    expect(stderr.join('\n')).toContain('the inbox needs the Anywhere plan');
   });
 });

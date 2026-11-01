@@ -62,7 +62,7 @@ interface Harness {
   peer: Record<string, unknown>;
 }
 
-function harness(options: { reachable?: boolean; heartbeatStatus?: number; peer?: Record<string, unknown> } = {}): Harness {
+function harness(options: { reachable?: boolean; heartbeatStatus?: number; peer?: Record<string, unknown>; openError?: () => Error } = {}): Harness {
   let reachable = options.reachable ?? true;
   let frozen = false;
   const thaw: Array<() => void> = [];
@@ -88,6 +88,7 @@ function harness(options: { reachable?: boolean; heartbeatStatus?: number; peer?
         timer = setTimeout(resolve, reachable ? 10 : PROBE_TIMEOUT_MS);
       });
       if (!reachable) throw new ChannelOpenError('unreachable', `${url}: ECONNREFUSED`);
+      if (options.openError) throw options.openError();
       const channel = new FakeChannel(url);
       channels.push(channel);
       return channel as unknown as ChannelSocket;
@@ -232,6 +233,7 @@ describe('link supervisor (PAN-4645 WI-18)', () => {
     const status = h.supervisor.status('link-1');
     expect(status.state).toBe('unsupported');
     expect(status.stateDetail).toContain('Install Overdeck 0.73.0 on peer');
+    expect(status.stateDetail?.endsWith(': npm install -g @overdeck/core@0.73.0')).toBe(true);
     const probes = h.opens.length;
     await settle(10 * 60_000);
     expect(h.opens.length).toBe(probes);
@@ -242,6 +244,43 @@ describe('link supervisor (PAN-4645 WI-18)', () => {
     expect(h.supervisor.reconnect('link-1')).toBe(true);
     await settle(50);
     expect(h.supervisor.status('link-1').state).toBe('online');
+  });
+
+  it('unsupported: a peer one link protocol behind (refusal 02 from an older responder) names this machine\'s version and the npm command', async () => {
+    h = harness({ openError: () => new ChannelOpenError('unsupported', 'link protocol mismatch', { linkProtocol: 0, serverVersion: '0.71.0' }) });
+    h.supervisor.start();
+    await settle(50);
+    const status = h.supervisor.status('link-1');
+    expect(status.state).toBe('unsupported');
+    expect(status.stateDetail).toBe('Install Overdeck 0.73.0 on peer: npm install -g @overdeck/core@0.73.0');
+    expect(status.unsupported).toEqual({ version: '0.73.0', on: 'peer' });
+    const opens = h.opens.length;
+    await settle(10 * 60_000);
+    expect(h.opens.length).toBe(opens);
+  });
+
+  it('unsupported: a newer responder (refusal 02, linkProtocol 2) names its version on this machine', async () => {
+    h = harness({ openError: () => new ChannelOpenError('unsupported', 'link protocol mismatch', { linkProtocol: 2, serverVersion: '0.80.0' }) });
+    h.supervisor.start();
+    await settle(50);
+    const status = h.supervisor.status('link-1');
+    expect(status.stateDetail).toBe('Install Overdeck 0.80.0 on this machine: npm install -g @overdeck/core@0.80.0');
+    expect(status.unsupported).toEqual({ version: '0.80.0', on: 'this-machine' });
+  });
+
+  it('reconnect clears unsupported', async () => {
+    h = harness({ peer: descriptor({ linkProtocol: 0 }) });
+    h.supervisor.start();
+    await settle(50);
+    expect(h.supervisor.status('link-1').unsupported).toEqual({ version: '0.73.0', on: 'peer' });
+    const opens = h.opens.length;
+    await settle(10 * 60_000);
+    expect(h.opens.length).toBe(opens);
+    h.peer.linkProtocol = 1;
+    expect(h.supervisor.reconnect('link-1')).toBe(true);
+    expect(h.supervisor.status('link-1').unsupported).toBeNull();
+    await settle(50);
+    expect(h.supervisor.status('link-1')).toMatchObject({ state: 'online', unsupported: null });
   });
 
   it('ac5: linkFetch to an offline link rejects at once; to a connecting unreachable link at 2.5 s', async () => {

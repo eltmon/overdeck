@@ -39,6 +39,82 @@ tokens, and the new link shows up as **Online** on both sides.
 Both servers on one host (for a test) need `--allow-loopback`, because a `localhost`
 pairing link only works on the machine that printed it.
 
+## SSH machines
+
+A machine that this one reaches only over SSH (a VPS, a lab box behind a bastion) can be
+linked without running anything there by hand. Use **Settings → Anywhere → Machines →
+Add an SSH machine**, or:
+
+```bash
+pan machines add-ssh me@vps.example.com
+```
+
+The dashboard server does all of it with its own OpenSSH client, keys and `~/.ssh/config`,
+so it works from any browser that can open this dashboard:
+
+1. It opens an SSH session to the host.
+2. It checks that the host has the same `pan` version as this machine.
+3. It adopts the Overdeck dashboard already running there, or starts one with `pan up`.
+4. It forwards a loopback port on this machine to the host's dashboard port.
+5. It pairs over that forwarded port and saves a machine link whose route has kind `ssh`.
+
+**Test** in the dialog (or `pan machines test-ssh <host>`) runs only step 2. The host field
+suggests the concrete `Host` aliases of this machine's `~/.ssh/config`.
+
+To set a server up from the server itself instead (a lasting service that survives
+logout and reboot), use [Link a fresh server](#link-a-fresh-server).
+
+### Requirements
+
+- OpenSSH (`ssh`) on this machine, on the dashboard's `PATH`.
+- A key or SSH agent the dashboard process can use **without a prompt**. Every call uses
+  `BatchMode=yes`. If your keys live in an agent, start the dashboard (`pan up`) from a
+  shell that has `SSH_AUTH_SOCK` set.
+- The host key already in `~/.ssh/known_hosts`. Overdeck never accepts a new or changed key
+  for you: run `ssh <host>` once in a terminal on this machine and check the key.
+- The same `pan` version on the host. A different version fails with `version-mismatch`,
+  which names both versions and the command to run there,
+  `npm install -g @overdeck/core@<this version>`. Nothing is installed for you. When `pan` is
+  not on the host's login `PATH`, give its absolute path under **Advanced** (`--pan-path`).
+
+### Started by Overdeck, or already running
+
+The row of an SSH machine shows `SSH <host> · forward <state> · <launch>`:
+
+- **Started by Overdeck** (`managed`): this machine ran `pan up` on the host. Removing the
+  machine stops that server, unless you tick **Leave the server running**
+  (`pan machines unlink <machine> --keep-server`).
+- **Already running** (`external`): the host's server was running before. Removing the
+  machine never stops it.
+
+Removal stops only the dashboard process. Sidecars that `pan up` started on the host (the
+supervisor, CLIProxy) keep running. A server is also left running when another machine
+holds an active link to it (`in-use`), or when it was restarted since this machine started
+it.
+
+### The forward
+
+This dashboard keeps the SSH port forward running while it runs: it starts it at boot,
+restarts it with back-off (1 s doubling to 60 s) when it exits, and moves it to another
+local port when its port is taken. When SSH refuses the login or the host key, the forward
+stops retrying and the row shows **forward attention** with the reason. Fix the key or the
+host key, then press **Reconnect**, which restarts the forward and starts or adopts the
+host's server again.
+
+## Link a fresh server
+
+To link a server you reach over SSH, one command on the server does everything: it
+installs Overdeck as a service that survives logout and reboot, starts it, and prints the
+link.
+
+```bash
+# on the server, over SSH
+npx @overdeck/core connect
+```
+
+Then run the `pan machines link '…'` line it prints on your laptop. See
+[`pan connect`](/cli/machines#connect) for lingering, macOS, firewalls and removal.
+
 ## Access levels
 
 | Level | What this machine may do on the other | Flag |
@@ -61,18 +137,33 @@ compare it with the other machine's **This machine** line.
 ## Routes
 
 A link keeps a list of ways to reach the other machine, best first: a LAN address, a
-Tailscale address, then public or relayed ones. Where they come from:
+Tailscale address, an SSH forward, then public or relayed ones. Where they come from:
 
 - The **pairing** address is the one in the pairing link.
 - **Advertised** addresses are learned from the other machine itself: its LAN and
   Tailscale addresses, and its Tailscale Serve name when it has one. When a better one
   answers, the link moves to it within a minute. Addresses the other machine stops
   advertising are dropped.
-- **Add route** (in the expanded route list) adds an address you know works, for
-  example an SSH-forwarded port: `tcp://127.0.0.1:3041`.
+- An **`ssh`** route is the forwarded loopback port (`tcp://127.0.0.1:<port>`) that this
+  dashboard keeps open for an [SSH machine](#ssh-machines). When the host also advertises a
+  LAN or Tailscale address that answers from here, the link moves to it, and the forward
+  stays as the fallback.
+- **Add route** (in the expanded route list) adds an address you know works. For a
+  machine you reach over SSH, use **Add an SSH machine** instead of forwarding a port by
+  hand.
 
 Expand a link's **Routes** to see each address, its kind, where it came from and whether
 it answered last time.
+
+**Through the overdeck.ai directory.** When both machines are signed in to the same
+overdeck.ai account, you can also link them without a pairing link: click **Link** in
+**Settings → Anywhere → Directory** (or run `pan machines join`), then approve on the other
+machine after checking that both screens show the same six-digit code. The directory also adds
+`direct` routes (`rtc://<environment id>`, a peer-to-peer WebRTC path) and, on the relay plan,
+`relay` routes (`rtc+turn://<environment id>`, through a TURN relay). They are tried only when
+no LAN, Tailscale, SSH or public route answers, appear with the source `directory`, and are
+never saved with the link. See
+[Find your machines through overdeck.ai](/configuration/remote-access#find-your-machines-through-overdeck-ai).
 
 ## States
 
@@ -81,7 +172,7 @@ it answered last time.
 | **Online** | Heartbeats arrive every 15 s over the channel. |
 | **Connecting** | A heartbeat is late (17.5 s); every route is being tried while the old channel stays open. |
 | **Offline** | No heartbeat for 20 s and no route answered. Retries back off from 1 s to 45 s; the link comes back within a minute of the other machine returning. |
-| **Unsupported** | The other machine runs an Overdeck without machine links, or another link protocol. The state names the version to install; **Reconnect** tries again. |
+| **Unsupported** | The other machine runs an Overdeck without machine links, or another link protocol. The state names the exact version, where to install it, and the `npm install -g @overdeck/core@<version>` command. It is not retried until **Reconnect** or a restart. |
 | **Revoked** | The other machine removed this machine's access. Link again with a new pairing link. |
 
 When a link drops, the row says why. **froze** means the other dashboard's event loop
@@ -184,6 +275,48 @@ with neither cannot do this (`no-ssh-host`). VS Code, VS Code Insiders and VSCod
 supported. Cursor and Windsurf are shown disabled: their remote-SSH launch could not be
 verified.
 
+## Fleet versions and Update all
+
+**Settings → Anywhere → Fleet versions** (or `pan machines versions`) shows one row per
+machine, this machine first: the Overdeck version and the version of each harness CLI
+installed there (Claude Code, Codex CLI, Kimi Code CLI, OpenCode, Muse Code, Prime Agent,
+OhMyPi). A linked machine that is not online shows its last known Overdeck version. A
+linked machine on an Overdeck from before fleet updates shows the version to install and
+its command.
+
+**Update all** (or `pan machines update`) asks every online machine to update itself:
+
+1. **Wait for running turns.** Each machine waits until no agent or conversation is in the
+   middle of a turn there, checking every 5 s. It never starts on its own while a turn
+   works. After 30 minutes the row says it is still waiting. **Update now** on that row
+   (or `pan machines update --now`) starts it at once; **Cancel** (or
+   `pan machines update --cancel`) stops a waiting update.
+2. **Update each harness CLI** with its own command. A CLI installed with npm is updated
+   with npm into the same prefix. A failure in one CLI does not stop the next; the row
+   shows the command's output.
+3. **Update Overdeck last** on a machine where it was installed with
+   `npm install -g @overdeck/core`, then restart that machine's dashboard. A repository
+   checkout (`pan reload` deployments) or the desktop app keeps its Overdeck and still
+   updates the CLIs.
+
+Each version shows `before → after` once it changed. Update all always installs the
+latest version; it never lets anyone pick a version.
+
+| CLI | Update command | Notes |
+| --- | --- | --- |
+| Claude Code | `claude update` | npm installs: `npm install -g --prefix <prefix> @anthropic-ai/claude-code@latest` |
+| Codex CLI | `codex update` | npm installs: `npm install -g --prefix <prefix> @openai/codex@latest` |
+| Kimi Code CLI | `kimi upgrade --yes` | |
+| OpenCode | `opencode upgrade` | npm installs: `npm install -g --prefix <prefix> opencode-ai@latest` |
+| Muse Code | none | Listed with its version; Overdeck does not update it. |
+| Prime Agent | none | Overdeck pins it to 0.8, so it is not updated to latest. |
+| OhMyPi | none | Listed with its version; Overdeck does not update it. |
+
+Homebrew installs, Windows, and an npm prefix Overdeck cannot write show the command to
+run yourself instead of running it. Offline, connecting, unsupported and revoked machines
+are skipped, and so is a machine reached over an agent-fenced link: Update all needs an
+operator-level link.
+
 ## Unlink
 
 **Unlink** on a link (or `pan machines unlink <label>`) removes it here and tells the
@@ -196,6 +329,14 @@ connections.
 
 - **Unsupported**: update Overdeck on the machine the state names, then **Reconnect**.
 - **Revoked**: the other side unlinked. Create a new pairing link there and link again.
+- **Update all skipped a machine**: the toast and `pan machines update` name the reason.
+  An offline or unsupported machine is never updated; bring it online (or install the
+  named Overdeck version) and run Update all again. "agent-fenced" means this machine's
+  link to it is agent-fenced; link again at operator level to update it from here.
+- **A CLI update failed**: the row shows `Failed: <CLI>`, and the Update cell's tooltip
+  (or `pan machines versions --json`) holds the command's output. Fix the cause on that
+  machine (often permissions on the npm prefix) and run Update all again; the other CLIs
+  were still updated.
 - **Offline with "ECONNREFUSED"**: the other dashboard is not running, or no advertised
   address reaches it from here. Add a route you know works.
 - **Offline with "closed the connection before proving the pinned machine key"**: every

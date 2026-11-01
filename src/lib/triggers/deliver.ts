@@ -91,7 +91,7 @@ function parseJsonObject(rawBody: Buffer): Record<string, unknown> | null {
   }
 }
 
-function eventLabels(source: TriggerEnvelopeSource, input: TriggerEventInput): { eventType: string | null; deliveryId: string | null } {
+function eventLabels(source: TriggerEnvelopeSource, input: Pick<TriggerEventInput, 'headers' | 'rawBody'>): { eventType: string | null; deliveryId: string | null } {
   if (source === 'stripe') {
     const body = parseJsonObject(input.rawBody);
     return {
@@ -134,16 +134,38 @@ export async function findTriggerByUrl(
 }
 
 export async function deliverTriggerEvent(input: TriggerEventInput, deps: TriggerDeliveryDeps): Promise<TriggerDeliveryResult> {
-  const result = await runDelivery(input, deps);
+  // Step 1: URL secret. Unknown id and wrong secret must look the same.
+  const record = await findTriggerByUrl(input, deps);
+  const result = record ? await runAfterSecret(record, input, Math.floor(deps.now() / 1000), deps) : TRIGGER_NOT_FOUND;
   logTriggerOutcome(input.triggerId, result, deps.log);
   return result;
 }
 
-async function runDelivery(input: TriggerEventInput, deps: TriggerDeliveryDeps): Promise<TriggerDeliveryResult> {
-  // Step 1: URL secret. Unknown id and wrong secret must look the same.
-  const record = await findTriggerByUrl(input, deps);
-  if (!record) return TRIGGER_NOT_FOUND;
+/** One event the overdeck.ai directory inbox held for this machine (PAN-2356 D-2356-17). */
+export interface InboxDeliveryInput {
+  headers: Record<string, string | string[] | undefined>; // lower-case names
+  rawBody: Buffer;
+  /** When the directory received the event, Unix milliseconds. */
+  receivedAt: number;
+}
 
+/**
+ * Steps 2-6 for an event from the directory inbox. Step 1 does not apply: the inbox secret in
+ * the inbox URL already authorised the sender. A Stripe signature's 300 s tolerance is measured
+ * against `receivedAt`, because the event may have waited up to 24 hours.
+ */
+export async function deliverInboxEvent(record: TriggerRecord, input: InboxDeliveryInput, deps: TriggerDeliveryDeps): Promise<TriggerDeliveryResult> {
+  const result = await runAfterSecret(record, input, Math.floor(input.receivedAt / 1000), deps);
+  logTriggerOutcome(record.id, result, deps.log);
+  return result;
+}
+
+async function runAfterSecret(
+  record: TriggerRecord,
+  input: Pick<TriggerEventInput, 'headers' | 'rawBody'>,
+  stripeNowSeconds: number,
+  deps: TriggerDeliveryDeps,
+): Promise<TriggerDeliveryResult> {
   // Step 2: signature over the exact raw bytes.
   let source: TriggerEnvelopeSource = 'unsigned';
   if (record.verify === 'github' || record.verify === 'stripe') {
@@ -151,7 +173,7 @@ async function runDelivery(input: TriggerEventInput, deps: TriggerDeliveryDeps):
     const check =
       record.verify === 'github'
         ? verifyGitHubSignature(input.rawBody, header(input.headers, 'x-hub-signature-256'), record.signingSecret)
-        : verifyStripeSignature(input.rawBody, header(input.headers, 'stripe-signature'), record.signingSecret, Math.floor(deps.now() / 1000));
+        : verifyStripeSignature(input.rawBody, header(input.headers, 'stripe-signature'), record.signingSecret, stripeNowSeconds);
     if (!check.ok) return { status: 401, body: { error: 'invalid signature' } };
     source = record.verify;
   }

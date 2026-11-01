@@ -3,8 +3,9 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-const { mockExecAsync } = vi.hoisted(() => ({
+const { mockExecAsync, mockCheckDiskFloor } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+  mockCheckDiskFloor: vi.fn(),
 }));
 
 vi.mock('child_process', async () => {
@@ -37,6 +38,13 @@ vi.mock('os', async () => {
     homedir: () => mockHomedir,
   };
 });
+
+// checkDiskFloor reads real free space via statfs (PAN-4723): mock it so tests
+// don't fail on CI runners whose /tmp has less than the 10 GiB floor.
+vi.mock('../../src/lib/disk-floor.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/lib/disk-floor.js')>()),
+  checkDiskFloor: mockCheckDiskFloor,
+}));
 
 describe('copyOverdeckSettingsToWorkspace', () => {
   let tempDir: string;
@@ -228,6 +236,8 @@ describe('createWorkspace', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'pan-wm-create-test-'));
     mockExecAsync.mockReset();
     mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    mockCheckDiskFloor.mockReset();
+    mockCheckDiskFloor.mockResolvedValue(null);
     vi.resetModules();
   });
 

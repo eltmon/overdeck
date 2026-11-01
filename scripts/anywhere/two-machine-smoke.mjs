@@ -1,20 +1,37 @@
 #!/usr/bin/env node
-// two-machine-smoke.mjs — two dashboards on one host link over a secure channel (PAN-4645 WI-21, D-4645-22).
+// two-machine-smoke.mjs — two dashboards on one host link over a secure channel (PAN-4645 WI-21, D-4645-22)
+// and run Update all across both (PAN-4654 WI-10).
 //
 // Requires `npm run build` first (it runs dist/dashboard/server.js and dist/cli/index.js).
 //
 // What it does, in order (each step is named in the output; a failure prints
 // "FAILED at step <name>: <why>" and exits 1):
-//   1. start       two servers, OVERDECK_HOME=<repo>/.tmp/anywhere-a (port 3041) and
-//                  .tmp/anywhere-b (port 3042), fresh homes, Deacon disabled, the link
-//                  supervisor opted in (OVERDECK_ANYWHERE_SUPERVISOR=1).
-//   2. proxy       a byte-logging TCP proxy on a free loopback port in front of B.
-//   3. pair+link   `pan pair --url http://127.0.0.1:<proxy> --json` on B, then
+//   1. fake-clis   fresh homes <repo>/.tmp/anywhere-a and .tmp/anywhere-b, each with a
+//                  fake HOME (<home>/fakehome) and a fake npm prefix (<home>/npm) holding
+//                  fake `claude` (2.1.0) and `codex` (0.150.0) and a fake `npm` that
+//                  "installs" 2.1.5 and 0.159.0. The servers and CLIs run with that HOME,
+//                  PATH=<home>/npm/bin:/usr/local/bin:/usr/bin:/bin and no SHELL, so the
+//                  harness-binary fallbacks cannot find the operator's real CLIs. The
+//                  servers run on a hard link to this Node at .tmp/anywhere-node/bin/node:
+//                  the dashboard puts its Node's directory first on PATH (path-env.ts),
+//                  and an nvm or npm-global bin directory also holds the real CLIs.
+//   2. start       two servers, OVERDECK_HOME=.tmp/anywhere-a (port 3041) and
+//                  .tmp/anywhere-b (port 3042), Deacon disabled, the link supervisor
+//                  opted in (OVERDECK_ANYWHERE_SUPERVISOR=1).
+//   3. proxy       a byte-logging TCP proxy on a free loopback port in front of B.
+//   4. pair+link   `pan pair --url http://127.0.0.1:<proxy> --json` on B, then
 //                  `pan machines link <url> --allow-loopback --json` on A, so A's pairing
 //                  route (lan, source pairing, which outranks B's advertised lan routes)
 //                  and its heartbeat cross the proxy. B's reverse link reaches A directly
 //                  over A's advertised LAN address.
-//   4. online      both `pan machines list --json` show the other machine online within 15 s.
+//   5. online      both `pan machines list --json` show the other machine online within 15 s.
+//   6. versions    `pan machines versions --json` on A shows two rows, each with claude
+//                  2.1.0 and codex 0.150.0. Guard: unless each row lists exactly claude and
+//                  codex and both update commands point into .tmp/anywhere-, the script
+//                  stops here and never runs Update all.
+//   7. update-all  `pan machines update --json` on A; within 60 s both rows are `done` with
+//                  claude 2.1.0 → 2.1.5 and codex 0.150.0 → 0.159.0. Overdeck is skipped
+//                  (a development install), so no dashboard restarts.
 //   PAN-4650 (conversations across machines), all through the proxied pairing route:
 //      seed        B gets one local conversation (row, >2 MiB Claude JSONL, an image
 //                  attachment, a vault index entry); A gets a vault-style saved copy of it.
@@ -26,12 +43,13 @@
 //      released-409 with released_to set on B, a message through A answers 409 conversation-released.
 //      forward     `pan machines forward <B> <port>` reaches a tiny HTTP server; B's dashboard
 //                  port answers port-refused.
-//      --live-claude adds remote-reply and pull (real Claude sessions; see liveClaudeSteps).
-//   5. kill B      A shows the link offline within 30 s.
-//   6. restart B   A shows it online again within 60 s.
-//   7. no-http     the proxy capture contains no "HTTP/1.1": everything that crossed
+//      --live-claude adds remote-reply and pull (real Claude sessions; see liveClaudeSteps),
+//                  runs with the real HOME and PATH, and skips versions and update-all.
+//   8. kill B      A shows the link offline within 30 s.
+//   9. restart B   A shows it online again within 60 s.
+//  10. no-http     the proxy capture contains no "HTTP/1.1": everything that crossed
 //                  the pairing route was the secure channel.
-//   8. stop        both servers are stopped. Nothing outside .tmp/anywhere-a|b is touched.
+//  11. stop        both servers are stopped. Nothing outside .tmp/anywhere-a|b is touched.
 //
 // Usage:
 //   node scripts/anywhere/two-machine-smoke.mjs
@@ -41,7 +59,7 @@
 // Not in CI (D-4645-22): it binds two LAN-visible ports for about two minutes.
 import { execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
 import { connect, createServer } from 'node:net';
@@ -56,6 +74,8 @@ const CLI = resolve(repo, 'dist', 'cli', 'index.js');
 const PORT_A = 3041;
 const PORT_B = 3042;
 const HOMES = { a: resolve(repo, '.tmp', 'anywhere-a'), b: resolve(repo, '.tmp', 'anywhere-b') };
+const NODE_ROOT = resolve(repo, '.tmp', 'anywhere-node');
+const NODE = resolve(NODE_ROOT, 'bin', 'node');
 const INJECT_PLAIN_HTTP = process.argv.includes('--inject-plain-http');
 const LIVE_CLAUDE = process.argv.includes('--live-claude');
 /** NFR-3: an open moves at most 1 MiB + 64 KiB. */
@@ -102,15 +122,72 @@ function freshHome(path) {
   mkdirSync(path, { recursive: true });
 }
 
+/** The fake CLIs of one smoke home (PAN-4654 WI-10): npm-installed claude and codex under <home>/npm. */
+const FAKE_PACKAGES = [
+  { pkg: '@anthropic-ai/claude-code', bin: 'claude', entry: 'bin/claude', banner: '$(cat "$dir/../VERSION") (Claude Code)', from: '2.1.0', to: '2.1.5' },
+  { pkg: '@openai/codex', bin: 'codex', entry: 'bin/codex.js', banner: 'codex-cli $(cat "$dir/../VERSION")', from: '0.150.0', to: '0.159.0' },
+];
+
+function fakeClis(home) {
+  const prefix = resolve(home, 'npm');
+  mkdirSync(resolve(home, 'fakehome'), { recursive: true });
+  mkdirSync(resolve(prefix, 'bin'), { recursive: true });
+  const installCases = [];
+  for (const fake of FAKE_PACKAGES) {
+    const dir = resolve(prefix, 'lib', 'node_modules', fake.pkg);
+    const entry = resolve(dir, fake.entry);
+    mkdirSync(dirname(entry), { recursive: true });
+    writeFileSync(resolve(dir, 'VERSION'), `${fake.from}\n`);
+    writeFileSync(entry, `#!/bin/sh\ndir=$(dirname "$(readlink -f "$0")")\necho "${fake.banner}"\n`, { mode: 0o755 });
+    symlinkSync(entry, resolve(prefix, 'bin', fake.bin));
+    installCases.push(`    ${fake.pkg}@latest) echo ${fake.to} > "$4/lib/node_modules/${fake.pkg}/VERSION" ;;`);
+  }
+  writeFileSync(resolve(prefix, 'bin', 'npm'), [
+    '#!/bin/sh',
+    `if [ "$1" = prefix ] && [ "$2" = -g ]; then echo "${prefix}"; exit 0; fi`,
+    'if [ "$1" = install ] && [ "$2" = -g ] && [ "$3" = --prefix ]; then',
+    '  case "$5" in',
+    ...installCases,
+    '    *) echo "fake npm: unknown package $5" >&2; exit 1 ;;',
+    '  esac',
+    '  exit 0',
+    'fi',
+    'echo "fake npm: unsupported $*" >&2',
+    'exit 1',
+    '',
+  ].join('\n'), { mode: 0o755 });
+}
+
+/**
+ * The dashboard prepends dirname(process.execPath) to PATH (src/dashboard/server/path-env.ts).
+ * When Node comes from an nvm or npm-global bin directory, that directory also holds the
+ * operator's real claude, codex and others, which would outrank the fakes. A link to the
+ * Node binary in an otherwise empty directory keeps them out of reach.
+ */
+function isolatedNode() {
+  rmSync(NODE_ROOT, { recursive: true, force: true });
+  mkdirSync(dirname(NODE), { recursive: true });
+  try {
+    linkSync(process.execPath, NODE);
+  } catch {
+    copyFileSync(process.execPath, NODE);
+    chmodSync(NODE, 0o755);
+  }
+}
+
 function serverEnv(home, port) {
   const env = { ...process.env };
   // Inherited values that would point the smoke servers or CLIs at the operator's dashboard.
   for (const key of ['OVERDECK_INTERNAL_TOKEN', 'OVERDECK_AGENT_ID', 'OVERDECK_DASHBOARD_SPAWNED_BY', 'DASHBOARD_URL', 'HOST']) delete env[key];
+  // No SHELL: the harness-binary resolver's last fallback is `$SHELL -lc 'command -v <binary>'`,
+  // which would find the operator's real CLIs, and Update all would then update them.
+  delete env.SHELL;
   return {
     ...env,
-    // A home of their own, so the seeded Claude transcript never lands in the operator's
-    // ~/.claude. --live-claude keeps the real HOME: Claude Code needs its login there.
-    ...(LIVE_CLAUDE ? {} : { HOME: resolve(home, 'home') }),
+    // A fake HOME and PATH (PAN-4654), so Update all only ever sees the smoke's fake CLIs and
+    // the seeded Claude transcript never lands in the operator's ~/.claude. --live-claude keeps
+    // the real HOME and PATH: Claude Code needs its login and binary (and skips Update all).
+    ...(LIVE_CLAUDE ? {} : { HOME: resolve(home, 'fakehome'), PATH: `${resolve(home, 'npm', 'bin')}:/usr/local/bin:/usr/bin:/bin` }),
     // Live harnesses run on tmux: its socket name is derived from OVERDECK_HOME, so the
     // smoke's sessions never share the operator's server (each home would need its own
     // Herdr session server otherwise).
@@ -130,7 +207,7 @@ function serverEnv(home, port) {
 
 function startServer(name, home, port) {
   const logFd = openSync(resolve(home, 'server.log'), 'a');
-  const child = spawn(process.execPath, [SERVER], { env: serverEnv(home, port), stdio: ['ignore', logFd, logFd] });
+  const child = spawn(NODE, [SERVER], { env: serverEnv(home, port), stdio: ['ignore', logFd, logFd] });
   running.servers.set(name, child);
   child.on('exit', (code, signal) => {
     if (running.servers.get(name) === child) running.servers.delete(name);
@@ -238,7 +315,7 @@ function claudeProjectDir(home, cwd) {
 
 /** Where B's seeded transcript lives; refuse anything but the smoke project's directory. */
 function seedTranscriptPath() {
-  const home = LIVE_CLAUDE ? process.env.HOME : resolve(HOMES.b, 'home');
+  const home = LIVE_CLAUDE ? process.env.HOME : resolve(HOMES.b, 'fakehome');
   const dir = claudeProjectDir(home, SEED_CWD);
   if (!/-tmp-anywhere-b-project$/.test(dir)) throw new Error(`refusing transcript dir ${dir}`);
   return { dir, file: resolve(dir, `${SEED.sessionId}.jsonl`) };
@@ -472,9 +549,15 @@ async function main() {
   }
   const capture = [];
 
+  await step('fake-clis', () => {
+    isolatedNode();
+    for (const home of [HOMES.a, HOMES.b]) {
+      freshHome(home);
+      fakeClis(home);
+    }
+  });
+
   await step('start', async () => {
-    freshHome(HOMES.a);
-    freshHome(HOMES.b);
     // A live harness's PTY supervisor puts its socket here; a fresh home has none yet.
     if (LIVE_CLAUDE) {
       for (const name of ['a', 'b']) {
@@ -515,6 +598,45 @@ async function main() {
     }
     return { ok: false, detail };
   }));
+
+  // --live-claude runs with the real CLIs on PATH, so the Update all guard would refuse.
+  if (!LIVE_CLAUDE) await step('versions', async () => {
+    const { rows } = await cli('a', ['machines', 'versions', '--json']);
+    if (rows.length !== 2) throw new Error(`expected two rows, got ${rows.length}`);
+    for (const row of rows) {
+      const clis = row.report?.harnesses ?? [];
+      // Guard: Update all runs only against the fake CLIs inside the smoke homes.
+      const binaries = clis.map((entry) => entry.binary).join(',');
+      if (binaries !== 'claude,codex') throw new Error(`${row.label} lists ${binaries || 'no CLIs'}, not exactly claude,codex; refusing to run Update all`);
+      const outside = clis.find((entry) => !entry.command.includes('.tmp/anywhere-'));
+      if (outside) throw new Error(`${row.label}'s ${outside.binary} would run "${outside.command}", outside the smoke homes; refusing to run Update all`);
+      const versions = clis.map((entry) => `${entry.binary} ${entry.version}`).join(', ');
+      if (versions !== 'claude 2.1.0, codex 0.150.0') throw new Error(`${row.label} reports ${versions}`);
+      log(`${row.label}: Overdeck ${row.report.overdeck.version} (${row.report.overdeck.installMode}), ${versions}`);
+    }
+  });
+
+  if (!LIVE_CLAUDE) await step('update-all', async () => {
+    const result = await cli('a', ['machines', 'update', '--json']);
+    log(`started on ${result.started.map((entry) => entry.label).join(', ') || 'none'}; skipped ${result.skipped.map((entry) => `${entry.label} (${entry.reason})`).join(', ') || 'none'}`);
+    if (result.started.length !== 2) throw new Error(`Update all started on ${result.started.length} machines, not 2`);
+    const changed = (job, name) => {
+      const component = job?.components.find((entry) => entry.name === name);
+      return component ? `${component.before} → ${component.after} (${component.status})` : 'missing';
+    };
+    await pollUntil('both machines updated', 60_000, async () => {
+      const { rows } = await cli('a', ['machines', 'versions', '--json']);
+      const states = rows.map((row) => {
+        const job = row.report?.job ?? null;
+        return { label: row.label, phase: job?.phase ?? 'none', claude: changed(job, 'claude'), codex: changed(job, 'codex'), overdeck: job?.components.find((entry) => entry.name === 'overdeck')?.status ?? 'missing' };
+      });
+      const detail = states.map((state) => `${state.label} ${state.phase}: claude ${state.claude}, codex ${state.codex}, overdeck ${state.overdeck}`).join('; ');
+      const ok = states.length === 2 && states.every((state) => state.phase === 'done'
+        && state.claude === '2.1.0 → 2.1.5 (updated)' && state.codex === '0.150.0 → 0.159.0 (updated)' && state.overdeck === 'skipped');
+      if (ok) log(detail);
+      return ok ? { ok: true, value: detail } : { ok: false, detail };
+    });
+  });
 
   await conversationSteps(selfB);
 
@@ -568,7 +690,7 @@ async function main() {
   });
 
   await step('stop', cleanup);
-  log('OK: two dashboards linked, survived a restart, and spoke only the secure channel on the pairing route');
+  log('OK: two dashboards linked, updated both machines\' CLIs with Update all, survived a restart, and spoke only the secure channel on the pairing route');
 }
 
 let exitCode = 0;

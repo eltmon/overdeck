@@ -16,13 +16,23 @@ import type { Duplex } from 'node:stream';
 import { createWebSocketStream, WebSocket as WsClient } from 'ws';
 
 import type { MachineKeyPair } from '../machine-key.js';
-import { type ChannelSocket, createChannelSocket } from './channel-socket.js';
-import { type Handshake, ikInitiator, NOISE_LINK_PROTOCOL, pairingSecrets, prologueFor, xxPskInitiator } from './noise.js';
-import { encodeFrame, encodePreamble, FrameReader, type Refusal, REFUSAL_CODES, WireError } from './wire.js';
+import { type ChannelMarker, type ChannelSocket, createChannelSocket } from './channel-socket.js';
+import { APPROVAL_NONCE_BYTES, approvalCommitment, approvalNonce, approvalSas, type Handshake, ikInitiator, NOISE_LINK_PROTOCOL, pairingSecrets, prologueFor, xxInitiator, xxPskInitiator } from './noise.js';
+import { type ChannelMode, encodeFrame, encodePreamble, FrameReader, type Refusal, REFUSAL_CODES, WireError } from './wire.js';
 
 export const DEFAULT_OPEN_TIMEOUT_MS = 10_000;
 
-export type TransportUrl = `tcp://${string}` | `wss://${string}`;
+export type TransportUrl = `tcp://${string}` | `wss://${string}` | `rtc://${string}` | `rtc+turn://${string}`;
+
+/** Opens a WebRTC data channel to `rtc://<id>` or `rtc+turn://<id>` (PAN-2356 WI-11). */
+export type RtcDialer = (url: `rtc://${string}` | `rtc+turn://${string}`, signal: AbortSignal) => Promise<Duplex>;
+
+let rtcDialer: RtcDialer | null = null;
+
+/** The dashboard registers the directory's WebRTC dialer here; null when signed out. */
+export function setRtcDialer(dialer: RtcDialer | null): void {
+  rtcDialer = dialer;
+}
 
 export type ChannelOpenErrorCode =
   | 'unreachable'
@@ -62,7 +72,9 @@ interface CommonOpenOptions {
 
 export type OpenChannelOptions =
   | (CommonOpenOptions & { mode: 'link'; remoteKeyHex: string })
-  | (CommonOpenOptions & { mode: 'pairing'; pairingCode: string });
+  | (CommonOpenOptions & { mode: 'pairing'; pairingCode: string })
+  /** PAN-2356 D-2356-9: Noise XX for one approval request (32 hex); authenticated only by the SAS. */
+  | (CommonOpenOptions & { mode: 'approval'; requestId: string });
 
 export async function openChannel(url: TransportUrl, opts: OpenChannelOptions): Promise<ChannelSocket> {
   return withDeadline(url, opts, async (signal, track) => {
@@ -161,6 +173,30 @@ async function handshakeAsInitiator(
     return finish(raw, reader, handshake, null, { mode: 'link', remoteKeyHex: opts.remoteKeyHex, pairingId: null });
   }
 
+  if (opts.mode === 'approval') {
+    raw.write(encodePreamble({ linkProtocol: NOISE_LINK_PROTOCOL, mode: 'approval', pairingId: opts.requestId }));
+    const handshake = xxInitiator(opts.localKey, prologueFor('approval', opts.requestId));
+    raw.write(encodeFrame(handshake.send()));
+    const message2 = await readMessage(reader, 'approval');
+    try {
+      handshake.recv(message2);
+    } catch {
+      throw new ChannelOpenError('protocol', `${label} sent an approval handshake message that did not verify`);
+    }
+    raw.write(encodeFrame(handshake.send()));
+    const remoteKeyHex = handshake.remoteKey().toString('hex');
+    // Commit-then-reveal (D-2356-10 amended): commit to our nonce, take the responder's, reveal ours.
+    const hash = handshake.result().hash;
+    const nonce = approvalNonce();
+    raw.write(encodeFrame(approvalCommitment(hash, nonce)));
+    const responderNonce = await readMessage(reader, 'approval');
+    if (responderNonce.length !== APPROVAL_NONCE_BYTES) {
+      throw new ChannelOpenError('protocol', `${label} sent an approval nonce of ${responderNonce.length} bytes`);
+    }
+    const sas = approvalSas(hash, nonce, responderNonce);
+    return finish(raw, reader, handshake, nonce, { mode: 'approval', remoteKeyHex, pairingId: null, requestId: opts.requestId, approvalSas: sas });
+  }
+
   const { psk, pairingId } = pairingSecrets(opts.pairingCode);
   raw.write(encodePreamble({ linkProtocol: NOISE_LINK_PROTOCOL, mode: 'pairing', pairingId }));
   const handshake = xxPskInitiator(opts.localKey, psk, prologueFor('pairing', pairingId));
@@ -181,14 +217,14 @@ function finish(
   reader: FrameReader,
   handshake: Handshake,
   finalMessage: Buffer | null,
-  channel: { mode: 'link' | 'pairing'; remoteKeyHex: string; pairingId: string | null },
+  channel: ChannelMarker,
 ): ChannelSocket {
   const leftover = reader.detach();
   if (finalMessage) raw.write(encodeFrame(finalMessage));
   return createChannelSocket({ raw, initiator: true, handshake: handshake.result(), channel, leftover });
 }
 
-async function readMessage(reader: FrameReader, mode: 'link' | 'pairing'): Promise<Buffer> {
+async function readMessage(reader: FrameReader, mode: ChannelMode): Promise<Buffer> {
   let frame;
   try {
     frame = await reader.readFrame();
@@ -196,13 +232,19 @@ async function readMessage(reader: FrameReader, mode: 'link' | 'pairing'): Promi
     if (error instanceof WireError && error.code === 'closed') {
       // The responder dropped us without a refusal: in link mode it could not
       // decrypt message 1 (it does not hold the key we pinned).
-      throw mode === 'link'
-        ? new ChannelOpenError('identity-refused', 'Responder closed the connection before proving the pinned machine key')
-        : new ChannelOpenError('pairing-refused', 'Responder closed the connection during pairing');
+      if (mode === 'link') {
+        throw new ChannelOpenError('identity-refused', 'Responder closed the connection before proving the pinned machine key');
+      }
+      throw new ChannelOpenError('pairing-refused', `Responder closed the connection during ${mode === 'approval' ? 'approval' : 'pairing'}`);
     }
     throw error;
   }
-  if (frame.kind === 'refusal') throw refusalToError(frame.refusal);
+  if (frame.kind === 'refusal') {
+    if (mode === 'approval' && frame.refusal.code === REFUSAL_CODES.pairingRefused) {
+      throw new ChannelOpenError('pairing-refused', 'Responder has no live approval request with this id');
+    }
+    throw refusalToError(frame.refusal);
+  }
   return frame.payload;
 }
 
@@ -250,6 +292,16 @@ function parseTransportUrl(url: TransportUrl): { kind: 'tcp'; host: string; port
 }
 
 function connectTransport(url: TransportUrl, signal: AbortSignal): Promise<Duplex> {
+  if (url.startsWith('rtc://') || url.startsWith('rtc+turn://')) {
+    const rtcUrl = url as `rtc://${string}` | `rtc+turn://${string}`;
+    if (!rtcDialer) {
+      return Promise.reject(new ChannelOpenError('unreachable', 'Direct connections need an overdeck.ai sign-in'));
+    }
+    if (signal.aborted) return Promise.reject(toOpenError(signal.reason, url));
+    return rtcDialer(rtcUrl, signal).catch((error: unknown) => {
+      throw toOpenError(signal.aborted ? signal.reason : error, url);
+    });
+  }
   const target = parseTransportUrl(url);
   return new Promise<Duplex>((resolve, reject) => {
     const fail = (error: unknown): void => reject(toOpenError(error, url));

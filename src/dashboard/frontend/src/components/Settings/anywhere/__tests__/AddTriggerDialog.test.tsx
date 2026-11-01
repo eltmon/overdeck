@@ -117,6 +117,50 @@ describe('AddTriggerDialog (PAN-4648)', () => {
     expect(document.body.textContent).not.toContain(URL_SECRET);
   });
 
+  it('offers the overdeck.ai inbox on the Anywhere plan and shows the inbox URL instead of the Funnel URL (PAN-2356)', async () => {
+    const inboxUrl = `https://connect.overdeck.ai/h/${'d'.repeat(64)}.${'e'.repeat(32)}`;
+    const base = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === '/api/directory') {
+        return Promise.resolve(jsonResponse(200, {
+          signedIn: true, state: 'online', url: 'https://connect.overdeck.ai', plan: 'tester', refusal: null,
+          machines: [], approvals: [], joins: [], relay: null,
+        }));
+      }
+      if (url === '/api/triggers' && init?.method === 'POST') {
+        return Promise.resolve(jsonResponse(201, {
+          trigger: { ...STRIPE_TRIGGER, id: 'trg_cccccccccccc', name: 'held', verify: 'none', inbox: { id: 'ib_0123456789abcdef', createdAt: '2026-11-01T00:00:00.000Z' } },
+          hookPath: `/hooks/trg_cccccccccccc/${URL_SECRET}`,
+          url: null,
+          urlSecretShownOnce: true,
+          generatedSigningSecret: null,
+          inboxUrl,
+        }));
+      }
+      return base(input, init);
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<OpenDialog />);
+
+    await user.type(screen.getByLabelText('Name'), 'held');
+    await user.type(screen.getByLabelText('Conversation (name or id)'), '20261101-0001');
+    await user.click(await screen.findByLabelText('Hold events while this machine is offline (overdeck.ai inbox, Anywhere plan)'));
+    await user.click(screen.getByRole('button', { name: 'Create trigger' }));
+
+    expect(await screen.findByTestId('trigger-created-inbox-url')).toHaveTextContent(inboxUrl);
+    expect(screen.queryByTestId('trigger-created-url')).toBeNull();
+    const posted = JSON.parse(String((callsWith('POST')[0]?.[1] as RequestInit).body)) as Record<string, unknown>;
+    expect(posted).toMatchObject({ name: 'held', inbox: true });
+  });
+
+  it('hides the inbox option when the directory is not connected on the Anywhere plan (PAN-2356)', async () => {
+    renderWithProviders(<OpenDialog />);
+    await screen.findByLabelText('Name');
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => input.toString() === '/api/directory')).toBe(true));
+    expect(screen.queryByLabelText(/overdeck.ai inbox/)).toBeNull();
+  });
+
   it('shows a server error inline', async () => {
     fetchMock.mockImplementation((input: string | URL | Request, init?: RequestInit) =>
       Promise.resolve(input.toString() === '/api/triggers' && init?.method === 'POST'

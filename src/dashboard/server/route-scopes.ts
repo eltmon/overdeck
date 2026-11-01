@@ -92,6 +92,12 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/conversations/:name/compact', scope: 'operate' },
   { method: 'POST', path: '/api/conversations/:name/thinking-level', scope: 'operate' },
   { method: 'POST', path: '/api/conversations/:name/resume', scope: 'operate' },
+  // PAN-4654: a linked machine reads this machine's version report for the fleet table.
+  { method: 'GET', path: '/api/versions/self', scope: 'read:state' },
+  // PAN-4654: an operator-level link starts, escalates or cancels this machine's
+  // update job; the handler also requires the operator actor stamp (D-10).
+  { method: 'POST', path: '/api/versions/self/update', scope: 'operate' },
+  { method: 'DELETE', path: '/api/versions/self/update', scope: 'operate' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

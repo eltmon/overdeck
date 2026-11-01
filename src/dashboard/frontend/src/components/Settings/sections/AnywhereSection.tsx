@@ -7,6 +7,8 @@ import { AccessTokensPanel } from '../anywhere/AccessTokensPanel';
 import { AnywhereStatusCard } from '../anywhere/AnywhereStatusCard';
 import { ANYWHERE_STATUS_QUERY_KEY, loadAnywhereStatus, type AnywhereAction } from '../anywhere/anywhereApi';
 import { DevicesPanel } from '../anywhere/DevicesPanel';
+import { DirectoryPanel } from '../anywhere/DirectoryPanel';
+import { FleetVersionsPanel } from '../anywhere/FleetVersionsPanel';
 import { MachinesPanel } from '../anywhere/MachinesPanel';
 import { McpUrlDialog } from '../anywhere/McpUrlDialog';
 import { PairDeviceDialog } from '../anywhere/PairDeviceDialog';
@@ -86,6 +88,8 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
         <AnywhereStatusCard onAction={handleAction} />
         <DevicesPanel />
         <MachinesPanel />
+        <DirectoryPanel />
+        <FleetVersionsPanel />
         {status?.tailscale?.nextStep === 'ready' && <TailscalePeersPanel />}
         <TriggersPanel />
         <AccessTokensPanel />

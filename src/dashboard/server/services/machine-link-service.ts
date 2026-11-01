@@ -4,7 +4,9 @@
  * `createMachineLink` turns a `pan pair` link from another machine into a
  * machine link, in this order (D-4645-18, continue.json D14):
  *
- *  1. `routeFromPairingUrl`: the transport route and the pairing code.
+ *  1. `routeFromPairingUrl`: the transport route and the pairing code — or a
+ *     transport this server already set up (an SSH forward, PAN-4404), taken
+ *     as given: its kind, no pairing-URL parsing and no loopback refusal.
  *  2. `ensureMachineKey`: our static key.
  *  3. `openChannel` in pairing mode (Noise XXpsk0 keyed by the code). Only now
  *     is the peer's machine key known.
@@ -32,6 +34,7 @@ import {
   LINK_PROTOCOL_VERSION,
   type LinkAccess,
   type MachineLinkView,
+  type RouteKind,
 } from '@overdeck/contracts';
 
 import { createAccessToken, MACHINE_TOKEN_SCOPES, revokeAccessToken } from '../../../lib/access-tokens.js';
@@ -41,7 +44,7 @@ import { currentAdvertisedEndpoints } from '../../../lib/anywhere/endpoints.js';
 import { ChannelOpenError, openChannel, type TransportUrl } from '../../../lib/anywhere/channel/open.js';
 import { type MachineLink, upsertLink } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
-import { type LinkRoute, mergeAdvertised, routeFromPairingUrl } from '../../../lib/anywhere/routes.js';
+import { type LinkRoute, mergeAdvertised, parseRouteUrl, routeFromPairingUrl } from '../../../lib/anywhere/routes.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 
 export const MACHINE_EXCHANGE_PATH = '/api/machines/exchange';
@@ -169,8 +172,11 @@ const defaultDeps: MachineLinkServiceDeps = {
   now: () => new Date().toISOString(),
 };
 
+/** Exactly one of `pairingUrl` or `transport`. */
 export interface CreateMachineLinkInput {
-  pairingUrl: string;
+  pairingUrl?: string;
+  /** A transport this server already set up (an SSH forward): no pairing-URL parsing, no loopback refusal. */
+  transport?: { url: TransportUrl; kind: RouteKind; pairingCode: string };
   bothWays?: boolean;
   access?: LinkAccess;
   allowLoopback?: boolean;
@@ -197,9 +203,17 @@ export async function createMachineLink(
   const bothWays = input.bothWays ?? true;
   const access: LinkAccess = input.access ?? 'operator';
 
+  if (input.pairingUrl === undefined && input.transport === undefined) {
+    throw new MachineLinkError('bad-pairing-url', 'A link needs a pairing link or a prepared transport');
+  }
   let route;
   try {
-    route = routeFromPairingUrl(input.pairingUrl, { allowLoopback: input.allowLoopback ?? false });
+    if (input.transport && !input.transport.pairingCode.startsWith('odp_')) {
+      throw new Error('The prepared transport carries no odp_ pairing code');
+    }
+    route = input.transport
+      ? { url: parseRouteUrl(input.transport.url).url, kind: input.transport.kind, source: 'pairing' as const, pairingCode: input.transport.pairingCode }
+      : routeFromPairingUrl(input.pairingUrl ?? '', { allowLoopback: input.allowLoopback ?? false });
   } catch (error) {
     throw new MachineLinkError('bad-pairing-url', (error as Error).message);
   }
@@ -286,9 +300,14 @@ export async function createMachineLink(
 }
 
 /** Live state for a link; the link supervisor (WI-18) provides the real one. */
+/** Which Overdeck version to install, and where, for an `unsupported` link (PAN-4654 FR-1). */
+export interface UnsupportedInstall { version: string; on: 'this-machine' | 'peer' }
+
 export interface LinkStatusSource {
   status(linkId: string): Pick<MachineLinkView, 'state' | 'stateDetail' | 'currentRoute' | 'lastHeartbeatAt' | 'incident' | 'peerVersion'> & {
     routeStatus: (url: string) => MachineLinkView['routes'][number]['status'];
+    /** Set while the link is `unsupported`; not part of `MachineLinkView`. */
+    unsupported: UnsupportedInstall | null;
   };
   /** Reset back-off and probe now; false for an unknown or revoked link. */
   reconnect?(linkId: string): boolean;
@@ -296,10 +315,12 @@ export interface LinkStatusSource {
   reconcile?(): void;
   /** A link's route list changed (Add route): re-rank and re-check. */
   updateRoutes?(linkId: string, routes: LinkRoute[]): void;
+  /** Routes the overdeck.ai directory offers right now (PAN-2356 D-2356-7); never stored. */
+  dynamicRoutes?(linkId: string): LinkRoute[];
 }
 
 export const connectingStatusSource: LinkStatusSource = {
-  status: () => ({ state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, routeStatus: () => 'untried' }),
+  status: () => ({ state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, unsupported: null, routeStatus: () => 'untried' }),
 };
 
 /** The public face of a link: never the token. `peerVersion` falls back to what the caller learned when the source has none. */
@@ -314,7 +335,8 @@ export function machineLinkView(link: MachineLink, peerVersion: string | null, s
     state: link.revokedAt ? 'revoked' : live.state,
     stateDetail: live.stateDetail,
     currentRoute: live.currentRoute,
-    routes: link.routes.map((route) => ({ url: route.url, kind: route.kind, source: route.source, status: live.routeStatus(route.url) })),
+    routes: [...link.routes, ...(source.dynamicRoutes?.(link.id) ?? []).filter((route) => !link.routes.some((stored) => stored.url === route.url))]
+      .map((route) => ({ url: route.url, kind: route.kind, source: route.source, status: live.routeStatus(route.url) })),
     lastHeartbeatAt: live.lastHeartbeatAt,
     incident: live.incident,
     peerVersion: live.peerVersion ?? peerVersion,

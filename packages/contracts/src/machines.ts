@@ -14,13 +14,21 @@ import { Schema } from "effect"
  */
 export const LINK_PROTOCOL_VERSION = 1
 
+/** The exact command that installs one Overdeck version (PAN-4654 FR-1, D-2). */
+export function overdeckInstallCommand(version: string): string {
+  return `npm install -g @overdeck/core@${version}`
+}
+
 /** Route kinds, ranked best to worst (D-10 of the Anywhere PRD). */
 export const ROUTE_KINDS = ["lan", "tailnet", "ssh", "public", "direct", "relay"] as const
 export const RouteKind = Schema.Literals(ROUTE_KINDS)
 export type RouteKind = typeof RouteKind.Type
 
-/** Where a route on a link came from. */
-export const RouteSource = Schema.Literals(["pairing", "manual", "advertised"])
+/**
+ * Where a route on a link came from. `directory` routes (PAN-2356) are dynamic: offered while the
+ * overdeck.ai directory lists the peer, never stored in machine-links.json.
+ */
+export const RouteSource = Schema.Literals(["pairing", "manual", "advertised", "directory"])
 export type RouteSource = typeof RouteSource.Type
 
 /** An endpoint a machine advertises in its descriptor (`lan` and `tailnet` only in this issue). */
@@ -60,6 +68,25 @@ export const LinkIncident = Schema.Struct({
 })
 export type LinkIncident = typeof LinkIncident.Type
 
+/** Whether the linking server started the SSH host's Overdeck or adopted one already running (PAN-4404). */
+export const SshLaunch = Schema.Literals(["managed", "external"])
+export type SshLaunch = typeof SshLaunch.Type
+
+/** State of the local SSH port forward that carries an SSH machine's link (PAN-4404 D-4404-10). */
+export const SshForwardState = Schema.Literals(["starting", "up", "down", "attention"])
+export type SshForwardState = typeof SshForwardState.Type
+
+/** The SSH side of a link that this server set up over SSH. */
+export const SshLinkInfo = Schema.Struct({
+  destination: Schema.String,
+  launch: SshLaunch,
+  forward: SshForwardState,
+  forwardDetail: Schema.NullOr(Schema.String),
+  localPort: Schema.Number,
+  remotePort: Schema.Number,
+})
+export type SshLinkInfo = typeof SshLinkInfo.Type
+
 /** One outbound link as shown by `GET /api/machines` and `pan machines list`. */
 export const MachineLinkView = Schema.Struct({
   id: Schema.String,
@@ -78,6 +105,8 @@ export const MachineLinkView = Schema.Struct({
   createdAt: Schema.String,
   /** PAN-4650: Hide this machine — its conversations are left out of the conversation list. */
   hidden: Schema.Boolean,
+  /** Present only on links this server set up over SSH. */
+  ssh: Schema.optional(SshLinkInfo),
 })
 export type MachineLinkView = typeof MachineLinkView.Type
 
@@ -105,3 +134,39 @@ export const MachinesResponse = Schema.Struct({
   inbound: Schema.Array(InboundMachineView),
 })
 export type MachinesResponse = typeof MachinesResponse.Type
+
+/**
+ * Version of the `OVERDECK_SSH_HELPER` result line that `pan machines ssh-helper`
+ * prints on the SSH host (PAN-4404).
+ */
+export const SSH_HELPER_PROTOCOL = 1
+
+/** Error codes of the SSH machine flow (PAN-4404 D-4404-9). */
+export const SSH_MACHINE_ERROR_CODES = [
+  "bad-destination",
+  "busy",
+  "unresolvable",
+  "unreachable",
+  "host-key",
+  "auth-failed",
+  "pan-missing",
+  "version-mismatch",
+  "helper-failed",
+  "start-failed",
+  "forward-failed",
+  "self-link",
+  "not-found",
+] as const
+export const SshMachineErrorCode = Schema.Literals(SSH_MACHINE_ERROR_CODES)
+export type SshMachineErrorCode = typeof SshMachineErrorCode.Type
+
+/** Answer of `POST /api/machines/ssh/test` and `pan machines test-ssh`. */
+export const SshTestResult = Schema.Struct({
+  reachable: Schema.Boolean,
+  panVersion: Schema.NullOr(Schema.String),
+  localVersion: Schema.String,
+  versionMatches: Schema.Boolean,
+  error: Schema.NullOr(SshMachineErrorCode),
+  message: Schema.NullOr(Schema.String),
+})
+export type SshTestResult = typeof SshTestResult.Type

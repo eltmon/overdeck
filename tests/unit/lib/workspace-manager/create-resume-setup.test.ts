@@ -4,8 +4,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
 
-const { mockExecAsync } = vi.hoisted(() => ({
+const { mockExecAsync, mockCheckDiskFloor } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+  mockCheckDiskFloor: vi.fn(),
 }));
 
 vi.mock('child_process', async () => {
@@ -17,6 +18,13 @@ vi.mock('util', async () => {
   const actual = await vi.importActual<typeof import('util')>('util');
   return { ...actual, promisify: () => mockExecAsync };
 });
+
+// checkDiskFloor reads real free space via statfs (PAN-4723): mock it so tests
+// don't fail on CI runners whose /tmp has less than the 10 GiB floor.
+vi.mock('../../../../src/lib/disk-floor.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/lib/disk-floor.js')>()),
+  checkDiskFloor: mockCheckDiskFloor,
+}));
 
 const isWorktreeAddCall = (command: unknown, args?: unknown): boolean =>
   (typeof command === 'string' && command.includes('git worktree add'))
@@ -49,6 +57,8 @@ beforeEach(() => {
   upsertProjectFromConfig('test-project', projectConfig());
 
   mockExecAsync.mockReset();
+  mockCheckDiskFloor.mockReset();
+  mockCheckDiskFloor.mockResolvedValue(null);
   mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
     if (isWorktreeAddCall(command, args)) {
       // Real git is not run here; stand in for the worktree it would create.

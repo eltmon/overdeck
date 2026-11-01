@@ -5,9 +5,12 @@
  *   creates the link (and, by default, the reverse one).
  * - `GET /api/machines` lists this machine, its links and the machines that
  *   link to it (inbound machine tokens). Views never carry a token or hash.
- * - `DELETE /api/machines/:id` unlinks: tells the peer (best effort, 2.5 s,
- *   through the link supervisor once WI-18 provides it), revokes the reverse
- *   token we issued the peer (closing its channels here) and removes the link.
+ * - `DELETE /api/machines/:id[?keepServer=1]` unlinks: tells the peer (best
+ *   effort, 2.5 s, through the link supervisor once WI-18 provides it), tears
+ *   down an SSH machine's side (PAN-4404: stops the host's server only when this
+ *   machine started it and `keepServer` is not set, then the forward), revokes
+ *   the reverse token we issued the peer (closing its channels here) and
+ *   removes the link.
  * - `DELETE /api/machines/self` lets a linked machine revoke its own token.
  * - `DELETE /api/machines/inbound/:tokenId` removes a machine that links to us.
  *
@@ -33,12 +36,20 @@ import { LinkUnavailableError } from '../../../lib/anywhere/link-client.js';
 import { ForwardRefusedError, listForwards, startForward, stopForward } from '../services/port-forwards.js';
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
 import { classifyHost, parseRouteUrl } from '../../../lib/anywhere/routes.js';
+import { SshMachineError } from '../../../lib/anywhere/ssh/target.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
 import { channelOfRequest } from '../channel-peer.js';
 import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import { createMachineLink, type LinkStatusSource, MachineLinkError, machineLinkView } from '../services/machine-link-service.js';
+import {
+  reconnectSshMachine,
+  removeSshMachineForLink,
+  SSH_MACHINE_ERROR_STATUS,
+  type SshRemoval,
+  sshInfoForLink,
+} from '../services/ssh-machine-service.js';
 import { type DashboardCredential, rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
 
 /** Tell the peer we are unlinking: `DELETE /api/machines/self` through its link. Resolves true when the peer answered. */
@@ -82,6 +93,7 @@ function inboundView(record: PublicAccessTokenRecord): InboundMachineView {
 
 export async function buildMachinesResponse(): Promise<MachinesResponse> {
   const [identity, key, links, settings] = await Promise.all([ensureEnvironmentIdentity(), ensureMachineKey(), listLinks(), readAnywhereSettings()]);
+  const sshInfos = await Promise.all(links.map((link) => sshInfoForLink(link.id)));
   return {
     self: {
       environmentId: identity.environmentId,
@@ -89,9 +101,20 @@ export async function buildMachinesResponse(): Promise<MachinesResponse> {
       fingerprint: machineKeyFingerprint(key.publicKey),
       shareConversations: settings.shareConversations,
     },
-    links: links.map((link) => (statusSource ? machineLinkView(link, null, statusSource) : machineLinkView(link, null))),
+    links: links.map((link, index) => {
+      const view = statusSource ? machineLinkView(link, null, statusSource) : machineLinkView(link, null);
+      const ssh = sshInfos[index];
+      return ssh ? { ...view, ssh } : view;
+    }),
     inbound: listActiveRecordsOfKind('machine').map(inboundView),
   };
+}
+
+function sshFailure(error: unknown): HttpServerResponse.HttpServerResponse {
+  if (error instanceof SshMachineError) {
+    return jsonResponse({ error: error.code, message: error.message, detail: error.detail }, { status: SSH_MACHINE_ERROR_STATUS[error.code] });
+  }
+  throw error;
 }
 
 async function notifyPeerWithin(link: MachineLink, notifier: PeerUnlinkNotifier): Promise<boolean> {
@@ -106,14 +129,21 @@ async function notifyPeerWithin(link: MachineLink, notifier: PeerUnlinkNotifier)
   }
 }
 
-/** Unlink by link id, environment id or label. */
+/** Unlink by link id, environment id or label. `keepServer` leaves an SSH machine's server running. */
 export async function handleMachinesUnlink(
   idOrEnvOrLabel: string,
   notifier: PeerUnlinkNotifier = peerUnlinkNotifier,
+  options: { keepServer?: boolean } = {},
 ): Promise<HttpServerResponse.HttpServerResponse> {
   const link = await getLink(idOrEnvOrLabel);
   if (!link) return jsonResponse({ error: `no machine link matches ${idOrEnvOrLabel}` }, { status: 404 });
   const peerNotified = await notifyPeerWithin(link, notifier);
+  let ssh: SshRemoval | null;
+  try {
+    ssh = await removeSshMachineForLink(link, { keepServer: options.keepServer === true });
+  } catch (error) {
+    return sshFailure(error);
+  }
   if (link.reverseTokenId) {
     await revokeAccessToken(link.reverseTokenId);
     closeDeviceConnections(link.reverseTokenId);
@@ -125,9 +155,9 @@ export async function handleMachinesUnlink(
     source: 'dashboard',
     level: 'info',
     message: `Unlinked machine "${link.label}"`,
-    details: JSON.stringify({ linkId: link.id, environmentId: link.environmentId, peerNotified }),
+    details: JSON.stringify({ linkId: link.id, environmentId: link.environmentId, peerNotified, ssh }),
   });
-  return jsonResponse({ ok: true, peerNotified });
+  return jsonResponse({ ok: true, peerNotified, ssh });
 }
 
 /** A linked machine revokes its own token (the peer unlinked us). Exactly a machine credential may call this. */
@@ -163,7 +193,7 @@ export async function handleInboundRevoke(tokenId: string): Promise<HttpServerRe
   return jsonResponse({ ok: true, inbound: revoked ? inboundView(revoked) : null, closedChannels });
 }
 
-const ERROR_STATUS: Record<MachineLinkError['code'], number> = {
+export const ERROR_STATUS: Record<MachineLinkError['code'], number> = {
   'bad-pairing-url': 400,
   'unreachable': 502,
   'pairing-refused': 401,
@@ -265,7 +295,8 @@ const unlinkRoute = HttpRouter.add(
     if (id === 'self') return yield* Effect.promise(() => handleMachinesSelfRevoke(resolveRequestCredential(request)));
     const refused = refuseChannel(request) ?? rejectUnauthorizedDashboardRequest(request);
     if (refused) return refused;
-    return yield* Effect.promise(() => handleMachinesUnlink(id));
+    const keepServer = new URL(request.url, 'http://localhost').searchParams.get('keepServer') === '1';
+    return yield* Effect.promise(() => handleMachinesUnlink(id, peerUnlinkNotifier, { keepServer }));
   }),
 );
 
@@ -280,6 +311,12 @@ const reconnectRoute = HttpRouter.add(
     const link = yield* Effect.promise(() => getLink(id));
     if (!link) return jsonResponse({ error: `no machine link matches ${id}` }, { status: 404 });
     if (!statusSource?.reconnect) return jsonResponse({ error: 'the link supervisor is not running on this dashboard' }, { status: 503 });
+    // An SSH machine: restart the forward and re-run start-or-adopt on the host first.
+    const sshOutcome = yield* Effect.promise(() => reconnectSshMachine(link).then(
+      () => null,
+      (error: unknown) => error,
+    ));
+    if (sshOutcome !== null) return sshFailure(sshOutcome);
     const started = statusSource.reconnect(link.id);
     return jsonResponse({ ok: started, link: machineLinkView(link, null, statusSource) }, { status: started ? 200 : 409 });
   }),
@@ -301,6 +338,10 @@ export async function handleAddRoute(idOrEnvOrLabel: string, bodyText: string): 
     parsed = parseRouteUrl(url);
   } catch (error) {
     return jsonResponse({ error: (error as Error).message }, { status: 400 });
+  }
+  if (parsed.transport === 'rtc') {
+    // Direct and relay routes come from the overdeck.ai directory and are never stored (PAN-2356 D-2356-7).
+    return jsonResponse({ error: 'rtc routes come from the overdeck.ai directory and cannot be added by hand' }, { status: 400 });
   }
   if (link.routes.some((route) => route.url === parsed.url)) {
     return jsonResponse({ error: `${parsed.url} is already a route of ${link.label}`, link: machineLinkView(link, null, statusSource ?? undefined) }, { status: 409 });

@@ -7,6 +7,11 @@
  * Badge tones follow the style guide: `online` is the machine-working blue
  * (`--info`), never green; `connecting` and `offline` stay neutral;
  * `revoked` and `unsupported` are amber because a person must act.
+ *
+ * SSH machines (PAN-4404): an **Add an SSH machine** button opens
+ * `AddSshMachineDialog`; an SSH-backed row shows its destination, forward
+ * state and launch kind in muted text, and its Remove confirmation offers to
+ * leave a server this dashboard started running (`RemoveSshMachineDialog`).
  */
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +19,7 @@ import { toast } from 'sonner';
 
 import { formatRelativeTime } from '../../../lib/dashboard-utils';
 import { useConfirm } from '../../DialogProvider';
+import { AddSshMachineDialog } from './AddSshMachineDialog';
 import { ANYWHERE_STATUS_QUERY_KEY, apiError, isOk } from './anywhereApi';
 import { LinkMachineDialog } from './LinkMachineDialog';
 import {
@@ -27,8 +33,11 @@ import {
   reconnectMachine,
   removeInboundMachine,
   setShareConversations,
+  type SshLinkInfo,
   unlinkMachine,
 } from './machinesApi';
+import { RemoveSshMachineDialog } from './RemoveSshMachineDialog';
+import { unlinkMachineKeepingServer } from './sshMachinesApi';
 import { Toggle } from '../Shared/Toggle';
 
 const STATE_LABEL: Record<LinkState, string> = {
@@ -83,8 +92,16 @@ function incidentText(link: MachineLinkView): string | null {
   return `${what} ${formatRelativeTime(incident.at)}`;
 }
 
+/** `SSH me@desk · forward up · Started by Overdeck` (plus the detail when the forward needs attention). */
+export function sshLine(ssh: SshLinkInfo): string {
+  const launch = ssh.launch === 'managed' ? 'Started by Overdeck' : 'Already running';
+  const detail = ssh.forward === 'attention' && ssh.forwardDetail ? ` (${ssh.forwardDetail})` : '';
+  return `SSH ${ssh.destination} · forward ${ssh.forward}${detail} · ${launch}`;
+}
+
 function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged: () => Promise<void> }) {
   const confirm = useConfirm();
+  const [removeOpen, setRemoveOpen] = useState(false);
   const [routesOpen, setRoutesOpen] = useState(false);
   const [routeUrl, setRouteUrl] = useState('');
   const [routeError, setRouteError] = useState<string | null>(null);
@@ -103,7 +120,13 @@ function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged:
     await onChanged();
   };
 
+  const ssh = link.ssh;
+
   const handleUnlink = async () => {
+    if (ssh) {
+      setRemoveOpen(true);
+      return;
+    }
     const confirmed = await confirm({
       title: `Unlink ${link.label}?`,
       message: `This machine loses access to ${link.label}, and ${link.label} is told to drop its access here. Link again with a new pairing link.`,
@@ -134,7 +157,12 @@ function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged:
     await onChanged();
   };
 
-  const showReconnect = link.state === 'offline' || link.state === 'unsupported';
+  const handleRemoveSsh = async (keepServer: boolean) => {
+    setRemoveOpen(false);
+    await run(() => (keepServer ? unlinkMachineKeepingServer(link.id) : unlinkMachine(link.id)), `Could not remove ${link.label}`);
+  };
+
+  const showReconnect = link.state === 'offline' || link.state === 'unsupported' || ssh?.forward === 'down' || ssh?.forward === 'attention';
   const incident = incidentText(link);
 
   return (
@@ -146,11 +174,14 @@ function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged:
             <LinkStateBadge state={link.state} />
           </div>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            {link.currentRoute ? <>via <span className="font-mono">{link.currentRoute}</span></> : 'no route in use'}
+            {link.currentRoute ? (
+              <>via {link.routes.find((route) => route.url === link.currentRoute)?.kind ?? 'route'} · <span className="font-mono">{link.currentRoute}</span></>
+            ) : 'no route in use'}
             {' · '}{ACCESS_LABEL[link.access]}
             {link.peerVersion ? <>{' · '}Overdeck {link.peerVersion}</> : null}
             {link.lastHeartbeatAt ? <>{' · '}heartbeat {formatRelativeTime(link.lastHeartbeatAt)}</> : null}
           </p>
+          {ssh && <p className="text-xs text-muted-foreground mt-0.5 truncate" data-testid={`machine-ssh-${link.id}`}>{sshLine(ssh)}</p>}
           {link.stateDetail && <p className="text-xs text-muted-foreground mt-0.5">{link.stateDetail}</p>}
           {incident && <p className="text-xs text-muted-foreground mt-0.5">{incident}</p>}
         </div>
@@ -164,7 +195,7 @@ function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged:
             </button>
           )}
           <button type="button" disabled={busy} onClick={() => void handleUnlink()} className={destructiveButtonClass}>
-            Unlink
+            {ssh ? 'Remove' : 'Unlink'}
           </button>
         </div>
       </div>
@@ -201,6 +232,9 @@ function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged:
           </div>
           {routeError && <p className="text-xs text-destructive">{routeError}</p>}
         </div>
+      )}
+      {removeOpen && ssh && (
+        <RemoveSshMachineDialog link={{ ...link, ssh }} onCancel={() => setRemoveOpen(false)} onConfirm={(keepServer) => void handleRemoveSsh(keepServer)} />
       )}
     </li>
   );
@@ -274,6 +308,7 @@ function ShareConversationsRow({ checked, onChanged }: { checked: boolean; onCha
 export function MachinesPanel() {
   const queryClient = useQueryClient();
   const [linkOpen, setLinkOpen] = useState(false);
+  const [sshOpen, setSshOpen] = useState(false);
   const { data, error, isLoading } = useQuery({
     queryKey: MACHINES_QUERY_KEY,
     queryFn: loadMachines,
@@ -291,9 +326,14 @@ export function MachinesPanel() {
     <div data-component="anywhere-machines-panel" data-testid="machines-panel">
       <div className="flex items-center justify-between gap-4 mb-2">
         <h3 className="text-sm font-medium text-foreground">Machines</h3>
-        <button type="button" onClick={() => setLinkOpen(true)} className={buttonClass}>
-          Link a machine
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setSshOpen(true)} className={buttonClass}>
+            Add an SSH machine
+          </button>
+          <button type="button" onClick={() => setLinkOpen(true)} className={buttonClass}>
+            Link a machine
+          </button>
+        </div>
       </div>
       {data && (
         <p className="text-xs text-muted-foreground px-4 mb-2">
@@ -327,6 +367,7 @@ export function MachinesPanel() {
       )}
 
       <LinkMachineDialog open={linkOpen} onClose={() => setLinkOpen(false)} />
+      <AddSshMachineDialog open={sshOpen} onClose={() => setSshOpen(false)} />
     </div>
   );
 }
