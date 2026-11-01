@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4648",
   "created": "2026-11-01T05:50:45.229Z",
-  "updated": "2026-11-01T07:57:44.558Z",
+  "updated": "2026-11-01T07:58:05.412Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "triggers-admin-routes.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T07:57:44.557Z"
+    },
+    "funnel-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:58:05.412Z"
     }
   }
 }
