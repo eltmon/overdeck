@@ -430,6 +430,28 @@ door that does not exist; a real record read door would be a separate change.
   and `pullRequest` + `pullRequests` on `GET /api/conversations/:id`. A new table
   goes in the init migration AND a `runSchemaTopUp` in `ensureRuntimeIndexesSync`,
   and bumps `OVERDECK_TABLE_COUNT`.
+- Conversation schedules (PAN-4640): the `conversation_schedules` table holds one
+  prompt, a 5-field cron, an IANA `time_zone`, `enabled`, `next_run_at`, and the
+  last run's time, status (`delivered`, `failed`, `skipped`) and error, deleted with
+  its conversation. The door is `src/lib/overdeck/conversation-schedules.ts`;
+  recurrence rules (5 fields only, a valid zone, at least one future run, runs at
+  least 15 minutes apart, DST-correct next run via croner, always `paused: true`)
+  live in `conversation-schedule-recurrence.ts`. The routes
+  (`GET/POST /api/conversations/:name/schedules`,
+  `PATCH/DELETE /api/conversations/:name/schedules/:id`, in
+  `routes/conversation-schedules.ts`) and `pan conv schedule` both call the door.
+  The sweep (`services/conversation-schedule-service.ts`, primary dashboard only,
+  boot +30 s then every 60 s, non-overlapping) claims each due row with a
+  compare-and-set `UPDATE` that advances `next_run_at` to the first run after the
+  current wall clock, then fires: it resumes a stopped session with resume cause
+  `message`, then delivers through `handleConversationMessage` (`follow_up` on Pi).
+  Claim-then-fire makes a fire at most once and collapses runs missed during
+  downtime into one. A failed fire is recorded and never retried; an archived
+  conversation's schedule is advanced and recorded `skipped`. The sweep is not a
+  deacon-lite patrol: resume and delivery are in-process dashboard calls (the
+  deacon child would need two internal HTTP hops and could not pass a resume
+  cause), and a scheduled prompt follows the operator-message rule, so the
+  deacon pause toggle does not apply.
 - `GET /api/conversations/:name/messages` and `/message-locator` resolve registered
   rows first. A name that is a bare Claude session UUID with no row (a Cmd-K hit on an
   indexed transcript Overdeck never registered) falls back to an exact `<uuid>.jsonl`
@@ -525,6 +547,21 @@ door that does not exist; a real record read door would be a separate change.
   composer thumbnail and the sent-message thumbnails open one shared lightbox
   (`components/chat/ImageLightbox.tsx`, host mounted in `main.tsx`); sent-message
   thumbnails come from `extractAttachmentImageRefs()` in `messagesTimeline/helpers.ts`.
+- Composer citations (PAN-4642): `lib/citationFormat.ts` is the exact serializer
+  (`formatCitationBlock`/`composePromptWithCitations`) — client-side only, identical
+  for every harness, no server route changed. `lib/composerCitations.ts` persists
+  each conversation's pending list to `localStorage` under `conv-citations:<name>`;
+  `PendingCitation.source` is a discriminated union (`{ kind: 'message'; messageId;
+  role }` today) shared with #2685's future preview-element kind. `components/chat/
+  citations/` holds the selection toolbar (`CiteSelectionToolbar.tsx`), the chips
+  strip (`CitationChips.tsx`), and the best-effort quote highlight
+  (`citationHighlight.ts`, the CSS Custom Highlight API). Rows opt in via
+  `data-cite-message-id`/`data-cite-role` (set only on settled, non-streaming rows in
+  `messagesTimeline/messageRows.tsx`), and `resolveSelectionCitation()` maps a DOM
+  selection back to one when both ends land in the same tagged row. On send the
+  pending list is consumed only after the message has committed to a delivery lane
+  (bubble, hold, offline hold, or outbox) — so a failed send keeps the citation block
+  in the retry outbox instead of losing it.
 - Conversation timeline layout (PAN-4497): `MessagesTimeline.tsx` virtualizes all but
   the last 8 rows with `@tanstack/react-virtual`. Visible virtual rows render in normal
   flow inside one wrapper translated to the first visible row's offset, so rows cannot
