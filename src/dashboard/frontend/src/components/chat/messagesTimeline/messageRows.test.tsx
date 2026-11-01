@@ -6,9 +6,9 @@
  */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { TurnBody } from './messageRows';
+import { AssistantMessageRow, TurnBody, UserMessageRow } from './messageRows';
 import { WorkLogGroup } from './workLogRows';
-import type { SubagentSummary, WorkLogEntry } from '../chat-types';
+import type { ChatMessage, SubagentSummary, WorkLogEntry } from '../chat-types';
 
 // ChatMarkdown pulls in the syntax-highlight chain; the gate asserts budget
 // behavior, not markdown fidelity.
@@ -151,5 +151,39 @@ describe('subagent transcript action', () => {
 
     fireEvent.click(screen.getByText('Task'));
     expect(screen.queryByRole('button', { name: 'Open subagent transcript' })).not.toBeInTheDocument();
+  });
+});
+
+describe('PAN-4642 cite-row gate', () => {
+  function assistantMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+    return { id: 'asst-1', role: 'assistant', text: 'Here is my reply.', createdAt: '2026-11-01T00:00:00Z', completedAt: '2026-11-01T00:00:01Z', ...overrides };
+  }
+  function userMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+    return { id: 'user-1', role: 'user', text: 'My question.', createdAt: '2026-11-01T00:00:00Z', ...overrides };
+  }
+
+  it('marks a completed assistant row citable when citeConversationName is set', () => {
+    render(<AssistantMessageRow message={assistantMessage()} durationStart="2026-11-01T00:00:00Z" isStreaming={false} citeConversationName="conv-a" />);
+    expect(document.querySelector('[data-cite-message-id="asst-1"][data-cite-role="assistant"]')).toBeInTheDocument();
+  });
+
+  it('does not mark a still-streaming assistant row citable', () => {
+    render(<AssistantMessageRow message={assistantMessage({ completedAt: undefined })} durationStart="2026-11-01T00:00:00Z" isStreaming citeConversationName="conv-a" />);
+    expect(document.querySelector('[data-cite-message-id]')).not.toBeInTheDocument();
+  });
+
+  it('does not mark an assistant row citable without citeConversationName', () => {
+    render(<AssistantMessageRow message={assistantMessage()} durationStart="2026-11-01T00:00:00Z" isStreaming={false} />);
+    expect(document.querySelector('[data-cite-message-id]')).not.toBeInTheDocument();
+  });
+
+  it('marks a settled user row citable when citeConversationName is set', () => {
+    render(<UserMessageRow message={userMessage()} citeConversationName="conv-a" />);
+    expect(document.querySelector('[data-cite-message-id="user-1"][data-cite-role="user"]')).toBeInTheDocument();
+  });
+
+  it('does not mark an optimistic user row citable', () => {
+    render(<UserMessageRow message={userMessage({ id: 'optimistic-1' })} citeConversationName="conv-a" />);
+    expect(document.querySelector('[data-cite-message-id]')).not.toBeInTheDocument();
   });
 });

@@ -58,7 +58,7 @@ function parseSlashCommandMessage(text: string): { command: string } | null {
   return match ? { command: match[1] } : null;
 }
 
-export function UserMessageRow({ message, cwd, issueId, bookmarkable }: { message: ChatMessage; cwd?: string; issueId?: string | null; bookmarkable?: boolean }) {
+export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConversationName }: { message: ChatMessage; cwd?: string; issueId?: string | null; bookmarkable?: boolean; citeConversationName?: string }) {
   const slashCommand = parseSlashCommandMessage(message.text);
   if (slashCommand) {
     return <SlashCommandDivider command={slashCommand.command} createdAt={message.createdAt} />;
@@ -114,6 +114,10 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable }: { messag
   }
 
   const isPending = message.id.startsWith('optimistic-') && !message.acknowledged;
+  const isOptimistic = message.id.startsWith('optimistic-');
+  const citeProps = citeConversationName && !isPending && !isOptimistic
+    ? { 'data-cite-message-id': message.id, 'data-cite-role': 'user' as const }
+    : undefined;
   return (
     <div className={styles.userMessageRow}>
       <div
@@ -121,7 +125,7 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable }: { messag
         style={isPending ? { opacity: 0.6 } : undefined}
         title={isPending ? 'Pending — waiting for agent to process' : undefined}
       >
-        <div className={styles.userMessageText}><ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} /></div>
+        <div className={styles.userMessageText} {...citeProps}><ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} /></div>
         <AttachmentThumbnails text={message.text} />
         <span className={styles.messageTimestamp}>
           {isPending ? (
@@ -209,6 +213,7 @@ export function AssistantMessageRow({
   cwd,
   issueId,
   bookmarkable,
+  citeConversationName,
 }: {
   message: ChatMessage;
   durationStart: string;
@@ -219,23 +224,28 @@ export function AssistantMessageRow({
   onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
   resolvedTheme?: 'light' | 'dark';
   bookmarkable?: boolean;
+  citeConversationName?: string;
 }) {
   const duration = message.completedAt
     ? formatElapsed(durationStart, message.completedAt)
     : null;
 
   const [allExpanded, setAllExpanded] = useState(false);
+  const stillStreaming = isStreaming && !message.completedAt;
+  const turnBody = <TurnBody text={message.text} streaming={stillStreaming} cwd={cwd} issueId={issueId} />;
 
   return (
     <div className={styles.assistantMessageRow}>
       <MessageRoleIcon
         message={message}
         role="assistant"
-        bookmarkable={!!bookmarkable && !(isStreaming && !message.completedAt)}
+        bookmarkable={!!bookmarkable && !stillStreaming}
         className={styles.assistantMessageAvatar}
       />
       <div className={styles.assistantMessageContent}>
-        <TurnBody text={message.text} streaming={isStreaming && !message.completedAt} cwd={cwd} issueId={issueId} />
+        {citeConversationName && !stillStreaming ? (
+          <div data-cite-message-id={message.id} data-cite-role="assistant">{turnBody}</div>
+        ) : turnBody}
         {turnDiffSummary && turnDiffSummary.files.length > 0 && (
           <div className="mt-2 rounded-md border border-border/50 bg-muted/30 p-2">
             <div className="flex items-center justify-between mb-1.5">
