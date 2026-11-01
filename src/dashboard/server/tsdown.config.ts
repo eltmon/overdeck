@@ -156,8 +156,20 @@ export default defineConfig(async () => {
         'playwright',
         'playwright-core',
         /^chromium-bidi/,
+        // PAN-2354: web-push (VAPID + RFC 8291) is CommonJS; keep it external so it
+        // resolves from the root node_modules at runtime.
+        'web-push',
         /^bun:/,
         /^@effect\/platform-bun/,
+        // PAN-4644: jsonc-parser's package.json has no "exports" map, so Node
+        // resolves it via "main" (the UMD/CJS build) at runtime. That build
+        // does internal `require('./impl/format')` calls relative to its own
+        // file. Bundling inlines that UMD source into a shared
+        // rolldown-runtime chunk, so the relative require resolves against
+        // dist/dashboard/ instead of node_modules/jsonc-parser/lib/umd/ and
+        // fails with MODULE_NOT_FOUND. Externalizing keeps it resolved from
+        // node_modules at runtime, where its sibling files are intact.
+        'jsonc-parser',
       ],
     },
   };

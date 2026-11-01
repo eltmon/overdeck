@@ -8,8 +8,9 @@
  * constant-time.
  *
  * Every record carries scopes from `ACCESS_TOKEN_SCOPES`. `admin` satisfies
- * every scope, `operate` satisfies `tell`, and the three `read:*` scopes are
- * independent grants (`scopeSatisfies`). Pairing always grants `['admin']`.
+ * every scope, `operate` satisfies `tell`, and the three `read:*` scopes and
+ * `approve` (answering blocking prompts, PAN-4649) are independent grants
+ * (`scopeSatisfies`). Pairing always grants `['admin']`.
  * `createAccessToken` accepts only known scopes, but a record read from the
  * file may hold any string: an unknown scope parses and satisfies nothing.
  *
@@ -39,7 +40,7 @@ export const ACCESS_TOKEN_REFRESH_MS = 5_000;
 const LAST_USED_THROTTLE_MS = 60_000;
 const MAX_NAME_LENGTH = 200;
 
-export const ACCESS_TOKEN_SCOPES = ['read:events', 'read:state', 'read:conversations', 'tell', 'operate', 'admin'] as const;
+export const ACCESS_TOKEN_SCOPES = ['read:events', 'read:state', 'read:conversations', 'tell', 'operate', 'approve', 'admin'] as const;
 export type AccessTokenScope = (typeof ACCESS_TOKEN_SCOPES)[number];
 export type AccessTokenKind = 'device' | 'token';
 

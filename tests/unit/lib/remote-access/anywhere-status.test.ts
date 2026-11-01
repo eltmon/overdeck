@@ -57,6 +57,19 @@ describe('computeAnywhereProblems (PAN-4445 D-8)', () => {
       expect(problem.message).not.toMatch(/\bpan [a-z]/);
     }
   });
+
+  it('reports Tailscale Serve without token sign-in with the tailscale-setup action (PAN-1254)', () => {
+    const problems = computeAnywhereProblems({ identityError: null, addresses: reachable, vault: vaultReady, tailscaleServeOn: true, requireTokenMint: false });
+    expect(problems).toEqual([
+      expect.objectContaining({ code: 'tailscale-serve-unprotected', action: { kind: 'tailscale-setup' } }),
+    ]);
+    expect(problems[0]?.message).not.toMatch(/\bpan [a-z]/);
+  });
+
+  it('reports no Tailscale problem once token sign-in is required or Serve is off', () => {
+    expect(computeAnywhereProblems({ identityError: null, addresses: reachable, vault: vaultReady, tailscaleServeOn: true, requireTokenMint: true })).toEqual([]);
+    expect(computeAnywhereProblems({ identityError: null, addresses: reachable, vault: vaultReady, tailscaleServeOn: false, requireTokenMint: false })).toEqual([]);
+  });
 });
 
 describe('readAnywhereVaultState (PAN-4445 D-9, openVaultContext)', () => {

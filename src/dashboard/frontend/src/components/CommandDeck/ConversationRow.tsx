@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getRuntimeBehavior, normalizeHarnessName } from '@overdeck/contracts';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone, CheckSquare, Square } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { continueTargetOf, openContinueOnDevice } from '../chat/continueOnDevice/continueOnDeviceStore';
@@ -18,6 +18,8 @@ import { resolveEffectiveProjectKey } from './projectsData';
 import { fallbackBadgeTone } from './fallbackBadge';
 import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import { PullRequestMenuItems } from './PullRequestMenuItems';
+import { TriageMenuItems } from './TriageMenuItems';
+import { formatSnoozeWake, isSnoozed } from './conversation-triage';
 import { PullRequestBadge } from '../primitives/PullRequestBadge';
 import styles from './styles/command-deck.module.css';
 
@@ -96,6 +98,11 @@ interface ConversationRowProps {
   conv: Conversation;
   isSelected: boolean;
   onSelect: (name: string) => void;
+  /** PAN-4639 D14: when present, the row's click goes here instead of onSelect
+   *  (multi-select handling by the list); nested rows and other callers keep onSelect. */
+  onRowClick?: (event: React.MouseEvent, name: string) => void;
+  /** PAN-4639 D14: part of the current multi-selection (top-level rows only). */
+  isMultiSelected?: boolean;
   mutations: ConversationMutations;
   variant?: 'flat' | 'nested';
   /** Registered projects for the Move submenu (PAN-1577). Fetched once by the
@@ -165,6 +172,8 @@ export function ConversationRow({
   conv,
   isSelected,
   onSelect,
+  onRowClick,
+  isMultiSelected = false,
   mutations,
   variant = 'flat',
   registeredProjects = [],
@@ -217,6 +226,9 @@ export function ConversationRow({
   }, [menuOpen]);
 
   const archivePending = mutations.isArchivePending(conv.name);
+  const stopPending = mutations.isStopPending(conv.name);
+  // PAN-4626: archive wins — it ends the session too.
+  const leavingKind: 'archive' | 'stop' | null = archivePending ? 'archive' : stopPending ? 'stop' : null;
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conv.name] ?? false);
   const isAwaitingPermission = useDashboardStore((s) => s.conversationsAwaitingPermissionByName?.[conv.name] ?? false);
   const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
@@ -242,12 +254,27 @@ export function ConversationRow({
       {verdictBadgeText(latestVerdict)}
     </a>
   ) : null;
+  const leavingLabel = leavingKind ? (
+    <span className={styles.conversationLeavingStatus}>
+      <Loader2 size={10} className={styles.conversationLeavingSpinner} aria-hidden="true" />
+      <span>{leavingKind === 'archive' ? 'Archiving…' : 'Stopping…'}</span>
+    </span>
+  ) : null;
   const iconSize = isNested ? 10 : 11;
   const dotSize = isNested ? 6 : 7;
   const spinnerSize = isNested ? 10 : 12;
   const stalledLabel = conv.stalledSince
     ? `waiting on agent — no activity since ${formatStalledTime(conv.stalledSince)}`
     : null;
+
+  // PAN-4639 WI-7: settling never calls stop or archive — the session keeps running.
+  const toggleSettle = useCallback(() => {
+    const settled = Boolean(conv.settledAt);
+    mutations.triage({
+      updates: [{ name: conv.name, settled: !settled }],
+      label: settled ? `Moved "${conv.title ?? conv.name}" to Inbox` : `Settled "${conv.title ?? conv.name}"`,
+    });
+  }, [conv.settledAt, conv.name, conv.title, mutations]);
 
   const beginRename = useCallback(() => {
     committingRef.current = false;
@@ -311,8 +338,8 @@ export function ConversationRow({
   }, [conv.isFavorited, conv.title, conv.name, confirm, mutations]);
 
   const itemClass = isNested
-    ? `${styles.projectConvItem} ${isSelected ? styles.projectConvItemSelected : ''}`
-    : `${styles.conversationItem} ${isSelected ? styles.conversationItemSelected : ''}`;
+    ? `${styles.projectConvItem} ${isSelected ? styles.projectConvItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''}`
+    : `${styles.conversationItem} ${isSelected || isMultiSelected ? styles.conversationItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''}`;
 
   // Fork / spawn status badges — shared by both row variants.
   const ownerLabel = conv.vaultOwnerLabel ?? 'another machine';
@@ -425,10 +452,15 @@ export function ConversationRow({
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('application/json', JSON.stringify({ name: conv.name, projectKey: conv.projectKey ?? null, cwd: conv.cwd }));
       }}
-      onClick={() => onSelect(conv.name)}
+      onClick={(e) => {
+        if (leavingKind) return;
+        if (onRowClick) onRowClick(e, conv.name);
+        else onSelect(conv.name);
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        if (leavingKind) return;
         e.currentTarget.focus();
         menuOpenerRef.current = 'row';
         setMenuPos({
@@ -438,31 +470,54 @@ export function ConversationRow({
         setMenuOpen(true);
       }}
       title={conv.name}
-      aria-busy={archivePending || undefined}
+      aria-busy={leavingKind ? true : undefined}
+      aria-selected={isMultiSelected || undefined}
     >
       {/* Stop button */}
       {conv.sessionAlive && (
+        stopPending ? (
+          <span
+            className={styles.conversationStopBtn}
+            aria-disabled="true"
+            aria-label={`Stopping agent for ${conv.name}`}
+            title="Stopping…"
+          >
+            <Loader2 size={iconSize} className={styles.conversationLeavingSpinner} />
+          </span>
+        ) : (
+          <span
+            role="button"
+            tabIndex={0}
+            className={styles.conversationStopBtn}
+            onClick={e => { e.stopPropagation(); mutations.stop(conv.name); }}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); mutations.stop(conv.name); } }}
+            title="Stop agent"
+            aria-label={`Stop agent for ${conv.name}`}
+          >
+            <X size={iconSize} />
+          </span>
+        )
+      )}
+
+      {/* Settle checkbox (PAN-4639 WI-7): top-level rows only. The session is not stopped. */}
+      {!isNested && (
         <span
-          role="button"
+          role="checkbox"
+          aria-checked={Boolean(conv.settledAt)}
           tabIndex={0}
-          className={styles.conversationStopBtn}
-          onClick={e => { e.stopPropagation(); mutations.stop(conv.name); }}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); mutations.stop(conv.name); } }}
-          title="Stop agent"
-          aria-label={`Stop agent for ${conv.name}`}
+          className={styles.conversationSettleBox}
+          aria-label={conv.settledAt ? `Unsettle ${conv.title ?? conv.name}` : `Settle ${conv.title ?? conv.name}`}
+          onClick={(e) => { e.stopPropagation(); toggleSettle(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleSettle(); }
+          }}
         >
-          <X size={iconSize} />
+          {conv.settledAt ? <CheckSquare size={iconSize} /> : <Square size={iconSize} />}
         </span>
       )}
 
       {/* Status indicator */}
-      {archivePending ? (
-        <Loader2
-          size={spinnerSize}
-          className={styles.conversationWorkingSpinner}
-          aria-label={`Archiving ${conv.name}`}
-        />
-      ) : conv.forkStatus && conv.forkStatus !== 'failed' ? (
+      {conv.forkStatus && conv.forkStatus !== 'failed' ? (
         <Loader2
           size={spinnerSize}
           className={styles.conversationWorkingSpinner}
@@ -541,7 +596,8 @@ export function ConversationRow({
           {conv.laneKey && conv.laneRole && (
             <span className={styles.laneLabel}>{`${LANE_GLYPH[conv.laneRole]} ${conv.laneKey} i${conv.laneIteration ?? 1}`}</span>
           )}
-          <span className={`${styles.projectConvLabel} ${archivePending || mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
+          <span className={`${styles.projectConvLabel} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
+          {leavingLabel}
           {conv.laneKey && conv.laneReport && !(isJudge && conv.laneVerdict) && (
             <span className={`${styles.laneReportBadge} ${LANE_REPORT_TONE[conv.laneReport.status]}`}>
               {conv.laneReport.status.toUpperCase()}
@@ -565,53 +621,63 @@ export function ConversationRow({
       ) : (
         // Flat list rows: title on line 1, muted metadata on line 2.
         <span className={styles.conversationMain}>
-          <span className={`${styles.conversationName} ${archivePending || mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
+          <span className={`${styles.conversationName} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
           <span className={styles.conversationMetaLine}>
-            {verdictBadge}
-            {conv.branch && (
-              <span
-                className={styles.conversationBranchChip}
-                title={`${conv.isWorktree ? 'Worktree' : 'Local'} · ${conv.branch} · ${conv.cwd}`}
-                aria-label={`Branch ${conv.branch} (${conv.isWorktree ? 'worktree' : 'local'})`}
-              >
-                {conv.isWorktree ? <GitFork size={10} /> : <GitBranch size={10} />}
-                <span className={styles.conversationBranchChipText}>{conv.branch}</span>
-              </span>
-            )}
-            {ownerBadge}
-            {pullRequestBadge}
-            {conv.lastAttachedAt && (
+            {leavingLabel ?? (
               <>
-                {conv.branch && <span className={styles.conversationMetaSep} aria-hidden>·</span>}
-                <time
-                  dateTime={conv.lastAttachedAt}
-                  title={new Date(conv.lastAttachedAt).toLocaleString()}
-                >
-                  {formatRelativeTime(conv.lastAttachedAt, now)}
-                </time>
-              </>
-            )}
-            {conv.totalCost !== undefined && conv.totalCost > 0 && (
-              <>
+                {verdictBadge}
+                {conv.branch && (
+                  <span
+                    className={styles.conversationBranchChip}
+                    title={`${conv.isWorktree ? 'Worktree' : 'Local'} · ${conv.branch} · ${conv.cwd}`}
+                    aria-label={`Branch ${conv.branch} (${conv.isWorktree ? 'worktree' : 'local'})`}
+                  >
+                    {conv.isWorktree ? <GitFork size={10} /> : <GitBranch size={10} />}
+                    <span className={styles.conversationBranchChipText}>{conv.branch}</span>
+                  </span>
+                )}
+                {ownerBadge}
+                {pullRequestBadge}
+                {conv.lastAttachedAt && (
+                  <>
+                    {conv.branch && <span className={styles.conversationMetaSep} aria-hidden>·</span>}
+                    <time
+                      dateTime={conv.lastAttachedAt}
+                      title={new Date(conv.lastAttachedAt).toLocaleString()}
+                    >
+                      {formatRelativeTime(conv.lastAttachedAt, now)}
+                    </time>
+                  </>
+                )}
+                {conv.totalCost !== undefined && conv.totalCost > 0 && (
+                  <>
+                    <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                    <span title="Total cost (cache-discount aware)">{conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}</span>
+                  </>
+                )}
+                {conv.totalTokens !== undefined && conv.totalTokens > 0 && (
+                  <>
+                    <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                    <span title={`${conv.totalTokens.toLocaleString()} tokens (input + output + cache read/write)`}>{formatTokens(conv.totalTokens)} tok</span>
+                  </>
+                )}
                 <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                <span title="Total cost (cache-discount aware)">{conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}</span>
+                <span title={`Harness: ${shortHarness(conv.harness ?? 'claude-code')}`}>{shortHarness(conv.harness ?? 'claude-code')}</span>
+                {conv.model && (
+                  <>
+                    <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                    <span title={`Model: ${conv.model}`}>{shortModel(conv.model)}</span>
+                  </>
+                )}
+                {forkBadges}
+                {isSnoozed(conv, now.getTime()) && conv.snoozedUntil && (
+                  <>
+                    <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                    <span className={styles.conversationSnoozeLabel}>{formatSnoozeWake(conv.snoozedUntil, now)}</span>
+                  </>
+                )}
               </>
             )}
-            {conv.totalTokens !== undefined && conv.totalTokens > 0 && (
-              <>
-                <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                <span title={`${conv.totalTokens.toLocaleString()} tokens (input + output + cache read/write)`}>{formatTokens(conv.totalTokens)} tok</span>
-              </>
-            )}
-            <span className={styles.conversationMetaSep} aria-hidden>·</span>
-            <span title={`Harness: ${shortHarness(conv.harness ?? 'claude-code')}`}>{shortHarness(conv.harness ?? 'claude-code')}</span>
-            {conv.model && (
-              <>
-                <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                <span title={`Model: ${conv.model}`}>{shortModel(conv.model)}</span>
-              </>
-            )}
-            {forkBadges}
           </span>
         </span>
       )}
@@ -733,6 +799,7 @@ export function ConversationRow({
               )}
             </span>
           )}
+          {!isNested && <TriageMenuItems conversation={conv} mutations={mutations} onClose={() => setMenuOpen(false)} />}
           <PullRequestMenuItems conversation={conv} mutations={mutations} onClose={() => setMenuOpen(false)} />
           {conv.claudeSessionId && !conv.forkStatus && (
             <MenuItemButton

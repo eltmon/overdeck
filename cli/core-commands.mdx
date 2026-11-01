@@ -75,6 +75,57 @@ Checks:
 
 Returns a health report with recommendations for any issues found.
 
+`pan doctor --json` prints the same checks as one JSON object (no banner,
+no colour) instead:
+
+```bash
+pan doctor --json
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-01T04:52:00.000Z",
+  "strict": false,
+  "exitCode": 0,
+  "summary": { "ok": 40, "warn": 2, "error": 0 },
+  "checks": [
+    { "name": "Git", "status": "ok", "message": "Installed", "fix": null }
+  ],
+  "patrolBudgets": [
+    { "patrol": "example-patrol", "actions": 3, "budget": 20, "suspended": false }
+  ]
+}
+```
+
+The exit code matches text mode: `1` when any check is `error`, or when any
+check is `warn` and `--strict` was passed; otherwise `0`.
+
+## pan diagnose
+
+Collect a redacted diagnostic bundle and, with your consent, start Claude
+Code or Codex in that bundle's directory to find and fix the problem. It
+works even when the dashboard, the supervisor, or Herdr is down — that is
+when you need it most.
+
+```bash
+pan diagnose
+pan diagnose --bundle-only
+pan diagnose --harness codex --describe "dashboard will not start"
+pan diagnose --no-issue
+```
+
+Flags: `--harness <claude-code|codex>`, `--describe <text>`, `--bundle-only`
+(collect the bundle and print its path; never launches a harness),
+`--no-issue` (never draft or create an upstream issue), `--yes` (skip the
+launch confirmation).
+
+Before starting a harness, `pan diagnose` always prints the bundle path and
+its file list, then asks for confirmation — nothing launches without it. See
+[DIAGNOSTICS-BUNDLE.md](https://github.com/eltmon/overdeck/blob/main/docs/DIAGNOSTICS-BUNDLE.md)
+for exactly what the bundle holds, what is redacted, and what is never
+collected.
+
 ## pan hygiene
 
 Audit commits, working-tree changes, pull requests, agents, tmux sessions,

@@ -207,6 +207,8 @@ terminal backends (`tests/unit/lib/vault/import-graph.test.ts`). PAN-4329 adds
 resolves config/key/store into a tagged state and prints nothing; `src/dashboard/server/services/vault-service.ts`
 runs every dashboard vault operation through one queue (`enqueueVaultOperation`) plus the sync loop
 (primary dashboard only, or `OVERDECK_VAULT_IN_PEER=1`); `routes/vault.ts` + Settings → Session Vault.
+PAN-4647: `vault-agent-subjects.ts` also lists pipeline agents inside their tracking window, so
+the settle poller auto-saves work/review/test/plan transcripts, not just managed conversations.
 
 ## Pull requests on conversations and issue rows (PAN-3822, PAN-4457)
 
@@ -220,8 +222,34 @@ and refreshes snapshots; links are never deleted, only dismissed. `pan done` /
 from `DerivedIssueState.pr`, not from links; the conversation list's badge
 (`primitives/PullRequestBadge.tsx`) reads the effective link.
 
+Conversation-message delivery (`handleConversationMessage`,
+`src/lib/overdeck/conversation-message.ts`) refuses an `ended` conversation with
+422; callers resume first via `handleConversationResume`
+(`conversation-runtime.ts`). Deacon-lite runs in the forked `deacon.js` child and
+reaches the dashboard only over internal HTTP, so work that resumes or messages
+conversations belongs in a dashboard service like the PR sync sweep. PAN-4640
+added `conversation_schedules` and `services/conversation-schedule-service.ts`
+on that pattern.
+
+## Scheduled messages (PAN-4641)
+
+`conversation_scheduled_messages` (overdeck.db) holds operator messages that wait
+for a Claude Code usage limit to reset; door
+`src/lib/overdeck/conversation-scheduled-messages.ts`. The tick
+`src/lib/overdeck/scheduled-message-delivery.ts` acts on each conversation's head
+row (resume if ended, defer on a choice menu, paste through
+`handleConversationMessage`, then confirm or re-arm from the transcript). It is
+hosted by `services/scheduled-message-patrol.ts` in the dashboard process, not the
+Deacon child, because the delivery and resume doors live there (60 s, skips peer
+dashboards, a frozen Deacon and `OVERDECK_DISABLE_SCHEDULED_MESSAGES=1`). Reset
+times come from `conversation-usage-limit.ts` and `limit-reset-text.ts`.
+
 ## Dashboard auth (verified 2026-09-30)
 
 No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.
 
-<!-- last-verified: 2026-10-26 -->
+## Webhook triggers (PAN-4648)
+
+`src/lib/triggers/`: `store.ts` is the door for `~/.overdeck/triggers.json` (0600; URL secrets kept as SHA-256 only), `signatures.ts` checks GitHub/Stripe HMACs over raw bytes, `envelope.ts` wraps the body as nonce-fenced external data (44 KiB inline), and `deliver.ts` runs secret → signature → rate limit → CPU hold → pending-input hold → message or create door through injected deps. `POST /hooks/:id/:secret` (`routes/trigger-hooks.ts`) is outside `/api`, so the gate passes it by path; `/api/triggers` (`routes/triggers.ts`) manages triggers; `pan triggers` writes the store directly. A request carrying `Tailscale-Funnel-Request` reaches only `POST /hooks/*`: the gate 404s everything else, the mint and `/ws/*` refuse it. Docs: `configuration/triggers.mdx`, `docs/DASHBOARD-AUTH.md`.
+
+<!-- last-verified: 2026-11-01 -->

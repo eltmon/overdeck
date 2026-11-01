@@ -25,10 +25,12 @@ import { getOverdeckHome } from './paths.js';
 export type UiTheme = 'dark' | 'light';
 
 /**
- * Terminal pane backgrounds. Must match XTERM_BG in
- * src/dashboard/frontend/src/components/XTerminal.tsx — tmux answers
- * Claude's OSC 11 query with this colour, so it has to be the same
- * background xterm.js actually renders.
+ * Fallback terminal pane backgrounds, used when the active color theme
+ * can't be resolved (PAN-4644). Must match the `terminal.background` of
+ * `BUILTIN_COLOR_THEMES` in `@overdeck/contracts` — tmux answers Claude's
+ * OSC 11 query with this colour, so it has to be the same background
+ * xterm.js actually renders. `resolveTerminalBackground()` in
+ * `color-themes/terminal-background.ts` is what new sessions actually use.
  */
 export const TERMINAL_BG: Record<UiTheme, string> = {
   dark: '#1a1a2e',

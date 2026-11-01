@@ -1420,11 +1420,15 @@ App pool's usage, which has no separate GraphQL source wired up.
 **The ledger.** Every metered call and every `/rate_limit` sample appends one
 JSON line to `~/.overdeck/github-quota/ledger-<YYYYMMDDHH>.jsonl` (UTC hour):
 `{ ts, pid, kind: 'call' | 'sample', caller, pool, bucket, cost, estimated,
-outcome, remaining?, limit?, resetAt?, agent? }`. The pool is the identity
-spent: `user` (the `gh` CLI token), `pat` (`GITHUB_TOKEN`) or `app` (GitHub
-App installation tokens). Readers aggregate the last 60 minutes from the
-current and previous hour files; files older than 3 hours are deleted on the
-hour rollover. The dashboard, the deacon child, CLI processes and the agent
+outcome, remaining?, limit?, resetAt?, agent? }`. Within one process,
+appends land in call order: each write starts after the previous one
+settles, and an entry's `ts` and file are fixed when the call is metered.
+Lines from different processes interleave in arrival order. The pool is
+the identity spent: `user` (the `gh` CLI token), `pat` (`GITHUB_TOKEN`) or
+`app` (GitHub App installation tokens). Readers aggregate the last 60
+minutes from the current and previous hour files; files older than 3 hours
+are deleted on the hour rollover. The dashboard, the deacon child, CLI
+processes and the agent
 `gh` shim (beside the agent git guard; conversations get it alone), which
 counts every call and, for agent panes and the Flywheel conversation, refuses
 grant-label writes (PAN-4343), all write it.

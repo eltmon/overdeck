@@ -6,7 +6,6 @@
 3 src/cli/commands/spawn.ts
 8 src/cli/commands/start.ts
 5 src/cli/commands/vault/resume.ts
-2 src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts
 2 src/dashboard/frontend/src/components/CommandDeck/ConversationActionMenu.tsx
 4 src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx
 2 src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx

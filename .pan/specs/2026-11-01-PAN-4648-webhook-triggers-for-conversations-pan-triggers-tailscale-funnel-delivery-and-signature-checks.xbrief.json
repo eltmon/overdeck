@@ -1,0 +1,962 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T05:04:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4648: Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery and signature checks",
+    "updated": "2026-11-01T05:49:13.195Z"
+  },
+  "plan": {
+    "id": "pan-4648",
+    "title": "Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery and signature checks",
+    "status": "running",
+    "uid": "4ea99d8d-f5fb-4f89-94d1-0edcf27cdb98",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-01T05:04:30Z",
+    "updated": "2026-11-01T05:49:13.195Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4648",
+        "label": "PAN-4648",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4648.md",
+        "label": "PRD PAN-4648",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-2350.md",
+        "label": "Epic PRD PAN-2350 (W-INT1, FR-26, D-20)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "webhooks",
+      "triggers",
+      "security",
+      "tailscale",
+      "cli",
+      "settings"
+    ],
+    "metadata": {
+      "sizeJustification": "This issue is already one slice of the PAN-2350 epic, which the operator split into 20+ sibling issues; W-INT1 itself was split again to move the directory inbox to PAN-2356. Its done check (a signed GitHub event through Funnel starts a conversation, a bad signature is refused, the body arrives marked as external data) needs the store, the signature checks, the envelope, the public route and the Funnel gate rule together, and the issue explicitly owns the CLI, the Settings panel and configuration/triggers.mdx. The subsystem count is high because each surface (src/lib, server, CLI, frontend, tests, Mintlify docs, root docs.json/package.json) is a separate top-level path, not because the change is broad: every item is a small vertical slice with its own tests.",
+      "canonicalFilename": "2026-11-01-PAN-4648-webhook-triggers-for-conversations-pan-triggers-tailscale-funnel-delivery-and-signature-checks.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Outside services (GitHub, Stripe, CI, chat bots) cannot reach an Overdeck conversation. The operator wants a secret URL that either messages an existing conversation or starts a new one in a project from a prompt template (epic PAN-2350 FR-26, D-20). Today no trigger code exists, and a naive public route is dangerous: Tailscale Funnel proxies internet traffic to 127.0.0.1, and with the default dashboard.require_token_mint=false the remote request gate and the session mint treat every loopback peer as the local operator.",
+      "Proposal": "Add src/lib/triggers/ (a 0600 JSON store in OVERDECK_HOME with hashed URL secrets, GitHub and Stripe signature checks over raw bytes, a nonce-fenced external-data envelope that neutralizes control characters and never starts with '/', and a delivery core with per-trigger rate limits, a CPU-pressure hold and a pending-input hold). Expose it at POST /hooks/:id/:secret outside /api, plus admin-scoped /api/triggers management routes, `pan triggers add|list|remove|set-secret`, and a Settings -> Anywhere -> Triggers panel. Harden the remote gate, the session mint and the WebSocket authorizer so any request carrying the tailscaled-set Tailscale-Funnel-Request header reaches only POST /hooks/*. Document the one-line Funnel command on port 8443 with the /hooks mount in configuration/triggers.mdx. Full detail, decisions D-1..D-15 and test vectors are in .pan/drafts/PAN-4648.md.",
+      "NonGoals": "- The directory inbox at https://connect.overdeck.ai/h/<id>, sealed storage and the 24-hour hold (PAN-2356).\n- Running the tailscale CLI from Overdeck: install, sign-in, Serve HTTPS, turning Funnel on or off, or reading Funnel status (PAN-1254).\n- Any change to POST /api/webhooks/github, its secret file, or src/dashboard/server/routes/webhooks.ts.\n- Queuing or retrying held events, delivery history, or a per-trigger event log.\n- Event-type or repository filters on a trigger.\n- Placeholders in prompt templates that substitute payload values.\n- Reviving an ended or archived conversation for a conversation trigger.\n- Changing the 50,000-character message limit in handleConversationMessage or handleConversationCreate.\n- Signature schemes other than GitHub X-Hub-Signature-256 and Stripe Stripe-Signature.\n- A pan-triggers skill file.\n- New ROUTE_SCOPES rows: the /api/triggers routes keep the default admin scope.\n- Any trigger path that answers a question, approves a permission, picks a pane choice or changes settings."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The hook path is POST /hooks/:id/:secret, outside /api (PRD D-1).",
+        "rationale": "REMOTE_GATE_ALLOWLIST matches exact strings only and isGatedPath covers only /api and /events, so a path outside /api needs no change to a security primitive, while /api/triggers management stays behind the normal admin gate."
+      },
+      {
+        "summary": "Funnel is turned on by one documented operator command on port 8443 with a /hooks mount; Overdeck does not run the tailscale CLI in this issue (PRD D-2, D-9).",
+        "rationale": "The issue says the Funnel route waits for PAN-1254, which owns the tailscale CLI wrapper; documenting the command lets this issue ship now without a colliding wrapper. Funnel is enabled per host:port, so port 8443 keeps a Serve dashboard on 443 private."
+      },
+      {
+        "summary": "The gates key on the Tailscale-Funnel-Request header, not on X-Forwarded-* (PRD D-3, FR-9).",
+        "rationale": "Verified in tailscale ipn/ipnlocal/serve.go: tailscaled deletes any client copy and sets it to ?1 on funneled requests only, while X-Forwarded-* also marks legitimate Traefik and tailnet Serve visitors."
+      },
+      {
+        "summary": "At most 44 KiB (45,056 bytes) of the event body is placed inline, not 64 KiB (PRD D-4).",
+        "rationale": "Both conversation doors cap a message at 50,000 characters for unrecorded reasons and are shared with the composer; FR-26's 64 KiB is an upper bound, and the route still verifies signatures over up to 1 MiB."
+      },
+      {
+        "summary": "Triggers are stored in ${OVERDECK_HOME}/triggers.json (0600) with the URL secret hashed and shown once (PRD D-5, D-6).",
+        "rationale": "Matches access-tokens.json and trusted-origins.json; signing secrets must be readable for HMAC, and keeping them out of overdeck.db keeps them out of database copies. Reading the file per event avoids CLI/dashboard cache drift."
+      },
+      {
+        "summary": "Every event type is delivered, including GitHub ping; the body is never JSON-validated (PRD D-7).",
+        "rationale": "The URL is the authorization and senders already choose event types; delivering ping makes the issue's 'signed GitHub test event starts the conversation' check executable."
+      },
+      {
+        "summary": "Project triggers start at most 6 conversations per rolling hour and conversation triggers send at most 60 messages; both hold while assessCpuPressure() reports saturated (PRD FR-6, D-10).",
+        "rationale": "A leaked public URL must not spawn unbounded agents; reusing the lane launch CPU check keeps one pressure policy. Limits live in memory because nothing is queued in this issue."
+      },
+      {
+        "summary": "A conversation trigger refuses with 503 while the conversation has any pending input (PRD D-11).",
+        "rationale": "The message door holds only for permission prompts and non-main input targets; checking getConversationRead().pendingInputKinds first is what guarantees a trigger never answers a question or picks a menu option."
+      },
+      {
+        "summary": "pan triggers gains a set-secret subcommand beyond add|list|remove.",
+        "rationale": "Stripe reveals its whsec_ secret only after the endpoint URL exists, so the secret must be settable after creation."
+      },
+      {
+        "summary": "No pan-triggers skill; the verb joins the pan pair/devices/token row in docs/SKILLS-CONVENTION.md (PRD D-15).",
+        "rationale": "Matches the existing convention for the other Anywhere verbs; scripts/lint-skills.sh does not require a skill per verb."
+      },
+      {
+        "summary": "The PRD is written as .pan/drafts/PAN-4648.md (uppercase), as the planning prompt specifies.",
+        "rationale": "plan-finalize readPrdDraftText reads `${issueId}.md` with the uppercase issue id, and getIssueDraftPath resolves an existing uppercase draft in place."
+      }
+    ],
+    "items": [
+      {
+        "id": "trigger-store",
+        "title": "Trigger store: ${OVERDECK_HOME}/triggers.json with hashed URL secrets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:04:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4648",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "trigger-deliver",
+            "triggers-admin-routes",
+            "cli-triggers"
+          ],
+          "files_scope": [
+            "src/lib/triggers/store.ts",
+            "tests/unit/lib/triggers/store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/triggers/store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports store.test.ts with 0 failed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W-1 exactly: export TRIGGERS_FILENAME, triggersPath(), TriggerTarget, TriggerVerifyKind, TriggerRecord, PublicTrigger, createTrigger, listTriggers, listPublicTriggers, removeTrigger, setTriggerSigningSecret, toPublicTrigger, hashUrlSecret. File format { v: 1, triggers: [] }. Copy writeRegistry (temp + rename, dir 0700, file 0600) and the mutate write queue from src/lib/access-tokens.ts lines 173-198. Ids are 'trg_' + 12 hex; URL secrets 64 hex, stored only as SHA-256 hex. Validation: name /^[A-Za-z0-9 ._-]{1,64}$/, template <= 2,000 chars, project target requires a template, signing secret 8-256 chars without whitespace; verify 'github' without a secret generates randomBytes(32) hex and returns it once."
+        },
+        "items": [
+          {
+            "id": "trigger-store.ac1",
+            "title": "Given an empty OVERDECK_HOME, when createTrigger runs, then it returns a 64-hex urlSecret whose SHA-256 equals the stored secretHash, and triggers.json contains no copy of the urlSecret",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-store.ac2",
+            "title": "When the store writes triggers.json, then the file mode is 0600 and toPublicTrigger returns an object without secretHash or signingSecret but with signingSecretSet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-store.ac3",
+            "title": "createTrigger throws for an invalid name, a template over 2,000 characters, a project target without a template, and a signing secret containing whitespace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-store.ac4",
+            "title": "When verify is 'github' and no signing secret is given, createTrigger returns a 64-hex generatedSigningSecret and stores it; removeTrigger then makes listTriggers return no record for that id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "trigger-signatures",
+        "title": "GitHub X-Hub-Signature-256 and Stripe Stripe-Signature verification over raw bytes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:04:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/triggers/signatures.ts",
+            "tests/unit/lib/triggers/signatures.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/triggers/signatures.test.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports signatures.test.ts with 0 failed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W-2 and the 'Signature checks' section: verifyGitHubSignature(rawBody: Buffer, header, secret) and verifyStripeSignature(rawBody: Buffer, header, secret, nowSeconds, toleranceSeconds = 300) returning { ok: true } | { ok: false; reason: 'missing' | 'mismatch' | 'stale' }. GitHub: 'sha256=' + hex HMAC-SHA256 of the raw bytes. Stripe: parse t and every v1, reject |now - t| > tolerance, HMAC-SHA256 hex keyed with the whole secret over `${t}.` + rawBody, any matching v1 passes. All compares use timingSafeEqual on equal-length buffers. Do not import src/dashboard/server/routes/webhooks.ts."
+        },
+        "items": [
+          {
+            "id": "trigger-signatures.ac1",
+            "title": "verifyGitHubSignature returns ok for secret \"It's a Secret to Everybody\", body 'Hello, World!' and header sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17, and returns mismatch when the last hex digit changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-signatures.ac2",
+            "title": "verifyStripeSignature returns ok for t=1700000000, now=1700000100 and a correct v1 even when an unrelated v1 precedes it, and returns stale for now=1700000301 and for now=1699999699",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-signatures.ac3",
+            "title": "Both functions return missing when the header is absent, and verifyStripeSignature returns missing when the header has no t or no v1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "trigger-envelope",
+        "title": "External-data envelope with nonce markers, control-character neutralizing and a 44 KiB inline cap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:04:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/triggers/envelope.ts",
+            "tests/unit/lib/triggers/envelope.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/triggers/envelope.test.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports envelope.test.ts with 0 failed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W-3 and the 'Envelope format' section verbatim: export TRIGGER_BODY_INLINE_MAX_BYTES = 45_056, TRIGGER_TEMPLATE_MAX_CHARS = 2_000 and buildTriggerEnvelope({ trigger: { id, name, template }, source, eventType, deliveryId, rawBody, nonce? }). The first line is the fixed prose 'An external webhook event arrived through Overdeck trigger ...'. Markers carry a per-event 16-hex nonce. Decode the first <= 45,056 bytes with TextDecoder('utf-8', { fatal: false }); add the '[truncated: <n> more bytes not shown]' line when cut. Replace \\r\\n with \\n, then every C0/C1 control except tab and newline (and lone \\r, and U+007F) with U+FFFD. Reduce event and delivery values to [A-Za-z0-9._:-], max 64 chars, '-' when empty."
+        },
+        "items": [
+          {
+            "id": "trigger-envelope.ac1",
+            "title": "Given a body that starts with '/handoff', buildTriggerEnvelope returns text whose first characters are 'An external webhook event' and which contains the body between two markers that carry the same nonce",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-envelope.ac2",
+            "title": "Given a body containing a forged '<<<END_OVERDECK_EXTERNAL_EVENT nonce=0000000000000000>>>' line, the returned text ends with the end marker carrying the real nonce and contains exactly one end marker with that nonce",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-envelope.ac3",
+            "title": "When the body contains \\r, \\x03 and \\x1b, buildTriggerEnvelope returns text where each of them is replaced by U+FFFD and \\t and \\n are preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-envelope.ac4",
+            "title": "Given a 100,000-byte ASCII body and a 2,000-character template, the output contains truncated=yes and the truncation line, and its length is at most 50,000 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "trigger-deliver",
+        "title": "Delivery core: URL-secret check, signature check, rate limit, CPU hold, pending-input hold, message or start",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:04:30Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4648",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "hooks-route"
+          ],
+          "parallelSafeReason": "Touches only two new files under src/lib/triggers/ and tests/unit/lib/triggers/; its inputs (store, signatures, envelope) are complete before it dispatches.",
+          "files_scope": [
+            "src/lib/triggers/deliver.ts",
+            "tests/unit/lib/triggers/deliver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/triggers/deliver.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports deliver.test.ts with 0 failed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W-4 and the 'Delivery algorithm' section: TriggerEventInput, TriggerDeliveryDeps (readTriggers, now, cpuPressure, pendingInputKinds, sendMessage, startConversation), TriggerDeliveryResult and deliverTriggerEvent, following steps 1-7 in order with the D-8 status table. Rate limits: in-memory Map<triggerId, number[]> pruned to the last 3,600,000 ms; 6 accepted per hour for project targets, 60 for conversation targets; only deliveries that reach step 6 count. Project targets pass model/harness/effort only when set on the record. Never pass deliverAs, attachments or clientMessageId. Export _resetTriggerRateLimitsForTests(). Log one '[triggers] <id> <outcome> <status>' line; never log the body or a secret."
+        },
+        "items": [
+          {
+            "id": "trigger-deliver.ac1",
+            "title": "When the trigger id is unknown or the URL secret is wrong, deliverTriggerEvent returns status 404 with identical bodies in both cases and calls neither door",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-deliver.ac2",
+            "title": "Given a github trigger, a bad signature returns 401 without calling a door; given a stripe trigger with no signing secret, the result is 503 'signing secret not set'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-deliver.ac3",
+            "title": "Given a conversation target whose pendingInputKinds is ['askUserQuestion'], the result is 503 and sendMessage is never called; pendingInputKinds null returns 410",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-deliver.ac4",
+            "title": "Given a project target, startConversation receives a message starting with 'An external webhook event' and receives harness only when the record sets it; a 201 door result returns 202 with started: true and the conversation name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-deliver.ac5",
+            "title": "The seventh accepted project event inside one hour returns 429 with retryAfterSeconds 3600, an event one hour later is accepted, and a saturated cpuPressure returns 503",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hooks-route",
+        "title": "Public route POST /hooks/:id/:secret with a 1 MiB raw-byte body cap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:04:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/trigger-hooks.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/server/routes/trigger-hooks.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/trigger-hooks.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports trigger-hooks.test.ts and no-loss-matrix.test.ts with 0 failed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W-5: HttpRouter.add('POST', '/hooks/:id/:secret') in a new routes/trigger-hooks.ts, registered in server.ts next to webhooksRouteLayer. Refuse Content-Length > 1,048,576 with 413 before reading; read request.arrayBuffer (never request.text); refuse > 1,048,576 bytes with 413. Lower-case header names, build TriggerDeliveryDeps as the PRD 'Delivery algorithm' section lists (listTriggers, assessCpuPressure, getConversationRead with conversationReadDependencies imported from routes/conversations.ts, handleConversationMessage, handleConversationCreate, generateAiTitle), and return the result with Retry-After when set. Export runTriggerHook(params, headers, rawBody, deps) for tests. Add the NO_LOSS_MATRIX row for 'POST /hooks/:id/:secret'."
+        },
+        "items": [
+          {
+            "id": "hooks-route.ac1",
+            "title": "Given a project trigger with verify github, when a GitHub ping body signed with its secret arrives with headers x-github-event: ping and tailscale-funnel-request: ?1, then runTriggerHook returns 202 with started: true and the create door receives a message containing 'source=github event=ping'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hooks-route.ac2",
+            "title": "The same request with a wrong X-Hub-Signature-256 returns 401 and the create door is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hooks-route.ac3",
+            "title": "A conversation trigger routes the envelope through the message door and returns 202 with delivered: true; a 1,048,577-byte body returns 413",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hooks-route.ac4",
+            "title": "no-loss-matrix.test.ts passes with a NO_LOSS_MATRIX row whose surface is 'POST /hooks/:id/:secret'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "triggers-admin-routes",
+        "title": "Admin routes GET/POST /api/triggers, DELETE /api/triggers/:id, PUT /api/triggers/:id/signing-secret",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:04:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/triggers.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/server/routes/triggers-admin.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/triggers-admin.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports triggers-admin.test.ts and no-loss-matrix.test.ts with 0 failed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-8",
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W-6 in a new routes/triggers.ts registered in server.ts. GET calls rejectUnauthorizedDashboardRequest; POST/DELETE/PUT call rejectUnsafeDashboardMutationRequest, as routes/access-tokens.ts does. No ROUTE_SCOPES rows (default admin). GET returns { triggers: PublicTrigger[], funnel: { port: 8443, baseUrl, command } } where baseUrl comes from a saved trusted origin whose host ends in .ts.net (readSavedTrustedOriginsSync) and command is 'tailscale funnel --bg --https=8443 --set-path=/hooks http://127.0.0.1:<API port>/hooks'. POST validates the conversation (getConversationByName, else getConversationById for a numeric value; store the name) or project (getProjectSync) and returns 201 { trigger, hookPath, url, urlSecretShownOnce: true, generatedSigningSecret }. Add four NO_LOSS_MATRIX rows (GET READ; POST, DELETE, PUT WRITE; door src/lib/triggers/store.ts)."
+        },
+        "items": [
+          {
+            "id": "triggers-admin-routes.ac1",
+            "title": "POST /api/triggers with a valid project target returns 201 with hookPath matching ^/hooks/trg_[0-9a-f]{12}/[0-9a-f]{64}$, and a following GET /api/triggers response contains neither secretHash, signingSecret nor that 64-hex secret",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triggers-admin-routes.ac2",
+            "title": "POST /api/triggers with an unknown conversation or project returns 400, and DELETE /api/triggers/<unknown id> returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triggers-admin-routes.ac3",
+            "title": "PUT /api/triggers/<id>/signing-secret on a stripe trigger returns 200 and the trigger in the following GET shows signingSecretSet: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triggers-admin-routes.ac4",
+            "title": "GET /api/triggers returns funnel.command containing '--https=8443 --set-path=/hooks' and the dashboard API port",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "funnel-gate",
+        "title": "Funnel isolation: requests with Tailscale-Funnel-Request reach only POST /hooks/*",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:04:30Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4648",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "docs-triggers"
+          ],
+          "parallelSafeReason": "Touches only the three gate modules and their existing tests, which no other item in this plan edits.",
+          "files_scope": [
+            "src/dashboard/server/routes/dashboard-auth.ts",
+            "src/dashboard/server/remote-request-gate.ts",
+            "src/dashboard/server/ws-auth.ts",
+            "src/dashboard/server/__tests__/remote-request-gate.test.ts",
+            "src/dashboard/server/__tests__/ws-auth.test.ts",
+            "src/dashboard/server/routes/__tests__/dashboard-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/remote-request-gate.test.ts src/dashboard/server/__tests__/ws-auth.test.ts src/dashboard/server/routes/__tests__/dashboard-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports the three gate test files with 0 failed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W-7. Add isTailscaleFunnelRequest(headers) to dashboard-auth.ts next to hasProxyForwardingHeader (line 355) and make rejectUnauthorizedDashboardSessionMintRequest's peerTrusted false for it. In remote-request-gate.ts, isTrustedLocalRequest returns false for it, and remoteGateRejection (after the gatePathname null check) returns { status: 404 } for a Funnel request unless the method is POST and the normalized path starts with /hooks/; extend RemoteGateRejection with 404 and answer jsonResponse({ error: 'not found' }, { status: 404 }). In ws-auth.ts authorizeDashboardUpgrade, return { ok: false, status: 403, message: 'Forbidden: public requests cannot open sockets' } first when the header is present. Update each module's header comment. This item does not depend on the trigger route existing."
+        },
+        "items": [
+          {
+            "id": "funnel-gate.ac1",
+            "title": "Given a loopback peer and header Tailscale-Funnel-Request: ?1, remoteGateRejection returns status 404 for GET /api/health, POST /api/dashboard/session, GET / and POST /hooks/../api/dashboard/session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "funnel-gate.ac2",
+            "title": "Given the same header, remoteGateRejection returns null for POST /hooks/trg_000000000000/abc, and a loopback request without the header to GET /api/health keeps today's result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "funnel-gate.ac3",
+            "title": "rejectUnauthorizedDashboardSessionMintRequest returns 401 for a loopback request carrying the Funnel header and no internal token, with require_token_mint false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "funnel-gate.ac4",
+            "title": "authorizeDashboardUpgrade returns { ok: false, status: 403 } for headers carrying the Funnel header even when a valid internal token is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-triggers",
+        "title": "pan triggers add|list|remove|set-secret",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:04:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/triggers.ts",
+            "src/cli/index.ts",
+            "tests/unit/cli/triggers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/triggers.test.ts tests/unit/cli/startup-lazy-load.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports triggers.test.ts and startup-lazy-load.test.ts with 0 failed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W-8 in src/cli/commands/triggers.ts following src/cli/commands/token.ts: import only Commander types and chalk at top, load src/lib/triggers/store.ts and project/conversation lookups inside each handler, export registerTriggersCommands(program), and add one import plus one registerTriggersCommands(program) call in src/cli/index.ts next to the token lines (46 and 227). Flags and output exactly as W-8 lists, including the local test URL http://127.0.0.1:<port>/hooks/<id>/<secret> (port from getDashboardApiUrl/dashboard.api_port), the D-9 Funnel URL, the D-2 Funnel command, any generated signing secret and 'The URL is shown once. Save it now.'. set-secret reads one line from stdin when --secret is absent."
+        },
+        "items": [
+          {
+            "id": "cli-triggers.ac1",
+            "title": "pan triggers add with both --conversation and --project exits 1 and prints a message naming both flags",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-triggers.ac2",
+            "title": "pan triggers add <name> --project <key> --prompt <text> --verify github prints a hook path matching ^/hooks/trg_[0-9a-f]{12}/[0-9a-f]{64}$, a 64-hex signing secret and the line 'The URL is shown once. Save it now.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-triggers.ac3",
+            "title": "pan triggers list prints one line per trigger and its output contains no 64-hex string; pan triggers remove <unknown id> exits 1 with 'No trigger with id <id>.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-triggers.ac4",
+            "title": "pan triggers set-secret <id> with the secret on stdin updates the trigger so listPublicTriggers returns signingSecretSet: true, and startup-lazy-load.test.ts still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-triggers-panel",
+        "title": "Settings -> Anywhere -> Triggers panel: list, remove, Funnel command and disclosure",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:04:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/TriggersPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/TriggersPanel.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/TriggersPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports TriggersPanel.test.tsx with 0 failed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W-9. Add TriggerRow, fetchTriggers, removeTrigger and ANYWHERE_TRIGGERS_QUERY_KEY to anywhereApi.ts in its { status, body } style. Create TriggersPanel.tsx copying DevicesPanel.tsx (useQuery, useConfirm destructive confirm, toast.error, invalidate on success): heading 'Triggers', rows with name, target text, verify kind with 'signing secret set'/'signing secret not set', created date and Remove; the empty-state sentence from W-9; the disclosure line 'Events reach this machine directly through Tailscale Funnel; overdeck.ai never sees them.'; and the Funnel command from GET /api/triggers in a copyable code element. Render <TriggersPanel /> after <DevicesPanel /> in AnywhereSection.tsx. Add the test path to root package.json test:frontend-subset. Follow pan-style-guide (no pill badges, muted status text)."
+        },
+        "items": [
+          {
+            "id": "settings-triggers-panel.ac1",
+            "title": "Given a mocked GET /api/triggers with two triggers, TriggersPanel renders two rows showing each name and target, and the rendered DOM contains no 64-hex string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-triggers-panel.ac2",
+            "title": "Clicking Remove and confirming sends DELETE /api/triggers/<id>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-triggers-panel.ac3",
+            "title": "Given an empty list, the panel renders the empty-state sentence, the Funnel disclosure line and the funnel command text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-triggers-panel.ac4",
+            "title": "Root package.json test:frontend-subset contains src/components/Settings/anywhere/__tests__/TriggersPanel.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-triggers-add",
+        "title": "Settings -> Anywhere -> Triggers: Add trigger dialog and Set signing secret",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:04:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/AddTriggerDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/TriggersPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AddTriggerDialog.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/AddTriggerDialog.test.tsx src/components/Settings/anywhere/__tests__/TriggersPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports AddTriggerDialog.test.tsx and TriggersPanel.test.tsx with 0 failed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W-10. Add createTrigger and setTriggerSigningSecret to anywhereApi.ts. Create AddTriggerDialog.tsx with fields Name, Target (Conversation | Project), Conversation (name or id) or Project (select from the projects query the Settings page already uses), Prompt template (required for Project, 2,000-character counter), Verification (none/GitHub/Stripe), Signing secret (optional password input). On 201 switch to a result view showing the URL (or hook path with the D-9 placeholder), any generated signing secret, copy buttons, 'This URL is shown once. Save it now.' and Done; closing discards the secret from component state. Add an 'Add trigger' button and a 'Set signing secret' row action (github/stripe only) to TriggersPanel.tsx. Add the test path to root package.json test:frontend-subset."
+        },
+        "items": [
+          {
+            "id": "settings-triggers-add.ac1",
+            "title": "Given Target Project with an empty prompt template, submitting is refused client-side and no POST /api/triggers is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-triggers-add.ac2",
+            "title": "Given a successful mocked POST, the dialog renders the returned URL and 'This URL is shown once. Save it now.', and after Done the URL text is no longer in the DOM",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-triggers-add.ac3",
+            "title": "Set signing secret on a stripe row sends PUT /api/triggers/<id>/signing-secret with the entered secret",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-triggers-add.ac4",
+            "title": "Root package.json test:frontend-subset contains src/components/Settings/anywhere/__tests__/AddTriggerDialog.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-triggers",
+        "title": "Docs: configuration/triggers.mdx, cli/triggers.mdx, docs.json, DASHBOARD-AUTH, SKILLS-CONVENTION, codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:04:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4648",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/triggers.mdx",
+            "cli/triggers.mdx",
+            "docs.json",
+            "docs/DASHBOARD-AUTH.md",
+            "docs/SKILLS-CONVENTION.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "bash scripts/lint-skills.sh",
+            "grep -c 'tailscale funnel --bg --https=8443 --set-path=/hooks' configuration/triggers.mdx"
+          ],
+          "expected_outputs": [
+            "lint-docs exits 0",
+            "lint-skills exits 0",
+            "grep prints a count of at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W-11. Write configuration/triggers.mdx with the sections W-11 lists (What a trigger does; Create a trigger; Signing secrets; Publish with Tailscale Funnel with prerequisites, the exact on/off commands, why port 8443 and the URL form; What the agent sees; Limits and refusals with the D-8 table; Security, including a sentence that PAN-2356 adds the directory inbox). Write cli/triggers.mdx in the format of cli/token.mdx with every flag matching `pan triggers <sub> --help`. Add configuration/triggers and cli/triggers to the 'Overdeck Anywhere' group in docs.json. Add the 'Webhook triggers and Tailscale Funnel' section to docs/DASHBOARD-AUTH.md after 'Remote request gate'. Change the docs/SKILLS-CONVENTION.md line 64 row to include pan triggers and configuration/triggers.mdx. Add a 'Webhook triggers (PAN-4648)' paragraph to .overdeck/context/codebase/architecture.md and refresh its single last-verified line."
+        },
+        "items": [
+          {
+            "id": "docs-triggers.ac1",
+            "title": "configuration/triggers.mdx contains the literal commands 'tailscale funnel --bg --https=8443 --set-path=/hooks' and 'tailscale funnel --https=8443 --set-path=/hooks off', and headings for Signing secrets, Publish with Tailscale Funnel, What the agent sees and Limits and refusals",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-triggers.ac2",
+            "title": "docs.json lists configuration/triggers and cli/triggers in the 'Overdeck Anywhere' group, and node scripts/lint-docs.js exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-triggers.ac3",
+            "title": "cli/triggers.mdx contains a section for each of add, list, remove and set-secret naming every flag that `pan triggers <sub> --help` prints, and bash scripts/lint-skills.sh exits 0 with pan triggers in the SKILLS-CONVENTION exclusion row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-triggers.ac4",
+            "title": "docs/DASHBOARD-AUTH.md contains a 'Webhook triggers and Tailscale Funnel' section that names the Tailscale-Funnel-Request header and states that Funnel requests reach only POST /hooks/*",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "trigger-store",
+        "to": "trigger-deliver",
+        "type": "blocks"
+      },
+      {
+        "from": "trigger-signatures",
+        "to": "trigger-deliver",
+        "type": "blocks"
+      },
+      {
+        "from": "trigger-envelope",
+        "to": "trigger-deliver",
+        "type": "blocks"
+      },
+      {
+        "from": "trigger-deliver",
+        "to": "hooks-route",
+        "type": "blocks"
+      },
+      {
+        "from": "trigger-store",
+        "to": "triggers-admin-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "hooks-route",
+        "to": "triggers-admin-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "trigger-store",
+        "to": "cli-triggers",
+        "type": "blocks"
+      },
+      {
+        "from": "triggers-admin-routes",
+        "to": "settings-triggers-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-triggers-panel",
+        "to": "settings-triggers-add",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-triggers",
+        "to": "docs-triggers",
+        "type": "blocks"
+      },
+      {
+        "from": "funnel-gate",
+        "to": "docs-triggers",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-triggers-add",
+        "to": "docs-triggers",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

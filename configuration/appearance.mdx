@@ -35,7 +35,69 @@ ui:
 
 ## What stays the same either way
 
-This is a typography, texture, and scale change — not a color change. The color palette, the meaning of each status color (amber = a human needs to act, blue = a machine is working, and so on), and the badge tint formula are identical under both themes. The one small visual difference outside typography is that badges use a slightly larger corner radius under Broadsheet for texture consistency with its softer vocabulary; Ledger's badge radius is unchanged.
+The Overdeck Theme picker above is a typography, texture, and scale change. The meaning of each status color (amber = a human needs to act, blue = a machine is working, and so on) and the badge tint formula are identical under both themes, and color themes (below) never touch them either. The one small visual difference outside typography is that badges use a slightly larger corner radius under Broadsheet for texture consistency with its softer vocabulary; Ledger's badge radius is unchanged.
+
+## Color themes
+
+A color theme is a separate, named set of colors — terminal palette, chat code-block syntax colors, and a small UI token subset — layered on top of the Overdeck Theme and mode choices above. Two built-ins ship in the box, `overdeck-dark` and `overdeck-light`; they carry today's terminal palette and change nothing else.
+
+**Settings → Appearance** shows a light-mode picker and a dark-mode picker under the Overdeck Theme cards. Each lists only themes of its own type (a light-mode picker never offers a dark theme). Switching the dashboard's light/dark mode swaps between the two selections immediately, with no reload.
+
+### Configuration
+
+The selection is `ui.color_theme` in `~/.overdeck/config.yaml`:
+
+```yaml
+ui:
+  color_theme:
+    light: ayu-light
+    dark: ayu-dark
+```
+
+- Each mode's id is independent; either or both may be unset.
+- An id that names no file, or names a theme of the wrong type for that mode (a light theme under `dark`), falls back to the built-in for that mode and logs a warning — config loading never fails on these keys.
+- A general dashboard settings save never removes `ui.color_theme`.
+
+### User themes
+
+A theme other than the two built-ins lives as a file at `~/.overdeck/themes/<id>.json` — the file name is the id. Hand-editing or dropping in a new file there is picked up on the next reload; no restart beyond that is needed. The on-disk shape:
+
+```jsonc
+{
+  "name": "Ayu Dark",
+  "type": "dark", // light | dark
+  "terminal": { "background": "#0d1017", "red": "#f06b73" /* ...21 keys, each optional */ },
+  "syntax": { "colors": { "editor.background": "#10141c" }, "tokenColors": [ /* VS Code-style scopes */ ] },
+  "ui": { "background": "#10141c", "accent": "#e6b450" /* ...6 keys, each optional */ }
+}
+```
+
+Any color the theme omits falls back to the matching built-in of the same `type` — a theme that sets only `terminal.background` still gets a complete, usable terminal palette.
+
+### Importing a VS Code theme
+
+Choose **Import VS Code theme** next to the pickers and pick a `.json` theme file (JSON-with-comments is fine — VS Code theme files commonly carry comments). Overdeck maps it onto the shape above and shows a preview — name, swatches, and a highlighted code sample — before anything is saved:
+
+| VS Code key | Theme field |
+| --- | --- |
+| `terminal.background` / `terminal.foreground` | `terminal.background` / `terminal.foreground` |
+| `terminalCursor.foreground` / `terminalCursor.background` | `terminal.cursor` / `terminal.cursorAccent` |
+| `terminal.selectionBackground` | `terminal.selectionBackground` |
+| `terminal.ansiBlack` … `terminal.ansiBrightWhite` (16 keys) | `terminal.black` … `terminal.brightWhite` |
+| `tokenColors` | `syntax.tokenColors` |
+| `editor.background`, `editor.foreground` | `syntax.colors` |
+| `editor.background` | `ui.background` |
+| `sideBar.background` | `ui.surface` |
+| `panel.border` | `ui.border` |
+| `editor.foreground`, else `foreground` | `ui.foreground` |
+| `descriptionForeground` | `ui.muted` |
+| `focusBorder` | `ui.accent` |
+
+A theme with no `type` field is classified by the luminance of `editor.background`; a theme with neither a `type` field nor an `editor.background` color defaults to `dark`, with a warning. Importing a `.vsix` extension package is tracked separately (#4659); a duplicate-and-edit color-picker editor for themes already in the store is tracked separately too (#4660) — until then, edit the JSON file by hand.
+
+### What color themes never change
+
+Signal and state colors — `--destructive*`, `--info*`, `--success*`, `--warning*`, and every `--signal-*`/`--state-*` token — are fixed by the pan-style-guide color law and are never set by a color theme's `ui` group, built-in or imported. A color theme changes terminal colors, chat syntax highlighting, and a small background/surface/border/foreground/muted/accent subset of the UI — never what a status color means.
 
 ## Creation flows are pages, not modals
 

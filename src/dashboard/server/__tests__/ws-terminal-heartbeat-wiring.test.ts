@@ -1,4 +1,6 @@
 import http from 'node:http';
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { Effect } from 'effect';
 import { WebSocket as WsClient } from 'ws';
@@ -9,6 +11,7 @@ import { _resetDashboardSessionTokenForTests, dashboardSessionCookieHeader } fro
 import { _resetTrustedOriginsForTests } from '../routes/origin-validation.js';
 import { startTerminalHeartbeat } from '../ws-terminal-heartbeat.js';
 import { setupTerminalWebSocket } from '../ws-terminal.js';
+import { getOverdeckHome } from '../../../lib/paths.js';
 
 const TRUSTED_ORIGIN = 'http://localhost:3011';
 
@@ -93,6 +96,7 @@ describe('/ws/terminal heartbeat wiring (PAN-4434)', () => {
   beforeEach(() => {
     delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
     process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
     _resetTrustedOriginsForTests();

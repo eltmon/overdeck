@@ -33,6 +33,8 @@ export interface ConversationPendingInputRow {
   name: string;
   title?: string | null;
   issueId?: string | null;
+  /** PAN-2355 — conversation harness; pi asks are answered by keystrokes. */
+  harness?: string | null;
   pendingInputKinds?: ReadonlyArray<string>;
   pendingAskUserQuestion?: PendingInputSubject['pendingAskUserQuestion'];
   pendingProposedPlan?: PendingInputSubject['pendingProposedPlan'];
@@ -89,6 +91,8 @@ export interface Decision {
   issueId?: string;
   issueTitle?: string;
   kinds: ReadonlyArray<string>;
+  /** PAN-2355 — conversation harness, so the phone can route pi answers. */
+  harness?: string | null;
   pendingAskUserQuestion?: PendingInputSubject['pendingAskUserQuestion'];
   pendingProposedPlan?: PendingInputSubject['pendingProposedPlan'];
   /** PAN-3113 — parsed pane choice menu, present on the paneChoice kind. */
@@ -247,6 +251,7 @@ export function useDecisions(): Decision[] {
         issueId: c.issueId ?? undefined,
         issueTitle,
         kinds,
+        harness: c.harness ?? null,
         pendingAskUserQuestion: c.pendingAskUserQuestion,
         pendingProposedPlan: c.pendingProposedPlan,
         pendingPaneChoice: c.pendingPaneChoice,

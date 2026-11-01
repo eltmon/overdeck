@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Option } from 'effect';
 
+import { rmSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } from '../../../../lib/access-tokens.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 import type { NetworkInterfaceInfo } from 'node:os';
 
 import {
@@ -16,6 +18,7 @@ import {
   dashboardSessionCookieHeader,
   forwardedClientIsLocal,
   hasDashboardAuthHeaders,
+  isTailscaleFunnelRequest,
   peerIsHostLocalDockerBridge,
   peerIsLocalContainerNetwork,
   rejectUnauthorizedDashboardRequest,
@@ -44,6 +47,7 @@ describe('dashboard session token persistence', () => {
   beforeEach(() => {
     delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
     process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
   });
@@ -95,6 +99,7 @@ describe('dashboard CSRF token persistence', () => {
   beforeEach(() => {
     delete process.env.OVERDECK_DASHBOARD_CSRF_TOKEN;
     process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
   });
@@ -136,6 +141,7 @@ describe('dashboard CSRF token persistence', () => {
 describe('dashboard session mint auth gate', () => {
   beforeEach(() => {
     process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
   });
   afterEach(() => {
@@ -156,6 +162,13 @@ describe('dashboard session mint auth gate', () => {
   it('mints for the internal token even from a non-loopback peer (CLI / cross-process)', () => {
     const req = fakeRequest({ remoteAddress: '192.168.1.50', headers: { [INTERNAL_TOKEN_HEADER]: 'stable-internal-token' } });
     expect(rejectUnauthorizedDashboardSessionMintRequest(req)).toBeNull();
+  });
+
+  it('refuses a loopback mint that Tailscale Funnel proxied from the internet (PAN-4648)', () => {
+    const funneled = fakeRequest({ remoteAddress: '127.0.0.1', headers: { 'tailscale-funnel-request': '?1' } });
+    expect(rejectUnauthorizedDashboardSessionMintRequest(funneled)?.status).toBe(401);
+    expect(isTailscaleFunnelRequest({ 'tailscale-funnel-request': '?1' })).toBe(true);
+    expect(isTailscaleFunnelRequest({ 'x-forwarded-for': '203.0.113.9' })).toBe(false);
   });
 });
 

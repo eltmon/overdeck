@@ -9,6 +9,9 @@
  *
  * Writes are async `appendFile` calls: each line is well under 4 KB, so the
  * append is atomic under `O_APPEND` and concurrent writers never interleave.
+ * Within one process, appends are serialized in call order: each write
+ * starts after the previous one settles, and the entry is stamped and its
+ * file resolved at call time.
  * Reads are bounded sync reads of at most two hour files (NFR-1); do not add
  * an async twin of `readLedgerWindow`. Metering never fails a caller: every
  * write swallows its errors (NFR-2).
@@ -107,49 +110,83 @@ export function ledgerFilePath(ms: number): string {
 
 let lastAppendHour: number | null = null;
 
+interface PreparedLedgerAppend {
+  dir: string;
+  file: string;
+  line: string;
+  nowMs: number;
+}
+
 /**
- * Append one entry to the current hour's ledger file. On the first append of
- * a new UTC hour in this process, prune expired hour files. Never throws.
+ * Stamp `ts`/`pid` and resolve the target directory and file synchronously,
+ * at call time, so a queued append lands in the home and hour that were
+ * current when the call was metered. Returns null instead of throwing.
  */
-export async function appendLedgerEntry(input: LedgerEntryInput): Promise<void> {
+function prepareLedgerAppend(input: LedgerEntryInput): PreparedLedgerAppend | null {
   try {
     const nowMs = Date.now();
     const entry: LedgerEntry = { ...input, ts: input.ts ?? new Date(nowMs).toISOString(), pid: input.pid ?? process.pid };
     const entryMs = Date.parse(entry.ts);
     const fileMs = Number.isFinite(entryMs) ? entryMs : nowMs;
-    // Resolve both paths before the first await, so a queued append lands in
-    // the home that was current when the call was metered.
     const dir = getGitHubQuotaDir();
     const file = ledgerFilePath(fileMs);
-    await mkdir(dir, { recursive: true });
-    await appendFile(file, `${JSON.stringify(entry)}\n`);
+    return { dir, file, line: `${JSON.stringify(entry)}\n`, nowMs };
+  } catch {
+    return null;
+  }
+}
 
-    const hour = Math.floor(nowMs / HOUR_MS);
+/**
+ * Write one prepared entry to disk. On the first write of a new UTC hour in
+ * this process, prune expired hour files. Never throws.
+ */
+async function writeLedgerAppend(prepared: PreparedLedgerAppend): Promise<void> {
+  try {
+    await mkdir(prepared.dir, { recursive: true });
+    await appendFile(prepared.file, prepared.line);
+
+    const hour = Math.floor(prepared.nowMs / HOUR_MS);
     if (lastAppendHour !== hour) {
       lastAppendHour = hour;
-      await pruneLedger(nowMs, dir);
+      await pruneLedger(prepared.nowMs, prepared.dir);
     }
   } catch {
     // NFR-2: metering never fails the caller.
   }
 }
 
-const pendingAppends = new Set<Promise<void>>();
+let appendChain: Promise<void> = Promise.resolve();
+
+/**
+ * Chain one more append onto the serialized write queue and return the new
+ * tail. The chain callback writes directly — it must never call
+ * `appendLedgerEntry`, which would deadlock waiting on this same chain.
+ */
+function enqueueLedgerAppend(input: LedgerEntryInput): Promise<void> {
+  const prepared = prepareLedgerAppend(input);
+  appendChain = appendChain.then(() => (prepared ? writeLedgerAppend(prepared) : undefined)).catch(() => undefined);
+  return appendChain;
+}
+
+/**
+ * Append one entry to the current hour's ledger file. Never throws.
+ */
+export async function appendLedgerEntry(input: LedgerEntryInput): Promise<void> {
+  await enqueueLedgerAppend(input);
+}
 
 /**
  * Append an entry without making the caller wait for the disk. Metered GitHub
  * calls use this on their normal path, so metering never delays the call it
- * measures. `flushLedgerWrites` awaits every queued append.
+ * measures. `flushLedgerWrites` awaits the chain.
  */
 export function queueLedgerEntry(input: LedgerEntryInput): void {
-  const pending = appendLedgerEntry(input);
-  pendingAppends.add(pending);
-  void pending.finally(() => pendingAppends.delete(pending));
+  void enqueueLedgerAppend(input);
 }
 
-/** Resolve once every append queued by `queueLedgerEntry` so far has landed. */
+/** Resolve once every append queued so far has landed. */
 export async function flushLedgerWrites(): Promise<void> {
-  await Promise.all([...pendingAppends]);
+  await appendChain;
 }
 
 function isLedgerEntry(value: unknown): value is LedgerEntry {

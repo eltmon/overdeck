@@ -298,7 +298,7 @@ export function HealthDashboard({ onOpenSettings }: HealthDashboardProps = {}) {
       <AnywhereStatusCard
         onAction={(action) => {
           if (action.kind === 'none') return;
-          requestSettingsSection(action.kind === 'pair-dialog' ? 'anywhere' : action.section);
+          requestSettingsSection(action.kind === 'settings-section' ? action.section : 'anywhere');
           onOpenSettings?.();
         }}
       />

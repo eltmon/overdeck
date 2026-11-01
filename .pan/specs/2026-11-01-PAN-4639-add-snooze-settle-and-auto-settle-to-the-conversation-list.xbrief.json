@@ -1,0 +1,858 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T04:42:10Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4639: Add snooze, settle and auto-settle to the conversation list",
+    "updated": "2026-11-01T04:47:27.427Z"
+  },
+  "plan": {
+    "id": "pan-4639",
+    "title": "Add snooze, settle and auto-settle to the conversation list",
+    "status": "running",
+    "uid": "891de9ce-ef61-48b9-8a8a-eb2738884014",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T04:42:10Z",
+    "updated": "2026-11-01T04:47:27.427Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4639",
+        "label": "PAN-4639",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4653",
+        "label": "PAN-4653 (sibling: auto-settle on merge)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4655",
+        "label": "PAN-4655 (sibling: auto-settle when idle)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "conversations",
+      "command-deck",
+      "frontend",
+      "sqlite"
+    ],
+    "narratives": {
+      "Problem": "The Command Deck conversation list has one way to clear a row: archive, which ends the session. Nothing lets the operator mark a conversation done for now while it keeps running, hide it until later, or see the conversations waiting on them at the top. Waiting-on-operator data (pendingInputCount) exists per row but does not affect ordering.",
+      "Proposal": "Store operator triage state (settled_at, settle_reason, snoozed_until) on the conversations row through a new store module and one bulk write route POST /api/conversations/triage. Return the fields from GET /api/conversations. In ConversationList, place each top-level group into Needs you / Inbox / Snoozed / Settled with a pure partition (needs-you overrides stored state; snooze wake compared with the client clock), add a settle checkbox and shared Settle/Snooze menu items, an Undo toast plus Cmd/Ctrl+Z, and shift/Cmd/Ctrl-click multi-select with a bulk bar. Auto-settle on merge and on idle are split into PAN-4653 and PAN-4655, which build on this storage.",
+      "NonGoals": "- Auto-settle on merge, the per-conversation auto-settle override, conversations.auto_settle_on_merge, its Settings toggle, and any change to autoArchiveSettledConversations, conversations.auto_archive_on_merge or pan conv auto-archive-on-merge (tracked in PAN-4653)\n- Auto-settle when idle and conversations.auto_settle_idle_days (tracked in PAN-4655)\n- Editing src/lib/overdeck/conversations.ts or raising any file-size allowlist row\n- Settle or snooze for issue-tree rows, agent rows or the Agents page\n- CLI verbs for settle or snooze\n- A server-side wake timer, or clearing snoozed_until on wake\n- Stopping, archiving or otherwise touching a session when settling or snoozing\n- Changing archive or unarchive behavior\n- Writing stored triage state when a conversation starts or stops waiting on the operator\n- Counting the terminal permission prompt (conversationsAwaitingPermissionByName) toward Needs you\n- t3code's working section and pinning"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split auto-settle on merge into PAN-4653 and auto-settle when idle into PAN-4655; this issue delivers sections, settle, snooze, undo and bulk select plus the storage",
+        "rationale": "The full proposal exceeds the plan size gate (25 files / 6 subsystems); both automatic paths ship independently once settled_at exists. Siblings filed with blocked-by notes; a comment on #4639 records the split."
+      },
+      {
+        "summary": "Settled applies to conversations only (issue open question 1)",
+        "rationale": "listConversations already excludes agent-/planning-/specialist- rows, and the issue's proposal names only ConversationList; issue-tree and agent rows have their own surfaces."
+      },
+      {
+        "summary": "The old conversations.auto_archive_on_merge key is left untouched here (issue open question 2)",
+        "rationale": "Its replacement is PAN-4653's scope; changing it here would split one behavior across two PRs."
+      },
+      {
+        "summary": "Sections are assigned per top-level group, not per row",
+        "rationale": "Keeps PAN-4223 lane/successor trees intact; settling a launcher must not strand its lanes as orphan rows in Inbox. A row whose parent is filtered out is already top-level and uses its own state."
+      },
+      {
+        "summary": "Needs you is display-only and counts pendingInputCount only",
+        "rationale": "The issue says a pending question brings a row back through the Needs-you rule regardless of other state; deriving it avoids writes and keeps stored intent intact after the question is answered."
+      },
+      {
+        "summary": "Snooze wake is a client-side comparison with useNow(30_000); the server never clears snoozed_until",
+        "rationale": "The issue requires waking without a timer that must survive a restart; Overdeck derives state it can derive."
+      },
+      {
+        "summary": "Write route is POST /api/conversations/triage with an updates array",
+        "rationale": "One route serves single, bulk and undo; PATCH would sit beside PATCH /api/conversations/:name, and POST /api/conversations/restart-all is the static-path precedent."
+      },
+      {
+        "summary": "Fix getSortKey('lastActivity') to read lastActivityAt here",
+        "rationale": "Inbox is ordered by the selected sort and the issue flags the bug; the fix is one line in a file this issue already changes."
+      },
+      {
+        "summary": "Snooze presets: 1 hour, this evening 18:00 (only before 17:00), tomorrow 09:00, next Monday 09:00, plus a custom datetime-local",
+        "rationale": "Matches the issue's preset list with concrete local times a test can pin."
+      }
+    ],
+    "items": [
+      {
+        "id": "triage-store",
+        "title": "Add settled_at, settle_reason and snoozed_until columns with a triage store module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:42:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4639",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/conversation-triage-store.ts",
+            "src/lib/overdeck/__tests__/conversation-triage-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-triage-store.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-triage-store.test.ts passes",
+            "file-size guard passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "triage-route",
+            "list-enrichment"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4639.md). Add the three nullable columns to the conversations CREATE TABLE in drizzle/overdeck/0000_overdeck_init.sql (after vault_owner_label) and as three runSchemaTopUp ALTER TABLE lines in infra.ts ensureRuntimeIndexesSync after the PAN-4436 vault_owner_label top-up. Create src/lib/overdeck/conversation-triage-store.ts exporting SETTLE_REASONS, SettleReason, ConversationTriage, EMPTY_CONVERSATION_TRIAGE, TriageUpdate, listConversationTriage(names) (one IN query), getConversationTriage, settleConversation, unsettleConversation, snoozeConversation, unsnoozeConversation, parseTriageUpdates(body) and applyTriageUpdate(update, nowMs) with the D3 mutual-exclusion rules and the API-contract validation. Do NOT edit src/lib/overdeck/conversations.ts (1222 lines, at its allowlist cap)."
+        },
+        "items": [
+          {
+            "id": "triage-store.ac1",
+            "title": "Given a fresh overdeck.db and an existing one without the columns, when the database opens, then PRAGMA table_info(conversations) returns settled_at, settle_reason and snoozed_until",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-store.ac2",
+            "title": "Given a settled conversation, when snoozeConversation runs, then getConversationTriage returns settledAt null and snoozedUntil set; when settleConversation runs again on a settled row, then settledAt keeps its first value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-store.ac3",
+            "title": "parseTriageUpdates returns ok:false for an empty updates array, more than 200 entries, a missing name, settled:true with a non-null snoozedUntil, an unparseable snoozedUntil, and an entry with neither settled nor snoozedUntil",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-store.ac4",
+            "title": "listConversationTriage returns one map entry per existing name from a single SQL statement, and src/lib/overdeck/conversations.ts stays at or under 1222 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "triage-route",
+        "title": "Add POST /api/conversations/triage for settle, unsettle, snooze, unsnooze, bulk and undo",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:42:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4639",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversation-triage.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/conversation-triage-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-triage-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-triage-route.test.ts, no-loss-matrix.test.ts and route-scopes.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. New route file modeled on src/dashboard/server/routes/conversation-bookmarks.ts exporting conversationTriageRouteLayer: validateOrigin (403), parseTriageUpdates (400), per update getConversationByName (missing -> notFound), origin 'vault' -> rejected {reason:'vault-browse-row'}, else applyTriageUpdate; after any write call invalidateConversationListEnrichmentCache(); respond 200 {conversations, notFound, rejected}. Register the layer in server.ts next to conversationBookmarksRouteLayer. Add the no-loss-matrix row 'POST /api/conversations/triage' (WRITE, door conversation-triage-store.applyTriageUpdate (PAN-4639)). The route never calls a runtime, stop, or terminal-backend function."
+        },
+        "items": [
+          {
+            "id": "triage-route.ac1",
+            "title": "Given three existing conversation names, when POST /api/conversations/triage sends settled:true for each, then the response returns 200 with three conversations whose settledAt is non-null and getConversationTriage reads the same values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-route.ac2",
+            "title": "Given an unknown name and a vault browse row, when they are posted, then the response returns the unknown name in notFound and the vault row in rejected with reason vault-browse-row, and writes nothing for them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-route.ac3",
+            "title": "A body with an empty updates array returns 400 and a request without a valid Origin returns 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-route.ac4",
+            "title": "NO_LOSS_MATRIX contains a WRITE row for POST /api/conversations/triage, and the route enumeration in no-loss-matrix.test.ts finds the new route in conversation-triage.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "list-enrichment",
+        "title": "Return settledAt, settleReason and snoozedUntil on every GET /api/conversations row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:42:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4639",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-list.ts",
+            "src/lib/overdeck/__tests__/conversation-list-triage.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-list-triage.test.ts src/lib/overdeck/__tests__/conversation-vault-browse.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-list-triage.test.ts and conversation-vault-browse.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In enrichConversationList call listConversationTriage once for the page (next to listPullRequestLinksForConversations) and spread triage.get(row.name) ?? EMPTY_CONVERSATION_TRIAGE into each returned row before the lanes spread. Spread EMPTY_CONVERSATION_TRIAGE into the vault browse copies in getConversationListWithVaultCopies."
+        },
+        "items": [
+          {
+            "id": "list-enrichment.ac1",
+            "title": "Given one settled, one snoozed and one untouched conversation, when getEnrichedConversationList runs, then the settled row returns an ISO settledAt and settleReason 'manual', the snoozed row returns an ISO snoozedUntil, and the untouched row returns null for all three fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-enrichment.ac2",
+            "title": "getConversationListWithVaultCopies returns settledAt, settleReason and snoozedUntil as null on every vault browse copy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "triage-helpers",
+        "title": "Add pure section partition, snooze presets and wake-label helpers for the conversation list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:42:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4639",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/conversation-triage.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/conversation-triage.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/conversation-triage.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-triage.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-9",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "list-sections",
+            "settle-controls",
+            "snooze-menu",
+            "bulk-select"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. New React-free module conversation-triage.ts exporting TriageConversation (extends TreeConversation with optional settledAt, settleReason, snoozedUntil), ConversationSectionId, SECTION_ORDER, isSnoozed, groupNeedsYou, sectionOf (D6: needsYou if root or any descendant pendingInputCount>0, else snoozed if root snoozedUntil>now, else settled if root settledAt, else inbox), partitionConversationSections(nodes, now) returning all four sections in SECTION_ORDER with D9 ordering (needsYou/inbox keep input order, snoozed by soonest wake, settled by newest settledAt), snoozePresets(now) per D12 and formatSnoozeWake(untilIso, now) per D13. Every time input is a parameter; no Date.now() inside."
+        },
+        "items": [
+          {
+            "id": "triage-helpers.ac1",
+            "title": "Given a settled root whose lane has pendingInputCount 1, when partitionConversationSections runs, then it returns the group in the needsYou section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-helpers.ac2",
+            "title": "Given a root snoozed until a time before now, when partitionConversationSections runs, then it returns the group in inbox; given two snoozed roots, then it returns the soonest wake first, and given two settled roots, then it returns the newest settledAt first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-helpers.ac3",
+            "title": "snoozePresets returns hour, evening, tomorrow and nextWeek at 10:00 local, omits evening at 17:30, and on a Monday returns nextWeek as the following Monday 09:00",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-helpers.ac4",
+            "title": "formatSnoozeWake returns 'back today HH:MM', 'back tomorrow HH:MM', 'back <Ddd> HH:MM' within 7 days and 'back <Mmm> <D> HH:MM' beyond, in 24-hour local time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "list-sections",
+        "title": "Render Needs you, Inbox, Snoozed and Settled sections in ConversationList and fix the Last activity sort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:42:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4639",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationList.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationList.sort.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/ConversationList.test.tsx src/components/CommandDeck/__tests__/ConversationList.sort.test.ts src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationList.test.tsx, ConversationList.sort.test.ts and ConversationList.render-count.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-9",
+            "FR-12",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add settledAt, settleReason, snoozedUntil to the Conversation interface. Change getSortKey('lastActivity') to lastActivityAt ?? lastAttachedAt ?? createdAt and update ConversationList.sort.test.ts. Use useNow(30_000) and pass buildConversationTree(...) through partitionConversationSections in displayConversations. Render the sections per D10 (Needs you header when non-empty; no Inbox header; collapsible Snoozed/Settled headers collapsed by default with counts; expanded state in localStorage commandDeck.sections.expanded with try/catch; 'Inbox clear' line when only Snoozed/Settled have rows), each section wrapper carrying data-section=<id>, rows keeping key={node.conv.id} inside the single AnimatePresence. Add ALL new CSS classes for this issue to command-deck.module.css: convSectionHeader, convSectionCount, conversationSettleBox, conversationSnoozeLabel, convBulkBar (style guide: muted, no pills)."
+        },
+        "items": [
+          {
+            "id": "list-sections.ac1",
+            "title": "Given a conversation with pendingInputCount 1 and two plain conversations, when the list renders, then the data-section=needsYou wrapper renders above the data-section=inbox wrapper and contains that conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-sections.ac2",
+            "title": "Given one settled and one snoozed conversation, when the list renders, then the Snoozed · 1 and Settled · 1 headers render with aria-expanded=false and their rows are not rendered until the header is clicked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-sections.ac3",
+            "title": "Given a conversation snoozed until 10:05 with fake timers at 10:00, when timers advance past 10:05 plus one 30 s tick with no refetch, then the row renders in the inbox section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-sections.ac4",
+            "title": "getSortKey(conv, 'lastActivity') returns lastActivityAt when present and falls back to lastAttachedAt, then createdAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "triage-mutation",
+        "title": "Add the triage mutation with optimistic update, Undo toast and shared undo stack",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:42:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4639",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/useConversationMutations.triage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/useConversationMutations.triage.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useConversationMutations.triage.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add triage({updates, label}) and undoLastTriage() to ConversationMutations and export TriageUpdateInput. triageMutation POSTs /api/conversations/triage; onMutate cancels ['conversations'], captures each name's prior {settledAt, settleReason, snoozedUntil} from the cache and applies the D3 change optimistically; onError restores priors and toasts the error; onSuccess pushes {label, priors} on a module-level stack (max 20, drop oldest) unless the call is an undo, and shows toast(label, {duration: 6000, action: {label: 'Undo', onClick}}); onSettled invalidates ['conversations']. Undo replays priors as {name, settled: settledAt !== null, settleReason, snoozedUntil}. Toast labels per PRD WI-6 step 3. Export __resetTriageUndoStackForTests."
+        },
+        "items": [
+          {
+            "id": "triage-mutation.ac1",
+            "title": "Given a cached unsettled conversation, when triage settles it, then the cache shows a non-null settledAt before the fetch resolves and the hook sends exactly one POST /api/conversations/triage with {name, settled: true}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-mutation.ac2",
+            "title": "Given a conversation snoozed until T that is then settled, when the toast's Undo action runs, then a second POST sends {settled: false, snoozedUntil: T} for that name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-mutation.ac3",
+            "title": "When the POST fails, then the cache restores the prior triage state and toast.error is called; and undoLastTriage on an empty stack returns false and sends no request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settle-controls",
+        "title": "Add the row settle checkbox and shared Settle/Unsettle menu items in the row and tab menus",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:42:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4639",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/TriageMenuItems.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/TriageMenuItems.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationActionMenu.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/TriageMenuItems.test.tsx src/components/CommandDeck/__tests__/ConversationRow.test.tsx src/components/CommandDeck/__tests__/ConversationActionMenu.archive.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "TriageMenuItems.test.tsx, ConversationRow.test.tsx and ConversationActionMenu.archive.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. New TriageMenuItems.tsx with structural props (like PullRequestMenuItems) rendering Settle (CheckCircle2) or Unsettle (CircleDashed) by settledAt; each calls mutations.triage then onClose. In ConversationRow.tsx, for non-nested rows only, render a <span role=checkbox aria-checked tabIndex=0 className=styles.conversationSettleBox> before the status indicator that toggles settle via mutations.triage with stopPropagation on click and Enter/Space (no real input inside the row button), and render <TriageMenuItems> before <PullRequestMenuItems> in the row menu. In ConversationActionMenu.tsx render <TriageMenuItems> before <PullRequestMenuItems>. Settling never calls stop or archive."
+        },
+        "items": [
+          {
+            "id": "settle-controls.ac1",
+            "title": "Given an unsettled top-level row, when its settle checkbox is clicked, then the row calls mutations.triage with {name, settled: true} and never calls onSelect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settle-controls.ac2",
+            "title": "Given a settled conversation, when the row menu or the tab ConversationActionMenu opens, then each renders an Unsettle item, and an unsettled one renders Settle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settle-controls.ac3",
+            "title": "Given a nested row (variant nested), when it renders, then no element with role=checkbox and no Settle menu item renders for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "snooze-menu",
+        "title": "Add the Snooze submenu with presets and custom time, Unsnooze, and the snoozed row wake label",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:42:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4639",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/TriageMenuItems.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/TriageMenuItems.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/TriageMenuItems.test.tsx src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "TriageMenuItems.test.tsx and ConversationRow.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In TriageMenuItems add a Snooze item (AlarmClock, aria-haspopup=menu) opening a nested MenuSurface like the Move submenu, listing snoozePresets(new Date()) and Custom… (an inline <input type=datetime-local> plus a Snooze button disabled until the value is in the future); each choice calls mutations.triage with snoozedUntil set to the ISO time. When isSnoozed is true add Unsnooze (snoozedUntil: null). In ConversationRow, when isSnoozed(conv, now.getTime()), render <span className=styles.conversationSnoozeLabel>{formatSnoozeWake(...)}</span> in the metadata line."
+        },
+        "items": [
+          {
+            "id": "snooze-menu.ac1",
+            "title": "Given fake time 2026-11-02 10:00 local, when the Snooze submenu opens, then it renders four presets plus Custom…, and at 17:30 it renders three presets plus Custom…",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snooze-menu.ac2",
+            "title": "When Tomorrow morning is chosen, then the menu calls mutations.triage with snoozedUntil equal to 2026-11-03 09:00 local as an ISO string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snooze-menu.ac3",
+            "title": "Given a Custom value earlier than now, then the Snooze button renders disabled; and given a row snoozed until tomorrow 09:00, then the row renders the label 'back tomorrow 09:00'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "keyboard-undo",
+        "title": "Undo the last triage change with Cmd/Ctrl+Z while the conversation list has focus",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:42:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4639",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationList.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/ConversationList.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationList.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Add onKeyDown on the conversationListWrapper div: when (metaKey || ctrlKey) && !shiftKey && key.toLowerCase() === 'z' and the event target is not an input, textarea, select or contentEditable element, call mutations.undoLastTriage(); preventDefault only when it returns true."
+        },
+        "items": [
+          {
+            "id": "keyboard-undo.ac1",
+            "title": "Given a conversation settled through its row checkbox, when Ctrl+Z is pressed with focus on a row, then a second POST /api/conversations/triage sends {settled: false} for that name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyboard-undo.ac2",
+            "title": "Given focus inside the rename input, when Ctrl+Z is pressed, then the list sends no triage request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bulk-select",
+        "title": "Add shift-click and Cmd/Ctrl-click multi-select with a bulk Settle/Unsettle/Snooze bar",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:42:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4639",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationList.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/ConversationList.test.tsx src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationList.test.tsx and ConversationList.render-count.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. ConversationList holds selected:Set<string> and anchor; top-level rows receive an OPTIONAL onRowClick(event, name) prop (when absent the row falls back to onSelect, so other callers keep working): Ctrl/Cmd toggles and sets anchor, Shift selects the range over visible top-level rows in render order (collapsed sections excluded; no anchor = toggle), plain click clears the selection and opens the row. Pass isMultiSelected through ConversationListItem to ConversationRow and add it to itemPropsEqual; the row sets aria-selected and the selected style. Render <div role=toolbar aria-label='Selected conversations' className=styles.convBulkBar> with 'N selected', Settle, Unsettle, Snooze presets (no Custom) and Clear; each action sends one mutations.triage call with one update per selected name, then clears the selection. Escape clears the selection."
+        },
+        "items": [
+          {
+            "id": "bulk-select.ac1",
+            "title": "Given three rows, when the first is Ctrl-clicked, the second Ctrl-clicked and the third Shift-clicked, then the toolbar renders '3 selected' and the three rows have aria-selected=true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bulk-select.ac2",
+            "title": "When the toolbar's Settle is clicked, then the list sends exactly one POST /api/conversations/triage with three updates of settled:true and the toolbar closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bulk-select.ac3",
+            "title": "Given a selection, when a row is plain-clicked or Escape is pressed, then the toolbar no longer renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-ci",
+        "title": "Document settle, snooze, sections, undo and bulk select, and add the new tests to the CI frontend subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:42:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4639",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Add '## Settling and snoozing conversations' before '## Archiving a conversation' in features/conversations.mdx covering the four sections and order, settle keeps the session running and is not archive, the checkbox and both menus, snooze presets and Custom, wake survives a dashboard restart, Needs you overrides stored state, Undo toast and Cmd/Ctrl+Z, Shift/Cmd/Ctrl-click with the bulk bar, and that auto-settle on merge and on idle are tracked by PAN-4653 and PAN-4655; add one sentence in the archive section contrasting archive with settle. Leave the auto-archive-on-merge text unchanged. Add conversation-triage.test.ts, useConversationMutations.triage.test.tsx, TriageMenuItems.test.tsx and ConversationList.sort.test.ts under src/components/CommandDeck/__tests__/ to test:frontend-subset in root package.json."
+        },
+        "items": [
+          {
+            "id": "docs-and-ci.ac1",
+            "title": "features/conversations.mdx renders a '## Settling and snoozing conversations' section that names Needs you, Inbox, Snoozed and Settled, says settling keeps the session running, and mentions Cmd/Ctrl+Z, the bulk bar, PAN-4653 and PAN-4655",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-ci.ac2",
+            "title": "Root package.json test:frontend-subset contains conversation-triage.test.ts, useConversationMutations.triage.test.tsx, TriageMenuItems.test.tsx and ConversationList.sort.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "triage-store",
+        "to": "triage-route",
+        "type": "blocks"
+      },
+      {
+        "from": "triage-store",
+        "to": "list-enrichment",
+        "type": "blocks"
+      },
+      {
+        "from": "triage-helpers",
+        "to": "list-sections",
+        "type": "blocks"
+      },
+      {
+        "from": "list-sections",
+        "to": "triage-mutation",
+        "type": "blocks"
+      },
+      {
+        "from": "list-sections",
+        "to": "settle-controls",
+        "type": "blocks"
+      },
+      {
+        "from": "triage-mutation",
+        "to": "settle-controls",
+        "type": "blocks"
+      },
+      {
+        "from": "settle-controls",
+        "to": "snooze-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "list-sections",
+        "to": "keyboard-undo",
+        "type": "blocks"
+      },
+      {
+        "from": "triage-mutation",
+        "to": "keyboard-undo",
+        "type": "blocks"
+      },
+      {
+        "from": "keyboard-undo",
+        "to": "bulk-select",
+        "type": "blocks"
+      },
+      {
+        "from": "snooze-menu",
+        "to": "bulk-select",
+        "type": "blocks"
+      },
+      {
+        "from": "bulk-select",
+        "to": "docs-and-ci",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-01-PAN-4639-add-snooze-settle-and-auto-settle-to-the-conversation-list.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

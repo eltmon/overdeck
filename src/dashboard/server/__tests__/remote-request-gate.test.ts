@@ -225,3 +225,36 @@ describe('remote request gate scopes (PAN-2351)', () => {
     expect(await send('GET', '/api/settings', { peer: LAN_PEER, headers: { authorization: 'Bearer odk_unknown' } })).toBe(401);
   });
 });
+
+describe('remote request gate: Tailscale Funnel isolation (PAN-4648)', () => {
+  const funnel = { 'tailscale-funnel-request': '?1' };
+
+  it('answers 404 to a funneled loopback request on every path except POST /hooks/*', async () => {
+    expect(await sendFull('GET', '/api/health', { peer: '127.0.0.1', headers: funnel })).toEqual({ status: 404, text: '{"error":"not found"}' });
+    expect(await send('POST', '/api/dashboard/session', { peer: '127.0.0.1', headers: funnel })).toBe(404);
+    expect(await send('GET', '/', { peer: '127.0.0.1', headers: funnel })).toBe(404);
+    expect(await send('GET', '/hooks/trg_x/abc', { peer: '127.0.0.1', headers: funnel })).toBe(404);
+    expect(await send('POST', '/api/webhooks/github', { peer: '127.0.0.1', headers: funnel })).toBe(404);
+    expect(await send('POST', '/hooks/trg_x/abc', { peer: '127.0.0.1', headers: funnel })).toBe(200);
+  });
+
+  it('normalizes the path before allowing /hooks, so a dotted path cannot escape', async () => {
+    expect(await send('POST', '/hooks/../api/dashboard/session', { peer: '127.0.0.1', headers: funnel })).toBe(404);
+    expect(await send('POST', '/hooks/%2e%2e/api/dashboard/session', { peer: '127.0.0.1', headers: funnel })).toBe(404);
+  });
+
+  it('ignores a credential on a funneled request', async () => {
+    const { token } = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    expect(await send('GET', '/api/conversations', { peer: '127.0.0.1', headers: { ...funnel, authorization: `Bearer ${token}` } })).toBe(404);
+  });
+
+  it('refuses the session mint for the same funneled request the gate 404s', () => {
+    const request = makeRequest('POST', '/api/dashboard/session', { peer: '127.0.0.1', headers: funnel });
+    expect(rejectUnauthorizedDashboardSessionMintRequest(request)?.status).toBe(401);
+  });
+
+  it('keeps today\'s result for a loopback request without the marker', async () => {
+    expect(await send('GET', '/api/health', { peer: '127.0.0.1' })).toBe(200);
+    expect(await send('GET', '/api/conversations', { peer: '127.0.0.1' })).toBe(200);
+  });
+});

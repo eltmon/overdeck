@@ -61,6 +61,11 @@ export const COMMAND_GROUPS = {
     load: () => import('./commands/vault/index.js'),
     register: (mod, program) => mod.registerVaultCommands(program),
   }),
+  account: group({
+    names: ['account'],
+    load: () => import('./commands/account/index.js'),
+    register: (mod, program) => mod.registerAccountCommands(program),
+  }),
   test: group({
     names: ['test'],
     load: () => import('./commands/test.js'),

@@ -1,0 +1,97 @@
+{
+  "version": "1",
+  "issueId": "PAN-4681",
+  "created": "2026-11-01T07:25:21.124Z",
+  "updated": "2026-11-01T09:52:30.287Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T08:52:28.243Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T09:16:37.202Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T09:52:30.286Z"
+    }
+  ],
+  "items": {
+    "register-messagerows-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4681",
+      "claimedAt": "2026-11-01T07:25:21.124Z",
+      "doneAt": "2026-11-01T07:31:36.254Z"
+    },
+    "gate-citations-on-composer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4681",
+      "claimedAt": "2026-11-01T07:31:44.966Z",
+      "doneAt": "2026-11-01T07:43:32.429Z"
+    },
+    "document-cite-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4681",
+      "claimedAt": "2026-11-01T07:43:38.512Z",
+      "doneAt": "2026-11-01T07:44:43.630Z"
+    },
+    "register-messagerows-test.ac1": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4681",
+      "claimedAt": "2026-11-01T07:46:18.735Z",
+      "doneAt": "2026-11-01T07:46:48.500Z"
+    },
+    "register-messagerows-test.ac2": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4681",
+      "claimedAt": "2026-11-01T07:46:53.026Z",
+      "doneAt": "2026-11-01T07:47:15.157Z"
+    },
+    "gate-citations-on-composer.ac1": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4681",
+      "claimedAt": "2026-11-01T07:47:20.537Z",
+      "doneAt": "2026-11-01T07:47:47.654Z"
+    },
+    "gate-citations-on-composer.ac2": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4681",
+      "claimedAt": "2026-11-01T07:47:22.561Z",
+      "doneAt": "2026-11-01T07:48:12.217Z"
+    },
+    "gate-citations-on-composer.ac3": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4681",
+      "claimedAt": "2026-11-01T07:47:24.949Z",
+      "doneAt": "2026-11-01T07:48:34.767Z"
+    },
+    "gate-citations-on-composer.ac4": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4681",
+      "claimedAt": "2026-11-01T07:47:26.645Z",
+      "doneAt": "2026-11-01T07:48:59.670Z"
+    },
+    "document-cite-gate.ac1": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4681",
+      "claimedAt": "2026-11-01T07:49:05.738Z",
+      "doneAt": "2026-11-01T07:49:24.946Z"
+    },
+    "document-cite-gate.ac2": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4681",
+      "claimedAt": "2026-11-01T07:49:30.930Z",
+      "doneAt": "2026-11-01T07:49:51.187Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}
