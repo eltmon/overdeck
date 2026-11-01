@@ -41,6 +41,19 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/conversations/:name/kickoff', scope: 'read:conversations' },
   { method: 'POST', path: '/api/conversations/:name/kickoff', scope: 'tell' },
   { method: 'GET', path: '/api/conversations/:name/bookmarks', scope: 'read:conversations' },
+  // PAN-4645 WI-5: the operate surfaces a linked machine (and any token with
+  // operate) may drive. Worker spawn (#4651) and release/transfer (#4650)
+  // add their rows in their own issues.
+  { method: 'POST', path: '/api/conversations', scope: 'operate' },
+  { method: 'POST', path: '/api/conversations/:name/stop', scope: 'operate' },
+  { method: 'POST', path: '/api/conversations/:name/abort', scope: 'operate' },
+  { method: 'POST', path: '/api/conversations/:id/permission', scope: 'operate' },
+  { method: 'POST', path: '/api/conversations/:id/codex-approval', scope: 'operate' },
+  { method: 'POST', path: '/api/conversations/:id/pane-choice', scope: 'operate' },
+  { method: 'POST', path: '/api/conversations/:id/pi-ask-answer', scope: 'operate' },
+  { method: 'POST', path: '/api/agents/:id/answer-question', scope: 'operate' },
+  { method: 'POST', path: '/api/agents/:id/permissions/:requestId/respond', scope: 'operate' },
+  { method: 'POST', path: '/api/lanes', scope: 'operate' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */
