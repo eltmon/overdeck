@@ -4,7 +4,7 @@
     "created": "2026-11-01T06:44:24Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4677: Fly remote smoke test (PAN-4295)",
-    "updated": "2026-11-01T06:45:01.164Z"
+    "updated": "2026-11-01T06:47:27.784Z"
   },
   "plan": {
     "id": "pan-4677",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "71c08499-b88c-42e7-bb83-a2dde9f1b98b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-11-01T06:44:24Z",
-    "updated": "2026-11-01T06:45:01.164Z",
+    "updated": "2026-11-01T06:47:27.784Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4677",
