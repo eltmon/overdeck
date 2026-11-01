@@ -76,6 +76,25 @@ describe('FlyApiClient', () => {
       const body = JSON.parse(options.body as string);
       expect(body.config.restart).toEqual({ policy: 'no' });
       expect(body.config).not.toHaveProperty('mounts');
+      expect(body.config).not.toHaveProperty('services');
+      expect(body.config).not.toHaveProperty('env');
+    });
+
+    it('sends services and env verbatim in the config body', async () => {
+      mockOk({ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' });
+      const services = [
+        { protocol: 'tcp' as const, internal_port: 3011, ports: [{ port: 443, handlers: ['tls', 'http'] }] },
+      ];
+      const env = { OVERDECK_PUBLIC_LINK_ONLY: '1', OVERDECK_MACHINE_NAME: 'fly-m1' };
+      await client.createMachine('my-app', 'ws-123', {
+        image: 'registry.fly.io/pan-workspace:latest',
+        services,
+        env,
+      });
+      const [, options] = fetchMock.mock.calls[0];
+      const body = JSON.parse(options.body as string);
+      expect(body.config.services).toEqual(services);
+      expect(body.config.env).toEqual(env);
     });
   });
 
