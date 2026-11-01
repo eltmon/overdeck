@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:42:19.941Z",
+  "updated": "2026-11-01T21:42:33.841Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -522,6 +522,10 @@
     "wi23-owner-usage.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T21:42:19.941Z"
+    },
+    "wi24-fleet-usage.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:42:33.840Z"
     }
   }
 }
