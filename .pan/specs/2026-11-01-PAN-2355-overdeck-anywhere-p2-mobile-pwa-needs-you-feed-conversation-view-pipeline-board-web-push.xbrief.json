@@ -4,17 +4,17 @@
     "created": "2026-11-01T05:06:03Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2355: Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push)",
-    "updated": "2026-11-01T05:13:37.263Z"
+    "updated": "2026-11-01T05:47:14.461Z"
   },
   "plan": {
     "id": "pan-2355",
     "title": "Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push)",
-    "status": "proposed",
+    "status": "running",
     "uid": "b658925e-cc6a-4d64-a6dd-7ce7be3db3f5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T05:06:03Z",
-    "updated": "2026-11-01T05:13:37.263Z",
+    "updated": "2026-11-01T05:47:14.461Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2355",
@@ -925,5 +925,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
