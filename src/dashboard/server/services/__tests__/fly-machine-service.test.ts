@@ -15,7 +15,7 @@ import type { MachineLinkView } from '@overdeck/contracts';
 import { _resetFlyMachineStoreForTests, _settleFlyMachineWritesForTests, listFlyMachines, upsertFlyMachine } from '../../../../lib/anywhere/fly/machine-store.js';
 import type { FlyProvisionResult } from '../../../../lib/anywhere/fly/provision.js';
 import type { MachineLink } from '../../../../lib/anywhere/link-store.js';
-import { addFlyMachine, type FlyMachineServiceDeps, removeFlyMachineForLink } from '../fly-machine-service.js';
+import { addFlyMachine, type FlyMachineServiceDeps, removeFlyMachineForLink, startFlyConversation } from '../fly-machine-service.js';
 import { MachineLinkError } from '../machine-link-service.js';
 
 const ENV_ID = '3f2c1b7e-9a4d-4c2b-8e1f-0a1b2c3d4e5f';
@@ -45,6 +45,8 @@ function fakes(overrides: Partial<FlyMachineServiceDeps> = {}) {
     destroy: vi.fn(async () => undefined),
     createMachineLink: vi.fn(async () => ({ link: LINK, view: VIEW })),
     removeLink: vi.fn(async () => null),
+    ensureProject: vi.fn(async () => undefined),
+    linkFetch: vi.fn(async () => ({ status: 201, json: { name: 'conv-fly-1' } })),
     notifyLinksChanged: vi.fn(),
     newId: () => 'rec-1',
     now: () => '2026-11-01T00:00:00.000Z',
@@ -119,6 +121,52 @@ describe('addFlyMachine (PAN-4652 WI-8)', () => {
   it('removes the link too when a step after linking fails', async () => {
     const deps = fakes({ updateRecord: vi.fn(async () => { throw new Error('disk full'); }) });
     await expect(addFlyMachine({}, deps)).rejects.toThrow('disk full');
+
+    expect(deps.destroy).toHaveBeenCalledTimes(1);
+    expect(deps.removeLink).toHaveBeenCalledWith('link-1');
+    expect(await listFlyMachines()).toEqual([]);
+  });
+});
+
+describe('project and conversation on the Fly machine (PAN-4652 WI-9)', () => {
+  it('clones the project after linking, then starts the conversation and returns its path', async () => {
+    const deps = fakes();
+    const result = await addFlyMachine({ projectKey: 'overdeck', message: 'Fix the flaky test', model: 'claude-sonnet-5-5' }, deps);
+
+    expect(deps.ensureProject).toHaveBeenCalledWith({ appName: 'overdeck-ws', machineId: VM.machineId }, 'overdeck');
+    expect(deps.notifyLinksChanged.mock.invocationCallOrder[0]).toBeLessThan(deps.ensureProject.mock.invocationCallOrder[0]!);
+    expect(result.conversation).toEqual({ environmentId: ENV_ID, name: 'conv-fly-1', path: `/conv/@${ENV_ID}/conv-fly-1` });
+  });
+
+  it('skips the conversation without a message', async () => {
+    const deps = fakes();
+    const result = await addFlyMachine({ projectKey: 'overdeck' }, deps);
+    expect(deps.ensureProject).toHaveBeenCalledTimes(1);
+    expect(deps.linkFetch).not.toHaveBeenCalled();
+    expect(result.conversation).toBeUndefined();
+  });
+
+  it('startFlyConversation posts the Claude Code body as the operator', async () => {
+    const linkFetch = vi.fn(async () => ({ status: 201, json: { name: 'conv-fly-1' } }));
+    const result = await startFlyConversation({ environmentId: ENV_ID }, { message: 'hi', projectKey: 'overdeck', effort: 'high' }, { linkFetch });
+
+    expect(linkFetch).toHaveBeenCalledWith(ENV_ID, '/api/conversations', {
+      method: 'POST',
+      actor: 'operator',
+      body: { message: 'hi', projectKey: 'overdeck', harness: 'claude-code', model: undefined, effort: 'high' },
+    });
+    expect(result.path).toBe(`/conv/@${ENV_ID}/conv-fly-1`);
+  });
+
+  it('turns a 409 from the VM into conversation-failed carrying the body', async () => {
+    const linkFetch = vi.fn(async () => ({ status: 409, json: { error: 'project busy' } }));
+    await expect(startFlyConversation({ environmentId: ENV_ID }, { message: 'hi', projectKey: 'overdeck' }, { linkFetch }))
+      .rejects.toMatchObject({ code: 'conversation-failed', detail: { status: 409, body: { error: 'project busy' } } });
+  });
+
+  it('a conversation failure destroys the machine, removes the link and deletes the record', async () => {
+    const deps = fakes({ linkFetch: vi.fn(async () => ({ status: 500, json: { error: 'boom' } })) });
+    await expect(addFlyMachine({ projectKey: 'overdeck', message: 'hi' }, deps)).rejects.toMatchObject({ code: 'conversation-failed' });
 
     expect(deps.destroy).toHaveBeenCalledTimes(1);
     expect(deps.removeLink).toHaveBeenCalledWith('link-1');

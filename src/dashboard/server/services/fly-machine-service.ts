@@ -18,6 +18,12 @@
  * it, and its notifier lives in `routes/machines.ts`, which imports this module
  * for the unlink hook.
  *
+ * With `projectKey` it clones that project onto the VM (`ensureFlyProject`,
+ * FR-9); with `message` it then starts a Claude Code conversation there through
+ * the link (`startFlyConversation`, FR-10) and returns its `/conv/@<env>/<name>`
+ * path. The clone runs after linking, so by the time the conversation request
+ * goes out the supervisor has long had the link online.
+ *
  * `removeFlyMachineForLink()` is the unlink hook: it destroys the VM unless
  * `keepServer` and always deletes the record (D-9: destroy, never stop).
  */
@@ -25,6 +31,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { MachineLinkView } from '@overdeck/contracts';
 
+import { linkFetch } from '../../../lib/anywhere/link-client.js';
 import type { MachineLink } from '../../../lib/anywhere/link-store.js';
 import { removeLink } from '../../../lib/anywhere/link-store.js';
 import {
@@ -34,6 +41,7 @@ import {
   updateFlyMachine,
   upsertFlyMachine,
 } from '../../../lib/anywhere/fly/machine-store.js';
+import { ensureFlyProject } from '../../../lib/anywhere/fly/project.js';
 import { destroyFlyVm, FlyMachineError, type FlyProvisionResult, provisionFlyMachine } from '../../../lib/anywhere/fly/provision.js';
 import { loadConfig, type RemoteConfig } from '../../../lib/config.js';
 import { createFlyApiClient } from '../../../lib/remote/fly-api.js';
@@ -50,9 +58,16 @@ export interface AddFlyMachineInput {
   image?: string;
 }
 
+export interface FlyConversation {
+  environmentId: string;
+  name: string;
+  path: string;
+}
+
 export interface AddFlyMachineResult {
   link: MachineLinkView;
   record: FlyMachineRecord;
+  conversation?: FlyConversation;
 }
 
 export interface FlyRemoval {
@@ -71,6 +86,8 @@ export interface FlyMachineServiceDeps {
   upsertRecord: (record: FlyMachineRecord) => Promise<unknown>;
   updateRecord: (id: string, patch: Partial<Omit<FlyMachineRecord, 'id'>>) => Promise<FlyMachineRecord | null>;
   removeRecord: (id: string) => Promise<unknown>;
+  ensureProject: (machine: { appName: string; machineId: string }, projectKey: string) => Promise<void>;
+  linkFetch: (environmentId: string, path: string, init: { method: string; actor: 'operator'; body: unknown }) => Promise<{ status: number; json: unknown }>;
   /** Wake the link supervisor so it opens the new link now (see the header). */
   notifyLinksChanged: () => void;
   newId: () => string;
@@ -97,6 +114,8 @@ const defaultDeps: Omit<FlyMachineServiceDeps, 'notifyLinksChanged'> = {
   upsertRecord: upsertFlyMachine,
   updateRecord: updateFlyMachine,
   removeRecord: removeFlyMachine,
+  ensureProject: (machine, projectKey) => ensureFlyProject(machine, projectKey),
+  linkFetch: (environmentId, path, init) => linkFetch(environmentId, path, init),
   newId: randomUUID,
   now: () => new Date().toISOString(),
   log: (message) => console.warn(`[fly-machines] ${message}`),
@@ -170,11 +189,41 @@ export async function addFlyMachine(
     const record = await deps.updateRecord(recordId, { linkId, environmentId: created.link.environmentId });
     if (!record) throw new Error(`The Fly machine record ${recordId} disappeared while linking`);
     deps.notifyLinksChanged();
-    return { link: created.view, record };
+
+    if (!input.projectKey) return { link: created.view, record };
+    await deps.ensureProject({ appName: vm.appName, machineId: vm.machineId }, input.projectKey);
+    if (input.message === undefined) return { link: created.view, record };
+    const conversation = await startFlyConversation(created.link, {
+      message: input.message,
+      projectKey: input.projectKey,
+      model: input.model,
+      effort: input.effort,
+    }, deps);
+    return { link: created.view, record, conversation };
   } catch (error) {
     await rollback(deps, vm, recordId, linkId);
     throw error;
   }
+}
+
+/** Start a Claude Code conversation on the linked VM, acting as the operator (FR-10). */
+export async function startFlyConversation(
+  link: Pick<MachineLink, 'environmentId'>,
+  input: { message: string; projectKey: string; model?: string; effort?: string },
+  deps: Pick<FlyMachineServiceDeps, 'linkFetch'> = defaultDeps,
+): Promise<FlyConversation> {
+  const body = { message: input.message, projectKey: input.projectKey, harness: 'claude-code', model: input.model, effort: input.effort };
+  let response: { status: number; json: unknown };
+  try {
+    response = await deps.linkFetch(link.environmentId, '/api/conversations', { method: 'POST', actor: 'operator', body });
+  } catch (error) {
+    throw new FlyMachineError('conversation-failed', `Could not reach the Fly machine to start the conversation: ${(error as Error).message}`);
+  }
+  const name = (response.json as { name?: unknown } | null)?.name;
+  if (response.status !== 201 || typeof name !== 'string' || !name) {
+    throw new FlyMachineError('conversation-failed', `The Fly machine refused the conversation (status ${response.status}).`, { status: response.status, body: response.json });
+  }
+  return { environmentId: link.environmentId, name, path: `/conv/@${link.environmentId}/${name}` };
 }
 
 /** Undo everything addFlyMachine made after provisioning. Each step logs its own failure and the next still runs. */

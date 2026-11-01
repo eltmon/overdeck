@@ -131,6 +131,15 @@ async function readHomeVersion(): Promise<string> {
   return manifest.version;
 }
 
+function flyApiFor(remote: RemoteConfig | undefined): FlyApiClient {
+  return createFlyApiClient(process.env[remote?.fly?.api_token_env ?? 'FLY_API_TOKEN']);
+}
+
+/** The Fly API client for the configured token (`remote.fly.api_token_env`, else FLY_API_TOKEN, else flyctl's). */
+export async function loadFlyApi(): Promise<FlyApiClient> {
+  return flyApiFor((await loadConfig()).remote);
+}
+
 /** Fill in every dependency the caller did not pass, loading config only when needed. */
 async function resolveDeps(overrides: Partial<FlyProvisionDeps>): Promise<FlyProvisionDeps> {
   const needsConfig = !overrides.api || !overrides.flyConfig || !overrides.syncAllCredentials
@@ -139,7 +148,7 @@ async function resolveDeps(overrides: Partial<FlyProvisionDeps>): Promise<FlyPro
   let provider: FlyProvider | null = null;
   const fly = (): FlyProvider => (provider ??= createFlyProviderFromConfig(remote, 'ephemeral'));
   return {
-    api: overrides.api ?? createFlyApiClient(process.env[remote?.fly?.api_token_env ?? 'FLY_API_TOKEN']),
+    api: overrides.api ?? flyApiFor(remote),
     flyConfig: overrides.flyConfig ?? remote?.fly ?? {},
     syncAllCredentials: overrides.syncAllCredentials ?? ((name) => fly().syncAllCredentials(name)),
     configureClaudeCode: overrides.configureClaudeCode ?? ((name) => fly().configureClaudeCode(name)),
@@ -154,7 +163,7 @@ async function resolveDeps(overrides: Partial<FlyProvisionDeps>): Promise<FlyPro
 }
 
 /** Probe every `intervalMs` until it returns true or `limitMs` passes. A throwing probe counts as false. */
-async function pollUntil(deps: FlyProvisionDeps, poll: { intervalMs: number; limitMs: number }, probe: () => Promise<boolean>): Promise<boolean> {
+export async function pollUntil(deps: Pick<FlyProvisionDeps, 'now' | 'sleep'>, poll: { intervalMs: number; limitMs: number }, probe: () => Promise<boolean>): Promise<boolean> {
   const deadline = deps.now() + poll.limitMs;
   for (;;) {
     if (await probe().catch(() => false)) return true;
@@ -164,13 +173,13 @@ async function pollUntil(deps: FlyProvisionDeps, poll: { intervalMs: number; lim
 }
 
 /** Run `script` detached on the VM so it outlives the 60 s exec deadline. */
-function detached(script: string): string {
+export function detached(script: string): string {
   return `setsid nohup sh -c ${shellQuote(script)} > /dev/null 2>&1 < /dev/null &`;
 }
 
 /** Destroy a Fly machine. A 404 means it is already gone. */
 export async function destroyFlyVm(appName: string, machineId: string, deps: Partial<Pick<FlyProvisionDeps, 'api'>> = {}): Promise<void> {
-  const api = deps.api ?? (await resolveDeps({})).api;
+  const api = deps.api ?? await loadFlyApi();
   try {
     await api.destroyMachine(appName, machineId);
   } catch (error) {
