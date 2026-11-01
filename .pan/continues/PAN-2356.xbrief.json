@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T13:55:37.786Z",
+  "updated": "2026-11-01T13:55:52.561Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
       "claimedBy": "agent-pan-2356",
       "claimedAt": "2026-11-01T13:55:19.494Z",
       "doneAt": "2026-11-01T13:55:37.786Z"
+    },
+    "wi7-do-relay.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:55:52.561Z"
     }
   }
 }
