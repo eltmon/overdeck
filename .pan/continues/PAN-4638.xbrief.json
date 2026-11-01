@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:53:26.242Z",
+  "updated": "2026-11-01T23:53:40.794Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -236,6 +236,10 @@
     "conversation-list-nesting.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T23:53:26.242Z"
+    },
+    "conversation-list-nesting.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T23:53:40.794Z"
     }
   }
 }
