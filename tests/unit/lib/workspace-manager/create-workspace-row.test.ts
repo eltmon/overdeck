@@ -4,8 +4,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
 
-const { mockExecAsync } = vi.hoisted(() => ({
+const { mockExecAsync, mockCheckDiskFloor } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+  mockCheckDiskFloor: vi.fn(),
 }));
 
 vi.mock('child_process', async () => {
@@ -17,6 +18,13 @@ vi.mock('util', async () => {
   const actual = await vi.importActual<typeof import('util')>('util');
   return { ...actual, promisify: () => mockExecAsync };
 });
+
+// checkDiskFloor reads real free space via statfs (PAN-4723): mock it so tests
+// don't fail on CI runners whose /tmp has less than the 10 GiB floor.
+vi.mock('../../../../src/lib/disk-floor.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/lib/disk-floor.js')>()),
+  checkDiskFloor: mockCheckDiskFloor,
+}));
 
 
 /** Matches both exec shell strings and execFile argv vectors for `git worktree add`. */
@@ -37,6 +45,8 @@ beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), 'pan-1990-create-row-'));
   mockExecAsync.mockReset();
   mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+  mockCheckDiskFloor.mockReset();
+  mockCheckDiskFloor.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -63,11 +73,27 @@ describe('createWorkspace: workspace row creation (PAN-1990)', () => {
 
     expect(result.success).toBe(true);
     expect(rowExistedDuringWorktreeAdd).toBe(true);
+    expect(mockCheckDiskFloor).toHaveBeenCalledWith(tempDir);
 
     const row = getWorkspaceForIssue('PAN-2050');
     expect(row?.kind).toBe('issue');
     expect(row?.branchName).toBe('feature/pan-2050');
     expect(row?.path).toBe(join(tempDir, 'workspaces', 'feature-pan-2050'));
+  });
+
+  it('refuses before creating the row or running git when the disk floor refuses (PAN-4723)', async () => {
+    upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
+    mockCheckDiskFloor.mockResolvedValue('Only 1.0 GiB free on the filesystem holding ' + tempDir + '; workspace creation needs at least 10.0 GiB. Free disk space (see /resources) and retry.');
+
+    const result = await createWorkspace({
+      projectConfig: { name: 'Test', path: tempDir },
+      featureName: 'pan-4723',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.errors.join(' ')).toContain('Only 1.0 GiB free');
+    expect(getWorkspaceForIssue('PAN-4723')).toBeNull();
+    expect(mockExecAsync).not.toHaveBeenCalled();
   });
 
   it('reuses an existing row for the same issue and creates no duplicates', async () => {
