@@ -131,6 +131,9 @@ describe('/ws/rpc revocation (PAN-4645 WI-7)', () => {
     cleanups.push(() => ws.terminate());
     const closing = closed(ws);
 
+    // The upgrade's token check queued a lastUsedAt write; let it land so the
+    // "other process" rewrite below is not overwritten by it.
+    await _settleAccessTokenWritesForTests();
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     startAccessTokenRefresh();
     const path = join(home, 'access-tokens.json');
