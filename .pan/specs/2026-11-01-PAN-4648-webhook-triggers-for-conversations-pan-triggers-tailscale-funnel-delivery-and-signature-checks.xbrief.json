@@ -4,17 +4,17 @@
     "created": "2026-11-01T05:04:30Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4648: Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery and signature checks",
-    "updated": "2026-11-01T05:07:59.334Z"
+    "updated": "2026-11-01T05:49:13.195Z"
   },
   "plan": {
     "id": "pan-4648",
     "title": "Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery and signature checks",
-    "status": "proposed",
+    "status": "running",
     "uid": "4ea99d8d-f5fb-4f89-94d1-0edcf27cdb98",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-01T05:04:30Z",
-    "updated": "2026-11-01T05:07:59.334Z",
+    "updated": "2026-11-01T05:49:13.195Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4648",
@@ -958,5 +958,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
