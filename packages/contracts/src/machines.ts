@@ -102,6 +102,15 @@ export type LoadSample = typeof LoadSample.Type
 export const MachinePlacementMode = Schema.Literals(["auto", "on-request"])
 export type MachinePlacementMode = typeof MachinePlacementMode.Type
 
+/** PAN-4651 D-4651-11: one project a machine has registered, as linked machines see it (never a path). */
+export const MachineProject = Schema.Struct({
+  key: Schema.String,
+  name: Schema.String,
+  /** `github.com/<owner>/<repo>` or `gitlab.com/<path>`; null when the project has no remote repo. */
+  gitOrigin: Schema.NullOr(Schema.String),
+})
+export type MachineProject = typeof MachineProject.Type
+
 /** One outbound link as shown by `GET /api/machines` and `pan machines list`. */
 export const MachineLinkView = Schema.Struct({
   id: Schema.String,

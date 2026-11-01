@@ -13,6 +13,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { type AdvertisedEndpoint, ROUTE_KINDS } from '@overdeck/contracts';
 
 import { MACHINE_ACCESS_LEVELS, type MachineAccess } from '../../../lib/access-tokens.js';
+import { listMachineProjects } from '../../../lib/anywhere/project-origin.js';
 import { sharedConversations, type SharedConversationsDeps } from '../../../lib/anywhere/shared-conversations.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
@@ -213,4 +214,33 @@ const sharedConversationsRoute = HttpRouter.add(
   }),
 );
 
-export const machinesPeerRouteLayer = Layer.mergeAll(exchangeRoute, approvalExchangeRoute, heartbeatRoute, sharedConversationsRoute);
+/**
+ * `GET /api/machines/projects` (PAN-4651 WI-3, D-4651-11): every project this
+ * machine has registered as `{ key, name, gitOrigin }` — never a path — for a
+ * linked machine's placement and project grouping. Machine credential only.
+ */
+export async function handleMachineProjects(
+  credential: DashboardCredential | null,
+  listProjects: typeof listMachineProjects = listMachineProjects,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'machine') {
+    return jsonResponse({ error: 'the project list is for linked machines only' }, { status: 403 });
+  }
+  try {
+    return jsonResponse({ projects: await listProjects() });
+  } catch (error) {
+    console.error('[machines] project list failed:', error instanceof Error ? error.message : String(error));
+    return jsonResponse({ error: 'the project list could not be built' }, { status: 500 });
+  }
+}
+
+const machineProjectsRoute = HttpRouter.add(
+  'GET',
+  '/api/machines/projects',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.promise(() => handleMachineProjects(resolveRequestCredential(request)));
+  }),
+);
+
+export const machinesPeerRouteLayer = Layer.mergeAll(exchangeRoute, approvalExchangeRoute, heartbeatRoute, sharedConversationsRoute, machineProjectsRoute);

@@ -72,6 +72,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/machines/heartbeat', scope: 'read:state' },
   // PAN-4650 WI-2: the shared conversation list a linked machine caches.
   { method: 'GET', path: '/api/machines/conversations', scope: 'read:conversations' },
+  // PAN-4651 WI-3: the project list (key, name, git origin) a linked machine caches.
+  { method: 'GET', path: '/api/machines/projects', scope: 'read:state' },
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },

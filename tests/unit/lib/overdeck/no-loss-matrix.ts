@@ -449,6 +449,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'DELETE /api/machines/inbound/:tokenId',      kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (inbound machine) (PAN-4645)' },
   { surface: 'GET /api/machines/heartbeat',                kind: 'http', disposition: 'READ',        door: 'link-heartbeat.startHeartbeatSource (event-loop stall record) (PAN-4645)' },
   { surface: 'GET /api/machines/conversations',            kind: 'http', disposition: 'READ',        door: 'anywhere/shared-conversations.sharedConversations (conversation list + anywhere.json) (PAN-4650)' },
+  { surface: 'GET /api/machines/projects',                 kind: 'http', disposition: 'READ',        door: 'anywhere/project-origin.listMachineProjects (projects.yaml keys, names, git origins) (PAN-4651)' },
   { surface: '* /api/conversations/@<machine>/*',          kind: 'http', disposition: 'RELOCATE',    door: "linked-conversation-proxy -> owner's /api/conversations/* over the machine link (PAN-4650)" },
   { surface: 'POST /api/conversations/:name/release',      kind: 'http', disposition: 'WRITE',       door: 'conversation-release-service.releaseConversation (settle + pack + stop) (PAN-4650)' },
   { surface: 'GET /api/conversations/:name/release/transfer/:transferId', kind: 'http', disposition: 'READ', door: 'conversation-release-service.readTransferPack (PAN-4650)' },

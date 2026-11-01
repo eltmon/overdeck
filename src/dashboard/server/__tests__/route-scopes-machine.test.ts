@@ -19,6 +19,7 @@ import {
   MACHINE_TOKEN_SCOPES,
 } from '../../../lib/access-tokens.js';
 import { _resetInternalTokenCacheForTests } from '../../../lib/internal-token.js';
+import { closeOverdeckDatabase } from '../../../lib/overdeck/infra.js';
 import { invalidateRemoteAccessConfig } from '../../../lib/remote-access/config.js';
 import type { ChannelMarker } from '../channel-peer.js';
 import { remoteGateRejection } from '../remote-request-gate.js';
@@ -69,9 +70,10 @@ function request(method: string, path: string, token: string) {
   })).modify({ remoteAddress: Option.some(`link:${KEY.slice(0, 16)}`) });
 }
 
-// PAN-4650 D-4650-7: an agent actor (the fenced link's operator included) never changes conversations.
+// PAN-4650 D-4650-7: an agent actor (the fenced link's operator included) never changes conversations
+// it did not start; PAN-4651 D-4651-2: nor starts lanes outside the work doors.
 const AGENT_FENCED = { status: 403, code: 'agent-fenced' } as const;
-const fencedOr = <T>(path: string, otherwise: T) => (path.startsWith('/api/conversations') ? AGENT_FENCED : otherwise);
+const fencedOr = <T>(path: string, otherwise: T) => (path.startsWith('/api/conversations') || path === '/api/lanes' ? AGENT_FENCED : otherwise);
 
 beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), 'pan-4645-route-scopes-'));
@@ -92,6 +94,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  closeOverdeckDatabase();
   await _settleAccessTokenWritesForTests();
   _resetAccessTokensForTests();
   _resetInternalTokenCacheForTests();
