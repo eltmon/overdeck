@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4663",
   "created": "2026-11-01T11:01:24.996Z",
-  "updated": "2026-11-01T11:15:17.728Z",
+  "updated": "2026-11-01T11:15:31.020Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,10 @@
     "init-perms-network-mode.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T11:15:17.728Z"
+    },
+    "init-perms-network-mode.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:15:31.020Z"
     }
   }
 }
