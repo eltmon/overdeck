@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4626",
   "created": "2026-11-01T05:58:08.711Z",
-  "updated": "2026-11-01T06:28:36.924Z",
+  "updated": "2026-11-01T06:28:47.837Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4626",
       "claimedAt": "2026-11-01T06:21:19.267Z",
       "doneAt": "2026-11-01T06:28:36.924Z"
+    },
+    "panel-stopping-status": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4626",
+      "claimedAt": "2026-11-01T06:28:47.837Z"
     }
   }
 }
