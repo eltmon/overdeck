@@ -1,0 +1,684 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T04:45:04.092Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4640: Add scheduled conversations that run a prompt on a recurring schedule",
+    "updated": "2026-11-01T04:50:11.941Z"
+  },
+  "plan": {
+    "id": "pan-4640",
+    "title": "Add scheduled conversations that run a prompt on a recurring schedule",
+    "status": "proposed",
+    "uid": "81180808-1de5-4fd2-be06-85b4352babe2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-01T04:45:04.092Z",
+    "updated": "2026-11-01T04:50:11.941Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4640",
+        "label": "PAN-4640",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4657",
+        "label": "PAN-4657 (dashboard slice split out of this issue)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4639",
+        "label": "PAN-4639 (snooze and settle; #4657 depends on it)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "scheduler",
+      "cli",
+      "dashboard-server",
+      "sqlite"
+    ],
+    "metadata": {
+      "sizeJustification": "The plan touches exactly 25 files, but the subsystem count (11) is inflated by single-file entries that the lint counts as their own subsystem: package.json, bun.lock, and four separate doc files (features/conversations.mdx, docs/DASHBOARD-ARCHITECTURE.md, cli/overview.mdx, sync-sources/skills). The code spans src/lib (door, recurrence, resume cause), src/dashboard/server (routes, sweep), src/cli (verbs), drizzle (schema) and tests/unit (no-loss matrix). That backend slice is already the minimum shippable unit: the CLI is how an agent schedules itself, and the sweep is what fires it. The separable dashboard slice (dialog, badge, list event, inbox resurfacing) was split into sibling issue #4657.",
+      "canonicalFilename": "2026-11-01-PAN-4640-add-scheduled-conversations-that-run-a-prompt-on-a-recurring-schedule.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck has no time-based trigger for a conversation. Recurring work lives inside a harness session's own wakeup or cron tools, which die with the process; src/lib/resume-contract.ts tells a resumed session to re-arm them itself. The t3code demo cited by the issue shows a thread that runs a stored prompt daily at 21:00, survives restarts, and resurfaces when it runs.",
+      "Proposal": "Add a conversation_schedules table in overdeck.db with a door (src/lib/overdeck/conversation-schedules.ts), a recurrence module on croner 10.0.1 (5-field cron plus IANA zone, presets compiled to cron, 15-minute minimum spacing), REST routes under /api/conversations/:name/schedules, a dashboard-resident 60 s sweep (src/dashboard/server/services/conversation-schedule-service.ts, primary dashboard only) that claims each due schedule with a compare-and-set before firing (at-most-once, missed runs collapse to one), resumes an ended session with resume cause 'message' and then delivers the prompt through handleConversationMessage (follow_up for Pi, plain submit otherwise), records delivered/failed/skipped without retries, and pan conv schedule add|list|pause|resume|rm. The dashboard dialog, row badge and inbox resurfacing are split into #4657. Full detail: .pan/drafts/PAN-4640.md.",
+      "NonGoals": "- The dashboard Schedule dialog, the row next-run badge, the conversation-list nextScheduledRunAt field, the conversation.schedules_changed event, and clearing PAN-4639 snooze/settle state on a run (all in #4657)\n- A new conversation per scheduled run; runs reuse the scheduled conversation\n- Per-schedule model or effort; a run uses the conversation's current model and effort\n- Cost or token caps beyond the 15-minute minimum spacing\n- Retrying a failed run before its next occurrence\n- Honoring the deacon pause toggle or the boot resume gate; scheduled runs follow the operator-message rule\n- Schedules on agent conversations (agent-, planning-, specialist- prefixes) or Session Vault browse copies\n- Seconds-level cron, 6- or 7-field patterns, @daily-style nicknames, and one-shot schedules\n- Remote access-token scopes (route-scopes.ts) for the schedule routes\n- Firing schedules from a peer dashboard or from the forked deacon child\n- Growing src/lib/overdeck/conversations.ts by any line (it sits exactly at its allowlist cap)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the dashboard dialog, row badge, list-refresh event and inbox resurfacing into sibling issue #4657; this issue ships schema, door, recurrence, sweep, routes, CLI and docs.",
+        "rationale": "Resurfacing needs PAN-4639's snooze/settle columns, which are still being planned; the split lets this issue ship now, the CLI already covers the t3code self-scheduling flow, and the combined surface exceeds the 25-file finalize limit."
+      },
+      {
+        "summary": "Run the sweep as a dashboard-resident service modeled on pull-request-sync-service.ts (primary dashboard only, boot +30 s, every 60 s), not as a deacon-lite patrol.",
+        "rationale": "deacon-lite runs in a forked child that reaches the dashboard only over internal HTTP and stops when the deacon is paused; resume and delivery live in the dashboard process and conversations are never gated. The 60 s cadence still meets the issue's 'within one deacon tick' criterion."
+      },
+      {
+        "summary": "Claim each due schedule with a compare-and-set UPDATE that advances next_run_at to the next future occurrence before firing (at-most-once).",
+        "rationale": "A crash mid-fire then loses one run instead of duplicating a prompt, and computing the next occurrence from the wall clock collapses any number of missed runs into one."
+      },
+      {
+        "summary": "Do not retry a failed run; record last_run_status 'failed' and the error and wait for the next occurrence.",
+        "rationale": "A daily schedule blocked by a permission prompt would otherwise retry every minute; the failure stays visible in pan conv schedule list."
+      },
+      {
+        "summary": "Resume a conversation whose harness is not alive via handleConversationResume with a new optional resumeCause 'message', then deliver via handleConversationMessage.",
+        "rationale": "handleConversationMessage refuses ended sessions with 422 (the issue's claim that the message route resumes is not true), and the hardcoded cause would tell the agent the operator resumed it."
+      },
+      {
+        "summary": "Deliver as follow_up only for Pi harnesses and as a plain submit for every other harness.",
+        "rationale": "pickDeliverAs defaults Pi to steer, and non-Pi harnesses refuse deliverAs follow_up with 422; Claude Code queues a plain submit behind a running turn."
+      },
+      {
+        "summary": "Store a 5-field cron plus an IANA time zone; presets are CLI sugar; the default zone is the creating process's Intl zone stored on the row.",
+        "rationale": "One storage format keeps the sweep simple; Overdeck has no configured time-zone setting, and CLI and dashboard run on the same machine."
+      },
+      {
+        "summary": "Use croner 10.0.1 pinned exactly in dependencies, always constructed with paused: true.",
+        "rationale": "Zero-dependency MIT library with correct DST handling (probed on 2026-11-01); 11.0.0 is only six days old; paused instances never arm timers in the server."
+      },
+      {
+        "summary": "Reject recurrences whose occurrences are less than 15 minutes apart.",
+        "rationale": "Answers the issue's open cost-guard question without per-schedule budgets: an every-minute schedule on a frontier model would send 1,440 turns a day."
+      },
+      {
+        "summary": "A scheduled run uses the conversation's current model and effort and reuses the same conversation.",
+        "rationale": "Answers the issue's two open questions with the t3code behavior and the smallest surface; both options can be added later without schema breakage."
+      },
+      {
+        "summary": "Due schedules on archived conversations are advanced and recorded 'skipped', and resuming a paused schedule recomputes next_run_at from now.",
+        "rationale": "Neither unarchiving nor resuming should trigger a surprise catch-up run."
+      },
+      {
+        "summary": "Prefix the delivered prompt with '[Scheduled run · schedule <id> · <cron> · <zone>]'.",
+        "rationale": "Tells the agent why the message arrived and prevents a stored prompt from being routed as a /pan composer command."
+      }
+    ],
+    "items": [
+      {
+        "id": "schedule-recurrence",
+        "title": "Add the croner-backed recurrence module with presets, validation and DST-correct next-run",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:45:04.092Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4640",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json",
+            "bun.lock",
+            "src/lib/overdeck/conversation-schedule-recurrence.ts",
+            "src/lib/overdeck/__tests__/conversation-schedule-recurrence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-schedule-recurrence.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-schedule-recurrence.test.ts passes including the three America/New_York DST fixtures",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Run `bun add croner@10.0.1 --exact` and create src/lib/overdeck/conversation-schedule-recurrence.ts exporting MIN_SCHEDULE_SPACING_MS, SchedulePreset, defaultScheduleTimeZone, isValidTimeZone, presetToCron, validateRecurrence and nextRunAfter exactly as PRD WI-1 specifies (exactly 5 fields; valid IANA zone via Intl.DateTimeFormat; croner parse; at least one future run; no two of the next 24 runs less than 15 minutes apart; croner always `paused: true`). Write the WI-1 tests with the cited DST fixtures; pass explicit Date values, no timers."
+        },
+        "items": [
+          {
+            "id": "schedule-recurrence.ac1",
+            "title": "nextRunAfter('30 2 * * *', 'America/New_York', 2026-03-07T07:30:00.000Z) returns 2026-03-08T07:30:00.000Z and the 01:30 fall-back fixture returns 2026-11-01T05:30:00.000Z once then 2026-11-02T06:30:00.000Z",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-recurrence.ac2",
+            "title": "validateRecurrence rejects '*/5 * * * *' with 'Schedules must be at least 15 minutes apart' and accepts '*/15 * * * *'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-recurrence.ac3",
+            "title": "validateRecurrence rejects '0 0 21 * * *', '@daily', '0 9 30 2 *' and time zone 'Mars/Base', each with its PRD error message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-recurrence.ac4",
+            "title": "presetToCron returns '0 * * * *' for hourly, '5 9 * * 1-5' for weekdays 09:05 and '0 9 * * 1' for weekly mon 09:00, and throws for '24:00'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-recurrence.ac5",
+            "title": "package.json contains \"croner\": \"10.0.1\" under dependencies and bun.lock resolves croner@10.0.1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schedule-store",
+        "title": "Add the conversation_schedules table and its door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:45:04.092Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4640",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "schedule-routes",
+            "schedule-sweep",
+            "schedule-cli"
+          ],
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/paths.ts",
+            "src/lib/overdeck/conversation-schedules.ts",
+            "src/lib/overdeck/__tests__/conversation-schedules.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-schedules.test.ts tests/unit/scripts/create-overdeck-db.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "conversation-schedules.test.ts and create-overdeck-db.test.ts pass",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Its files (init SQL, infra.ts top-up, paths.ts, the new door and its test) are touched by no other item in this plan; dependents start only after it completes."
+        },
+        "narrative": {
+          "Action": "Add the conversation_schedules DDL from PRD WI-2 to drizzle/overdeck/0000_overdeck_init.sql after conversation_bookmarks, the matching CREATE TABLE/INDEX IF NOT EXISTS top-ups in ensureRuntimeIndexesSync in src/lib/overdeck/infra.ts after the bookmarks top-up, and bump OVERDECK_TABLE_COUNT in src/lib/overdeck/paths.ts by one (41 to 42 today). Create the door src/lib/overdeck/conversation-schedules.ts with the exact WI-2 surface (validateScheduleInput, validateSchedulePatch, create/list/listAll/get/update/remove, listDueSchedules, claimScheduleRun compare-and-set, recordScheduleRunOutcome), joining conversations by name like conversation-bookmarks.ts. Never add lines to src/lib/overdeck/conversations.ts (it is at its 1,222-line cap). Write the WI-2 tests with a temp OVERDECK_HOME and explicit now values."
+        },
+        "items": [
+          {
+            "id": "schedule-store.ac1",
+            "title": "createConversationSchedule on an operator conversation returns status 'created' with nextRunAt equal to nextRunAfter(cron, zone, now), and listConversationSchedules returns that schedule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-store.ac2",
+            "title": "createConversationSchedule refuses an agent- conversation with code 'agent-conversation', returns 'not-found' for an unknown name, and returns 'limit' for the 21st schedule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-store.ac3",
+            "title": "claimScheduleRun returns true for the stored next_run_at and returns false when called again with the same expected value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-store.ac4",
+            "title": "Given a paused schedule, when updateConversationSchedule sets enabled true at time T, then next_run_at is recomputed from T and listDueSchedules marks archived conversations with archived true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-store.ac5",
+            "title": "Deleting a conversation row deletes its schedules, and a fresh database created by create-overdeck-db contains the conversation_schedules table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schedule-routes",
+        "title": "Expose schedule CRUD routes under /api/conversations/:name/schedules",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:45:04.092Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4640",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversation-schedules.ts",
+            "src/dashboard/server/routes/__tests__/conversation-schedules-route.test.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-schedules-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-schedules-route.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/conversation-schedules.ts by copying the structure of routes/conversation-bookmarks.ts and implement GET, POST, PATCH and DELETE exactly per the PRD WI-3 table (validateOrigin first, 201 on create, 400 validation, 404 unknown conversation or schedule, 409 with code for agent-conversation, vault-browse-copy and limit, 400 'Invalid schedule id' for a non-numeric id). Register conversationSchedulesRouteLayer in src/dashboard/server/server.ts next to conversationBookmarksRouteLayer, add four rows to tests/unit/lib/overdeck/no-loss-matrix.ts after the bookmarks rows, and write the WI-3 route tests with the bookmark route test harness. Do not add route-scopes.ts rows."
+        },
+        "items": [
+          {
+            "id": "schedule-routes.ac1",
+            "title": "POST /api/conversations/:name/schedules with a valid daily cron returns 201 with the schedule, and a following GET returns it in schedules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-routes.ac2",
+            "title": "POST with cron '* * * * *' returns 400 with the 15-minute message, and POST on an agent- conversation returns 409 with code 'agent-conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-routes.ac3",
+            "title": "PATCH with {enabled:false} returns the schedule with enabled false, and DELETE returns 200 then 404 on a second call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-routes.ac4",
+            "title": "no-loss-matrix.test.ts passes with the four schedule routes present in the matrix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resume-cause-override",
+        "title": "Let handleConversationResume take an optional resume cause",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:45:04.092Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4640",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-resume-clear-chain.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-resume-clear-chain.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "conversation-resume-clear-chain.test.ts passes including the PAN-4640 cases",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/conversation-runtime.ts add `resumeCause?: ResumeCause` to the deps parameter of handleConversationResume, compute `resumeCause = deps.resumeCause ?? (conv.status === 'ended' ? 'operator' : 'system')` on the existing line, and import `type ResumeCause` in the existing resume-contract import (zero net lines, per the PRD WI-4 before/after). Add a describe('PAN-4640 resume cause override') block to conversation-resume-clear-chain.test.ts asserting the delivered contract text for both cases; if the contract does not reach the mocked deliverAgentMessage, mock ../resume-contract-delivery.js instead."
+        },
+        "items": [
+          {
+            "id": "resume-cause-override.ac1",
+            "title": "Given an ended conversation, when handleConversationResume runs with resumeCause 'message', then the delivered resume contract contains 'because a new message arrived while it was stopped'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-cause-override.ac2",
+            "title": "Given an ended conversation, when handleConversationResume runs without resumeCause, then the delivered resume contract still contains 'The operator resumed this session'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schedule-sweep",
+        "title": "Add the dashboard sweep that fires due schedules",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:45:04.092Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4640",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "schedule-docs"
+          ],
+          "acJustification": "Five unit-level criteria pin the firing semantics (collapse, lost claim, archived skip, no retry, resume-before-deliver, timer wiring); the sixth is the issue's end-to-end criterion that only a live dashboard can prove, kept on the item that owns the behavior so the test role verifies it here.",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-schedule-service.ts",
+            "src/dashboard/server/services/__tests__/conversation-schedule-service.test.ts",
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-schedule-service.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "conversation-schedule-service.test.ts passes under fake timers",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-14",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Its files (the new service, its test, main.ts) are touched by no other item; it consumes the door and the resume-cause override only after both complete."
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation-schedule-service.ts per PRD WI-5: runScheduleSweepOnce walks listDueSchedules sequentially, computes the next occurrence from the current clock, claims with claimScheduleRun before firing, records 'skipped' for archived conversations, and records 'delivered' or 'failed' (no retry). fireScheduledPrompt resolves the /clear chain head, resumes via handleConversationResume with resumeCause 'message' when conversationHarnessAlive is false, then calls handleConversationMessage with the '[Scheduled run · schedule <id> · <cron> · <zone>]' header and deliverAs 'follow_up' only for Pi harnesses. Start/stop copy the PR sync service (boot +30 s, 60 s, unref'd timers, non-overlap flag); wire them in src/dashboard/server/main.ts inside `if (!isPeerDashboard)` after the PR sync block and next to stopPullRequestSyncService. Tests inject every collaborator and use vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "schedule-sweep.ac1",
+            "title": "Given a schedule due three days ago with cron '0 21 * * *' UTC, when one sweep runs, then fire is called exactly once and claim stores the first 21:00 after now",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-sweep.ac2",
+            "title": "Given claim returns false, fire is never called; given archived true, record stores 'skipped' with 'conversation archived' and fire is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-sweep.ac3",
+            "title": "Given fire resolves {ok:false}, record stores 'failed' with the error and a second sweep at the same time fires nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-sweep.ac4",
+            "title": "Given conversationHarnessAlive returns false, fireScheduledPrompt calls handleConversationResume with resumeCause 'message' before handleConversationMessage, whose message starts with '[Scheduled run · schedule ' and carries deliverAs 'follow_up' only for a pi conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-sweep.ac5",
+            "title": "Given fake timers, when startConversationScheduleService runs and time advances 30 s then 60 s, then two sweeps run, and after stopConversationScheduleService no further sweep runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-sweep.ac6",
+            "title": "Live (test role, no browser): given a dashboard built from the branch and a schedule due one minute ahead on a stopped operator conversation, when the time passes, then the sweep records last_run_at and advances next_run_at within 60 s, and once the resumed session is ready the transcript contains the '[Scheduled run · schedule <id> ·' prompt and pan conv schedule list shows last run 'delivered'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schedule-cli",
+        "title": "Add pan conv schedule add|list|pause|resume|rm",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:45:04.092Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4640",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/conversations/schedule.ts",
+            "src/cli/commands/conversations/index.ts",
+            "src/cli/commands/conversations/__tests__/schedule.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/conversations/__tests__/schedule.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "schedule.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Register the nested `schedule` group in registerConversationsCommands (src/cli/commands/conversations/index.ts) with add, list, pause, resume and rm exactly as PRD WI-6 shows (use `--weekly <spec>`, never a space inside the angle brackets). Implement src/cli/commands/conversations/schedule.ts: resolve <conv> from self/./current/me, a number, a name or a unique title; require exactly one recurrence flag and exactly one of --prompt/--prompt-file; write through the dashboard routes with an ECONNREFUSED fallback to the door like pull-requests.ts; print add and list output with next-run times formatted in the schedule's own zone. Write the WI-6 tests mocking the door, resolveCurrentConversation and fetch."
+        },
+        "items": [
+          {
+            "id": "schedule-cli.ac1",
+            "title": "pan conv schedule add self --daily 21:00 --prompt hi --tz America/New_York sends POST /api/conversations/<name>/schedules with cron '0 21 * * *', timeZone 'America/New_York' and enabled true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-cli.ac2",
+            "title": "Passing both --cron and --hourly exits 1 with 'Pass exactly one of --cron, --hourly, --daily, --weekdays, --weekly'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-cli.ac3",
+            "title": "pan conv schedule pause 3 sends PATCH {enabled:false} to the conversation that owns schedule 3, and an unknown id exits 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-cli.ac4",
+            "title": "pan conv schedule list prints the schedule's next run as 21:00 with the zone abbreviation for a '0 21 * * *' America/New_York schedule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-cli.ac5",
+            "title": "When fetch fails with ECONNREFUSED, add falls back to createConversationSchedule and prints the created schedule id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schedule-docs",
+        "title": "Document scheduled runs in the user docs, the pan-conversations skill and the architecture doc",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:45:04.092Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4640",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "sync-sources/skills/pan-conversations/SKILL.md",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "cli/overview.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "npm run lint:skills",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "lint:skills reports no skill/CLI drift",
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a '## Scheduled runs' section to features/conversations.mdx after '## Bookmarks' covering every point in PRD WI-7 step 1; add the schedule verbs, trigger, description entry and a Notes bullet to sync-sources/skills/pan-conversations/SKILL.md; add a 'Conversation schedules (PAN-4640)' subsection to docs/DASHBOARD-ARCHITECTURE.md next to the PR-links text explaining the table, door, routes, sweep and why it is not a deacon-lite patrol; add `pan conv schedule add` to the Conversations row on cli/overview.mdx line 44. Then run npm run build, npm run lint:skills and npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "schedule-docs.ac1",
+            "title": "features/conversations.mdx contains a '## Scheduled runs' section that shows a `pan conv schedule add self --daily 21:00` example and states the 15-minute minimum, the one-run-after-downtime rule and that failed runs are not retried",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-docs.ac2",
+            "title": "SKILL.md contains the five 'pan conversations schedule' command lines and npm run lint:skills passes against the built CLI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-docs.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a 'Conversation schedules (PAN-4640)' subsection that names conversation-schedule-service.ts and explains why the sweep runs in the dashboard process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "schedule-recurrence",
+        "to": "schedule-store",
+        "type": "blocks"
+      },
+      {
+        "from": "schedule-store",
+        "to": "schedule-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "schedule-store",
+        "to": "schedule-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "resume-cause-override",
+        "to": "schedule-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "schedule-store",
+        "to": "schedule-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "schedule-routes",
+        "to": "schedule-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "schedule-sweep",
+        "to": "schedule-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "schedule-cli",
+        "to": "schedule-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
