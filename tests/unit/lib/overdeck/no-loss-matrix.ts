@@ -80,6 +80,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/agents/:id/classify-completion',                 kind: 'http', disposition: 'RELOCATE',   door: 'Orchestration' },
   { surface: 'POST /api/internal/agents/:id/permissions/request',        kind: 'http', disposition: 'RELOCATE',   door: 'AgentPermissionsWriter.request' },
   { surface: 'POST /api/agents/:id/permissions/:requestId/respond',      kind: 'http', disposition: 'RELOCATE',   door: 'AgentPermissionsWriter.resolve' },
+  { surface: 'POST /api/agents/:id/plan-action',                         kind: 'http', disposition: 'RELOCATE',   door: 'ExitPlanMode keystrokes, agent mirror of conversation plan-action (PAN-1520)' },
   { surface: 'GET /api/agents/:id/runtime',                              kind: 'http', disposition: 'READ',       door: 'AgentsResolver.getRuntime' },
   { surface: 'GET /api/agents/:id/git-info',                             kind: 'http', disposition: 'RELOCATE',   door: 'Workspace/git' },
   { surface: 'GET /api/agents/:id/activity',                             kind: 'http', disposition: 'RELOCATE',   door: 'Transcripts/runtime' },
