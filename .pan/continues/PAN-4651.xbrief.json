@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T20:35:01.703Z",
+  "updated": "2026-11-01T20:38:42.521Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,9 +148,10 @@
       "doneAt": "2026-11-01T20:34:57.179Z"
     },
     "wi24-fleet-usage": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4651",
-      "claimedAt": "2026-11-01T20:35:01.703Z"
+      "claimedAt": "2026-11-01T20:35:01.703Z",
+      "doneAt": "2026-11-01T20:38:42.520Z"
     }
   }
 }
