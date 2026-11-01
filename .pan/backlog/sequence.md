@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T07:42:13Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-01T07:55:09Z · model: claude-opus-5-5 · open: 872_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -12,6 +12,7 @@ _Last sequenced: 2026-11-01T07:42:13Z · model: claude-opus-5-5 · open: 871_
 | 5 | PAN-4670 | S | high | ok |  |  | In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs. |
 | 6 | PAN-4672 | S | high | ok |  |  | In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout. |
 | 7 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
+| 7 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 8 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 9 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 10 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
@@ -907,6 +908,10 @@ New in-pipeline substrate-improvement bug filed after the prior run; pinned in t
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
+### PAN-4690 (rank 7)
+
+New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).
+
 ### PAN-4553 (rank 8)
 
 New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup failures fatal, the unconditional root npm install in workspace-manager/create.ts aborts every polyrepo workspace creation, so pan start fails for all MYN issues and the CLI misreports it as an unresponsive dashboard. The fix is small (skip the root install when the workspace root has no package.json, surface the real error) and it supersedes the non-fatal PAN-4390 report of the same root cause.
@@ -1195,10 +1200,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
-### PAN-4213 (rank 80)
-
-Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1206,10 +1207,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T07:42:13Z",
+  "generatedAt": "2026-11-01T07:55:09Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 871,
+  "openCount": 872,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -12111,6 +12112,19 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4690",
+      "rank": 7,
+      "size": "S",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched",
+      "rationale": "New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13793,6 +13807,20 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4690",
+      "to": "PAN-4626",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4690",
+      "to": "PAN-4643",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }
