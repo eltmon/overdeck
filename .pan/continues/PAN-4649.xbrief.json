@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4649",
+  "created": "2026-11-01T05:49:52.049Z",
+  "updated": "2026-11-01T05:49:52.049Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "approve-scope": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4649",
+      "claimedAt": "2026-11-01T05:49:52.049Z"
+    }
+  }
+}
