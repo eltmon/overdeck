@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T04:45:43Z · model: claude-opus-5-5 · open: 857_
+_Last sequenced: 2026-11-01T04:52:45Z · model: claude-opus-5-5 · open: 860_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -268,9 +268,9 @@ _Last sequenced: 2026-11-01T04:45:43Z · model: claude-opus-5-5 · open: 857_
 | 274 | PAN-4654 | M | medium | needs-refinement |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
 | 275 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 276 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 277 | PAN-4649 | M | medium | needs-refinement |  |  | Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending. |
+| 277 | PAN-4649 | M | medium | ok |  |  | Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending. |
 | 278 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650, PAN-4649 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
-| 279 | PAN-4647 | M | medium | needs-refinement |  | PAN-4645 | Auto-save pipeline agent transcripts to the Session Vault so linked machines can read them. Body pending. |
+| 279 | PAN-4647 | M | medium | ok |  | PAN-4645 | Auto-save pipeline agent transcripts to the Session Vault so linked machines can read them. Body pending. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
 | 282 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
@@ -283,7 +283,7 @@ _Last sequenced: 2026-11-01T04:45:43Z · model: claude-opus-5-5 · open: 857_
 | 289 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
 | 290 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
-| 292 | PAN-4648 | M | medium | needs-refinement |  | PAN-4645 | Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending. |
+| 292 | PAN-4648 | M | medium | ok |  | PAN-4645 | Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending. |
 | 293 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
 | 294 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
@@ -819,7 +819,10 @@ _Last sequenced: 2026-11-01T04:45:43Z · model: claude-opus-5-5 · open: 857_
 | 827 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 828 | PAN-4644 | L | low | ok |  |  | Import VS Code themes and custom color themes for UI tokens, terminal palette and syntax highlighting; cosmetic, large surface. |
 | 829 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 830 | PAN-4658 | S | low | needs-refinement |  | PAN-4642 | Cite text from the EditorPane markdown preview; needs a decision on how the preview picks its target conversation. Builds on #4642. |
+| 831 | PAN-4659 | M | low | ok |  | PAN-4644 | Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, waits for #4644 to merge. |
 | 832 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 833 | PAN-4660 | M | low | ok |  | PAN-4644 | Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, waits for #4644 to merge. |
 | 834 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 835 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
 | 836 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
@@ -1192,10 +1195,10 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T04:45:43Z",
+  "generatedAt": "2026-11-01T04:52:45Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 857,
+  "openCount": 860,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -4569,7 +4572,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "size": "M",
       "importance": "medium",
       "score": 44,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
       "why": "Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending.",
       "rationale": "Rank 278->277 (swap with PAN-4651): revision 5 lists it as a start-now item that PAN-4651 waits for; dropped the inferred PAN-4650 dependency.",
@@ -4599,7 +4602,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "size": "M",
       "importance": "medium",
       "score": 46,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4645"
       ],
@@ -4760,7 +4763,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "size": "M",
       "importance": "medium",
       "score": 42,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4645"
       ],
@@ -11373,6 +11376,36 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "planning": "auto"
     },
     {
+      "issue": "PAN-4658",
+      "rank": 830,
+      "size": "S",
+      "importance": "low",
+      "score": 22,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4642"
+      ],
+      "why": "Cite text from the EditorPane markdown preview; needs a decision on how the preview picks its target conversation. Builds on #4642.",
+      "rationale": "New issue split from #4642; ranked just after it because it reuses its citation store and has an open design decision.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4659",
+      "rank": 831,
+      "size": "M",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4644"
+      ],
+      "why": "Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, waits for #4644 to merge.",
+      "rationale": "New issue split from #4644 with clear AC; cosmetic and blocked on #4644, so it sits right after that issue.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3505",
       "rank": 832,
       "size": "XS",
@@ -11382,6 +11415,21 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "dependsOn": [],
       "why": "Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close",
       "rationale": "Triage: flywheelRunId and the main-push guard both still exist; verify the allowlist bug against current logic. Rank held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4660",
+      "rank": 833,
+      "size": "M",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4644"
+      ],
+      "why": "Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, waits for #4644 to merge.",
+      "rationale": "New issue split from #4644 with clear AC; cosmetic and blocked on #4644, so it sits right after that issue.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13532,6 +13580,27 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     {
       "from": "PAN-4639",
       "to": "PAN-4657",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4642",
+      "to": "PAN-4658",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4644",
+      "to": "PAN-4659",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4644",
+      "to": "PAN-4660",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
