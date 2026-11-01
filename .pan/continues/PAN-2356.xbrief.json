@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T15:07:46.892Z",
+  "updated": "2026-11-01T15:08:01.087Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -462,6 +462,10 @@
       "claimedBy": "agent-pan-2356",
       "claimedAt": "2026-11-01T15:07:32.360Z",
       "doneAt": "2026-11-01T15:07:46.892Z"
+    },
+    "wi23-docs-dev.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:08:01.086Z"
     }
   }
 }
