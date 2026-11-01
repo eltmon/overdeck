@@ -20,6 +20,7 @@ import { setHeartbeatConversationsHashSource, setHeartbeatEndpointsHashSource } 
 import { startTransferSweep } from './conversation-release-service.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
 import { createLinkedConversationsSync } from './linked-conversations-sync.js';
+import { stopForwardsWithoutLink } from './port-forwards.js';
 
 let supervisor: LinkSupervisor | null = null;
 let advertiser: EndpointAdvertiser | null = null;
@@ -71,7 +72,10 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   // on the same cadence as the store snapshot.
   reconcileTimer = setInterval(() => {
     supervisor?.reconcile();
-    linkedConversations.prune(linksSnapshot().filter((link) => link.revokedAt === null).map((link) => link.environmentId));
+    const active = linksSnapshot().filter((link) => link.revokedAt === null).map((link) => link.environmentId);
+    linkedConversations.prune(active);
+    // PAN-4650 WI-18: a forward closes when its link goes away.
+    stopForwardsWithoutLink(active);
   }, MACHINE_LINKS_REFRESH_MS);
   reconcileTimer.unref?.();
   // PAN-4650 WI-9: Pull here transfer directories live at most 15 minutes.
