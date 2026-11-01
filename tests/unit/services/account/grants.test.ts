@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_STORAGE_CAP_BYTES, entitlementFor, quotaDecision } from '../../../../services/account/src/entitlement.ts';
+import { DEFAULT_STORAGE_CAP_BYTES, FREE_PLAN_MAX_MACHINES, entitlementFor, quotaDecision } from '../../../../services/account/src/entitlement.ts';
 import {
   addGrant,
   getActiveGrant,
@@ -146,11 +146,21 @@ describe('entitlement and storage cap (D-26, D-27)', () => {
     const { rc } = setup();
     const grant = await addGrant(rc, 100, 'alice', { storageCapBytes: 2147483648 }, 'admin-add');
     expect(entitlementFor(grant).storageBytesCap).toBe(2147483648);
-    expect(entitlementFor({ storage_cap_bytes: null }).storageBytesCap).toBe(DEFAULT_STORAGE_CAP_BYTES);
+    expect(entitlementFor({ storage_cap_bytes: null, entitlement: 'tester' }).storageBytesCap).toBe(DEFAULT_STORAGE_CAP_BYTES);
+  });
+
+  it('a free grant is the free plan with 3 machines; any other grant is tester (PAN-2356)', () => {
+    expect(FREE_PLAN_MAX_MACHINES).toBe(3);
+    expect(entitlementFor({ storage_cap_bytes: null, entitlement: 'free' })).toEqual({
+      plan: 'free', storageBytesCap: DEFAULT_STORAGE_CAP_BYTES, maxDevices: 3,
+    });
+    expect(entitlementFor({ storage_cap_bytes: null, entitlement: 'tester' })).toEqual({
+      plan: 'tester', storageBytesCap: DEFAULT_STORAGE_CAP_BYTES, maxDevices: null,
+    });
   });
 
   it('quotaDecision allows exactly-at-cap and refuses one byte over', () => {
-    const e = entitlementFor({ storage_cap_bytes: 1000 });
+    const e = entitlementFor({ storage_cap_bytes: 1000, entitlement: 'tester' });
     expect(quotaDecision(e, 600, 400)).toEqual({ allowed: true });
     expect(quotaDecision(e, 600, 401)).toEqual({ allowed: false, reason: 'quota_exceeded', capBytes: 1000, usedBytes: 600 });
     expect(quotaDecision(e, 0, 0)).toEqual({ allowed: true });

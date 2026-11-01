@@ -111,6 +111,7 @@ interface LookupRow {
   deleted_at: number | null;
   grant_github_id: number | null;
   storage_cap_bytes: number | null;
+  grant_entitlement: string | null;
   grant_expires_at: number | null;
 }
 
@@ -135,7 +136,7 @@ export async function lookupDevice(rc: DeviceContext, token: string): Promise<De
   const row = await rc.env.DB.prepare(
     `SELECT d.device_id, d.user_id, d.revoked_at, d.last_used_at,
             u.github_id, u.github_login, u.deleted_at,
-            g.github_id AS grant_github_id, g.storage_cap_bytes, g.expires_at AS grant_expires_at
+            g.github_id AS grant_github_id, g.storage_cap_bytes, g.entitlement AS grant_entitlement, g.expires_at AS grant_expires_at
      FROM devices d
      JOIN users u ON u.user_id = d.user_id
      LEFT JOIN grants g ON g.github_id = u.github_id
@@ -149,7 +150,9 @@ export async function lookupDevice(rc: DeviceContext, token: string): Promise<De
 
   const owner = isOwner(rc, row.github_id);
   const grantActive = row.grant_github_id !== null && (row.grant_expires_at === null || row.grant_expires_at > now);
-  const entitlement = owner ? entitlementFor(null) : entitlementFor(grantActive ? { storage_cap_bytes: row.storage_cap_bytes } : null);
+  const entitlement = owner
+    ? entitlementFor(null)
+    : entitlementFor(grantActive ? { storage_cap_bytes: row.storage_cap_bytes, entitlement: row.grant_entitlement ?? 'tester' } : null);
 
   if (row.last_used_at === null || row.last_used_at < now - LAST_USED_THROTTLE_MS) {
     await rc.env.DB.prepare('UPDATE devices SET last_used_at = ? WHERE device_id = ? AND (last_used_at IS NULL OR last_used_at < ?)')
