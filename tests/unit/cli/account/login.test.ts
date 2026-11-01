@@ -42,22 +42,20 @@ function form(fields: Record<string, string>): string {
   return new URLSearchParams(fields).toString();
 }
 
+const realSetTimeout = globalThis.setTimeout;
+
 /**
- * Sinon's fake timers (vi.useFakeTimers) fake setImmediate too, so neither advanceTimersByTimeAsync(0)
- * nor a process.nextTick loop observes real filesystem I/O completing (ensureEnvironmentIdentity,
- * readAccount). A direct `await` on such a promise still resolves for real regardless of the fake
- * timers, so this briefly switches to real timers to let pending real I/O settle, then switches back
- * before the caller advances fake time for pollForToken's waits.
+ * Real filesystem I/O (ensureEnvironmentIdentity, readAccount) resolves on its own regardless
+ * of vi.useFakeTimers() — sinon's fake timers never touch Node's real I/O completion — but
+ * observing that from the test needs a real wait between checks since a *faked* setTimeout
+ * never fires by itself. This uses the real setTimeout captured above before any faking, so
+ * the fake timers installed in beforeEach (and the fake Date pollForToken's wait accounting
+ * shares with the service, per the D-5 clock rule) are never disturbed. A tick cap, not a
+ * Date.now() deadline, because Date is one of the things vi.useFakeTimers() fakes.
  */
-async function flushRealIo(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
-  vi.useRealTimers();
-  try {
-    const deadline = Date.now() + timeoutMs;
-    while (!predicate() && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    }
-  } finally {
-    vi.useFakeTimers();
+async function flushRealIo(predicate: () => boolean, maxTicks = 400): Promise<void> {
+  for (let i = 0; i < maxTicks && !predicate(); i++) {
+    await new Promise((resolve) => realSetTimeout(resolve, 5));
   }
 }
 
@@ -103,8 +101,6 @@ describe('loginCommand (PAN-4330 W-4)', () => {
   });
 
   it('stores a 0600 account.json with an odd_ token and githubLogin "owner", and prints a line with "as owner" (ac1)', async () => {
-    // flushRealIo briefly uses real timers to let real filesystem I/O settle (see its own doc comment);
-    // under load the default 5s test timeout can be tight for two such flushes plus setup overhead.
     const { env, deps } = setup(OWNER);
     const io = makeIo();
     const loginPromise = loginCommand({ baseUrl: TEST_BASE_URL }, io, { fetch: serviceFetch(env, deps) });
@@ -113,7 +109,6 @@ describe('loginCommand (PAN-4330 W-4)', () => {
     const userCode = extractUserCode(io.stdout);
     await approveInBrowser(env, deps, userCode);
     await vi.advanceTimersByTimeAsync(5000);
-    await flushRealIo(() => io.stdout.some((l) => l.includes('Signed in to')));
     await loginPromise;
 
     expect(io.stdout.some((line) => line.includes('as owner'))).toBe(true);
@@ -123,7 +118,7 @@ describe('loginCommand (PAN-4330 W-4)', () => {
     if (process.platform !== 'win32') {
       expect(statSync(accountPath()).mode & 0o777).toBe(0o600);
     }
-  }, 20000);
+  });
 
   it('exits 1 with the invite-list message and writes no account.json for a non-allowlisted identity (ac2)', async () => {
     const { env, deps } = setup(STRANGER);
@@ -138,7 +133,7 @@ describe('loginCommand (PAN-4330 W-4)', () => {
     expect(await runPromise).toBe(1);
     expect(io.stderr).toContain(ACCESS_DENIED_MESSAGE);
     await expect(readAccount()).resolves.toBeNull();
-  }, 20000);
+  });
 
   it('exits 1 for an unsupported platform before any fetch call (ac3)', async () => {
     const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')!;
