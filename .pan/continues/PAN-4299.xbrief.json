@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4299",
   "created": "2026-11-01T05:05:33.847Z",
-  "updated": "2026-11-01T05:31:36.938Z",
+  "updated": "2026-11-01T05:31:51.297Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "compose-migration-helper.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T05:31:36.938Z"
+    },
+    "compose-migration-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:31:51.297Z"
     }
   }
 }
