@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4680",
   "created": "2026-11-01T07:24:32.678Z",
-  "updated": "2026-11-01T09:27:27.874Z",
+  "updated": "2026-11-01T09:27:45.112Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,10 @@
     "serialize-appends.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T09:27:27.873Z"
+    },
+    "queue-order-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:27:45.112Z"
     }
   }
 }
