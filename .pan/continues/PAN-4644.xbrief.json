@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4644",
   "created": "2026-11-01T04:54:46.297Z",
-  "updated": "2026-11-01T05:32:03.283Z",
+  "updated": "2026-11-01T05:38:37.723Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-01T05:31:57.339Z"
     },
     "vscode-json-mapper": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4644",
-      "claimedAt": "2026-11-01T05:32:03.283Z"
+      "claimedAt": "2026-11-01T05:32:03.283Z",
+      "doneAt": "2026-11-01T05:38:37.722Z"
     }
   }
 }
