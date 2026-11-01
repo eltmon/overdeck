@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T23:39:00.465413Z · model: claude-opus-5-5 · open: 862_
+_Last sequenced: 2026-11-01T23:40:35.653714Z · model: claude-opus-5-5 · open: 862_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -602,7 +602,7 @@ _Last sequenced: 2026-11-01T23:39:00.465413Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 603 | PAN-4296 | L | medium | ok |  | PAN-1676 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
+| 603 | PAN-4296 | L | medium | ok |  | PAN-4652, PAN-1676 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
 | 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -1197,7 +1197,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T23:39:00.465413Z",
+  "generatedAt": "2026-11-01T23:40:35.653714Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 862,
@@ -8652,6 +8652,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "score": 34,
       "condition": "ok",
       "dependsOn": [
+        "PAN-4652",
         "PAN-1676"
       ],
       "why": "Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time",
@@ -13218,6 +13219,13 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4652",
+      "to": "PAN-4296",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
