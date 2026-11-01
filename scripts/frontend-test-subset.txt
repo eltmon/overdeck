@@ -42,6 +42,7 @@ src/components/IssueActionMenu/__tests__/useIssueActions.render-count.test.tsx
 src/components/Settings/__tests__/ColorThemeImportPreview.test.tsx
 src/components/Settings/__tests__/ColorThemeSection.test.tsx
 src/components/Settings/__tests__/ModelPresetsBar.test.tsx
+src/components/Settings/anywhere/__tests__/AddSshMachineDialog.test.tsx
 src/components/Settings/anywhere/__tests__/AddTriggerDialog.test.tsx
 src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx
 src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx

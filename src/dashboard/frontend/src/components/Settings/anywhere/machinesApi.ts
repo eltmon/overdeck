@@ -8,7 +8,7 @@ import type { LinkAccess, MachineLinkView, MachinesResponse } from '@overdeck/co
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import { apiError, type ApiResult, isOk } from './anywhereApi';
 
-export type { InboundMachineView, LinkAccess, LinkState, MachineLinkView, MachinesResponse } from '@overdeck/contracts';
+export type { InboundMachineView, LinkAccess, LinkState, MachineLinkView, MachinesResponse, SshLinkInfo } from '@overdeck/contracts';
 
 export const MACHINES_QUERY_KEY = ['anywhere-machines'] as const;
 
