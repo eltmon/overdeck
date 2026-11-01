@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T13:45:16.877Z",
+  "updated": "2026-11-01T13:45:44.961Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "wi2-account-free-plan.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T13:45:16.877Z"
+    },
+    "wi3-connect-scaffold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:45:44.961Z"
     }
   }
 }
