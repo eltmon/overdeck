@@ -4,17 +4,17 @@
     "created": "2026-11-01T05:09:13Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2354: Needs-you push to the phone: Web Push sent from the machine with RFC 8291 encryption, optional ntfy",
-    "updated": "2026-11-01T05:12:27.639Z"
+    "updated": "2026-11-01T05:46:37.988Z"
   },
   "plan": {
     "id": "pan-2354",
     "title": "Needs-you push to the phone: Web Push sent from the machine with RFC 8291 encryption, optional ntfy",
-    "status": "proposed",
+    "status": "running",
     "uid": "b89a6e91-cada-49d3-9dbc-5cf9c4164de8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T05:09:13Z",
-    "updated": "2026-11-01T05:12:27.639Z",
+    "updated": "2026-11-01T05:46:37.988Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2354",
@@ -1352,5 +1352,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
