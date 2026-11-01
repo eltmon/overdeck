@@ -508,6 +508,58 @@ describe('pan skills pack', () => {
     expect(mocks.addPack).not.toHaveBeenCalled();
   });
 
+  it('truncates a non-runtime pack executables list after three', async () => {
+    const many = { ...preview, manifest: { ...preview.manifest, capabilities: { ...capabilities, executables: ['a.sh', 'b.sh', 'c.sh', 'd.sh'] } } };
+    mocks.addPack.mockImplementation(async (_input: unknown, confirm: (p: typeof many) => Promise<boolean>) => ({ written: await confirm(many), preview: many }));
+    await expect(run(...addArgs)).rejects.toThrow('exit 1');
+    const out = logs.join('\n');
+    expect(out).toContain('  Executables  a.sh, b.sh, c.sh, …');
+    expect(out).not.toContain('d.sh');
+    expect(out).not.toContain('  Runs');
+  });
+
+  describe('gstack runtime pack (PAN-4727)', () => {
+    const GSTACK_COMMIT = '541f9683'.padEnd(40, '0');
+    const executables = ['bin/gstack-config', 'bin/gstack-paths', 'bin/gstack-skill-start', 'review/bin/x.sh', 'scripts/pack-render.sh'];
+    const command = ['bash', 'setup', '--pack-root', `/h/.overdeck/packs/gstack/render/${GSTACK_COMMIT}`, '--pack-state-root', '/h/.overdeck/packs/gstack/state'];
+    const gstackPreview = {
+      id: 'gstack', url: 'https://github.com/eltmon/gstack', ref: 'main', commit: GSTACK_COMMIT, adapter: 'gstack-runtime',
+      runtime: { command },
+      manifest: {
+        skills: [
+          { name: 'codex', dir: 'codex', description: '', optIn: true },
+          { name: 'review', dir: 'review', description: '', optIn: false },
+        ],
+        capabilities: { ...capabilities, hooks: true, executables, projectMutatingSkills: ['codex'], requiresCli: ['bun'], runtime: true },
+        license: 'MIT', pluginName: null,
+        excluded: [{ name: 'gstack-upgrade', reason: 'Runs git reset --hard on the install; Overdeck pins commits.' }, { name: 'qa', reason: 'Calls $B.' }],
+      },
+    };
+    const gstackArgs = ['pack', 'add', 'gstack', 'https://github.com/eltmon/gstack', '--ref', 'main'];
+
+    beforeEach(() => {
+      mocks.addPack.mockImplementation(async (_input: unknown, confirm: (p: typeof gstackPreview) => Promise<boolean>) => {
+        const written = await confirm(gstackPreview);
+        if (written) mocks.writePackEntry();
+        return { written, preview: gstackPreview };
+      });
+    });
+
+    it('shows the render command, every executable, what is not mounted and bun', async () => {
+      await expect(run(...gstackArgs)).rejects.toThrow('exit 1');
+      const out = logs.join('\n');
+      expect(out).toContain(`  Runs         ${command.join(' ')}`);
+      expect(out).toContain('  Executables  5 files the mounted skills can run:');
+      for (const file of executables) expect(out).toContain(`\n                ${file}`);
+      expect(out).not.toContain('…');
+      expect(out).toContain('  Not mounted  2: gstack-upgrade (Runs git reset --hard on the install; Overdeck pins commits.); qa (Calls $B.)');
+      expect(out).toContain('  Requires     bun');
+      expect(out).toContain('Trusting runs the command above once now; skills run the listed scripts when you invoke them.');
+      expect(out).toContain('Not written: re-run with --yes to trust 541f968.');
+      expect(mocks.writePackEntry).not.toHaveBeenCalled();
+    });
+  });
+
   it('accepts the deft-readonly adapter', async () => {
     await run(...addArgs, '--adapter', 'deft-readonly', '--yes');
     expect(mocks.addPack).toHaveBeenCalledWith(expect.objectContaining({ adapter: 'deft-readonly' }), expect.any(Function));

@@ -238,14 +238,27 @@ function printPackPreview(preview: PackPreview, notAppliedLabels: NotAppliedLabe
   const { manifest } = preview;
   const optIn = manifest.skills.filter(skill => skill.optIn).map(skill => skill.name);
   const executables = manifest.capabilities.executables;
+  // A runtime pack (gstack) runs its scripts, so consent lists every one of them (PAN-4727 D5).
+  const runtime = manifest.capabilities.runtime === true;
   const rows: Array<[string, string]> = [
     ['Source', `${preview.url} @ ${preview.ref} (${short(preview.commit)})`],
     ['Adapter', preview.adapter],
     ['License', manifest.license ?? 'unknown'],
     ['Skills', `${manifest.skills.length}${optIn.length > 0 ? ` (${optIn.length} opt-in: ${optIn.join(', ')})` : ''}`],
-    ['Executables', executables.length > 3 ? `${executables.slice(0, 3).join(', ')}, …` : listOrNone(executables)],
-    ['Not applied', listOrNone(notAppliedLabels(manifest.capabilities))],
   ];
+  if (manifest.excluded?.length) {
+    rows.push(['Not mounted', `${manifest.excluded.length}: ${manifest.excluded.map(skill => `${skill.name} (${skill.reason})`).join('; ')}`]);
+  }
+  if (runtime) {
+    rows.push(
+      ['Runs', preview.runtime?.command.join(' ') ?? 'unknown'],
+      ['Executables', `${executables.length} files the mounted skills can run:`],
+    );
+  } else {
+    rows.push(['Executables', executables.length > 3 ? `${executables.slice(0, 3).join(', ')}, …` : listOrNone(executables)]);
+  }
+  rows.push(['Not applied', listOrNone(notAppliedLabels(manifest.capabilities))]);
+  if (runtime) rows.push(['Requires', listOrNone(manifest.capabilities.requiresCli)]);
   if (preview.diff && preview.previousCommit) {
     rows.push(
       ['Previous', short(preview.previousCommit)],
@@ -257,6 +270,7 @@ function printPackPreview(preview: PackPreview, notAppliedLabels: NotAppliedLabe
   }
   console.log(chalk.bold(`Pack ${preview.id}`));
   for (const [label, value] of rows) console.log(`  ${label.padEnd(12)} ${value}`);
+  if (runtime) for (const file of executables) console.log(`${' '.repeat(16)}${file}`);
 }
 
 /** PD-10: `--yes` trusts; a TTY asks; anything else writes nothing. */
@@ -291,11 +305,16 @@ export async function skillsPackAddCommand(id: string, url: string, options: Pac
     console.error(chalk.red('--adapter must be plain, claude-plugin, deft-readonly, or gstack-runtime'));
     process.exit(1);
   }
-  const [{ addPack }, { CORE_SKILLS }] = await Promise.all([
+  const [{ addPack }, { CORE_SKILLS }, { KNOWN_PACKS }] = await Promise.all([
     import('../../lib/skill-packs/sources.js'),
     import('../../lib/skill-overrides/resolve.js'),
+    import('../../lib/skill-packs/adapters.js'),
   ]);
-  const note = `Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack ${id} on`;
+  const runtimeNote =
+    (options.adapter ?? KNOWN_PACKS[id]?.adapter) === 'gstack-runtime'
+      ? '\nTrusting runs the command above once now; skills run the listed scripts when you invoke them.'
+      : '';
+  const note = `Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack ${id} on${runtimeNote}`;
   const confirm = await packConfirm(options.yes, note);
   let result;
   try {
