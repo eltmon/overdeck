@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T18:47:06.241Z",
+  "updated": "2026-11-01T18:47:10.711Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4652",
       "claimedAt": "2026-11-01T18:41:45.588Z",
       "doneAt": "2026-11-01T18:47:06.241Z"
+    },
+    "wi3-fly-machine-services": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T18:47:10.711Z"
     }
   }
 }
