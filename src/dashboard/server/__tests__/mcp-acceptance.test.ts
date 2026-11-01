@@ -48,6 +48,7 @@ const stubs = Layer.mergeAll(
   stub('GET', '/api/conversations', [{ name: 'conv-a', title: 'Alpha', status: 'active' }, { name: 'conv-b', title: 'Beta', status: 'ended' }]),
   stub('POST', '/api/conversations/:name/message', { ok: true }),
   stub('POST', '/api/conversations', { name: 'conv-new' }),
+  stub('POST', '/api/fleet/conversations', { conversation: 'conv-new', machine: { environmentId: 'env-desk-1', label: 'desk', self: true }, reason: null }),
   stub('GET', '/api/conversations/:id', { name: 'conv-a', harness: 'claude-code' }),
   stub('POST', '/api/conversations/:id/permission', { ok: true }),
   stub('PUT', '/api/settings', { ok: true }),
@@ -180,10 +181,17 @@ describe('MCP acceptance with the default MCP scopes (PAN-4649 W-10)', () => {
     expect(stubCalls).toEqual([{ route: 'POST /api/conversations/:id/permission', body: { signature: 'sig-1', choice: 'allow-once' } }]);
   });
 
-  it('start_conversation reaches POST /api/conversations under operate', async () => {
+  it('start_conversation reaches POST /api/fleet/conversations under operate (PAN-4651)', async () => {
     const token = await mintToken([...MCP_DEFAULT_SCOPES]);
     const result = await callTool(token, 'start_conversation', { message: 'begin' });
     expect(result.isError).toBe(false);
-    expect(stubCalls).toEqual([{ route: 'POST /api/conversations', body: { message: 'begin' } }]);
+    expect(stubCalls).toEqual([{ route: 'POST /api/fleet/conversations', body: { message: 'begin' } }]);
+  });
+
+  it('PAN-4651 ac29: a linked conversation\'s permission prompt is refused without approve, before any forward', async () => {
+    const refused = await callTool(await mintToken([...MCP_DEFAULT_SCOPES]), 'answer_permission', { conversation: '@desk/conv-a', signature: 'sig-1', choice: 'allow-once' });
+    expect(refused.isError).toBe(true);
+    expect(refused.text).toContain('missingScope: approve');
+    expect(stubCalls).toEqual([]);
   });
 });

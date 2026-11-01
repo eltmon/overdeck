@@ -5,8 +5,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { ALL_TOOLS } from '../../../../src/lib/mcp/server.js';
-import { READ_TOOLS, resolveMachine } from '../../../../src/lib/mcp/tools-read.js';
-import { callTool, connectClient, ENVIRONMENT, fakeApi, resultJson, resultText } from './harness.js';
+import { READ_TOOLS } from '../../../../src/lib/mcp/tools-read.js';
+import { callTool, connectClient, fakeApi, resultJson, resultText } from './harness.js';
 
 const SCOPES = ['read:state', 'read:conversations', 'operate'];
 
@@ -19,11 +19,15 @@ describe('MCP read tools (PAN-4649 W-5)', () => {
     expect(tools.slice(0, READ_TOOLS.length).map((tool) => tool.name)).toEqual(READ_TOOLS.map((tool) => tool.name));
   });
 
-  it('list_machines returns this machine only', async () => {
-    const client = await connectClient(fakeApi({ 'GET /api/environment': ENVIRONMENT }), SCOPES);
-    expect(resultJson(await callTool(client, 'list_machines'))).toEqual([
-      { environmentId: 'env-desk-1', label: 'desk', platform: { os: 'linux', arch: 'x64' }, serverVersion: '1.2.3', thisMachine: true },
-    ]);
+  it('PAN-4651 ac29: list_machines returns this machine and a linked one with its state', async () => {
+    const machines = [
+      { environmentId: 'env-desk-1', label: 'desk', thisMachine: true, state: 'online', load: null, tags: ['linux'] },
+      { environmentId: 'env-laptop', label: 'laptop', thisMachine: false, state: 'offline', load: null, tags: [] },
+    ];
+    const api = fakeApi({ 'GET /api/fleet/machines': { status: 200, json: machines } });
+    const client = await connectClient(api, SCOPES);
+    expect(resultJson(await callTool(client, 'list_machines'))).toEqual(machines);
+    expect(api.calls).toEqual([{ method: 'GET', path: '/api/fleet/machines' }]);
   });
 
   it('list_conversations calls GET /api/conversations?limit=50 and returns only projected keys', async () => {
@@ -64,6 +68,17 @@ describe('MCP read tools (PAN-4649 W-5)', () => {
     expect(resultJson(await callTool(client, 'search_conversations', { query: 'deploy fix' }))).toEqual([{ name: 'conv-b' }]);
   });
 
+  it('PAN-4651: search_conversations merges the linked machines\' hits with their machine label', async () => {
+    const api = fakeApi({
+      'GET /api/palette/search?q=cache&limit=20': { status: 200, json: { conversations: [{ conversationId: 'conv-b' }] } },
+      'GET /api/fleet/search?q=cache&limit=20': { status: 200, json: { machines: [{ label: 'laptop', conversations: [{ conversationId: '@env-laptop/conv-z' }] }] } },
+    });
+    const client = await connectClient(api, SCOPES);
+    expect(resultJson(await callTool(client, 'search_conversations', { query: 'cache' }))).toEqual([
+      { conversationId: 'conv-b' }, { conversationId: '@env-laptop/conv-z', machineLabel: 'laptop' },
+    ]);
+  });
+
   it('search_conversations requires a query', async () => {
     const api = fakeApi({});
     const client = await connectClient(api, SCOPES);
@@ -88,17 +103,5 @@ describe('MCP read tools (PAN-4649 W-5)', () => {
     const result = await callTool(client, 'pair_device');
     expect(result.isError).toBe(true);
     expect(resultText(result)).toBe('Unknown tool pair_device');
-  });
-
-  it('resolveMachine accepts auto, the label and the id, and refuses any other machine by name', async () => {
-    const api = fakeApi({ 'GET /api/environment': ENVIRONMENT });
-    await expect(resolveMachine(api)).resolves.toEqual({ ok: true });
-    await expect(resolveMachine(api, 'auto')).resolves.toEqual({ ok: true });
-    await expect(resolveMachine(api, 'desk')).resolves.toEqual({ ok: true });
-    await expect(resolveMachine(api, 'env-desk-1')).resolves.toEqual({ ok: true });
-    await expect(resolveMachine(api, 'laptop')).resolves.toEqual({
-      ok: false,
-      error: 'Unknown machine "laptop". This server can start work only on desk (env-desk-1).',
-    });
   });
 });

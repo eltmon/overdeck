@@ -85,6 +85,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/fleet/workers', scope: 'operate' },
   { method: 'POST', path: '/api/fleet/workers/:id/stop', scope: 'operate' },
   { method: 'POST', path: '/api/fleet/issues/:id/start', scope: 'operate' },
+  // PAN-4651 WI-29: the MCP list_machines tool (no routes, fingerprints or access levels).
+  { method: 'GET', path: '/api/fleet/machines', scope: 'read:state' },
   // PAN-4651 WI-17: a linked machine's operator reads a project's source facts and ignored files (operator-level link only, checked by the routes).
   { method: 'GET', path: '/api/machines/projects/:key/source', scope: 'read:state' },
   { method: 'GET', path: '/api/machines/projects/:key/file', scope: 'read:state' },

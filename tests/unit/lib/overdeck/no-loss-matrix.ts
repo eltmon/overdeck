@@ -458,6 +458,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/fleet/workers',                    kind: 'http', disposition: 'WRITE',       door: 'agents/worker/start.startWorker, or the target worker work door + agents/worker/remote-standin (remote.json) + remote-worker-follower (PAN-4651)' },
   { surface: 'POST /api/fleet/workers/:id/stop',           kind: 'http', disposition: 'WRITE',       door: 'linkFetch POST /api/workers/:id/stop on the owner + remote-standin.writeRemoteStandIn (stopped) (PAN-4651)' },
   { surface: 'POST /api/fleet/issues/:id/start',            kind: 'http', disposition: 'WRITE',       door: 'linkFetch POST /api/machines/work/issues/:id/start on the target (PAN-4651)' },
+  { surface: 'GET /api/fleet/machines',                     kind: 'http', disposition: 'AGGREGATE',   door: 'machine-load + machine-capabilities here + link-supervisor status per link (PAN-4651)' },
   { surface: 'GET /api/fleet/projects',                     kind: 'http', disposition: 'AGGREGATE',   door: 'anywhere/project-origin.listMachineProjects + linked-projects-sync cache, grouped by git origin (PAN-4651)' },
   { surface: 'GET /api/fleet/projects/source',              kind: 'http', disposition: 'READ',        door: 'fleet-add-project.readOwnerSource -> linkFetch GET /api/machines/projects/:key/source (PAN-4651)' },
   { surface: 'POST /api/fleet/projects/add-here',           kind: 'http', disposition: 'WRITE',       door: 'fleet-add-project.addProjectHere -> project create job + writeProjectFileExclusive (PAN-4651)' },

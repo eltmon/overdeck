@@ -86,3 +86,21 @@ describe('POST /api/fleet/placement (D-4651-10)', () => {
     expect(refuseFleetRequest(false, () => null)).toBeNull();
   });
 });
+
+describe('GET /api/fleet/machines (PAN-4651 D-4651-18)', () => {
+  it('lists this machine then visible links with state, load and tags only', async () => {
+    const { buildFleetMachines } = await import('../routes/fleet-work.js');
+    const machines = await buildFleetMachines({
+      self: async () => ({ environmentId: 'env-laptop', label: 'laptop' }),
+      selfLoad: () => sample(3, 8, 1),
+      selfTags: () => ['linux'],
+      links: async () => [link('desk', { routes: [{ url: 'tcp://10.0.0.2:3011' }] } as never), link('hid', { hidden: true }), link('old', { revokedAt: 'x' })],
+      status: (() => ({ state: 'online', load: null, tags: ['docker'] })) as never,
+    });
+    expect(machines).toEqual([
+      { environmentId: 'env-laptop', label: 'laptop', thisMachine: true, state: 'online', load: sample(3, 8, 1), tags: ['linux'] },
+      { environmentId: 'env-desk', label: 'desk', thisMachine: false, state: 'online', load: null, tags: ['docker'] },
+    ]);
+    expect(JSON.stringify(machines)).not.toContain('10.0.0.2');
+  });
+});

@@ -24,11 +24,17 @@
  * - `POST /api/fleet/workers/:id/stop` → stops the worker a stand-in stands
  *   for on its owner, then marks the stand-in `stopped`.
  *
+ * - `GET /api/fleet/machines` (`read:state`, D-4651-18) → `[{ environmentId,
+ *   label, thisMachine, state, load, tags }]` for the MCP `list_machines` tool.
+ *   It carries no routes, fingerprints or access levels (`GET /api/machines`
+ *   stays admin for those).
+ *
  * The actor a forwarded call carries: `operator` for the browser and operator
  * CLIs, `{ agentId }` for an agent sender (`x-overdeck-sender`), and for an
  * `odk_` token credential `operator` with a ceiling of the token's scopes
  * (D-4651-17), derived from the resolved credential, never from a header.
  */
+import type { LoadSample } from '@overdeck/contracts';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
 
@@ -38,8 +44,8 @@ import { readRemoteStandIn, type RemoteStandIn, writeRemoteStandIn } from '../..
 import { PARENT_ID_RE, startWorker, type StartWorkerOptions } from '../../../lib/agents/worker/start.js';
 import { removeAgentStateDir } from '../../../lib/agents/state-dir-removal.js';
 import { type LinkActorInit, linkFetch } from '../../../lib/anywhere/link-client.js';
-import type { MachineLink } from '../../../lib/anywhere/link-store.js';
-import { TAG_PATTERN } from '../../../lib/anywhere/machine-capabilities.js';
+import { listLinks, type MachineLink } from '../../../lib/anywhere/link-store.js';
+import { currentMachineProfile, TAG_PATTERN } from '../../../lib/anywhere/machine-capabilities.js';
 import { gitOriginOf } from '../../../lib/anywhere/project-origin.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { getProjectSync, resolveProjectFromIssue } from '../../../lib/projects.js';
@@ -49,7 +55,10 @@ import { actorForSender, SENDER_HEADER } from '../linked-conversation-proxy.js';
 import { defaultFleetTargetDeps, type FleetTarget, type FleetTargetDeps, placeAuto, resolveTargetMachine } from '../services/fleet-target.js';
 import { currentLinkedConversationsSync } from '../services/linked-conversations-sync.js';
 import { currentRemoteWorkerFollower } from '../services/remote-worker-follower.js';
-import { credentialScopes, type DashboardCredential, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
+import { currentLinkSupervisor } from '../services/anywhere-boot.js';
+import { connectingStatusSource, type LinkStatusSource } from '../services/machine-link-service.js';
+import { currentMachineLoad } from '../services/machine-load.js';
+import { credentialScopes, type DashboardCredential, rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
 import { refuseFleetRequest } from './machines-fleet.js';
 import { readJsonResponse } from './machines-work.js';
 import { parseStartWorkerBody } from './workers.js';
@@ -332,6 +341,37 @@ export async function handleFleetWorkerStop(localId: string, caller: FleetCaller
   return jsonResponse({ stopped: true });
 }
 
+export interface FleetMachinesDeps {
+  self: () => Promise<{ environmentId: string; label: string }>;
+  selfLoad: () => LoadSample | null;
+  selfTags: () => string[];
+  links: () => Promise<MachineLink[]>;
+  status: LinkStatusSource['status'];
+}
+
+const defaultFleetMachinesDeps = (): FleetMachinesDeps => ({
+  self: async () => {
+    const identity = await ensureEnvironmentIdentity();
+    return { environmentId: identity.environmentId, label: identity.label };
+  },
+  selfLoad: currentMachineLoad,
+  selfTags: () => currentMachineProfile()?.tags ?? [],
+  links: listLinks,
+  status: (linkId) => (currentLinkSupervisor() ?? connectingStatusSource).status(linkId),
+});
+
+/** `GET /api/fleet/machines`: this machine, then every visible, non-revoked link. */
+export async function buildFleetMachines(deps: FleetMachinesDeps = defaultFleetMachinesDeps()) {
+  const [self, links] = await Promise.all([deps.self(), deps.links()]);
+  return [
+    { ...self, thisMachine: true, state: 'online', load: deps.selfLoad(), tags: deps.selfTags() },
+    ...links.filter((link) => !link.revokedAt && link.hidden !== true).map((link) => {
+      const live = deps.status(link.id);
+      return { environmentId: link.environmentId, label: link.label, thisMachine: false, state: live.state, load: live.load ?? null, tags: live.tags ?? [] };
+    }),
+  ];
+}
+
 export const readFleetBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
@@ -419,4 +459,15 @@ const issueStartRoute = HttpRouter.add(
   }),
 );
 
-export const fleetWorkRouteLayer = Layer.mergeAll(placementRoute, conversationsRoute, workersRoute, workerStopRoute, issueStartRoute);
+const machinesRoute = HttpRouter.add(
+  'GET',
+  '/api/fleet/machines',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = refuseFleetRequest(channelOfRequest(request) !== null, () => rejectUnauthorizedDashboardRequest(request));
+    if (refused) return refused;
+    return jsonResponse(yield* Effect.promise(() => buildFleetMachines()));
+  }),
+);
+
+export const fleetWorkRouteLayer = Layer.mergeAll(placementRoute, conversationsRoute, workersRoute, workerStopRoute, issueStartRoute, machinesRoute);
