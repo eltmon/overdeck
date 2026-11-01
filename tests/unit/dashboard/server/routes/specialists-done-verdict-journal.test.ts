@@ -5,6 +5,7 @@
  */
 import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { rmSync } from 'node:fs';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,6 +15,7 @@ import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../.
 import { specialistsLegacyRouteLayer } from '../../../../../src/dashboard/server/routes/specialists/legacy-routes.js';
 import { EventStoreService } from '../../../../../src/dashboard/server/services/domain-services.js';
 import { readPipelineJournal } from '../../../../../src/lib/cloister/pipeline-journal.js';
+import { getOverdeckHome } from '../../../../../src/lib/paths.js';
 
 const PR_URL = 'https://github.com/eltmon/overdeck/pull/4035';
 
@@ -75,6 +77,9 @@ beforeEach(async () => {
   workspacePath = join(projectPath, 'workspaces', 'feature-pan-4035');
   await mkdir(workspacePath, { recursive: true });
   process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
+  // The token file wins over env (PAN-4628); delete any file a sibling
+  // test in this worker's shared OVERDECK_HOME left behind.
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   _resetInternalTokenCacheForTests();
   mocks.resolveProject.mockReturnValue({ projectPath, projectKey: 'overdeck' });
   mocks.commentOnArtifact.mockReturnValue(Effect.succeed(undefined));

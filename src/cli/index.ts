@@ -1212,60 +1212,7 @@ program
   .command('serve')
   .description('Start the dashboard server and open it in the default browser (npx launcher)')
   .option('--port <port>', 'Port to listen on', '3011')
-  .action(async (options: { port: string }) => {
-    const { spawn } = await import('child_process');
-    const { randomBytes } = await import('crypto');
-    const { join, dirname } = await import('path');
-    const { fileURLToPath } = await import('url');
-    const { existsSync } = await import('fs');
-
-    // Node 22+ is guaranteed here: ensureCompatibleNode() at CLI startup
-    // relaunches under a compatible Node (or exits) before any command runs.
-    const nodeVersion = process.versions.node;
-
-    const __dirname = dirname(fileURLToPath(import.meta.url));
-    const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
-    const bundledFrontendIndex = join(__dirname, '..', 'dashboard', 'public', 'index.html');
-    const port = parseInt(options.port, 10) || 3011;
-    const url = `http://localhost:${port}`;
-    const internalToken = process.env.OVERDECK_INTERNAL_TOKEN || randomBytes(32).toString('hex');
-    const browserUrl = `${url}#overdeck_token=${encodeURIComponent(internalToken)}`;
-
-    if (!existsSync(bundledServer) || !existsSync(bundledFrontendIndex)) {
-      console.error(chalk.red('Error: Dashboard bundle not found.'));
-      console.error(chalk.dim('This package may not be fully built. Try: npm run build'));
-      return exitCli(1);
-    }
-
-    console.log(chalk.bold('Overdeck Dashboard'));
-    console.log(chalk.dim(`Starting server on port ${port} (Node ${nodeVersion})...`));
-
-    const server = spawn(process.execPath, [bundledServer], {
-      stdio: 'inherit',
-      env: { ...process.env, PORT: String(port), OVERDECK_INTERNAL_TOKEN: internalToken },
-    });
-
-    server.on('error', async (err) => {
-      console.error(chalk.red('Failed to start dashboard:'), err.message);
-      return exitCli(1);
-    });
-
-    // Open browser after server has had a moment to start
-    setTimeout(async () => {
-      console.log(`  ${chalk.cyan(url)}`);
-      const [{ openBrowser }, { Effect }, { layer: nodeServicesLayer }] = await Promise.all([
-        import('../lib/browser.js'),
-        import('effect'),
-        import('@effect/platform-node/NodeServices'),
-      ]);
-      await Effect.runPromise(
-        openBrowser(browserUrl).pipe(Effect.provide(nodeServicesLayer)),
-      ).catch(() => {
-        // If openBrowser fails, show URL for manual opening
-        console.log(chalk.dim(`  Open your browser to: ${browserUrl}`));
-      });
-    }, 1_500);
-  });
+  .action(lazyAction(() => import('./commands/serve.js'), 'serveCommand'));
 
 await groups.finish();
 

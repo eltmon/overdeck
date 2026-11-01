@@ -13,6 +13,8 @@ export type HarnessContextChannel =
 export type HarnessAttachmentDelivery = "native" | "inline-paths"
 export type HarnessBinaryConfigKey = "acp.kimi.binaryPath" | "kimiCode.binaryPath"
 export type HarnessLaunchPreflight = "claude-code-model-minimum"
+/** message = an AskUserQuestion answer is sent as a conversation message; pi-ask-modal = keystrokes drive the open ask modal (a queued message would be swallowed). */
+export type HarnessAskAnswerDelivery = "message" | "pi-ask-modal"
 /** claude-project-hash = resolve via HashResolver; agent-dir = first-message cwd, else the agent dir; first-message-only = first-message cwd, else null. */
 export type HarnessWorkspaceResolution = "claude-project-hash" | "agent-dir" | "first-message-only"
 
@@ -49,8 +51,15 @@ export interface HarnessCapabilities {
   readonly workspaceResolution: HarnessWorkspaceResolution
   /** The conversation scanner correlates transcripts to agents by session id. */
   readonly correlatesBySessionId: boolean
-  /** A pending question is answered by sending the conversation a composed answer message (PAN-4649). */
+  /**
+   * The MCP `answer_question` tool may answer this harness's pending question with a composed
+   * message (PAN-4649). Narrower than `askAnswerDelivery`: the tool carries no toolUseId, so it
+   * cannot tell a Codex approval from a question and serves only harnesses where a message is
+   * always the answer.
+   */
   readonly answersQuestionByMessage: boolean
+  /** How the dashboard delivers an operator's answer to a pending AskUserQuestion in a conversation. */
+  readonly askAnswerDelivery: HarnessAskAnswerDelivery
 }
 
 export const HARNESS_CAPABILITY_KEYS = [
@@ -71,6 +80,7 @@ export const HARNESS_CAPABILITY_KEYS = [
   "workspaceResolution",
   "correlatesBySessionId",
   "answersQuestionByMessage",
+  "askAnswerDelivery",
 ] as const satisfies readonly (keyof HarnessCapabilities)[]
 
 export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -91,6 +101,7 @@ export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
   workspaceResolution: "claude-project-hash",
   correlatesBySessionId: false,
   answersQuestionByMessage: true,
+  askAnswerDelivery: "message",
 }
 
 export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
@@ -111,6 +122,7 @@ export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
   workspaceResolution: "first-message-only",
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
+  askAnswerDelivery: "pi-ask-modal",
 }
 
 export const CODEX_CAPABILITIES: HarnessCapabilities = {
@@ -131,6 +143,7 @@ export const CODEX_CAPABILITIES: HarnessCapabilities = {
   workspaceResolution: "agent-dir",
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
+  askAnswerDelivery: "message",
 }
 
 export const ACP_CAPABILITIES: HarnessCapabilities = {
@@ -151,6 +164,7 @@ export const ACP_CAPABILITIES: HarnessCapabilities = {
   workspaceResolution: "agent-dir",
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
+  askAnswerDelivery: "message",
 }
 
 export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -171,6 +185,7 @@ export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
   workspaceResolution: "first-message-only",
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
+  askAnswerDelivery: "message",
 }
 
 export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
@@ -191,6 +206,7 @@ export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
   workspaceResolution: "agent-dir",
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
+  askAnswerDelivery: "message",
 }
 
 export const MUSE_CAPABILITIES: HarnessCapabilities = {
@@ -211,6 +227,7 @@ export const MUSE_CAPABILITIES: HarnessCapabilities = {
   workspaceResolution: "first-message-only",
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
+  askAnswerDelivery: "message",
 }
 
 export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
@@ -231,4 +248,5 @@ export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
   workspaceResolution: "first-message-only",
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
+  askAnswerDelivery: "message",
 }

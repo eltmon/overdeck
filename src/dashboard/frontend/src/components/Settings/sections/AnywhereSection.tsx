@@ -8,6 +8,7 @@ import type { AnywhereAction } from '../anywhere/anywhereApi';
 import { DevicesPanel } from '../anywhere/DevicesPanel';
 import { McpUrlDialog } from '../anywhere/McpUrlDialog';
 import { PairDeviceDialog } from '../anywhere/PairDeviceDialog';
+import { SetUpPhoneDialog } from '../anywhere/SetUpPhoneDialog';
 import { PushPanel } from '../anywhere/PushPanel';
 
 interface AnywhereSectionProps {
@@ -20,6 +21,7 @@ interface AnywhereSectionProps {
 export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: AnywhereSectionProps = {}) {
   const [localOpen, setLocalOpen] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
+  const [phoneOpen, setPhoneOpen] = useState(false);
   const open = pairDialogOpen ?? localOpen;
   const setOpen = (next: boolean) => {
     setLocalOpen(next);
@@ -36,13 +38,20 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
       title="Anywhere"
       description="Reach this machine from your other devices"
       actions={(
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setMcpOpen(true)}
             className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-muted/50 transition-colors"
           >
             Copy MCP URL
+          </button>
+          <button
+            type="button"
+            onClick={() => setPhoneOpen(true)}
+            className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-muted/50 transition-colors"
+          >
+            Set up a phone
           </button>
           <button
             type="button"
@@ -62,6 +71,7 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
       </div>
       <PairDeviceDialog open={open} onClose={() => setOpen(false)} />
       <McpUrlDialog open={mcpOpen} onClose={() => setMcpOpen(false)} />
+      <SetUpPhoneDialog open={phoneOpen} onClose={() => setPhoneOpen(false)} />
     </SettingsSection>
   );
 }
