@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T20:33:57.472Z",
+  "updated": "2026-11-01T20:34:11.719Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "wi5-public-link-only-gate.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T20:33:57.472Z"
+    },
+    "wi5-public-link-only-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:34:11.719Z"
     }
   }
 }
