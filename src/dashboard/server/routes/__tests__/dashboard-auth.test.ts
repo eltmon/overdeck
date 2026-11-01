@@ -15,6 +15,7 @@ import {
   dashboardCsrfToken,
   dashboardSessionCookieHeader,
   hasDashboardAuthHeaders,
+  isTailscaleFunnelRequest,
   peerIsHostLocalDockerBridge,
   peerIsLocalContainerNetwork,
   rejectUnauthorizedDashboardRequest,
@@ -155,6 +156,13 @@ describe('dashboard session mint auth gate', () => {
   it('mints for the internal token even from a non-loopback peer (CLI / cross-process)', () => {
     const req = fakeRequest({ remoteAddress: '192.168.1.50', headers: { [INTERNAL_TOKEN_HEADER]: 'stable-internal-token' } });
     expect(rejectUnauthorizedDashboardSessionMintRequest(req)).toBeNull();
+  });
+
+  it('refuses a loopback mint that Tailscale Funnel proxied from the internet (PAN-4648)', () => {
+    const funneled = fakeRequest({ remoteAddress: '127.0.0.1', headers: { 'tailscale-funnel-request': '?1' } });
+    expect(rejectUnauthorizedDashboardSessionMintRequest(funneled)?.status).toBe(401);
+    expect(isTailscaleFunnelRequest({ 'tailscale-funnel-request': '?1' })).toBe(true);
+    expect(isTailscaleFunnelRequest({ 'x-forwarded-for': '203.0.113.9' })).toBe(false);
   });
 });
 

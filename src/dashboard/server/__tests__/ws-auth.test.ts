@@ -52,6 +52,14 @@ describe('authorizeDashboardUpgrade', () => {
     expect(result).toEqual({ ok: true, credential: { kind: 'root-session' } });
   });
 
+  it('refuses a Tailscale Funnel upgrade with 403 even with a valid internal token (PAN-4648)', () => {
+    const result = authorizeDashboardUpgrade(
+      { [INTERNAL_TOKEN_HEADER]: 'stable-internal-token', 'tailscale-funnel-request': '?1' },
+      'GET',
+    );
+    expect(result).toEqual({ ok: false, status: 403, message: 'Forbidden: public requests cannot open sockets' });
+  });
+
   it('accepts no origin with the internal token header', () => {
     const result = authorizeDashboardUpgrade({ [INTERNAL_TOKEN_HEADER]: 'stable-internal-token' }, 'GET');
     expect(result).toEqual({ ok: true, credential: { kind: 'internal-token' } });

@@ -356,6 +356,11 @@ export function hasProxyForwardingHeader(headers: HeaderMap): boolean {
   return ['x-forwarded-for', 'x-forwarded-host', 'forwarded'].some((name) => getHeaderFromMap(headers, name) !== undefined);
 }
 
+/** True for a request Tailscale Funnel proxied from the public internet. tailscaled deletes any client-sent copy and sets `?1` (ipn/ipnlocal/serve.go). */
+export function isTailscaleFunnelRequest(headers: HeaderMap): boolean {
+  return getHeaderFromMap(headers, 'tailscale-funnel-request') !== undefined;
+}
+
 export function rejectUnauthorizedDashboardSessionMintRequest(
   request: HttpServerRequest.HttpServerRequest,
 ): HttpServerResponse.HttpServerResponse | null {
@@ -365,7 +370,9 @@ export function rejectUnauthorizedDashboardSessionMintRequest(
   }
   // With dashboard.require_token_mint, a loopback peer is not enough: a local
   // reverse proxy makes every remote visitor look like one (PAN-3762 D-3762-9).
-  const peerTrusted = !readRemoteAccessConfig().requireTokenMint && isLoopbackPeer(request);
+  // A Tailscale Funnel request is a public visitor, never a trusted peer (PAN-4648).
+  const peerTrusted =
+    !readRemoteAccessConfig().requireTokenMint && isLoopbackPeer(request) && !isTailscaleFunnelRequest(request.headers as HeaderMap);
   if (!hasDashboardInternalToken(request) && !peerTrusted) {
     return jsonResponse({ error: 'unauthorized' }, { status: 401 });
   }
