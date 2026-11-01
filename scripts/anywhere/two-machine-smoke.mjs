@@ -66,6 +66,17 @@
 //                  is printed by `pan worker wait <localId>` on A.
 //      worker-offline B is SIGSTOPped for 25 s during a wait; the wait keeps waiting and
 //                  prints B's next report after SIGCONT.
+//   PAN-4638 (gauntlet lanes across machines), after the PAN-4651 steps:
+//      lane-remote `pan lane start --role play --machine <B> --json` on A, under a root
+//                  conversation on A; the JSON names B. (B's projects.yaml puts the smoke
+//                  project's lanes root under B's fake HOME, as the lane door requires.)
+//      lane-report `pan lane report --status done` on B inside the lane; `pan lane wait <name>`
+//                  on A exits 0 with the body within 20 s, and `pan lane list --json` on A
+//                  lists the lane on B.
+//      lane-nest   A's GET /api/conversations lists @<B>/<name> under A's root conversation
+//                  (parentConversationId) with gauntletRun smoke.
+//      lane-reap   `pan lane stop <name>`, then `pan lane reap <name>` on A exit 0; B's row
+//                  is archived. The fake harness may or may not start on B; no step needs it.
 //   8. kill B      A shows the link offline within 30 s.
 //   9. restart B   A shows it online again within 60 s. B restarts with
 //                  OVERDECK_TEST_FORCE_CPU_SATURATED=1 (the smoke hook machine-load.ts reads).
@@ -290,11 +301,11 @@ async function stopServer(name) {
 }
 
 /** `pan` with its exit code, stdout and stderr (never throws on a non-zero exit). */
-async function cliRaw(name, args, timeout = 60_000) {
+async function cliRaw(name, args, timeout = 60_000, extraEnv = {}) {
   const home = HOMES[name];
   const port = name === 'a' ? PORT_A : PORT_B;
   try {
-    const { stdout, stderr } = await execFileAsync(process.execPath, [CLI, ...args], { env: serverEnv(home, port), timeout, maxBuffer: 4 * 1024 * 1024 });
+    const { stdout, stderr } = await execFileAsync(process.execPath, [CLI, ...args], { env: { ...serverEnv(home, port), ...extraEnv }, timeout, maxBuffer: 4 * 1024 * 1024 });
     return { code: 0, stdout, stderr };
   } catch (error) {
     return { code: error.code ?? 1, stdout: error.stdout ?? '', stderr: error.stderr ?? String(error.message) };
@@ -588,8 +599,13 @@ function machineConfigs() {
   writeFileSync(resolve(HOMES.a, 'projects.yaml'), projectsYaml(projectA));
 }
 
-function projectsYaml(path) {
-  return ['projects:', '  smoke:', '    name: Smoke', `    path: ${path}`, '    github_repo: smoke/repo', '    issue_prefix: SMK', ''].join('\n');
+function projectsYaml(path, lanesRoot = null) {
+  return [
+    'projects:', '  smoke:', '    name: Smoke', `    path: ${path}`, '    github_repo: smoke/repo', '    issue_prefix: SMK',
+    // PAN-4638: a lane directory must live under $HOME, which is the fake home here.
+    ...(lanesRoot ? ['    gauntlet:', `      lanes_root: ${lanesRoot}`] : []),
+    '',
+  ].join('\n');
 }
 
 function internalToken(name) {
@@ -633,7 +649,7 @@ async function fleetWorkSteps(selfA, selfB) {
   await step('projects', async () => {
     const projectB = SEED_CWD;
     mkdirSync(resolve(projectB, 'workspaces', `feature-${SMOKE_ISSUE.toLowerCase()}`), { recursive: true });
-    writeFileSync(resolve(HOMES.b, 'projects.yaml'), projectsYaml(projectB));
+    writeFileSync(resolve(HOMES.b, 'projects.yaml'), projectsYaml(projectB, resolve(HOMES.b, 'fakehome', 'lanes')));
     await pollUntil(`A lists B under ${SMOKE_ORIGIN}`, 45_000, async () => {
       const { json } = await apiA('GET', '/api/fleet/projects');
       const row = json?.projects?.find((project) => project.gitOrigin?.toLowerCase() === SMOKE_ORIGIN);
@@ -733,6 +749,70 @@ async function reportOnB(remoteId, body) {
   writeFileSync(file, `${body}\n`);
   const report = await cliRaw('b', ['worker', 'report', remoteId, '--file', file]);
   if (report.code !== 0) throw new Error(`pan worker report on B failed: ${report.stderr}`);
+}
+
+// ─── PAN-4638: gauntlet lanes across machines ──────────────────────────────
+
+const LANE_ROOT = 'smoke-orch';
+
+async function laneSteps(selfB) {
+  const lane = await step('lane-remote', async () => {
+    const a = openDb('a');
+    insertConversation(a, { name: LANE_ROOT, cwd: resolve(HOMES.a, 'project'), title: 'Smoke: orchestrator', status: 'active', origin: 'local', environmentId: null });
+    a.close();
+    // By environment id: both smoke dashboards run on one host, so they share its label.
+    const start = await cliRaw('a', ['lane', 'start', '--role', 'play', '--run', 'smoke', '--key', 'smoke', '--prompt', 'hi', '--parent', LANE_ROOT,
+      '--project', 'smoke', '--model', 'claude-opus-5-5', '--harness', 'claude-code', '--machine', selfB.environmentId, '--no-wait', '--json'], 90_000);
+    if (start.code !== 0) throw new Error(`pan lane start --machine failed (${start.code}): ${start.stderr || start.stdout}`);
+    const result = JSON.parse(start.stdout);
+    if (result.machine?.environmentId !== selfB.environmentId || result.machine?.label !== selfB.label || result.conversation?.id !== null) {
+      throw new Error(`the launch did not name B: ${start.stdout}`);
+    }
+    log(`lane ${result.conversation.name} on ${result.machine.label} in ${result.cwd}`);
+    return result.conversation.name;
+  });
+
+  await step('lane-report', async () => {
+    const file = resolve(HOMES.b, `${lane}-report.md`);
+    writeFileSync(file, 'smoke lane report\n');
+    const report = await cliRaw('b', ['lane', 'report', '--file', file, '--status', 'done'], 60_000, { OVERDECK_CONVERSATION: `conv-${lane}` });
+    if (report.code !== 0) throw new Error(`pan lane report on B failed (${report.code}): ${report.stderr}`);
+    const wait = await cliRaw('a', ['lane', 'wait', lane, '--timeout', '20'], 40_000);
+    if (wait.code !== 0 || !wait.stdout.includes('smoke lane report')) throw new Error(`pan lane wait on A answered ${wait.code}: ${wait.stdout} ${wait.stderr}`);
+    const listed = JSON.parse((await cliRaw('a', ['lane', 'list', '--run', 'smoke', '--json'])).stdout);
+    const row = listed.find((entry) => entry.name === lane);
+    if (row?.machine?.environmentId !== selfB.environmentId) throw new Error(`pan lane list on A does not list ${lane} on B: ${JSON.stringify(listed)}`);
+    log(`A printed B's lane report; pan lane list shows ${lane} on ${row.machine.label} (${row.activity})`);
+  });
+
+  await step('lane-nest', () => pollUntil(`A nests @${selfB.environmentId}/${lane} under ${LANE_ROOT}`, 45_000, async () => {
+    const rows = JSON.parse((await getA('/api/conversations?limit=200')).body.toString('utf8'));
+    const list = Array.isArray(rows) ? rows : (rows.conversations ?? []);
+    const root = list.find((row) => row.name === LANE_ROOT);
+    const linked = list.find((row) => row.name === `@${selfB.environmentId}/${lane}`);
+    const detail = `root ${root?.id ?? 'missing'}, linked parent ${linked?.parentConversationId ?? 'missing'}, run ${linked?.gauntletRun ?? 'missing'}`;
+    if (root && linked?.parentConversationId === root.id && linked.gauntletRun === 'smoke') {
+      log(detail);
+      return { ok: true, value: detail };
+    }
+    return { ok: false, detail };
+  }));
+
+  await step('lane-reap', async () => {
+    const stopped = await cliRaw('a', ['lane', 'stop', lane], 60_000);
+    if (stopped.code !== 0) throw new Error(`pan lane stop on A failed (${stopped.code}): ${stopped.stderr}`);
+    // The fake harness may still be exiting in the lane directory; reap refuses while a process runs there.
+    const reaped = await pollUntil(`pan lane reap ${lane} succeeds`, 30_000, async () => {
+      const answer = await cliRaw('a', ['lane', 'reap', lane], 60_000);
+      return answer.code === 0 ? { ok: true, value: answer } : { ok: false, detail: answer.stderr.trim() };
+    });
+    const b = openDb('b');
+    const archived = b.prepare('SELECT archived_at FROM conversations WHERE name = ?').get(lane)?.archived_at ?? null;
+    b.close();
+    if (archived === null) throw new Error(`B's row for ${lane} is not archived after the reap`);
+    if (!existsSync(resolve(HOMES.a, 'remote-lanes', lane, 'archived.json'))) throw new Error(`A did not archive the stand-in of ${lane}`);
+    log(`${reaped.stdout.trim()}; B archived the row, A archived the stand-in`);
+  });
 }
 
 async function autoStep(selfA, selfB) {
@@ -870,6 +950,7 @@ async function main() {
 
   await conversationSteps(selfB);
   if (!LIVE_CLAUDE) await fleetWorkSteps(selfA, selfB);
+  if (!LIVE_CLAUDE) await laneSteps(selfB);
 
   await step('kill B', async () => {
     const child = running.servers.get('b');
