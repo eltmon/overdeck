@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4654",
   "created": "2026-11-01T13:26:56.845Z",
-  "updated": "2026-11-01T14:18:25.662Z",
+  "updated": "2026-11-01T14:18:39.803Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "versions-self-report.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:18:25.662Z"
+    },
+    "versions-self-report.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:18:39.803Z"
     }
   }
 }
