@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T06:43:47.326Z",
+  "updated": "2026-11-01T06:44:08.856Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,10 @@
     "wi2-secure-channel.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T06:43:47.326Z"
+    },
+    "wi2-secure-channel.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:44:08.855Z"
     }
   }
 }
