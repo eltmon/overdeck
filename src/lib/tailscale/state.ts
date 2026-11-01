@@ -242,7 +242,8 @@ function firstLine(text: string): string | null {
   return text.split('\n').map((line) => line.trim()).find((line) => line !== '') ?? null;
 }
 
-function defaultPort(): number {
+/** The dashboard's loopback API port — the Serve target and the peer probe port. */
+export function dashboardApiPort(): number {
   const port = Number(new URL(getDashboardLoopbackApiUrl()).port);
   return Number.isFinite(port) && port > 0 ? port : 3011;
 }
@@ -273,7 +274,7 @@ const NOT_RUN: TailscaleRunResult = { ok: false, code: null, stdout: '', stderr:
 async function readUncached(deps: ReadTailscaleStateDeps): Promise<TailscaleState> {
   const platform = deps.platform ?? process.platform;
   const uid = deps.uid !== undefined ? deps.uid : (process.getuid?.() ?? null);
-  const port = deps.port ?? defaultPort();
+  const port = deps.port ?? dashboardApiPort();
   const requireTokenMint = deps.requireTokenMint ?? readRemoteAccessConfig().requireTokenMint;
   const run = deps.run ?? ((cli: TailscaleCli, args: string[]) => runTailscale(cli, args));
 
