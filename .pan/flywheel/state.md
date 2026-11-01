@@ -458,3 +458,10 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   PAN-4732 started, told to plan the smallest unblock first (slow convention
   or CI quarantine via `readQuarantineList`). A re-run that fails the same way
   means stop treating it as a flake. Hold merges and deploys until green.
+- 2026-11-01 20:25 UTC: PAN-4652 raised a `pan ask` decision (od-3dc41e82) to
+  re-attach its worktree after its own live Fly test detached HEAD. Flywheel
+  verified it non-destructive (detached commit is a main commit, branch holds
+  all pushed work, tree clean) and told the agent to `git switch` and withdraw
+  the ask, rather than leave it blocked for the absent operator. `pan answer`
+  only answers pane menus; `pan ask` decisions are answered in the dashboard
+  Needs-you, or the asking agent withdraws them.
