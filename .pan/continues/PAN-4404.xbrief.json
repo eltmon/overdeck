@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:39:17.476Z",
+  "updated": "2026-11-01T14:39:31.459Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -266,6 +266,10 @@
     "wi11-ssh-ui.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T14:39:17.475Z"
+    },
+    "wi12-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:39:31.459Z"
     }
   }
 }
