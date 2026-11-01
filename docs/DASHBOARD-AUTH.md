@@ -54,6 +54,9 @@ Every registry credential (device or token) carries scopes from
 - `operate` satisfies `tell`.
 - `read:events`, `read:state`, `read:conversations` and `tell` are independent
   grants; only `admin` implies them.
+- `approve` (PAN-4649) is an independent grant to answer blocking prompts:
+  permission prompts, pane-choice menus, pi asks, Codex approvals, plan
+  approvals and agent questions. Only `admin` implies it; `operate` does not.
 - An unknown scope string in the registry file parses but satisfies nothing
   (`scopeSatisfies`), so a hand-edited record fails closed.
 
@@ -66,9 +69,10 @@ does not list needs `admin` (D-6):
 | --- | --- |
 | `read:events` | `GET /events/stream`, `GET /events/version` |
 | `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership` |
-| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about` |
+| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search` |
 | `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message` |
-| `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`) |
+| `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers` |
+| `approve` | `POST /api/conversations/:id/permission`, `POST /api/conversations/:id/pane-choice`, `POST /api/conversations/:id/pi-ask-answer`, `POST /api/conversations/:id/codex-approval`, `POST /api/conversations/:name/plan-action`, `POST /api/agents/:id/answer-question`, `POST /api/agents/:id/plan-action`, `POST /api/agents/:id/permissions/:requestId/respond` |
 | `admin` | everything else, including `/ws/rpc`, `/ws/voice`, `/ws/autopreso` |
 
 A `:param` segment matches exactly one non-empty segment; matching is exact and
@@ -83,6 +87,25 @@ narrow token from `127.0.0.1` still gets 403 on an `admin` route. A credential
 without the required scope gets **403**
 `{ "error": "insufficient_scope", "missingScope": "<scope>" }` (HTTP) or a 403
 upgrade rejection. A missing or invalid credential stays **401**.
+
+### `/mcp` (PAN-4649)
+
+`/mcp` serves the MCP tool module (`src/lib/mcp/`) over streamable HTTP. It is
+outside the gate's `/api/` and `/events/` prefixes, so the gate does not see it,
+and it is not in the route-scope table: `rejectUnauthorizedDashboardRequest`
+would demand `admin` for it. The route checks the credential itself, in order:
+an untrusted `Origin` that is present → 403, no internal token configured →
+503, no credential → 401, a credential that is not `kind: 'token'` (the
+internal token, the root session, a paired device) → 403, a token carrying
+`admin` → 403. MCP never runs with a root credential (parent PRD D-21).
+
+Each tool then calls an ordinary dashboard route over the loopback URL with the
+caller's own Bearer token, so the route that tool proxies enforces its scope
+through this table and a revoked token fails its next request. The one check
+the tool layer adds is `approve` on `answer_question`, because that tool posts
+to the `tell`-scoped message route. The endpoint is stateless (a fresh MCP
+server per `POST`, no session); `GET /mcp` and `DELETE /mcp` answer 405 with
+`Allow: POST`. See [configuration/mcp.mdx](../configuration/mcp.mdx).
 
 Only root credentials may create or revoke access tokens, issue pairing
 credentials, or revoke a device other than the caller's own (D-11). A device or
