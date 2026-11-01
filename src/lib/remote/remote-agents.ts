@@ -347,7 +347,7 @@ export interface RefreshHostHeartbeatDeps {
 
 /**
  * Refresh the host-heartbeat freshness file on every active ephemeral-tier VM.
- * The deacon patrol calls this each cycle; the VM-side ephemeral watchdog uses
+ * The hygiene scheduler calls this every 60 s (PAN-4295); the VM-side ephemeral watchdog uses
  * the file's mtime to decide when to self-stop the machine.
  */
 export async function refreshHostHeartbeatForEphemeralVms(
@@ -369,11 +369,18 @@ export async function refreshHostHeartbeatForEphemeralVms(
 
   for (const state of ephemeralStates) {
     try {
-      await runSsh(
+      const result = await runSsh(
         fly,
         state.vmName,
         `mkdir -p ${shellQuote(REMOTE_PAN_DIR)} && echo ${shellQuote(heartbeatContent)} > ${shellQuote(REMOTE_HOST_HEARTBEAT_PATH)}`,
       );
+      if (result.exitCode !== 0) {
+        const output = result.stderr.trim() || result.stdout.trim() || 'no output';
+        actions.push(
+          `Host heartbeat failed for ${state.issueId.toUpperCase()} on ${state.vmName} (exit ${result.exitCode}): ${output}`,
+        );
+        continue;
+      }
       actions.push(`Host heartbeat refreshed for ${state.issueId.toUpperCase()} on ${state.vmName}`);
     } catch (err: any) {
       actions.push(

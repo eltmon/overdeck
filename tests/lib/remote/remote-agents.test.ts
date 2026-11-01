@@ -377,4 +377,26 @@ describe('refreshHostHeartbeatForEphemeralVms', () => {
     expect(actions[0]).toContain('failed');
     expect(actions[0]).toContain('fly API down');
   });
+
+  it('reports a failure when the heartbeat exec exits non-zero', async () => {
+    const ssh = vi.fn(() => Effect.succeed({ stdout: '', stderr: 'machine not started', exitCode: 1 }));
+    const actions = await refreshHostHeartbeatForEphemeralVms({
+      listActiveRemoteAgentStates: () => [
+        {
+          id: 'agent-pan-1845',
+          issueId: 'PAN-1845',
+          vmName: 'vm-eph',
+          model: 'claude-sonnet-4-6',
+          status: 'running',
+          startedAt: '2026-01-01T00:00:00Z',
+          location: 'remote',
+          tier: 'ephemeral',
+        },
+      ],
+      createFlyProvider: () => ({ ssh }) as any,
+      now: () => new Date('2026-01-01T00:00:00Z'),
+    });
+    expect(actions).toEqual(['Host heartbeat failed for PAN-1845 on vm-eph (exit 1): machine not started']);
+    expect(actions[0]).not.toContain('refreshed');
+  });
 });
