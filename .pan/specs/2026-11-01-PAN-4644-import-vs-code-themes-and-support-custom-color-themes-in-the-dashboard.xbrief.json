@@ -4,17 +4,17 @@
     "created": "2026-11-01T04:48:30Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4644: Import VS Code themes and support custom color themes in the dashboard",
-    "updated": "2026-11-01T04:53:11.483Z"
+    "updated": "2026-11-01T04:54:32.835Z"
   },
   "plan": {
     "id": "pan-4644",
     "title": "Import VS Code themes and support custom color themes in the dashboard",
-    "status": "proposed",
+    "status": "running",
     "uid": "57ddb572-e714-4637-a164-6e3b5237aea8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T04:48:30Z",
-    "updated": "2026-11-01T04:53:11.483Z",
+    "updated": "2026-11-01T04:54:32.835Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4644",
@@ -1088,5 +1088,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
