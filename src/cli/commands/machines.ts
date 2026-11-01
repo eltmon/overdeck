@@ -15,6 +15,7 @@ import type { Command } from 'commander';
 import type { MachineLinkView, MachinesResponse } from '@overdeck/contracts';
 
 import { callDashboard, errorText, isDashboardUnreachable } from './dashboard-call.js';
+import { registerMachinesSshCommands } from './machines-ssh.js';
 
 const DOCS_PAGE = 'configuration/linked-machines.mdx';
 export const NOT_RUNNING = 'Overdeck dashboard is not running. Start the dashboard with pan up, then retry.';
@@ -163,4 +164,5 @@ export function registerMachinesCommands(program: Command): void {
     .description('Remove a link by label, environment id or link id, revoking the token the other machine holds')
     .option('--json', 'Print { ok, peerNotified } as JSON')
     .action((target: string, options: { json?: boolean }) => runMachinesUnlink(target, options));
+  registerMachinesSshCommands(machines);
 }
