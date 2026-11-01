@@ -156,11 +156,21 @@ Every Fly Machine runs the `pan-workspace` image defined in
 - Node.js 22
 - pnpm
 - Claude Code CLI (`@anthropic-ai/claude-code`)
+- Overdeck (`@overdeck/core`, so `pan` runs on the VM), pinned by the
+  `OVERDECK_VERSION` build argument (default `latest`)
+- Docker (`docker.io` and `iptables`), started by Fly machine provisioning, not by
+  the image
 - flyctl
 - git, tmux, build-essential, python3, jq
 
 The image runs no sshd: Fly's hallpass provides `fly ssh console`, sftp and the
-Machines exec API.
+Machines exec API. Its `CMD` stays `sleep infinity`: a Fly machine (below) starts
+`pan serve` by exec after it writes the machine's identity, and a remote work agent
+VM starts no server at all.
+
+To pin the Overdeck version in the image, pass the build argument:
+`docker build --build-arg OVERDECK_VERSION=0.72.0 …`. Provisioning a Fly machine
+reinstalls home's exact version anyway when the VM's differs.
 
 ### Build and push
 
@@ -182,6 +192,47 @@ update the config and recreate workspaces to pick it up.
 > The Fly app (`pan-workspaces` by default) must exist before you can push to its
 > registry. `pan remote setup` or `pan workspace create --remote` will create the app
 > automatically using the Machines API (`POST /apps`).
+
+---
+
+## Fly machines (linked)
+
+A **Fly machine** (PAN-4652) is a Fly VM that runs `pan serve` and is linked one way
+from home, so its conversations stream into home's dashboard like any linked machine's.
+It is not a remote work agent: a remote work agent VM (`pan start --remote`, the rest of
+this page) runs Claude Code in raw tmux and no Overdeck server. Start one with
+`pan machines add-fly`; the operator guide is the `## Fly machines` section of
+`configuration/linked-machines.mdx`, and the design is `## Fly machines (PAN-4652)` in
+`docs/ANYWHERE-ARCHITECTURE.md`.
+
+| | Remote work agent VM | Fly machine |
+|---|---|---|
+| Started by | `pan start --remote` | `pan machines add-fly`, `POST /api/machines/fly` |
+| Runs | Claude Code in tmux | `pan serve`, then Claude Code conversations through it |
+| Reached by | Machines exec API | a secure channel over `wss://<app>.fly.dev/ws/link` |
+| State on home | `agents/agent-<issue>/remote-state.json` | `fly-machines.json` plus a machine link |
+| Removed by | the reap, after hand-off | unlink, the idle sweep, the stopped-machine sweep (always destroyed) |
+
+**Server environment (D-4).** The VM's `pan serve --port 3011 --no-open` runs with
+`OVERDECK_TERMINAL_BACKEND=tmux`, `IS_SANDBOX=1`, `OVERDECK_PUBLIC_LINK_ONLY=1` and
+`PORT=3011`, set on the command line so remote work agent VMs are unchanged.
+
+**Memory (D-12).** Fly machines get `max(remote.fly.vm_memory ?? 1024, 2048)` MB; the
+dashboard server and Claude Code do not fit in 1 GB.
+
+**Public IPs (D-10).** `https://<app>.fly.dev` needs the app to hold a shared IPv4 and an
+IPv6, and the Machines API cannot allocate them. Run once per app:
+
+```bash
+fly ips allocate-v4 --shared -a <app>
+fly ips allocate-v6 -a <app>
+```
+
+**Lifetime.** Home heartbeats every Fly machine every 60 s, and a VM whose heartbeat is
+300 s old stops itself. Home destroys a Fly machine that is stopped or gone, that has had
+no active linked conversation for `[remote.fly] machine_idle_minutes` (default 30, 0
+disables), or that provisioning never linked within 30 minutes. Fly machines count toward
+`remote.max_concurrent_agents`.
 
 ---
 
