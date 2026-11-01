@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T20:41:31.891Z",
+  "updated": "2026-11-01T20:41:45.672Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -292,6 +292,10 @@
     "wi13-route-and-cli.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T20:41:31.890Z"
+    },
+    "wi14-live-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:41:45.672Z"
     }
   }
 }
