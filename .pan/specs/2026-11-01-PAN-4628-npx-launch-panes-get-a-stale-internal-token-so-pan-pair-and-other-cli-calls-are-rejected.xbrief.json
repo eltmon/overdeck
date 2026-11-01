@@ -4,17 +4,17 @@
     "created": "2026-11-01T04:57:35Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4628: npx launch: panes get a stale internal token, so pan pair and other CLI calls are rejected",
-    "updated": "2026-11-01T05:02:23.088Z"
+    "updated": "2026-11-01T05:03:39.282Z"
   },
   "plan": {
     "id": "pan-4628",
     "title": "npx launch: panes get a stale internal token, so pan pair and other CLI calls are rejected",
-    "status": "proposed",
+    "status": "running",
     "uid": "05473c27-0999-4c7c-baf9-945493726269",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T04:57:35Z",
-    "updated": "2026-11-01T05:02:23.088Z",
+    "updated": "2026-11-01T05:03:39.282Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4628",
@@ -541,5 +541,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
