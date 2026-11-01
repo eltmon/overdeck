@@ -22,7 +22,7 @@
 1 src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx
 1 src/dashboard/frontend/src/components/newConversation/newConversationApi.ts
 1 src/dashboard/server/routes/agents/shared.ts
-8 src/dashboard/server/routes/agents/spawn.ts
+8 src/dashboard/server/routes/agents/spawn-issue.ts
 1 src/dashboard/server/services/agent-directory.ts
 1 src/dashboard/server/services/conversation-lifecycle.ts
 2 src/dashboard/server/services/vault-continue.ts

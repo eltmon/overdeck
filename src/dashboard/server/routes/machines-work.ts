@@ -18,6 +18,11 @@
  *   → project from the issue prefix, origin check → `startWorker` with
  *   `parentId: null` and `startedBy: { environmentId, parentId }` (the caller's
  *   parent lives on the caller's machine). Answers `{ id, cwd, branch }`.
+ * - `POST /api/machines/work/issues/:id/start { gitOrigin, model?, harness?, effort? }`
+ *   → project from the issue prefix, origin check → `spawnIssueAgentForRoute`,
+ *   the same gates and spawn as the dashboard's Start button
+ *   (`POST /api/agents`). Answers `{ issueId, agentId }`; a refusal from those
+ *   gates passes through unchanged.
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
@@ -30,6 +35,7 @@ import { generateAiTitle } from '../../../lib/overdeck/conversation-reads.js';
 import { handleConversationCreate } from '../../../lib/overdeck/conversation-runtime.js';
 import { listProjectsAsync, type ProjectConfig, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { jsonResponse } from '../http-helpers.js';
+import { spawnIssueAgentForRoute } from './agents/spawn-issue.js';
 import { conversationReadDependencies } from './conversations.js';
 import { type DashboardCredential, resolveRequestCredential } from './dashboard-auth.js';
 import { parseStartWorkerBody } from './workers.js';
@@ -191,6 +197,45 @@ export async function handleWorkWorker(
   }
 }
 
+export interface IssueStartDoorDeps<R> extends WorkDoorDeps {
+  projectKeyForIssue: (issueId: string) => Promise<string | null>;
+  spawn: (input: { body: Record<string, unknown>; internalRequest: false }) => Effect.Effect<HttpServerResponse.HttpServerResponse, unknown, R>;
+}
+
+const defaultIssueStartDoorDeps = {
+  ...defaultWorkDoorDeps,
+  projectKeyForIssue: defaultWorkerDoorDeps.projectKeyForIssue,
+  spawn: spawnIssueAgentForRoute,
+};
+
+/** `POST /api/machines/work/issues/:id/start`. */
+export function handleWorkIssueStart<R>(
+  credential: DashboardCredential | null,
+  issueId: string,
+  raw: unknown,
+  deps: IssueStartDoorDeps<R>,
+): Effect.Effect<HttpServerResponse.HttpServerResponse, unknown, R> {
+  return Effect.gen(function* () {
+    if (credential?.kind !== 'machine') return machineOnly();
+    const body = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+    if (!body) return jsonResponse({ error: 'body must be an object' }, { status: 400 });
+    const gitOrigin = parseGitOrigin(body);
+    if (gitOrigin === undefined) return jsonResponse({ error: 'gitOrigin must be a repository slug or null' }, { status: 400 });
+    const fields: Record<string, unknown> = { issueId };
+    for (const key of ['model', 'harness', 'effort']) {
+      const value = optionalString(body, key);
+      if (value === false) return jsonResponse({ error: `${key} must be a string` }, { status: 400 });
+      if (value !== undefined) fields[key] = value;
+    }
+    const projectKey = yield* Effect.promise(() => deps.projectKeyForIssue(issueId).catch(() => null));
+    const preflight = yield* Effect.promise(() => workDoorPreflight(credential, { gitOrigin, projectKey }, deps));
+    if (!preflight.ok) return preflight.response;
+    const response = yield* deps.spawn({ body: fields, internalRequest: false });
+    if (response.status !== 200) return response;
+    return jsonResponse({ issueId: issueId.toUpperCase(), agentId: `agent-${issueId.toLowerCase()}` });
+  });
+}
+
 export const readWorkDoorBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
@@ -221,4 +266,15 @@ const workWorkerRoute = HttpRouter.add(
   }),
 );
 
-export const machinesWorkRouteLayer = Layer.mergeAll(workConversationRoute, workWorkerRoute);
+const workIssueStartRoute = HttpRouter.add(
+  'POST',
+  '/api/machines/work/issues/:id/start',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const params = yield* HttpRouter.params;
+    const body = yield* readWorkDoorBody;
+    return yield* handleWorkIssueStart(resolveRequestCredential(request), params['id'] ?? '', body, defaultIssueStartDoorDeps);
+  }),
+);
+
+export const machinesWorkRouteLayer = Layer.mergeAll(workConversationRoute, workWorkerRoute, workIssueStartRoute);
