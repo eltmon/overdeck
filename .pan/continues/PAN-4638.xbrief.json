@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:43:22.949Z",
+  "updated": "2026-11-01T23:43:42.116Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,11 @@
     "lane-stop-reap-remote.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T23:43:22.948Z"
+    },
+    "lane-cli-machine": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4638",
+      "claimedAt": "2026-11-01T23:43:42.116Z"
     }
   }
 }
