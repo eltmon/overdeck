@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T15:48:28Z · model: claude-opus-5-5 · open: 859_
+_Last sequenced: 2026-11-01T15:50:31Z · model: claude-opus-5-5 · open: 860_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,6 +8,7 @@ _Last sequenced: 2026-11-01T15:48:28Z · model: claude-opus-5-5 · open: 859_
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 2 | PAN-4723 | S | critical | ok |  |  | In pipeline: flaky create-workspace-row test turned main red via an unmocked git call in a non-git temp dir; red main stalls merges |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
+| 4 | PAN-4724 | M | high | ok |  |  | In pipeline: per-issue cost snapshot rescans all 771k cost_events rows every 15 s (~1.5 s), hogging the dashboard DB poll lane. |
 | 5 | PAN-4717 | S | high | ok |  |  | In pipeline: conversation issue links may open an empty drawer for issues absent from the snapshot; CodeRabbit follow-up to #4716. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
@@ -879,6 +880,10 @@ New issue since the prior run, already in pipeline: a flaky unit test turned mai
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
+### PAN-4724 (rank 4)
+
+New substrate-improvement performance bug already in the pipeline: getCostsByIssue() runs a full GROUP BY over every cost_events row on a 15 s refresh, holding the dashboard database worker's poll lane about 1.5 s per run and growing with every agent turn. The issue gives clear acceptance criteria (equivalence test, under 50 ms refresh at production size, overdeck.db migration path), so its condition is ok. As an in-pipeline issue it takes the free rank 4 and no other node moves; it is a sibling of PAN-4544, which removes the same kind of synchronous cost scan from /api/costs/stream.
+
 ### PAN-4717 (rank 5)
 
 New in-pipeline follow-up to PAN-4714 (merged as #4716) fixing an unreviewed CodeRabbit finding; pinned into a free top-tier slot next to its parent and not re-ranked.
@@ -1183,10 +1188,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
 
 Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
 
-### PAN-3096 (rank 82)
-
-New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1194,10 +1195,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T15:48:28Z",
+  "generatedAt": "2026-11-01T15:50:31Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 859,
+  "openCount": 860,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -11906,6 +11907,19 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "rationale": "New issue since the prior run, already in pipeline: a flaky unit test turned main CI red, and a red main empties the merge gate for every PR, so it takes the free rank-2 slot as critical substrate work.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4724",
+      "rank": 4,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: per-issue cost snapshot rescans all 771k cost_events rows every 15 s (~1.5 s), hogging the dashboard DB poll lane.",
+      "rationale": "New substrate-improvement performance bug already in the pipeline: getCostsByIssue() runs a full GROUP BY over every cost_events row on a 15 s refresh, holding the dashboard database worker's poll lane about 1.5 s per run and growing with every agent turn. The issue gives clear acceptance criteria (equivalence test, under 50 ms refresh at production size, overdeck.db migration path), so its condition is ok. As an in-pipeline issue it takes the free rank 4 and no other node moves; it is a sibling of PAN-4544, which removes the same kind of synchronous cost scan from /api/costs/stream.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13266,6 +13280,13 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-4724",
+      "to": "PAN-4544",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
