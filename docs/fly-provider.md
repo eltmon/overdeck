@@ -383,3 +383,37 @@ refused.
    fly ssh console -a pan-workspaces -C "ss -tlnp"
    ```
 3. Ensure `flyctl` is on your `$PATH` — `FlyProvider.tunnel()` spawns it directly.
+
+---
+
+## Live verification
+
+PAN-4295 was smoke-tested live on 2026-11-01, before merge, with the feature
+branch's own `dist/` build (`node dist/cli/index.js`). The throwaway issue was
+PAN-4677 ([#4677](https://github.com/eltmon/overdeck/issues/4677)); its agent
+ran on machine `080ee717f272e8` (`pan-pan-4677-ws`, app `pan-workspaces`,
+ephemeral tier, image rebuilt the same day with Claude Code 2.1.316).
+
+| Check | Result |
+|---|---|
+| O1: key-free VM | `/root/.ssh` and `/.ssh` do not exist; `find / -xdev` finds no `id_rsa*`, `id_ed25519*`, `id_ecdsa*` or `exe-dev-key`. |
+| O2: positive evidence mid-work | `admin remote reap --issue PAN-4677` printed `still-running`; the machine stayed `started`. |
+| O3: hand-off | After `REMOTE_DONE`, `--dry-run` printed `handed-off` ("Dry run — would hand off to review"); the real run printed `handed-off`, opened PR [#4694](https://github.com/eltmon/overdeck/pull/4694), copied the session JSONL, destroyed the machine and logged "Requested review through the dashboard review route". The journal recorded `review.requested` with `source: "api"`, as expected before the route change deploys. |
+
+The first real reap failed once with `cannot lock ref 'refs/remotes/origin/feature/pan-4677'`.
+A concurrent fetch had updated the same ref. That failure writes no state and
+leaves the machine running, so the next tick (or a rerun) hands off; the rerun did.
+
+The run found and fixed, in this branch: the clone outlasting the 60 s exec
+deadline ([#4685](https://github.com/eltmon/overdeck/issues/4685), now cloned in
+the background), Claude Code refusing bypass mode as root (`IS_SANDBOX=1`), and
+the first-run Bypass Permissions disclaimer (`bypassPermissionsModeAccepted`).
+It also filed [#4682](https://github.com/eltmon/overdeck/issues/4682) (the
+default image name does not exist; set `[remote.fly] image =
+"registry.fly.io/pan-workspaces:latest"`) and
+[#4683](https://github.com/eltmon/overdeck/issues/4683) (`pan start --remote`
+re-plans a planned issue, and the post-planning auto-start runs locally).
+
+The automatic 60 s tick, the `remote-reap` journal source and the heartbeat
+file are checked after deploy in
+[#4696](https://github.com/eltmon/overdeck/issues/4696).
