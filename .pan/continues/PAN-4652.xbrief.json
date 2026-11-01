@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T20:35:04.255Z",
+  "updated": "2026-11-01T20:35:18.718Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,6 +180,10 @@
     "wi6-fly-machine-store.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T20:35:04.255Z"
+    },
+    "wi7-provision-vm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:35:18.717Z"
     }
   }
 }
