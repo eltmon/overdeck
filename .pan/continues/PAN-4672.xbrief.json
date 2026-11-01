@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4672",
   "created": "2026-11-01T06:29:18.701Z",
-  "updated": "2026-11-01T08:04:05.201Z",
+  "updated": "2026-11-01T08:04:39.315Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "hold-503-after-timeout.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T08:04:05.201Z"
+    },
+    "hold-503-after-timeout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:04:39.314Z"
     }
   }
 }
