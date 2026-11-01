@@ -285,9 +285,10 @@ export async function skillsPackAddCommand(id: string, url: string, options: Pac
     options.adapter !== undefined &&
     options.adapter !== 'plain' &&
     options.adapter !== 'claude-plugin' &&
-    options.adapter !== 'deft-readonly'
+    options.adapter !== 'deft-readonly' &&
+    options.adapter !== 'gstack-runtime'
   ) {
-    console.error(chalk.red('--adapter must be plain, claude-plugin, or deft-readonly'));
+    console.error(chalk.red('--adapter must be plain, claude-plugin, deft-readonly, or gstack-runtime'));
     process.exit(1);
   }
   const [{ addPack }, { CORE_SKILLS }] = await Promise.all([
@@ -493,7 +494,7 @@ export function registerSkillsCommands(program: Command): void {
 
   const pack = skills.command('pack').description('Register, update, and cache external skill packs pinned to a commit');
   pack.command('add <id> <url>').description('Register a git skill pack at the commit a ref resolves to (enables nothing)')
-    .requiredOption('--ref <ref>', 'Tag or branch to pin').option('--adapter <adapter>', 'plain, claude-plugin, or deft-readonly')
+    .requiredOption('--ref <ref>', 'Tag or branch to pin').option('--adapter <adapter>', 'plain, claude-plugin, deft-readonly, or gstack-runtime')
     .option('--yes', 'Trust the resolved commit without asking').action(skillsPackAddCommand);
   pack.command('update <id>').description('Move a pack to the commit its ref (or --ref) now resolves to')
     .option('--ref <ref>', 'Switch to a different tag or branch').option('--yes', 'Trust the new commit without asking')
