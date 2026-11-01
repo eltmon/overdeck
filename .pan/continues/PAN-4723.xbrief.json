@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4723",
   "created": "2026-11-01T15:14:51.273Z",
-  "updated": "2026-11-01T15:45:01.699Z",
+  "updated": "2026-11-01T15:45:14.716Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,10 @@
     "mock-disk-floor-create-workspace-row.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T15:45:01.699Z"
+    },
+    "mock-disk-floor-create-resume-setup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:45:14.715Z"
     }
   },
   "agentModel": "claude-sonnet-5"
