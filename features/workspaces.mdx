@@ -349,6 +349,10 @@ pan workspace create MIN-123 --remote
 
 The workspace is provisioned on a Fly.io Machine with your project's dependencies pre-installed. Agents connect to the remote environment via the same tmux-based interface used for local workspaces.
 
+### When the Agent Finishes
+
+Within about a minute of the agent writing `REMOTE_DONE`, Overdeck brings the branch into a local worktree, opens the PR, destroys the machine and starts review. You don't run any command. Ephemeral machines stop themselves about 5 minutes after Overdeck stops running. VMs never receive your SSH keys: git uses HTTPS with your synced `gh` token.
+
 ## Troubleshooting
 
 **Workspace creation fails:**
