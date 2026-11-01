@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T20:14:11.904Z",
+  "updated": "2026-11-01T20:14:15.876Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,11 @@
       "claimedBy": "agent-pan-4651",
       "claimedAt": "2026-11-01T20:06:01.977Z",
       "doneAt": "2026-11-01T20:14:11.904Z"
+    },
+    "wi20-fleet-needs-you": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:14:15.876Z"
     }
   }
 }
