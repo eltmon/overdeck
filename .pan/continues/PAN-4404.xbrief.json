@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:40:14.725Z",
+  "updated": "2026-11-01T14:40:30.700Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -282,6 +282,10 @@
     "wi13-ssh-smoke.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T14:40:14.725Z"
+    },
+    "wi13-ssh-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:40:30.700Z"
     }
   }
 }
