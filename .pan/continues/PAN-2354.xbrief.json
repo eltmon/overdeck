@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2354",
   "created": "2026-11-01T05:46:47.920Z",
-  "updated": "2026-11-01T06:56:19.841Z",
+  "updated": "2026-11-01T07:19:43.624Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
       "claimedBy": "agent-pan-2354",
       "claimedAt": "2026-11-01T06:55:53.202Z",
       "doneAt": "2026-11-01T06:56:19.840Z"
+    },
+    "deps.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:19:43.624Z"
     }
   }
 }
