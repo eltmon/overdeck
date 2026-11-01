@@ -38,7 +38,9 @@
 //      list        A's GET /api/conversations lists @<B>/<name> once, carrying the saved copy.
 //      open-budget opening it through A moves at most 1 MiB + 64 KiB from B to A.
 //      image       its attachment fetched through A matches B's bytes.
-//      tell-once   `pan tell @<B>/<name> … --message-id smoke1` twice gets the same answer,
+//      tell-once   `pan tell @<B>/<name> … --message-id smoke1` twice gets the same answer
+//                  (the seeded conversation has no live pane, so that answer is a failed delivery;
+//                  remote-reply proves delivery),
 //                  and the same id with other text is refused by B's receipt store.
 //      released-409 with released_to set on B, a message through A answers 409 conversation-released.
 //      forward     `pan machines forward <B> <port>` reaches a tiny HTTP server; B's dashboard
@@ -424,7 +426,9 @@ async function conversationSteps(selfB) {
     }
     const other = await cliRaw('a', ['tell', target, 'different text', '--message-id', 'smoke1']);
     if (!/belongs to a different send/.test(other.stderr)) throw new Error(`B's receipt store did not hold smoke1: ${other.stderr || other.stdout}`);
-    log(`repeat answered the same (exit ${first.code}: ${(first.stdout || first.stderr).trim().split('\n')[0]}); other text refused by the receipt`);
+    // The seeded conversation has no live pane, so the first answer is usually a failed delivery;
+    // this step checks the replay, and --live-claude's remote-reply checks delivery.
+    log(`repeat replayed the first answer (exit ${first.code}: ${(first.stdout || first.stderr).trim().split('\n')[0]}); other text refused by the receipt`);
   });
 
   await step('released-409', async () => {

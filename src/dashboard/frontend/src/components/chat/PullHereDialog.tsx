@@ -100,10 +100,14 @@ export function PullHereDialog({ target, onClose }: { target: PullTarget; onClos
 
   const owner = target.machineLabel;
   const failed = status?.state === 'failed';
+  // A poll failed while the pull runs (e.g. the dashboard restarted and forgot the job): stop
+  // the spinner trap, say so, and let the operator close the dialog.
+  const lost = status?.state === 'running' && error !== null;
+  const closable = !status || failed || lost;
   const current = status ? PULL_STEPS.indexOf(status.step) : -1;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/32 backdrop-blur-sm" onClick={status ? undefined : onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/32 backdrop-blur-sm" onClick={closable ? onClose : undefined}>
       <div
         role="dialog"
         aria-modal="true"
@@ -114,7 +118,7 @@ export function PullHereDialog({ target, onClose }: { target: PullTarget; onClos
         <div className="flex items-center gap-2 border-b border-border px-5 py-3">
           <ArrowDownToLine className="h-4 w-4 shrink-0 text-muted-foreground" />
           <h2 className="flex-1 text-sm font-medium">{status ? `Pulling “${target.title}” here` : `Pull “${target.title}” here?`}</h2>
-          {(!status || failed) && (
+          {closable && (
             <button type="button" aria-label="Close" className="rounded-[var(--radius-sm)] p-1 text-muted-foreground hover:bg-accent" onClick={onClose}>
               <X className="h-4 w-4" />
             </button>
@@ -138,6 +142,10 @@ export function PullHereDialog({ target, onClose }: { target: PullTarget; onClos
               {failed ? (
                 <p role="alert" className="text-destructive">
                   {status.error ?? 'The pull failed'}. The conversation is still running on <span className="font-mono">{owner}</span>.
+                </p>
+              ) : lost ? (
+                <p role="alert" className="text-destructive">
+                  Lost track of the pull: {error}. It may still finish; the conversation list shows where it runs.
                 </p>
               ) : (
                 <p className="text-muted-foreground">If adoption fails, {owner} takes the conversation back and nothing is lost.</p>

@@ -79,6 +79,18 @@ describe('PullHereDialog (PAN-4650 WI-14)', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(PULL_POLL_MS); });
     expect(screen.getByRole('alert').textContent).toBe('No checkout of overdeck. The conversation is still running on desk.');
   });
+
+  it('lets the operator close the dialog when a poll fails while the pull runs', async () => {
+    getPull.mockRejectedValueOnce(new Error('HTTP 404'));
+    const onClose = vi.fn();
+    render(<PullHereDialog target={TARGET} onClose={onClose} />);
+    await act(async () => { fireEvent.click(screen.getByText('Pull here')); });
+    expect(screen.queryByLabelText('Close')).toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(PULL_POLL_MS); });
+    expect(screen.getByRole('alert').textContent).toBe('Lost track of the pull: HTTP 404. It may still finish; the conversation list shows where it runs.');
+    fireEvent.click(screen.getByLabelText('Close'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('PullHereButton (PAN-4650 WI-14)', () => {

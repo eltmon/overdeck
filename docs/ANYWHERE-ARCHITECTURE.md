@@ -39,7 +39,7 @@ step, each named in the output:
 | `list` | A's `GET /api/conversations` lists `@<B>/<name>` once, carrying the saved copy |
 | `open-budget` | opening it through A moves at most 1,114,112 bytes B to A |
 | `image` | its attachment through A matches B's bytes |
-| `tell-once` | a repeated `pan tell … --message-id` gets the same answer; the same id with other text is refused |
+| `tell-once` | a repeated `pan tell … --message-id` replays the first answer; the same id with other text is refused (the seeded conversation has no live pane, so that answer is a failed delivery; `remote-reply` checks delivery) |
 | `released-409` | with `released_to` set on B, a message through A answers 409 `conversation-released` |
 | `forward` | `pan machines forward` reaches a dev server on B; B's dashboard port is refused |
 | `kill B` | after `SIGKILL`, A shows the link offline within 30 s |
@@ -594,6 +594,15 @@ the owner's `/ws/rpc` or `/ws/terminal` with the link token and no Origin, then 
 bytes. The owner's scope table decides what is allowed; the remote-control routes
 (messages, approvals, stop, abort, switch model, compact, resume, attachments, tool
 bodies, diffs, image upload) carry `read:conversations`, `tell`, `approve` or `operate`.
+
+A loopback browser request passes the remote gate without a credential, and the owner
+sees every forwarded write as the operator, so the proxy refuses a write (any method but
+GET and HEAD) unless it carries a header-borne credential (the CLI's internal token or an
+API token, which no cross-site page can attach) or a trusted Origin or Referer (the
+dashboard's own fetches). The viewer's own writes (`POST /api/linked-conversations/pull`,
+`POST /api/conversations/:name/reclaim`, `POST /api/linked-conversations/open-in-editor`)
+use `rejectUnsafeDashboardMutationRequest`: JSON only, plus a trusted Origin and the CSRF
+token unless a header-borne credential is present.
 
 ### The agent fence (D-4650-7)
 

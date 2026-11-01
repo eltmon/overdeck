@@ -36,7 +36,7 @@ import { deriveSubkeys } from '../../../lib/vault/identity.js';
 import { removeOwned } from '../../../lib/vault/local-index.js';
 import { storeForBackend } from '../../../lib/vault/open.js';
 import { unpackDirectory } from '../../../lib/vault/transfer-pack.js';
-import { PULL_TRANSFERS_DIRNAME, type ReleaseAnswer, type WhenTurnRunning } from './conversation-release-service.js';
+import { PULL_TRANSFERS_DIRNAME, type ReleaseAnswer, TRANSFER_ID, type WhenTurnRunning } from './conversation-release-service.js';
 import { continueHere, ownerToken, previewContinue, type Outcome, type VaultContinueDeps } from './vault-continue.js';
 
 export type PullStep = 'release' | 'transfer' | 'adopt' | 'finish';
@@ -144,8 +144,15 @@ async function runOnline(job: PullJob, link: MachineLink, ownerName: string, whe
     throw new PullFailure(String(body.code ?? 'release-refused'), String(body.error ?? `${link.label} answered ${release.status}`));
   }
   const answer = json(release) as unknown as ReleaseAnswer;
+  const undo = () => deps.forward(link.environmentId, { method: 'POST', path: ownerPath(ownerName, '/release/undo'), actor: 'operator' }).catch(() => undefined);
+  // The transfer id becomes a directory here (removed afterwards), so it must be the owner's UUID shape.
+  if (typeof answer.transferId !== 'string' || !TRANSFER_ID.test(answer.transferId)) {
+    await undo();
+    throw new PullFailure('release-invalid', `${link.label} answered the release with an invalid transfer id`);
+  }
   const dir = join(deps.home(), PULL_TRANSFERS_DIRNAME, answer.transferId);
-  // From here the owner is released: every failure undoes it.
+  // From here the owner is released: every failure before adoption undoes it.
+  let adoptedHere = false;
   try {
     job.step = 'transfer';
     if (answer.bytes > LINK_FORWARD_MAX_BYTES) {
@@ -178,17 +185,24 @@ async function runOnline(job: PullJob, link: MachineLink, ownerName: string, whe
       },
     };
     const result = adopted(await deps.continueHere(answer.vaultId, { expectedOwnerToken: ownerToken(answer.ownerEnvironmentId), onDrift: 'note' }, overrides));
-    // adoptRecord recorded the transfer store's tail in this machine's vault index; the real vault settles it fresh.
-    if (adoptedPath) await deps.removeOwned(adoptedPath);
-    if (answer.nativeSessionId) markPulledFrom(result.name, { environmentId: answer.ownerEnvironmentId, nativeSessionId: answer.nativeSessionId });
-    archivePushedBack(answer.pulledFrom, self, answer.ownerEnvironmentId);
+    // The conversation now runs here: an undo would start a second runner on the owner (NFR-2),
+    // so the bookkeeping below is best-effort.
+    adoptedHere = true;
+    try {
+      // adoptRecord recorded the transfer store's tail in this machine's vault index; the real vault settles it fresh.
+      if (adoptedPath) await deps.removeOwned(adoptedPath);
+      if (answer.nativeSessionId) markPulledFrom(result.name, { environmentId: answer.ownerEnvironmentId, nativeSessionId: answer.nativeSessionId });
+      archivePushedBack(answer.pulledFrom, self, answer.ownerEnvironmentId);
+    } catch (error) {
+      console.warn(`[pull] ${result.name} runs here, but its bookkeeping failed:`, error instanceof Error ? error.message : String(error));
+    }
 
     job.step = 'finish';
     job.result = result;
     // The owner sweeps an unfinished transfer after 15 minutes, so a failed complete is not fatal.
     await deps.forward(link.environmentId, { method: 'POST', path: ownerPath(ownerName, '/release/complete'), actor: 'operator' }).catch(() => undefined);
   } catch (error) {
-    await deps.forward(link.environmentId, { method: 'POST', path: ownerPath(ownerName, '/release/undo'), actor: 'operator' }).catch(() => undefined);
+    if (!adoptedHere) await undo();
     throw error;
   } finally {
     await rm(dir, { recursive: true, force: true });

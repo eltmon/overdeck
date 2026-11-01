@@ -48,4 +48,17 @@ describe('remote editor launch (PAN-4650 WI-20)', () => {
     expect(launch).toHaveBeenCalledWith('code', ['--remote', 'ssh-remote+desk.tail1234.ts.net', '/home/desk/overdeck']);
     expect(JSON.parse(await HttpServerResponse.toWeb(response).text())).toMatchObject({ commandLine: 'code --remote ssh-remote+desk.tail1234.ts.net /home/desk/overdeck' });
   });
+
+  it('refuses a shared cwd that is not an absolute path, so it never becomes an editor flag', async () => {
+    const launch = vi.fn();
+    for (const cwd of ['--folder-uri=x', 'relative/dir', '']) {
+      const row = { cwd } as SharedConversationRow;
+      const response = await handleLinkedOpenInEditor(
+        { conversation: '@desk/conv-x', editor: 'vscode' },
+        { getLink: async () => TAILNET, getLinked: () => ({ id: 1, environmentId: 'env-desk', name: 'conv-x', row, nativeSessionId: null, cachedAt: '', listHash: '' }), launch },
+      );
+      expect(response.status).toBe(409);
+    }
+    expect(launch).not.toHaveBeenCalled();
+  });
 });

@@ -50,7 +50,7 @@ export const TRANSFER_TTL_MS = 15 * 60_000;
 export const TRANSFER_SWEEP_INTERVAL_MS = 60_000;
 export const TURN_POLL_MS = 2_000;
 export const TURN_WAIT_MAX_MS = 30 * 60_000;
-const TRANSFER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const TRANSFER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export type WhenTurnRunning = 'wait' | 'stop';
 

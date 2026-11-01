@@ -167,6 +167,27 @@ describe('Pull here job (PAN-4650 WI-10)', () => {
     expect(calls.map((call) => call.path)).toEqual(['/api/conversations/conv-x/release', '/api/conversations/conv-x/release/undo']);
   });
 
+  it('a failure after adoption never posts undo, so the owner does not start a second runner', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const job = await run(deps({ removeOwned: vi.fn(async () => { throw new Error('index locked'); }) }));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('conv-new runs here'), 'index locked');
+    warn.mockRestore();
+    expect(job).toMatchObject({ state: 'done', result: { name: 'conv-new' } });
+    expect(calls.map((call) => call.path)).not.toContain('/api/conversations/conv-x/release/undo');
+    expect(calls.at(-1)!.path).toBe('/api/conversations/conv-x/release/complete');
+  });
+
+  it('refuses a transfer id that is not a UUID, undoes the release and touches no directory', async () => {
+    for (const transferId of ['..', '../x', 42]) {
+      calls = [];
+      releaseAnswer.transferId = transferId as string;
+      const job = await run(deps());
+      expect(job).toMatchObject({ state: 'failed', code: 'release-invalid' });
+      expect(calls.map((call) => call.path)).toEqual(['/api/conversations/conv-x/release', '/api/conversations/conv-x/release/undo']);
+    }
+    expect(existsSync(odb.home)).toBe(true);
+  });
+
   it('a refused release fails without an undo', async () => {
     const job = await run(deps({ forward: forward({ release: async () => ({ status: 409, headers: {}, body: Buffer.from('{"code":"turn-still-running","error":"busy"}') }) }) }));
     expect(job).toMatchObject({ state: 'failed', step: 'release', code: 'turn-still-running' });

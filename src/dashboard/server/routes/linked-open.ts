@@ -13,6 +13,7 @@ import { parseLinkedConversationName } from '@overdeck/contracts';
 import { getLink, type MachineLink } from '../../../lib/anywhere/link-store.js';
 import { getLinkedConversation, type LinkedConversationRecord } from '../../../lib/overdeck/linked-conversations.js';
 import { jsonResponse } from '../http-helpers.js';
+import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { REMOTE_EDITOR_UNSUPPORTED_HINT, resolveRemoteEditorLaunch } from '../services/open-remote.js';
 
 export interface LinkedOpenDeps {
@@ -40,7 +41,8 @@ export async function handleLinkedOpenInEditor(body: Record<string, unknown>, ov
   const link = await deps.getLink(parsed.target);
   const record = link && link.revokedAt === null ? deps.getLinked(link.environmentId, parsed.name) : null;
   if (!link || !record) return jsonResponse({ error: 'No such linked conversation', code: 'not-found' }, { status: 404 });
-  if (!record.row.cwd) return jsonResponse({ error: 'The owner did not share a working directory', code: 'no-cwd' }, { status: 409 });
+  // An absolute path only: the cwd is a positional editor argument, so a shared value starting with `-` must never become a flag.
+  if (!record.row.cwd?.startsWith('/')) return jsonResponse({ error: 'The owner did not share an absolute working directory', code: 'no-cwd' }, { status: 409 });
   const launch = resolveRemoteEditorLaunch({ editor: body['editor'], link, cwd: record.row.cwd });
   if ('error' in launch) {
     return launch.error === 'editor-unsupported'
@@ -56,6 +58,8 @@ const linkedOpenRoute = HttpRouter.add(
   '/api/linked-conversations/open-in-editor',
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = rejectUnsafeDashboardMutationRequest(request);
+    if (refused) return refused;
     const text = yield* request.text;
     let body: Record<string, unknown> = {};
     try {

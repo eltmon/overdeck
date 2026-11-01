@@ -36,7 +36,7 @@ import {
   type ServiceAnswer,
   type WhenTurnRunning,
 } from '../services/conversation-release-service.js';
-import { type DashboardCredential, resolveRequestCredential } from './dashboard-auth.js';
+import { type DashboardCredential, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
 
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -145,6 +145,8 @@ const reclaimRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/reclaim',
   Effect.gen(function* () {
+    const refused = rejectUnsafeDashboardMutationRequest(yield* HttpServerRequest.HttpServerRequest);
+    if (refused) return refused;
     const name = decodeURIComponent((yield* HttpRouter.params)['name'] ?? '');
     const body = yield* readJsonBody;
     return answer(yield* Effect.promise(() => reclaimRelease(name, { force: body['force'] === true })));
@@ -155,6 +157,8 @@ const startPullRoute = HttpRouter.add(
   'POST',
   '/api/linked-conversations/pull',
   Effect.gen(function* () {
+    const refused = rejectUnsafeDashboardMutationRequest(yield* HttpServerRequest.HttpServerRequest);
+    if (refused) return refused;
     const body = yield* readJsonBody;
     const when = body['whenTurnRunning'] ?? 'wait';
     if (typeof body['conversation'] !== 'string') return jsonResponse({ error: 'conversation is required' }, { status: 400 });

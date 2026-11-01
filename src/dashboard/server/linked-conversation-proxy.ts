@@ -16,6 +16,13 @@
  * so it needs `admin`: a machine credential arriving over a channel cannot use
  * it, and no request hops through two links. Channel callers are refused here
  * as well.
+ *
+ * A write (anything but GET/HEAD) goes to the owner as the operator, so it is
+ * refused unless it carries a header-borne credential (the CLI's internal
+ * token or an API token, which no cross-site page can attach) or a trusted
+ * Origin/Referer (the dashboard's own fetches). A loopback browser request
+ * passes the remote gate without a credential; this is what stops another
+ * web page from writing to a linked conversation.
  */
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -33,6 +40,8 @@ import { isOperatorConversation } from '../../lib/terminal-backends/prompt-guard
 import { channelOfRequest } from './channel-peer.js';
 import { jsonResponse } from './http-helpers.js';
 import { remoteGateRejection } from './remote-request-gate.js';
+import { resolveDashboardCredential } from './routes/dashboard-auth.js';
+import { type HeaderMap, validateOriginHeaders } from './routes/origin-validation.js';
 
 const PREFIX = '/api/conversations/';
 /** Header the CLI sets to its `senderFromEnv().id` (D-4650-6). */
@@ -99,6 +108,16 @@ function header(request: HttpServerRequest.HttpServerRequest, name: string): str
   return Array.isArray(value) ? value[0] : value;
 }
 
+/** The refusal for a cross-site write through the proxy, or null when the request may be forwarded. */
+export function crossSiteWriteRefusal(headers: HeaderMap, method: string): HttpServerResponse.HttpServerResponse | null {
+  const upper = method.toUpperCase();
+  if (upper === 'GET' || upper === 'HEAD') return null;
+  const kind = resolveDashboardCredential(headers)?.kind;
+  if (kind === 'internal-token' || kind === 'token') return null;
+  const origin = validateOriginHeaders(headers, method);
+  return origin.ok ? null : jsonResponse({ error: origin.error }, { status: 403 });
+}
+
 /** Forward one admitted request for `target`; always answers. */
 export async function forwardLinkedConversationRequest(
   input: { method: string; target: LinkedTarget; query: string; contentType?: string; sender?: string; body?: Buffer },
@@ -144,6 +163,8 @@ export const linkedConversationProxyLayer = HttpRouter.middleware(
       if (channelOfRequest(request) !== null) {
         return jsonResponse({ error: 'a linked machine cannot reach a third machine through this one' }, { status: 403 });
       }
+      const refused = crossSiteWriteRefusal(request.headers as HeaderMap, request.method);
+      if (refused) return refused;
       const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
       const body = hasBody ? Buffer.from(yield* Effect.orElseSucceed(request.arrayBuffer, () => new ArrayBuffer(0))) : undefined;
       return yield* Effect.promise(() => forwardLinkedConversationRequest({
