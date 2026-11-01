@@ -77,4 +77,29 @@ describe('pan machines add-fly --harness (PAN-4296 WI-6)', () => {
     expect(log).toHaveBeenCalledWith('Linked fly-m1 (Fly app overdeck-ws, region iad; docker: yes; codex: yes)');
     log.mockRestore();
   });
+
+  it('sends no harness key without --harness, and prints codex: no for a record without a Codex sign-in path', async () => {
+    let received: Record<string, unknown> = {};
+    dashboard.url = await serve((req, res) => {
+      let text = '';
+      req.on('data', (chunk: Buffer) => { text += chunk.toString(); });
+      req.on('end', () => {
+        received = JSON.parse(text) as Record<string, unknown>;
+        res.writeHead(201, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({
+          link: { label: 'fly-m1' },
+          record: { label: 'fly-m1', region: 'iad', docker: false, appName: 'overdeck-ws', codexAuthPath: null },
+        }));
+      });
+    });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const program = new Command().exitOverride();
+    registerMachinesFlyCommands(program.command('machines'));
+    await program.parseAsync(['machines', 'add-fly', '--project', 'overdeck'], { from: 'user' });
+
+    expect(received).toEqual({ projectKey: 'overdeck' });
+    expect('harness' in received).toBe(false);
+    expect(log).toHaveBeenCalledWith('Linked fly-m1 (Fly app overdeck-ws, region iad; docker: no; codex: no)');
+    log.mockRestore();
+  });
 });
