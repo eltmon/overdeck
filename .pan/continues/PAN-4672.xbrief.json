@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4672",
   "created": "2026-11-01T06:29:18.701Z",
-  "updated": "2026-11-01T08:03:13.097Z",
+  "updated": "2026-11-01T08:03:36.174Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "traefik-start-up.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T08:03:13.097Z"
+    },
+    "hold-503-after-timeout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:03:36.174Z"
     }
   }
 }
