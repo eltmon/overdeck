@@ -1,0 +1,122 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T06:44:24Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4677: Fly remote smoke test (PAN-4295)",
+    "updated": "2026-11-01T06:45:01.164Z"
+  },
+  "plan": {
+    "id": "pan-4677",
+    "title": "Fly remote smoke test (PAN-4295)",
+    "status": "proposed",
+    "uid": "71c08499-b88c-42e7-bb83-a2dde9f1b98b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-01T06:44:24Z",
+    "updated": "2026-11-01T06:45:01.164Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4677",
+        "label": "PAN-4677",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4295",
+        "label": "PAN-4295",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "smoke-test",
+      "fly",
+      "remote"
+    ],
+    "narratives": {
+      "Problem": "PAN-4295 needs a live end-to-end Fly remote run. This throwaway issue gives the remote work agent a trivial, verifiable change to commit, push and open a PR for.",
+      "Proposal": "Append the single line 'Fly remote smoke test for PAN-4295' to docs/fly-smoke.txt (creating it), commit with an Item trailer, push. The PR is closed unmerged afterwards.",
+      "NonGoals": "- Do not change any file other than docs/fly-smoke.txt (planning artifacts under .pan/ excepted)\n- Do not add tests\n- Do not touch Fly remote source code; that is PAN-4295's own work\n- Do not add the file to any docs index, Mintlify navigation or README\n- Do not merge the PR"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Exactly one xBRIEF item that also serves as the documentation item",
+        "rationale": "The issue body states 'One xBRIEF item, no tests, no other files'; the file lives under docs/, which satisfies the docs gate."
+      },
+      {
+        "summary": "Use printf with >> to append",
+        "rationale": "Appending creates the file when absent and preserves any existing content, matching 'append exactly one line (create the file if it does not exist)'."
+      }
+    ],
+    "metadata": {
+      "docsJustification": "The only change is the docs/fly-smoke.txt marker file; no documented behavior changes.",
+      "canonicalFilename": "2026-11-01-PAN-4677-fly-remote-smoke-test-pan-4295.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "append-smoke-line",
+        "title": "Append the smoke-test line to docs/fly-smoke.txt",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T06:44:24Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4677",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-smoke.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "tail -n 1 docs/fly-smoke.txt",
+            "git diff --name-only origin/main...HEAD -- . ':!.pan'"
+          ],
+          "expected_outputs": [
+            "tail prints exactly: Fly remote smoke test for PAN-4295",
+            "git diff lists only docs/fly-smoke.txt"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "From the workspace root run: printf 'Fly remote smoke test for PAN-4295\\n' >> docs/fly-smoke.txt . Commit only docs/fly-smoke.txt with the trailer 'Item: append-smoke-line' and push. Add no tests and touch no other file."
+        },
+        "items": [
+          {
+            "id": "append-smoke-line.ac1",
+            "title": "Given the pushed feature branch, when running tail -n 1 docs/fly-smoke.txt, then it prints exactly 'Fly remote smoke test for PAN-4295' and the file ends with a single newline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "append-smoke-line.ac2",
+            "title": "Given the pushed feature branch, when running git diff --numstat origin/main...HEAD -- docs/fly-smoke.txt, then it reports exactly 1 added line and 0 removed lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "append-smoke-line.ac3",
+            "title": "Given the pushed feature branch, when running git diff --name-only origin/main...HEAD -- . ':!.pan', then it returns only docs/fly-smoke.txt (no tests, no source files)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}
