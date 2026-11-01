@@ -4,17 +4,17 @@
     "created": "2026-10-25T10:02:57Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4626: Stop and archive still show no visible pending state on the conversation row: dim the row and label it",
-    "updated": "2026-10-25T10:10:20.192Z"
+    "updated": "2026-11-01T05:57:36.226Z"
   },
   "plan": {
     "id": "pan-4626",
     "title": "Stop and archive still show no visible pending state on the conversation row: dim the row and label it",
-    "status": "proposed",
+    "status": "running",
     "uid": "cc1ec287-a974-493a-ac4e-d07a67fe3262",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-10-25T10:02:57Z",
-    "updated": "2026-10-25T10:10:20.192Z",
+    "updated": "2026-11-01T05:57:36.226Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4626",
@@ -636,5 +636,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
