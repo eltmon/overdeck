@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T07:24:37.785Z",
+  "updated": "2026-11-01T07:24:58.309Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -208,6 +208,10 @@
       "claimedBy": "agent-pan-1254",
       "claimedAt": "2026-11-01T07:10:56.452Z",
       "doneAt": "2026-11-01T07:24:37.784Z"
+    },
+    "route-tailscale-actions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:24:58.308Z"
     }
   }
 }
