@@ -26,6 +26,7 @@ import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { modelSupportsImages, findModelDef } from '../Settings/modelCatalog';
 import { EffortPicker } from './EffortPicker';
+import { DeliveryModeSelect, type DeliverAs } from './DeliveryModeSelect';
 import { useComposerEffort, type EffortResolution } from './useComposerEffort';
 import { ContextWindowMeter } from './ContextWindowMeter';
 import { VaultContinueDialog } from './VaultContinueDialog';
@@ -83,11 +84,6 @@ interface ComposerFooterProps {
   /** Agent-backed panels: the agent's launch/pinned effort and its source (PAN-4255). */
   effortResolution?: EffortResolution | null;
 }
-
-type DeliverAs = 'auto' | 'steer' | 'follow_up';
-
-/** PAN-4292 D1: what Steer means for Claude Code, shown on the selector while Steer is chosen. */
-const CLAUDE_STEER_TOOLTIP = 'Steer: interrupt the current turn and send now (Claude Code Ctrl+Enter). Auto queues the message for the running turn.';
 
 function isPiConversation(conversation: Conversation): boolean {
   return conversation.harness === 'ohmypi' || conversation.harness === 'pi';
@@ -827,20 +823,7 @@ function ComposerFooterInput({
           <EffortPicker chip={effortChip} pending={effortPending} title={effortTitle} value={effort} onChange={handleEffortChange} disabled={effortPending || !liveChangeEnabled} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
           {showDeliverySelector && (
-            <select
-              className={styles.deliveryMethodSelect}
-              value={deliverAs}
-              onChange={(event) => setDeliverAs(event.target.value as DeliverAs)}
-              title={steerKind === 'control-channel'
-                ? (agentBusy ? 'Pi delivery mode while busy' : 'Pi delivery mode')
-                : (deliverAs === 'steer' ? CLAUDE_STEER_TOOLTIP : 'Delivery mode')}
-              aria-label={steerKind === 'control-channel' ? 'Pi delivery mode' : 'Delivery mode'}
-              disabled={!conversation.sessionAlive}
-            >
-              <option value="auto">Auto</option>
-              <option value="steer">{steerOptionLabel}</option>
-              {steerKind === 'control-channel' && <option value="follow_up">Follow-up</option>}
-            </select>
+            <DeliveryModeSelect value={deliverAs} onChange={setDeliverAs} steerKind={steerKind} agentBusy={agentBusy} sessionAlive={conversation.sessionAlive} steerOptionLabel={steerOptionLabel} />
           )}
           {piConversation && !agentId && (
             <>
