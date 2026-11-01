@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4656",
   "created": "2026-11-01T13:30:21.841Z",
-  "updated": "2026-11-01T14:01:57.195Z",
+  "updated": "2026-11-01T14:02:09.473Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "launchd-agent.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:01:57.194Z"
+    },
+    "up-sidecars-launchd.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:02:09.472Z"
     }
   }
 }
