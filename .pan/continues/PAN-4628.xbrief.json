@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4628",
   "created": "2026-11-01T05:04:21.139Z",
-  "updated": "2026-11-01T07:32:30.396Z",
+  "updated": "2026-11-01T07:32:55.357Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "hook-readers-file-first.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T07:32:30.396Z"
+    },
+    "serve-file-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:32:55.357Z"
     }
   }
 }
