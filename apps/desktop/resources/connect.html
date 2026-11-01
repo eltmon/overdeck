@@ -112,16 +112,16 @@
     note: document.getElementById("note"),
   };
   const buttons = [els.open, els.useLocal, els.forget, els.connect];
-  let mode = "local";
+  let canUseThisComputer = false;
 
   function setBusy(busy) {
     for (const button of buttons) button.disabled = busy;
     els.link.disabled = busy;
-    if (!busy) els.useLocal.disabled = mode !== "remote";
+    if (!busy) els.useLocal.disabled = !canUseThisComputer;
   }
 
   function render(state) {
-    mode = state.mode;
+    canUseThisComputer = state.canUseThisComputer;
     const machine = state.machine;
     els.machine.hidden = !machine;
     if (machine) {
@@ -129,7 +129,7 @@
       els.open.textContent = "Open " + machine.label;
       els.forget.textContent = "Forget " + machine.label;
     }
-    els.useLocal.disabled = mode !== "remote";
+    els.useLocal.disabled = !canUseThisComputer;
     els.error.textContent = state.error || "";
   }
 

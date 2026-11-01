@@ -34,6 +34,8 @@ export interface ConnectMachineView {
 export interface ConnectState {
   mode: "local" | "remote";
   machine: ConnectMachineView | null;
+  /** True when this computer's dashboard is not showing: remote mode, or a failed launch with no server. */
+  canUseThisComputer: boolean;
   error: string | null;
 }
 
@@ -123,11 +125,12 @@ export function closeConnectWindow(): void {
 export function registerConnectIpc(handlers: ConnectHandlers): void {
   ipcMain.handle(CONNECT_IPC.GET_STATE, (event): ConnectState | ConnectActionResult => {
     if (!fromConnectWindow(event)) return NOT_ALLOWED;
-    const { mode, machine } = handlers.getState();
+    const { mode, machine, canUseThisComputer } = handlers.getState();
     // Project explicitly so nothing but label and origin reaches the renderer.
     return {
       mode,
       machine: machine ? { label: machine.label, baseUrl: machine.baseUrl } : null,
+      canUseThisComputer,
       error: lastError,
     };
   });

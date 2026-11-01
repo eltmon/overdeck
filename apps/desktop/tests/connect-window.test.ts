@@ -61,6 +61,7 @@ import {
 const injected = {
   getState: vi.fn(() => ({
     mode: "remote" as const,
+    canUseThisComputer: true,
     // Extra fields stand in for anything a caller might leak; getState must drop them.
     machine: { label: "desk", baseUrl: "http://100.101.102.103:3011", token: "odk_secret", tokenCiphertext: "c" },
   })),
@@ -120,6 +121,7 @@ describe("connect window", () => {
     expect(state).toEqual({
       mode: "remote",
       machine: { label: "desk", baseUrl: "http://100.101.102.103:3011" },
+      canUseThisComputer: true,
       error: "Can't reach desk.",
     });
     expect(JSON.stringify(state)).not.toContain("token");

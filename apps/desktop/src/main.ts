@@ -298,6 +298,7 @@ function registerIpcHandlers(): void {
       return {
         mode: getActiveDashboard().kind,
         machine: record ? { label: record.label, baseUrl: record.baseUrl } : null,
+        canUseThisComputer: getActiveDashboard().kind === "remote" || !localServerStarted,
       };
     },
     pair: async (link) => {

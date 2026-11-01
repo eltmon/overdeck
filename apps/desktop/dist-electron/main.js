@@ -1499,13 +1499,14 @@ function closeConnectWindow() {
 function registerConnectIpc(handlers) {
 	electron.ipcMain.handle(CONNECT_IPC.GET_STATE, (event) => {
 		if (!fromConnectWindow(event)) return NOT_ALLOWED;
-		const { mode, machine } = handlers.getState();
+		const { mode, machine, canUseThisComputer } = handlers.getState();
 		return {
 			mode,
 			machine: machine ? {
 				label: machine.label,
 				baseUrl: machine.baseUrl
 			} : null,
+			canUseThisComputer,
 			error: lastError
 		};
 	});
@@ -1701,7 +1702,8 @@ function registerIpcHandlers() {
 				machine: record ? {
 					label: record.label,
 					baseUrl: record.baseUrl
-				} : null
+				} : null,
+				canUseThisComputer: getActiveDashboard().kind === "remote" || !localServerStarted
 			};
 		},
 		pair: async (link) => {
