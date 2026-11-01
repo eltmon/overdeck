@@ -459,6 +459,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/fleet/workers/:id/stop',           kind: 'http', disposition: 'WRITE',       door: 'linkFetch POST /api/workers/:id/stop on the owner + remote-standin.writeRemoteStandIn (stopped) (PAN-4651)' },
   { surface: 'POST /api/fleet/issues/:id/start',            kind: 'http', disposition: 'WRITE',       door: 'linkFetch POST /api/machines/work/issues/:id/start on the target (PAN-4651)' },
   { surface: 'GET /api/fleet/projects',                     kind: 'http', disposition: 'AGGREGATE',   door: 'anywhere/project-origin.listMachineProjects + linked-projects-sync cache, grouped by git origin (PAN-4651)' },
+  { surface: 'GET /api/machines/projects/:key/source',      kind: 'http', disposition: 'READ',        door: 'projects/ignored-files.listIgnoredFiles + projectCloneUrl (operator-level link, operator actor) (PAN-4651)' },
+  { surface: 'GET /api/machines/projects/:key/file',        kind: 'http', disposition: 'READ',        door: 'projects/ignored-files.readProjectFile (operator-level link, operator actor) (PAN-4651)' },
   { surface: 'GET /api/workers/:id/status',                kind: 'http', disposition: 'READ',        door: 'agents/liveness.isAlive + agents/worker/report.listWorkerReports (PAN-4651)' },
   { surface: 'POST /api/workers/:id/stop',                 kind: 'http', disposition: 'WRITE',       door: 'agents/termination.stopAgent (operator) (PAN-4651)' },
   { surface: '* /api/conversations/@<machine>/*',          kind: 'http', disposition: 'RELOCATE',    door: "linked-conversation-proxy -> owner's /api/conversations/* over the machine link (PAN-4650)" },

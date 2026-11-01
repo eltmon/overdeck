@@ -76,6 +76,7 @@ import { machinesPeerRouteLayer } from './routes/machines-peer.js'
 import { machinesWorkRouteLayer } from './routes/machines-work.js'
 import { fleetWorkRouteLayer } from './routes/fleet-work.js'
 import { fleetProjectsRouteLayer } from './routes/fleet-projects.js'
+import { machinesProjectsRouteLayer } from './routes/machines-projects.js'
 import { directoryRouteLayer } from './routes/directory.js'
 import { directoryApprovalRouteLayer } from './routes/directory-approval.js'
 import { pushRouteLayer } from './routes/push.js'
@@ -431,6 +432,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   machinesWorkRouteLayer,
   fleetWorkRouteLayer,
   fleetProjectsRouteLayer,
+  machinesProjectsRouteLayer,
   directoryRouteLayer,
   directoryApprovalRouteLayer,
   pushRouteLayer,
