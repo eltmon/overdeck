@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4654",
   "created": "2026-11-01T13:26:56.845Z",
-  "updated": "2026-11-01T13:48:53.545Z",
+  "updated": "2026-11-01T13:52:56.713Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-01T13:48:52.323Z"
     },
     "cli-versions-update": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4654",
-      "claimedAt": "2026-11-01T13:48:53.545Z"
+      "claimedAt": "2026-11-01T13:48:53.545Z",
+      "doneAt": "2026-11-01T13:52:56.712Z"
     }
   }
 }
