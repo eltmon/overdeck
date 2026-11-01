@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4670",
   "created": "2026-11-01T11:02:32.150Z",
-  "updated": "2026-11-01T11:17:29.816Z",
+  "updated": "2026-11-01T11:17:44.625Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,10 @@
     "ci-subset-simple-actions.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T11:17:29.816Z"
+    },
+    "plan-ready-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:17:44.625Z"
     }
   }
 }
