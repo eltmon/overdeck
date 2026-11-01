@@ -82,14 +82,14 @@ export async function resolveLaunchDisabledSkills(ctx: LaunchSkillContext): Prom
 
 /**
  * The pack skills enabled for this launch, from the cached extraction of each
- * pack's trusted commit. PD-4: a pack whose commit is not cached is skipped,
+ * pack's trusted commit (a `gstack-runtime` pack's render of it). PD-4: a pack whose commit is not cached is skipped,
  * with a warning when anything in it would have been on.
  */
 export async function resolveLaunchPackSelection(
   ctx: LaunchSkillContext,
   exclude: ReadonlySet<string> = new Set(),
 ): Promise<{ selection: MountSelection; warnings: string[] }> {
-  const [{ resolvePackSkill, resolvePackToggle }, { listPackCatalog }, { packExtractDir }] =
+  const [{ resolvePackSkill, resolvePackToggle }, { listPackCatalog }, { packExtractDir, packRenderDir }] =
     await Promise.all([
       import('./resolve.js'),
       import('./catalog.js'),
@@ -115,8 +115,8 @@ export async function resolveLaunchPackSelection(
       selection.packs.push({
         id: pack.id,
         commit: pack.commit,
-        root: packExtractDir(pack.id, pack.commit),
-        ...(pack.adapter === 'deft-readonly' ? { transform: 'deft-readonly' as const } : {}),
+        root: pack.adapter === 'gstack-runtime' ? packRenderDir(pack.id, pack.commit) : packExtractDir(pack.id, pack.commit),
+        ...(pack.adapter === 'deft-readonly' || pack.adapter === 'gstack-runtime' ? { transform: pack.adapter } : {}),
         skills,
       });
     }
