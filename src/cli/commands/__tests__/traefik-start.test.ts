@@ -52,3 +52,64 @@ describe('startTraefikContainer — pan dev (skipWhenRunning: false)', () => {
     expect(result).toBe('failed');
   });
 });
+
+describe('startTraefikContainer — pan up (skipWhenRunning: true)', () => {
+  it('starts Traefik when the migration throws and no container is running', async () => {
+    const migrate = vi.fn(() => {
+      throw new Error('EACCES');
+    });
+    const exec = vi.fn(async (command: string) => {
+      if (command.startsWith('docker ps')) return { stdout: '' };
+      return { stdout: '' };
+    });
+
+    const result = await startTraefikContainer(TRAEFIK_DIR, { skipWhenRunning: true }, { migrate, exec, log: vi.fn() });
+
+    expect(exec).toHaveBeenCalledWith('docker compose up -d', TRAEFIK_DIR);
+    expect(result).toBe('started');
+  });
+
+  it('leaves a running container alone when the migration throws', async () => {
+    const migrate = vi.fn(() => {
+      throw new Error('EACCES');
+    });
+    const exec = vi.fn(async (command: string) => {
+      if (command.startsWith('docker ps')) return { stdout: 'overdeck-traefik\n' };
+      return { stdout: '' };
+    });
+
+    const result = await startTraefikContainer(TRAEFIK_DIR, { skipWhenRunning: true }, { migrate, exec, log: vi.fn() });
+
+    expect(result).toBe('already-running');
+    expect(exec).not.toHaveBeenCalledWith('docker compose up -d', TRAEFIK_DIR);
+  });
+
+  it('recreates a running container when the migration changed the file', async () => {
+    const calls: string[] = [];
+    const migrate = vi.fn(() => true);
+    const exec = vi.fn(async (command: string) => {
+      calls.push(command);
+      return { stdout: '' };
+    });
+
+    const result = await startTraefikContainer(TRAEFIK_DIR, { skipWhenRunning: true }, { migrate, exec, log: vi.fn() });
+
+    expect(calls).toEqual(['docker compose up -d']);
+    expect(result).toBe('started');
+  });
+
+  it('attempts docker compose up -d when the container check fails', async () => {
+    const migrate = vi.fn(() => {
+      throw new Error('EACCES');
+    });
+    const exec = vi.fn(async (command: string) => {
+      if (command.startsWith('docker ps')) throw new Error('docker ps failed');
+      return { stdout: '' };
+    });
+
+    const result = await startTraefikContainer(TRAEFIK_DIR, { skipWhenRunning: true }, { migrate, exec, log: vi.fn() });
+
+    expect(exec).toHaveBeenCalledWith('docker compose up -d', TRAEFIK_DIR);
+    expect(result).toBe('started');
+  });
+});
