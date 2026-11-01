@@ -73,6 +73,7 @@ import { machinesSshRouteLayer } from './routes/machines-ssh.js'
 import { versionsSelfRouteLayer } from './routes/versions-self.js'
 import { machinesFleetRouteLayer } from './routes/machines-fleet.js'
 import { machinesPeerRouteLayer } from './routes/machines-peer.js'
+import { machinesWorkRouteLayer } from './routes/machines-work.js'
 import { directoryRouteLayer } from './routes/directory.js'
 import { directoryApprovalRouteLayer } from './routes/directory-approval.js'
 import { pushRouteLayer } from './routes/push.js'
@@ -425,6 +426,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   versionsSelfRouteLayer,
   machinesFleetRouteLayer,
   machinesPeerRouteLayer,
+  machinesWorkRouteLayer,
   directoryRouteLayer,
   directoryApprovalRouteLayer,
   pushRouteLayer,
