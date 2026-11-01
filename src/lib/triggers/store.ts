@@ -16,17 +16,17 @@
  * the CLI and the dashboard never disagree and no cache needs invalidating. A
  * file that does not parse throws naming the path, never a permissive parse.
  *
- * This module imports only Node built-ins and `../paths.js` so the CLI can load
- * it without the dashboard or Effect runtime layers.
+ * This module imports only Node built-ins, `../paths.js` and `./envelope.js` so
+ * the CLI can load it without the dashboard or Effect runtime layers.
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getOverdeckHome } from '../paths.js';
+import { TRIGGER_TEMPLATE_MAX_CHARS } from './envelope.js';
 
 export const TRIGGERS_FILENAME = 'triggers.json';
 export const TRIGGER_ID_PREFIX = 'trg_';
-const TEMPLATE_MAX_CHARS = 2_000;
 const NAME_PATTERN = /^[A-Za-z0-9 ._-]{1,64}$/;
 const SIGNING_SECRET_PATTERN = /^\S{8,256}$/;
 
@@ -197,8 +197,8 @@ export async function createTrigger(input: CreateTriggerInput): Promise<CreatedT
   const target = normalizeTarget(input.target);
   const template = input.template === undefined || input.template === null || input.template === '' ? null : input.template;
   if (template !== null && typeof template !== 'string') throw new Error('Prompt template must be text');
-  if (template !== null && template.length > TEMPLATE_MAX_CHARS) {
-    throw new Error(`Prompt template must be at most ${TEMPLATE_MAX_CHARS} characters`);
+  if (template !== null && template.length > TRIGGER_TEMPLATE_MAX_CHARS) {
+    throw new Error(`Prompt template must be at most ${TRIGGER_TEMPLATE_MAX_CHARS} characters`);
   }
   if (target.kind === 'project' && (template === null || template.trim() === '')) {
     throw new Error('A project target needs a prompt template');
