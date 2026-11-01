@@ -60,6 +60,7 @@
               "configuration/session-vault",
               "configuration/remote-access",
               "configuration/mcp",
+              "configuration/push-notifications",
               "cli/vault",
               "cli/pair",
               "cli/account",
