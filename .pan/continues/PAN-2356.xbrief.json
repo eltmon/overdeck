@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T13:39:50.693Z",
+  "updated": "2026-11-01T13:40:04.033Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-01T13:37:19.324Z"
     },
     "wi3-connect-scaffold": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2356",
-      "claimedAt": "2026-11-01T13:39:50.693Z"
+      "claimedAt": "2026-11-01T13:39:50.693Z",
+      "doneAt": "2026-11-01T13:40:04.033Z"
     }
   }
 }
