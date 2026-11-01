@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4648",
   "created": "2026-11-01T05:50:45.229Z",
-  "updated": "2026-11-01T07:58:52.295Z",
+  "updated": "2026-11-01T07:59:08.278Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,10 @@
     "funnel-gate.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T07:58:52.295Z"
+    },
+    "funnel-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:59:08.278Z"
     }
   }
 }
