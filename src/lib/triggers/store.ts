@@ -45,6 +45,17 @@ export interface TriggerRecord {
   verify: TriggerVerifyKind;
   signingSecret: string | null;
   createdAt: string;
+  /**
+   * The overdeck.ai directory inbox that holds this trigger's events while the machine is offline
+   * (PAN-2356). Absent on triggers written before it existed.
+   */
+  inbox?: TriggerInbox | null;
+}
+
+export interface TriggerInbox {
+  /** `ib_` + 16 hex: the directory's public handle; the inbox secret lives only in the URL. */
+  id: string;
+  createdAt: string;
 }
 
 export type PublicTrigger = Omit<TriggerRecord, 'secretHash' | 'signingSecret'> & { signingSecretSet: boolean };
@@ -100,6 +111,13 @@ function isTarget(value: unknown): value is TriggerTarget {
   return false;
 }
 
+function isInbox(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== 'object') return false;
+  const inbox = value as Record<string, unknown>;
+  return typeof inbox.id === 'string' && /^ib_[0-9a-f]{16}$/.test(inbox.id) && typeof inbox.createdAt === 'string';
+}
+
 function isRecord(value: unknown): value is TriggerRecord {
   if (typeof value !== 'object' || value === null) return false;
   const r = value as Record<string, unknown>;
@@ -112,7 +130,8 @@ function isRecord(value: unknown): value is TriggerRecord {
     (r.template === null || typeof r.template === 'string') &&
     (r.verify === 'none' || r.verify === 'github' || r.verify === 'stripe') &&
     (r.signingSecret === null || typeof r.signingSecret === 'string') &&
-    typeof r.createdAt === 'string'
+    typeof r.createdAt === 'string' &&
+    isInbox(r.inbox)
   );
 }
 

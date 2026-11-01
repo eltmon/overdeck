@@ -21,6 +21,9 @@ import { defaultApprovalDeps, DirectoryApprovalService, setApprovalService } fro
 import { DirectoryClient, defaultOpenSocket, setDirectoryClient } from './directory-client.js';
 import { directoryRoutesFor } from './directory-routes.js';
 import { startDirectoryRtc, stopDirectoryRtc } from './directory-rtc.js';
+import { InboxDedupe } from '../../../lib/triggers/inbox.js';
+import { triggerDeliveryDependencies } from '../routes/trigger-hooks.js';
+import { InboxClient } from './inbox-client.js';
 import { RelayClient, setRelayClient } from './relay-client.js';
 import { setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
@@ -30,6 +33,7 @@ let advertiser: EndpointAdvertiser | null = null;
 let directory: DirectoryClient | null = null;
 let approvals: DirectoryApprovalService | null = null;
 let relay: RelayClient | null = null;
+let inbox: InboxClient | null = null;
 let reconcileTimer: NodeJS.Timeout | null = null;
 
 /** The port this dashboard listens on, by the same rule as ServerConfig. */
@@ -80,6 +84,9 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   // WI-14: two-screen approvals; their views ride in GET /api/directory.
   approvals = new DirectoryApprovalService(defaultApprovalDeps(directory, () => advertiser?.current() ?? []));
   setApprovalService(approvals);
+  // WI-19: deliver the webhook events the directory inbox held while this machine was away.
+  inbox = new InboxClient(directory, { keyPair: ensureMachineKey, delivery: triggerDeliveryDependencies, dedupe: new InboxDedupe() });
+  inbox.start();
   const approvalViews = approvals;
   directory.setApprovalViews(() => approvalViews.views());
 
@@ -116,6 +123,8 @@ export function stopAnywhere(): void {
   reconcileTimer = null;
   supervisor?.stop();
   supervisor = null;
+  inbox?.stop();
+  inbox = null;
   approvals?.stop();
   approvals = null;
   setApprovalService(null);
