@@ -27,6 +27,7 @@ import {
   fetchPackSource,
   getPack,
   listPacks,
+  packBrowserDir,
   packCacheDir,
   packExtractDir,
   packRenderDir,
@@ -74,6 +75,19 @@ describe('pack registry', () => {
   it('stores adapter only when given', async () => {
     await writePackEntry({ id: 'p', url: 'u', ref: 'main', commit: COMMIT, adapter: 'plain' });
     expect(readConfig().skills?.packs?.['p']).toEqual({ url: 'u', ref: 'main', commit: COMMIT, adapter: 'plain' });
+  });
+
+  it('round-trips browser: true and stores it only when set (PAN-4730)', async () => {
+    await writePackEntry({ id: 'gstack', url: 'u', ref: 'main', commit: COMMIT, adapter: 'gstack-runtime', browser: true });
+    expect(readConfig().skills?.packs?.['gstack']).toEqual({ url: 'u', ref: 'main', commit: COMMIT, adapter: 'gstack-runtime', browser: true });
+    expect(await getPack('gstack')).toEqual({ id: 'gstack', url: 'u', ref: 'main', commit: COMMIT, adapter: 'gstack-runtime', browser: true });
+    await writePackEntry({ id: 'gstack', url: 'u', ref: 'main', commit: COMMIT, adapter: 'gstack-runtime' });
+    expect(readConfig().skills?.packs?.['gstack']).toEqual({ url: 'u', ref: 'main', commit: COMMIT, adapter: 'gstack-runtime' });
+  });
+
+  it('ignores a browser value other than true without skipping the entry', async () => {
+    writeFileSync(configPath(), `skills:\n  packs:\n    gstack: { url: u, ref: r, commit: ${COMMIT}, browser: 'yes' }\n`);
+    expect(await getPack('gstack')).toEqual({ id: 'gstack', url: 'u', ref: 'r', commit: COMMIT });
   });
 
   it('preserves comments and unrelated keys', async () => {
@@ -150,6 +164,7 @@ describe('pack cache paths', () => {
     expect(packsHome()).toBe(join(overdeckHome, 'packs'));
     expect(packRepoDir('mattpocock')).toBe(join(overdeckHome, 'packs', 'mattpocock', 'repo.git'));
     expect(packExtractDir('mattpocock', COMMIT)).toBe(join(overdeckHome, 'packs', 'mattpocock', COMMIT));
+    expect(packBrowserDir('gstack')).toBe(join(overdeckHome, 'packs', 'gstack', 'browser'));
   });
 
   it('throws on ids and commits that could escape the cache', () => {

@@ -1,8 +1,8 @@
 /**
  * Skill pack sources (PAN-4334): the pack registry and the pack cache paths.
  *
- * - registry: `~/.overdeck/config.yaml` → `skills.packs.<id>: { url, ref, commit, adapter? }`
- *   (the trusted commit is an operator decision, so it is stored)
+ * - registry: `~/.overdeck/config.yaml` → `skills.packs.<id>: { url, ref, commit, adapter?, browser? }`
+ *   (the trusted commit and the browser-runtime consent are operator decisions, so they are stored)
  * - cache:    `~/.overdeck/packs/<id>/` (derived; deletable at any time)
  *
  * Server-reachable: every fs and git call is async. Nothing here imports
@@ -40,6 +40,8 @@ export interface PackRegistryEntry {
   ref: string;
   commit: string;
   adapter?: PackAdapterId;
+  /** gstack-runtime only: the operator trusted the browser runtime (PAN-4730). */
+  browser?: true;
 }
 
 function assertPackId(id: string): void {
@@ -79,6 +81,11 @@ export function packStateDir(id: string): string {
   return join(packCacheDir(id), 'state');
 }
 
+/** A runtime pack's browser cache (bun package cache and Chromium), shared across commits; removed with the pack. */
+export function packBrowserDir(id: string): string {
+  return join(packCacheDir(id), 'browser');
+}
+
 async function readTextOrEmpty(path: string): Promise<string> {
   try {
     return await readFile(path, 'utf8');
@@ -90,11 +97,19 @@ async function readTextOrEmpty(path: string): Promise<string> {
 
 function toEntry(id: string, raw: unknown): PackRegistryEntry | null {
   if (!PACK_ID_PATTERN.test(id) || !raw || typeof raw !== 'object') return null;
-  const { url, ref, commit, adapter } = raw as Record<string, unknown>;
+  const { url, ref, commit, adapter, browser } = raw as Record<string, unknown>;
   if (typeof url !== 'string' || !url || typeof ref !== 'string' || !ref) return null;
   if (typeof commit !== 'string' || !COMMIT_PATTERN.test(commit)) return null;
   if (adapter !== undefined && !ADAPTERS.includes(adapter as PackAdapterId)) return null;
-  return { id, url, ref, commit, ...(adapter ? { adapter: adapter as PackAdapterId } : {}) };
+  // Only `browser: true` records consent; any other value is ignored, not a malformed entry.
+  return {
+    id,
+    url,
+    ref,
+    commit,
+    ...(adapter ? { adapter: adapter as PackAdapterId } : {}),
+    ...(browser === true ? { browser: true as const } : {}),
+  };
 }
 
 /** Registered packs sorted by id; malformed entries are skipped. */
@@ -173,6 +188,7 @@ export async function writePackEntry(entry: PackRegistryEntry): Promise<void> {
     ref: entry.ref,
     commit: entry.commit,
     ...(entry.adapter ? { adapter: entry.adapter } : {}),
+    ...(entry.browser === true ? { browser: true } : {}),
   };
   await editGlobalConfig((doc) => {
     doc.setIn(['skills', 'packs', entry.id], doc.createNode(value));
