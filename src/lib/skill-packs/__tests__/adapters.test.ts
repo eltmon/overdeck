@@ -128,6 +128,35 @@ describe('claude-plugin adapter', () => {
   });
 });
 
+describe('plugin root', () => {
+  it('reads a claude-plugin pack from pluginRoot and returns repo-relative dirs', async () => {
+    const root = fixture({
+      'harness/p/claude-code/.claude-plugin/plugin.json': JSON.stringify({ name: 'p', license: 'MIT' }),
+      'harness/p/claude-code/skills/alpha/SKILL.md': skillMd('alpha', 'Alpha.'),
+      'harness/p/claude-code/skills/alpha/scripts/run.sh': 'echo hi\n',
+      'harness/p/claude-code/skills/beta/SKILL.md': skillMd('beta', 'Beta.'),
+      'harness/p/claude-code/agents/x.md': '# Agent\n',
+      'skills/decoy/SKILL.md': skillMd('decoy', 'Decoy at repo root.'),
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin', { pluginRoot: 'harness/p/claude-code' });
+    expect(manifest.skills.map((skill) => [skill.name, skill.dir])).toEqual([
+      ['alpha', 'harness/p/claude-code/skills/alpha'],
+      ['beta', 'harness/p/claude-code/skills/beta'],
+    ]);
+    expect(manifest.capabilities.agents).toBe(true);
+    expect(manifest.capabilities.executables).toEqual(['harness/p/claude-code/skills/alpha/scripts/run.sh']);
+    expect(manifest.license).toBe('MIT');
+    expect(manifest.pluginName).toBe('p');
+  });
+
+  it('rejects a plugin root that escapes the repo', async () => {
+    const root = fixture({ 'skills/x/SKILL.md': skillMd('x', 'X.') });
+    for (const pluginRoot of ['../x', '/abs', '..', '']) {
+      await expect(readPackManifest(root, 'plain', { pluginRoot })).rejects.toThrow(/invalid pack plugin root/);
+    }
+  });
+});
+
 describe('plain adapter', () => {
   it('finds nested and flat skills', async () => {
     const root = fixture({
