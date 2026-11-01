@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T07:40:47.283Z",
+  "updated": "2026-11-01T07:41:09.014Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,10 @@
     "workers-route.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T07:40:47.283Z"
+    },
+    "mcp-core-read.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:41:09.014Z"
     }
   }
 }
