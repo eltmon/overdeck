@@ -5,6 +5,7 @@ import { SettingsSection } from '../primitives/SettingsSection';
 import { AnywhereStatusCard } from '../anywhere/AnywhereStatusCard';
 import type { AnywhereAction } from '../anywhere/anywhereApi';
 import { DevicesPanel } from '../anywhere/DevicesPanel';
+import { MachinesPanel } from '../anywhere/MachinesPanel';
 import { PairDeviceDialog } from '../anywhere/PairDeviceDialog';
 
 interface AnywhereSectionProps {
@@ -44,6 +45,7 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
       <div className="space-y-4">
         <AnywhereStatusCard onAction={handleAction} />
         <DevicesPanel />
+        <MachinesPanel />
       </div>
       <PairDeviceDialog open={open} onClose={() => setOpen(false)} />
     </SettingsSection>
