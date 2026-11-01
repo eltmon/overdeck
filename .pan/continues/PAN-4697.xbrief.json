@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4697",
   "created": "2026-11-01T09:15:31.379Z",
-  "updated": "2026-11-01T09:21:29.088Z",
+  "updated": "2026-11-01T09:27:59.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-01T09:21:21.266Z"
     },
     "package-script-flip": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4697",
-      "claimedAt": "2026-11-01T09:21:29.088Z"
+      "claimedAt": "2026-11-01T09:21:29.088Z",
+      "doneAt": "2026-11-01T09:27:59.078Z"
     }
   }
 }
