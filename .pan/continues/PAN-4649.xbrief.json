@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T09:55:35.835Z",
+  "updated": "2026-11-01T10:14:53.325Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -17,6 +17,11 @@
       "reason": "resume",
       "agentModel": "claude-opus-5-5",
       "timestamp": "2026-11-01T09:55:35.835Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T10:14:53.325Z"
     }
   ],
   "items": {
