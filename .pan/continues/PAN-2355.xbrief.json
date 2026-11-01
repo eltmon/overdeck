@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-2355",
+  "created": "2026-11-01T05:47:25.756Z",
+  "updated": "2026-11-01T05:47:25.756Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "answer-transport-extract": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T05:47:25.756Z"
+    }
+  }
+}
