@@ -4,17 +4,17 @@
     "created": "2026-11-01T16:05:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4724: getCostsByIssueSnapshot re-aggregates all 771k cost_events rows every 15 s (~1.5 s each); make the per-issue cost rollup incremental",
-    "updated": "2026-11-01T16:05:08.621Z"
+    "updated": "2026-11-01T16:06:13.187Z"
   },
   "plan": {
     "id": "pan-4724",
     "title": "getCostsByIssueSnapshot re-aggregates all 771k cost_events rows every 15 s (~1.5 s each); make the per-issue cost rollup incremental",
-    "status": "proposed",
+    "status": "running",
     "uid": "bb1201ea-9869-48fe-bdc0-b647d3d13255",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T16:05:00Z",
-    "updated": "2026-11-01T16:05:08.621Z",
+    "updated": "2026-11-01T16:06:13.187Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4724",
@@ -444,5 +444,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
