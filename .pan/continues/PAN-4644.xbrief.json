@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4644",
   "created": "2026-11-01T04:54:46.297Z",
-  "updated": "2026-11-01T07:35:46.535Z",
+  "updated": "2026-11-01T07:36:05.612Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -238,6 +238,10 @@
     "appearance-pickers.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:35:46.535Z"
+    },
+    "appearance-pickers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:36:05.612Z"
     }
   }
 }
