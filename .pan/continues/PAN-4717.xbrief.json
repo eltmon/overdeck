@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4717",
   "created": "2026-11-01T14:07:20.462Z",
-  "updated": "2026-11-01T14:53:36.275Z",
+  "updated": "2026-11-01T14:53:51.356Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
     "drawer-absent-issue-hydration-test.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T14:53:36.275Z"
+    },
+    "drawer-absent-issue-hydration-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:53:51.356Z"
     }
   }
 }
