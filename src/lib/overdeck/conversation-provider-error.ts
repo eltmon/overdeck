@@ -117,8 +117,8 @@ export function providerErrorFromTranscriptTail(text: string, cutFirstLine: bool
   return null;
 }
 
-/** Reads the transcript's last 64 KB and parses it; null on any error (missing file, non-file, read failure). */
-export async function readConversationProviderError(path: string): Promise<ConversationProviderError | null> {
+/** The transcript's last 64 KB; null on any error (missing file, non-file, read failure). */
+export async function readTranscriptTail(path: string): Promise<{ text: string; cutFirstLine: boolean } | null> {
   try {
     const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK);
     try {
@@ -127,11 +127,17 @@ export async function readConversationProviderError(path: string): Promise<Conve
       const start = Math.max(0, info.size - TAIL_BYTES);
       const buffer = Buffer.alloc(info.size - start);
       await handle.read(buffer, 0, buffer.length, start);
-      return providerErrorFromTranscriptTail(buffer.toString('utf8'), start > 0);
+      return { text: buffer.toString('utf8'), cutFirstLine: start > 0 };
     } finally {
       await handle.close();
     }
   } catch {
     return null;
   }
+}
+
+/** Reads the transcript's last 64 KB and parses it; null on any error (missing file, non-file, read failure). */
+export async function readConversationProviderError(path: string): Promise<ConversationProviderError | null> {
+  const tail = await readTranscriptTail(path);
+  return tail ? providerErrorFromTranscriptTail(tail.text, tail.cutFirstLine) : null;
 }
