@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:42:35.800Z",
+  "updated": "2026-11-01T23:42:51.476Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -188,6 +188,10 @@
     "lane-stop-reap-remote.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T23:42:35.799Z"
+    },
+    "lane-stop-reap-remote.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T23:42:51.475Z"
     }
   }
 }
