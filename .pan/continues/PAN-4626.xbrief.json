@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4626",
+  "created": "2026-11-01T05:58:08.711Z",
+  "updated": "2026-11-01T05:58:08.712Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "hook-stop-pending": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4626",
+      "claimedAt": "2026-11-01T05:58:08.711Z"
+    }
+  }
+}
