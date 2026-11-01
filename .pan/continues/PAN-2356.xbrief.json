@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:35:10.005Z",
+  "updated": "2026-11-01T14:35:24.205Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -288,6 +288,10 @@
     "wi14-approval-service.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T14:35:10.005Z"
+    },
+    "wi14-approval-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:35:24.205Z"
     }
   }
 }
