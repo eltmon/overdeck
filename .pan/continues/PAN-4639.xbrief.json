@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T09:39:28.942Z",
+  "updated": "2026-11-01T09:39:49.155Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "settle-controls.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T09:39:28.941Z"
+    },
+    "snooze-menu.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:39:49.155Z"
     }
   }
 }
