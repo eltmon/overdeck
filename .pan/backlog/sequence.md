@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T07:06:00Z · model: claude-opus-5-5 · open: 867_
+_Last sequenced: 2026-11-01T07:15:31Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -24,11 +24,13 @@ _Last sequenced: 2026-11-01T07:06:00Z · model: claude-opus-5-5 · open: 867_
 | 17 | PAN-4674 | S | high | ok |  |  | Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist |
 | 18 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 19 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
+| 20 | PAN-4680 | S | critical | ok |  |  | In pipeline: run-gh ledger test flaked main red; queueLedgerEntry appends race. Serialize appends with a promise chain. |
 | 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 22 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 24 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 25 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
+| 26 | PAN-4681 | S | high | ok |  |  | In pipeline: CodeRabbit fixes lost at #4667 merge: messageRows test not in CI subset; cite toolbar shown with no composer. |
 | 27 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
 | 28 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 29 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
@@ -278,6 +280,7 @@ _Last sequenced: 2026-11-01T07:06:00Z · model: claude-opus-5-5 · open: 867_
 | 276 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 277 | PAN-4649 | M | medium | ok |  |  | Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending. |
 | 278 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650, PAN-4649 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
+| 279 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
 | 282 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
@@ -305,6 +308,7 @@ _Last sequenced: 2026-11-01T07:06:00Z · model: claude-opus-5-5 · open: 867_
 | 304 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
 | 305 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
 | 306 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
+| 307 | PAN-4683 | M | medium | ok |  |  | pan start --remote misses specs on feature branches and re-plans; planning never pushes branch; post-plan work starts local. |
 | 308 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
@@ -951,6 +955,10 @@ New operator-reported settings UI bug (substrate-improvement label sets a high f
 
 New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network timeout becomes a defect that skips pausing agents and stopping the stack, and the merge door then refuses re-runs with Already merged. PAN-4299 is stuck half-closed right now, and pan close refuses on DoD row 5. Substrate bug with clear AC, so it slots into the free rank 19 beside the other merge and close-out fixes; it overlaps PAN-3557 (label retry), and fixing either should consult the other.
 
+### PAN-4680 (rank 20)
+
+New in-pipeline fix for a red-main flake (run 41283191295): unserialized ledger appends reorder entries, so main CI fails at random; placed in free slot 20 as critical substrate work.
+
 ### PAN-4572 (rank 21)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
@@ -970,6 +978,10 @@ New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done
 ### PAN-4219 (rank 25)
 
 New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.
+
+### PAN-4681 (rank 26)
+
+New in-pipeline follow-up to the merged PAN-4642 PR: an unregistered frontend test and a citation toggle without a mounted composer; placed in free slot 26 beside PAN-4671, its root cause.
 
 ### PAN-4229 (rank 27)
 
@@ -1187,14 +1199,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
 
 Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
 
-### PAN-3096 (rank 83)
-
-New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
-
-### PAN-3084 (rank 84)
-
-Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1202,10 +1206,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T07:06:00Z",
+  "generatedAt": "2026-11-01T07:15:31Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 867,
+  "openCount": 871,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -12057,6 +12061,58 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4680",
+      "rank": 20,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: run-gh ledger test flaked main red; queueLedgerEntry appends race. Serialize appends with a promise chain.",
+      "rationale": "New in-pipeline fix for a red-main flake (run 41283191295): unserialized ledger appends reorder entries, so main CI fails at random; placed in free slot 20 as critical substrate work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4681",
+      "rank": 26,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: CodeRabbit fixes lost at #4667 merge: messageRows test not in CI subset; cite toolbar shown with no composer.",
+      "rationale": "New in-pipeline follow-up to the merged PAN-4642 PR: an unregistered frontend test and a citation toggle without a mounted composer; placed in free slot 26 beside PAN-4671, its root cause.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4682",
+      "rank": 279,
+      "size": "XS",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md.",
+      "rationale": "New one-line config/doc fix found in the PAN-4295 Fly smoke test; every unconfigured createVm points at a missing image, so it sits just after PAN-4295.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4683",
+      "rank": 307,
+      "size": "M",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start --remote misses specs on feature branches and re-plans; planning never pushes branch; post-plan work starts local.",
+      "rationale": "New remote-start bug from the PAN-4295 smoke test with three linked gaps (spec lookup, branch push, start location); ranked with the Fly remote cluster near PAN-4295.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13704,6 +13760,34 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4671",
+      "to": "PAN-4681",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4682",
+      "to": "PAN-4295",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4683",
+      "to": "PAN-4295",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4682",
+      "to": "PAN-4683",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
