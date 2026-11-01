@@ -708,6 +708,10 @@ export function createConversation(opts: {
   parentName?: string;
   /** PAN-4223: lane facts; requires parentName. Omitted = a root or a successor. */
   lane?: { run: string; key: string; role: LaneRole; criticOfName?: string };
+  /** PAN-4638 D-4638-3: a lane launched for another machine; its parent and critic link live in that machine's stand-in. */
+  remoteLaunch?: boolean;
+  /** PAN-4638 D-4638-2: refuse an existing name instead of vacating it. */
+  refuseExistingName?: boolean;
 }): LegacyConversation {
   if (opts.name.startsWith('vault-')) throw new Error('conversation names starting with "vault-" are reserved for Session Vault browse copies');
   const db = overdeckDb();
@@ -718,7 +722,9 @@ export function createConversation(opts: {
     : (resolveWorkspaceForCwd(opts.cwd)?.id ?? null);
   // Validate the parent link before the transaction so a bad parent inserts
   // nothing (and never deletes a same-name row).
-  if (opts.lane && !opts.parentName) throw new Error('a lane needs a parent');
+  if (opts.lane && !opts.parentName && !opts.remoteLaunch) throw new Error('a lane needs a parent');
+  if (opts.remoteLaunch && opts.lane?.criticOfName) throw new Error('a remote-launched lane links no builder');
+  if (opts.refuseExistingName && getConversationUuidByName(opts.name)) throw new Error(`conversation ${opts.name} exists`);
   let parentId: string | null = null;
   if (opts.parentName) {
     parentId = getConversationUuidByName(opts.parentName);

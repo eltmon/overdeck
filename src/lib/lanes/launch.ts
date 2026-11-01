@@ -53,12 +53,12 @@ import { pairBuilder, type PairingRow } from './pairing.js';
 import { LaneLaunchError, type LaneLaunchRequest, type LaneLaunchResult } from './types.js';
 import { addBranchWorktree, addDetachedWorktree, applySparse, fetchBase, laneDirName, removeWorktree } from './worktree.js';
 
-const RUN_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
-const KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;
+export const RUN_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
+export const KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;
 /** opencode takes free-form effort names, as at the conversation door. */
-const OPENCODE_EFFORT_PATTERN = /^[a-z][a-z0-9_-]*$/;
+export const OPENCODE_EFFORT_PATTERN = /^[a-z][a-z0-9_-]*$/;
 /** D10 `starting`: a row not ended, created less than this long ago. */
-const STARTING_GRACE_MS = 3 * 60_000;
+export const STARTING_GRACE_MS = 3 * 60_000;
 const REPLACE_POLL_MS = 1_000;
 const REPLACE_WAIT_MS = 30_000;
 /** D8: roles only a root conversation (by effective launcher) may launch. */
@@ -96,7 +96,7 @@ export interface LaneLaunchDeps {
 
 const projectLocks = new Map<string, Promise<void>>();
 
-async function withProjectLock<T>(projectKey: string, fn: () => Promise<T>): Promise<T> {
+export async function withProjectLock<T>(projectKey: string, fn: () => Promise<T>): Promise<T> {
   const previous = projectLocks.get(projectKey) ?? Promise.resolve();
   let release!: () => void;
   const held = new Promise<void>((resolveHeld) => { release = resolveHeld; });
@@ -144,7 +144,7 @@ function resolveRun(requested: string | undefined, launcher: LegacyConversation)
 }
 
 /** D8 directory names. The orchestrator follows the builder rule for n ≥ 2 so every iteration gets a new directory (D7). */
-function laneDir(role: LaneRole, run: string, key: string, n: number): string {
+export function laneDir(role: LaneRole, run: string, key: string, n: number): string {
   switch (role) {
     case 'builder': return n === 1 ? `${run}-${key}` : `${run}-${key}-i${n}`;
     case 'orchestrator': return n === 1 ? `${run}-${key}-orch` : `${run}-${key}-orch-i${n}`;
@@ -174,7 +174,7 @@ async function iterationBranch(
   return conventionBranch(run, key, n);
 }
 
-function isWithin(child: string, parent: string): boolean {
+export function isWithin(child: string, parent: string): boolean {
   return child === parent || child.startsWith(parent.endsWith(sep) ? parent : `${parent}${sep}`);
 }
 
@@ -182,12 +182,12 @@ async function realOrResolved(path: string): Promise<string> {
   return realpath(path).catch(() => resolve(path));
 }
 
-async function pathExists(path: string): Promise<boolean> {
+export async function pathExists(path: string): Promise<boolean> {
   return stat(path).then(() => true, () => false);
 }
 
 /** FR-3: under $HOME, not under /tmp, neither equal to nor containing the project checkout. Creates it when missing. */
-async function prepareLanesRoot(lanesRoot: string, projectPath: string, home: string, tmpRoot: string): Promise<string> {
+export async function prepareLanesRoot(lanesRoot: string, projectPath: string, home: string, tmpRoot: string): Promise<string> {
   const homeReal = await realOrResolved(home);
   const tmpRoots = [resolve(tmpRoot), await realOrResolved(tmpRoot)];
   const projectReal = await realOrResolved(projectPath);
@@ -298,7 +298,7 @@ async function answeredVerdict(
   return answer ? { criticId: answer.id, role: answer.role, iteration: answer.iteration, verdict: answer.verdict, file: answer.file } : null;
 }
 
-function gitFailure(error: unknown): LaneLaunchError {
+export function gitFailure(error: unknown): LaneLaunchError {
   const message = error instanceof Error ? error.message : String(error);
   return new LaneLaunchError(400, `git worktree add failed: ${message.trim()}`);
 }

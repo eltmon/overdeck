@@ -43,7 +43,8 @@ export interface LaneLaunchResult {
 }
 
 export class LaneLaunchError extends Error {
-  constructor(readonly status: 400 | 404 | 409 | 429 | 500, message: string) {
+  /** A machine-readable refusal code, e.g. `name-taken` (PAN-4638 D-4638-2). */
+  constructor(readonly status: 400 | 404 | 409 | 429 | 500, message: string, readonly code?: string) {
     super(message);
     this.name = 'LaneLaunchError';
   }
