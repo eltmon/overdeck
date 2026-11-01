@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T07:04:11Z · model: claude-opus-5-5 · open: 867_
+_Last sequenced: 2026-11-01T07:06:00Z · model: claude-opus-5-5 · open: 867_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1202,7 +1202,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T07:04:11Z",
+  "generatedAt": "2026-11-01T07:06:00Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 867,
