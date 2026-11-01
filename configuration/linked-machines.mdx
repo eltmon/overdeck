@@ -200,6 +200,8 @@ a Fly machine started for Claude Code can also run a Codex conversation later.
 ### Limits
 
 - Claude Code and Codex. Other harnesses cannot run on a Fly machine.
+- Codex runs with its usual `workspace-write` sandbox on a Fly machine; shell commands
+  work there (checked live, PAN-4296).
 - Docker: the VM runs Docker with the `vfs` storage driver, because the VM's disk cannot
   host the default overlay driver. Containers run, but images take more disk and start
   more slowly than on your own machine. `add-fly --json` reports `record.docker` as `true`
