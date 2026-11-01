@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4296",
   "created": "2026-11-01T21:43:56.125Z",
-  "updated": "2026-11-01T21:43:56.126Z",
+  "updated": "2026-11-01T21:44:24.425Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -13,6 +13,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4296",
       "claimedAt": "2026-11-01T21:43:56.125Z"
+    },
+    "wi2-record-codex-path": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4296",
+      "claimedAt": "2026-11-01T21:44:24.425Z"
     }
   }
 }
