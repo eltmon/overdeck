@@ -569,7 +569,9 @@ export class FlyProvider implements RemoteProvider {
     await this.sshImpl(vmName, 'mkdir -p ~/.claude');
 
     // Set onboarding complete + pre-trust /workspace so the agent doesn't
-    // hang at the "do you trust this folder?" dialog on first launch.
+    // hang at the "do you trust this folder?" dialog on first launch, and
+    // pre-acknowledge the Bypass Permissions disclaimer (default "No, exit"),
+    // as preTrustDirectory() does for local workspaces (PAN-4295 smoke test).
     const onboardingScript = `
 import json, os
 path = os.path.expanduser("~/.claude.json")
@@ -579,6 +581,7 @@ if os.path.exists(path):
         data = json.load(f)
 data["hasCompletedOnboarding"] = True
 data["lastOnboardingVersion"] = "2.0.50"
+data["bypassPermissionsModeAccepted"] = True
 projects = data.setdefault("projects", {})
 ws = projects.setdefault("/workspace", {})
 ws["hasTrustDialogAccepted"] = True
