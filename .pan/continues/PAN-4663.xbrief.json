@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4663",
   "created": "2026-11-01T11:01:24.996Z",
-  "updated": "2026-11-01T11:03:44.362Z",
+  "updated": "2026-11-01T11:11:17.903Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-01T11:03:20.257Z"
     },
     "network-guard-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4663",
-      "claimedAt": "2026-11-01T11:03:44.362Z"
+      "claimedAt": "2026-11-01T11:03:44.362Z",
+      "doneAt": "2026-11-01T11:11:17.903Z"
     }
   }
 }
