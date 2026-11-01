@@ -128,6 +128,122 @@ describe('ConversationRow settle checkbox (settle-controls.ac1, ac3)', () => {
   });
 });
 
+describe('Snooze submenu (snooze-menu.ac1-ac3)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('renders four presets plus Custom… at 10:00 local', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 2, 10, 0));
+    render(<TriageMenuItems conversation={conversation} mutations={{ triage: vi.fn() }} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Snooze' }));
+
+    expect(screen.getByRole('menuitem', { name: '1 hour' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'This evening' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Tomorrow morning' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Next week' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Custom snooze time')).toBeInTheDocument();
+  });
+
+  it('omits This evening at 17:30 local, keeping the other three presets plus Custom…', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 2, 17, 30));
+    render(<TriageMenuItems conversation={conversation} mutations={{ triage: vi.fn() }} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Snooze' }));
+
+    expect(screen.queryByRole('menuitem', { name: 'This evening' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '1 hour' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Tomorrow morning' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Next week' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Custom snooze time')).toBeInTheDocument();
+  });
+
+  it('choosing Tomorrow morning calls triage with tomorrow 09:00 local as an ISO string (ac2)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 2, 10, 0));
+    const triage = vi.fn();
+    const onClose = vi.fn();
+    render(<TriageMenuItems conversation={conversation} mutations={{ triage }} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Snooze' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Tomorrow morning' }));
+
+    const expected = new Date(2026, 10, 3, 9, 0, 0, 0).toISOString();
+    expect(triage).toHaveBeenCalledWith(
+      expect.objectContaining({ updates: [{ name: 'test-conversation', snoozedUntil: expected }] }),
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('a Custom value earlier than now keeps the Snooze button disabled (ac3)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 2, 10, 0));
+    render(<TriageMenuItems conversation={conversation} mutations={{ triage: vi.fn() }} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Snooze' }));
+
+    const input = screen.getByLabelText('Custom snooze time');
+    fireEvent.change(input, { target: { value: '2026-11-01T09:00' } });
+    expect(screen.getByRole('button', { name: 'Snooze' })).toBeDisabled();
+  });
+
+  it('a Custom value in the future enables the Snooze button and calls triage on click', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 2, 10, 0));
+    const triage = vi.fn();
+    render(<TriageMenuItems conversation={conversation} mutations={{ triage }} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Snooze' }));
+
+    const input = screen.getByLabelText('Custom snooze time');
+    fireEvent.change(input, { target: { value: '2026-11-05T14:00' } });
+    const button = screen.getByRole('button', { name: 'Snooze' });
+    expect(button).not.toBeDisabled();
+    fireEvent.click(button);
+
+    const expected = new Date(2026, 10, 5, 14, 0).toISOString();
+    expect(triage).toHaveBeenCalledWith(
+      expect.objectContaining({ updates: [{ name: 'test-conversation', snoozedUntil: expected }] }),
+    );
+  });
+
+  it('shows Unsnooze for a conversation snoozed in the future, and not for an unsnoozed one', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 2, 10, 0));
+    const futureSnooze = { ...conversation, snoozedUntil: new Date(2026, 10, 3, 9, 0).toISOString() };
+    render(<TriageMenuItems conversation={futureSnooze} mutations={{ triage: vi.fn() }} onClose={vi.fn()} />);
+    expect(screen.getByRole('menuitem', { name: 'Unsnooze' })).toBeInTheDocument();
+  });
+
+  it('clicking Unsnooze sends snoozedUntil: null', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 2, 10, 0));
+    const triage = vi.fn();
+    const futureSnooze = { ...conversation, snoozedUntil: new Date(2026, 10, 3, 9, 0).toISOString() };
+    render(<TriageMenuItems conversation={futureSnooze} mutations={{ triage }} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Unsnooze' }));
+    expect(triage).toHaveBeenCalledWith(
+      expect.objectContaining({ updates: [{ name: 'test-conversation', snoozedUntil: null }] }),
+    );
+  });
+
+  it('a row snoozed until tomorrow 09:00 renders the wake label "back tomorrow 09:00" (ac3)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 2, 10, 0));
+    const until = new Date(2026, 10, 3, 9, 0, 0, 0).toISOString();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ConversationRow
+          conv={{ ...conversation, snoozedUntil: until }}
+          isSelected={false}
+          onSelect={vi.fn()}
+          mutations={baseMutations()}
+        />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText('back tomorrow 09:00')).toBeInTheDocument();
+  });
+});
+
 describe('row and tab menus both offer Settle/Unsettle (settle-controls.ac2, ac3)', () => {
   it('the row overflow menu shows Settle for an unsettled conversation', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

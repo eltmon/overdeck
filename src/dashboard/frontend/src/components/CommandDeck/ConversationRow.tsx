@@ -19,6 +19,7 @@ import { fallbackBadgeTone } from './fallbackBadge';
 import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import { PullRequestMenuItems } from './PullRequestMenuItems';
 import { TriageMenuItems } from './TriageMenuItems';
+import { formatSnoozeWake, isSnoozed } from './conversation-triage';
 import { PullRequestBadge } from '../primitives/PullRequestBadge';
 import styles from './styles/command-deck.module.css';
 
@@ -639,6 +640,12 @@ export function ConversationRow({
               </>
             )}
             {forkBadges}
+            {isSnoozed(conv, now.getTime()) && conv.snoozedUntil && (
+              <>
+                <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                <span className={styles.conversationSnoozeLabel}>{formatSnoozeWake(conv.snoozedUntil, now)}</span>
+              </>
+            )}
           </span>
         </span>
       )}
