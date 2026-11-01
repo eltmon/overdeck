@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4724",
   "created": "2026-11-01T16:06:34.998Z",
-  "updated": "2026-11-01T16:27:04.292Z",
+  "updated": "2026-11-01T16:27:19.002Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "rollup-docs.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T16:27:04.292Z"
+    },
+    "rollup-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:27:19.001Z"
     }
   }
 }
