@@ -139,3 +139,42 @@ describe('ledger append queue ordering (PAN-4680)', () => {
     }
   });
 });
+
+describe('ledger append queue failure isolation (PAN-4680)', () => {
+  let home: string;
+  const originalHome = process.env.OVERDECK_HOME;
+
+  beforeEach(() => {
+    home = mkdtempSync(join(tmpdir(), 'pan-ledger-queue-fail-'));
+    process.env.OVERDECK_HOME = home;
+    mkdirMock.mockReset().mockImplementation((...args: Parameters<typeof actualFsPromises.mkdir>) => actualFsPromises.mkdir(...args));
+    appendFileMock.mockReset().mockImplementation((...args: Parameters<typeof actualFsPromises.appendFile>) => actualFsPromises.appendFile(...args));
+  });
+
+  afterEach(async () => {
+    await flushLedgerWrites().catch(() => undefined);
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('a rejected append does not stop later appends', async () => {
+    appendFileMock.mockImplementationOnce(() => Promise.reject(new Error('EIO')));
+
+    queueLedgerEntry(entry(1));
+    queueLedgerEntry(entry(2));
+    queueLedgerEntry(entry(3));
+
+    await expect(flushLedgerWrites()).resolves.toBeUndefined();
+    expect(readLedgerWindow(Date.now()).map((e) => e.cost)).toEqual([2, 3]);
+  });
+
+  it('a rejected direct append resolves for its caller', async () => {
+    appendFileMock.mockImplementationOnce(() => Promise.reject(new Error('EIO')));
+
+    await expect(appendLedgerEntry(entry(1))).resolves.toBeUndefined();
+    await appendLedgerEntry(entry(2));
+
+    expect(readLedgerWindow(Date.now()).map((e) => e.cost)).toEqual([2]);
+  });
+});
