@@ -58,6 +58,15 @@ export const getAgentHealthHistoryRoute = HttpRouter.add(
 
 export function emitAgentRuntimeEvent(id: string, body: Record<string, unknown>, timestamp: string) {
   return Effect.gen(function* () {
+    // PAN-2354: the AskUserQuestion PreToolUse hook reports every real decision
+    // question here. It is not a domain event; it wakes the needs-you push
+    // service so the phone hears about the question in ~1 s instead of a poll.
+    if (body['kind'] === 'ask_user_question_blocked') {
+      const { wakeNeedsYouPush } = yield* Effect.promise(() => import('../../services/needs-you-push-service.js'));
+      wakeNeedsYouPush(`auq-hook:${id}`);
+      return { ok: true as const, emitted: false };
+    }
+
     let eventBody = body;
     if (body['kind'] === 'linear_mcp_auth_required' || body['kind'] === 'linear_mcp_auth_healthy') {
       const { AgentStateService } = yield* Effect.promise(
