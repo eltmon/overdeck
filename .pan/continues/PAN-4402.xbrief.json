@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4402",
   "created": "2026-11-01T05:03:16.844Z",
-  "updated": "2026-11-01T05:44:28.780Z",
+  "updated": "2026-11-01T05:44:51.311Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,10 @@
     "boot-switching.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T05:44:28.779Z"
+    },
+    "boot-switching.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:44:51.311Z"
     }
   }
 }
