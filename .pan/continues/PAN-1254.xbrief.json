@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T07:32:13.494Z",
+  "updated": "2026-11-01T07:32:32.331Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,10 @@
     "route-tailscale-peers.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:32:13.494Z"
+    },
+    "route-tailscale-peers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:32:32.331Z"
     }
   }
 }
