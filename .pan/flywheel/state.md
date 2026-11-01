@@ -435,3 +435,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   silent `handoff.abandoned` gave-up. Cost PAN-4663 and PAN-4670 three hours.
   Each tick, scan workspaces whose last handoff.* entry is `handoff.abandoned`
   with no live agent and an unmerged issue; relaunch with `pan start <id>`.
+- Re-staging a deploy: a `pan reload` waiting for restart approval keeps the
+  build it staged. When main moves on while it waits, kill it and start a new
+  one so the approval ships current main. Find it with
+  `ps -eo pid,args | grep "[p]an reload"`: `pgrep -f "pan reload"` inside a
+  `for … kill` also matches the shell running it and kills that shell
+  (exit 144, 2026-11-01).
