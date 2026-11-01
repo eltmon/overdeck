@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4648",
   "created": "2026-11-01T05:50:45.229Z",
-  "updated": "2026-11-01T07:54:30.326Z",
+  "updated": "2026-11-01T07:54:45.064Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "trigger-deliver.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T07:54:30.326Z"
+    },
+    "hooks-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:54:45.063Z"
     }
   }
 }
