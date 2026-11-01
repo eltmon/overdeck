@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:50:56.114Z",
+  "updated": "2026-11-01T23:51:14.959Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -226,6 +226,11 @@
     "lane-cli-machine.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T23:50:56.114Z"
+    },
+    "conversation-list-nesting": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4638",
+      "claimedAt": "2026-11-01T23:51:14.959Z"
     }
   }
 }
