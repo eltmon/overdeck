@@ -62,10 +62,16 @@ let home: string;
 let operatorToken: string;
 let fencedToken: string;
 
+// A link always stamps its actor; `agent-fenced` links downgrade `operator` to an agent.
 function request(method: string, path: string, token: string) {
-  return HttpServerRequest.fromWeb(new Request(`http://dashboard.test${path}`, { method, headers: { authorization: `Bearer ${token}` } }))
-    .modify({ remoteAddress: Option.some(`link:${KEY.slice(0, 16)}`) });
+  return HttpServerRequest.fromWeb(new Request(`http://dashboard.test${path}`, {
+    method, headers: { authorization: `Bearer ${token}`, 'x-overdeck-link-actor': 'operator' },
+  })).modify({ remoteAddress: Option.some(`link:${KEY.slice(0, 16)}`) });
 }
+
+// PAN-4650 D-4650-7: an agent actor (the fenced link's operator included) never changes conversations.
+const AGENT_FENCED = { status: 403, code: 'agent-fenced' } as const;
+const fencedOr = <T>(path: string, otherwise: T) => (path.startsWith('/api/conversations') ? AGENT_FENCED : otherwise);
 
 beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), 'pan-4645-route-scopes-'));
@@ -110,12 +116,12 @@ describe('route-scope rows for machine credentials (PAN-4645 WI-5)', () => {
 
   it.each(OPERATE_ROWS)('lets a machine credential over its channel through %s %s', (method, path) => {
     expect(remoteGateRejection(request(method, path, operatorToken), LINK)).toBeNull();
-    expect(remoteGateRejection(request(method, path, fencedToken), LINK)).toBeNull();
+    expect(remoteGateRejection(request(method, path, fencedToken), LINK)).toEqual(fencedOr(path, null));
   });
 
   it.each(APPROVE_ROWS)('lets only an operator-level machine credential answer prompts on %s %s', (method, path) => {
     expect(remoteGateRejection(request(method, path, operatorToken), LINK)).toBeNull();
-    expect(remoteGateRejection(request(method, path, fencedToken), LINK)).toEqual({ status: 403, missingScope: 'approve' });
+    expect(remoteGateRejection(request(method, path, fencedToken), LINK)).toEqual(fencedOr(path, { status: 403, missingScope: 'approve' }));
   });
 
   it.each(ADMIN_ONLY)('answers 403 insufficient_scope admin for a machine credential on %s %s', (method, path) => {

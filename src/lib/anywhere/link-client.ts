@@ -175,16 +175,9 @@ export function linkActorHeaders(actor: LinkActorInit = 'operator', ceiling?: re
   return headers;
 }
 
-/**
- * One JSON request to a linked machine. Rejects with `LinkUnavailableError`
- * when the link cannot carry it (offline at once, unreachable after 2.5 s).
- */
-export async function linkFetch(
-  environmentId: string,
-  path: string,
-  init: LinkFetchInit = {},
-): Promise<{ status: number; json: unknown }> {
-  const routes = init.routeSource ?? source;
+/** The link's route once it can carry a request; rejects with `LinkUnavailableError` otherwise. */
+async function onlineRoute(environmentId: string, routeSource?: LinkRouteSource): Promise<LinkRouteInfo> {
+  const routes = routeSource ?? source;
   if (!routes) throw new LinkUnavailableError('no-link', 'Machine links are not running on this dashboard');
   const info = routes.routeFor(environmentId);
   const early = unavailable(info, environmentId);
@@ -194,6 +187,19 @@ export async function linkFetch(
     const online = await routes.waitOnline(environmentId, LINK_WAIT_MS);
     if (!online) throw afterWait(routes.routeFor(environmentId), environmentId, info!.label);
   }
+  return info!;
+}
+
+/**
+ * One JSON request to a linked machine. Rejects with `LinkUnavailableError`
+ * when the link cannot carry it (offline at once, unreachable after 2.5 s).
+ */
+export async function linkFetch(
+  environmentId: string,
+  path: string,
+  init: LinkFetchInit = {},
+): Promise<{ status: number; json: unknown }> {
+  const info = await onlineRoute(environmentId, init.routeSource);
   const payload = init.body === undefined ? null : Buffer.from(JSON.stringify(init.body), 'utf8');
   const agent = init.agent ?? agentFor(environmentId, init.routeSource);
   return new Promise((resolve, reject) => {
@@ -205,7 +211,7 @@ export async function linkFetch(
         agent,
         headers: {
           accept: 'application/json',
-          authorization: `Bearer ${info!.token}`,
+          authorization: `Bearer ${info.token}`,
           ...linkActorHeaders(init.actor, init.ceiling),
           ...(payload ? { 'content-type': 'application/json', 'content-length': String(payload.length) } : {}),
         },
@@ -229,6 +235,88 @@ export async function linkFetch(
     );
     req.on('error', reject);
     if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+/** Largest request or response body `linkForward` carries (D-4650-4). */
+export const LINK_FORWARD_MAX_BYTES = 32 * 1024 * 1024;
+export const LINK_FORWARD_TIMEOUT_MS = 120_000;
+
+/** A request or response body above `LINK_FORWARD_MAX_BYTES`. */
+export class LinkForwardTooLargeError extends Error {
+  constructor(readonly side: 'request' | 'response') {
+    super(`the ${side} body is larger than ${LINK_FORWARD_MAX_BYTES} bytes`);
+    this.name = 'LinkForwardTooLargeError';
+  }
+}
+
+export interface LinkForwardInit {
+  method: string;
+  /** Path and query on the linked machine. */
+  path: string;
+  /** Extra request headers (for example `content-type`); the token and actor stamp are added. */
+  headers?: Record<string, string>;
+  body?: Buffer;
+  actor?: LinkActorInit;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  /** Test seams, as on `linkFetch`. */
+  agent?: Agent;
+  routeSource?: LinkRouteSource;
+}
+
+export interface LinkForwardResponse {
+  status: number;
+  headers: Record<string, string | string[] | undefined>;
+  body: Buffer;
+}
+
+/**
+ * Forward one request of any content type to a linked machine and buffer its
+ * answer (PAN-4650 D-4650-4). Bodies over 32 MiB on either side reject with
+ * `LinkForwardTooLargeError`; an unavailable link rejects with
+ * `LinkUnavailableError` within 2.5 s.
+ */
+export async function linkForward(environmentId: string, init: LinkForwardInit): Promise<LinkForwardResponse> {
+  if (init.body && init.body.length > LINK_FORWARD_MAX_BYTES) throw new LinkForwardTooLargeError('request');
+  const info = await onlineRoute(environmentId, init.routeSource);
+  const agent = init.agent ?? agentFor(environmentId, init.routeSource);
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      {
+        method: init.method,
+        path: init.path,
+        host: 'link.invalid',
+        agent,
+        timeout: init.timeoutMs ?? LINK_FORWARD_TIMEOUT_MS,
+        headers: {
+          ...init.headers,
+          authorization: `Bearer ${info.token}`,
+          ...linkActorHeaders(init.actor),
+          ...(init.body ? { 'content-length': String(init.body.length) } : {}),
+        },
+        ...(init.signal ? { signal: init.signal } : {}),
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        res.on('data', (chunk: Buffer) => {
+          size += chunk.length;
+          if (size > LINK_FORWARD_MAX_BYTES) {
+            res.destroy();
+            reject(new LinkForwardTooLargeError('response'));
+            return;
+          }
+          chunks.push(chunk);
+        });
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks) }));
+        res.on('error', reject);
+      },
+    );
+    req.on('timeout', () => req.destroy(new LinkUnavailableError('machine-unreachable', `${info.label} did not answer in time`)));
+    req.on('error', reject);
+    if (init.body) req.write(init.body);
     req.end();
   });
 }
