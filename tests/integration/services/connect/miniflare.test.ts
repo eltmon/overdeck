@@ -29,12 +29,13 @@ const SLOW = 60_000;
 /** Device tokens: `odd_` + 64 hex. Free-plan devices 1-9 share one account; 'e…' is a tester account. */
 const freeToken = (n: number) => 'odd_' + n.toString(16).padStart(64, 'f');
 const TESTER_TOKEN = 'odd_' + 'e'.repeat(64);
+const TESTER_TOKEN_2 = 'odd_' + 'e'.repeat(63) + 'd';
 
 const ACCOUNT_STUB = `
 import { WorkerEntrypoint } from 'cloudflare:workers';
 export class AccountRpc extends WorkerEntrypoint {
   async verifyDevice(token) {
-    if (token === ${JSON.stringify(TESTER_TOKEN)}) {
+    if (token === ${JSON.stringify(TESTER_TOKEN)} || token === ${JSON.stringify(TESTER_TOKEN_2)}) {
       return { ok: true, userId: 'u-tester', githubId: 2, deviceId: 'd-tester', entitlement: { plan: 'tester', maxDevices: null } };
     }
     if (/^odd_f+[0-9a-f]$/.test(token)) {
@@ -222,6 +223,31 @@ describe('connect service on real workerd (PAN-2356 WI-3)', () => {
     late.close();
     replacement.close();
     peers[1]!.close();
+  }, SLOW);
+
+  it('stamps from with the sender even when the frame claims another (WI-6)', async () => {
+    const a = await register(TESTER_TOKEN, 11);
+    const b = await register(TESTER_TOKEN_2, 12);
+    const session = 'ab'.repeat(16);
+    const data = { sdp: { type: 'offer', sdp: 'v=0' } };
+    a.send({ type: 'signal', to: envId(12), from: envId(99), session, purpose: 'link', relay: false, data });
+    const got = await b.waitFor(isType('signal'));
+    expect(got).toEqual({ type: 'signal', from: envId(11), session, purpose: 'link', relay: false, data });
+
+    b.close();
+    await a.waitFor((f) => f['type'] === 'directory' && (f['machines'] as Array<{ environmentId: string; online: boolean }>).some((m) => m.environmentId === envId(12) && !m.online));
+    const before = a.frames.length;
+    a.send({ type: 'signal', to: envId(12), session, purpose: 'link', relay: false, data });
+    const error = await a.waitFor(isType('error'), before);
+    expect(error).toMatchObject({ code: 'peer_offline', session });
+
+    a.send({ type: 'ice-servers', requestId: 'stun-1', relay: false });
+    expect(await a.waitFor(isType('ice-servers'))).toEqual({
+      type: 'ice-servers',
+      requestId: 'stun-1',
+      iceServers: [{ urls: ['stun:stun.cloudflare.com:3478'] }],
+    });
+    a.close();
   }, SLOW);
 
   it('logs only frame types, ids and outcomes, never the label (WI-5)', async () => {

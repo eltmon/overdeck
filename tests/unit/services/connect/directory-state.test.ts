@@ -30,7 +30,7 @@ function hello(state: DirectoryState, n: number, identity = FREE, online: string
   return reduce(
     state,
     { kind: 'hello', registeredAs: null, identity, frame: helloFrame(n), fingerprint: `fp-${n}` },
-    { now: NOW, online: new Set(online) },
+    { now: NOW, online: new Set(online), stunUrls: [] },
   );
 }
 
@@ -68,7 +68,7 @@ describe('directory reducer: presence and the machine limit (PAN-2356 WI-5)', ()
     const forgotten = reduce(
       state,
       { kind: 'frame', registeredAs: env(1), frame: { type: 'forget', environmentId: env(3) } },
-      { now: NOW, online: new Set([env(3)]) },
+      { now: NOW, online: new Set([env(3)]), stunUrls: [] },
     );
     expect(forgotten.state.machines.map((m) => m.environmentId)).toEqual([env(1), env(2)]);
     expect(forgotten.effects).toContainEqual({ kind: 'delete-machine', environmentId: env(3) });
@@ -94,7 +94,7 @@ describe('directory reducer: presence and the machine limit (PAN-2356 WI-5)', ()
   it('marks a machine offline with a new last-seen time when its last socket goes', () => {
     const state = register(2);
     const later = NOW + 60_000;
-    const { state: next, effects } = reduce(state, { kind: 'socket-gone', registeredAs: env(2) }, { now: later, online: new Set([env(1)]) });
+    const { state: next, effects } = reduce(state, { kind: 'socket-gone', registeredAs: env(2) }, { now: later, online: new Set([env(1)]), stunUrls: [] });
     expect(next.machines[1]?.lastSeenAt).toBe(later);
     const frame = sends(effects)[0];
     expect(frame).toMatchObject({ to: 'others', frame: { type: 'directory' } });
@@ -104,12 +104,12 @@ describe('directory reducer: presence and the machine limit (PAN-2356 WI-5)', ()
   });
 
   it('closes a socket that sends another frame before hello with 4010', () => {
-    const { effects } = reduce(EMPTY_DIRECTORY, { kind: 'frame', registeredAs: null, frame: { type: 'endpoints', endpoints: [] } }, { now: NOW, online: new Set() });
+    const { effects } = reduce(EMPTY_DIRECTORY, { kind: 'frame', registeredAs: null, frame: { type: 'endpoints', endpoints: [] } }, { now: NOW, online: new Set(), stunUrls: [] });
     expect(closes(effects)).toEqual([{ kind: 'close', to: 'self', code: 4010, reason: 'hello required' }]);
   });
 
   it('answers an unsupported protocol with an error and close 4010', () => {
-    const { effects } = reduce(EMPTY_DIRECTORY, { kind: 'bad-frame', registeredAs: null, reason: 'unsupported' }, { now: NOW, online: new Set() });
+    const { effects } = reduce(EMPTY_DIRECTORY, { kind: 'bad-frame', registeredAs: null, reason: 'unsupported' }, { now: NOW, online: new Set(), stunUrls: [] });
     expect(sends(effects)[0]).toMatchObject({ frame: { type: 'error', code: 'unsupported' } });
     expect(closes(effects)[0]).toMatchObject({ code: 4010 });
   });
@@ -118,7 +118,7 @@ describe('directory reducer: presence and the machine limit (PAN-2356 WI-5)', ()
     const { effects } = reduce(
       EMPTY_DIRECTORY,
       { kind: 'hello', registeredAs: null, identity: FREE, frame: helloFrame(1, 'SECRET-LABEL'), fingerprint: 'fp' },
-      { now: NOW, online: new Set() },
+      { now: NOW, online: new Set(), stunUrls: [] },
     );
     const logs = effects.filter((e) => e.kind === 'log');
     expect(logs).toEqual([{ kind: 'log', type: 'hello', environmentId: env(1), outcome: 'registered' }]);
@@ -152,5 +152,116 @@ describe('keyFingerprint', () => {
   it('matches machineKeyFingerprint on the machine', async () => {
     const hex = 'a1b2c3d4'.repeat(8);
     expect(await keyFingerprint(hex)).toBe(machineKeyFingerprint(hex));
+  });
+});
+
+describe('directory reducer: signalling and approvals (PAN-2356 WI-6)', () => {
+  const ctx = (online: string[], now = NOW) => ({ now, online: new Set(online), stunUrls: ['stun:stun.cloudflare.com:3478'] });
+  const id = (n: number) => n.toString(16).padStart(32, '0');
+  const offer = { sdp: { type: 'offer' as const, sdp: 'v=0' } };
+
+  it('forwards a signal with from stamped as the sender', () => {
+    const state = register(2, TESTER);
+    const { effects } = reduce(
+      state,
+      { kind: 'frame', registeredAs: env(1), frame: { type: 'signal', to: env(2), session: id(1), purpose: 'link', relay: false, data: offer } },
+      ctx([env(2)]),
+    );
+    expect(sends(effects)).toEqual([
+      { kind: 'send', to: { environmentId: env(2) }, frame: { type: 'signal', from: env(1), session: id(1), purpose: 'link', relay: false, data: offer } },
+    ]);
+  });
+
+  it('answers peer_offline with the session when the target has no socket', () => {
+    const state = register(2, TESTER);
+    const { effects } = reduce(
+      state,
+      { kind: 'frame', registeredAs: env(1), frame: { type: 'signal', to: env(2), session: id(7), purpose: 'link', relay: false, data: offer } },
+      ctx([]),
+    );
+    expect(sends(effects)[0]).toMatchObject({ to: 'self', frame: { type: 'error', code: 'peer_offline', session: id(7) } });
+  });
+
+  it('refuses an approval signal with no pending approval as approval_unknown', () => {
+    const state = register(2, TESTER);
+    const { effects } = reduce(
+      state,
+      { kind: 'frame', registeredAs: env(1), frame: { type: 'signal', to: env(2), session: id(1), purpose: 'approval', relay: false, data: offer } },
+      ctx([env(2)]),
+    );
+    expect(sends(effects)[0]).toMatchObject({ to: 'self', frame: { type: 'error', code: 'approval_unknown', session: id(1) } });
+  });
+
+  it('passes approval signals both ways while a request is pending, and stores and forwards the request', () => {
+    const state = register(2, TESTER);
+    const requested = reduce(state, { kind: 'frame', registeredAs: env(2), frame: { type: 'approval-request', requestId: id(9), to: null } }, ctx([env(1)]));
+    expect(requested.effects).toContainEqual({
+      kind: 'send',
+      to: 'others',
+      frame: { type: 'approval-request', requestId: id(9), from: env(2), label: 'machine-2', fingerprint: 'fp-2', publicKeyHex: key(2), expiresAt: NOW + 600_000 },
+    });
+    const back = reduce(
+      requested.state,
+      { kind: 'frame', registeredAs: env(1), frame: { type: 'signal', to: env(2), session: id(1), purpose: 'approval', relay: false, data: offer } },
+      ctx([env(2)]),
+    );
+    expect(sends(back.effects)[0]).toMatchObject({ to: { environmentId: env(2) }, frame: { type: 'signal', from: env(1), purpose: 'approval' } });
+  });
+
+  it('refuses a sixth pending approval in an account with approval_limit', () => {
+    let state = register(6, TESTER);
+    for (let n = 1; n <= 5; n++) {
+      state = reduce(state, { kind: 'frame', registeredAs: env(n), frame: { type: 'approval-request', requestId: id(n), to: null } }, ctx([])).state;
+    }
+    expect(state.approvals).toHaveLength(5);
+    const sixth = reduce(state, { kind: 'frame', registeredAs: env(6), frame: { type: 'approval-request', requestId: id(6), to: null } }, ctx([]));
+    expect(sixth.state.approvals).toHaveLength(5);
+    expect(sends(sixth.effects)[0]).toMatchObject({ to: 'self', frame: { type: 'error', code: 'approval_limit', requestId: id(6) } });
+  });
+
+  it('keeps one pending request per requesting machine', () => {
+    const state = register(2, TESTER);
+    const first = reduce(state, { kind: 'frame', registeredAs: env(1), frame: { type: 'approval-request', requestId: id(1), to: env(2) } }, ctx([]));
+    const second = reduce(first.state, { kind: 'frame', registeredAs: env(1), frame: { type: 'approval-request', requestId: id(2), to: env(2) } }, ctx([]));
+    expect(sends(second.effects)[0]).toMatchObject({ frame: { code: 'approval_limit' } });
+  });
+
+  it('drops an expired request after 10 minutes', () => {
+    const state = register(2, TESTER);
+    const requested = reduce(state, { kind: 'frame', registeredAs: env(1), frame: { type: 'approval-request', requestId: id(1), to: env(2) } }, ctx([]));
+    const later = reduce(
+      requested.state,
+      { kind: 'frame', registeredAs: env(2), frame: { type: 'signal', to: env(1), session: id(3), purpose: 'approval', relay: false, data: offer } },
+      ctx([env(1)], NOW + 600_000),
+    );
+    expect(later.state.approvals).toEqual([]);
+    expect(later.effects[0]).toEqual({ kind: 'delete-approval', requestId: id(1) });
+    expect(sends(later.effects)[0]).toMatchObject({ frame: { code: 'approval_unknown' } });
+  });
+
+  it('sends pending approvals to a target machine on its welcome', () => {
+    const state = register(2, TESTER);
+    const requested = reduce(state, { kind: 'frame', registeredAs: env(1), frame: { type: 'approval-request', requestId: id(1), to: env(2) } }, ctx([]));
+    const { effects } = hello(requested.state, 2, TESTER, [env(1)]);
+    const frames = sends(effects).filter((e) => e.kind === 'send' && e.to === 'self').map((e) => (e as { frame: { type: string } }).frame.type);
+    expect(frames).toEqual(['welcome', 'approval-request']);
+  });
+
+  it('cancels a request and tells the other machines', () => {
+    const state = register(2, TESTER);
+    const requested = reduce(state, { kind: 'frame', registeredAs: env(1), frame: { type: 'approval-request', requestId: id(1), to: env(2) } }, ctx([]));
+    const cancelled = reduce(requested.state, { kind: 'frame', registeredAs: env(2), frame: { type: 'approval-cancel', requestId: id(1) } }, ctx([env(1)]));
+    expect(cancelled.state.approvals).toEqual([]);
+    expect(cancelled.effects).toContainEqual({ kind: 'send', to: 'others', frame: { type: 'approval-cancel', requestId: id(1) } });
+  });
+
+  it('answers ice-servers relay false with the STUN servers', () => {
+    const state = register(1, TESTER);
+    const { effects } = reduce(state, { kind: 'frame', registeredAs: env(1), frame: { type: 'ice-servers', requestId: 'r1', relay: false } }, ctx([]));
+    expect(sends(effects)[0]).toEqual({
+      kind: 'send',
+      to: 'self',
+      frame: { type: 'ice-servers', requestId: 'r1', iceServers: [{ urls: ['stun:stun.cloudflare.com:3478'] }] },
+    });
   });
 });

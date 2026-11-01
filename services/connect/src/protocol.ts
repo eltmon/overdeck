@@ -7,6 +7,7 @@
  */
 import { CONNECT_PROTOCOL_VERSION } from '../../../packages/contracts/src/connect.ts';
 import type { DirectoryEndpoint, MachineToDirectoryFrame } from '../../../packages/contracts/src/connect.ts';
+import type { SignalData } from '../../../packages/contracts/src/sharing.ts';
 
 /** 64 KiB, counted in UTF-16 code units (`string.length`). */
 export const MAX_FRAME_CHARS = 65_536;
@@ -14,9 +15,15 @@ export const MAX_LABEL_CHARS = 64;
 export const MAX_ENDPOINTS = 16;
 export const MAX_ENDPOINT_URL_CHARS = 256;
 export const MAX_VERSION_CHARS = 64;
+export const MAX_SDP_CHARS = 32_768;
+export const MAX_CANDIDATE_CHARS = 2_048;
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const KEY_HEX_RE = /^[0-9a-f]{64}$/;
+/** Session ids and approval request ids: 16 random bytes as 32 lowercase hex. */
+export const ID_HEX_RE = /^[0-9a-f]{32}$/;
+/** A machine-chosen correlation id for `ice-servers` and `inbox-create`. */
+const REQUEST_ID_RE = /^[0-9A-Za-z_-]{1,64}$/;
 const ENDPOINT_URL_RE = /^(tcp|wss):\/\/[^\s]+$/;
 /** C0 and C1 control characters, plus DEL. */
 const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/;
@@ -61,6 +68,51 @@ function endpointsOf(obj: Obj): DirectoryEndpoint[] {
   });
 }
 
+function bool(obj: Obj, key: string): boolean {
+  const value = obj[key];
+  if (typeof value !== 'boolean') fail();
+  return value;
+}
+
+/** Share's SignalData rules (services/share/src/protocol.ts): sdp or candidate, capped lengths. */
+function signalDataOf(value: unknown): SignalData {
+  if (!isObject(value)) fail();
+  let sdp: SignalData['sdp'];
+  let candidate: SignalData['candidate'];
+  if ('sdp' in value) {
+    const raw = value['sdp'];
+    if (!isObject(raw)) fail();
+    const type = raw['type'];
+    const text = raw['sdp'];
+    if (type !== 'offer' && type !== 'answer') fail();
+    if (typeof text !== 'string' || text.length > MAX_SDP_CHARS) fail();
+    sdp = { type, sdp: text };
+  }
+  if ('candidate' in value) {
+    const raw = value['candidate'];
+    if (!isObject(raw)) fail();
+    const text = raw['candidate'];
+    if (typeof text !== 'string' || text.length > MAX_CANDIDATE_CHARS) fail();
+    const out: { candidate: string; sdpMid?: string | null; sdpMLineIndex?: number | null } = { candidate: text };
+    if ('sdpMid' in raw) {
+      const mid = raw['sdpMid'];
+      if (mid !== null && typeof mid !== 'string') fail();
+      out.sdpMid = mid;
+    }
+    if ('sdpMLineIndex' in raw) {
+      const index = raw['sdpMLineIndex'];
+      if (index !== null && (typeof index !== 'number' || !Number.isSafeInteger(index) || index < 0)) fail();
+      out.sdpMLineIndex = index;
+    }
+    candidate = out;
+  }
+  if (sdp === undefined && candidate === undefined) fail();
+  return {
+    ...(sdp !== undefined ? { sdp } : {}),
+    ...(candidate !== undefined ? { candidate } : {}),
+  };
+}
+
 function build(obj: Obj): MachineToDirectoryFrame {
   const type = obj['type'];
   switch (type) {
@@ -85,6 +137,26 @@ function build(obj: Obj): MachineToDirectoryFrame {
       return { type, endpoints: endpointsOf(obj) };
     case 'forget':
       return { type, environmentId: environmentIdOf(obj) };
+    case 'signal': {
+      const purpose = obj['purpose'];
+      if (purpose !== 'link' && purpose !== 'approval') fail();
+      return {
+        type,
+        to: environmentIdOf(obj, 'to'),
+        session: str(obj, 'session', 32, ID_HEX_RE),
+        purpose,
+        relay: bool(obj, 'relay'),
+        data: signalDataOf(obj['data']),
+      };
+    }
+    case 'ice-servers':
+      return { type, requestId: str(obj, 'requestId', 64, REQUEST_ID_RE), relay: bool(obj, 'relay') };
+    case 'approval-request': {
+      const to = obj['to'];
+      return { type, requestId: str(obj, 'requestId', 32, ID_HEX_RE), to: to === null ? null : environmentIdOf(obj, 'to') };
+    }
+    case 'approval-cancel':
+      return { type, requestId: str(obj, 'requestId', 32, ID_HEX_RE) };
     default:
       return fail();
   }

@@ -11,9 +11,9 @@
  */
 import type { ConnectPlan, DirectoryEndpoint, DirectoryToMachineFrame } from '../../../packages/contracts/src/connect.ts';
 import { EMPTY_DIRECTORY, reduce } from './directory-state.ts';
-import type { DirectoryEffect, DirectoryEvent, DirectoryState, MachineRow, Target } from './directory-state.ts';
+import type { ApprovalRow, DirectoryEffect, DirectoryEvent, DirectoryState, MachineRow, Target } from './directory-state.ts';
 import type { ConnectIdentity, Deps, Env } from './env.ts';
-import { HDR_IDENTITY, INTERNAL } from './env.ts';
+import { HDR_IDENTITY, INTERNAL, parseConfig } from './env.ts';
 import { keyFingerprint } from './fingerprint.ts';
 import { isWebSocketUpgrade } from './http.ts';
 import { logFrame } from './log.ts';
@@ -40,7 +40,23 @@ const SCHEMA = [
     last_seen_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS approvals (
+    request_id TEXT PRIMARY KEY,
+    from_env TEXT NOT NULL,
+    to_env TEXT,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  )`,
 ];
+
+interface ApprovalSqlRow {
+  request_id: string;
+  from_env: string;
+  to_env: string | null;
+  created_at: number;
+  expires_at: number;
+  [key: string]: SqlStorageValue;
+}
 
 interface MachineSqlRow {
   environment_id: string;
@@ -127,7 +143,17 @@ export class DirectoryHost {
       }));
     const planRow = sql.exec<{ value: string }>(`SELECT value FROM meta WHERE key = 'plan'`).toArray()[0];
     const plan = planRow?.value === 'free' || planRow?.value === 'tester' ? (planRow.value as ConnectPlan) : null;
-    return { plan, machines };
+    const approvals = sql
+      .exec<ApprovalSqlRow>('SELECT * FROM approvals ORDER BY created_at, request_id')
+      .toArray()
+      .map((r): ApprovalRow => ({
+        requestId: r.request_id,
+        fromEnv: r.from_env,
+        toEnv: r.to_env,
+        createdAt: r.created_at,
+        expiresAt: r.expires_at,
+      }));
+    return { plan, machines, approvals };
   }
 
   async fetch(req: Request): Promise<Response> {
@@ -189,7 +215,9 @@ export class DirectoryHost {
 
   private async apply(ws: WebSocket, event: DirectoryEvent): Promise<void> {
     const online = new Set(this.registered(ws).map((r) => r.environmentId));
-    const { state, effects } = reduce(this.state, event, { now: this.deps.now(), online });
+    const config = parseConfig(this.env);
+    const stunUrls = config.ok ? config.config.stunUrls : [];
+    const { state, effects } = reduce(this.state, event, { now: this.deps.now(), online, stunUrls });
     this.state = state;
     this.execute(ws, effects);
   }
@@ -207,6 +235,8 @@ export class DirectoryHost {
       'put-plan': 0,
       'put-machine': 0,
       'delete-machine': 0,
+      'put-approval': 0,
+      'delete-approval': 0,
       register: 1,
       send: 2,
       close: 3,
@@ -234,6 +264,17 @@ export class DirectoryHost {
         }
         case 'delete-machine':
           sql.exec('DELETE FROM machines WHERE environment_id = ?', e.environmentId);
+          break;
+        case 'put-approval': {
+          const r = e.row;
+          sql.exec(
+            'INSERT INTO approvals (request_id, from_env, to_env, created_at, expires_at) VALUES (?, ?, ?, ?, ?)',
+            r.requestId, r.fromEnv, r.toEnv, r.createdAt, r.expiresAt,
+          );
+          break;
+        }
+        case 'delete-approval':
+          sql.exec('DELETE FROM approvals WHERE request_id = ?', e.requestId);
           break;
         case 'register': {
           const attachment = attachmentOf(self);

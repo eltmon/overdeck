@@ -7,6 +7,7 @@
  * first, then socket registration, then sends, then closes. The reducer never mutates its input.
  */
 import {
+  APPROVAL_TTL_MS,
   CONNECT_CLOSE_CODES,
   CONNECT_PROTOCOL_VERSION,
   FREE_MACHINE_LIMIT_MESSAGE,
@@ -37,12 +38,28 @@ export interface MachineRow {
   readonly lastSeenAt: number;
 }
 
+/** A pending approval request (D-2356-9): a row of the `approvals` table. */
+export interface ApprovalRow {
+  readonly requestId: string;
+  readonly fromEnv: string;
+  /** null ⇒ every other machine of the account may approve. */
+  readonly toEnv: string | null;
+  /** Unix milliseconds. */
+  readonly createdAt: number;
+  readonly expiresAt: number;
+}
+
 export interface DirectoryState {
   /** The account plan last seen on a `hello`; null before the first one. */
   readonly plan: ConnectPlan | null;
   /** In registration order. */
   readonly machines: readonly MachineRow[];
+  /** Pending approvals, oldest first. Expired rows are dropped lazily on every event. */
+  readonly approvals: readonly ApprovalRow[];
 }
+
+export const MAX_PENDING_APPROVALS_PER_MACHINE = 1;
+export const MAX_PENDING_APPROVALS_PER_ACCOUNT = 5;
 
 /** What the Worker verified about the device behind a socket (from `X-Connect-Identity`). */
 export interface SocketIdentity {
@@ -69,6 +86,8 @@ export interface ReduceContext {
   readonly now: number;
   /** Environment ids with an open registered socket, not counting the event's own socket. */
   readonly online: ReadonlySet<string>;
+  /** STUN servers handed out for `ice-servers { relay: false }` (the `STUN_URLS` var). */
+  readonly stunUrls: readonly string[];
 }
 
 /**
@@ -81,6 +100,8 @@ export type DirectoryEffect =
   | { readonly kind: 'put-plan'; readonly plan: ConnectPlan }
   | { readonly kind: 'put-machine'; readonly row: MachineRow }
   | { readonly kind: 'delete-machine'; readonly environmentId: string }
+  | { readonly kind: 'put-approval'; readonly row: ApprovalRow }
+  | { readonly kind: 'delete-approval'; readonly requestId: string }
   | { readonly kind: 'register'; readonly environmentId: string }
   | { readonly kind: 'send'; readonly to: Target; readonly frame: DirectoryToMachineFrame }
   | { readonly kind: 'close'; readonly to: Target; readonly code: number; readonly reason: string }
@@ -91,7 +112,7 @@ export interface ReduceResult {
   readonly effects: DirectoryEffect[];
 }
 
-export const EMPTY_DIRECTORY: DirectoryState = { plan: null, machines: [] };
+export const EMPTY_DIRECTORY: DirectoryState = { plan: null, machines: [], approvals: [] };
 
 /** UTC calendar month of `now`, `YYYY-MM`. */
 export function monthOf(now: number): string {
@@ -115,8 +136,39 @@ export function toDirectoryMachines(machines: readonly MachineRow[], online: Rea
   }));
 }
 
-function errorFrame(code: ConnectErrorCode, message: string): DirectoryToMachineFrame {
-  return { type: 'error', code, message };
+function errorFrame(code: ConnectErrorCode, message: string, extra?: { requestId?: string; session?: string }): DirectoryToMachineFrame {
+  return { type: 'error', code, message, ...extra };
+}
+
+/** True when a live approval lets `a` and `b` exchange approval signals, in either direction. */
+function approvalBetween(approvals: readonly ApprovalRow[], a: string, b: string): boolean {
+  const pairs = (from: string, to: string) => (r: ApprovalRow) => r.fromEnv === from && (r.toEnv === null || r.toEnv === to);
+  return approvals.some(pairs(a, b)) || approvals.some(pairs(b, a));
+}
+
+/** The `approval-request` frame for a row, or null when its requester left the directory. */
+function approvalFrame(row: ApprovalRow, machines: readonly MachineRow[]): DirectoryToMachineFrame | null {
+  const from = machines.find((m) => m.environmentId === row.fromEnv);
+  if (!from) return null;
+  return {
+    type: 'approval-request',
+    requestId: row.requestId,
+    from: row.fromEnv,
+    label: from.label,
+    fingerprint: from.fingerprint,
+    publicKeyHex: from.publicKeyHex,
+    expiresAt: row.expiresAt,
+  };
+}
+
+/** Drops expired approvals; the deletions are persisted with the event's other effects. */
+function pruneApprovals(state: DirectoryState, now: number): ReduceResult {
+  const live = state.approvals.filter((r) => r.expiresAt > now);
+  if (live.length === state.approvals.length) return { state, effects: [] };
+  const effects: DirectoryEffect[] = state.approvals
+    .filter((r) => r.expiresAt <= now)
+    .map((r) => ({ kind: 'delete-approval', requestId: r.requestId }));
+  return { state: { ...state, approvals: live }, effects };
 }
 
 function withOnline(online: ReadonlySet<string>, add: string | null, remove: string | null = null): Set<string> {
@@ -194,8 +246,13 @@ function hello(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'he
       },
     },
     { kind: 'send', to: 'others', frame: { type: 'directory', machines } },
-    { kind: 'log', type: 'hello', environmentId: env, outcome: existing ? 'updated' : 'registered' },
   );
+  for (const approval of next.approvals) {
+    if (approval.fromEnv === env || (approval.toEnv !== null && approval.toEnv !== env)) continue;
+    const pending = approvalFrame(approval, next.machines);
+    if (pending) effects.push({ kind: 'send', to: 'self', frame: pending });
+  }
+  effects.push({ kind: 'log', type: 'hello', environmentId: env, outcome: existing ? 'updated' : 'registered' });
   return { state: next, effects };
 }
 
@@ -232,12 +289,18 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
       if (!state.machines.some((m) => m.environmentId === target)) {
         return { state, effects: [{ kind: 'log', type: f.type, environmentId: target, outcome: 'unknown_machine' }] };
       }
-      const next: DirectoryState = { ...state, machines: state.machines.filter((m) => m.environmentId !== target) };
+      const dropped = state.approvals.filter((r) => r.fromEnv === target || r.toEnv === target);
+      const next: DirectoryState = {
+        ...state,
+        machines: state.machines.filter((m) => m.environmentId !== target),
+        approvals: state.approvals.filter((r) => !dropped.includes(r)),
+      };
       const online = withOnline(ctx.online, self === target ? null : self, target);
       return {
         state: next,
         effects: [
           { kind: 'delete-machine', environmentId: target },
+          ...dropped.map((r) => ({ kind: 'delete-approval', requestId: r.requestId }) as const),
           { kind: 'send', to: 'others', frame: { type: 'directory', machines: toDirectoryMachines(next.machines, online) } },
           ...(self === target
             ? []
@@ -245,6 +308,102 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
           { kind: 'close', to: { environmentId: target }, code: CONNECT_CLOSE_CODES.forgotten, reason: 'forgotten' },
           ...(self === target ? [{ kind: 'close', to: 'self', code: CONNECT_CLOSE_CODES.forgotten, reason: 'forgotten' } as const] : []),
           { kind: 'log', type: f.type, environmentId: target, outcome: 'ok' },
+        ],
+      };
+    }
+    case 'signal': {
+      const session = { session: f.session };
+      const refuse = (code: ConnectErrorCode, message: string, outcome: string): ReduceResult => ({
+        state,
+        effects: [
+          { kind: 'send', to: 'self', frame: errorFrame(code, message, session) },
+          { kind: 'log', type: f.type, environmentId: self, outcome },
+        ],
+      });
+      if (f.to === self) return refuse('bad_frame', 'a machine cannot signal itself', 'self');
+      if (f.purpose === 'approval' && !approvalBetween(state.approvals, self, f.to)) {
+        return refuse('approval_unknown', 'no pending approval between these machines', 'approval_unknown');
+      }
+      if (!ctx.online.has(f.to)) return refuse('peer_offline', 'the other machine is offline', 'peer_offline');
+      return {
+        state,
+        effects: [
+          {
+            kind: 'send',
+            to: { environmentId: f.to },
+            // `from` is the sender socket's machine, never a field of the frame (D-2356-6).
+            frame: { type: 'signal', from: self, session: f.session, purpose: f.purpose, relay: f.relay, data: f.data },
+          },
+          { kind: 'log', type: f.type, environmentId: self, outcome: 'forwarded' },
+        ],
+      };
+    }
+    case 'ice-servers': {
+      if (f.relay) {
+        return {
+          state,
+          effects: [
+            { kind: 'send', to: 'self', frame: errorFrame('turn_unavailable', 'relay credentials are not available', { requestId: f.requestId }) },
+            { kind: 'log', type: f.type, environmentId: self, outcome: 'turn_unavailable' },
+          ],
+        };
+      }
+      const iceServers = ctx.stunUrls.length > 0 ? [{ urls: [...ctx.stunUrls] }] : [];
+      return {
+        state,
+        effects: [
+          { kind: 'send', to: 'self', frame: { type: 'ice-servers', requestId: f.requestId, iceServers } },
+          { kind: 'log', type: f.type, environmentId: self, outcome: 'stun' },
+        ],
+      };
+    }
+    case 'approval-request': {
+      const ids = { requestId: f.requestId };
+      const refuse = (code: ConnectErrorCode, message: string, outcome: string): ReduceResult => ({
+        state,
+        effects: [
+          { kind: 'send', to: 'self', frame: errorFrame(code, message, ids) },
+          { kind: 'log', type: f.type, environmentId: self, outcome },
+        ],
+      });
+      if (f.to === self || state.approvals.some((r) => r.requestId === f.requestId)) {
+        return refuse('bad_frame', 'invalid approval request', 'bad_request');
+      }
+      if (state.approvals.filter((r) => r.fromEnv === self).length >= MAX_PENDING_APPROVALS_PER_MACHINE) {
+        return refuse('approval_limit', 'this machine already has a pending approval request', 'approval_limit');
+      }
+      if (state.approvals.length >= MAX_PENDING_APPROVALS_PER_ACCOUNT) {
+        return refuse('approval_limit', 'the account has too many pending approval requests', 'approval_limit');
+      }
+      const row: ApprovalRow = { requestId: f.requestId, fromEnv: self, toEnv: f.to, createdAt: ctx.now, expiresAt: ctx.now + APPROVAL_TTL_MS };
+      const next: DirectoryState = { ...state, approvals: [...state.approvals, row] };
+      const pending = approvalFrame(row, next.machines);
+      return {
+        state: next,
+        effects: [
+          { kind: 'put-approval', row },
+          ...(pending ? [{ kind: 'send', to: f.to === null ? 'others' : { environmentId: f.to }, frame: pending } as const] : []),
+          { kind: 'log', type: f.type, environmentId: self, outcome: 'stored' },
+        ],
+      };
+    }
+    case 'approval-cancel': {
+      const row = state.approvals.find((r) => r.requestId === f.requestId);
+      if (!row || (row.fromEnv !== self && row.toEnv !== null && row.toEnv !== self)) {
+        return {
+          state,
+          effects: [
+            { kind: 'send', to: 'self', frame: errorFrame('approval_unknown', 'no such pending approval', { requestId: f.requestId }) },
+            { kind: 'log', type: f.type, environmentId: self, outcome: 'approval_unknown' },
+          ],
+        };
+      }
+      return {
+        state: { ...state, approvals: state.approvals.filter((r) => r !== row) },
+        effects: [
+          { kind: 'delete-approval', requestId: row.requestId },
+          { kind: 'send', to: 'others', frame: { type: 'approval-cancel', requestId: row.requestId } },
+          { kind: 'log', type: f.type, environmentId: self, outcome: 'cancelled' },
         ],
       };
     }
@@ -260,6 +419,12 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
 }
 
 export function reduce(state: DirectoryState, event: DirectoryEvent, ctx: ReduceContext): ReduceResult {
+  const pruned = pruneApprovals(state, ctx.now);
+  const result = reduceLive(pruned.state, event, ctx);
+  return pruned.effects.length === 0 ? result : { state: result.state, effects: [...pruned.effects, ...result.effects] };
+}
+
+function reduceLive(state: DirectoryState, event: DirectoryEvent, ctx: ReduceContext): ReduceResult {
   switch (event.kind) {
     case 'hello':
       return hello(state, event, ctx);
