@@ -649,3 +649,105 @@ describe('ConversationList nesting (PAN-4223 WI-10)', () => {
     expect(screen.queryByText('Lane 11')).not.toBeInTheDocument();
   });
 });
+
+describe('ConversationList sections (PAN-4639 WI-5)', () => {
+  function triageConv(id: number, name: string, extra: Record<string, unknown> = {}) {
+    return {
+      ...mockConversation,
+      id,
+      name,
+      tmuxSession: `conv-${name}`,
+      title: name,
+      createdAt: `2026-10-05T00:0${id}:00.000Z`,
+      // Keep the poll interval off the 2s "pending spawn" branch for the
+      // fake-timer test — an ended row with sessionAlive false counts as
+      // pending spawn and would refetch every 2s under advanced timers.
+      endedAt: '2026-10-05T09:00:00.000Z',
+      ...extra,
+    };
+  }
+
+  function renderRows(rows: unknown[]) {
+    const client = makeClient();
+    client.setQueryData(['conversations'], rows);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+    return client;
+  }
+
+  beforeEach(() => {
+    localStorage.removeItem('commandDeck.sections.expanded');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('list-sections.ac1: the needsYou wrapper renders above the inbox wrapper and contains the pending conversation', () => {
+    renderRows([
+      triageConv(1, 'plain-a'),
+      triageConv(2, 'needs-you', { pendingInputCount: 1 }),
+      triageConv(3, 'plain-b'),
+    ]);
+    const needsYouRow = screen.getByTitle('needs-you').closest('[data-section]');
+    const inboxRow = screen.getByTitle('plain-a').closest('[data-section]');
+    expect(needsYouRow).toHaveAttribute('data-section', 'needsYou');
+    expect(inboxRow).toHaveAttribute('data-section', 'inbox');
+    // needsYouRow precedes inboxRow in document order.
+    expect(needsYouRow!.compareDocumentPosition(inboxRow!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('list-sections.ac2: Snoozed and Settled headers render collapsed, with their rows hidden until clicked', () => {
+    renderRows([
+      triageConv(1, 'settled-1', { settledAt: '2026-09-01T00:00:00.000Z' }),
+      triageConv(2, 'snoozed-1', { snoozedUntil: '2099-01-01T00:00:00.000Z' }),
+    ]);
+    const settledHeader = screen.getByRole('button', { name: /Settled · 1/ });
+    const snoozedHeader = screen.getByRole('button', { name: /Snoozed · 1/ });
+    expect(settledHeader).toHaveAttribute('aria-expanded', 'false');
+    expect(snoozedHeader).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTitle('settled-1')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('snoozed-1')).not.toBeInTheDocument();
+
+    fireEvent.click(settledHeader);
+    expect(screen.getByTitle('settled-1')).toBeInTheDocument();
+    expect(settledHeader).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(snoozedHeader);
+    expect(screen.getByTitle('snoozed-1')).toBeInTheDocument();
+  });
+
+  it('list-sections.ac3: a snoozed row moves to inbox once its wake time passes, driven only by the 30s tick', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-05T10:00:00.000Z'));
+    const rows = [triageConv(1, 'wakes-soon', { snoozedUntil: '2026-10-05T10:00:05.000Z' })];
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(rows)));
+
+    renderRows(rows);
+    expect(screen.getByRole('button', { name: /Snoozed · 1/ })).toBeInTheDocument();
+    expect(screen.queryByTitle('wakes-soon')).not.toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+
+    expect(screen.queryByRole('button', { name: /Snoozed/ })).not.toBeInTheDocument();
+    expect(screen.getByTitle('wakes-soon')).toBeInTheDocument();
+  });
+
+  it('shows "Inbox clear" when only Snoozed/Settled have rows', () => {
+    renderRows([triageConv(1, 'settled-1', { settledAt: '2026-09-01T00:00:00.000Z' })]);
+    expect(screen.getByText('Inbox clear')).toBeInTheDocument();
+  });
+
+  it('shows the generic empty message when there are no conversations at all', () => {
+    renderRows([]);
+    expect(screen.getByText('No conversations yet')).toBeInTheDocument();
+  });
+});
