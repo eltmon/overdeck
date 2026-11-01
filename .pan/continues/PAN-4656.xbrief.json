@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4656",
   "created": "2026-11-01T13:30:21.841Z",
-  "updated": "2026-11-01T14:04:32.839Z",
+  "updated": "2026-11-01T14:04:46.115Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,10 @@
     "pair-link-helper.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T14:04:32.838Z"
+    },
+    "pair-link-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:04:46.115Z"
     }
   }
 }
