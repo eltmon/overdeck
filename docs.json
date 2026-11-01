@@ -62,6 +62,7 @@
               "configuration/tailscale",
               "cli/vault",
               "cli/pair",
+              "cli/tailscale",
               "cli/devices",
               "cli/token"
             ]
