@@ -10,10 +10,10 @@ import {
   shell,
 } from "electron";
 
-import { createTray, destroyTray } from "./tray.js";
+import { createTray, destroyTray, refreshTrayMode } from "./tray.js";
 import { loadDesktopSettings, getDesktopSettings, updateDesktopSetting } from "./settings.js";
 import { startServer, stopServer } from "./server.js";
-import { configureApplicationMenu } from "./menu.js";
+import { configureApplicationMenu, refreshApplicationMenu } from "./menu.js";
 import { initializeNotifications, registerNotificationHandlers } from "./notifications.js";
 import { handleAutoStartNag } from "./autostart.js";
 import { registerDesktopProtocol } from "./protocol.js";
@@ -360,6 +360,11 @@ function destroyDashboardWindows(): void {
   terminalWindows.clear();
 }
 
+function refreshModeUi(): void {
+  refreshApplicationMenu();
+  refreshTrayMode();
+}
+
 function startLocalServer(): void {
   localServerStarted = true;
   startServer(onLocalServerReady);
@@ -425,6 +430,7 @@ async function openRemoteDashboard(record: MachineRecord): Promise<ConnectAction
   mainWindow = createWindow();
   handleAutoStartNagOnce();
   closeConnectWindow();
+  refreshModeUi();
   return { ok: true };
 }
 
@@ -437,6 +443,7 @@ function switchToLocal(options: { closeConnectWindow: boolean }): ConnectActionR
   setMachineActive(false);
   if (getActiveDashboard().kind === "local" && localServerStarted) {
     if (options.closeConnectWindow) closeConnectWindow();
+    refreshModeUi();
     return { ok: true };
   }
   destroyDashboardWindows();
@@ -444,6 +451,7 @@ function switchToLocal(options: { closeConnectWindow: boolean }): ConnectActionR
   setLocalDashboard("");
   closeConnectWhenLocalReady = options.closeConnectWindow;
   startLocalServer();
+  refreshModeUi();
   return { ok: true };
 }
 

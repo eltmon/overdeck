@@ -114,6 +114,75 @@ function updateDesktopSetting(key, value) {
 	return true;
 }
 //#endregion
+//#region src/connection.ts
+/**
+* The dashboard the desktop app currently shows: the embedded local server or
+* the one chosen machine (PAN-4402 W-4).
+*
+* This is the one piece of runtime state main, menu and tray share. In remote
+* mode main-process calls carry the device token as a bearer (D-10), and the
+* remote windows authenticate with the device cookie set in an in-memory
+* partition, so the cookie never reaches disk (D-3).
+*/
+/** baseUrl is '' until the embedded server is ready. */
+let active = {
+	kind: "local",
+	baseUrl: ""
+};
+function getActiveDashboard() {
+	return active;
+}
+function setLocalDashboard(baseUrl) {
+	active = {
+		kind: "local",
+		baseUrl
+	};
+}
+/** No `persist:` prefix, so the partition's cookies and storage stay in memory. */
+function remotePartitionName(environmentId) {
+	return `remote-${environmentId}`;
+}
+function setRemoteDashboard(record, token) {
+	active = {
+		kind: "remote",
+		baseUrl: record.baseUrl,
+		partition: remotePartitionName(record.environmentId),
+		label: record.label,
+		token
+	};
+}
+function dashboardFetch(path, init = {}) {
+	const current = active;
+	if (!current.baseUrl) return Promise.reject(/* @__PURE__ */ new Error("The dashboard server is not ready yet."));
+	if (current.kind === "local") return fetch(`${current.baseUrl}${path}`, init);
+	const headers = new Headers(init.headers);
+	headers.set("Authorization", `Bearer ${current.token}`);
+	return fetch(`${current.baseUrl}${path}`, {
+		...init,
+		headers
+	});
+}
+async function prepareRemoteSession(remote) {
+	if (remote.partition.startsWith("persist:")) throw new Error(`Refusing to store a machine credential in the persistent partition ${remote.partition}.`);
+	const ses = electron.session.fromPartition(remote.partition);
+	await ses.cookies.set({
+		url: remote.baseUrl,
+		name: "overdeck_device",
+		value: remote.token,
+		httpOnly: true,
+		sameSite: "strict",
+		secure: remote.baseUrl.startsWith("https:")
+	});
+	return ses;
+}
+function isSameOrigin(url, baseUrl) {
+	try {
+		return new URL(url).origin === new URL(baseUrl).origin;
+	} catch {
+		return false;
+	}
+}
+//#endregion
 //#region src/tray.ts
 let tray = null;
 let pollTimer = null;
@@ -132,18 +201,30 @@ function createTrayIcon(status) {
 	return electron.nativeImage.createFromBuffer(Buffer.from(svg));
 }
 function buildTooltip(agentCount, attentionCount, lastActivity) {
-	if (getDesktopSettings().tray.tooltipDetail === "minimal") return `Overdeck — ${agentCount} agent${agentCount !== 1 ? "s" : ""}`;
-	const lines = ["Overdeck"];
+	const settings = getDesktopSettings();
+	const active = getActiveDashboard();
+	const title = active.kind === "remote" ? `Overdeck — ${active.label}` : "Overdeck";
+	if (settings.tray.tooltipDetail === "minimal") return `${title} — ${agentCount} agent${agentCount !== 1 ? "s" : ""}`;
+	const lines = [title];
 	lines.push(`${agentCount} agent${agentCount !== 1 ? "s" : ""} running`);
 	if (attentionCount > 0) lines.push(`⚠ ${attentionCount} need${attentionCount !== 1 ? "" : "s"} attention`);
 	if (lastActivity) lines.push(`Last: ${lastActivity}`);
 	return lines.join("\n");
 }
 function buildContextMenu() {
-	return electron.Menu.buildFromTemplate([
+	const template = [
 		{
 			label: "Show Dashboard",
 			click: () => showOrCreateWindow()
+		},
+		{
+			label: "Connect to a Machine…",
+			click: () => openConnectWindowFromMenu()
+		},
+		{
+			label: "Use This Computer",
+			enabled: getActiveDashboard().kind === "remote",
+			click: () => useThisComputer()
 		},
 		{ type: "separator" },
 		{
@@ -173,14 +254,14 @@ function buildContextMenu() {
 				electron.app.quit();
 			}
 		}
-	]);
+	];
+	return electron.Menu.buildFromTemplate(template);
 }
 async function refreshTrayStatus() {
 	if (!tray || isQuitting) return;
-	const url = serverUrl;
-	if (!url) return;
+	if (!getActiveDashboard().baseUrl) return;
 	try {
-		const resp = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(3e3) });
+		const resp = await dashboardFetch("/api/health", { signal: AbortSignal.timeout(3e3) });
 		if (!resp.ok) return;
 		const data = await resp.json();
 		const agentCount = data.agentCount ?? 0;
@@ -200,6 +281,14 @@ function createTray() {
 	tray.setContextMenu(buildContextMenu());
 	tray.on("click", () => showOrCreateWindow());
 	pollTimer = setInterval(() => void refreshTrayStatus(), 5e3);
+	refreshTrayStatus();
+}
+/** Rebuild the context menu and tooltip after a switch between this computer and the chosen machine. */
+function refreshTrayMode() {
+	if (!tray) return;
+	const active = getActiveDashboard();
+	tray.setToolTip(active.kind === "remote" ? `Overdeck — ${active.label}` : "Overdeck");
+	tray.setContextMenu(buildContextMenu());
 	refreshTrayStatus();
 }
 function destroyTray() {
@@ -550,9 +639,8 @@ function getUpdateStatus() {
 * Linux/Windows: Settings in File menu.
 */
 async function fetchActiveWorkspaces() {
-	if (!serverUrl) return [];
 	try {
-		const resp = await fetch(`${serverUrl}/api/workspaces`, { signal: AbortSignal.timeout(2e3) });
+		const resp = await dashboardFetch("/api/workspaces", { signal: AbortSignal.timeout(2e3) });
 		if (!resp.ok) return [];
 		return (await resp.json()).workspaces?.slice(0, 10) ?? [];
 	} catch {
@@ -626,9 +714,14 @@ function buildMenuTemplate() {
 		]
 	});
 	template.push({ role: "windowMenu" });
+	const active = getActiveDashboard();
 	template.push({
 		label: "Overdeck",
 		submenu: [
+			...active.kind === "remote" ? [{
+				label: `Showing ${active.label}`,
+				enabled: false
+			}, { type: "separator" }] : [],
 			{
 				label: "Start Cloister",
 				click: () => callServerApi("/api/cloister/start", "POST")
@@ -640,6 +733,16 @@ function buildMenuTemplate() {
 			{
 				label: "Emergency Stop All Agents",
 				click: () => callServerApi("/api/agents/emergency-stop", "POST")
+			},
+			{ type: "separator" },
+			{
+				label: "Connect to a Machine…",
+				click: () => openConnectWindowFromMenu()
+			},
+			{
+				label: "Use This Computer",
+				enabled: active.kind === "remote",
+				click: () => useThisComputer()
 			},
 			{ type: "separator" },
 			{
@@ -696,6 +799,10 @@ function buildMenuTemplate() {
 		});
 	}
 	return template;
+}
+/** Rebuild after a switch between this computer and the chosen machine. */
+function refreshApplicationMenu() {
+	rebuildMenu();
 }
 function configureApplicationMenu() {
 	const menu = electron.Menu.buildFromTemplate(buildMenuTemplate());
@@ -1309,75 +1416,6 @@ async function revokeOwnDevice(record, token, deps) {
 	}
 }
 //#endregion
-//#region src/connection.ts
-/**
-* The dashboard the desktop app currently shows: the embedded local server or
-* the one chosen machine (PAN-4402 W-4).
-*
-* This is the one piece of runtime state main, menu and tray share. In remote
-* mode main-process calls carry the device token as a bearer (D-10), and the
-* remote windows authenticate with the device cookie set in an in-memory
-* partition, so the cookie never reaches disk (D-3).
-*/
-/** baseUrl is '' until the embedded server is ready. */
-let active = {
-	kind: "local",
-	baseUrl: ""
-};
-function getActiveDashboard() {
-	return active;
-}
-function setLocalDashboard(baseUrl) {
-	active = {
-		kind: "local",
-		baseUrl
-	};
-}
-/** No `persist:` prefix, so the partition's cookies and storage stay in memory. */
-function remotePartitionName(environmentId) {
-	return `remote-${environmentId}`;
-}
-function setRemoteDashboard(record, token) {
-	active = {
-		kind: "remote",
-		baseUrl: record.baseUrl,
-		partition: remotePartitionName(record.environmentId),
-		label: record.label,
-		token
-	};
-}
-function dashboardFetch(path, init = {}) {
-	const current = active;
-	if (!current.baseUrl) return Promise.reject(/* @__PURE__ */ new Error("The dashboard server is not ready yet."));
-	if (current.kind === "local") return fetch(`${current.baseUrl}${path}`, init);
-	const headers = new Headers(init.headers);
-	headers.set("Authorization", `Bearer ${current.token}`);
-	return fetch(`${current.baseUrl}${path}`, {
-		...init,
-		headers
-	});
-}
-async function prepareRemoteSession(remote) {
-	if (remote.partition.startsWith("persist:")) throw new Error(`Refusing to store a machine credential in the persistent partition ${remote.partition}.`);
-	const ses = electron.session.fromPartition(remote.partition);
-	await ses.cookies.set({
-		url: remote.baseUrl,
-		name: "overdeck_device",
-		value: remote.token,
-		httpOnly: true,
-		sameSite: "strict",
-		secure: remote.baseUrl.startsWith("https:")
-	});
-	return ses;
-}
-function isSameOrigin(url, baseUrl) {
-	try {
-		return new URL(url).origin === new URL(baseUrl).origin;
-	} catch {
-		return false;
-	}
-}
-//#endregion
 //#region src/connect-window.ts
 /**
 * The connect window: a small local page that takes a pairing link and shows
@@ -1720,6 +1758,10 @@ function destroyDashboardWindows() {
 	for (const win of terminalWindows.values()) if (!win.isDestroyed()) win.destroy();
 	terminalWindows.clear();
 }
+function refreshModeUi() {
+	refreshApplicationMenu();
+	refreshTrayMode();
+}
 function startLocalServer() {
 	localServerStarted = true;
 	startServer(onLocalServerReady);
@@ -1781,6 +1823,7 @@ async function openRemoteDashboard(record) {
 	mainWindow = createWindow();
 	handleAutoStartNagOnce();
 	closeConnectWindow();
+	refreshModeUi();
 	return { ok: true };
 }
 /**
@@ -1792,6 +1835,7 @@ function switchToLocal(options) {
 	setMachineActive(false);
 	if (getActiveDashboard().kind === "local" && localServerStarted) {
 		if (options.closeConnectWindow) closeConnectWindow();
+		refreshModeUi();
 		return { ok: true };
 	}
 	destroyDashboardWindows();
@@ -1799,6 +1843,7 @@ function switchToLocal(options) {
 	setLocalDashboard("");
 	closeConnectWhenLocalReady = options.closeConnectWindow;
 	startLocalServer();
+	refreshModeUi();
 	return { ok: true };
 }
 /** FR-9: best-effort self-revoke, then delete the record whatever the result. */
