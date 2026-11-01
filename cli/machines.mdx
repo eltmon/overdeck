@@ -81,3 +81,82 @@ Unlinked "desk"; the other machine was told and its token here was revoked.
 When the other machine cannot be reached it prints that it will see the link as revoked
 when it next connects. An unknown target prints `No machine link matches "<target>"` and
 exits 1. `--json` prints `{ ok, peerNotified }`.
+
+## Through the overdeck.ai directory
+
+These verbs need a signed-in machine (`pan account login`). See
+[Find your machines through overdeck.ai](/configuration/remote-access#find-your-machines-through-overdeck-ai).
+Each one exits 1 with the dashboard's error text.
+
+### directory
+
+```bash
+pan machines directory [--json]
+```
+
+Lists your account's machines in the directory, then pending approval requests and your own
+join requests. `--json` prints the `GET /api/directory` response unchanged.
+
+```
+LABEL   FINGERPRINT               STATE              LINKED  ENVIRONMENT
+desk    0a71-b2da-d646-3485-3ce1  online             linked  0b5c9e7a-4c1d-4f2e-9a3b-6d7e8f901234
+vps     4c2e-91aa-0d13-7f60-be52  last seen 2 h ago  -       7d0e1f22-9a8b-4c3d-8e2f-1a2b3c4d5e6f
+```
+
+### join
+
+```bash
+pan machines join [--to <label|environment-id>] [--json]
+```
+
+Asks your other machines (or the one named by `--to`) to link with this one, then waits up to
+10 minutes for one of them to open the request.
+
+```
+Requested approval (request 9f2c…). This machine's fingerprint: 4c2e-91aa-0d13-7f60-be52
+Code: 123 456 · approver desk 0a71-b2da-d646-3485-3ce1
+Accept? [y/N]
+```
+
+Accept only if the approving machine shows the same code. Without a terminal (for example
+over a script) it prints `Confirm with: pan machines accept <requestId>` and exits 0; run that
+command after comparing the codes. `--json` prints `{ requestId, sas, fingerprint, approver }`.
+
+### approve
+
+```bash
+pan machines approve <request-id> [--yes]
+```
+
+Opens a direct connection to the requesting machine, prints the code and its fingerprint, asks
+`Approve? [y/N]` unless `--yes`, then approves. The link appears in `pan machines list` once
+the other machine accepts.
+
+```
+Code: 123 456 · fingerprint 4c2e-91aa-0d13-7f60-be52
+Approve only if the other machine shows the same code.
+Approved. The link appears in pan machines list once the other machine accepts.
+```
+
+### accept and reject
+
+```bash
+pan machines accept <request-id>
+pan machines reject <request-id>
+```
+
+`accept` confirms this machine's join request after comparing the codes. `reject` refuses an
+incoming approval request or this machine's own join request.
+
+### forget
+
+```bash
+pan machines forget <label|environment-id>
+```
+
+Removes a machine from the directory and frees its slot on the free account. Links that already
+exist keep working over their other routes.
+
+```
+Removed vps from the directory.
+```

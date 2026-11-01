@@ -74,6 +74,16 @@ Tailscale address, then public or relayed ones. Where they come from:
 Expand a link's **Routes** to see each address, its kind, where it came from and whether
 it answered last time.
 
+**Through the overdeck.ai directory.** When both machines are signed in to the same
+overdeck.ai account, you can also link them without a pairing link: click **Link** in
+**Settings → Anywhere → Directory** (or run `pan machines join`), then approve on the other
+machine after checking that both screens show the same six-digit code. The directory also adds
+`direct` routes (`rtc://<environment id>`, a peer-to-peer WebRTC path) and, on the relay plan,
+`relay` routes (`rtc+turn://<environment id>`, through a TURN relay). They are tried only when
+no LAN, Tailscale, SSH or public route answers, appear with the source `directory`, and are
+never saved with the link. See
+[Find your machines through overdeck.ai](/configuration/remote-access#find-your-machines-through-overdeck-ai).
+
 ## States
 
 | State | Meaning |
