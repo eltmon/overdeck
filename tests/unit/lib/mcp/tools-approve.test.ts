@@ -60,6 +60,19 @@ describe('MCP approval tools (PAN-4649 W-7)', () => {
     expect(api.calls.filter((call) => call.method === 'POST')).toEqual([]);
   });
 
+  it('answer_question treats a missing harness as Claude Code and refuses an unrecognized one', async () => {
+    const api = fakeApi({
+      'GET /api/conversations/conv-old': { status: 200, json: { name: 'conv-old', harness: null } },
+      'POST /api/conversations/conv-old/message': { status: 200, json: { ok: true } },
+      'GET /api/conversations/conv-x': { status: 200, json: { name: 'conv-x', harness: 'mystery' } },
+    });
+    const client = await connectClient(api, APPROVER);
+    expect((await callTool(client, 'answer_question', { conversation: 'conv-old', answers: ['Yes'] })).isError).toBeFalsy();
+    const refused = await callTool(client, 'answer_question', { conversation: 'conv-x', answers: ['Yes'] });
+    expect(resultText(refused)).toBe(NOT_CLAUDE_CODE_TEXT);
+    expect(api.calls.filter((call) => call.method === 'POST').map((call) => call.path)).toEqual(['/api/conversations/conv-old/message']);
+  });
+
   it('answer_permission with an unknown choice posts nothing', async () => {
     const api = fakeApi({});
     const client = await connectClient(api, APPROVER);

@@ -49,6 +49,8 @@ export interface HarnessCapabilities {
   readonly workspaceResolution: HarnessWorkspaceResolution
   /** The conversation scanner correlates transcripts to agents by session id. */
   readonly correlatesBySessionId: boolean
+  /** A pending question is answered by sending the conversation a composed answer message (PAN-4649). */
+  readonly answersQuestionByMessage: boolean
 }
 
 export const HARNESS_CAPABILITY_KEYS = [
@@ -68,6 +70,7 @@ export const HARNESS_CAPABILITY_KEYS = [
   "launchPreflight",
   "workspaceResolution",
   "correlatesBySessionId",
+  "answersQuestionByMessage",
 ] as const satisfies readonly (keyof HarnessCapabilities)[]
 
 export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -87,6 +90,7 @@ export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
   launchPreflight: "claude-code-model-minimum",
   workspaceResolution: "claude-project-hash",
   correlatesBySessionId: false,
+  answersQuestionByMessage: true,
 }
 
 export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
@@ -106,6 +110,7 @@ export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
   launchPreflight: null,
   workspaceResolution: "first-message-only",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
 }
 
 export const CODEX_CAPABILITIES: HarnessCapabilities = {
@@ -125,6 +130,7 @@ export const CODEX_CAPABILITIES: HarnessCapabilities = {
   launchPreflight: null,
   workspaceResolution: "agent-dir",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
 }
 
 export const ACP_CAPABILITIES: HarnessCapabilities = {
@@ -144,6 +150,7 @@ export const ACP_CAPABILITIES: HarnessCapabilities = {
   launchPreflight: null,
   workspaceResolution: "agent-dir",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
 }
 
 export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -163,6 +170,7 @@ export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
   launchPreflight: null,
   workspaceResolution: "first-message-only",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
 }
 
 export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
@@ -182,6 +190,7 @@ export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
   launchPreflight: null,
   workspaceResolution: "agent-dir",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
 }
 
 export const MUSE_CAPABILITIES: HarnessCapabilities = {
@@ -201,6 +210,7 @@ export const MUSE_CAPABILITIES: HarnessCapabilities = {
   launchPreflight: null,
   workspaceResolution: "first-message-only",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
 }
 
 export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
@@ -220,4 +230,5 @@ export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
   launchPreflight: null,
   workspaceResolution: "first-message-only",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
 }

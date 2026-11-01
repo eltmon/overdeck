@@ -6,8 +6,11 @@
  * the route-scope table maps to `approve`. `answer_question` posts the same
  * composed message the dashboard sends for a Claude Code AskUserQuestion, and
  * that message route needs only `tell`, so this tool checks `approve` itself
- * (D-4649-5) and serves Claude Code conversations only (D-4649-6).
+ * (D-4649-5) and serves only harnesses that declare `answersQuestionByMessage`
+ * — today Claude Code (D-4649-6).
  */
+import { getHarnessBehavior, normalizeHarnessName } from '@overdeck/contracts';
+
 import { scopeSatisfies } from '../access-tokens.js';
 import { errorResult, isOk, requiredString, routeErrorResult, routeResult, type OverdeckTool } from './tool.js';
 
@@ -21,6 +24,17 @@ export const NOT_CLAUDE_CODE_TEXT = 'answer_question supports Claude Code conver
 export function composeQuestionAnswer(answers: readonly string[], questions?: readonly string[]): string {
   const lines = answers.map((answer, i) => `Q: ${questions?.[i] ?? `Question ${i + 1}`}\nA: ${answer}`);
   return `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
+}
+
+/**
+ * True when the conversation's harness answers a pending question through a
+ * composed message (`answersQuestionByMessage`). A missing or null harness is
+ * Claude Code; an unrecognized harness name is refused.
+ */
+function answersQuestionByMessage(conversation: unknown): boolean {
+  const harness = conversation && typeof conversation === 'object' ? (conversation as Record<string, unknown>)['harness'] : undefined;
+  if (harness !== undefined && harness !== null && normalizeHarnessName(harness) === null) return false;
+  return getHarnessBehavior(normalizeHarnessName(harness)).capabilities.answersQuestionByMessage;
 }
 
 function stringArray(value: unknown): string[] | null {
@@ -60,8 +74,7 @@ const answerQuestion: OverdeckTool = {
     const name = encodeURIComponent(conversation.value);
     const read = await ctx.api.request('GET', `/api/conversations/${name}`);
     if (!isOk(read)) return routeErrorResult(read);
-    const harness = read.json && typeof read.json === 'object' ? (read.json as Record<string, unknown>)['harness'] : undefined;
-    if (harness !== undefined && harness !== null && harness !== 'claude-code') return errorResult(NOT_CLAUDE_CODE_TEXT);
+    if (!answersQuestionByMessage(read.json)) return errorResult(NOT_CLAUDE_CODE_TEXT);
 
     const message = composeQuestionAnswer(answers, questions);
     return routeResult(await ctx.api.request('POST', `/api/conversations/${name}/message`, { message }));
