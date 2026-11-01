@@ -126,6 +126,10 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_pull_requests_key` ON `conversation_pull_requests` (`host`, `repository`, `number`)');
   // PAN-4498: operator bookmarks on transcript messages. Mirrors the init migration.
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_bookmarks` (`conversation_id` text NOT NULL, `message_id` text NOT NULL, `label` text NOT NULL, `message_created_at` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, PRIMARY KEY(`conversation_id`, `message_id`), FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
+  // PAN-4640: recurring scheduled prompts on conversations. Mirrors the init migration.
+  runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_schedules` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` text NOT NULL, `prompt` text NOT NULL, `cron` text NOT NULL, `time_zone` text NOT NULL, `enabled` integer NOT NULL DEFAULT 1, `next_run_at` integer, `last_run_at` integer, `last_run_status` text, `last_run_error` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_schedules_due` ON `conversation_schedules` (`enabled`, `next_run_at`)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_schedules_conversation` ON `conversation_schedules` (`conversation_id`)');
   // Gauntlet lanes: launch-time facts written once by the lane door (.pan/drafts/pan-4223.md).
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `parent_conversation_id` text REFERENCES `conversations`(`id`)');
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `gauntlet_run` text');

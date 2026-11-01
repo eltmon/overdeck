@@ -49,6 +49,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'claude-sonnet-4-5': 'workhorse',
   'gpt-5.6-terra': 'workhorse',
   'gpt-5.6-terra[372k]': 'workhorse',
+  'gpt-6.1-terra': 'workhorse',
   'gemini-3-flash-preview': 'workhorse',
   'kimi-k2.7-code': 'workhorse',
   'kimi-code/kimi-for-coding': 'workhorse',

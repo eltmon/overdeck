@@ -199,6 +199,19 @@ describe('cost module', () => {
       expect(sol61?.cacheReadPer1k).toBe(0.0001);
       expect(sol6?.cacheReadPer1k).toBe(0.0002);
     });
+
+    it('prices gpt-6.1-terra distinctly from gpt-5.6-terra', () => {
+      const terra61 = getPricing('openai', 'gpt-6.1-terra');
+      const terra56 = getPricing('openai', 'gpt-5.6-terra');
+      expect(terra61?.model).toBe('gpt-6.1-terra');
+      expect(terra61?.inputPer1k).toBe(0.001);
+      expect(terra61?.cacheReadPer1k).toBe(0.00005);
+      expect(terra61?.outputPer1k).toBe(0.005);
+      expect(terra56?.model).toBe('gpt-5.6-terra');
+      expect(terra56?.inputPer1k).toBe(0.0025);
+      expect(terra56?.cacheReadPer1k).toBe(0.00025);
+      expect(terra56?.outputPer1k).toBe(0.015);
+    });
   });
 
   describe('calculateCost - Standard Calculation', () => {

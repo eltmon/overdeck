@@ -169,7 +169,17 @@ Right-click on a markdown chip lists **Open in internal editor**, one
 **Open in `<EDITORS label>`** entry per editor the server reports available
 (`pan.getAvailableEditors`, fetched once and cached module-wide, same
 pattern as the chip's Quickview syntax-highlighter cache), then the
-existing **Copy relative path** / **Copy full path** items. Choosing any
-open action calls `setMarkdownOpenTarget` before opening, so the choice
-survives a reload. Right-click on a non-markdown chip is unchanged — still
-exactly **Open in editor** / **Copy relative path** / **Copy full path**.
+**Open containing folder**, then the existing **Copy relative path** /
+**Copy full path** items. Choosing any editor open action calls
+`setMarkdownOpenTarget` before opening, so the choice survives a reload.
+Right-click on a non-markdown chip lists **Open in editor** / **Open
+containing folder** / **Copy relative path** / **Copy full path**.
+
+**Open containing folder** sends `shellOpenInEditor` with
+`editor: 'file-manager'` and `reveal: true` for `filePath` (never
+`targetPath`, which can carry a `:line:column` suffix). The server opens the
+parent folder with the file selected: `open -R` on macOS,
+`explorer /select,` on Windows, and the freedesktop
+`org.freedesktop.FileManager1.ShowItems` D-Bus call on Linux, which falls
+back to `xdg-open` on the parent folder when no file manager implements it.
+It does not change the persisted markdown open target.

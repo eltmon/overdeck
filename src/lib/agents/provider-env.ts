@@ -138,6 +138,7 @@ const PROVIDER_ENV_KEYS = [
 // The GPT-6 family (astra, sol, luna, 6.1 sol) shares the 272K billing tier and the 872K
 // raw ceiling with GPT-5.6 (Codex catalog, 2026-09-07 / 0.157.1), so it takes the same pin. The
 // set name is kept for continuity with PAN-3057/PAN-3388.
+// gpt-6.1-terra is deliberately absent: the pinned CLIProxy does not serve it (PAN-4633 D8, follow-up PAN-4634). Its claude-code policy still resolves to 272K through the capability fallthrough below.
 const GPT_56_MODELS = new Set(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']);
 const GPT_56_LONG_MODELS = new Set(Object.keys(GPT56_LONG_CONTEXT_VARIANTS));
 

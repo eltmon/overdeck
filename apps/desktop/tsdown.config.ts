@@ -24,4 +24,11 @@ export default defineConfig([
       neverBundle: ["electron"],
     },
   },
+  {
+    ...shared,
+    entry: ["src/connect-preload.ts"],
+    deps: {
+      neverBundle: ["electron"],
+    },
+  },
 ]);

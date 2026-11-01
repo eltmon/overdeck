@@ -1,11 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { ConversationSearchBanner } from '../ConversationSearchBanner';
 import { useConversationSearchStatus, type ConversationSearchStatus } from '../../hooks/useConversationSearchStatus';
+import { requestSettingsSection } from '../../lib/settingsSection';
 
 vi.mock('../../hooks/useConversationSearchStatus', () => ({
   useConversationSearchStatus: vi.fn(),
+}));
+vi.mock('../../lib/settingsSection', () => ({
+  requestSettingsSection: vi.fn(),
 }));
 
 const mockUseStatus = vi.mocked(useConversationSearchStatus);
@@ -45,12 +49,26 @@ describe('ConversationSearchBanner', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('shows the unavailable reason when no API key is configured', () => {
+  it('offers a one-click route to the OpenAI key field when no API key is configured', () => {
     mockUseStatus.mockReturnValue({
-      data: makeStatus({ available: false, unavailableReason: 'OpenAI API key not found. Add it under Settings → API Keys.' }),
+      data: makeStatus({ available: false, unavailableReason: 'OpenAI API key not found. Add it under Settings → Providers → OpenAI.' }),
+    } as ReturnType<typeof useConversationSearchStatus>);
+    const onOpenSettings = vi.fn();
+    render(<ConversationSearchBanner onOpenSettings={onOpenSettings} />);
+    expect(screen.getByText('Conversation search needs an OpenAI API key')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /add openai key/i }));
+    expect(requestSettingsSection).toHaveBeenCalledWith('provider-openai');
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the raw reason for other unavailability causes', () => {
+    mockUseStatus.mockReturnValue({
+      data: makeStatus({ available: false, unavailableReason: 'embedding provider misconfigured' }),
     } as ReturnType<typeof useConversationSearchStatus>);
     render(<ConversationSearchBanner />);
-    expect(screen.getByText(/OpenAI API key not found/)).toBeInTheDocument();
+    expect(screen.getByText('Conversation search is not working')).toBeInTheDocument();
+    expect(screen.getByText('embedding provider misconfigured')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add openai key/i })).not.toBeInTheDocument();
   });
 
   it('links to OpenAI billing when the failure is credit-related (PAN-3771)', () => {

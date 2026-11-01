@@ -110,16 +110,21 @@ export function herdrSocketPath(deps: SelectTerminalBackendDeps = {}): string {
 }
 
 /**
- * The `herdr` binary: the first executable on PATH, then `~/.local/bin` (the
- * vendor installer's target, which a bare service PATH often omits).
+ * Where the `herdr` binary is looked for, in order: PATH, then `~/.local/bin`
+ * (the vendor installer's target, which a bare service PATH often omits — the
+ * PATH `npx` gives the dashboard does). The probe scans these directories, and
+ * the terminal streams spawn with them as PATH, so both find the same binary.
  */
-async function findHerdrBinary(deps: SelectTerminalBackendDeps): Promise<string | null> {
+export function herdrSearchDirs(deps: SelectTerminalBackendDeps = {}): string[] {
   const pathEnv = deps.pathEnv ?? process.env.PATH ?? '';
+  return [...pathEnv.split(delimiter), join(deps.homeDir ?? homedir(), '.local', 'bin')].filter(Boolean);
+}
+
+/** The `herdr` binary: the first executable in `herdrSearchDirs`. */
+async function findHerdrBinary(deps: SelectTerminalBackendDeps): Promise<string | null> {
   const isExecutable = deps.isExecutable ?? defaultIsExecutable;
-  const dirs = [...pathEnv.split(delimiter), join(deps.homeDir ?? homedir(), '.local', 'bin')];
   const seen = new Set<string>();
-  for (const dir of dirs) {
-    if (!dir) continue;
+  for (const dir of herdrSearchDirs(deps)) {
     const candidate = join(dir, HERDR_BINARY);
     if (seen.has(candidate)) continue;
     seen.add(candidate);

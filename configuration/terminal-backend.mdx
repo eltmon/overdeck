@@ -34,6 +34,9 @@ it. Availability is checked separately, every time an agent launches — the
 Overdeck home (`~/.config/herdr/sessions/<session>/herdr.sock`, where
 `<session>` is `overdeck` for the default `~/.overdeck` home).
 
+The dashboard's terminal view uses the same lookup, so a dashboard started with `npx`, whose
+`PATH` lacks `~/.local/bin`, still streams Herdr terminals.
+
 The dashboard logs the result once at boot:
 
 ```text

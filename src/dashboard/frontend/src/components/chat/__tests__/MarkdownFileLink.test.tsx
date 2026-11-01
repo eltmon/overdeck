@@ -153,6 +153,7 @@ describe('MarkdownFileLink', () => {
     expect(event.defaultPrevented).toBe(true);
     expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
       'Open in editor',
+      'Open containing folder',
       'Copy relative path',
       'Copy full path',
     ]);
@@ -210,6 +211,21 @@ describe('MarkdownFileLink', () => {
         editor: 'vscode',
       });
       expect(toastMock.success).toHaveBeenCalledWith('Opened in editor');
+    });
+  });
+
+  it('reveals the file path without the line suffix in the file manager', async () => {
+    render(<MarkdownFileLink {...meta} />);
+
+    fireEvent.contextMenu(screen.getByRole('link'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open containing folder' }));
+
+    await waitFor(() => {
+      expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+        cwd: meta.filePath,
+        editor: 'file-manager',
+        reveal: true,
+      });
     });
   });
 
@@ -394,6 +410,7 @@ describe('MarkdownFileLink', () => {
           'Open in internal editor',
           'Open in Cursor',
           'Open in VS Code',
+          'Open containing folder',
           'Copy relative path',
           'Copy full path',
         ]);
@@ -463,13 +480,14 @@ describe('MarkdownFileLink', () => {
       expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename);
     });
 
-    it('renders exactly the three original items for a non-markdown chip', () => {
+    it('renders the original items plus the reveal action for a non-markdown chip', () => {
       render(<MarkdownFileLink {...meta} />);
 
       fireEvent.contextMenu(screen.getByRole('link'));
 
       expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
         'Open in editor',
+        'Open containing folder',
         'Copy relative path',
         'Copy full path',
       ]);

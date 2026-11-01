@@ -277,6 +277,7 @@ describe('settings', () => {
         'gpt-6-sol',
         'gpt-6-luna',
         'gpt-6.1-sol',
+        'gpt-6.1-terra',
       ]);
     });
 

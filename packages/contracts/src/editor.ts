@@ -57,5 +57,8 @@ export const EditorIdSchema = Schema.Literals(EDITOR_IDS)
 export const OpenInEditorInput = Schema.Struct({
   cwd: Schema.String,
   editor: EditorIdSchema,
+  // With editor "file-manager": open the folder containing `cwd` and select
+  // the file in it, instead of opening `cwd` itself.
+  reveal: Schema.optional(Schema.Boolean),
 })
 export type OpenInEditorInput = typeof OpenInEditorInput.Type

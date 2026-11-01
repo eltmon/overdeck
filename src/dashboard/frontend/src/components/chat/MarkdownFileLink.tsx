@@ -233,6 +233,20 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
       });
   }, [targetPath]);
 
+  // Opens the folder holding the file with the file selected. Uses filePath,
+  // not targetPath: targetPath may end in a `:line[:column]` goto suffix.
+  const revealInFileManager = useCallback(() => {
+    void getTransport()
+      .request((client) => (client as PanRpcProtocolClient)[WS_METHODS.shellOpenInEditor]({
+        cwd: filePath,
+        editor: 'file-manager',
+        reveal: true,
+      }))
+      .catch((error) => {
+        toast.error(`Failed to open containing folder: ${error instanceof Error ? error.message : String(error)}`);
+      });
+  }, [filePath]);
+
   // PAN-3260 — markdown chips default to the internal editor pane; the
   // persisted overdeck:markdown-open-target preference (set from the
   // right-click menu) can override to a specific external editor. Outside a
@@ -337,12 +351,13 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
             openWithExternalEditor(entry.id);
           },
         })),
+        { label: 'Open containing folder', onClick: revealInFileManager },
         { label: 'Copy relative path', onClick: () => copyPath(displayPath, 'relative path') },
         { label: 'Copy full path', onClick: () => copyPath(targetPath, 'full path') },
       ];
       showContextMenu({ x, y, items });
     });
-  }, [deck, filePath, targetPath, basename, handleOpen, openWithExternalEditor, displayPath, copyPath]);
+  }, [deck, filePath, targetPath, basename, handleOpen, openWithExternalEditor, revealInFileManager, displayPath, copyPath]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -405,6 +420,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
             y: event.clientY,
             items: [
               { label: 'Open in editor', onClick: handleOpen },
+              { label: 'Open containing folder', onClick: revealInFileManager },
               { label: 'Copy relative path', onClick: () => copyPath(displayPath, 'relative path') },
               { label: 'Copy full path', onClick: () => copyPath(targetPath, 'full path') },
             ],

@@ -109,7 +109,7 @@ function resolveOpenAiApiKey(
   const configValue = envWasExplicit ? undefined : resolveConfiguredOpenAiApiKey();
   if (configValue) return { value: configValue, reason: '' };
 
-  return { reason: 'OpenAI API key not found. Add it under Settings → API Keys, or set the OPENAI_API_KEY environment variable.' };
+  return { reason: 'OpenAI API key not found. Add it under Settings → Providers → OpenAI, or set the OPENAI_API_KEY environment variable.' };
 }
 
 function resolveConfiguredOpenAiApiKey(): string | undefined {

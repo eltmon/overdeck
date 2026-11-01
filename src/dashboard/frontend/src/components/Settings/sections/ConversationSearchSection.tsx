@@ -9,6 +9,7 @@ import type {
 } from '../hooks/useConversationSearch';
 import type { ConversationSearchConfig } from '../types';
 import { EMBEDDING_MODELS_BY_PROVIDER } from '../embeddingModels';
+import { requestSettingsSection } from '../../../lib/settingsSection';
 
 interface ConversationSearchSectionProps {
   conversationSearch: ConversationSearchConfig;
@@ -127,9 +128,18 @@ export function ConversationSearchSection({
           </label>
           <div className="flex items-end text-xs">
             {hasOpenAiKey ? (
-              <span className="text-success">✓ Using OpenAI key from API Keys section</span>
+              <span className="text-success">✓ Using the OpenAI key from Providers</span>
             ) : (
-              <span className="text-warning">No OpenAI key set — configure in API Keys above</span>
+              <span className="text-warning">
+                No OpenAI key set —{' '}
+                <button
+                  type="button"
+                  onClick={() => requestSettingsSection('provider-openai')}
+                  className="font-medium underline underline-offset-2 hover:opacity-80"
+                >
+                  add one in Providers
+                </button>
+              </span>
             )}
           </div>
         </div>

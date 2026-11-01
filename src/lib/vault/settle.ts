@@ -66,6 +66,8 @@ export interface SettleOptions {
   now?: () => Date;
   /** WIP code-snapshot capture mode (PAN-4329 D-1). Default `'auto'`. */
   wip?: WipMode;
+  /** Title for a record this settle mints (PAN-4647); ignored when the record already exists or is forked. */
+  recordTitle?: string;
 }
 
 export type SettleResult =
@@ -287,7 +289,7 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
           owner: { environmentId: me.environmentId, label: me.label },
           harness,
           nativeSessionId,
-          title: facts.title ?? basename(nativePath),
+          title: options.recordTitle ?? facts.title ?? basename(nativePath),
           model: facts.model,
           project: cwd ? basename(cwd) : null,
           cwd: cwd ?? '',

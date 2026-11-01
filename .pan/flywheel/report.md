@@ -1,71 +1,40 @@
-# Flywheel run report — 2026-10-24 (conversation 3302)
+# Flywheel report — 2026-10-26 (conv 3341)
 
-Run window: 08:10–17:00 UTC. Operator-directed run: no backlog pickups
-(nothing was `released`); every start below was requested by the operator.
-Ended with the v0.70.0 release and a pause, on the operator's instruction.
+## Shipped
 
-## Released
+- PAN-4534: CI failure feedback names the failing test. It had merged on
+  2026-10-24; closed out this run, with every Definition-of-Done row passing.
+- PAN-4633: adds GPT-6.1 Terra (gpt-6.1-terra) to the catalog, pricing,
+  Codex floor and CLIProxy route. PR #4635 merged at 20:18 UTC, went live in
+  0.72.0, and is closed out.
+- PAN-4630: dashboard terminals no longer loop on "Connection lost", because
+  Herdr streams now spawn with ~/.local/bin on PATH. PR #4631 merged through
+  the merge door, main CI was green at 4775d716, `pan reload` deployed
+  7a659f67, and the issue is closed out.
 
-**v0.70.0** (tag `v0.70.0`, release commit `fb6e836cd69`), changelog in
-`changelog.mdx`. Shipped with 17 merged fixes; PAN-4534 was left for the next
-release by operator choice.
+## In flight
 
-## Merged today (18 PRs)
+Nothing.
 
-| Issue | PR | What it does |
-| --- | --- | --- |
-| PAN-4584 | #4588 | Archiving a conversation shows progress and reports failures |
-| PAN-4583 | #4587 | Editor pane reads markdown anywhere under $HOME (read-only) |
-| PAN-4582 | #4600 | Each Herdr agent gets its own tab; no more blank terminals |
-| PAN-4589 | #4604 | CI test gate recognizes commit-status CI (Dagger Cloud) |
-| PAN-4609 | #4615 | Verification docs: what runs, why it is slow, which gates to keep |
-| PAN-4585 | #4611 | Opt-in Semgrep install and doctor checks (phase 1) |
-| PAN-4597 | #4607 | Approved PRs stay on Awaiting Merge; issue-view Merge button back |
-| PAN-4595 | #4601 | `pan show --health` stops calling working Herdr agents stuck |
-| PAN-4546 | #4617 | Two concurrent quality-gate slots (+ PAN-4610 stranded-ticket fix) |
-| PAN-4596 | #4606 | Held handoffs show their unsent kickoff with a Start button |
-| PAN-4598 | #4603 | Merge-train batches assemble again; per-row Merge on the Flywheel |
-| PAN-4614 | #4619 | `concerns.md` marked merge=union (no more conflicts) |
-| PAN-4605 | #4620 | PRs opened outside a workspace are adopted into the pipeline |
-| PAN-4618 | #4621 | CI skips bookkeeping commits, cancels superseded runs |
-| PAN-4532 | #4602 | Dashboard restart no longer loses a verification's review dispatch |
-| PAN-4527 | #4599 | A re-review never joins a verification of the previous head |
-| PAN-4531 | #4608 | Verification stops early once CI already failed for the head |
-| PAN-4540 | #4612 | Gate refusals no longer strand approved green PRs in auto-merge |
+## Waiting on the operator
 
-Closed out: all 18 issues above, plus PAN-4610, deployed in
-build `fb6e836cd` (the v0.70.0 release commit). A clean
-`npx @overdeck/core@0.70.0 --version` printed `0.70.0`.
-
-## In flight at pause
-
-- **PAN-4534** (#4613): CI failure feedback names the failing test. Built in
-  conversation 3304, entering verification/review. Not in v0.70.0.
-
-## Parked
-
-None.
+- PAN-4636: an outside PR that the pipeline adopts can never pass
+  verification. Adoption never skips the plan-checklist check, which only
+  strikes skip, so it fails `incomplete-plan-items`, and the failure reaches
+  no agent. It is labeled `needs-handoff` (review machinery, TENET-10) and
+  needs a supervised `pan handoff`. Until it is fixed, recover each instance
+  with `pan start <id> --plan auto`; that worked for PAN-4630.
+- PAN-4626: stop and archive pending state on conversation rows. It is
+  planned (`pan plan --auto`) and ranked first, and it waits for the
+  `released` label.
+- PAN-4616: verify that GitHub's mergeable state honors `merge=union`. A
+  leftover planning workspace from the 2026-10-24 mis-start remains; it is
+  not released.
 
 ## Substrate fixes this run
 
-Filed and fixed: PAN-4595, PAN-4596, PAN-4597, PAN-4598, PAN-4605,
-PAN-4609, PAN-4610, PAN-4614, PAN-4618 (see table). Operator-approved
-speedups: local verification gates for panopticon-cli trimmed to install +
-typecheck (machine config, backup `projects.yaml.bak-2026-10-24-gates`), two
-gate slots (PAN-4546), early stop on red CI (PAN-4531).
-
-## Operator decisions and other work
-
-- Flywheel granted merge authority for approved, green, clean PRs on a green
-  main (memory `flywheel-may-merge-ready-prs`).
-- Disk: removed 19 merged MYN worktrees and pruned unused Docker images
-  (29 GB → 72 GB free). Restic backups verified healthy; the 8 failures in
-  the prior week were all "no space left on device".
-- Lessons recorded in `.pan/flywheel/state.md`: handoff conversations need
-  pipeline workspaces, a PRD/plan, and recorded ACs (now automated by
-  PAN-4605 adoption); the merge door can refuse transiently right after
-  another merge; CI runner starvation from bookkeeping commits.
-
-## Unaddressed SHOULD-level review findings
-
-Not collected this run.
+- Filed PAN-4636, with file:line root cause and recovery recipe in
+  `.pan/flywheel/state.md`.
+- Observed once, not filed: the merge door counts the non-blocking flake-lane
+  CI job as pending (`pr-facts.ts` line 242). It can delay an approved merge
+  by up to 30 minutes.

@@ -292,6 +292,35 @@ export const AUDITED_MODEL_ADDITIONS = {
     notes: 'OpenAI GPT-6.1 mid tier (September 29, 2026), successor to gpt-6-sol at the same API price with half the cached-input price. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] variant. 1.05M marketing context. Codex under ChatGPT sign-in needs CLI 0.159.0+.',
   },
 
+  // GPT-6.1 Terra (2026-10-26). Codex 0.159.0 `codex debug models`: context_window 500000,
+  // max_context_window 872000, supported_in_api true, default effort low; pinned to 272K (PAN-4633 D3).
+  // Pricing and 1.05M context / 128K output: developers.openai.com/api/docs/models/gpt-6.1-terra.
+  // Skills inherit the gpt-5.6-terra baseline.
+  'gpt-6.1-terra': {
+    model: 'gpt-6.1-terra',
+    provider: 'openai',
+    displayName: 'GPT-6.1 Terra',
+    costPer1MTokens: 3, // $1.00 in / $5.00 out ($0.05 cached)
+    contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+    maxOutputTokens: 128_000,
+    minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    skills: {
+      'code-generation': 97,
+      'code-review': 94,
+      debugging: 96,
+      planning: 95,
+      documentation: 92,
+      testing: 94,
+      security: 91,
+      performance: 92,
+      synthesis: 94,
+      speed: 70,
+      'context-length': 95,
+    },
+    notes: 'OpenAI GPT-6.1 workhorse tier (October 26, 2026), below gpt-6.1-sol in the slot gpt-5.6-terra fills for GPT-5.6. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] variant. 1.05M marketing context. Codex under ChatGPT sign-in needs CLI 0.159.0+. CLIProxy 7.3.16 does not serve it (PAN-4634).',
+  },
+
   'gpt-6-luna': {
     model: 'gpt-6-luna',
     provider: 'openai',
