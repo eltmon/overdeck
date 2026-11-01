@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4652",
+  "created": "2026-11-01T18:40:05.145Z",
+  "updated": "2026-11-01T18:40:05.145Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-image-pan-docker": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T18:40:05.145Z"
+    }
+  }
+}
