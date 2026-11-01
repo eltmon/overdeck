@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T13:51:37.671Z",
+  "updated": "2026-11-01T13:51:50.527Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "wi5-do-presence.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T13:51:37.671Z"
+    },
+    "wi5-do-presence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:51:50.527Z"
     }
   }
 }
