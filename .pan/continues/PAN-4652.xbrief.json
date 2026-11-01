@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T20:31:30.383Z",
+  "updated": "2026-11-01T20:31:42.672Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "wi1-image-pan-docker.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T20:31:30.383Z"
+    },
+    "wi2-serve-no-open.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:31:42.672Z"
     }
   }
 }
