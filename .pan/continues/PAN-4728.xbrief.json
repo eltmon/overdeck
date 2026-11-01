@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4728",
   "created": "2026-11-01T17:45:22.507Z",
-  "updated": "2026-11-01T17:55:45.023Z",
+  "updated": "2026-11-01T18:05:13.116Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-01T17:55:28.342Z"
     },
     "known-pack-pstack": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4728",
-      "claimedAt": "2026-11-01T17:55:45.023Z"
+      "claimedAt": "2026-11-01T17:55:45.023Z",
+      "doneAt": "2026-11-01T18:05:13.115Z"
     }
   }
 }
