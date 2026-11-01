@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:11:50.874Z",
+  "updated": "2026-11-01T14:28:56.458Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,10 @@
       "claimedBy": "agent-pan-4404",
       "claimedAt": "2026-11-01T14:11:22.315Z",
       "doneAt": "2026-11-01T14:11:50.874Z"
+    },
+    "wi1-contracts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:28:56.457Z"
     }
   }
 }
