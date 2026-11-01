@@ -40,10 +40,10 @@ const defaultDeps: ForwardWebSocketDeps = {
 /** Answer an upgrade with a JSON error body, so the viewer can read the code. */
 export function rejectUpgradeJson(socket: Duplex, status: number, body: { error: string; code?: string }): void {
   const text = JSON.stringify(body);
-  socket.write(
+  // end(), not write() + destroy(): over a secure channel destroy() drops the queued response.
+  socket.end(
     `HTTP/1.1 ${status} ${status === 403 ? 'Forbidden' : 'Error'}\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(text)}\r\n\r\n${text}`,
   );
-  socket.destroy();
 }
 
 function pipeToPort(ws: WebSocket, tcp: Socket): void {

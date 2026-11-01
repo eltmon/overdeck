@@ -79,6 +79,19 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/conversations/:name/release/complete', scope: 'operate' },
   // PAN-4650 WI-17: the dev-server ports a linked machine may preview.
   { method: 'GET', path: '/api/conversations/:name/preview-ports', scope: 'read:conversations' },
+  // PAN-4650 FR-3: the rest of remote control a linked machine's operator drives
+  // through the link proxy (images, tool bodies, diffs, jumps; switch model,
+  // compact, effort, resume; image upload). Agent actors stay fenced off writes.
+  { method: 'GET', path: '/api/conversations/:name/attachments/:file', scope: 'read:conversations' },
+  { method: 'GET', path: '/api/conversations/:name/tool-body/:toolUseId', scope: 'read:conversations' },
+  { method: 'GET', path: '/api/conversations/:name/message-locator', scope: 'read:conversations' },
+  { method: 'GET', path: '/api/conversations/:name/diffs', scope: 'read:conversations' },
+  { method: 'GET', path: '/api/conversations/:name/diffs/:turnId', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/conversations/:name/upload-image', scope: 'tell' },
+  { method: 'POST', path: '/api/conversations/:name/switch-model', scope: 'operate' },
+  { method: 'POST', path: '/api/conversations/:name/compact', scope: 'operate' },
+  { method: 'POST', path: '/api/conversations/:name/thinking-level', scope: 'operate' },
+  { method: 'POST', path: '/api/conversations/:name/resume', scope: 'operate' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

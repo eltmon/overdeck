@@ -78,6 +78,21 @@ describe('agent fence (PAN-4650 D-4650-7)', () => {
     expect(remoteGateRejection(request('POST', '/api/conversations/x/stop', 'operator'), LINK)).toBeNull();
   });
 
+  it('FR-3: lets the operator actor reach the remote-control reads and writes of a conversation', () => {
+    for (const [method, path] of [
+      ['GET', '/api/conversations/x/attachments/shot.png'],
+      ['GET', '/api/conversations/x/tool-body/toolu_1'],
+      ['GET', '/api/conversations/x/diffs/full'],
+      ['POST', '/api/conversations/x/switch-model'],
+      ['POST', '/api/conversations/x/compact'],
+      ['POST', '/api/conversations/x/resume'],
+      ['POST', '/api/conversations/x/upload-image'],
+    ] as const) {
+      expect(remoteGateRejection(request(method, path, 'operator'), LINK), `${method} ${path}`).toBeNull();
+    }
+    expect(remoteGateRejection(request('POST', '/api/conversations/x/compact', 'agent:agent-pan-1'), LINK)).toEqual({ status: 403, code: 'agent-fenced' });
+  });
+
   it('ac4: a machine credential over a channel cannot use the proxy prefix (admin only)', () => {
     expect(remoteGateRejection(request('POST', '/api/conversations/@desk/conv-x/message', 'operator'), LINK)).toEqual({ status: 403, missingScope: 'admin' });
     expect(remoteGateRejection(request('GET', '/api/conversations/%40desk%2Fconv-x/messages', 'operator'), LINK)).toEqual({ status: 403, missingScope: 'admin' });

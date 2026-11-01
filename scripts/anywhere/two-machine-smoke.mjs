@@ -15,6 +15,18 @@
 //                  and its heartbeat cross the proxy. B's reverse link reaches A directly
 //                  over A's advertised LAN address.
 //   4. online      both `pan machines list --json` show the other machine online within 15 s.
+//   PAN-4650 (conversations across machines), all through the proxied pairing route:
+//      seed        B gets one local conversation (row, >2 MiB Claude JSONL, an image
+//                  attachment, a vault index entry); A gets a vault-style saved copy of it.
+//      list        A's GET /api/conversations lists @<B>/<name> once, carrying the saved copy.
+//      open-budget opening it through A moves at most 1 MiB + 64 KiB from B to A.
+//      image       its attachment fetched through A matches B's bytes.
+//      tell-once   `pan tell @<B>/<name> … --message-id smoke1` twice gets the same answer,
+//                  and the same id with other text is refused by B's receipt store.
+//      released-409 with released_to set on B, a message through A answers 409 conversation-released.
+//      forward     `pan machines forward <B> <port>` reaches a tiny HTTP server; B's dashboard
+//                  port answers port-refused.
+//      --live-claude adds remote-reply and pull (real Claude sessions; see liveClaudeSteps).
 //   5. kill B      A shows the link offline within 30 s.
 //   6. restart B   A shows it online again within 60 s.
 //   7. no-http     the proxy capture contains no "HTTP/1.1": everything that crossed
@@ -28,7 +40,10 @@
 //
 // Not in CI (D-4645-22): it binds two LAN-visible ports for about two minutes.
 import { execFile, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, openSync, rmSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
+import { DatabaseSync } from 'node:sqlite';
 import { connect, createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,10 +57,18 @@ const PORT_A = 3041;
 const PORT_B = 3042;
 const HOMES = { a: resolve(repo, '.tmp', 'anywhere-a'), b: resolve(repo, '.tmp', 'anywhere-b') };
 const INJECT_PLAIN_HTTP = process.argv.includes('--inject-plain-http');
+const LIVE_CLAUDE = process.argv.includes('--live-claude');
+/** NFR-3: an open moves at most 1 MiB + 64 KiB. */
+const OPEN_BUDGET_BYTES = 1_114_112;
+const SEED = { name: 'smoke-desk', sessionId: '6f1c4650-0000-4000-8000-000000000001', vaultId: '6f1c4650-0000-4000-8000-0000000000aa' };
+const SEED_CWD = resolve(HOMES.b, 'project');
 
 const started = Date.now();
 const log = (line) => console.log(`[${((Date.now() - started) / 1000).toFixed(1).padStart(6)} s] ${line}`);
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+/** Bytes B sent through the proxy (to A), for the open budget. */
+const fromB = { bytes: 0 };
 
 /** Live processes and sockets, closed on exit whatever happens. */
 const running = { servers: new Map(), proxy: null, proxySockets: new Set() };
@@ -79,6 +102,13 @@ function serverEnv(home, port) {
   for (const key of ['OVERDECK_INTERNAL_TOKEN', 'OVERDECK_AGENT_ID', 'OVERDECK_DASHBOARD_SPAWNED_BY', 'DASHBOARD_URL', 'HOST']) delete env[key];
   return {
     ...env,
+    // A home of their own, so the seeded Claude transcript never lands in the operator's
+    // ~/.claude. --live-claude keeps the real HOME: Claude Code needs its login there.
+    ...(LIVE_CLAUDE ? {} : { HOME: resolve(home, 'home') }),
+    // Live harnesses run on tmux: its socket name is derived from OVERDECK_HOME, so the
+    // smoke's sessions never share the operator's server (each home would need its own
+    // Herdr session server otherwise).
+    ...(LIVE_CLAUDE ? { OVERDECK_TERMINAL_BACKEND: 'tmux' } : {}),
     OVERDECK_HOME: home,
     API_PORT: String(port),
     PORT: String(port),
@@ -131,6 +161,18 @@ async function stopServer(name) {
   clearTimeout(timer);
 }
 
+/** `pan` with its exit code, stdout and stderr (never throws on a non-zero exit). */
+async function cliRaw(name, args, timeout = 60_000) {
+  const home = HOMES[name];
+  const port = name === 'a' ? PORT_A : PORT_B;
+  try {
+    const { stdout, stderr } = await execFileAsync(process.execPath, [CLI, ...args], { env: serverEnv(home, port), timeout, maxBuffer: 4 * 1024 * 1024 });
+    return { code: 0, stdout, stderr };
+  } catch (error) {
+    return { code: error.code ?? 1, stdout: error.stdout ?? '', stderr: error.stderr ?? String(error.message) };
+  }
+}
+
 async function cli(name, args) {
   const home = HOMES[name];
   const port = name === 'a' ? PORT_A : PORT_B;
@@ -154,7 +196,7 @@ function startProxy(capture) {
         running.proxySockets.delete(upstream);
       };
       client.on('data', (chunk) => { capture.push(chunk); upstream.write(chunk); });
-      upstream.on('data', (chunk) => { capture.push(chunk); client.write(chunk); });
+      upstream.on('data', (chunk) => { capture.push(chunk); fromB.bytes += chunk.length; client.write(chunk); });
       client.on('error', drop).on('close', drop);
       upstream.on('error', drop).on('close', drop);
     });
@@ -181,11 +223,232 @@ function linkTo(machines, environmentId) {
   return machines.links.find((link) => link.environmentId === environmentId) ?? null;
 }
 
+// ─── PAN-4650: conversations across machines ───────────────────────────────
+
+/** Claude Code's project directory for a cwd (every character but letters, digits and '-' becomes '-'). */
+function claudeProjectDir(home, cwd) {
+  return resolve(home, '.claude', 'projects', cwd.replace(/[^a-zA-Z0-9-]/g, '-'));
+}
+
+/** Where B's seeded transcript lives; refuse anything but the smoke project's directory. */
+function seedTranscriptPath() {
+  const home = LIVE_CLAUDE ? process.env.HOME : resolve(HOMES.b, 'home');
+  const dir = claudeProjectDir(home, SEED_CWD);
+  if (!/-tmp-anywhere-b-project$/.test(dir)) throw new Error(`refusing transcript dir ${dir}`);
+  return { dir, file: resolve(dir, `${SEED.sessionId}.jsonl`) };
+}
+
+/** A Claude JSONL of more than 2 MiB: 300 turns of 8 KiB text. */
+function seedTranscript() {
+  const lines = [];
+  const filler = 'lorem ipsum dolor sit amet '.repeat(300);
+  for (let turn = 0; turn < 300; turn++) {
+    const at = new Date(Date.UTC(2026, 10, 1, 10, 0, turn)).toISOString();
+    lines.push(JSON.stringify({ type: 'user', uuid: randomUUID(), sessionId: SEED.sessionId, cwd: SEED_CWD, timestamp: at, message: { role: 'user', content: `turn ${turn}: ${filler}` } }));
+    lines.push(JSON.stringify({ type: 'assistant', uuid: randomUUID(), sessionId: SEED.sessionId, cwd: SEED_CWD, timestamp: at, message: { role: 'assistant', model: 'claude-opus-5-5', content: [{ type: 'text', text: `answer ${turn}: ${filler}` }] } }));
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function openDb(name) {
+  const db = new DatabaseSync(resolve(HOMES[name], 'overdeck.db'));
+  db.exec('PRAGMA busy_timeout = 5000');
+  return db;
+}
+
+function insertConversation(db, row) {
+  db.prepare(`INSERT INTO conversations (id, name, cwd, harness, title, created_at, tmux_session, status, origin, vault_owner_label, environment_id, ended_at)
+    VALUES (?, ?, ?, 'claude-code', ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(randomUUID(), row.name, row.cwd, row.title, Date.now(), `conv-${row.name}`, row.status, row.origin, row.ownerLabel ?? null, row.environmentId, row.status === 'ended' ? Date.now() : null);
+}
+
+async function seedConversations(selfB) {
+  mkdirSync(SEED_CWD, { recursive: true });
+  const transcript = seedTranscriptPath();
+  mkdirSync(transcript.dir, { recursive: true });
+  writeFileSync(transcript.file, seedTranscript());
+  // A 1x1 PNG in B's attachments folder for the conversation.
+  const attachmentDir = resolve(HOMES.b, 'conversation-attachments', SEED.name);
+  mkdirSync(attachmentDir, { recursive: true });
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  writeFileSync(resolve(attachmentDir, 'shot.png'), png);
+  // B settles this transcript into vault record SEED.vaultId, so its shared row names it.
+  mkdirSync(resolve(HOMES.b, 'vault'), { recursive: true });
+  writeFileSync(resolve(HOMES.b, 'vault', 'index.json'), JSON.stringify({
+    v: 1, owned: { [transcript.file]: { vaultId: SEED.vaultId, harness: 'claude-code', tail: { lineCount: 0, byteOffset: 0, lastHashes: [] } } }, listCache: [],
+  }));
+  const b = openDb('b');
+  insertConversation(b, { name: SEED.name, cwd: SEED_CWD, title: 'Smoke: desk conversation', status: 'active', origin: 'local', environmentId: selfB.environmentId });
+  const id = b.prepare('SELECT id FROM conversations WHERE name = ?').get(SEED.name).id;
+  b.prepare("INSERT INTO conversation_files (conversation_id, harness, locator, created_at) VALUES (?, 'claude-code', ?, ?)").run(id, SEED.sessionId, Date.now());
+  b.close();
+  // A holds a Session Vault saved copy of the same record (FR-2: listed once).
+  const a = openDb('a');
+  insertConversation(a, { name: `vault-${SEED.vaultId}`, cwd: SEED_CWD, title: 'Smoke: desk conversation', status: 'ended', origin: 'vault', ownerLabel: 'b', environmentId: selfB.environmentId });
+  a.close();
+  return { png, transcriptBytes: Buffer.byteLength(seedTranscript()) };
+}
+
+async function getA(path) {
+  const response = await fetch(`http://127.0.0.1:${PORT_A}${path}`);
+  return { status: response.status, body: Buffer.from(await response.arrayBuffer()), type: response.headers.get('content-type') };
+}
+
+async function postA(path, body) {
+  const response = await fetch(`http://127.0.0.1:${PORT_A}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  return { status: response.status, json: await response.json().catch(() => null) };
+}
+
+async function conversationSteps(selfB) {
+  const linkedName = `@${selfB.environmentId}/${SEED.name}`;
+  const linkedPath = `/api/conversations/${encodeURIComponent(linkedName)}`;
+  const seeded = await step('seed', () => seedConversations(selfB));
+  log(`B transcript ${seeded.transcriptBytes} bytes; A holds saved copy vault-${SEED.vaultId}`);
+
+  await step('list', () => pollUntil(`A lists ${linkedName}`, 45_000, async () => {
+    const rows = JSON.parse((await getA('/api/conversations')).body.toString());
+    const linked = rows.filter((row) => row.name === linkedName);
+    const copies = rows.filter((row) => row.name === `vault-${SEED.vaultId}`);
+    const detail = `${linked.length} linked row(s), ${copies.length} saved-copy row(s)`;
+    if (linked.length !== 1) return { ok: false, detail };
+    if (copies.length !== 0 || linked[0].savedCopyName !== `vault-${SEED.vaultId}`) throw new Error(`not one row per conversation: ${detail}, savedCopyName ${linked[0].savedCopyName}`);
+    log(`${linkedName} listed once (machine ${linked[0].machineLabel}, ${linked[0].machineState}, saved copy ${linked[0].savedCopyName})`);
+    return { ok: true, value: linked[0] };
+  }));
+
+  await step('open-budget', async () => {
+    const before = fromB.bytes;
+    const opened = await getA(`${linkedPath}/messages`);
+    const moved = fromB.bytes - before;
+    if (opened.status !== 200) throw new Error(`open answered ${opened.status}: ${opened.body.toString().slice(0, 200)}`);
+    log(`open moved ${moved} bytes B->A (budget ${OPEN_BUDGET_BYTES}; transcript ${seeded.transcriptBytes})`);
+    if (moved > OPEN_BUDGET_BYTES) throw new Error(`open moved ${moved} bytes, over the ${OPEN_BUDGET_BYTES}-byte budget`);
+    if (moved === 0) throw new Error('nothing crossed the proxy; the open did not use the pairing route');
+  });
+
+  await step('image', async () => {
+    const image = await getA(`${linkedPath}/attachments/shot.png`);
+    if (image.status !== 200 || !image.body.equals(seeded.png)) throw new Error(`attachment answered ${image.status} with ${image.body.length} bytes (${image.type})`);
+    log(`attachment matched B's ${seeded.png.length} bytes (${image.type})`);
+  });
+
+  await step('tell-once', async () => {
+    const target = linkedName;
+    const first = await cliRaw('a', ['tell', target, 'smoke hello', '--message-id', 'smoke1']);
+    const second = await cliRaw('a', ['tell', target, 'smoke hello', '--message-id', 'smoke1']);
+    if (first.code !== second.code || first.stdout !== second.stdout || first.stderr !== second.stderr) {
+      throw new Error(`a repeated id got a different answer: ${JSON.stringify([first, second])}`);
+    }
+    const other = await cliRaw('a', ['tell', target, 'different text', '--message-id', 'smoke1']);
+    if (!/belongs to a different send/.test(other.stderr)) throw new Error(`B's receipt store did not hold smoke1: ${other.stderr || other.stdout}`);
+    log(`repeat answered the same (exit ${first.code}: ${(first.stdout || first.stderr).trim().split('\n')[0]}); other text refused by the receipt`);
+  });
+
+  await step('released-409', async () => {
+    const b = openDb('b');
+    b.prepare('UPDATE conversations SET released_to = ? WHERE name = ?').run('env-elsewhere', SEED.name);
+    b.close();
+    const answer = await postA(`${linkedPath}/message`, { message: 'after release', clientMessageId: 'smoke-released' });
+    if (answer.status !== 409 || answer.json?.code !== 'conversation-released') throw new Error(`answered ${answer.status} ${JSON.stringify(answer.json)}`);
+    const b2 = openDb('b');
+    b2.prepare('UPDATE conversations SET released_to = NULL WHERE name = ?').run(SEED.name);
+    b2.close();
+    log(`409 conversation-released: ${answer.json.error}`);
+  });
+
+  await step('forward', async () => {
+    const dev = createHttpServer((_request, response) => response.end('hello from b'));
+    await new Promise((done) => dev.listen(0, '127.0.0.1', done));
+    running.dev = dev;
+    const devPort = dev.address().port;
+    const forward = await cli('a', ['machines', 'forward', selfB.environmentId, String(devPort), '--json']);
+    const body = await (await fetch(forward.url)).text();
+    if (body !== 'hello from b') throw new Error(`forward ${forward.url} answered ${JSON.stringify(body)}`);
+    log(`forward b:${devPort} -> ${forward.url} relayed the page`);
+    await cliRaw('a', ['machines', 'forward', '--stop', forward.id]);
+    const refused = await cliRaw('a', ['machines', 'forward', selfB.environmentId, String(PORT_B)]);
+    if (refused.code === 0 || !/cannot be forwarded|port-refused/.test(refused.stderr)) throw new Error(`a forward to B's dashboard port was not refused: ${refused.stderr || refused.stdout}`);
+    log(`a forward to B's dashboard port :${PORT_B} was refused`);
+  });
+
+  if (LIVE_CLAUDE) await liveClaudeSteps(selfB);
+}
+
+/**
+ * --live-claude: a real Claude Code conversation on B. `remote-reply` sends from A and
+ * waits for the assistant's answer on A; `pull` makes an uncommitted change in its
+ * checkout, pulls it to A with `pan conv pull`, and checks B now refuses messages.
+ * Costs real model usage and starts a real harness session.
+ */
+async function liveClaudeSteps(selfB) {
+  const liveCwd = resolve(HOMES.b, 'live-project');
+  const git = (...args) => execFileAsync('git', args, { cwd: liveCwd });
+  let linkedName = '';
+  let ownerName = '';
+
+  await step('remote-reply', async () => {
+    mkdirSync(liveCwd, { recursive: true });
+    writeFileSync(resolve(liveCwd, 'README.md'), 'smoke\n');
+    await git('init', '-q');
+    await git('-c', 'user.email=smoke@overdeck.invalid', '-c', 'user.name=smoke', 'commit', '-q', '--allow-empty', '-m', 'init');
+    await git('add', 'README.md');
+    await git('-c', 'user.email=smoke@overdeck.invalid', '-c', 'user.name=smoke', 'commit', '-q', '-m', 'readme');
+    const created = await fetch(`http://127.0.0.1:${PORT_B}/api/conversations`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'Answer with one short line: hello.', cwd: liveCwd }),
+    });
+    const conv = await created.json();
+    if (!created.ok || !conv?.name) throw new Error(`B could not start a conversation: ${created.status} ${JSON.stringify(conv)}`);
+    ownerName = conv.name;
+    linkedName = `@${selfB.environmentId}/${ownerName}`;
+    await pollUntil(`A lists ${linkedName}`, 90_000, async () => {
+      const rows = JSON.parse((await getA('/api/conversations')).body.toString());
+      return rows.some((row) => row.name === linkedName) ? { ok: true, value: true } : { ok: false, detail: 'not listed yet' };
+    });
+    // The answer (9300) never appears in the question, so finding it proves the reply came back.
+    const sent = await postA(`/api/conversations/${encodeURIComponent(linkedName)}/message`, { message: 'What is 4650 doubled? Answer with the number only.', clientMessageId: 'smoke-live-1' });
+    if (sent.status >= 400) throw new Error(`send through A answered ${sent.status} ${JSON.stringify(sent.json)}`);
+    await pollUntil('the reply on A', 240_000, async () => {
+      const page = await getA(`/api/conversations/${encodeURIComponent(linkedName)}/messages`);
+      return page.body.toString().includes('9300') ? { ok: true, value: true } : { ok: false, detail: `status ${page.status}` };
+    });
+    log(`${linkedName} answered through A`);
+  });
+
+  await step('pull', async () => {
+    writeFileSync(resolve(liveCwd, 'uncommitted.txt'), 'pulled with the conversation\n');
+    const pulled = await cliRaw('a', ['conv', 'pull', linkedName, '--stop-turn', '--json'], 35 * 60_000);
+    const job = JSON.parse(pulled.stdout.trim().split('\n').filter((line) => line.startsWith('{')).pop() ?? '{}');
+    if (pulled.code !== 0 || job.state !== 'done') throw new Error(`pan conv pull failed: ${pulled.stderr || pulled.stdout}`);
+    const a = openDb('a');
+    const row = a.prepare('SELECT cwd FROM conversations WHERE name = ?').get(job.conversation.name);
+    a.close();
+    if (!row || readFileSync(resolve(row.cwd, 'uncommitted.txt'), 'utf8') !== 'pulled with the conversation\n') {
+      throw new Error(`the uncommitted change is not in A's checkout ${row?.cwd}`);
+    }
+    const refused = await fetch(`http://127.0.0.1:${PORT_B}/api/conversations/${encodeURIComponent(ownerName)}/message`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: 'still there?' }),
+    });
+    const body = await refused.json().catch(() => null);
+    if (refused.status !== 409 || body?.code !== 'conversation-released') throw new Error(`B answered ${refused.status} ${JSON.stringify(body)} after the pull`);
+    log(`pulled to A as ${job.conversation.name} (cwd ${row.cwd}); B answers 409 conversation-released`);
+    // Leave no Claude session running behind the smoke.
+    await fetch(`http://127.0.0.1:${PORT_A}/api/conversations/${encodeURIComponent(job.conversation.name)}/stop`, { method: 'POST' }).catch(() => undefined);
+  });
+}
+
 async function cleanup() {
   for (const socket of running.proxySockets) socket.destroy();
   running.proxySockets.clear();
   if (running.proxy) await new Promise((done) => running.proxy.close(() => done()));
   running.proxy = null;
+  if (running.dev) await new Promise((done) => running.dev.close(() => done()));
+  running.dev = null;
+  // --live-claude seeds into the real ~/.claude; remove only the smoke project's directory.
+  if (LIVE_CLAUDE) {
+    const { dir } = seedTranscriptPath();
+    if (/-tmp-anywhere-b-project$/.test(dir)) rmSync(dir, { recursive: true, force: true });
+  }
   await Promise.all([...running.servers.keys()].map((name) => stopServer(name)));
 }
 
@@ -230,6 +493,8 @@ async function main() {
     }
     return { ok: false, detail };
   }));
+
+  await conversationSteps(selfB);
 
   await step('kill B', async () => {
     const child = running.servers.get('b');
