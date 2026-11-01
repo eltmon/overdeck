@@ -77,12 +77,13 @@ if [ "${OVERDECK_BARE_CONTEXT:-}" = "1" ]; then
   exit 0
 fi
 
-INTERNAL_TOKEN="${OVERDECK_INTERNAL_TOKEN:-}"
+INTERNAL_TOKEN=""
+TOKEN_PATH="${OVERDECK_HOME:-$HOME/.overdeck}/internal-token"
+if [ -f "$TOKEN_PATH" ]; then
+  INTERNAL_TOKEN=$(cat "$TOKEN_PATH" 2>/dev/null || true)
+fi
 if [ -z "$INTERNAL_TOKEN" ]; then
-  TOKEN_PATH="${OVERDECK_HOME:-$HOME/.overdeck}/internal-token"
-  if [ -f "$TOKEN_PATH" ]; then
-    INTERNAL_TOKEN=$(cat "$TOKEN_PATH" 2>/dev/null || true)
-  fi
+  INTERNAL_TOKEN="${OVERDECK_INTERNAL_TOKEN:-}"
 fi
 
 MEMORY_BRIEFING=""
