@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4644",
   "created": "2026-11-01T04:54:46.297Z",
-  "updated": "2026-11-01T05:04:04.271Z",
+  "updated": "2026-11-01T05:04:17.840Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4644",
       "claimedAt": "2026-11-01T04:58:22.013Z",
       "doneAt": "2026-11-01T05:04:04.270Z"
+    },
+    "config-color-theme": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4644",
+      "claimedAt": "2026-11-01T05:04:17.840Z"
     }
   }
 }
