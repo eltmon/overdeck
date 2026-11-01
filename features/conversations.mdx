@@ -293,6 +293,51 @@ they stay with this conversation — a handoff or fork does not copy them. If
 a bookmarked message is no longer in the loaded transcript, its row in the
 list shows "This message is not in the loaded transcript."
 
+## Scheduled runs
+
+A schedule sends a stored prompt to a conversation on a recurring timetable,
+for example every evening at 21:00. Overdeck keeps the schedule and fires it
+from the dashboard, so it keeps working after the agent's session stops and
+after the dashboard restarts. A harness's own wakeup or cron tools stop when
+its process stops; a schedule does not.
+
+```bash
+pan conv schedule add self --daily 21:00 --prompt "Summarize today's merged PRs"
+pan conv schedule list
+pan conv schedule pause 3
+pan conv schedule resume 3
+pan conv schedule rm 3
+```
+
+`<conv>` is `self` (also `.`, `current` or `me`) when you run the command
+inside a conversation, a conversation number (the `/conv/<n>` id), a name, or
+a unique title match. Pass exactly one recurrence:
+
+- `--hourly` runs on the hour.
+- `--daily HH:MM`, `--weekdays HH:MM` (Monday to Friday) and `--weekly "mon 09:00"` use a 24-hour time.
+- `--cron "<expr>"` takes a standard 5-field cron expression (`minute hour day-of-month month day-of-week`). Six- and seven-field patterns and nicknames such as `@daily` are refused.
+
+Pass the prompt with `--prompt` or `--prompt-file`. The schedule runs in the
+time zone given by `--tz` (an IANA zone such as `America/New_York`); without
+it, the zone of the machine that creates the schedule is stored on the
+schedule. Runs must be at least 15 minutes apart, so a frontier-model
+conversation cannot be sent a prompt every minute. Add `--paused` to create a
+schedule without arming it.
+
+How a schedule fires:
+
+- While the dashboard runs, a due schedule fires within a minute of its time. The prompt arrives with a `[Scheduled run · schedule <id> · <cron> · <zone>]` header so the agent knows why it arrived.
+- If the conversation's session has stopped, Overdeck resumes it first, then delivers the prompt. The run uses the conversation's current model and effort.
+- If the dashboard was down across several run times, the schedule fires once when it comes back, not once per missed time.
+- A paused schedule never fires. Resuming it computes the next run from now, so it does not catch up on runs missed while paused.
+- A schedule on an archived conversation is skipped and moves to its next run. Unarchiving does not trigger a catch-up run.
+- A failed run (for example, the agent is waiting on a permission answer) is recorded and is not retried. `pan conv schedule list` shows the last outcome and error.
+
+Agent conversations and Session Vault browse copies cannot be scheduled, and
+a conversation can hold at most 20 schedules. The schedule dialog in the
+conversation menu and the next-run badge on the conversation row arrive with
+[#4657](https://github.com/eltmon/overdeck/issues/4657).
+
 ## Why hand off?
 
 A conversation accumulates context as it works: dead ends it already ruled out,

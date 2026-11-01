@@ -345,3 +345,32 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - PAN-4666 (needs-handoff): flywheel status drops agents whose Herdr pane says
   `done` (turn finished, process alive). Confirm liveness with
   `pan show <id> --health`, never the status list, before any respawn.
+- 2026-11-01 06:15 UTC: PAN-4669 (needs-handoff): `idle-stack-reaper.ts`
+  line 166 checks tmux sessions only, so on Herdr it stops every running
+  agent's server/frontend containers after 10 min. Same class as PAN-4666
+  (liveness decided outside `liveness.ts`). The dashboard offered "Start" on
+  PAN-4643 while agent-pan-4643 was working, and the click failed with
+  "Invalid CSRF token"; cause not yet found (token derivation is stable,
+  dashboard not restarted since 2026-10-26). Operator also asked: deploy
+  #4637 (7c97ec4ddaa) via `pan reload` on green main CI and verify
+  buildCommit; track PAN-4626 (agent started by the operator).
+- 2026-11-01 06:10 UTC: the PAN-4643 "Start work" + "Invalid CSRF token" was
+  the simple-mode issue page: `postJson` in `lib/simple/useSimpleActions.ts`
+  sends no CSRF header (every simple action 403s), and `isPlanReadyToStart`
+  (`lib/simple/derive.ts`) lets an idle, finished planner override a running
+  work agent. Filed and started PAN-4670. `pan reload` builds into the idle
+  generation, then waits for `pan restart approve` from the operator; the
+  reload process exits after the build, so check `/api/health` buildCommit
+  with `git merge-base --is-ancestor` before calling it deployed.
+- 2026-11-01 06:25 UTC: operator rule (memory `coderabbit-advisory-not-blocking`):
+  review CodeRabbit findings when it posts; when rate-limited or silent, merge
+  without it. The review context ingests CodeRabbit only at review start, so
+  check for newer coderabbitai[bot] inline comments before every merge
+  (PAN-4671, needs-handoff). Missed findings on #4662/#4637 → PAN-4672.
+- 2026-11-01 06:35 UTC: PAN-4675 (needs-handoff). A `gh` network timeout in
+  `addLabel` (`merge-agent.ts` ~line 500, `Effect.promise`) aborted
+  PAN-4299's post-merge lifecycle after the merge door had merged it; the
+  door then answers "Already merged". Instance recovery: `pan kill <id>`
+  (stops agent and stack), then `pan close <id> --force` passed with no
+  override. `pan close` blocks on a confirmation prompt: always pass
+  `--force` and `< /dev/null` from the loop.
