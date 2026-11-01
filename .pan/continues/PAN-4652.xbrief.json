@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T19:20:25.386Z",
+  "updated": "2026-11-01T19:20:30.678Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
       "claimedBy": "agent-pan-4652",
       "claimedAt": "2026-11-01T19:15:46.122Z",
       "doneAt": "2026-11-01T19:20:25.386Z"
+    },
+    "wi12-credential-refresh-fly": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:20:30.678Z"
     }
   }
 }
