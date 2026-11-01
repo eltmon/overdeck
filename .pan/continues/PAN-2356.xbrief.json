@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:35:53.123Z",
+  "updated": "2026-11-01T14:36:59.098Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -300,6 +300,11 @@
     "wi14-approval-service.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:35:53.122Z"
+    },
+    "wi17-relay-client": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:36:59.098Z"
     }
   }
 }
