@@ -392,3 +392,11 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   Recovery: confirm the only dirty file is the continue file, commit it as
   bookkeeping on the feature branch, push, `pan review request <id>` (re-runs
   verification). Hit PAN-4643 and PAN-4626.
+- 2026-11-01 08:05 UTC: PAN-4690 is a chain, not one bug. Reaper (PAN-4669)
+  stops server/frontend → review spawn rebuilds the stack before spawning the
+  reviewer and the rebuild hangs (containers "stuck Created") → review never
+  dispatches → deacon re-request blocked by the continue file that
+  `clearFeedbackForIssue` dirties on every dispatch (`writeContinueState`
+  always bumps `updated`). Hit 4643, 4626, 2354, 4330. The commit-and-rerequest
+  recovery only works when the stack is healthy at dispatch; until PAN-4669 and
+  PAN-4690 land, every review is at risk.
