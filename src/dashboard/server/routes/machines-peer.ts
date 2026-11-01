@@ -12,24 +12,16 @@ import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { type AdvertisedEndpoint, ROUTE_KINDS } from '@overdeck/contracts';
 
-import {
-  createAccessToken,
-  listActiveRecordsOfKind,
-  MACHINE_ACCESS_LEVELS,
-  MACHINE_TOKEN_SCOPES,
-  type MachineAccess,
-  revokeAccessToken,
-} from '../../../lib/access-tokens.js';
-import { upsertLink } from '../../../lib/anywhere/link-store.js';
-import { type LinkRoute, mergeAdvertised } from '../../../lib/anywhere/routes.js';
+import { MACHINE_ACCESS_LEVELS, type MachineAccess } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
 import { endStreamOnDeviceRevocation } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
+import { currentApprovalService } from '../services/directory-approval.js';
 import { startHeartbeatSource } from '../services/link-heartbeat.js';
+import { grantMachineLink, GrantMachineLinkError } from '../services/machine-link-grant.js';
 import { resolveRequestCredential } from './dashboard-auth.js';
 import { buildEnvironmentDescriptor } from './environment.js';
-import { notifyLinksChanged } from './machines.js';
 import { getOverdeckVersion } from './misc/shared.js';
 
 const MAX_LABEL_LENGTH = 200;
@@ -83,42 +75,20 @@ export async function handleMachinesExchange(
   const body = parseExchangeBody(bodyText);
   if (typeof body === 'string') return jsonResponse({ error: body }, { status: 400 });
 
-  // D-4645-18: one active machine token per peer environment.
-  for (const previous of listActiveRecordsOfKind('machine')) {
-    if (previous.environmentId === body.environmentId) await revokeAccessToken(previous.id);
-  }
-  const { token, record } = await createAccessToken({
-    name: `machine:${body.label}`,
-    kind: 'machine',
-    scopes: MACHINE_TOKEN_SCOPES(body.access),
-    machineKey: channel.remoteKeyHex,
-    environmentId: body.environmentId,
-    access: body.access,
-  });
-
-  let reverseLinkId: string | null = null;
-  if (body.reverse) {
-    const now = new Date().toISOString();
-    let routes: LinkRoute[];
-    try {
-      routes = mergeAdvertised([], body.reverse.endpoints, () => now);
-    } catch (error) {
-      await revokeAccessToken(record.id);
-      return jsonResponse({ error: `reverse.endpoints: ${(error as Error).message}` }, { status: 400 });
-    }
-    const { link, replaced } = await upsertLink({
+  let granted;
+  try {
+    granted = await grantMachineLink({
       environmentId: body.environmentId,
       label: body.label,
-      machineKey: channel.remoteKeyHex,
-      token: body.reverse.token,
+      peerKeyHex: channel.remoteKeyHex,
       access: body.access,
-      reverseTokenId: record.id,
-      routes,
+      reverse: body.reverse,
     });
-    if (replaced?.reverseTokenId && replaced.reverseTokenId !== record.id) await revokeAccessToken(replaced.reverseTokenId).catch(() => null);
-    reverseLinkId = link.id;
-    notifyLinksChanged();
+  } catch (error) {
+    if (error instanceof GrantMachineLinkError) return jsonResponse({ error: error.message }, { status: 400 });
+    throw error;
   }
+  const { token, record, reverseLinkId } = granted;
 
   emitActivityEntry({
     source: 'dashboard',
@@ -138,6 +108,28 @@ const exchangeRoute = HttpRouter.add(
     const channel = channelOfRequest(request);
     const text = yield* request.text;
     return yield* Effect.promise(() => handleMachinesExchange(text, channel));
+  }),
+);
+
+/**
+ * `POST /api/machines/approval-exchange` (PAN-2356 WI-14): the approver's half of a two-screen
+ * approval. Reachable only through an approval-mode channel (the request gate refuses every other
+ * socket, and the service checks the marker again).
+ */
+const approvalExchangeRoute = HttpRouter.add(
+  'POST',
+  '/api/machines/approval-exchange',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const channel = channelOfRequest(request);
+    if (channel?.mode !== 'approval') {
+      return jsonResponse({ error: 'the approval exchange is accepted only inside an approval channel' }, { status: 403 });
+    }
+    const service = currentApprovalService();
+    if (!service) return jsonResponse({ error: 'approval-refused' }, { status: 403 });
+    const text = yield* request.text;
+    const answer = yield* Effect.promise(() => service.handleExchange(text, channel));
+    return jsonResponse(answer.json, { status: answer.status });
   }),
 );
 
@@ -191,4 +183,4 @@ const heartbeatRoute = HttpRouter.add(
   }),
 );
 
-export const machinesPeerRouteLayer = Layer.mergeAll(exchangeRoute, heartbeatRoute);
+export const machinesPeerRouteLayer = Layer.mergeAll(exchangeRoute, approvalExchangeRoute, heartbeatRoute);

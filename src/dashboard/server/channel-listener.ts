@@ -50,6 +50,10 @@ export interface ChannelListenerDeps {
   onPairingFailure: () => void;
   /** Reported inside refusal `02`. */
   serverVersion?: () => Promise<string>;
+  /** Approval mode (PAN-2356): accept one channel for this machine's own live request id. */
+  takeApproval?: (requestId: string) => boolean;
+  /** Approval mode: the accepted channel, so the requester can show its SAS. */
+  onApprovalChannel?: (channel: ChannelSocket) => void;
   maxPending?: number;
   log?: (message: string) => void;
 }
@@ -143,11 +147,13 @@ export function installChannelListener(nodeServer: HttpServer, deps: ChannelList
         isPinnedPeer: deps.isPinnedPeer,
         takePairing: deps.takePairing,
         onPairingFailure: deps.onPairingFailure,
+        takeApproval: deps.takeApproval,
         serverVersion,
       });
       resume();
       const channel = await channelPromise;
       track(channel);
+      if (channel.channel.mode === 'approval') deps.onApprovalChannel?.(channel);
       toHttp(channel);
     } catch (error) {
       const code = (error as { code?: string }).code ?? 'error';

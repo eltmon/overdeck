@@ -27,6 +27,17 @@ export const DirectoryMachineView = Schema.Struct({
 })
 export type DirectoryMachineView = typeof DirectoryMachineView.Type
 
+/**
+ * Approver side: `pending` (request arrived), `open` (approval channel open, SAS known),
+ * `approving` (this operator approved; waiting for the other machine to accept), `failed`.
+ */
+export const DirectoryApprovalState = Schema.Literals(["pending", "open", "approving", "failed"])
+export type DirectoryApprovalState = typeof DirectoryApprovalState.Type
+
+/** Requester side: `waiting` (no approver yet), `open` (SAS known), `accepted`, `rejected`. */
+export const DirectoryJoinState = Schema.Literals(["waiting", "open", "accepted", "rejected"])
+export type DirectoryJoinState = typeof DirectoryJoinState.Type
+
 /** An incoming approval request: another machine asks to link with this one. */
 export const DirectoryApprovalView = Schema.Struct({
   requestId: Schema.String,
@@ -38,6 +49,9 @@ export const DirectoryApprovalView = Schema.Struct({
   expiresAt: Schema.Number,
   /** Six-digit code, set once the approval channel is open. */
   sas: Schema.NullOr(Schema.String),
+  state: DirectoryApprovalState,
+  /** Why the approval failed, when `state` is `failed`. */
+  error: Schema.NullOr(Schema.String),
 })
 export type DirectoryApprovalView = typeof DirectoryApprovalView.Type
 
@@ -52,6 +66,7 @@ export const DirectoryJoinView = Schema.Struct({
   sas: Schema.NullOr(Schema.String),
   /** The approver's fingerprint, from the handshake key (never from the directory). */
   fingerprint: Schema.NullOr(Schema.String),
+  state: DirectoryJoinState,
 })
 export type DirectoryJoinView = typeof DirectoryJoinView.Type
 

@@ -5,8 +5,9 @@
  * offer, answer and ICE candidates, and `ice-servers` frames fetch STUN servers (direct) or TURN
  * credentials (relay). It registers the dialer that `openChannel('rtc://<id>')` uses and routes
  * every incoming `link` data channel into the channel listener's handshake, so a WebRTC path is one
- * more transport under the same secure channel. Incoming `approval` channels go to the approval
- * service (WI-14) through `setIncomingApprovalChannel`.
+ * more transport under the same secure channel. Incoming `approval` data channels take the same
+ * path: the listener runs the approval handshake only for this machine's own live request id
+ * (`takeApproval`, WI-14).
  */
 import { randomBytes } from 'node:crypto';
 import type { Duplex } from 'node:stream';
@@ -24,15 +25,6 @@ export interface DirectoryPort {
   on<T extends DirectoryToMachineFrame['type']>(type: T, handler: (frame: Extract<DirectoryToMachineFrame, { type: T }>) => void): () => void;
   isOnline(): boolean;
   machine(environmentId: string): DirectoryMachine | null;
-}
-
-export type IncomingApprovalChannel = (raw: Duplex, from: string) => void;
-
-let incomingApproval: IncomingApprovalChannel = (raw) => raw.destroy();
-
-/** The approval service receives incoming `approval` data channels here. */
-export function setIncomingApprovalChannel(handler: IncomingApprovalChannel | null): void {
-  incomingApproval = handler ?? ((raw) => raw.destroy());
 }
 
 /** Asks the directory for ICE servers and waits for the matching answer or refusal. */
@@ -79,10 +71,8 @@ export interface DirectoryRtc {
 
 /** The transport and its dialer for one directory connection. */
 export function createDirectoryRtc(directory: DirectoryPort, acceptLink: (raw: Duplex) => void = (raw) => void acceptRawChannel(raw)): DirectoryRtc {
-  const transport = new RtcTransport(directorySignalingPort(directory), (raw, purpose, from) => {
-    if (purpose === 'link') acceptLink(raw);
-    else incomingApproval(raw, from);
-  });
+  // Link and approval channels both run the listener's handshake; the preamble picks the mode.
+  const transport = new RtcTransport(directorySignalingPort(directory), (raw) => acceptLink(raw));
   // A `peer_offline` answer fails the pending dial at once instead of at the open timeout.
   const offError = directory.on('error', (frame) => {
     if (frame.code === 'peer_offline' && frame.session) transport.abortSession(frame.session);

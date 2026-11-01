@@ -42,9 +42,11 @@ const sample = {
       fingerprint: "cdcd-cdcd-cdcd-cdcd-cdcd",
       expiresAt: 1_793_000_000_000,
       sas: "123 456",
+      state: "open",
+      error: null,
     },
   ],
-  joins: [{ requestId: "1".repeat(32), to: null, expiresAt: 1_793_000_000_000, sas: null, fingerprint: null }],
+  joins: [{ requestId: "1".repeat(32), to: null, expiresAt: 1_793_000_000_000, sas: null, fingerprint: null, state: "waiting" }],
   relay: { month: "2026-11", bytesUsed: 12_345_000_000, capBytes: RELAY_MONTHLY_CAP_BYTES, stopped: false },
 }
 

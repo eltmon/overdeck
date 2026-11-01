@@ -17,6 +17,7 @@ import { ensureMachineKey } from '../../../lib/anywhere/machine-key.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { setLinkStatusSource, setPeerUnlinkNotifier } from '../routes/machines.js';
 import { getOverdeckVersion } from '../routes/misc/shared.js';
+import { defaultApprovalDeps, DirectoryApprovalService, setApprovalService } from './directory-approval.js';
 import { DirectoryClient, defaultOpenSocket, setDirectoryClient } from './directory-client.js';
 import { directoryRoutesFor } from './directory-routes.js';
 import { startDirectoryRtc, stopDirectoryRtc } from './directory-rtc.js';
@@ -26,6 +27,7 @@ import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js'
 let supervisor: LinkSupervisor | null = null;
 let advertiser: EndpointAdvertiser | null = null;
 let directory: DirectoryClient | null = null;
+let approvals: DirectoryApprovalService | null = null;
 let reconcileTimer: NodeJS.Timeout | null = null;
 
 /** The port this dashboard listens on, by the same rule as ServerConfig. */
@@ -69,6 +71,11 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   // WI-11: `rtc://` and `rtc+turn://` routes dial through the directory; incoming data channels
   // run the same secure-channel handshake as TCP.
   startDirectoryRtc(directory);
+  // WI-14: two-screen approvals; their views ride in GET /api/directory.
+  approvals = new DirectoryApprovalService(defaultApprovalDeps(directory, () => advertiser?.current() ?? []));
+  setApprovalService(approvals);
+  const approvalViews = approvals;
+  directory.setApprovalViews(() => approvalViews.views());
 
   supervisor = new LinkSupervisor({
     ...defaultLinkSupervisorDeps(serverVersion),
@@ -98,7 +105,11 @@ export function stopAnywhere(): void {
   reconcileTimer = null;
   supervisor?.stop();
   supervisor = null;
+  approvals?.stop();
+  approvals = null;
+  setApprovalService(null);
   stopDirectoryRtc();
+  directory?.setApprovalViews(null);
   directory?.stop();
   directory = null;
   setDirectoryClient(null);
