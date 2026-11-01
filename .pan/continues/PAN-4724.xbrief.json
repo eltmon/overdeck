@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4724",
   "created": "2026-11-01T16:06:34.998Z",
-  "updated": "2026-11-01T16:26:23.405Z",
+  "updated": "2026-11-01T16:26:37.957Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "rollup-bench.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T16:26:23.405Z"
+    },
+    "rollup-bench.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:26:37.957Z"
     }
   }
 }
