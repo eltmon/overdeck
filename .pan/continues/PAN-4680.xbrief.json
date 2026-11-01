@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4680",
   "created": "2026-11-01T07:24:32.678Z",
-  "updated": "2026-11-01T09:29:03.924Z",
+  "updated": "2026-11-01T09:29:18.790Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "queue-rejection-test.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T09:29:03.924Z"
+    },
+    "docs-ledger-order.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:29:18.790Z"
     }
   }
 }
