@@ -515,6 +515,21 @@ door that does not exist; a real record read door would be a separate change.
   composer thumbnail and the sent-message thumbnails open one shared lightbox
   (`components/chat/ImageLightbox.tsx`, host mounted in `main.tsx`); sent-message
   thumbnails come from `extractAttachmentImageRefs()` in `messagesTimeline/helpers.ts`.
+- Composer citations (PAN-4642): `lib/citationFormat.ts` is the exact serializer
+  (`formatCitationBlock`/`composePromptWithCitations`) — client-side only, identical
+  for every harness, no server route changed. `lib/composerCitations.ts` persists
+  each conversation's pending list to `localStorage` under `conv-citations:<name>`;
+  `PendingCitation.source` is a discriminated union (`{ kind: 'message'; messageId;
+  role }` today) shared with #2685's future preview-element kind. `components/chat/
+  citations/` holds the selection toolbar (`CiteSelectionToolbar.tsx`), the chips
+  strip (`CitationChips.tsx`), and the best-effort quote highlight
+  (`citationHighlight.ts`, the CSS Custom Highlight API). Rows opt in via
+  `data-cite-message-id`/`data-cite-role` (set only on settled, non-streaming rows in
+  `messagesTimeline/messageRows.tsx`), and `resolveSelectionCitation()` maps a DOM
+  selection back to one when both ends land in the same tagged row. On send the
+  pending list is consumed only after the message has committed to a delivery lane
+  (bubble, hold, offline hold, or outbox) — so a failed send keeps the citation block
+  in the retry outbox instead of losing it.
 - Conversation timeline layout (PAN-4497): `MessagesTimeline.tsx` virtualizes all but
   the last 8 rows with `@tanstack/react-virtual`. Visible virtual rows render in normal
   flow inside one wrapper translated to the first visible row's offset, so rows cannot
