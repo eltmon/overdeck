@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4404",
+  "created": "2026-11-01T13:29:30.411Z",
+  "updated": "2026-11-01T13:29:30.411Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-contracts": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:29:30.411Z"
+    }
+  }
+}
