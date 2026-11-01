@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T19:29:40.062Z",
+  "updated": "2026-11-01T19:51:10.367Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,11 @@
       "claimedBy": "agent-pan-4652",
       "claimedAt": "2026-11-01T19:28:40.604Z",
       "doneAt": "2026-11-01T19:29:40.062Z"
+    },
+    "wi14-live-checkpoint": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:51:10.366Z"
     }
   }
 }
