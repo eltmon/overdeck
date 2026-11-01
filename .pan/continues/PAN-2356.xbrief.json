@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T15:08:31.119Z",
+  "updated": "2026-11-01T15:09:59.314Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -474,6 +474,11 @@
     "wi23-docs-dev.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T15:08:31.118Z"
+    },
+    "wi24-anywhere-page": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T15:09:59.313Z"
     }
   }
 }
