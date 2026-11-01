@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2354",
   "created": "2026-11-01T05:46:47.920Z",
-  "updated": "2026-11-01T07:32:27.148Z",
+  "updated": "2026-11-01T07:32:46.549Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -248,6 +248,10 @@
     "dispatcher.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T07:32:27.147Z"
+    },
+    "dispatcher.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:32:46.548Z"
     }
   }
 }
