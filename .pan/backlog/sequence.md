@@ -1,13 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T06:36:40Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-01T07:06:00Z · model: claude-opus-5-5 · open: 867_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
 | 2 | PAN-4639 | L | medium | ok |  |  | In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions. |
-| 3 | PAN-4640 | L | medium | ok |  | PAN-4639 | In pipeline: Overdeck-owned conversation schedules fired by a deacon-lite tick; resurfaces settled/snoozed rows (needs #4639). |
+| 3 | PAN-4677 | XS | low | ok |  |  | In pipeline: throwaway one-line task for the PAN-4295 live Fly smoke test; PR closed unmerged, never merge. |
 | 4 | PAN-4663 | XS | critical | ok |  |  | In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts |
 | 5 | PAN-4670 | S | high | ok |  |  | In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs. |
 | 6 | PAN-4672 | S | high | ok |  |  | In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout. |
@@ -179,7 +179,7 @@ _Last sequenced: 2026-11-01T06:36:40Z · model: claude-opus-5-5 · open: 869_
 | 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 178 | PAN-4655 | M | medium | ok |  | PAN-4639 | Ranked for readiness when #4639 merges: idle auto-settle after N days (default 3); supersedes the #1485 archive part. |
 | 179 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 180 | PAN-4657 | M | medium | ok |  | PAN-4640, PAN-4639 | Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; waits for in-pipeline #4640 and #4639. |
+| 180 | PAN-4657 | M | medium | ok |  | PAN-4639 | Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; #4640 merged, waits on in-pipeline #4639. |
 | 181 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
 | 182 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
 | 183 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
@@ -278,7 +278,6 @@ _Last sequenced: 2026-11-01T06:36:40Z · model: claude-opus-5-5 · open: 869_
 | 276 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 277 | PAN-4649 | M | medium | ok |  |  | Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending. |
 | 278 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650, PAN-4649 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
-| 279 | PAN-4647 | M | medium | ok |  |  | Auto-save pipeline agent transcripts to the Session Vault so linked machines can read them. Body pending. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
 | 282 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
@@ -320,7 +319,7 @@ _Last sequenced: 2026-11-01T06:36:40Z · model: claude-opus-5-5 · open: 869_
 | 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
 | 320 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
-| 322 | PAN-4330 | M | medium | ok |  | PAN-4297 | Sign-in client: pan account, Settings → Anywhere, device token; entry point for shared sessions and cross-machine continue |
+| 322 | PAN-4330 | M | medium | ok |  |  | Sign-in client: pan account, Settings → Anywhere, device token; entry point for shared sessions and cross-machine continue |
 | 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 324 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
 | 325 | PAN-4473 | M | medium | ok |  | PAN-4330 | Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service |
@@ -456,7 +455,7 @@ _Last sequenced: 2026-11-01T06:36:40Z · model: claude-opus-5-5 · open: 869_
 | 455 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 456 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
 | 457 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 458 | PAN-4402 | L | medium | ok |  |  | Anywhere desktop half: connection catalog, environment switcher, version gating; PAN-3762 server half has closed |
+| 458 | PAN-4405 | M | medium | ok |  |  | Aggregated cross-environment overview, Needs-You and search; unblocked now that the PAN-4402 desktop switcher has closed |
 | 459 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 460 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 461 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
@@ -494,7 +493,7 @@ _Last sequenced: 2026-11-01T06:36:40Z · model: claude-opus-5-5 · open: 869_
 | 493 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
 | 494 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
 | 495 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 496 | PAN-4404 | L | medium | ok |  | PAN-4402, PAN-4645 | Desktop-managed SSH launch and loopback forward for remote environments; the one SSH stack PAN-3863 builds on |
+| 496 | PAN-4404 | L | medium | ok |  | PAN-4645 | Desktop-managed SSH launch and loopback forward for remote environments; PAN-4402 closed, still waits on PAN-4645 |
 | 497 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
 | 498 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
 | 499 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
@@ -506,7 +505,6 @@ _Last sequenced: 2026-11-01T06:36:40Z · model: claude-opus-5-5 · open: 869_
 | 505 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
 | 506 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
 | 507 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 508 | PAN-4405 | M | medium | ok |  | PAN-4402 | Aggregated cross-environment overview, Needs-You and search, after the PAN-4402 switcher reaches parity |
 | 509 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
 | 510 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
 | 511 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
@@ -522,7 +520,7 @@ _Last sequenced: 2026-11-01T06:36:40Z · model: claude-opus-5-5 · open: 869_
 | 521 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
 | 522 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
 | 523 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 524 | PAN-3863 | L | medium | ok |  | PAN-4402, PAN-4404 | Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 and the PAN-4402 desktop catalog |
+| 524 | PAN-3863 | L | medium | ok |  | PAN-4404 | Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 (PAN-4402 catalog has closed) |
 | 525 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
 | 526 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
 | 527 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
@@ -885,9 +883,9 @@ New in-pipeline follow-up to the merged #4584 with a decided design, so it is pi
 
 New in-pipeline issue with a live workspace, so it is pinned near the top beside PAN-4626 per the in-pipeline rule; it also offers a non-destructive path for the idle cleanup asked in PAN-1485.
 
-### PAN-4640 (rank 3)
+### PAN-4677 (rank 3)
 
-New in-pipeline issue with a live workspace, pinned just below PAN-4639 because its resurfacing rule clears the snooze and settle states that PAN-4639 adds.
+New in-pipeline issue pinned at the free rank 3; it exists only to exercise PAN-4295 Fly remote execution end to end.
 
 ### PAN-4663 (rank 4)
 
@@ -1204,10 +1202,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T06:36:40Z",
+  "generatedAt": "2026-11-01T07:06:00Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 867,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -1236,17 +1234,15 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "planning": "auto"
     },
     {
-      "issue": "PAN-4640",
+      "issue": "PAN-4677",
       "rank": 3,
-      "size": "L",
-      "importance": "medium",
-      "score": 50,
+      "size": "XS",
+      "importance": "low",
+      "score": 20,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4639"
-      ],
-      "why": "In pipeline: Overdeck-owned conversation schedules fired by a deacon-lite tick; resurfaces settled/snoozed rows (needs #4639).",
-      "rationale": "New in-pipeline issue with a live workspace, pinned just below PAN-4639 because its resurfacing rule clears the snooze and settle states that PAN-4639 adds.",
+      "dependsOn": [],
+      "why": "In pipeline: throwaway one-line task for the PAN-4295 live Fly smoke test; PR closed unmerged, never merge.",
+      "rationale": "New in-pipeline issue pinned at the free rank 3; it exists only to exercise PAN-4295 Fly remote execution end to end.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1442,6 +1438,19 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "dependsOn": [],
       "why": "Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text",
       "rationale": "New operator-reported settings UI bug (substrate-improvement label sets a high floor): truncated model names make the operator misread which model is routed. Cause and fix are already identified in WorkhorsePanel.tsx, so it is a small, self-contained change; ranked just below the crew-removal bug because it misleads but does not block configuration.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4675",
+      "rank": 19,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close.",
+      "rationale": "New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network timeout becomes a defect that skips pausing agents and stopping the stack, and the merge door then refuses re-runs with Already merged. PAN-4299 is stuck half-closed right now, and pan close refuses on DoD row 5. Substrate bug with clear AC, so it slots into the free rank 19 beside the other merge and close-out fixes; it overlaps PAN-3557 (label retry), and fixing either should consult the other.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3457,11 +3466,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 45,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4640",
         "PAN-4639"
       ],
-      "why": "Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; waits for in-pipeline #4640 and #4639.",
-      "rationale": "New issue split from in-pipeline PAN-4640 with clear acceptance criteria; it ranks beside PAN-4653 and PAN-4655 because it becomes workable once PAN-4639 and PAN-4640 merge.",
+      "why": "Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; #4640 merged, waits on in-pipeline #4639.",
+      "rationale": "Rank held: dependency PAN-4640 closed as completed, leaving only in-pipeline PAN-4639 (snooze and settle) before this slice is workable.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4697,19 +4705,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "planning": "auto"
     },
     {
-      "issue": "PAN-4647",
-      "rank": 279,
-      "size": "M",
-      "importance": "medium",
-      "score": 46,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Auto-save pipeline agent transcripts to the Session Vault so linked machines can read them. Body pending.",
-      "rationale": "New Anywhere child; it builds on the existing Session Vault Phase A and the owner column from PAN-4645 (advisory). Body is still a placeholder.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2211",
       "rank": 280,
       "size": "M",
@@ -5223,9 +5218,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "importance": "medium",
       "score": 62,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4297"
-      ],
+      "dependsOn": [],
       "why": "Sign-in client: pan account, Settings → Anywhere, device token; entry point for shared sessions and cross-machine continue",
       "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
       "gate": "auto",
@@ -6908,18 +6901,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "planning": "auto"
     },
     {
-      "issue": "PAN-4402",
-      "rank": 458,
-      "size": "L",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Anywhere desktop half: connection catalog, environment switcher, version gating; PAN-3762 server half has closed",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3873",
       "rank": 459,
       "size": "M",
@@ -7380,10 +7361,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 48,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4402",
         "PAN-4645"
       ],
-      "why": "Desktop-managed SSH launch and loopback forward for remote environments; the one SSH stack PAN-3863 builds on",
+      "why": "Desktop-managed SSH launch and loopback forward for remote environments; PAN-4402 closed, still waits on PAN-4645",
+      "rationale": "Rank held; PAN-4402 closed as completed, but PAN-4645 is still open and still blocks this issue.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7522,15 +7503,14 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     },
     {
       "issue": "PAN-4405",
-      "rank": 508,
+      "rank": 458,
       "size": "M",
       "importance": "medium",
       "score": 46,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4402"
-      ],
-      "why": "Aggregated cross-environment overview, Needs-You and search, after the PAN-4402 switcher reaches parity",
+      "dependsOn": [],
+      "why": "Aggregated cross-environment overview, Needs-You and search; unblocked now that the PAN-4402 desktop switcher has closed",
+      "rationale": "Lifted from 508 into the slot PAN-4402 vacated: PAN-4402 closed as completed on 2026-11-01, so this issue has no open dependency left.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7729,11 +7709,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 45,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4402",
         "PAN-4404"
       ],
-      "why": "Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 and the PAN-4402 desktop catalog",
-      "rationale": "Rank held; PAN-3762 closed and its catalog and SSH-launch work moved to PAN-4402 and PAN-4404, so those replace it as dependencies.",
+      "why": "Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 (PAN-4402 catalog has closed)",
+      "rationale": "Rank held; PAN-4402 closed as completed, but the PAN-4404 SSH stack this builds on is still open.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12078,19 +12057,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4675",
-      "rank": 19,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close.",
-      "rationale": "New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network timeout becomes a defect that skips pausing agents and stopping the stack, and the merge door then refuses re-runs with Already merged. PAN-4299 is stuck half-closed right now, and pan close refuses on DoD row 5. Substrate bug with clear AC, so it slots into the free rank 19 beside the other merge and close-out fixes; it overlaps PAN-3557 (label retry), and fixing either should consult the other.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -12999,13 +12965,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     },
     {
       "from": "PAN-2350",
-      "to": "PAN-4402",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
       "to": "PAN-4403",
       "type": "contains",
       "source": "github-ref",
@@ -13050,13 +13009,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "from": "PAN-2350",
       "to": "PAN-4332",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4297",
-      "to": "PAN-4330",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13131,28 +13083,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 1
     },
     {
-      "from": "PAN-4402",
-      "to": "PAN-4404",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4402",
-      "to": "PAN-4405",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4404",
-      "to": "PAN-3863",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4402",
       "to": "PAN-3863",
       "type": "unblocks",
       "source": "github-ref",
@@ -13391,13 +13322,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     },
     {
       "from": "PAN-4639",
-      "to": "PAN-4640",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4639",
       "to": "PAN-1485",
       "type": "informs",
       "source": "github-ref",
@@ -13455,13 +13379,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     {
       "from": "PAN-2350",
       "to": "PAN-4646",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4647",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -13684,13 +13601,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 1
     },
     {
-      "from": "PAN-4640",
-      "to": "PAN-4657",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4639",
       "to": "PAN-4657",
       "type": "unblocks",
@@ -13787,6 +13697,13 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4677",
+      "to": "PAN-4295",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }

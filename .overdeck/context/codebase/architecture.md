@@ -207,6 +207,8 @@ terminal backends (`tests/unit/lib/vault/import-graph.test.ts`). PAN-4329 adds
 resolves config/key/store into a tagged state and prints nothing; `src/dashboard/server/services/vault-service.ts`
 runs every dashboard vault operation through one queue (`enqueueVaultOperation`) plus the sync loop
 (primary dashboard only, or `OVERDECK_VAULT_IN_PEER=1`); `routes/vault.ts` + Settings → Session Vault.
+PAN-4647: `vault-agent-subjects.ts` also lists pipeline agents inside their tracking window, so
+the settle poller auto-saves work/review/test/plan transcripts, not just managed conversations.
 
 ## Pull requests on conversations and issue rows (PAN-3822, PAN-4457)
 
