@@ -104,7 +104,7 @@ export const MachineLinkView = Schema.Struct({
   peerVersion: Schema.NullOr(Schema.String),
   createdAt: Schema.String,
   /** PAN-4650: Hide this machine — its conversations are left out of the conversation list. */
-  hidden: Schema.Boolean,
+  hidden: Schema.optional(Schema.Boolean),
   /** Present only on links this server set up over SSH. */
   ssh: Schema.optional(SshLinkInfo),
 })

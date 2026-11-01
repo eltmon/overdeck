@@ -57,12 +57,12 @@ describe('owner column top-ups (PAN-4645 WI-9)', () => {
     const dir = join(TEST_HOME, 'pre-4645');
     mkdirSync(dir, { recursive: true });
     const dbPath = join(dir, 'overdeck.db');
-    const migration = readFileSync(OVERDECK_MIGRATION_PATH, 'utf8')
-      .split('\n')
-      .filter((line) => !/^\t`(environment_id|released_to)` /.test(line))
-      .join('\n');
+    // Strip the two columns from the conversations table only (linked_conversations has its own environment_id).
+    const withoutColumns = (statement: string): string => (/CREATE TABLE `conversations` /.test(statement)
+      ? statement.split('\n').filter((line) => !/^\t`(environment_id|released_to)` /.test(line)).join('\n')
+      : statement);
     const raw = openDatabase(dbPath);
-    for (const statement of migration.split('--> statement-breakpoint')) {
+    for (const statement of readFileSync(OVERDECK_MIGRATION_PATH, 'utf8').split('--> statement-breakpoint').map(withoutColumns)) {
       const trimmed = statement.trim();
       if (trimmed) raw.exec(trimmed);
     }
