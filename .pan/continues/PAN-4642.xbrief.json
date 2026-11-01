@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4642",
   "created": "2026-11-01T04:49:54.715Z",
-  "updated": "2026-11-01T05:43:27.027Z",
+  "updated": "2026-11-01T05:43:48.957Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "extract-attachment-strip.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T05:43:27.026Z"
+    },
+    "citation-format.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:43:48.957Z"
     }
   }
 }
