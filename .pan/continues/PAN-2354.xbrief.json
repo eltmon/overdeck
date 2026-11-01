@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2354",
   "created": "2026-11-01T05:46:47.920Z",
-  "updated": "2026-11-01T07:34:36.467Z",
+  "updated": "2026-11-01T07:34:54.639Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -276,6 +276,10 @@
     "service.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T07:34:36.467Z"
+    },
+    "hook-wake.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:34:54.638Z"
     }
   }
 }
