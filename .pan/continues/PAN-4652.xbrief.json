@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T18:51:30.325Z",
+  "updated": "2026-11-01T18:52:55.401Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-01T18:51:26.140Z"
     },
     "wi5-public-link-only-gate": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4652",
-      "claimedAt": "2026-11-01T18:51:30.325Z"
+      "claimedAt": "2026-11-01T18:51:30.325Z",
+      "doneAt": "2026-11-01T18:52:55.401Z"
     }
   }
 }
