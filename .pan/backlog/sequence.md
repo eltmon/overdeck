@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T06:59:41Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-01T07:03:03Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -456,7 +456,7 @@ _Last sequenced: 2026-11-01T06:59:41Z · model: claude-opus-5-5 · open: 869_
 | 455 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 456 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
 | 457 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 458 | PAN-4402 | L | medium | ok |  |  | Anywhere desktop half: connection catalog, environment switcher, version gating; PAN-3762 server half has closed |
+| 458 | PAN-4405 | M | medium | ok |  |  | Aggregated cross-environment overview, Needs-You and search; unblocked now that the PAN-4402 desktop switcher has closed |
 | 459 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 460 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 461 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
@@ -494,7 +494,7 @@ _Last sequenced: 2026-11-01T06:59:41Z · model: claude-opus-5-5 · open: 869_
 | 493 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
 | 494 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
 | 495 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 496 | PAN-4404 | L | medium | ok |  | PAN-4402, PAN-4645 | Desktop-managed SSH launch and loopback forward for remote environments; the one SSH stack PAN-3863 builds on |
+| 496 | PAN-4404 | L | medium | ok |  | PAN-4645 | Desktop-managed SSH launch and loopback forward for remote environments; PAN-4402 closed, still waits on PAN-4645 |
 | 497 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
 | 498 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
 | 499 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
@@ -506,7 +506,6 @@ _Last sequenced: 2026-11-01T06:59:41Z · model: claude-opus-5-5 · open: 869_
 | 505 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
 | 506 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
 | 507 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 508 | PAN-4405 | M | medium | ok |  | PAN-4402 | Aggregated cross-environment overview, Needs-You and search, after the PAN-4402 switcher reaches parity |
 | 509 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
 | 510 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
 | 511 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
@@ -522,7 +521,7 @@ _Last sequenced: 2026-11-01T06:59:41Z · model: claude-opus-5-5 · open: 869_
 | 521 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
 | 522 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
 | 523 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 524 | PAN-3863 | L | medium | ok |  | PAN-4402, PAN-4404 | Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 and the PAN-4402 desktop catalog |
+| 524 | PAN-3863 | L | medium | ok |  | PAN-4404 | Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 (PAN-4402 catalog has closed) |
 | 525 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
 | 526 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
 | 527 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
@@ -1204,10 +1203,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T06:59:41Z",
+  "generatedAt": "2026-11-01T07:03:03Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -6916,18 +6915,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "planning": "auto"
     },
     {
-      "issue": "PAN-4402",
-      "rank": 458,
-      "size": "L",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Anywhere desktop half: connection catalog, environment switcher, version gating; PAN-3762 server half has closed",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3873",
       "rank": 459,
       "size": "M",
@@ -7388,10 +7375,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 48,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4402",
         "PAN-4645"
       ],
-      "why": "Desktop-managed SSH launch and loopback forward for remote environments; the one SSH stack PAN-3863 builds on",
+      "why": "Desktop-managed SSH launch and loopback forward for remote environments; PAN-4402 closed, still waits on PAN-4645",
+      "rationale": "Rank held; PAN-4402 closed as completed, but PAN-4645 is still open and still blocks this issue.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7530,15 +7517,14 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     },
     {
       "issue": "PAN-4405",
-      "rank": 508,
+      "rank": 458,
       "size": "M",
       "importance": "medium",
       "score": 46,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4402"
-      ],
-      "why": "Aggregated cross-environment overview, Needs-You and search, after the PAN-4402 switcher reaches parity",
+      "dependsOn": [],
+      "why": "Aggregated cross-environment overview, Needs-You and search; unblocked now that the PAN-4402 desktop switcher has closed",
+      "rationale": "Lifted from 508 into the slot PAN-4402 vacated: PAN-4402 closed as completed on 2026-11-01, so this issue has no open dependency left.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7737,11 +7723,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 45,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4402",
         "PAN-4404"
       ],
-      "why": "Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 and the PAN-4402 desktop catalog",
-      "rationale": "Rank held; PAN-3762 closed and its catalog and SSH-launch work moved to PAN-4402 and PAN-4404, so those replace it as dependencies.",
+      "why": "Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 (PAN-4402 catalog has closed)",
+      "rationale": "Rank held; PAN-4402 closed as completed, but the PAN-4404 SSH stack this builds on is still open.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12994,13 +12979,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     },
     {
       "from": "PAN-2350",
-      "to": "PAN-4402",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
       "to": "PAN-4403",
       "type": "contains",
       "source": "github-ref",
@@ -13119,28 +13097,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 1
     },
     {
-      "from": "PAN-4402",
-      "to": "PAN-4404",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4402",
-      "to": "PAN-4405",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4404",
-      "to": "PAN-3863",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4402",
       "to": "PAN-3863",
       "type": "unblocks",
       "source": "github-ref",
