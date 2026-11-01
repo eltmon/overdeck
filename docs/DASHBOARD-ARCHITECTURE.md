@@ -293,7 +293,10 @@ door that does not exist; a real record read door would be a separate change.
   table (PAN-4312 — that scan cost ~9s on a 3GB embeddings DB). Successful values remain
   usable for at most five minutes during refresh failures, with a five-second retry
   backoff. Search configuration, provider availability, and runtime health are still
-  read per request.
+  read per request. The per-issue cost snapshot (`getCostsByIssue`) reads
+  `cost_issue_rollup`, a trigger-maintained table of ~3k grain rows
+  (`src/lib/overdeck/cost-issue-rollup.ts`), instead of aggregating every
+  `cost_events` row (PAN-4724: ~1.5 s → ~5 ms per refresh).
 - Agent resource costs use one grouped worker query and a 15-second shared snapshot,
   invalidated when agent membership changes. Hourly burn remains twice the sum in the
   last 30 minutes, with the inclusive cutoff and rounding to cents preserved. SQLite's
