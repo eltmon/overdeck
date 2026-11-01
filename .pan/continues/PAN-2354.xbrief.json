@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2354",
   "created": "2026-11-01T05:46:47.920Z",
-  "updated": "2026-11-01T07:22:43.891Z",
+  "updated": "2026-11-01T07:23:03.799Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
     "config.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T07:22:43.890Z"
+    },
+    "types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:23:03.799Z"
     }
   }
 }
