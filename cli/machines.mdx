@@ -108,20 +108,28 @@ A failure prints the same messages as `add-ssh` and exits 1. `--json` prints
 pan machines list [--json]
 ```
 
-Shows this machine, every link with its state, and the machines that hold access here.
+Shows this machine (first row), every link with its state, load and capability tags, and
+the machines that hold access here.
 
 ```
 This machine: studio (1111-2222-3333-4444-5555)
 
-LABEL   STATE                             ROUTE                    ACCESS    SSH                       FINGERPRINT
-desk    online                            tcp://192.168.1.5:3011   operator  -                         0a71-b2da-d646-3485-3ce1
-laptop  offline (network 12.0 s, 1 h ago) tcp://10.0.0.9:3011      operator  -                         7c0d-11aa-9b3e-4d2f-88e1
-vps     online                            tcp://127.0.0.1:41234    operator  me@vps (up, managed)      5e1f-0b9c-2d44-a1e7-63c0
+LABEL                  STATE                             ROUTE                    ACCESS    SSH                   FINGERPRINT               LOAD                         TAGS
+studio (this machine)  self                              -                        -         -                     1111-2222-3333-4444-5555  CPU 1% · 12 GB · 0 agents    linux
+desk                   online                            tcp://192.168.1.5:3011   operator  -                     0a71-b2da-d646-3485-3ce1  CPU 3% · 41 GB · 2 agents    docker, gpu, linux
+laptop                 offline (network 12.0 s, 1 h ago) tcp://10.0.0.9:3011      operator  -                     7c0d-11aa-9b3e-4d2f-88e1  -                            -
+vps                    online                            tcp://127.0.0.1:41234    operator  me@vps (up, managed)  5e1f-0b9c-2d44-a1e7-63c0  CPU n/a · 3 GB · 0 agents    linux · reserved
 
 Inbound
 LABEL  ACCESS    FINGERPRINT               LAST USED  TOKEN ID
 desk   operator  0a71-b2da-d646-3485-3ce1  just now   tok_…
 ```
+
+LOAD is the machine's last 15-second load sample: CPU pressure (PSI `some avg10`, `n/a` off
+Linux), free memory and working agents; `-` before the first sample or for a machine whose
+Overdeck predates it. TAGS lists its capability tags and `reserved` for a machine with
+`anywhere.machine.placement: on-request` (see
+[Auto placement](/configuration/linked-machines#auto-placement)).
 
 The STATE cell carries the last incident (`froze` when the other dashboard stalled,
 `network` otherwise) and, for `unsupported`, `revoked` and `offline`, the detail. The SSH
@@ -133,6 +141,67 @@ cell shows `<destination> (<forward state>, <managed|external>)` for an SSH mach
 | `--json` | Print `{ self, links, inbound }` as JSON. |
 
 With no links: `` No linked machines. Link one with `pan machines link <pairing-url>` using a `pan pair` link from the other machine. ``
+
+## Starting work on another machine: `--machine`, `--machine auto`, `--needs`
+
+Three commands take a machine:
+
+```bash
+pan start PAN-123 --machine desk
+pan worker run --issue PAN-123 --prompt "Run the suite" --machine auto --needs docker
+pan lane start --run hotel --key 663 --role builder --brief b.md --machine auto
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--machine <label\|environment-id>` | Run on that linked machine (honored even when it is reserved or busy). |
+| `--machine auto` | Let Auto placement pick by load and print `Auto → <label> (…)`; when it picks this machine the normal local path runs. |
+| `--needs <tag,…>` | Only machines with every listed capability tag. |
+| `--push-first` | (`pan start`, `pan worker run`) Push unpushed commits before starting on the other machine. |
+| `--ignore-unpushed` | (`pan start`, `pan worker run`) Start even though local commits are not pushed. |
+
+`--machine fly` is refused until PAN-4652. `pan lane start --machine` refuses another machine
+until PAN-4638. See [Linked machines](/configuration/linked-machines#start-work-on-another-machine).
+
+## who
+
+```bash
+pan machines who <issue> [--json]
+```
+
+Lists which machines run agents or conversations for an issue: this machine first, then every
+online linked machine (2.5 seconds each; a machine that does not answer is named on stderr).
+
+```
+MACHINE  KIND          ID           STATUS
+studio   agent         agent-pan-7  running
+desk     conversation  conv-a1b2    working
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Print `{ machines: [{ environmentId, label, self, agents, conversations, error? }] }`. |
+
+## add-project
+
+```bash
+pan machines add-project <machine> <project-key> [--file <path>]... [--no-env] [--parent-dir <dir>] [--to <machine>] [--json]
+```
+
+Copies a project between linked machines through the normal project creation: the target
+clones the repository from its origin, registers it, then receives the chosen git-ignored
+files (written 0600; an existing file is kept and reported `skipped`). By default
+`<machine>`'s `<project-key>` is added to **this** machine; with `--to <target>`, this
+machine's `<project-key>` is added to `<target>` (`pan machines add-project <this label> <key> --to desk`).
+Files cross only an operator-level link.
+
+| Flag | Effect |
+| --- | --- |
+| `--file <path>` | Also copy this git-ignored file (repeat for more; at most 1 MiB each). |
+| `--no-env` | Do not copy `.env`, `.envrc` and `.dev.vars` (copied by default). |
+| `--parent-dir <dir>` | Clone under this directory instead of the projects folder (this machine only). |
+| `--to <machine>` | Add this machine's project to `<machine>` instead. |
+| `--json` | Print the finished add job as JSON. |
 
 ## unlink
 

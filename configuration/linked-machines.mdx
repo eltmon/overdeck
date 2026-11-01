@@ -317,6 +317,115 @@ run yourself instead of running it. Offline, connecting, unsupported and revoked
 are skipped, and so is a machine reached over an agent-fenced link: Update all needs an
 operator-level link.
 
+## Start work on another machine
+
+The new-conversation dialog has a **Machine** field: **This machine** (the default),
+**Auto**, each online linked machine by label, and **Fly (new VM)**, shown disabled until
+Fly machines arrive. The CLI takes the same choice:
+
+```bash
+pan start PAN-123 --machine desk
+pan worker run --issue PAN-123 --prompt "Run the suite" --machine desk
+pan lane start --run hotel --key 663 --role builder --brief b.md --machine auto
+```
+
+A conversation or agent started on another machine runs there and is listed on both
+machines. The other machine must have a project for the same repository (the same
+`github_repo` or `gitlab_repo`); if it does not, the error names the command that adds it
+(see [Projects across machines](#projects-across-machines)). Lanes on other machines arrive
+with PAN-4638: `pan lane start --machine` launches here when the choice is this machine and
+refuses otherwise.
+
+Work started this way is **link-started**: the other machine records which machine asked
+for it. An agent on your machine may then message and stop that work, and only that work.
+It can never open terminals or port forwards there, create conversations or workers outside
+the work doors, add projects, pair devices, mint tokens or change settings.
+
+## Delegation
+
+`pan worker run --machine <label|auto>` starts a worker on another machine and gives you a
+local **stand-in** id (`agent-<issue>-worker-<n>`). `pan worker wait` on that id mirrors the
+remote worker's reports exactly like a local worker's.
+
+- **Offline:** while the other machine is asleep or unreachable, the follower backs off
+  (1 s, doubling up to 5 minutes) and keeps waiting; the wait does not fail. It resumes
+  after a dashboard restart.
+- **Parent stop:** when the agent or conversation that started the worker ends, this
+  machine stops the remote worker.
+- **Unpushed commits:** the other machine starts from its view of `origin`. If your branch
+  has commits that are not pushed, the CLI refuses and says so; re-run with `--push-first`
+  to push them, or `--ignore-unpushed` to start anyway.
+
+## Auto placement
+
+**Auto** (`--machine auto`) picks a machine for you and prints why, for example
+`Auto → desk (CPU pressure 3%, 41 GB free, 2 agents)`.
+
+1. Candidates are this machine and every online, visible linked machine.
+2. A machine is skipped when it is offline, has no project for the repository, lacks a
+   needed tag, has a saturated CPU, or is **reserved**. A reserved machine is still picked
+   when it is the only machine with a needed tag.
+3. The rest are ranked by lowest CPU pressure, then most free memory, then fewest working
+   agents, then this machine.
+
+Each machine reports its load every 15 seconds and its **capability tags**: `linux`,
+`macos` or `windows`, plus `docker`, `gpu` and `ios-sim` when they are detected. Add your own
+tags, or reserve a machine, in its `config.yaml`:
+
+```yaml
+anywhere:
+  machine:
+    tags: [payments, big-disk]
+    placement: on-request   # Auto skips this machine unless only it has a needed tag
+```
+
+`--needs docker,gpu` (and the dialog's **Needs** field when **Auto** is chosen) limits Auto to
+machines with every listed tag. The Machines list (`pan machines list`, Settings → Anywhere →
+Machines) shows each machine's load and tags.
+
+## Projects across machines
+
+With **Combine matching repositories across machines** on (Settings → Anywhere → Machines,
+default on), the sidebar shows one project per repository: a project that other machines
+also have shows "· N machines", conversations from those machines appear under it, and
+repositories that only other machines have are listed under **On other machines**.
+
+**Add this project to <machine>** clones the repository on the target machine through the
+normal project creation, registers it, and copies the git-ignored files you select: `.env`,
+`.envrc` and `.dev.vars` are selected by default, files larger than 1 MiB, directories and
+symlinks are never copied, and an existing file on the target is kept. Files cross only an
+operator-level link, for the operator. From the CLI:
+
+```bash
+pan machines add-project desk overdeck            # desk's overdeck, cloned here
+pan machines add-project laptop overdeck --to desk   # this machine's overdeck, cloned on desk
+```
+
+## Fleet Needs-You and search
+
+**Needs you** lists questions and permission prompts waiting on every online linked
+machine, labelled "on <machine>". A conversation on another machine opens through the link;
+an agent there is answered on that machine. The command palette's search adds an
+"On <machine>" group for every online linked machine. `pan machines who PAN-123` lists which
+machines run agents or conversations for an issue. Offline machines add nothing and never
+cause an error.
+
+## Fleet usage
+
+The Costs page's **Machines** tab shows today, week and month spend for each machine and an
+**All machines** total. An offline machine shows its last known numbers with "cached <time>".
+A provider request recorded on two machines (for example a conversation pulled from one to the
+other) is counted once in All machines.
+
+## Compare settings
+
+**Compare settings** on a machine's row (Settings → Anywhere → Machines) lists the
+`config.yaml` keys whose values differ between this machine and that one. Secrets show only
+"set" or "not set". Each value this machine sets comes with a copyable
+`pan admin config set <key> <value>` line to run on the other machine; nothing is changed for
+you. With a Tailscale route, **Open <machine>'s dashboard** goes to that machine's own
+Settings.
+
 ## Unlink
 
 **Unlink** on a link (or `pan machines unlink <label>`) removes it here and tells the

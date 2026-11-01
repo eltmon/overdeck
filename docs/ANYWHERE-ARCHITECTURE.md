@@ -556,7 +556,6 @@ service, lingering, then one pairing link (`.pan/drafts/PAN-4656.md`).
 Placeholder headings for the decisions that land with the follow-up issues; each adds its
 section here when it ships.
 
-- #4651: D-19, D-21.
 - #2356: D-3, D-20.
 
 ## Conversations across machines (#4650)
@@ -639,4 +638,90 @@ viewer (`services/port-forwards.ts`) probes first, then listens on `127.0.0.1:0`
 each connection its own channel; a forward closes on stop, on unlink or after 30 idle
 minutes. `GET /api/conversations/:name/preview-ports` lists the workspace's assigned
 ports and service ports.
-- #4651: D-19, D-21.
+
+## Work across machines (#4651)
+
+Decisions: `.pan/drafts/PAN-4651.md` (D-4651-1 … D-4651-24); epic D-19 (Auto placement)
+and D-21 (MCP fleet reach). The vocabulary is PAN-4650's: the machine you sit at is the
+**viewer**, the machine that runs a piece of work is its **owner**.
+
+### Work doors and provenance (D-4651-1/2/3)
+
+Owner routes under `/api/machines/work/*` (`routes/machines-work.ts`) are the only way a
+linked machine starts work here. Each takes exactly a `machine` credential (403
+`machine-only`), resolves the project on this machine, and compares the caller's git
+origin slug with that project's (case-insensitive; 404 `project-missing` naming this
+machine otherwise). The caller never names a path. `conversations` runs
+`handleConversationCreate`; `workers` runs `startWorker` with `startedBy` written into
+`worker.json`; `issues/:id/start` runs `spawnIssueAgentForRoute`
+(`routes/agents/spawn-issue.ts`, the extracted body of `POST /api/agents`); `projects`
+(operator actor on an operator-level link only) clones and copies files.
+
+`conversations.started_by_environment_id` records the asking machine
+(`overdeck/conversation-provenance.ts`, the only writer). The agent fence
+(`link-fence.ts`, synchronous) lets an agent actor call the work-door creates and change
+only conversations whose provenance is its own environment; bare creates
+(`/api/conversations`, `/api/workers`, `/api/lanes`), the project door, `/ws/terminal` and
+`/ws/forward` stay refused. `POST /api/workers/:id/stop` checks `worker.json` itself.
+
+### Delegation follower (D-4651-4/5/6/7)
+
+`POST /api/fleet/workers` with a remote target allocates a local **stand-in** id
+(`~/.overdeck/agents/<localId>/`, `agents/worker/remote-standin.ts`), calls the owner's
+worker door and writes `remote.json` (0600). `services/remote-worker-follower.ts`, started
+in `startAnywhere`, resumes every running stand-in at boot, polls the owner's
+`GET /api/workers/:id/status?after=<seq>` every 5 s while the link is online, mirrors
+reports with the owner's `seq`, marks a confirmed-dead worker `exited`, backs off 1 s
+doubling to 300 s (±20 %) while unreachable without ever giving up, and after two dead
+observations of the parent posts the owner's stop once. `pan worker wait` reads a
+stand-in through `remote.json` (`worker-remote.ts`). Remote `pan worker run` and
+`pan start` refuse unpushed commits (`delegation-push-check.ts`) and send
+`x-overdeck-sender`, so an agent's delegation reaches the owner as that agent.
+
+### Auto placement (D-19, D-4651-8/9/10)
+
+Each machine samples its load every 15 s (`services/machine-load.ts`: CPU PSI avg10, the
+governor's saturated verdict, available memory, working agents) and detects capability
+tags every 10 minutes (`anywhere/machine-capabilities.ts`: OS, `docker`, `gpu`,
+`ios-sim`, plus `anywhere.machine.tags`; `anywhere.machine.placement: on-request` reserves
+the machine). Both ride in the heartbeat, never in the public descriptor. The supervisor
+keeps each peer's last values. `choosePlacement` (`anywhere/placement.ts`, pure) rejects
+offline/unsupported, `no project`, `no <tag>`, `CPU saturated`, then `reserved` (unless
+only reserved machines have the needed tag), and scores by lowest PSI, most memory, fewest
+working agents, this machine, label. `services/fleet-target.ts` resolves every fleet
+spawn's `machine` (self, `auto`, a link label or id, `fly` refused until #4652).
+`OVERDECK_TEST_FORCE_CPU_SATURATED=1` is the smoke hook, read only by `machine-load.ts`.
+
+### Projects, Needs-You and search across machines (D-4651-11 … D-4651-16)
+
+Owners serve `GET /api/machines/projects` and `GET /api/machines/needs-you` and put their
+hashes in the heartbeat (`projectsHash`, `needsYouHash`); the viewer caches them in memory
+(`linked-projects-sync.ts`, `linked-needs-you-sync.ts`), fetching on connect and on a
+changed hash only. `GET /api/fleet/projects` groups by git origin slug
+(`anywhere.json` `combineRepositories`, default on); `GET /api/fleet/needs-you`,
+`GET /api/fleet/search` (2.5 s per link) and `GET /api/fleet/issues/:id/activity` combine
+online links. "Add this project" uses the project-creation core in both directions
+(`services/fleet-add-project.ts`); copied files are the owner's git-ignored files up to
+1 MiB (`projects/ignored-files.ts`), cross only an operator-level link for the operator,
+are written 0600 and never overwrite.
+
+### MCP fleet reach (D-21, D-4651-17/18)
+
+`requiredScopeFor` judges `/api/conversations/@<machine>/<rest>` by `/api/conversations/<rest>`,
+so a token's scopes reach linked conversations; the proxy refuses any channel caller first
+(403 `no-chained-hops`). For an `odk_` token the proxy forwards actor `operator` with
+`x-overdeck-link-ceiling` set to the token's own scopes (from the resolved credential,
+never a header), so the owner applies exactly what the operator granted. The MCP tools use
+`GET /api/fleet/machines`, `/api/fleet/search` and the fleet spawn routes; settings stay
+unreachable (machine tokens never carry `admin`).
+
+### Fleet usage and compare (D-4651-19/20/21)
+
+`GET /api/fleet/usage` reads this machine's month window and request digest in one scan
+(`costs/request-digest.ts`) and each online link's `GET /api/costs/summary` and
+`GET /api/costs/request-digest` (`read:costs`); offline links answer cached totals from
+`fleet-usage-cache.json` (0600). All machines subtracts, per window, every request hash an
+earlier machine already counted. `GET /api/fleet/settings-compare/:machine` compares
+`GET /api/settings/resolved` (`settings-resolved.ts`: explicitly set `config.yaml` keys,
+secrets only as set / not set) and prints `pan admin config set` lines; links never change
+settings.
