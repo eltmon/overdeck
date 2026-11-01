@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T09:34:04.837Z",
+  "updated": "2026-11-01T09:34:23.837Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "triage-store.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T09:34:04.837Z"
+    },
+    "triage-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:34:23.837Z"
     }
   }
 }
