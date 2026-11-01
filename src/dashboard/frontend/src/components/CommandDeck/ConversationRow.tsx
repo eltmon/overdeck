@@ -245,6 +245,12 @@ export function ConversationRow({
       {verdictBadgeText(latestVerdict)}
     </a>
   ) : null;
+  const leavingLabel = leavingKind ? (
+    <span className={styles.conversationLeavingStatus}>
+      <Loader2 size={10} className={styles.conversationLeavingSpinner} aria-hidden="true" />
+      <span>{leavingKind === 'archive' ? 'Archiving…' : 'Stopping…'}</span>
+    </span>
+  ) : null;
   const iconSize = isNested ? 10 : 11;
   const dotSize = isNested ? 6 : 7;
   const spinnerSize = isNested ? 10 : 12;
@@ -551,6 +557,7 @@ export function ConversationRow({
             <span className={styles.laneLabel}>{`${LANE_GLYPH[conv.laneRole]} ${conv.laneKey} i${conv.laneIteration ?? 1}`}</span>
           )}
           <span className={`${styles.projectConvLabel} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
+          {leavingLabel}
           {conv.laneKey && conv.laneReport && !(isJudge && conv.laneVerdict) && (
             <span className={`${styles.laneReportBadge} ${LANE_REPORT_TONE[conv.laneReport.status]}`}>
               {conv.laneReport.status.toUpperCase()}
@@ -576,51 +583,55 @@ export function ConversationRow({
         <span className={styles.conversationMain}>
           <span className={`${styles.conversationName} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
           <span className={styles.conversationMetaLine}>
-            {verdictBadge}
-            {conv.branch && (
-              <span
-                className={styles.conversationBranchChip}
-                title={`${conv.isWorktree ? 'Worktree' : 'Local'} · ${conv.branch} · ${conv.cwd}`}
-                aria-label={`Branch ${conv.branch} (${conv.isWorktree ? 'worktree' : 'local'})`}
-              >
-                {conv.isWorktree ? <GitFork size={10} /> : <GitBranch size={10} />}
-                <span className={styles.conversationBranchChipText}>{conv.branch}</span>
-              </span>
-            )}
-            {ownerBadge}
-            {pullRequestBadge}
-            {conv.lastAttachedAt && (
+            {leavingLabel ?? (
               <>
-                {conv.branch && <span className={styles.conversationMetaSep} aria-hidden>·</span>}
-                <time
-                  dateTime={conv.lastAttachedAt}
-                  title={new Date(conv.lastAttachedAt).toLocaleString()}
-                >
-                  {formatRelativeTime(conv.lastAttachedAt, now)}
-                </time>
-              </>
-            )}
-            {conv.totalCost !== undefined && conv.totalCost > 0 && (
-              <>
+                {verdictBadge}
+                {conv.branch && (
+                  <span
+                    className={styles.conversationBranchChip}
+                    title={`${conv.isWorktree ? 'Worktree' : 'Local'} · ${conv.branch} · ${conv.cwd}`}
+                    aria-label={`Branch ${conv.branch} (${conv.isWorktree ? 'worktree' : 'local'})`}
+                  >
+                    {conv.isWorktree ? <GitFork size={10} /> : <GitBranch size={10} />}
+                    <span className={styles.conversationBranchChipText}>{conv.branch}</span>
+                  </span>
+                )}
+                {ownerBadge}
+                {pullRequestBadge}
+                {conv.lastAttachedAt && (
+                  <>
+                    {conv.branch && <span className={styles.conversationMetaSep} aria-hidden>·</span>}
+                    <time
+                      dateTime={conv.lastAttachedAt}
+                      title={new Date(conv.lastAttachedAt).toLocaleString()}
+                    >
+                      {formatRelativeTime(conv.lastAttachedAt, now)}
+                    </time>
+                  </>
+                )}
+                {conv.totalCost !== undefined && conv.totalCost > 0 && (
+                  <>
+                    <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                    <span title="Total cost (cache-discount aware)">{conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}</span>
+                  </>
+                )}
+                {conv.totalTokens !== undefined && conv.totalTokens > 0 && (
+                  <>
+                    <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                    <span title={`${conv.totalTokens.toLocaleString()} tokens (input + output + cache read/write)`}>{formatTokens(conv.totalTokens)} tok</span>
+                  </>
+                )}
                 <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                <span title="Total cost (cache-discount aware)">{conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}</span>
+                <span title={`Harness: ${shortHarness(conv.harness ?? 'claude-code')}`}>{shortHarness(conv.harness ?? 'claude-code')}</span>
+                {conv.model && (
+                  <>
+                    <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                    <span title={`Model: ${conv.model}`}>{shortModel(conv.model)}</span>
+                  </>
+                )}
+                {forkBadges}
               </>
             )}
-            {conv.totalTokens !== undefined && conv.totalTokens > 0 && (
-              <>
-                <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                <span title={`${conv.totalTokens.toLocaleString()} tokens (input + output + cache read/write)`}>{formatTokens(conv.totalTokens)} tok</span>
-              </>
-            )}
-            <span className={styles.conversationMetaSep} aria-hidden>·</span>
-            <span title={`Harness: ${shortHarness(conv.harness ?? 'claude-code')}`}>{shortHarness(conv.harness ?? 'claude-code')}</span>
-            {conv.model && (
-              <>
-                <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                <span title={`Model: ${conv.model}`}>{shortModel(conv.model)}</span>
-              </>
-            )}
-            {forkBadges}
           </span>
         </span>
       )}

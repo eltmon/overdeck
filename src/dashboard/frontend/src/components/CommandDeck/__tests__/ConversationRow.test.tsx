@@ -465,7 +465,11 @@ describe('ConversationRow Check for new conversations (PAN-4455 WI-12)', () => {
 });
 
 describe('ConversationRow leaving state (PAN-4626)', () => {
-  function renderRowWithMutations(overrides: Partial<ConversationMutations>, convOverrides?: Partial<Conversation>) {
+  function renderRowWithMutations(
+    overrides: Partial<ConversationMutations>,
+    convOverrides?: Partial<Conversation>,
+    variant?: 'flat' | 'nested',
+  ) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const rowMutations: ConversationMutations = { ...mutations, ...overrides };
     const onSelect = vi.fn();
@@ -476,6 +480,7 @@ describe('ConversationRow leaving state (PAN-4626)', () => {
           isSelected={false}
           onSelect={onSelect}
           mutations={rowMutations}
+          variant={variant}
         />
       </QueryClientProvider>,
     );
@@ -514,6 +519,26 @@ describe('ConversationRow leaving state (PAN-4626)', () => {
 
     fireEvent.click(screen.getByText('Test conversation').closest('button')!);
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('flat row: replaces the meta line with "Archiving…" while archive-pending', () => {
+    renderRowWithMutations({ isArchivePending: vi.fn(() => true) });
+
+    expect(screen.getByText('Archiving…')).toBeInTheDocument();
+    expect(screen.queryByTitle(/^Harness:/)).toBeNull();
+  });
+
+  it('flat row: shows "Stopping…" while stop-pending', () => {
+    renderRowWithMutations({ isStopPending: vi.fn(() => true) }, { sessionAlive: true });
+
+    expect(screen.getByText('Stopping…')).toBeInTheDocument();
+  });
+
+  it('nested row: appends "Archiving…" after the title while archive-pending', () => {
+    renderRowWithMutations({ isArchivePending: vi.fn(() => true) }, undefined, 'nested');
+
+    expect(screen.getByText('Archiving…')).toBeInTheDocument();
+    expect(screen.getByText('Test conversation')).toBeInTheDocument();
   });
 
   it('shows a disabled, "Archiving…" menu item while archive-pending', () => {
