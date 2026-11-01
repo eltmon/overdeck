@@ -1,11 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T08:29:50Z · model: claude-opus-5-5 · open: 873_
+_Last sequenced: 2026-11-01T08:32:59Z · model: claude-opus-5-5 · open: 873_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
+| 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: merged and closed out (#4584 follow-up: dim stop/archive rows, Stopping…/Archiving… label); awaits issue close. |
 | 2 | PAN-4639 | L | medium | ok |  |  | In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4663 | XS | critical | ok |  |  | In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts |
@@ -673,7 +673,7 @@ _Last sequenced: 2026-11-01T08:29:50Z · model: claude-opus-5-5 · open: 873_
 | 666 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651, PAN-4652 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 668 | PAN-4643 | M | medium | ok |  |  | pan diagnose: redacted diagnostics bundle (needs doctor --json) handed to a Claude Code or Codex session; works with dashboard down. |
+| 668 | PAN-4643 | M | medium | ok |  |  | Merged and closed out: pan diagnose shipped; the issue awaits closure and has nothing left to pick up. |
 | 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
 | 669 | PAN-4641 | M | medium | ok |  |  | Server-held 'send when limits reset' composer message; needs a parsed reset time; usage-window data would come from #2065. |
 | 672 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
@@ -883,7 +883,7 @@ _Last sequenced: 2026-11-01T08:29:50Z · model: claude-opus-5-5 · open: 873_
 
 ### PAN-4626 (rank 1)
 
-New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.
+Labels moved to closed-out after merge; rank held at 1 under the in-pipeline pin, nothing left to schedule.
 
 ### PAN-4639 (rank 2)
 
@@ -1208,7 +1208,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T08:29:50Z",
+  "generatedAt": "2026-11-01T08:32:59Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 873,
@@ -1221,8 +1221,8 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "score": 55,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending.",
-      "rationale": "New in-pipeline follow-up to the merged #4584 with a decided design, so it is pinned at rank 1 per the in-pipeline rule.",
+      "why": "In pipeline: merged and closed out (#4584 follow-up: dim stop/archive rows, Stopping…/Archiving… label); awaits issue close.",
+      "rationale": "Labels moved to closed-out after merge; rank held at 1 under the in-pipeline pin, nothing left to schedule.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9621,8 +9621,8 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "score": 40,
       "condition": "ok",
       "dependsOn": [],
-      "why": "pan diagnose: redacted diagnostics bundle (needs doctor --json) handed to a Claude Code or Codex session; works with dashboard down.",
-      "rationale": "New issue: a self-serve support path with clear scope and acceptance criteria, ranked with other medium operator-tooling features.",
+      "why": "Merged and closed out: pan diagnose shipped; the issue awaits closure and has nothing left to pick up.",
+      "rationale": "Work merged and was closed out since the prior run; rank held because a merged issue blocks nothing and should not be picked.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12891,7 +12891,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "to": "PAN-2354",
       "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.5
+      "confidence": 0.3
     },
     {
       "from": "PAN-2350",
