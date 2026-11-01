@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T05:10:21Z · model: claude-opus-5-5 · open: 861_
+_Last sequenced: 2026-11-01T05:12:21Z · model: claude-opus-5-5 · open: 861_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -657,9 +657,9 @@ _Last sequenced: 2026-11-01T05:10:21Z · model: claude-opus-5-5 · open: 861_
 | 665 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 666 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 667 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 668 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651, PAN-4652 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 668 | PAN-4643 | M | medium | ok |  |  | pan diagnose: redacted diagnostics bundle (needs doctor --json) handed to a Claude Code or Codex session; works with dashboard down. |
 | 669 | PAN-4641 | M | medium | ok |  |  | Server-held 'send when limits reset' composer message; needs a parsed reset time; usage-window data would come from #2065. |
+| 670 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651, PAN-4652 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 671 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 672 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 673 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
@@ -814,11 +814,11 @@ _Last sequenced: 2026-11-01T05:10:21Z · model: claude-opus-5-5 · open: 861_
 | 822 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
 | 823 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
 | 824 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
-| 825 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
 | 825 | PAN-4642 | M | medium | ok |  |  | Cite selected reply text with a comment as composer chips sent with the next prompt; share pending list with #2685 annotations. |
+| 826 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
 | 827 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 828 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 828 | PAN-4644 | L | low | ok |  |  | Import VS Code themes and custom color themes for UI tokens, terminal palette and syntax highlighting; cosmetic, large surface. |
+| 829 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 830 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 831 | PAN-4658 | S | low | needs-refinement |  | PAN-4642 | Cite text from the EditorPane markdown preview; needs a decision on how the preview picks its target conversation. Builds on #4642. |
 | 832 | PAN-4659 | M | low | ok |  | PAN-4644 | Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, waits for #4644 to merge. |
@@ -1196,7 +1196,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T05:10:21Z",
+  "generatedAt": "2026-11-01T05:12:21Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 861,
@@ -9371,7 +9371,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-4638",
-      "rank": 668,
+      "rank": 670,
       "size": "L",
       "importance": "medium",
       "score": 38,
@@ -9381,7 +9381,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
         "PAN-4652"
       ],
       "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
-      "rationale": "New PAN-2350 child; placed in the free slot beside the Anywhere set because it depends on machine links, delegation and Fly-as-machine plan items that have no issues yet, and planning questions remain open.",
+      "rationale": "Rank 668->670: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11299,13 +11299,14 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-37",
-      "rank": 825,
+      "rank": 826,
       "size": "M",
       "importance": "medium",
       "score": 30,
       "condition": "stale",
       "dependsOn": [],
       "why": "Support external PR selection for merge-agent",
+      "rationale": "Rank 825->826: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11337,14 +11338,14 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
     },
     {
       "issue": "PAN-3244",
-      "rank": 828,
+      "rank": 829,
       "size": "S",
       "importance": "low",
       "score": 20,
       "condition": "stale",
       "dependsOn": [],
       "why": "Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close",
-      "rationale": "Demoted from rank 67: the component this issue targets (the deploy-patrol deploy window) was deleted by the PAN-3917 cut on main; the issue needs re-triage against the new tree or closure.",
+      "rationale": "Rank 828->829: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
