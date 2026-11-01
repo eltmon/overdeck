@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T20:39:49.635Z",
+  "updated": "2026-11-01T20:40:03.690Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -264,6 +264,10 @@
     "wi11-heartbeat-and-sweep.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T20:39:49.635Z"
+    },
+    "wi12-credential-refresh-fly.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:40:03.689Z"
     }
   }
 }
