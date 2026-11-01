@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4647",
   "created": "2026-11-01T04:58:27.549Z",
-  "updated": "2026-11-01T05:38:54.488Z",
+  "updated": "2026-11-01T05:39:14.979Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "settle-record-title.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T05:38:54.488Z"
+    },
+    "agent-subject-lister.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:39:14.978Z"
     }
   }
 }
