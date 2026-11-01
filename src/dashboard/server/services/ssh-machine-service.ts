@@ -58,6 +58,23 @@ import { getOverdeckVersion } from '../routes/misc/shared.js';
 import { createMachineLink } from './machine-link-service.js';
 import type { SshForwardSupervisor } from './ssh-forward-supervisor.js';
 
+/** HTTP status of each SSH machine error (D-4404-9). */
+export const SSH_MACHINE_ERROR_STATUS: Record<SshMachineErrorCode, number> = {
+  'bad-destination': 400,
+  'busy': 409,
+  'unresolvable': 502,
+  'unreachable': 502,
+  'host-key': 409,
+  'auth-failed': 401,
+  'pan-missing': 424,
+  'version-mismatch': 409,
+  'helper-failed': 502,
+  'start-failed': 502,
+  'forward-failed': 502,
+  'self-link': 409,
+  'not-found': 404,
+};
+
 export const VERSION_PROBE_TIMEOUT_MS = 20_000;
 export const HELPER_START_TIMEOUT_MS = 150_000;
 export const HELPER_STOP_TIMEOUT_MS = 45_000;

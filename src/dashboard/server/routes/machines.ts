@@ -154,7 +154,7 @@ export async function handleInboundRevoke(tokenId: string): Promise<HttpServerRe
   return jsonResponse({ ok: true, inbound: revoked ? inboundView(revoked) : null, closedChannels });
 }
 
-const ERROR_STATUS: Record<MachineLinkError['code'], number> = {
+export const ERROR_STATUS: Record<MachineLinkError['code'], number> = {
   'bad-pairing-url': 400,
   'unreachable': 502,
   'pairing-refused': 401,

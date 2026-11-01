@@ -66,6 +66,7 @@ import { environmentRouteLayer } from './routes/environment.js'
 import { pairingRouteLayer } from './routes/pairing.js'
 import { anywhereRouteLayer } from './routes/anywhere.js'
 import { machinesRouteLayer } from './routes/machines.js'
+import { machinesSshRouteLayer } from './routes/machines-ssh.js'
 import { machinesPeerRouteLayer } from './routes/machines-peer.js'
 import { pushRouteLayer } from './routes/push.js'
 import { tailscaleRouteLayer } from './routes/tailscale.js'
@@ -399,6 +400,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   pairingRouteLayer,
   anywhereRouteLayer,
   machinesRouteLayer,
+  machinesSshRouteLayer,
   machinesPeerRouteLayer,
   pushRouteLayer,
   tailscaleRouteLayer,
