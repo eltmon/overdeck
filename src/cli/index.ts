@@ -35,7 +35,7 @@ if (existsSync(OVERDECK_ENV_FILE)) {
   }
 }
 
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import chalk from 'chalk';
 import { lazyAction } from './lazy-action.js';
 import type { RoleEffort } from '../lib/config-yaml.js';
@@ -507,6 +507,7 @@ await groups.register('knowledge');
 await groups.register('swarm'); await groups.register('task');
 await groups.register('workspace');
 await groups.register('vault');
+await groups.register('account');
 await groups.register('test');
 await groups.register('tts');
 
@@ -1176,12 +1177,29 @@ const doctorCmd = program
   .command('doctor')
   .description('Check system health and dependencies')
   .option('--strict', 'Exit non-zero if any optional dependency is missing (e.g. Pi binary)')
+  .option('--json', 'Print every check as JSON (name, status, message, fix); same exit code as text mode')
   .action(lazyAction(() => import('./commands/doctor.js'), 'doctorCommand'));
 doctorCmd
   .command('github-quota')
   .description('Show GitHub API quota use per caller, active pauses, and skipped projects')
   .option('--json', 'Print JSON')
   .action(lazyAction(() => import('./commands/doctor-github-quota.js'), 'doctorGithubQuotaCommand'));
+
+program
+  .command('diagnose')
+  .description('Collect a redacted diagnostic bundle and start Claude Code or Codex to fix the problem')
+  .addOption(new Option('--harness <harness>', 'Harness to start').choices(['claude-code', 'codex']))
+  .option('--describe <text>', 'What went wrong, in your words (saved in the bundle)')
+  .option('--bundle-only', 'Write the bundle and print its path; do not start a harness')
+  .option('--no-issue', 'Do not let the session draft or create an upstream issue')
+  .option('--yes', 'Start the harness without asking to confirm the bundle')
+  .action(async (options) => {
+    // Not `lazyAction`: that forwards every argument Commander passes,
+    // including the trailing Command instance, which would land in
+    // diagnoseCommand's injectable `deps` parameter and shadow its default.
+    const { diagnoseCommand } = await import('./commands/diagnose.js');
+    await diagnoseCommand(options);
+  });
 
 await groups.register('resources');
 

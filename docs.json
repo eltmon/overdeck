@@ -62,6 +62,7 @@
               "configuration/mcp",
               "cli/vault",
               "cli/pair",
+              "cli/account",
               "cli/devices",
               "cli/token"
             ]
