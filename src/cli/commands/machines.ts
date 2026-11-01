@@ -43,6 +43,7 @@ import {
 import { callDashboard, errorText, isDashboardUnreachable } from './dashboard-call.js';
 import { call, fail, NEEDS_PAN_UP, NOT_RUNNING } from './machines-call.js';
 import { registerMachinesAddProjectCommand } from './machines-add-project.js';
+import { registerMachinesWhoCommand } from './machines-who.js';
 import { registerMachinesSshCommands } from './machines-ssh.js';
 
 export { NOT_RUNNING } from './machines-call.js';
@@ -506,4 +507,5 @@ export function registerMachinesCommands(program: Command): void {
     .action((options: MachinesUpdateOptions) => runMachinesUpdate(options));
   registerMachinesSshCommands(machines);
   registerMachinesAddProjectCommand(machines);
+  registerMachinesWhoCommand(machines);
 }

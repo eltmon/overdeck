@@ -96,6 +96,9 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/fleet/needs-you', scope: 'read:conversations' },
   // PAN-4651 WI-21: palette search across linked machines.
   { method: 'GET', path: '/api/fleet/search', scope: 'read:conversations' },
+  // PAN-4651 WI-22: which machine is working on an issue.
+  { method: 'GET', path: '/api/machines/issue-activity', scope: 'read:state' },
+  { method: 'GET', path: '/api/fleet/issues/:id/activity', scope: 'read:state' },
   // PAN-4651 WI-5: a linked machine follows (and stops) a worker it delegated here.
   { method: 'GET', path: '/api/workers/:id/status', scope: 'read:state' },
   { method: 'POST', path: '/api/workers/:id/stop', scope: 'operate' },
