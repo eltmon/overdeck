@@ -546,6 +546,14 @@ async function startTraefikBody(config: PlatformConfig): Promise<void> {
       reason: `Traefik directory missing: ${config.traefikDir}. Run \`pan install\`.`,
     });
   }
+  // PAN-4299: publish on the configured bind address before `up -d`, which
+  // recreates the container when the file changed. A failed migration never blocks the start.
+  try {
+    const { migrateTraefikCompose } = await import('./traefik.js');
+    migrateTraefikCompose(join(config.traefikDir, 'docker-compose.yml'));
+  } catch (err) {
+    console.warn(`[platform-lifecycle] Traefik compose migration failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
   try {
     await execAsync('docker compose up -d', { cwd: config.traefikDir });
   } catch (err: any) {
