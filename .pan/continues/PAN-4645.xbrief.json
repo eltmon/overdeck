@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T10:26:02.325Z",
+  "updated": "2026-11-01T10:26:17.361Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -386,6 +386,10 @@
       "claimedBy": "agent-pan-4645",
       "claimedAt": "2026-11-01T10:11:51.294Z",
       "doneAt": "2026-11-01T10:26:02.324Z"
+    },
+    "wi18-link-supervisor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:26:17.360Z"
     }
   }
 }
