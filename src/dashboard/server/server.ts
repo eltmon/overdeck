@@ -33,6 +33,7 @@ import { WorkspaceServiceLive } from './services/workspace-service.js';
 import { OpenRouterServiceLive } from './services/openrouter-service.js';
 import { PanOpenLive } from './services/open.js';
 import { setupTerminalWebSocket } from './ws-terminal.js';
+import { setupLinkedWebSocket } from './ws-linked.js';
 import { knowledgeViewerRouteLayer, setupKnowledgeViewerProxy } from './routes/knowledge-viewer.js';
 import { setupVoiceWebSocket } from './ws-voice.js';
 import { setupAutoPresoWebSocket } from './ws-autopreso.js';
@@ -147,6 +148,7 @@ const HttpServerLive = Layer.unwrap(
       const nodeServer = NodeHttp.createServer();
       holdRequestsUntilServed(nodeServer);
       setupTerminalWebSocket(nodeServer);
+      setupLinkedWebSocket(nodeServer);
       setupKnowledgeViewerProxy(nodeServer);
       setupVoiceWebSocket(nodeServer);
       setupAutoPresoWebSocket(nodeServer);
