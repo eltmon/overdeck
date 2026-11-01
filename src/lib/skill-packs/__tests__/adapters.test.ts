@@ -278,6 +278,26 @@ describe('KNOWN_PACKS', () => {
       disclosure: SAGEOX_DISCLOSURE,
     });
   });
+
+  it('points pstack at the eltmon/plugins fork, pinned, with the Claude Code build as plugin root', () => {
+    expect(KNOWN_PACKS['pstack']).toEqual({
+      id: 'pstack',
+      url: 'https://github.com/eltmon/plugins',
+      ref: 'ae5650febf4320793844c12c4adaa937f417f8da',
+      adapter: 'claude-plugin',
+      pluginRoot: 'harness/pstack/claude-code',
+      mountExtras: ['docs', 'README.md'],
+      optIn: [
+        'automate-me',
+        'create-formal-verification-skill',
+        'create-verification-skill',
+        'maintain-verification-skill',
+        'make-bot-ui',
+        'reflect',
+        'setup-pstack',
+      ],
+    });
+  });
 });
 
 describe('notAppliedLabels', () => {

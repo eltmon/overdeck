@@ -52,6 +52,10 @@ export interface KnownPack {
   skillsRoot?: string;
   /** Repo-relative dir that holds the plugin (manifest, skills, agents, hooks, LICENSE); default the repo root. */
   pluginRoot?: string;
+  /** Ref `pan skills pack add <id>` pins when --ref is omitted (a tag, branch or 40-hex commit). */
+  ref?: string;
+  /** Plugin-root-relative files or dirs the mount copies next to skills/ (reference docs skills link to). */
+  mountExtras?: readonly string[];
   optIn?: readonly string[];
   /** One-line statement of what leaves the machine, shown on the pack row. */
   disclosure?: string;
@@ -82,6 +86,24 @@ export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
       'ox-cli-cart-drop',
     ],
     disclosure: SAGEOX_DISCLOSURE,
+  },
+  // Cursor's generated Claude Code build of poteto's pstack, from the eltmon/plugins fork (PAN-4728).
+  pstack: {
+    id: 'pstack',
+    url: 'https://github.com/eltmon/plugins',
+    ref: 'ae5650febf4320793844c12c4adaa937f417f8da',
+    adapter: 'claude-plugin',
+    pluginRoot: 'harness/pstack/claude-code',
+    mountExtras: ['docs', 'README.md'],
+    optIn: [
+      'automate-me',
+      'create-formal-verification-skill',
+      'create-verification-skill',
+      'maintain-verification-skill',
+      'make-bot-ui',
+      'reflect',
+      'setup-pstack',
+    ],
   },
 };
 
