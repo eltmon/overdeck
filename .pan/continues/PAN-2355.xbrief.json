@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2355",
   "created": "2026-11-01T05:47:25.756Z",
-  "updated": "2026-11-01T06:12:06.664Z",
+  "updated": "2026-11-01T06:12:08.327Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-2355",
       "claimedAt": "2026-11-01T06:05:42.043Z",
       "doneAt": "2026-11-01T06:12:06.664Z"
+    },
+    "mobile-conversations": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2355",
+      "claimedAt": "2026-11-01T06:12:08.327Z"
     }
   }
 }
