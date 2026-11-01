@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4724",
   "created": "2026-11-01T16:06:34.998Z",
-  "updated": "2026-11-01T16:23:07.270Z",
+  "updated": "2026-11-01T16:23:21.698Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,10 @@
     "rollup-install.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T16:23:07.270Z"
+    },
+    "rollup-install.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:23:21.698Z"
     }
   }
 }
