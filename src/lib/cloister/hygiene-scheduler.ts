@@ -20,7 +20,7 @@ import { reconcileMergedIssueDocker } from './merged-docker-reconcile.js';
 import { sweepOrphanedSwarmSlots } from './swarm-orphan-sweep.js';
 import { refreshHostHeartbeatForEphemeralVms } from '../remote/remote-agents.js';
 import { refreshClaudeCredentialsForActiveRemoteAgents } from '../remote/remote-credential-refresh.js';
-import { heartbeatFlyMachines, sweepFlyMachines } from '../remote/fly-machine-loops.js';
+import { heartbeatFlyMachines, sweepFlyMachines, syncFlyCodexAuth } from '../remote/fly-machine-loops.js';
 import { loadCloisterConfigSync } from './config.js';
 
 // Cadences carried over verbatim from deacon.ts's runPatrol/startDeacon (see
@@ -80,6 +80,9 @@ export function startHygieneScheduler(): void {
     // PAN-4652: Fly machines (linked, running pan serve) get the same heartbeat, outside the freeze for the same reason.
     ['heartbeatFlyMachines', () => heartbeatFlyMachines(), REMOTE_HEARTBEAT_INTERVAL_MS],
     ['sweepFlyMachines', () => sweepFlyMachines(), REMOTE_HEARTBEAT_INTERVAL_MS],
+    // PAN-4296: Codex sign-in sync, outside the freeze too: a VM refresh must reach home
+    // before home's own next refresh, or one side's refresh token is burned.
+    ['syncFlyCodexAuth', () => syncFlyCodexAuth(), REMOTE_HEARTBEAT_INTERVAL_MS],
     ['reapOrphanedDashboardServers', reapOrphanedDashboardServers, ORPHAN_DASHBOARD_SERVER_INTERVAL_MS],
     ['reapLeftoverPlaywrightBrowsers', reapLeftoverPlaywrightBrowsers, PLAYWRIGHT_REAPER_INTERVAL_MS],
     ['reapHerdrResiduePanes', reapHerdrResiduePanes, HERDR_RESIDUE_INTERVAL_MS],

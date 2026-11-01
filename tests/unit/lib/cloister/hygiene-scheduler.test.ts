@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   refreshClaudeCredentialsForActiveRemoteAgents: vi.fn(async () => [] as string[]),
   heartbeatFlyMachines: vi.fn(async () => [] as string[]),
   sweepFlyMachines: vi.fn(async () => [] as string[]),
+  syncFlyCodexAuth: vi.fn(async () => [] as string[]),
   loadCloisterConfigSync: vi.fn(() => ({ retention: { transcript_days: 30 } })),
 }));
 
@@ -61,6 +62,7 @@ vi.mock('../../../../src/lib/remote/remote-credential-refresh.js', () => ({
 vi.mock('../../../../src/lib/remote/fly-machine-loops.js', () => ({
   heartbeatFlyMachines: mocks.heartbeatFlyMachines,
   sweepFlyMachines: mocks.sweepFlyMachines,
+  syncFlyCodexAuth: mocks.syncFlyCodexAuth,
 }));
 vi.mock('../../../../src/lib/cloister/config.js', () => ({
   loadCloisterConfigSync: mocks.loadCloisterConfigSync,
@@ -108,6 +110,7 @@ describe('hygiene-scheduler', () => {
     expect(mocks.refreshClaudeCredentialsForActiveRemoteAgents).toHaveBeenCalledTimes(1);
     expect(mocks.heartbeatFlyMachines).toHaveBeenCalledTimes(1);
     expect(mocks.sweepFlyMachines).toHaveBeenCalledTimes(1);
+    expect(mocks.syncFlyCodexAuth).toHaveBeenCalledTimes(1);
   });
 
   it('fires the 60s-cadence routines on their own interval', async () => {
@@ -136,6 +139,9 @@ describe('hygiene-scheduler', () => {
     expect(mocks.heartbeatFlyMachines).toHaveBeenCalledWith();
     expect(mocks.sweepFlyMachines).toHaveBeenCalledTimes(1);
     expect(mocks.sweepFlyMachines).toHaveBeenCalledWith();
+    // PAN-4296: the Codex sign-in sync, every 60 s with no argument.
+    expect(mocks.syncFlyCodexAuth).toHaveBeenCalledTimes(1);
+    expect(mocks.syncFlyCodexAuth).toHaveBeenCalledWith();
     // ~10-minute-cadence routines must not have fired yet.
     expect(mocks.reapOrphanedDashboardServers).not.toHaveBeenCalled();
     expect(mocks.reapLeftoverPlaywrightBrowsers).not.toHaveBeenCalled();

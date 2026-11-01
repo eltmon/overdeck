@@ -2,7 +2,8 @@
  * PAN-4652 WI-11: the Fly machine heartbeat and sweep — no client with zero
  * records (NFR-1), failures never read as refreshed, positive evidence only
  * for gone machines, the idle window under fake timers, and the unlinked
- * provisioning limit.
+ * provisioning limit. PAN-4296 WI-7: the Codex sign-in sync — no client
+ * without a Codex-ready record, push, pull, skip on an indeterminate read.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,10 +11,12 @@ import type { FlyMachineRecord } from '../../../../src/lib/anywhere/fly/machine-
 import { FlyApiError } from '../../../../src/lib/remote/fly-api.js';
 import {
   _resetFlyMachineLoopsForTests,
+  type FlyCodexSyncDeps,
   type FlyMachineLoopDeps,
   heartbeatFlyMachines,
   type LinkedConversationActivity,
   sweepFlyMachines,
+  syncFlyCodexAuth,
 } from '../../../../src/lib/remote/fly-machine-loops.js';
 
 const ENV = '3f2c1b7e-9a4d-4c2b-8e1f-0a1b2c3d4e5f';
@@ -22,7 +25,7 @@ const MINUTE = 60_000;
 function record(overrides: Partial<FlyMachineRecord> = {}): FlyMachineRecord {
   return {
     id: 'rec-1', linkId: 'link-1', environmentId: ENV, machineId: 'm1', machineName: 'overdeck-machine-1a2b3c4d',
-    appName: 'overdeck-ws', region: 'iad', label: 'fly-m1', projectKey: null, docker: true,
+    appName: 'overdeck-ws', region: 'iad', label: 'fly-m1', projectKey: null, docker: true, codexAuthPath: null,
     createdAt: new Date().toISOString(),
     ...overrides,
   };
@@ -183,5 +186,91 @@ describe('sweepFlyMachines (PAN-4652 WI-11)', () => {
     expect((await sweepFlyMachines(deps))[0]).toMatch(/^could not destroy fly-m1 \(machine stopped\)/);
     expect(deps.removeLink).not.toHaveBeenCalled();
     expect(deps.removeRecord).not.toHaveBeenCalled();
+  });
+});
+
+describe('syncFlyCodexAuth (PAN-4296 WI-7)', () => {
+  const PATH = '/.codex/auth.json';
+  const signIn = (refresh: string, lastRefresh: string) => JSON.stringify({
+    tokens: { access_token: 'a', id_token: 'i', refresh_token: refresh, account_id: 'acct-1' },
+    last_refresh: lastRefresh,
+  });
+  const HOME = signIn('rt-home', '2026-11-01T10:00:00.000Z');
+  const NEWER_VM = signIn('rt-vm', '2026-11-01T11:00:00.000Z');
+  const ready = (overrides: Partial<FlyMachineRecord> = {}) => record({ codexAuthPath: PATH, ...overrides });
+
+  function sync(records: FlyMachineRecord[], vmRead: { stdout: string; exit_code: number } | Error, homeAuth: string | null = HOME) {
+    const execCommand = vi.fn(async (_app: string, _id: string, command: string[]) => {
+      const script = command[2]!;
+      if (script.startsWith('if [ -f')) {
+        if (vmRead instanceof Error) throw vmRead;
+        return { stdout: vmRead.stdout, stderr: '', exit_code: vmRead.exit_code };
+      }
+      return { stdout: '', stderr: '', exit_code: 0 };
+    });
+    const deps = {
+      listRecords: vi.fn(async () => records),
+      api: vi.fn(async () => ({ execCommand })),
+      readHomeAuth: vi.fn(async () => homeAuth),
+      writeHomeAuth: vi.fn(async () => undefined),
+      activity: vi.fn(),
+    } satisfies FlyCodexSyncDeps;
+    const scripts = () => execCommand.mock.calls.map((call) => call[2][2]!);
+    return { deps, execCommand, scripts };
+  }
+
+  it('makes no Fly API call without a Codex-ready record', async () => {
+    const { deps } = sync([record(), ready({ id: 'rec-2', linkId: null })], { stdout: HOME, exit_code: 0 });
+    expect(await syncFlyCodexAuth(deps)).toEqual([]);
+    expect(deps.api).not.toHaveBeenCalled();
+    expect(deps.readHomeAuth).not.toHaveBeenCalled();
+  });
+
+  it('skips a record without codexAuthPath and pushes to a VM with no sign-in', async () => {
+    const { deps, scripts } = sync([record({ id: 'rec-0', label: 'fly-m0' }), ready()], { stdout: '__MISSING__', exit_code: 0 });
+    expect(await syncFlyCodexAuth(deps)).toEqual(['Codex sign-in copied to fly-m1']);
+    expect(scripts()).toHaveLength(2);
+    expect(scripts()[1]).toContain(`printf %s '${Buffer.from(HOME).toString('base64')}' | base64 -d`);
+    expect(deps.writeHomeAuth).not.toHaveBeenCalled();
+  });
+
+  it('copies a newer same-account VM refresh home and pushes nothing', async () => {
+    const { deps, scripts } = sync([ready()], { stdout: NEWER_VM, exit_code: 0 });
+    expect(await syncFlyCodexAuth(deps)).toEqual(['Codex sign-in refreshed on fly-m1 copied home']);
+    expect(deps.writeHomeAuth).toHaveBeenCalledWith(NEWER_VM);
+    expect(scripts()).toHaveLength(1);
+    expect(deps.activity).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(deps.activity.mock.calls)).not.toContain('rt-vm');
+  });
+
+  it('compares a later machine against the pulled sign-in, not the stale home copy', async () => {
+    const { deps, scripts } = sync([ready(), ready({ id: 'rec-2', machineId: 'm2', label: 'fly-m2' })], { stdout: NEWER_VM, exit_code: 0 });
+    expect(await syncFlyCodexAuth(deps)).toEqual(['Codex sign-in refreshed on fly-m1 copied home']);
+    expect(deps.writeHomeAuth).toHaveBeenCalledTimes(1);
+    expect(scripts()).toHaveLength(2);
+  });
+
+  it('neither pushes nor writes when the read exits non-zero or throws', async () => {
+    for (const vmRead of [{ stdout: '', exit_code: 1 }, new Error('Fly API error 429')]) {
+      const { deps, scripts } = sync([ready()], vmRead);
+      expect(await syncFlyCodexAuth(deps)).toEqual(['Codex sign-in sync skipped on fly-m1: the Fly machine did not answer']);
+      expect(scripts()).toHaveLength(1);
+      expect(deps.writeHomeAuth).not.toHaveBeenCalled();
+    }
+  });
+
+  it('runs nothing beyond the read when both sides hold the same sign-in', async () => {
+    const { deps, scripts } = sync([ready()], { stdout: `${JSON.stringify(JSON.parse(HOME), null, 2)}\n`, exit_code: 0 });
+    expect(await syncFlyCodexAuth(deps)).toEqual([]);
+    expect(scripts()).toHaveLength(1);
+    expect(deps.writeHomeAuth).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed push as a failure, never as copied', async () => {
+    const { deps, execCommand } = sync([ready()], { stdout: '__MISSING__', exit_code: 0 });
+    execCommand.mockImplementation(async (_app: string, _id: string, command: string[]) =>
+      (command[2]!.startsWith('if [ -f') ? { stdout: '__MISSING__', stderr: '', exit_code: 0 } : { stdout: '', stderr: HOME, exit_code: 1 }));
+    const lines = await syncFlyCodexAuth(deps);
+    expect(lines).toEqual([`failed to copy the Codex sign-in to fly-m1: Could not write ${PATH} on the Fly machine (exit 1)`]);
   });
 });

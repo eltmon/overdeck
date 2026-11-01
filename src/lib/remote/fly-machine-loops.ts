@@ -1,9 +1,10 @@
 /**
  * Keep Fly machines alive while used and destroy them when not (PAN-4652
- * WI-11, FR-14, FR-16, D-9).
+ * WI-11, FR-14, FR-16, D-9), and keep their Codex sign-in in step with home's
+ * (PAN-4296 WI-7, FR-10).
  *
- * Both routines run every 60 s in the deacon child's hygiene scheduler, outside
- * the deacon freeze, over the records in `fly-machines.json`:
+ * All three routines run every 60 s in the deacon child's hygiene scheduler,
+ * outside the deacon freeze, over the records in `fly-machines.json`:
  *
  * - `heartbeatFlyMachines` writes the host heartbeat on every Fly machine, so
  *   its watchdog (installed at provisioning) does not stop it. When home stops
@@ -15,16 +16,25 @@
  *   `remote.fly.machine_idle_minutes` (default 30, 0 disables), or when its
  *   provisioning never linked it within 30 minutes. A stopped Fly machine has
  *   lost its rootfs, so it is destroyed, never restarted.
+ * - `syncFlyCodexAuth` reads the Codex `auth.json` of every linked machine with
+ *   a `codexAuthPath` and decides by newest refresh wins (PAN-4296 D-3): it
+ *   pushes home's sign-in, copies a newer VM refresh home, or does nothing. A
+ *   VM that does not answer is skipped until the next tick. No sign-in content
+ *   reaches a log line or an activity entry.
  *
- * With zero records neither routine constructs a Fly client (NFR-1). Calls go
+ * With no matching record no routine constructs a Fly client (NFR-1). Calls go
  * by the record's app and machine id through the API client (D-11). The idle
  * clock lives in memory: after a deacon restart the window starts again.
  */
+import { readFile } from 'node:fs/promises';
+
+import { decideCodexAuthSync, parseCodexAuthSnapshot, pushVmCodexAuth, readVmCodexAuth, writeHomeCodexAuth } from '../anywhere/fly/codex-auth.js';
 import type { FlyMachineRecord } from '../anywhere/fly/machine-store.js';
 import { listFlyMachines, removeFlyMachine } from '../anywhere/fly/machine-store.js';
 import { destroyFlyVm, loadFlyApi } from '../anywhere/fly/provision.js';
 import { removeLink } from '../anywhere/link-store.js';
 import { emitActivityEntry } from '../activity-logger.js';
+import { getNativeCodexAuthPath } from '../codex-auth.js';
 import { loadConfig } from '../config.js';
 import { listLinkedConversations } from '../overdeck/linked-conversations.js';
 import type { FlyApiClient } from './fly-api.js';
@@ -162,6 +172,72 @@ export async function sweepFlyMachines(overrides: Partial<FlyMachineLoopDeps> = 
     idleSince.delete(record.id);
     deps.activity(`Destroyed Fly machine ${record.label}: ${reason}`, { machineId: record.machineId, appName: record.appName, linkId: record.linkId, reason });
     lines.push(`destroyed ${record.label}: ${reason}`);
+  }
+  return lines;
+}
+
+export interface FlyCodexSyncDeps {
+  listRecords: () => Promise<FlyMachineRecord[]>;
+  /** Called only when at least one record is Codex-ready (NFR-1). */
+  api: () => Promise<Pick<FlyApiClient, 'execCommand'>>;
+  /** Home's native Codex `auth.json`, or null when it does not exist. */
+  readHomeAuth: () => Promise<string | null>;
+  writeHomeAuth: (raw: string) => Promise<void>;
+  activity: (message: string, details: Record<string, unknown>) => void;
+}
+
+async function readNativeCodexAuth(): Promise<string | null> {
+  try {
+    return await readFile(getNativeCodexAuthPath(), 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+const defaultCodexSyncDeps: FlyCodexSyncDeps = {
+  listRecords: listFlyMachines,
+  api: loadFlyApi,
+  readHomeAuth: readNativeCodexAuth,
+  writeHomeAuth: (raw) => writeHomeCodexAuth(raw),
+  activity: defaultDeps.activity,
+};
+
+/** FR-10: newest refresh wins between home's Codex sign-in and each Codex-ready Fly machine's. */
+export async function syncFlyCodexAuth(overrides: Partial<FlyCodexSyncDeps> = {}): Promise<string[]> {
+  const deps = { ...defaultCodexSyncDeps, ...overrides };
+  const targets = (await deps.listRecords()).filter((record) => record.linkId !== null && record.codexAuthPath !== null);
+  if (targets.length === 0) return [];
+  const api = await deps.api();
+  const homeRaw = await deps.readHomeAuth();
+  let home = homeRaw === null ? null : parseCodexAuthSnapshot(homeRaw);
+  const lines: string[] = [];
+
+  for (const record of targets) {
+    const path = record.codexAuthPath!;
+    const exec = (command: string, timeoutSeconds: number) =>
+      api.execCommand(record.appName, record.machineId, ['/bin/sh', '-c', command], timeoutSeconds);
+    const read = await readVmCodexAuth(exec, path);
+    if (read.state === 'indeterminate') {
+      lines.push(`Codex sign-in sync skipped on ${record.label}: the Fly machine did not answer`);
+      continue;
+    }
+    const vm = read.state === 'present' ? parseCodexAuthSnapshot(read.raw) : null;
+    const action = decideCodexAuthSync(home, vm);
+    try {
+      if (action === 'push') {
+        await pushVmCodexAuth(exec, path, home!.raw);
+        lines.push(`Codex sign-in copied to ${record.label}`);
+      } else if (action === 'pull') {
+        await deps.writeHomeAuth(vm!.raw);
+        home = parseCodexAuthSnapshot(vm!.raw);
+        deps.activity(`Codex sign-in refreshed on Fly machine ${record.label} copied home`, { machineId: record.machineId, appName: record.appName, linkId: record.linkId });
+        lines.push(`Codex sign-in refreshed on ${record.label} copied home`);
+      }
+    } catch (error) {
+      // pushVmCodexAuth names the path and exit code only; a home write names the local path.
+      lines.push(`failed to ${action === 'push' ? 'copy the Codex sign-in to' : 'copy the Codex sign-in home from'} ${record.label}: ${(error as Error).message}`);
+    }
   }
   return lines;
 }
