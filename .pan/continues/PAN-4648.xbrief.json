@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4648",
   "created": "2026-11-01T05:50:45.229Z",
-  "updated": "2026-11-01T07:53:05.583Z",
+  "updated": "2026-11-01T07:53:21.238Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "trigger-envelope.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T07:53:05.583Z"
+    },
+    "trigger-deliver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:53:21.237Z"
     }
   }
 }
