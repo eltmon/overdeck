@@ -56,6 +56,8 @@ export interface LinkSupervisorDeps {
   setLinkRoutes: (id: string, routes: LinkRoute[]) => Promise<unknown>;
   /** Called with every descriptor read through a link (WI-19 merges advertised endpoints). */
   onDescriptor?: (link: MachineLink, descriptor: EnvironmentDescriptor) => void | Promise<void>;
+  /** Called after each heartbeat on the current channel (PAN-4650: conversations hash). */
+  onHeartbeat?: (link: MachineLink, payload: HeartbeatPayload) => void | Promise<void>;
   /** This machine's Overdeck version, for the "install …" detail. */
   serverVersion: string;
   now: () => number;
@@ -594,6 +596,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       void this.refetchDescriptor(entry, channel);
     }
     entry.lastEndpointsHash = payload.endpointsHash;
+    void this.deps.onHeartbeat?.(entry.link, payload);
   }
 
   private async refetchDescriptor(entry: Entry, heartbeatChannel: ChannelSocket): Promise<void> {

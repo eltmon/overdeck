@@ -117,3 +117,11 @@ export function cachedListHash(environmentId: string): string | null {
     .get<{ list_hash: string }>(environmentId);
   return row?.list_hash ?? emptyAnswerHashes.get(environmentId) ?? null;
 }
+
+/** Environments with anything cached (rows, or the hash of an answer with no rows). */
+export function linkedConversationEnvironmentIds(): string[] {
+  const rows = getOverdeckDatabase()
+    .prepare('SELECT DISTINCT environment_id FROM linked_conversations')
+    .all<{ environment_id: string }>();
+  return [...new Set([...rows.map((row) => row.environment_id), ...emptyAnswerHashes.keys()])];
+}

@@ -10,7 +10,7 @@
  */
 import { defaultDiscoverDeps, EndpointAdvertiser, setAdvertisedEndpointsSource } from '../../../lib/anywhere/endpoints.js';
 import { setLinkRouteSource, linkFetch, closeLinkAgent } from '../../../lib/anywhere/link-client.js';
-import { MACHINE_LINKS_REFRESH_MS, startLinkStoreRefresh, stopLinkStoreRefresh } from '../../../lib/anywhere/link-store.js';
+import { linksSnapshot, MACHINE_LINKS_REFRESH_MS, startLinkStoreRefresh, stopLinkStoreRefresh } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey } from '../../../lib/anywhere/machine-key.js';
 import { sharedConversationsHashForHeartbeat } from '../../../lib/anywhere/shared-conversations.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
@@ -18,6 +18,7 @@ import { setLinkStatusSource, setPeerUnlinkNotifier } from '../routes/machines.j
 import { getOverdeckVersion } from '../routes/misc/shared.js';
 import { setHeartbeatConversationsHashSource, setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
+import { createLinkedConversationsSync } from './linked-conversations-sync.js';
 
 let supervisor: LinkSupervisor | null = null;
 let advertiser: EndpointAdvertiser | null = null;
@@ -46,7 +47,13 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   setHeartbeatConversationsHashSource(sharedConversationsHashForHeartbeat);
   await advertiser.start();
 
-  supervisor = new LinkSupervisor(defaultLinkSupervisorDeps(await getOverdeckVersion()));
+  // PAN-4650 WI-3: linked machines' conversation lists, fetched on connect and on a changed hash.
+  const linkedConversations = createLinkedConversationsSync();
+  supervisor = new LinkSupervisor({
+    ...defaultLinkSupervisorDeps(await getOverdeckVersion()),
+    onDescriptor: (link) => linkedConversations.onConnect(link),
+    onHeartbeat: (link, payload) => linkedConversations.onHeartbeat(link, payload),
+  });
   supervisor.start();
   setLinkStatusSource(supervisor);
   setLinkRouteSource(supervisor);
@@ -60,7 +67,10 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   });
   // Links created or removed by the routes (or another process) are picked up
   // on the same cadence as the store snapshot.
-  reconcileTimer = setInterval(() => supervisor?.reconcile(), MACHINE_LINKS_REFRESH_MS);
+  reconcileTimer = setInterval(() => {
+    supervisor?.reconcile();
+    linkedConversations.prune(linksSnapshot().filter((link) => link.revokedAt === null).map((link) => link.environmentId));
+  }, MACHINE_LINKS_REFRESH_MS);
   reconcileTimer.unref?.();
 }
 
