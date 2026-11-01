@@ -286,9 +286,14 @@ export async function createMachineLink(
 }
 
 /** Live state for a link; the link supervisor (WI-18) provides the real one. */
+/** Which Overdeck version to install, and where, for an `unsupported` link (PAN-4654 FR-1). */
+export interface UnsupportedInstall { version: string; on: 'this-machine' | 'peer' }
+
 export interface LinkStatusSource {
   status(linkId: string): Pick<MachineLinkView, 'state' | 'stateDetail' | 'currentRoute' | 'lastHeartbeatAt' | 'incident' | 'peerVersion'> & {
     routeStatus: (url: string) => MachineLinkView['routes'][number]['status'];
+    /** Set while the link is `unsupported`; not part of `MachineLinkView`. */
+    unsupported: UnsupportedInstall | null;
   };
   /** Reset back-off and probe now; false for an unknown or revoked link. */
   reconnect?(linkId: string): boolean;
@@ -299,7 +304,7 @@ export interface LinkStatusSource {
 }
 
 export const connectingStatusSource: LinkStatusSource = {
-  status: () => ({ state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, routeStatus: () => 'untried' }),
+  status: () => ({ state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, unsupported: null, routeStatus: () => 'untried' }),
 };
 
 /** The public face of a link: never the token. `peerVersion` falls back to what the caller learned when the source has none. */
