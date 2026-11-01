@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4730",
   "created": "2026-11-01T20:48:21.313Z",
-  "updated": "2026-11-01T22:08:51.755Z",
+  "updated": "2026-11-01T22:09:06.100Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -372,6 +372,9 @@
       "doneAt": "2026-11-01T22:08:36.498Z"
     },
     "gstack-daemon-report.ac1": {
+      "status": "cancelled"
+    },
+    "gstack-browser-live.ac4": {
       "status": "cancelled"
     }
   }
