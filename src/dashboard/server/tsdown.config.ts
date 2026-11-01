@@ -156,6 +156,9 @@ export default defineConfig(async () => {
         'playwright',
         'playwright-core',
         /^chromium-bidi/,
+        // PAN-2354: web-push (VAPID + RFC 8291) is CommonJS; keep it external so it
+        // resolves from the root node_modules at runtime.
+        'web-push',
         /^bun:/,
         /^@effect\/platform-bun/,
       ],
