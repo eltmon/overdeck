@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T06:08:55.732Z",
+  "updated": "2026-11-01T06:15:28.743Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "ts-install-plan.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T06:08:55.731Z"
+    },
+    "ts-userspace": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:15:28.743Z"
     }
   }
 }
