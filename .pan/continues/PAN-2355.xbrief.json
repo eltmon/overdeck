@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2355",
   "created": "2026-11-01T05:47:25.756Z",
-  "updated": "2026-11-01T07:46:59.487Z",
+  "updated": "2026-11-01T07:47:17.027Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "setup-phone-dialog.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:46:59.487Z"
+    },
+    "setup-phone-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:47:17.027Z"
     }
   }
 }
