@@ -222,6 +222,15 @@ and refreshes snapshots; links are never deleted, only dismissed. `pan done` /
 from `DerivedIssueState.pr`, not from links; the conversation list's badge
 (`primitives/PullRequestBadge.tsx`) reads the effective link.
 
+Conversation-message delivery (`handleConversationMessage`,
+`src/lib/overdeck/conversation-message.ts`) refuses an `ended` conversation with
+422; callers resume first via `handleConversationResume`
+(`conversation-runtime.ts`). Deacon-lite runs in the forked `deacon.js` child and
+reaches the dashboard only over internal HTTP, so work that resumes or messages
+conversations belongs in a dashboard service like the PR sync sweep. PAN-4640
+added `conversation_schedules` and `services/conversation-schedule-service.ts`
+on that pattern.
+
 ## Dashboard auth (verified 2026-09-30)
 
 No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.

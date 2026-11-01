@@ -420,6 +420,28 @@ door that does not exist; a real record read door would be a separate change.
   and `pullRequest` + `pullRequests` on `GET /api/conversations/:id`. A new table
   goes in the init migration AND a `runSchemaTopUp` in `ensureRuntimeIndexesSync`,
   and bumps `OVERDECK_TABLE_COUNT`.
+- Conversation schedules (PAN-4640): the `conversation_schedules` table holds one
+  prompt, a 5-field cron, an IANA `time_zone`, `enabled`, `next_run_at`, and the
+  last run's time, status (`delivered`, `failed`, `skipped`) and error, deleted with
+  its conversation. The door is `src/lib/overdeck/conversation-schedules.ts`;
+  recurrence rules (5 fields only, a valid zone, at least one future run, runs at
+  least 15 minutes apart, DST-correct next run via croner, always `paused: true`)
+  live in `conversation-schedule-recurrence.ts`. The routes
+  (`GET/POST /api/conversations/:name/schedules`,
+  `PATCH/DELETE /api/conversations/:name/schedules/:id`, in
+  `routes/conversation-schedules.ts`) and `pan conv schedule` both call the door.
+  The sweep (`services/conversation-schedule-service.ts`, primary dashboard only,
+  boot +30 s then every 60 s, non-overlapping) claims each due row with a
+  compare-and-set `UPDATE` that advances `next_run_at` to the first run after the
+  current wall clock, then fires: it resumes a stopped session with resume cause
+  `message`, then delivers through `handleConversationMessage` (`follow_up` on Pi).
+  Claim-then-fire makes a fire at most once and collapses runs missed during
+  downtime into one. A failed fire is recorded and never retried; an archived
+  conversation's schedule is advanced and recorded `skipped`. The sweep is not a
+  deacon-lite patrol: resume and delivery are in-process dashboard calls (the
+  deacon child would need two internal HTTP hops and could not pass a resume
+  cause), and a scheduled prompt follows the operator-message rule, so the
+  deacon pause toggle does not apply.
 - `GET /api/conversations/:name/messages` and `/message-locator` resolve registered
   rows first. A name that is a bare Claude session UUID with no row (a Cmd-K hit on an
   indexed transcript Overdeck never registered) falls back to an exact `<uuid>.jsonl`

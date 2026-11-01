@@ -71,6 +71,7 @@ import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { conversationKickoffRouteLayer } from './routes/conversation-kickoff.js';
 import { conversationBookmarksRouteLayer } from './routes/conversation-bookmarks.js';
+import { conversationSchedulesRouteLayer } from './routes/conversation-schedules.js';
 import { conversationsRetrospectiveRouteLayer } from './routes/conversations-retrospective.js';
 import { conversationCompanionTerminalRouteLayer } from './routes/conversation-companion-terminal.js';
 import { conversationPullRequestRoutes } from './routes/conversation-pull-requests.js';
@@ -315,6 +316,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   conversationsRouteLayer,
   conversationKickoffRouteLayer,
   conversationBookmarksRouteLayer,
+  conversationSchedulesRouteLayer,
   conversationsRetrospectiveRouteLayer,
   conversationCompanionTerminalRouteLayer,
   conversationPullRequestRoutes,

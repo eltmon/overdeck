@@ -217,3 +217,52 @@ describe('handleConversationResume clear-chain redirect', () => {
     expect(createSessionCalls).toHaveLength(0);
   });
 });
+
+describe('PAN-4640 resume cause override', () => {
+  beforeEach(async () => {
+    ensurePtySupervisorBuildArtifact();
+    overdeckHome = join(tmpdir(), `pan-conv-resume-cause-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    process.env.OVERDECK_HOME = overdeckHome;
+    mkdirSync(overdeckHome, { recursive: true });
+    fakeHome = overdeckHome;
+    resolvedHarnessBinary = '/usr/bin/claude';
+    createSessionCalls = [];
+    const { deliverAgentMessage } = await import('../../agents.js');
+    vi.mocked(deliverAgentMessage).mockClear();
+  });
+
+  afterEach(async () => {
+    await resetConversationDb();
+    rmSync(overdeckHome, { recursive: true, force: true });
+    delete process.env.OVERDECK_HOME;
+  });
+
+  async function resumeEnded(name: string, deps: { resumeCause?: 'message' }): Promise<string> {
+    const { createConversation, markConversationEnded } = await import('../conversations.js');
+    const { handleConversationResume } = await import('../conversation-runtime.js');
+    const { deliverAgentMessage } = await import('../../agents.js');
+    const cwd = join(overdeckHome, 'projects', name);
+    mkdirSync(cwd, { recursive: true });
+    const sessionFile = join(overdeckHome, `${name}.jsonl`);
+    writeFileSync(sessionFile, '');
+    createConversation({ name, tmuxSession: `conv-${name}`, cwd, harness: 'claude-code', claudeSessionId: `${name}-session` });
+    markConversationEnded(name);
+
+    await handleConversationResume(name, {}, { resolveSessionFile: async () => sessionFile, ...deps });
+    const contract = vi.mocked(deliverAgentMessage).mock.calls
+      .map((call) => String(call[1]))
+      .find((text) => text.startsWith('CONVERSATION RESUME:'));
+    expect(contract).toBeDefined();
+    return contract!;
+  }
+
+  it('uses the injected resume cause', async () => {
+    const contract = await resumeEnded('resume-cause-message', { resumeCause: 'message' });
+    expect(contract).toContain('because a new message arrived while it was stopped');
+  });
+
+  it('keeps the operator cause for an ended conversation without an override', async () => {
+    const contract = await resumeEnded('resume-cause-default', {});
+    expect(contract).toContain('The operator resumed this session');
+  });
+});
