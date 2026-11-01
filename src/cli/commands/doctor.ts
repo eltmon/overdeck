@@ -24,6 +24,7 @@ import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
 import { checkSyncSourceCheckout } from './doctor-sync-source-freshness.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
+import { checkTraefikPortBinding } from './doctor-traefik.js';
 import { checkProjectTrackerConfig } from './doctor-project-config.js';
 import { checkHerdr } from './doctor-herdr.js';
 import { checkPrimeAgent } from './doctor-prime-agent.js';
@@ -920,6 +921,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Check inotify watch budget and persistence (PAN-3063)
   for (const c of await checkInotify()) checks.push(c);
+  for (const c of await checkTraefikPortBinding()) checks.push(c); // PAN-4299
 
   // Check for legacy command invocations in shell rc files (PAN-705)
   const legacyPatterns = [
