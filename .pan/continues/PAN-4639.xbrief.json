@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T09:35:52.464Z",
+  "updated": "2026-11-01T09:36:11.107Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "list-enrichment.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T09:35:52.464Z"
+    },
+    "triage-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:36:11.106Z"
     }
   }
 }
