@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4680",
   "created": "2026-11-01T07:24:32.678Z",
-  "updated": "2026-11-01T09:24:12.600Z",
+  "updated": "2026-11-01T09:26:17.840Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,10 @@
       "claimedBy": "agent-pan-4680",
       "claimedAt": "2026-11-01T09:22:57.176Z",
       "doneAt": "2026-11-01T09:24:12.600Z"
+    },
+    "serialize-appends.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:26:17.840Z"
     }
   }
 }
