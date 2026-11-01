@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:15:16.352Z",
+  "updated": "2026-11-01T14:15:30.772Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,10 @@
       "claimedBy": "agent-pan-2356",
       "claimedAt": "2026-11-01T14:14:59.002Z",
       "doneAt": "2026-11-01T14:15:16.352Z"
+    },
+    "wi10-rtc-transport.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:15:30.772Z"
     }
   }
 }
