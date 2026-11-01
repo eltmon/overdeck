@@ -429,3 +429,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   main's verdict by run number:
   `gh api "repos/eltmon/overdeck/actions/workflows/ci.yml/runs?branch=main&per_page=6" --jq '.workflow_runs | sort_by(-.run_number)'`.
   Note the skill's `gh run list` query can time out; this endpoint has not.
+- 2026-11-01 11:05 UTC: PAN-4710 (needs-handoff). Deferred planning hand-off
+  retries (`deferred-handoff.ts` `defaultSpawn` ~150) send no guardrail ack,
+  unlike the first hand-off, so they fail at "agent count high" and end in a
+  silent `handoff.abandoned` gave-up. Cost PAN-4663 and PAN-4670 three hours.
+  Each tick, scan workspaces whose last handoff.* entry is `handoff.abandoned`
+  with no live agent and an unmerged issue; relaunch with `pan start <id>`.
