@@ -629,7 +629,7 @@ export async function enablePackBrowser(
  * browser runtime, and delete the browser cache. Browse daemons are left
  * running (the CLI reports them).
  */
-export async function disablePackBrowser(id: string): Promise<{ changed: boolean }> {
+export async function disablePackBrowser(id: string): Promise<{ changed: boolean; renderDir: string; cacheDir: string }> {
   const entry = await requireBrowserPack(id);
   const renderDir = packRenderDir(id, entry.commit);
   const changed = entry.browser === true || (await isBrowserReady(renderDir));
@@ -640,8 +640,9 @@ export async function disablePackBrowser(id: string): Promise<{ changed: boolean
   const dir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
   await rm(renderDir, { recursive: true, force: true });
   await renderPack(id, dir, entry.commit);
-  await rm(packBrowserDir(id), { recursive: true, force: true });
-  return { changed };
+  const cacheDir = packBrowserDir(id);
+  await rm(cacheDir, { recursive: true, force: true });
+  return { changed, renderDir, cacheDir };
 }
 
 /**

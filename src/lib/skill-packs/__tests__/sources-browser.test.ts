@@ -187,14 +187,18 @@ describe('disablePackBrowser', () => {
     await enablePackBrowser('gstack', accept);
     expect(existsSync(join(packRenderDir('gstack', good), 'node_modules'))).toBe(true);
 
-    expect(await disablePackBrowser('gstack')).toEqual({ changed: true });
+    expect(await disablePackBrowser('gstack')).toEqual({
+      changed: true,
+      renderDir: packRenderDir('gstack', good),
+      cacheDir: packBrowserDir('gstack'),
+    });
     expect(await getPack('gstack')).toEqual({ id: 'gstack', url: up.url, ref: good, commit: good });
     expect(existsSync(join(packRenderDir('gstack', good), '.gstack-pack.json'))).toBe(true);
     expect(existsSync(browserMarker(good))).toBe(false);
     expect(existsSync(join(packRenderDir('gstack', good), 'node_modules'))).toBe(false);
     expect(existsSync(packBrowserDir('gstack'))).toBe(false);
 
-    expect(await disablePackBrowser('gstack')).toEqual({ changed: false });
+    expect((await disablePackBrowser('gstack')).changed).toBe(false);
   });
 });
 

@@ -6,8 +6,9 @@
  *   pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
  *   pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]   (PAN-4334; <skill> may be <pack>/<skill>)
  *   pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>] [--conversation <tmuxSession>] [--codex-home <dir>] [--plugin-link <path>]   (hidden; launchers)
- *   pan skills pack add <id> [url] [--ref <ref>] [--adapter plain|claude-plugin|deft-readonly] [--yes]      (PAN-4334; known packs default url/ref, PAN-4728)
+ *   pan skills pack add <id> [url] [--ref <ref>] [--adapter plain|claude-plugin|deft-readonly] [--browser] [--yes]      (PAN-4334; known packs default url/ref, PAN-4728)
  *   pan skills pack update <id> [--ref <ref>] [--yes]
+ *   pan skills pack browser <id> [on|off] [--yes]   (PAN-4730; gstack's browser runtime, second consent; ./skills-pack-browser.ts)
  *   pan skills pack list [--json] [--offline] | remove <id> | sync [id] | gc [--max-age-days <n>]
  *   pan skills pack sageox status [--project <key>] [--json] | upload on|off --project <key>   (PAN-2444)
  *   pan skills deft status|enable|disable …   (PAN-3943; ./skills-deft.ts)
@@ -24,7 +25,8 @@ import { registerSkillsDeftCommands } from './skills-deft.js';
 interface ListOptions { project?: string; issue?: string; json?: boolean }
 interface SetOptions { project?: string; issue?: string; pack?: string }
 interface LaunchSettingsOptions { harness: string; cwd: string; issue?: string; conversation?: string; codexHome?: string; pluginLink?: string }
-interface PackAddOptions { ref?: string; adapter?: string; yes?: boolean }
+interface PackAddOptions { ref?: string; adapter?: string; yes?: boolean; browser?: boolean }
+interface PackBrowserOptions { yes?: boolean }
 interface PackUpdateOptions { ref?: string; yes?: boolean }
 interface PackListOptions { json?: boolean; offline?: boolean }
 interface PackGcOptions { maxAgeDays?: string }
@@ -251,10 +253,9 @@ function printPackPreview(preview: PackPreview, notAppliedLabels: NotAppliedLabe
     rows.push(['Not mounted', `${manifest.excluded.length}: ${manifest.excluded.map(skill => `${skill.name} (${skill.reason})`).join('; ')}`]);
   }
   if (runtime) {
-    rows.push(
-      ['Runs', preview.runtime?.command.join(' ') ?? 'unknown'],
-      ['Executables', `${executables.length} files the mounted skills can run:`],
-    );
+    // The browser-runtime preview (PAN-4730) renders nothing, so it has no render command; its own Runs row follows.
+    if (preview.runtime) rows.push(['Runs', preview.runtime.command.join(' ')]);
+    rows.push(['Executables', `${executables.length} files the mounted skills can run:`]);
   } else {
     rows.push(['Executables', executables.length > 3 ? `${executables.slice(0, 3).join(', ')}, …` : listOrNone(executables)]);
   }
@@ -275,10 +276,16 @@ function printPackPreview(preview: PackPreview, notAppliedLabels: NotAppliedLabe
 }
 
 /** PD-10: `--yes` trusts; a TTY asks; anything else writes nothing. */
-async function packConfirm(yes: boolean | undefined, note?: string): Promise<(preview: PackPreview) => Promise<boolean>> {
+async function packConfirm(
+  yes: boolean | undefined,
+  note?: string,
+  question = 'Trust this commit? [y/N] ',
+): Promise<(preview: PackPreview) => Promise<boolean>> {
   const { notAppliedLabels } = await import('../../lib/skill-packs/adapters.js');
   return async preview => {
     printPackPreview(preview, notAppliedLabels);
+    // PAN-4730 D13: the browser runtime's command, downloads and writes join the preview (add --browser, browser on, update).
+    if (preview.browser) (await import('./skills-pack-browser.js')).printBrowserPreview(preview.browser);
     if (note) console.log(note);
     if (yes) return true;
     if (!process.stdin.isTTY) {
@@ -288,7 +295,7 @@ async function packConfirm(yes: boolean | undefined, note?: string): Promise<(pr
     const { createInterface } = await import('node:readline/promises');
     const rl = createInterface({ input: process.stdin, output: process.stderr });
     try {
-      return /^y(es)?$/i.test((await rl.question('Trust this commit? [y/N] ')).trim());
+      return /^y(es)?$/i.test((await rl.question(question)).trim());
     } finally {
       rl.close();
     }
@@ -339,6 +346,44 @@ export async function skillsPackAddCommand(id: string, url: string | undefined, 
   }
   if (!result.written) process.exit(1);
   console.log(`Trusted ${id} @ ${short(result.preview.commit)}.`);
+  // PAN-4730 D10: the browser runtime is a second, separate consent with its own preview.
+  if (options.browser) await skillsPackBrowserCommand(id, 'on', { yes: options.yes });
+}
+
+const BROWSER_NOTE = 'Trusting runs the command above once now and downloads the listed packages and Chromium.';
+
+/** `pan skills pack browser <id> [on|off]` (PAN-4730): build or remove a runtime pack's browser runtime. */
+export async function skillsPackBrowserCommand(id: string, state: string | undefined, options: PackBrowserOptions): Promise<void> {
+  const value = state ?? 'on';
+  if (value !== 'on' && value !== 'off') {
+    console.error(chalk.red('state must be on or off'));
+    process.exit(1);
+  }
+  const { enablePackBrowser, disablePackBrowser } = await import('../../lib/skill-packs/sources.js');
+  if (value === 'off') {
+    let off;
+    try {
+      off = await disablePackBrowser(id);
+    } catch (error) {
+      return failOnPackError(error);
+    }
+    console.log(`Browser runtime for ${id} is off; ${off.renderDir} was rendered again without it and ${off.cacheDir} was removed.`);
+    for (const line of await (await import('./skills-pack-browser.js')).daemonLines()) console.log(line);
+    return;
+  }
+  const confirm = await packConfirm(options.yes, BROWSER_NOTE, 'Trust this browser runtime? [y/N] ');
+  let result;
+  try {
+    result = await enablePackBrowser(id, confirm);
+  } catch (error) {
+    return failOnPackError(error);
+  }
+  if (result.alreadyOn) {
+    console.log(`Browser runtime for ${id} is already on.`);
+    return;
+  }
+  if (!result.written) process.exit(1);
+  console.log(`Browser runtime for ${id} is on. Browser skills mount at the next launch.`);
 }
 
 export async function skillsPackUpdateCommand(id: string, options: PackUpdateOptions): Promise<void> {
@@ -594,10 +639,13 @@ export function registerSkillsCommands(program: Command): void {
     .description('Register a git skill pack at the commit a ref resolves to (enables nothing); known packs default the url and ref')
     .option('--ref <ref>', 'Tag, branch or commit to pin (default: the known pack ref)')
     .option('--adapter <adapter>', 'plain, claude-plugin, deft-readonly, or gstack-runtime')
+    .option('--browser', 'Also build the browser runtime (gstack; asks separately)')
     .option('--yes', 'Trust the resolved commit without asking').action(skillsPackAddCommand);
   pack.command('update <id>').description('Move a pack to the commit its ref (or --ref) now resolves to')
     .option('--ref <ref>', 'Switch to a different tag or branch').option('--yes', 'Trust the new commit without asking')
     .action(skillsPackUpdateCommand);
+  pack.command('browser <id> [state]').description("Turn a runtime pack's browser runtime on or off (gstack)")
+    .option('--yes', 'Trust without asking').action(skillsPackBrowserCommand);
   pack.command('list').description('List registered skill packs')
     .option('--json', 'Output as JSON').option('--offline', 'Skip the update check (no network)')
     .action(skillsPackListCommand);
