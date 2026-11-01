@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4727",
   "created": "2026-11-01T17:45:56.667Z",
-  "updated": "2026-11-01T18:45:06.446Z",
+  "updated": "2026-11-01T18:45:21.884Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,6 +242,10 @@
     "gstack-add-update-sync.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T18:45:06.446Z"
+    },
+    "gstack-mount-transform.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:45:21.883Z"
     }
   }
 }
