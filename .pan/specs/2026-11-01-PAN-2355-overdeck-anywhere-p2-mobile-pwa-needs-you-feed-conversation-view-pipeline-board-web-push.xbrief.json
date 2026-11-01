@@ -1,0 +1,929 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T05:06:03Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2355: Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push)",
+    "updated": "2026-11-01T05:47:14.461Z"
+  },
+  "plan": {
+    "id": "pan-2355",
+    "title": "Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push)",
+    "status": "running",
+    "uid": "b658925e-cc6a-4d64-a6dd-7ce7be3db3f5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T05:06:03Z",
+    "updated": "2026-11-01T05:47:14.461Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2355",
+        "label": "PAN-2355",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2355/.pan/drafts/pan-2355.md",
+        "label": "PRD draft (.pan/drafts/pan-2355.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/.pan/drafts/pan-2350.md",
+        "label": "Epic PRD pan-2350.md rev 5 (W-PHONE2, FR-16)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "pwa",
+      "mobile",
+      "frontend",
+      "pairing"
+    ],
+    "narratives": {
+      "Problem": "Epic FR-16/W-PHONE2: the phone must install one machine's dashboard as a PWA over Tailscale Serve HTTPS and answer an AskUserQuestion in three taps or fewer. Today there is no manifest, service worker or phone layout; no URL opens a specific question; an installed iPhone app cannot reuse a Safari pairing cookie and cannot type a 64-character pairing code; and with require_token_mint off a phone at the Serve address would get the root session.",
+      "Proposal": "Add a hand-written service worker (push and notificationclick only, never caching) and a manifest with start_url /m; a lazy-loaded standalone phone shell at /m with Needs you (question cards that answer through a transport module extracted from usePendingInputDialogs) and Conversations (reusing ConversationPanel unchanged); in-app pairing by camera scan (jsqr) or paste that hands the code to the existing #pair= bootstrap; a Settings -> Anywhere 'Set up a phone' dialog that refuses to show a pairing code until require_token_mint is on and links ${origin}/m#pair=; a Playwright phone-viewport spec proving the two in-app taps and 44px targets; CI allowlist wiring; and configuration/phone.mdx.",
+      "NonGoals": "- No Web Push sending, VAPID keys, subscription routes or 'Turn on notifications' control (PAN-2354 owns them)\n- No pipeline board tab (PAN-4661)\n- No Tailscale install, sign-in, Serve setup or detection code (PAN-1254)\n- No automatic require_token_mint enabling and no server auth changes (PAN-4645 W-SEC4)\n- No fleet aggregation of conversations or needs-you rows (PAN-4650, PAN-4651)\n- No new HTTP routes and no server-side code changes\n- No edits to ConversationPanel.tsx and no file-size allowlist raises\n- No service-worker caching, precache, offline page, respondWith or vite-plugin-pwa/Workbox\n- No second service worker file or second registration\n- No terminals on the phone; no answering permission prompts, plan approvals or pane choices from the phone feed; no true multiSelect answers\n- No desktop-to-/m redirect or 'switch to mobile' banner; no change to desktop layouts\n- No per-machine manifest names\n- No CSRF unification of the answer routes (they keep plain JSON headers)\n- No edits to configuration/remote-access.mdx or configuration/tailscale.mdx\n- No interactive mockup gate"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plan against the rescoped issue body (W-PHONE2, FR-16) and rebaseline .pan/drafts/pan-2355.md in place",
+        "rationale": "The July draft depended on the closed PAN-2352 and owned Web Push, which the rev-5 epic moved to PAN-2354; the role rule says correct a drifted PRD in place."
+      },
+      {
+        "summary": "Skip the interactive mockup gate; require Playwright screenshots of each phone screen in the PR instead",
+        "rationale": "The operator's mockup rule targets redesigns of established surfaces; /m is new, and the epic assigned a mockup issue (PAN-4646) only to W-CONV5."
+      },
+      {
+        "summary": "Move the pipeline board tab to the follow-up PAN-4661",
+        "rationale": "FR-16 and the W-PHONE2 done check do not need it, and dropping it keeps the plan at or under the 25-file projected-surface limit without a size justification."
+      },
+      {
+        "summary": "This issue owns public/sw.js including push and notificationclick handlers; PAN-2354 owns VAPID, subscriptions, sending and the notifications control; payload {title, body, url, tag?}",
+        "rationale": "Both issues need the worker; one owner prevents two workers. The PAN-2354 planner was told via pan tell, with an extend-never-duplicate rule for whichever lands second."
+      },
+      {
+        "summary": "Deep links are query parameters on /m (?subject, ?tab, ?conversation), not path segments",
+        "rationale": "The static server 404s a missing path whose last segment has an extension, so ids with dots in a path would break."
+      },
+      {
+        "summary": "Hand-written service worker with no fetch handler instead of vite-plugin-pwa",
+        "rationale": "index.html is deliberately no-cache and its boot watchdog polls /; caching would break both and risk stale state; no dependency is needed."
+      },
+      {
+        "summary": "In-app pairing by camera scan with the jsqr@1.4.0 decoder plus paste fallback",
+        "rationale": "An installed iPhone app has storage separate from Safari and the 64-hex pairing code cannot be typed; iOS Safari lacks BarcodeDetector."
+      },
+      {
+        "summary": "The setup dialog gates the pairing code on require_token_mint and links to the existing setting instead of writing settings",
+        "rationale": "With the flag off a phone at the Serve address gets root; PAN-4645 owns auto-enabling, so this issue only refuses to proceed and never adds a second settings writer."
+      },
+      {
+        "summary": "Add one user doc page configuration/phone.mdx although the issue body says Docs: None",
+        "rationale": "The iPhone install-then-pair order and the require_token_mint step are documented nowhere else, and the PRD authoring rule plus the finalize gate require a docs item; remote-access.mdx and tailscale.mdx are left to PAN-1254/PAN-4645."
+      },
+      {
+        "summary": "Theme and background color #202020",
+        "rationale": "It is the default Broadsheet dark background (index.css:481-483)."
+      }
+    ],
+    "items": [
+      {
+        "id": "answer-transport-extract",
+        "title": "Extract the AUQ answer transports into lib/pendingInputAnswer.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2355",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/pendingInputAnswer.ts",
+            "src/dashboard/frontend/src/lib/__tests__/pendingInputAnswer.test.ts",
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "src/dashboard/frontend/src/lib/useDecisions.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/lib/__tests__/pendingInputAnswer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pendingInputAnswer.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ],
+          "foundationFor": [
+            "mobile-needs-you"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-1 (D-12). Create FE/src/lib/pendingInputAnswer.ts exporting parseCodexOptionNumber, buildPendingAnswerRequest(target: PendingAnswerTarget) and postPendingAnswer(request, failureLabel) exactly as specified in PRD FR-8. Move the endpoint/body choice out of usePendingInputDialogs.ts (askUserQuestionAnswerMutation and codexApprovalMutation mutationFns, lines ~359-470, and the inline /^\\s*(\\d+)/ parse in handleSubmitAskUserQuestion) into the module; keep onMutate/onSuccess/onError/toasts unchanged and keep the plain {'Content-Type':'application/json'} headers. The prose fallback text must stay byte-identical. Add harness?: string | null to ConversationPendingInputRow and Decision in FE/src/lib/useDecisions.ts and set harness: c.harness ?? null in the useDecisions() conversation loop. Behavior-preserving refactor: usePendingInputDialogs.ts must only shrink."
+        },
+        "items": [
+          {
+            "id": "answer-transport-extract.ac1",
+            "title": "Given an agent target, when buildPendingAnswerRequest runs, then it returns url /api/agents/<id>/answer-question with body {answers, toolUseId}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-transport-extract.ac2",
+            "title": "Given a conv target with harness 'ohmypi' or 'pi', when buildPendingAnswerRequest runs, then it returns url /api/conversations/<id>/pi-ask-answer with body {toolUseId, answers}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-transport-extract.ac3",
+            "title": "Given a conv target with a non-pi harness, when buildPendingAnswerRequest runs, then it returns url /api/conversations/<id>/message whose message starts with 'Operator answered the pending question' and matches the pre-refactor text for one and for two answers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-transport-extract.ac4",
+            "title": "Given a toolUseId starting with 'codex-approval:' and answer label '2. Allow', when buildPendingAnswerRequest runs, then it returns /api/conversations/<id>/codex-approval with body {optionNumber: 2, toolUseId}; an unparsable label returns {error: 'Could not determine which option was selected'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-transport-extract.ac5",
+            "title": "Given a 409 response with body {error:'decision-closed'}, when postPendingAnswer runs, then it rejects with an Error whose message is 'decision-closed', and usePendingInputDialogs.ts has fewer lines than on origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pwa-manifest",
+        "title": "Add the web app manifest, PNG icons and PWA head tags",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2355",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/public/manifest.webmanifest",
+            "src/dashboard/frontend/public/icons/*.png",
+            "src/dashboard/frontend/index.html"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"JSON.parse(require('fs').readFileSync('src/dashboard/frontend/public/manifest.webmanifest','utf8'))\"",
+            "file src/dashboard/frontend/public/icons/*.png",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "manifest parses as JSON",
+            "file reports four PNG images at 192x192, 512x512, 512x512 and 180x180",
+            "build completes and dist/dashboard/public/manifest.webmanifest exists"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Second-lander rule first: if git ls-files src/dashboard/frontend/public/manifest.webmanifest shows PAN-2354 already created a minimal manifest (and an index.html manifest link), extend that manifest to the values below and do not add a second manifest link. PRD W-2 (D-7). Write FE/public/manifest.webmanifest with id /m, name and short_name Overdeck, start_url /m, scope /, display standalone, background_color and theme_color #202020, and four icons: /icons/icon-192.png, /icons/icon-512.png, /icons/icon-maskable-512.png (purpose maskable, mark inside the central 80%), /icons/apple-touch-icon.png (180x180, opaque). Generate the PNGs once from FE/public/favicon.svg on a #202020 square with a throwaway Playwright script in the session scratchpad (do not commit the script). In FE/index.html change the viewport meta to add viewport-fit=cover and add the six tags listed in PRD W-2 after the favicon link."
+        },
+        "items": [
+          {
+            "id": "pwa-manifest.ac1",
+            "title": "Given the built dashboard, when GET /manifest.webmanifest is requested, then it returns 200 with content-type application/manifest+json and start_url '/m', scope '/', display 'standalone'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pwa-manifest.ac2",
+            "title": "Given the manifest, when each of its four icon src paths is requested, then each returns 200 with content-type image/png and the declared pixel size",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pwa-manifest.ac3",
+            "title": "Given index.html, when it is served, then it contains <link rel=\"manifest\" href=\"/manifest.webmanifest\">, <meta name=\"theme-color\" content=\"#202020\">, <link rel=\"apple-touch-icon\" href=\"/icons/apple-touch-icon.png\"> and a viewport meta with viewport-fit=cover",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "service-worker",
+        "title": "Add public/sw.js with push and notificationclick handlers and no caching",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2355",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/public/sw.js"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node --check src/dashboard/frontend/public/sw.js",
+            "grep -c \"caches\\.\\|respondWith\" src/dashboard/frontend/public/sw.js || true"
+          ],
+          "expected_outputs": [
+            "node --check exits 0",
+            "grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-3 (D-1, D-2, D-5). First run `git ls-files src/dashboard/frontend/public/sw.js`; if PAN-2354 already added it, extend that file instead of creating one (never a second worker). Write plain ES2020 with no imports: install -> self.skipWaiting(); activate -> event.waitUntil(self.clients.claim()); expose self.overdeckNotificationFromPush(text) returning {title, options:{body, tag, data:{url}}} per the D-2 contract (invalid JSON -> title 'Overdeck', body 'Something needs you', url '/m'; missing or cross-origin url -> '/m'); push -> event.waitUntil(self.registration.showNotification(title, options)); notificationclick -> close, clients.matchAll({type:'window', includeUncontrolled:true}), focus+navigate the first same-origin client or clients.openWindow(url). No fetch listener unless the D-5 installability checkpoint fails, and then only a listener that never calls respondWith. Header comment states D-1, D-2 and D-5 including the extend-never-duplicate rule."
+        },
+        "items": [
+          {
+            "id": "service-worker.ac1",
+            "title": "Given the built dashboard, when GET /sw.js is requested, then it returns 200 with a text/javascript content-type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-worker.ac2",
+            "title": "Given push text {\"title\":\"T\",\"body\":\"B\",\"url\":\"/m?subject=c1\"}, when overdeckNotificationFromPush runs, then it returns title 'T' with options.data.url ending in '/m?subject=c1'; given url 'https://evil.example/x' or invalid JSON, then data.url ends in '/m'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-worker.ac3",
+            "title": "Given sw.js, when grep counts 'caches.' and 'respondWith', then the count is 0 (no caching, no request interception)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-shell",
+        "title": "Add the /m branch and the MobileApp phone shell with stub tabs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2355",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/components/mobile/MobileApp.tsx",
+            "src/dashboard/frontend/src/components/mobile/MobileNeedsYou.tsx",
+            "src/dashboard/frontend/src/components/mobile/MobileConversations.tsx",
+            "src/dashboard/frontend/src/components/mobile/MobilePairScreen.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/mobile/__tests__/MobileApp.test.tsx",
+            "npm run typecheck",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "MobileApp.test.tsx passes",
+            "typecheck completes without errors",
+            "build emits a separate chunk containing MobileApp"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "mobile-needs-you",
+            "mobile-conversations",
+            "mobile-pair-screen"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4 (D-3, D-4, D-6, D-17). In FE/src/App.tsx add a module-scope React.lazy import of ./components/mobile/MobileApp and, right after the /popout/diff branch (~line 133), return <Suspense fallback={null}><MobileApp /></Suspense> when pathname is '/m' or '/m/'. Create MobileApp.tsx (default export): exported readMobileRoute(search) parsing ?subject, ?tab, ?conversation; pushState + popstate navigation; mounts <EventRouter />; renders MobilePairScreen when useConnectionState().sessionAuthFailed; bottom tab bar (Needs you default, Conversations) with min-h-11 targets and env(safe-area-inset-bottom) padding; Install app button on beforeinstallprompt, iOS Safari Add-to-Home-Screen hint, nothing when display-mode standalone; registers /sw.js with scope / once when isSecureContext and not import.meta.env.DEV (warn on failure). Create stub MobileNeedsYou({subjectId}), MobileConversations({conversationId,onOpen,onBack}) and MobilePairScreen() with their final names and props so later items never edit MobileApp.tsx. Tailwind utilities only; follow /pan-style-guide. Header comment documents D-3, D-4, D-6. App.tsx must stay at or under its allowlist cap (1019). PAN-2354 coordination: if src/dashboard/frontend/src/components/push/TurnOnNotificationsButton.tsx exists on main when this item lands, mount <TurnOnNotificationsButton compact /> at the end of MobileApp's header (otherwise PAN-2354 mounts it later). That control registers the same '/sw.js' with scope '/', so the registration here must keep exactly that URL and scope."
+        },
+        "items": [
+          {
+            "id": "mobile-shell.ac1",
+            "title": "Given readMobileRoute, when called with '', '?subject=a.b', '?tab=conversations' and '?conversation=12', then it returns needs-you, needs-you with subjectId 'a.b', conversations, and conversation 12 respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-shell.ac2",
+            "title": "Given sessionAuthFailed is true, when MobileApp renders, then it renders the MobilePairScreen and no tab bar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-shell.ac3",
+            "title": "Given a secure context outside dev, when MobileApp mounts, then navigator.serviceWorker.register is called once with ('/sw.js', {scope:'/'}); given isSecureContext false, then register is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-shell.ac4",
+            "title": "Given a synthetic beforeinstallprompt event, when it fires, then an 'Install app' button renders; and the desktop route '/' still renders the Sidebar and never imports MobileApp eagerly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-needs-you",
+        "title": "Build the phone Needs-you list and question card",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2355",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileNeedsYou.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileNeedsYou.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/mobile/__tests__/MobileNeedsYou.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MobileNeedsYou.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-5 (D-13). Replace the stub MobileNeedsYou with a list built from useDecisions() (blocking first). Expand the row matching subjectId, else the first askUserQuestion row; an unknown subjectId shows 'This question was already answered.' above the list. Question card (same file): each question with options as full-width buttons (min-h-11), selected state, Send disabled until every question has a selection, a 'Type an answer' link revealing a text field whose text replaces the selection. Send builds PendingAnswerTarget {kind: source==='agent'?'agent':'conv', id, answers, questions, harness: decision.harness, toolUseId} and calls buildPendingAnswerRequest + postPendingAnswer from lib/pendingInputAnswer.ts, wrapped in useAskUserQuestionUiStore markAnswered/unmarkAnswered; on failure show the error under the card. Non-AUQ kinds are read-only: conversation subjects get an Open button to /m?conversation=<id>; agent subjects show 'Answer on the desktop'."
+        },
+        "items": [
+          {
+            "id": "mobile-needs-you.ac1",
+            "title": "Given an agent AUQ decision a1 with toolUseId t1 and options Yes/No, when the operator taps Yes then Send, then fetch is called once with POST /api/agents/a1/answer-question and body {answers:['Yes'], toolUseId:'t1'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-needs-you.ac2",
+            "title": "Given a conversation decision with harness 'ohmypi', when answered, then the POST goes to /api/conversations/<name>/pi-ask-answer; given a toolUseId 'codex-approval:x' and option '2. Allow', then the POST goes to /codex-approval with optionNumber 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-needs-you.ac3",
+            "title": "Given subjectId matches the second row, when the list renders, then that row's card is expanded and the first is collapsed; given an unknown subjectId, then 'This question was already answered.' renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-needs-you.ac4",
+            "title": "Given a permissionRequest conversation row, when it renders, then it shows an Open button and no option buttons; given the POST returns 500 with {error:'boom'}, then 'boom' renders under the card and the toolUseId is un-marked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-conversations",
+        "title": "Build the phone conversation list and full-screen view",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2355",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileConversations.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileConversations.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/mobile/__tests__/MobileConversations.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MobileConversations.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-6 (D-14, D-15). Replace the stub MobileConversations: list from useQuery(['mobile-conversations']) over GET /api/conversations (an array), archived rows hidden, newest first, rows show title, issue id and time since last activity (min-h-11 rows); tap calls onOpen(id). With a conversationId, fetch /api/conversations/<id> with refetchInterval 5000 and render ConversationPanel exactly as StandaloneConversationPopoutRoute does (FE/src/App/StandaloneRoutes.tsx:38-80) inside a full-height wrapper with a Back header calling onBack. Never edit ConversationPanel.tsx; phone layout fixes go in the wrapper classes only."
+        },
+        "items": [
+          {
+            "id": "mobile-conversations.ac1",
+            "title": "Given GET /api/conversations returns three conversations, when the list renders, then their titles render newest first and archived rows are hidden",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-conversations.ac2",
+            "title": "Given the list, when the operator taps a row with id 7, then onOpen is called with 7",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-conversations.ac3",
+            "title": "Given conversationId 7, when the component renders, then it fetches /api/conversations/7 and renders ConversationPanel (mocked) with that conversation and a Back control that calls onBack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-conversations.ac4",
+            "title": "Given the diff, when git diff --stat origin/main is inspected, then src/dashboard/frontend/src/components/chat/ConversationPanel.tsx is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-pair-screen",
+        "title": "Build in-app pairing: scan or paste a pairing code",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2355",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobilePairScreen.tsx",
+            "src/dashboard/frontend/package.json",
+            "bun.lock",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/mobile/__tests__/MobileApp.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MobileApp.test.tsx passes including the pairing cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-7 (D-8). Add \"jsqr\": \"1.4.0\" to src/dashboard/frontend/package.json dependencies and run bun install at the repo root (bun.lock updates). Replace the stub MobilePairScreen: heading 'Pair this phone', text pointing to Settings -> Anywhere -> Set up a phone, a 'Scan pairing code' button (getUserMedia({video:{facingMode:'environment'}}) into a <video>, requestAnimationFrame loop drawing to a canvas, jsQR loaded by dynamic import only here, stop all tracks on success and unmount; camera unavailable/denied -> 'Camera is not available. Paste the pairing link instead.'), a paste field and a Pair button. Export parsePairingInput(input, origin) using /(odp_[0-9a-f]{64})/: bare code or same-origin link -> {credential}; link for another origin -> {error:'This code is for <origin>. Open Overdeck at that address instead.'}; else {error:'That is not an Overdeck pairing code.'}. On a credential: history.replaceState(null,'','/m#pair='+credential) then window.location.reload(). Do not change wsTransport.ts. Loop/timer tests use fake timers."
+        },
+        "items": [
+          {
+            "id": "mobile-pair-screen.ac1",
+            "title": "Given 'odp_'+64 hex chars, when parsePairingInput runs with origin https://desk.ts.net, then it returns that credential; given 'https://desk.ts.net/m#pair=<code>', then it returns the same credential",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-pair-screen.ac2",
+            "title": "Given 'https://other.ts.net/m#pair=<code>' with origin https://desk.ts.net, when parsePairingInput runs, then it returns the error 'This code is for https://other.ts.net. Open Overdeck at that address instead.'; given 'hello', then it returns 'That is not an Overdeck pairing code.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-pair-screen.ac3",
+            "title": "Given a pasted valid link, when the operator taps Pair, then history.replaceState is called with '/m#pair=<code>' and location.reload is called once (both stubbed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-pair-screen.ac4",
+            "title": "Given getUserMedia rejects, when the operator taps Scan pairing code, then 'Camera is not available. Paste the pairing link instead.' renders and the paste field still accepts input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "setup-phone-dialog",
+        "title": "Add Settings -> Anywhere -> Set up a phone dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2355",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/SetUpPhoneDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SetUpPhoneDialog.test.tsx and PairDeviceDialog.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-8 (D-9, D-10, D-11). Add a 'Set up a phone' button before 'Pair a device' in AnywhereSection's actions with its own open state. SetUpPhoneDialog, following PairDeviceDialog.tsx for shell, qrcode-generator QR, expiry and errors: Step 1 Tailscale app (checkpoint D-11: import PAN-1254's phone-app QR component if `git grep -n -i tailscale -- src/dashboard/frontend/src` finds one, else a QR of https://tailscale.com/download with the text 'Install Tailscale on your phone and sign in with the same account as this machine.'); Step 2 address: trusted non-loopback https:// origins from fetchAnywhereStatus plus an input that adds an https:// origin via addTrustedAddress (http:// refused with 'A phone app needs an https:// address.'); Step 3 read dashboard.require_token_mint from GET /api/settings: when false hide step 4, show the warning plus 'Open the setting' (requestSettingsSection('access-tokens')) and 'Check again'; never write settings. Step 4 Android/iPhone switch: Android one QR of ${origin}/m#pair=${credential}; iPhone two QRs (${origin}/m, then ${origin}/m#pair=${credential}), expiry and 'Create another code'; 403 from issuePairingLink -> 'Pairing links can be created only from a browser on this machine.'"
+        },
+        "items": [
+          {
+            "id": "setup-phone-dialog.ac1",
+            "title": "Given GET /api/settings returns dashboard.require_token_mint false, when the dialog renders, then step 4 is absent and an 'Open the setting' button renders that calls requestSettingsSection('access-tokens')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-phone-dialog.ac2",
+            "title": "Given require_token_mint true and the trusted address https://desk.tailnet.ts.net, when the operator taps Create pairing link, then the rendered link equals https://desk.tailnet.ts.net/m#pair=<credential>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-phone-dialog.ac3",
+            "title": "Given status addresses http://192.168.1.5:3011, http://localhost:3011 and https://desk.tailnet.ts.net, when step 2 renders, then only https://desk.tailnet.ts.net is offered; typing http://x then Add shows 'A phone app needs an https:// address.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-phone-dialog.ac4",
+            "title": "Given the iPhone switch is selected, when the pairing link exists, then two QR codes render and the first encodes https://desk.tailnet.ts.net/m; given issuePairingLink returns 403, then 'Pairing links can be created only from a browser on this machine.' renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-uat-spec",
+        "title": "Add the Playwright phone-viewport spec with tap count and screenshots",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2355",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-2355-mobile.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-2355-mobile.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "pan-2355-mobile.spec.ts passes and writes test-results/pan-2355/needs-you.png, conversations.png and pair.png"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3",
+            "NFR-4",
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-9. Use startIsolatedDashboard() from FE/tests/fixtures/isolated-dashboard.ts (never the live dashboard on 3011) and a fresh isolated browser context: viewport 390x844, hasTouch, isMobile, notifications granted. Assert manifest/icons/sw.js responses; route-mock GET /api/conversations/pending-input with one claude-code conversation AUQ (options Yes/No) and record POST /api/conversations/*/message; open /m, tap Yes, tap Send, assert exactly one POST whose message starts with 'Operator answered the pending question'; open /m?subject=<name> and assert that card is expanded; assert every visible button and link in the shell has a bounding box >= 44x44; via context.serviceWorkers() evaluate self.overdeckNotificationFromPush with a cross-origin url and assert data.url ends in /m; save screenshots of Needs you, Conversations and the pair screen (a fresh context in which page.route('**/api/dashboard/session', r => r.fulfill({ status: 401 })) forces the unauthenticated state, because the isolated dashboard otherwise mints a root session for a loopback peer) to test-results/pan-2355/ and embed them in the PR description."
+        },
+        "items": [
+          {
+            "id": "mobile-uat-spec.ac1",
+            "title": "Given the isolated dashboard at 390x844, when /m loads with one mocked AUQ, then tapping 'Yes' then 'Send' produces exactly one POST to /api/conversations/<name>/message whose message starts with 'Operator answered the pending question'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-uat-spec.ac2",
+            "title": "Given /manifest.webmanifest and /sw.js, when requested, then they return 200 with application/manifest+json and text/javascript, and the registered service worker's overdeckNotificationFromPush maps a cross-origin url to a data.url ending in /m",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-uat-spec.ac3",
+            "title": "Given the phone shell, when every visible button and link is measured, then each bounding box is at least 44x44 CSS px",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-uat-spec.ac4",
+            "title": "Given the run completes, when test-results/pan-2355/ is listed, then needs-you.png, conversations.png and pair.png exist, and in the pair-screen context (session mint mocked to 401) the page renders the 'Pair this phone' heading before pair.png is captured",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-test-wiring",
+        "title": "Register the new tests in the CI allowlists",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-01T05:06:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-2355",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json",
+            "src/dashboard/frontend/package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const s=require('./package.json').scripts['test:frontend-subset'];for(const f of ['src/lib/__tests__/pendingInputAnswer.test.ts','src/components/mobile/__tests__/MobileApp.test.tsx','src/components/mobile/__tests__/MobileNeedsYou.test.tsx','src/components/mobile/__tests__/MobileConversations.test.tsx','src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx']){if(!s.includes(f))throw new Error('missing '+f)}\"",
+            "node -e \"if(!require('./src/dashboard/frontend/package.json').scripts['test:playwright'].includes('tests/pan-2355-mobile.spec.ts'))throw new Error('missing spec')\""
+          ],
+          "expected_outputs": [
+            "first node command exits 0",
+            "second node command exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-10. Append the five new frontend test files (src/lib/__tests__/pendingInputAnswer.test.ts, src/components/mobile/__tests__/MobileApp.test.tsx, src/components/mobile/__tests__/MobileNeedsYou.test.tsx, src/components/mobile/__tests__/MobileConversations.test.tsx, src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx) to root package.json scripts.test:frontend-subset, and append tests/pan-2355-mobile.spec.ts to src/dashboard/frontend/package.json scripts.test:playwright. CI runs only these allowlists."
+        },
+        "items": [
+          {
+            "id": "ci-test-wiring.ac1",
+            "title": "Given root package.json, when scripts.test:frontend-subset is read, then it contains all five new test file paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-test-wiring.ac2",
+            "title": "Given src/dashboard/frontend/package.json, when scripts.test:playwright is read, then it contains tests/pan-2355-mobile.spec.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-phone",
+        "title": "Write configuration/phone.mdx and add it to docs.json",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:06:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2355",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/phone.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const d=JSON.stringify(require('./docs.json'));if(!d.includes('configuration/phone'))throw new Error('nav missing')\"",
+            "test -f configuration/phone.mdx"
+          ],
+          "expected_outputs": [
+            "node command exits 0",
+            "phone.mdx exists"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-11. Create configuration/phone.mdx titled 'Use Overdeck on your phone' with sections: Before you start (Tailscale Serve HTTPS, link to configuration/remote-access, require_token_mint on); Set up a phone (the four dialog steps); Android (scan, then Install app); iPhone (Add to Home Screen first, then Scan pairing code inside the installed app, because the installed app has its own storage; iOS 16.4+ for notifications); Answer a question (three taps); What the phone can and cannot do (D-13, no terminals); Notifications (PAN-2354's control; the service worker never caches pages); Remove a phone (Settings -> Anywhere -> Devices -> Revoke). Add 'configuration/phone' after 'configuration/remote-access' in docs.json's 'Overdeck Anywhere' group. Do not edit configuration/remote-access.mdx or configuration/tailscale.mdx (PAN-1254/PAN-4645 rewrite them)."
+        },
+        "items": [
+          {
+            "id": "docs-phone.ac1",
+            "title": "Given configuration/phone.mdx, when read, then its iPhone section states that the home-screen app must be installed before scanning the pairing code inside it, and why (separate storage)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-phone.ac2",
+            "title": "Given configuration/phone.mdx, when read, then it states that require_token_mint must be on before a phone opens the Tailscale Serve address and names Settings -> Anywhere -> Set up a phone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-phone.ac3",
+            "title": "Given docs.json, when the 'Overdeck Anywhere' group is read, then it lists 'configuration/phone' directly after 'configuration/remote-access'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "answer-transport-extract",
+        "to": "mobile-needs-you",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-shell",
+        "to": "mobile-needs-you",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-shell",
+        "to": "mobile-conversations",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-shell",
+        "to": "mobile-pair-screen",
+        "type": "blocks"
+      },
+      {
+        "from": "pwa-manifest",
+        "to": "mobile-uat-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "service-worker",
+        "to": "mobile-uat-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-needs-you",
+        "to": "mobile-uat-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-conversations",
+        "to": "mobile-uat-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-pair-screen",
+        "to": "mobile-uat-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "answer-transport-extract",
+        "to": "ci-test-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-shell",
+        "to": "ci-test-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-needs-you",
+        "to": "ci-test-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-conversations",
+        "to": "ci-test-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-pair-screen",
+        "to": "ci-test-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "setup-phone-dialog",
+        "to": "ci-test-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-uat-spec",
+        "to": "ci-test-wiring",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-01-PAN-2355-overdeck-anywhere-p2-mobile-pwa-needs-you-feed-conversation-view-pipeline-board-web-push.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

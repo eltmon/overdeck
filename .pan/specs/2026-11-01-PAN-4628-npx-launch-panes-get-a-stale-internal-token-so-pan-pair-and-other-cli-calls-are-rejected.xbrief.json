@@ -1,0 +1,545 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T04:57:35Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4628: npx launch: panes get a stale internal token, so pan pair and other CLI calls are rejected",
+    "updated": "2026-11-01T05:03:39.282Z"
+  },
+  "plan": {
+    "id": "pan-4628",
+    "title": "npx launch: panes get a stale internal token, so pan pair and other CLI calls are rejected",
+    "status": "running",
+    "uid": "05473c27-0999-4c7c-baf9-945493726269",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T04:57:35Z",
+    "updated": "2026-11-01T05:03:39.282Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4628",
+        "label": "PAN-4628",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4628.md",
+        "label": "PRD PAN-4628",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-2350.md",
+        "label": "Parent PRD (Overdeck Anywhere, W-SEC2)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "internal-token",
+      "auth",
+      "npx",
+      "pan-pair",
+      "hooks",
+      "overdeck-anywhere"
+    ],
+    "narratives": {
+      "Problem": "pan serve (the npx @overdeck/core launcher, src/cli/index.ts lines 1215-1272) mints a throwaway internal token per run and passes it to the dashboard only through OVERDECK_INTERNAL_TOKEN in env; it never writes <OVERDECK_HOME>/internal-token. Every token reader prefers env over the file. A long-lived Herdr server spawned from that dashboard captures the env token, and every pane inherits it; after the next npx launch the dashboard holds a new token, so pan pair, pan devices, other CLI senders and hook heartbeats from panes get 401/403. On a fresh npx machine pan pair fails too: with no file, a CLI generates a new file token the env-only server never saw.",
+      "Proposal": "Make the token file the single source of truth (PRD D-1..D-4). All seven readers resolve file -> env -> none: getInternalToken/ensureInternalToken in src/lib/internal-token.ts, readInternalTokenForRequest in routes/agents/shared.ts, the caveman hook script, and the four shell hooks. ensureInternalToken seeds a missing file from env (or a random token) with mode 0600, and caches by source so request paths do no file I/O after boot. pan serve is extracted to src/cli/commands/serve.ts, resolves its token with ensureInternalToken, and stops adding the token to the server child's env. pan pair's 401 message explains a token mismatch and the restart remedy. DASHBOARD-AUTH.md and remote-access.mdx document the file-first order.",
+      "NonGoals": "- Injecting the internal token into pane env, or any change to launchAgentPane or src/lib/terminal-backends/*\n- Stripping OVERDECK_INTERNAL_TOKEN from the Herdr server's spawn env, or restarting Herdr\n- A pan doctor env-vs-file check, or a boot warning when an env token is ignored\n- Rotating the internal token, or retry-on-401 logic in CLI senders\n- Changing pan serve's description or --port option (no skill file changes)\n- Raising any scripts/file-size-allowlist.txt row\n- pan connect (PAN-4656, W-LINK9), machine links, Tailscale, the directory, trusted-origins changes, and every other PAN-2350 work item owned by a sibling issue"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix stale panes by making every token reader file-first, not by injecting the current token into pane env at launch",
+        "rationale": "File-first repairs panes that already exist (each pan call and hook run re-resolves), also works when launchAgentPane runs in a CLI process that holds a stale env value, and keeps the root secret out of agent environments and transcripts (remote-access.mdx: the root token never leaves the machine). Injection would only reach panes launched after the fix."
+      },
+      {
+        "summary": "ensureInternalToken seeds a missing token file from OVERDECK_INTERNAL_TOKEN (else a random token)",
+        "rationale": "After the first ensure on a home the file always exists, so every reader agrees; the Windows smoke probe (env token, fresh home) keeps working because its env value becomes the file value."
+      },
+      {
+        "summary": "Extract the pan serve action to src/cli/commands/serve.ts with injectable spawn and browser opener",
+        "rationale": "Makes the token and child-env behavior unit-testable, follows the existing lazyAction command pattern, and shrinks the src/cli/index.ts god file instead of growing it."
+      },
+      {
+        "summary": "Override the issue's 'Docs: None' and update docs/DASHBOARD-AUTH.md and configuration/remote-access.mdx",
+        "rationale": "remote-access.mdx lines 85-87 state that pan pair needs a pan up dashboard, which this issue makes false; DASHBOARD-AUTH.md describes the token without its resolution order."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Seven small items across src/lib, the dashboard auth reader, CLI commands, shell hooks and two docs; all encode one token-resolution contract and are under the file and subsystem limits.",
+      "canonicalFilename": "2026-11-01-PAN-4628-npx-launch-panes-get-a-stale-internal-token-so-pan-pair-and-other-cli-calls-are-rejected.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "token-file-first",
+        "title": "Resolve the internal token file-first in src/lib/internal-token.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:57:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4628",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "serve-file-token",
+            "docs-token-contract"
+          ],
+          "files_scope": [
+            "src/lib/internal-token.ts",
+            "src/lib/__tests__/internal-token.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/internal-token.test.ts",
+            "npx vitest run $(grep -rlE \"internal-token\\.js'|OVERDECK_INTERNAL_TOKEN\" src tests --include=*.test.ts | grep -v src/dashboard/frontend)",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "internal-token.test.ts passes, including 'file wins over a stale env token' and 'env seeds the file when none exists'",
+            "every non-frontend test file that imports the internal-token module or sets OVERDECK_INTERNAL_TOKEN exits 0 under vitest",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item 1 exactly: replace the module cache with a source-tracked cache ({token, source: 'file'|'env'} | null); add readTokenFile() and envToken() helpers; getInternalToken() returns file (non-empty) else env else null and never writes; ensureInternalToken() returns a file-sourced cache without I/O, else reads the file, else writes envToken() ?? randomBytes(32).toString('hex') to <OVERDECK_HOME>/internal-token with mode 0600 (keep the existing mkdir 0700 and best-effort chmodSync) and caches it as source 'file'. _resetInternalTokenCacheForTests() resets the new cache. Rewrite the module header to state the file-first order and the PAN-4628 reason. Add src/lib/__tests__/internal-token.test.ts with the four cases named in the PRD; each beforeEach resets the cache and removes the token file and OVERDECK_INTERNAL_TOKEN. Then run the regression sweep over every test file importing the module; if one breaks because the seed write leaves a file behind, fix that test by deleting the token file in its beforeEach, never by changing the resolver. The sweep command uses shell expansion; if the slot runner does not run it through a shell, expand the file list by hand with the same grep."
+        },
+        "items": [
+          {
+            "id": "token-file-first.ac1",
+            "title": "Given a token file containing file-token and OVERDECK_INTERNAL_TOKEN=stale-token, when getInternalToken() and ensureInternalToken() run, then both return file-token and the file is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "token-file-first.ac2",
+            "title": "Given no token file and OVERDECK_INTERNAL_TOKEN=seed-token, when getInternalToken() runs it returns seed-token and creates no file; when ensureInternalToken() runs it returns seed-token and persists the file with contents seed-token and mode 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "token-file-first.ac3",
+            "title": "Given neither a file nor an env token, when ensureInternalToken() runs, then it returns a 64-character hex token equal to the file's trimmed contents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "token-file-first.ac4",
+            "title": "Given ensureInternalToken() already returned a file-sourced token, when the file is deleted and ensureInternalToken() runs again, then it returns the same token and does not recreate the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "token-file-first.ac5",
+            "title": "Given the file list from grep -rlE \"internal-token\\.js'|OVERDECK_INTERNAL_TOKEN\" src tests --include=*.test.ts | grep -v src/dashboard/frontend, when npx vitest run executes those files, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-reader-file-first",
+        "title": "Read the token file first in routes/agents/shared.ts readInternalTokenForRequest",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:57:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4628",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/shared.ts",
+            "src/dashboard/server/routes/__tests__/agents-runtime-event-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/agents-runtime-event-auth.test.ts src/dashboard/server/routes/__tests__/agents-delivery-method.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agents-runtime-event-auth.test.ts and agents-delivery-method.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item 2: rewrite readInternalTokenForRequest() (src/dashboard/server/routes/agents/shared.ts lines 221-230) to read <OVERDECK_HOME>/internal-token with the async readFile first, return it when non-empty, and only then fall back to process.env.OVERDECK_INTERNAL_TOKEN, else null. Keep it async (no sync fs in server code). Add src/dashboard/server/routes/__tests__/agents-runtime-event-auth.test.ts calling validateAgentRuntimeEventAuth with a minimal request object carrying the x-overdeck-internal-token header, covering the four cases in the PRD; reset env in afterEach."
+        },
+        "items": [
+          {
+            "id": "server-reader-file-first.ac1",
+            "title": "Given a token file file-token and env stale-token, when validateAgentRuntimeEventAuth receives header file-token it returns ok true, and with header stale-token it returns a 403 response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-reader-file-first.ac2",
+            "title": "Given no token file and env env-token, when validateAgentRuntimeEventAuth receives header env-token, then it returns ok true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-reader-file-first.ac3",
+            "title": "Given neither a token file nor an env token, when validateAgentRuntimeEventAuth runs, then it returns a 503 response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "caveman-reader-file-first",
+        "title": "Read the token file first in the generated caveman hook script",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:57:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4628",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/caveman/workspace.ts",
+            "src/lib/caveman/__tests__/workspace.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/caveman/__tests__/workspace.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workspace.test.ts passes including the new ordering assertion",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item 3: in the template string emitted by src/lib/caveman/workspace.ts (function internalToken() at lines 219-224), resolve the path <OVERDECK_HOME or ~/.overdeck>/internal-token first, return its trimmed contents when non-empty, else return process.env.OVERDECK_INTERNAL_TOKEN || ''. Preserve the template's escaping style. Extend the existing generated-script test (near line 152 of src/lib/caveman/__tests__/workspace.test.ts) to assert that inside the generated function internalToken() the existsSync(path) check appears before process.env.OVERDECK_INTERNAL_TOKEN."
+        },
+        "items": [
+          {
+            "id": "caveman-reader-file-first.ac1",
+            "title": "Given the generated caveman hook script, when the test locates function internalToken(), then the existsSync(path) token-file check appears before the process.env.OVERDECK_INTERNAL_TOKEN fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "caveman-reader-file-first.ac2",
+            "title": "The generated script still contains the x-overdeck-internal-token header, and npx vitest run src/lib/caveman/__tests__/workspace.test.ts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hook-readers-file-first",
+        "title": "Read the token file first in the four shell hooks",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:57:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4628",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/hooks/pan-hook-lib.sh",
+            "sync-sources/hooks/session-start-hook*",
+            "sync-sources/hooks/user-prompt-submit-hook*",
+            "sync-sources/hooks/stop-hook*",
+            "tests/scripts/user-prompt-submit-hook.test.ts",
+            "tests/scripts/pan-hook-lib-guards.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/scripts/user-prompt-submit-hook.test.ts tests/scripts/pan-hook-lib-guards.test.ts tests/scripts/session-start-hook.test.ts",
+            "grep -c 'OVERDECK_INTERNAL_TOKEN:-' sync-sources/hooks/pan-hook-lib.sh sync-sources/hooks/session-start-hook sync-sources/hooks/user-prompt-submit-hook sync-sources/hooks/stop-hook"
+          ],
+          "expected_outputs": [
+            "the three hook test files pass, including the new stale-env cases",
+            "each hook still references OVERDECK_INTERNAL_TOKEN:- exactly once, now as the fallback after the file read"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item 4: at pan-hook-lib.sh lines 264-275, session-start-hook lines 80-86, user-prompt-submit-hook lines 33-39 and stop-hook lines 75-81, replace the env-first block with the PRD's file-first block (read ${OVERDECK_HOME:-$HOME/.overdeck}/internal-token first; use ${OVERDECK_INTERNAL_TOKEN:-} only when the file value is empty), keeping each site's variable names (PAN_INTERNAL_TOKEN/_pan_token_path in pan-hook-lib.sh). Rewrite the pan-hook-lib.sh comment that says 'No launcher exports OVERDECK_INTERNAL_TOKEN' to explain the PAN-4628 stale-env reason. Add the two test cases named in the PRD: a user-prompt-submit-hook case with OVERDECK_HOME=tempDir, a file-token file and env stale-token asserting the curl log; and pan-hook-lib-guards cases that source the lib in bash -c and print $PAN_INTERNAL_TOKEN with and without the file. In pan-hook-lib-guards.test.ts follow the existing sourcing pattern (source \"$LIB_PATH\" inside /bin/bash -c). In stop-hook the block sits inside if [ \"$API_ERROR_DETECTED\" != \"true\" ] and keeps its indentation."
+        },
+        "items": [
+          {
+            "id": "hook-readers-file-first.ac1",
+            "title": "Given OVERDECK_HOME holds internal-token=file-token and OVERDECK_INTERNAL_TOKEN=stale-token, when user-prompt-submit-hook runs, then the stub curl log contains file-token and does not contain stale-token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-readers-file-first.ac2",
+            "title": "Given the same file and env, when pan-hook-lib.sh is sourced and $PAN_INTERNAL_TOKEN is printed, then stdout is file-token; with no token file it prints the env value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-readers-file-first.ac3",
+            "title": "session-start-hook and stop-hook read the token file before the env value: in each file the internal-token path read appears on an earlier line than ${OVERDECK_INTERNAL_TOKEN:-}, and npx vitest run tests/scripts/session-start-hook.test.ts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "serve-file-token",
+        "title": "Extract pan serve to commands/serve.ts and resolve its token from the token file",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:57:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4628",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/serve.ts",
+            "src/cli/index.ts",
+            "tests/unit/cli/serve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/serve.test.ts",
+            "grep -c 'OVERDECK_INTERNAL_TOKEN: internalToken' src/cli/index.ts src/cli/commands/serve.ts",
+            "echo \"$(wc -l < src/cli/index.ts) $(git show origin/main:src/cli/index.ts | wc -l)\"",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "serve.test.ts passes",
+            "the grep prints 0 for both files",
+            "the first number (working tree) is lower than the second (origin/main)",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item 5: move the serve action body from src/cli/index.ts (lines 1215-1272) into export async function serveCommand(options: { port: string }, deps: ServeDeps = {}) in new src/cli/commands/serve.ts, with injectable spawn, openBrowser and openDelayMs (default 1500). Resolve the bundle as join(packageRoot, 'dist', 'dashboard', 'server.js') and join(packageRoot, 'dist', 'dashboard', 'public', 'index.html') using packageRoot from src/lib/paths.ts, never import.meta.url (lazy dist chunks, PAN-4195). After the bundle check, const internalToken = ensureInternalToken(); spawn the server with env { ...process.env, PORT: String(port) } (no OVERDECK_INTERNAL_TOKEN key added). Keep messages, exit paths and the browser fallback line. In index.ts keep the comment and command registration and use .action(lazyAction(() => import('./commands/serve.js'), 'serveCommand')). Write tests/unit/cli/serve.test.ts with fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync), a fake spawn and opener, and packageRoot mocked to a temp dir holding empty bundle files. Then run the PRD's implementation checkpoint (build, isolated serve on a free port with OVERDECK_TERMINAL_BACKEND=tmux, OVERDECK_DISABLE_DEACON=1, OVERDECK_DISABLE_AUTO_MERGE=1, then pan pair --url http://192.0.2.10:<port> --json with a stale env token); kill the server by its literal PID. If the live run is impossible, record why in the PR body. Mock packageRoot with a partial vi.mock using importOriginal: internal-token.ts imports getOverdeckHome from the same paths module, so a full mock breaks it."
+        },
+        "items": [
+          {
+            "id": "serve-file-token.ac1",
+            "title": "Given a temp OVERDECK_HOME with no token file and no env token, when serveCommand runs with a fake spawn, then the token file exists afterwards, the spawn env has no OVERDECK_INTERNAL_TOKEN key, and the opened browser URL ends with #overdeck_token=<file token>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serve-file-token.ac2",
+            "title": "Given a token file file-token and env stale-token, when serveCommand runs, then the opened browser URL carries #overdeck_token=file-token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serve-file-token.ac3",
+            "title": "Given two serveCommand runs on the same OVERDECK_HOME, when both open the browser, then both URLs carry the same #overdeck_token value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serve-file-token.ac4",
+            "title": "Given the built CLI, when node dist/cli/index.js serve --help runs, then it prints the --port option with default 3011; src/cli/index.ts routes serve through lazyAction(() => import('./commands/serve.js'), 'serveCommand') and wc -l returns fewer lines for it than for git show origin/main:src/cli/index.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serve-file-token.ac5",
+            "title": "Given an isolated dashboard started with node dist/cli/index.js serve --port <P> on a temp OVERDECK_HOME, when pan pair --url http://192.0.2.10:<P> --json runs with OVERDECK_INTERNAL_TOKEN=stale-token, then it exits 0 and prints JSON whose url starts with http://192.0.2.10:<P>/#pair= (or the PR body records why the live run could not execute)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pair-401-text",
+        "title": "Explain a token mismatch in the pan pair and pan devices 401 message",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:57:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4628",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/pair.ts",
+            "tests/unit/cli/pair.test.ts",
+            "tests/unit/cli/devices.test.ts",
+            "src/dashboard/frontend/tests/pan-3762-pairing.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/pair.test.ts tests/unit/cli/devices.test.ts",
+            "grep -c 'pan serve' src/cli/commands/pair.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pair.test.ts and devices.test.ts pass",
+            "the grep prints 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item 6: rename NEEDS_PAN_UP to TOKEN_REJECTED in src/cli/commands/pair.ts (all uses in runPair, runDevicesList, runDevicesRevoke) with the exact text in the PRD. In tests/unit/cli/pair.test.ts rename the 'explains pan up on a 401' case to 'explains a token mismatch on a 401' and assert stderr contains 'The running dashboard holds a different token' and not 'pan serve'; update tests/unit/cli/devices.test.ts only if it asserts the old string. In src/dashboard/frontend/tests/pan-3762-pairing.spec.ts replace lines 36-37 with the PRD's file-first read (add existsSync to its node:fs import)."
+        },
+        "items": [
+          {
+            "id": "pair-401-text.ac1",
+            "title": "Given the dashboard answers 401, when pan pair runs, then it exits 1 and stderr contains 'The running dashboard holds a different token' and 'npx @overdeck/core'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-401-text.ac2",
+            "title": "Given the dashboard answers 401, when pan devices list or pan devices revoke runs, then stderr shows the same TOKEN_REJECTED text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-401-text.ac3",
+            "title": "src/cli/commands/pair.ts no longer contains the string 'pan serve', and pan-3762-pairing.spec.ts reads the token file before falling back to OVERDECK_INTERNAL_TOKEN",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-token-contract",
+        "title": "Document the file-first token order in DASHBOARD-AUTH.md and remote-access.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:57:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4628",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-AUTH.md",
+            "configuration/remote-access.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'file first' docs/DASHBOARD-AUTH.md",
+            "grep -n 'npx @overdeck/core' configuration/remote-access.mdx",
+            "grep -c 'started by `pan up`, which shares' configuration/remote-access.mdx"
+          ],
+          "expected_outputs": [
+            "DASHBOARD-AUTH.md shows the new resolution-order sentence",
+            "remote-access.mdx shows the new pan pair paragraph naming npx @overdeck/core",
+            "the last grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item 7 with the exact replacement sentences given there: in docs/DASHBOARD-AUTH.md (Internal token bullet, lines 10-13) replace 'Generated once, on first server start, and never rotated automatically.' with the resolution-order text; in configuration/remote-access.mdx replace the paragraph at lines 85-87 ('`pan pair` talks to a dashboard started by `pan up`, which shares this machine's internal token. A paired device cannot create more pairing credentials.') with the new paragraph naming pan up and npx @overdeck/core, the token file, and the restart remedy."
+        },
+        "items": [
+          {
+            "id": "docs-token-contract.ac1",
+            "title": "docs/DASHBOARD-AUTH.md's Internal token bullet states that the token file is read first, that OVERDECK_INTERNAL_TOKEN applies only when no file exists and is then persisted, and cites PAN-4628",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-token-contract.ac2",
+            "title": "configuration/remote-access.mdx states that dashboards started by pan up and by npx @overdeck/core both use ~/.overdeck/internal-token and tells the reader to restart the dashboard when pan pair reports a rejected token; the old 'started by `pan up`, which shares' sentence returns 0 grep matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "token-file-first",
+        "to": "serve-file-token",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
