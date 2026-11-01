@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T20:38:38.628Z",
+  "updated": "2026-11-01T20:38:53.203Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -244,6 +244,10 @@
     "wi10-cap-counts-fly-machines.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T20:38:38.628Z"
+    },
+    "wi11-heartbeat-and-sweep.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:38:53.203Z"
     }
   }
 }
