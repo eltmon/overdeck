@@ -1255,3 +1255,87 @@ Everything above is a selector over existing rows and events; nothing is stored.
 `activity.entry` is meant for news (something shipped, failed, finished or needs
 the operator); progress telemetry belongs in `activity.detailed`. Moving the
 remaining telemetry emit sites is tracked in PAN-4306.
+
+## Needs-you push (PAN-2354)
+
+The primary dashboard pushes a notification to the operator's phone when an
+agent or conversation needs them. The machine sends Web Push itself: the
+payload is encrypted to the phone (RFC 8291 `aes128gcm`) and signed with the
+machine's own VAPID key, so neither the push service nor overdeck.ai can read
+it. ntfy is an optional second provider that gets titles only. Operator docs:
+`configuration/push-notifications.mdx`.
+
+**Detection.** `src/dashboard/server/services/needs-you-push-service.ts` feeds
+one dispatcher from four sources:
+
+1. `agent.enrichment_changed` events: agent questions (including `pan ask`
+   decisions, whose `toolUseId` starts with `operator-decision:`), plan
+   approvals and permission prompts.
+2. The conversation pending-input feed (`getConversationsPendingInputFeed`),
+   scanned every 5 s, but only while a push target exists (a Web Push
+   subscription or a ready ntfy topic). With no target nothing is scanned.
+3. The wake path. The AskUserQuestion PreToolUse hook's
+   `ask_user_question_blocked` heartbeat (`routes/agents/runtime-events.ts`)
+   and a waiting `conversation.permission_changed` event call
+   `wakeNeedsYouPush()`. After a 500 ms debounce it scans conversations and
+   calls `pollEnrichmentNow()` (agent-enrichment-service), so a Claude Code
+   question reaches the phone in about a second.
+4. Edge events: `agent.heartbeat_dead`, and `pipeline.journal` entries of type
+   `verification.started`, `merge.completed` (finished), `merge.failed`,
+   `review.stall-escalated` and `conflict.repair-escalated` (failed).
+
+It runs only when `isPeerDashboardProcess()` is false; a peer would send every
+push twice.
+
+**Keys and priming** (`src/lib/push/dispatcher.ts`). Each subject
+(`agent:<id>`, `conv:<name>`) keeps a set of pending keys: `auq:<toolUseId>`,
+`plan:<toolUseId>`, `perm:<signature>` (`perm:pending` without a signature). A
+key notifies on its rising edge and is forgotten when it disappears, so the
+next prompt notifies again. `auq:` and `plan:` keys are globally unique, so a
+key already active under another subject (a conversation seen both as an
+enrichment agent and as a feed row) is not sent twice. Items asked more than
+60 s before the service started are recorded silently, so a restart never
+replays old questions. Edge notifications dedup by tag for 24 h. At most 6
+notifications go out per rolling minute; the rest are counted into one
+`<N> more items need you` summary.
+
+**Closed trigger list** (`src/lib/push/classify.ts`): question
+(`pendingAskUserQuestion`), approval (`pendingProposedPlan`, a permission
+prompt), finished and failed (the edge events above). Pane choices, held
+kickoffs, rate limits, session-resume gates, `verification.failed` and plain
+`agent.stopped` never notify.
+
+**Providers for PAN-2080.** `src/lib/push/types.ts` defines `PushProvider`
+(`name`, `hasTargets()`, `send(notification)`) and `NeedsYouNotification`
+(`title` for Web Push, `publicTitle` that carries only the kind plus an issue id
+or "a conversation", `body`, `url`, `tag`). `webpush-provider.ts` and
+`ntfy-provider.ts` implement it; Slack, email and TTS plug in the same way.
+Both use a 5 s timeout and one retry after 5 s for network errors, 429 and 5xx.
+A Web Push 404/410 deletes the subscription, and a subscription whose paired
+device is revoked is deleted before sending.
+
+**Files under `<OVERDECK_HOME>/push/`** (directory 0700):
+
+- `vapid.json` (0600): `{ publicKey, privateKey, createdAt }`. Created once with
+  temp file plus `link()`, never overwritten: a new key would orphan every
+  subscription.
+- `subscriptions.json` (0600): at most 20 records `{ id, endpoint, keys, label,
+  credentialId, createdAt, lastSuccessAt, lastFailureAt, failureCount }`,
+  written atomically through one in-process queue. Endpoints must be `https:`
+  on Google, Mozilla, Apple or Microsoft push hosts (SSRF guard).
+
+**Routes** (`routes/push.ts`, admin scope): `GET /api/push/vapid-public-key`,
+`GET /api/push/status` (hosts and a masked ntfy topic only), `POST` and
+`DELETE /api/push/subscriptions`, `POST /api/push/test`.
+
+**The seam with PAN-2355.** There is exactly one service worker,
+`src/dashboard/frontend/public/sw.js`, always registered with
+`navigator.serviceWorker.register('/sw.js', { scope: '/' })`. PAN-2355 owns the
+manifest, the worker, registration and the `/m` phone shell; PAN-2354 owns the
+keys, the subscription store and routes, the send path and the **Turn on
+notifications** control. Second-lander rule: whichever issue lands second
+extends the existing `sw.js` and manifest, never adds a second worker or script
+URL. The payload contract is `{ title, body, url, tag }`, where `url` is a
+same-origin path: `/m?subject=<encodeURIComponent(id)>` for questions and
+approvals, `/m` for everything else. A click focuses an open window and
+navigates it to `url`, else opens one; a cross-origin `url` becomes `/m`.

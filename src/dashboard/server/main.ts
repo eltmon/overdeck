@@ -13,6 +13,9 @@ import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
+import { startNeedsYouPushService, stopNeedsYouPushService } from './services/needs-you-push-service.js';
+import { conversationReadDependencies } from './routes/conversations.js';
+import { getConversationsPendingInputFeed } from '../../lib/overdeck/conversation-reads.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
 import {
   enqueueProjectsResourceRefreshStaggered,
@@ -259,6 +262,11 @@ if (isPeerDashboard) {
 // PAN-3931: in a peer dashboard those events stay in memory (emitOnly).
 startAgentEnrichmentService();
 console.log(`[overdeck] AgentEnrichmentService started${isPeerDashboard ? ' (peer: in-memory events only)' : ''}`);
+// PAN-2354: needs-you push to phones (Web Push, optional ntfy). Primary only —
+// a peer dashboard would send every notification twice.
+if (!isPeerDashboard) {
+  startNeedsYouPushService({ readConversationFeed: () => getConversationsPendingInputFeed(conversationReadDependencies) });
+}
 
 // Enable demand-driven agent output capture. The poller starts only while an
 // RPC or public SSE subscriber has expressed output interest.
@@ -762,6 +770,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   clearInterval(attachmentCleanupTimer);
   stopResourceRefreshServices();
   stopAgentEnrichmentService();
+  stopNeedsYouPushService();
   stopAgentOutputService();
   stopConversationLifecycleService();
   stopCodexPluginImporter();

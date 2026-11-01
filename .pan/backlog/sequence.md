@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T08:41:27Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-01T08:51:39Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -296,7 +296,7 @@ _Last sequenced: 2026-11-01T08:41:27Z · model: claude-opus-5-5 · open: 871_
 | 290 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
 | 292 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
-| 292 | PAN-4648 | M | medium | ok |  | PAN-4645 | Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending. |
+| 292 | PAN-4648 | M | medium | ok |  |  | Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending. |
 | 293 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
 | 296 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
@@ -1206,7 +1206,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T08:41:27Z",
+  "generatedAt": "2026-11-01T08:51:39Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 871,
@@ -4715,7 +4715,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
         "PAN-4295"
       ],
       "why": "Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build.",
-      "rationale": "Body unchanged in substance; it still waits on PAN-4295 (in progress) to merge and deploy, so rank held behind it.",
+      "rationale": "Body re-read: still waits on #4295 deploy plus #4682/#4683 workarounds; no material change, rank kept.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4952,9 +4952,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "importance": "medium",
       "score": 42,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4645"
-      ],
+      "dependsOn": [],
       "why": "Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending.",
       "rationale": "New Anywhere child (W-INT1); its Funnel route follows W-TS1 and its inbox follows W-LINK5, so it ranks last of the new children. Body is still a placeholder.",
       "gate": "auto",
@@ -13556,7 +13554,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "to": "PAN-4648",
       "type": "unblocks",
       "source": "ai-inferred",
-      "confidence": 0.6
+      "confidence": 0.4
     },
     {
       "from": "PAN-2350",
@@ -13702,15 +13700,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "from": "PAN-2354",
       "to": "PAN-2355",
       "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-1254",
       "to": "PAN-2355",
       "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-4666",
@@ -13809,6 +13807,34 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-1254",
+      "to": "PAN-4648",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1254",
+      "to": "PAN-4649",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2354",
+      "to": "PAN-2080",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4697",
+      "to": "PAN-4681",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
