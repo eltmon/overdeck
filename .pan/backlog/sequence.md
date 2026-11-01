@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T05:59:23Z · model: claude-opus-5-5 · open: 862_
+_Last sequenced: 2026-11-01T06:01:14Z · model: claude-opus-5-5 · open: 863_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -13,6 +13,7 @@ _Last sequenced: 2026-11-01T05:59:23Z · model: claude-opus-5-5 · open: 862_
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 8 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
+| 9 | PAN-4669 | S | critical | ok |  |  | Herdr hosts: idle-stack reaper checks tmux only, so it stops server/frontend containers of every live agent after 10m; needs-handoff |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
@@ -902,6 +903,10 @@ New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan
 
 New substrate bug in the Flywheel's own status read model: a second liveness rule in derive-status.ts hides live agents, so the loop or operator may respawn running work; small fix with clear ACs, ranked beside PAN-4636 as critical but labeled needs-handoff (TENET-10), so it goes through a supervised pan handoff.
 
+### PAN-4669 (rank 9)
+
+New since the prior run: on the default Herdr backend the idle-stack reaper decides liveness from the tmux session list, so it stops the dev server and UI containers of every running workspace 10 minutes after start, breaking agents' dev servers and preview URLs fleet-wide. The fix is small and well specified (route through liveness.ts or the backend list()), with clear acceptance criteria, so it ranks in the critical substrate tier next to PAN-4666, the same bypass-liveness.ts class. It carries needs-handoff (TENET-10), so pickup is a supervised pan handoff, not autonomous.
+
 ### PAN-4547 (rank 11)
 
 Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by hand. With false DoD refusals fixed by PAN-4543, auto close-out only needs a patrol on the existing verify-on-main path and live settings. High because unclosed issues distort every pipeline view.
@@ -1186,10 +1191,6 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
 
 Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
 
-### PAN-2699 (rank 91)
-
-npm run build regenerates the committed record-cost-event.js bundle, dirtying every workspace tree and blocking clean-workspace gates.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1197,10 +1198,10 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T05:59:23Z",
+  "generatedAt": "2026-11-01T06:01:14Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 862,
+  "openCount": 863,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -11993,6 +11994,19 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "rationale": "New substrate bug in the Flywheel's own status read model: a second liveness rule in derive-status.ts hides live agents, so the loop or operator may respawn running work; small fix with clear ACs, ranked beside PAN-4636 as critical but labeled needs-handoff (TENET-10), so it goes through a supervised pan handoff.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4669",
+      "rank": 9,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Herdr hosts: idle-stack reaper checks tmux only, so it stops server/frontend containers of every live agent after 10m; needs-handoff",
+      "rationale": "New since the prior run: on the default Herdr backend the idle-stack reaper decides liveness from the tmux session list, so it stops the dev server and UI containers of every running workspace 10 minutes after start, breaking agents' dev servers and preview URLs fleet-wide. The fix is small and well specified (route through liveness.ts or the backend list()), with clear acceptance criteria, so it ranks in the critical substrate tier next to PAN-4666, the same bypass-liveness.ts class. It carries needs-handoff (TENET-10), so pickup is a supervised pan handoff, not autonomous.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13665,6 +13679,13 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     {
       "from": "PAN-1254",
       "to": "PAN-2355",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4666",
+      "to": "PAN-4669",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
