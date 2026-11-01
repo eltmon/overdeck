@@ -266,7 +266,7 @@ export async function runConnect(options: ConnectOptions, deps: ConnectDeps): Pr
     out(`The other machine must reach ${hostAndPort(base.base)}. If a firewall blocks it, open that port `
       + 'or set up Tailscale with `pan tailscale setup`, then run pan connect again.');
   }
-  if (runtime) out(`To run pan on this machine: ${join(deps.overdeckHome, 'runtime', 'node_modules', '.bin', 'pan')}`);
+  if (runtime) out(`Run Overdeck commands on this machine with: ${join(deps.overdeckHome, 'runtime', 'node_modules', '.bin', 'pan')}`);
   return 0;
 }
 

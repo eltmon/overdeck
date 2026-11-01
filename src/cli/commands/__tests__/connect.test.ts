@@ -133,7 +133,7 @@ describe('pan connect: platform and runtime', () => {
     await expect(runConnect({}, deps)).resolves.toBe(0);
     expect(deps.reexec).not.toHaveBeenCalled();
     expect(deps.ensureDurableRuntime).not.toHaveBeenCalled();
-    expect(plain(stdout).split('\n').at(-1)).toBe('To run pan on this machine: /home/alice/.overdeck/runtime/node_modules/.bin/pan');
+    expect(plain(stdout).split('\n').at(-1)).toBe('Run Overdeck commands on this machine with: /home/alice/.overdeck/runtime/node_modules/.bin/pan');
   });
 
   it('never re-execs from an npx root when OVERDECK_CONNECT_REEXEC=1', async () => {
