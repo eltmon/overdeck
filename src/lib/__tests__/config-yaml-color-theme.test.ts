@@ -27,4 +27,20 @@ describe('ui.color_theme configuration (PAN-4644)', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ui.color_theme.light'));
     warnSpy.mockRestore();
   });
+
+  it('does not throw on a null color_theme (e.g. "ui:\\n  color_theme:\\n"), warns, and yields null for both modes', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { config } = mergeConfigs({ ui: { color_theme: null as never } });
+    expect(config.ui.colorTheme).toEqual({ light: null, dark: null });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ui.color_theme'));
+    warnSpy.mockRestore();
+  });
+
+  it('does not throw on an array color_theme, warns, and yields null for both modes', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { config } = mergeConfigs({ ui: { color_theme: ['ayu-dark'] as never } });
+    expect(config.ui.colorTheme).toEqual({ light: null, dark: null });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ui.color_theme'));
+    warnSpy.mockRestore();
+  });
 });

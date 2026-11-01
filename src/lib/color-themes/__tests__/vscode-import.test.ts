@@ -70,6 +70,13 @@ describe('mapVsCodeTheme', () => {
     expect(mapVsCodeTheme(lightText, 'l.json').theme.type).toBe('light');
   });
 
+  it('guesses dark/light from a shorthand 3-digit editor.background hex', () => {
+    const darkText = JSON.stringify({ name: 'Guessed Dark Short', colors: { 'editor.background': '#111' } });
+    const lightText = JSON.stringify({ name: 'Guessed Light Short', colors: { 'editor.background': '#fff' } });
+    expect(mapVsCodeTheme(darkText, 'd.json').theme.type).toBe('dark');
+    expect(mapVsCodeTheme(lightText, 'l.json').theme.type).toBe('light');
+  });
+
   it('falls back to the file name when name is absent', () => {
     const { theme } = mapVsCodeTheme(JSON.stringify({ type: 'dark' }), 'My Theme.json');
     expect(theme.name).toBe('My Theme');

@@ -75,4 +75,21 @@ describe('color theme store', () => {
     const { getColorTheme } = await import('../store.js');
     expect(await getColorTheme('does-not-exist')).toBeUndefined();
   });
+
+  it('getColorTheme returns undefined for a prototype-shaped id (never resolves via the prototype chain)', async () => {
+    const { getColorTheme } = await import('../store.js');
+    expect(await getColorTheme('constructor')).toBeUndefined();
+  });
+
+  it('a 64-char base name collision gets a truncated, still-valid id (never exceeds 64 chars)', async () => {
+    const { saveColorTheme } = await import('../store.js');
+    const longName = 'a'.repeat(64);
+    const first = await saveColorTheme({ name: longName, type: 'dark' });
+    const second = await saveColorTheme({ name: longName, type: 'dark' });
+    if ('errors' in first || 'errors' in second) throw new Error('expected saved themes');
+    expect(first.theme.id).toHaveLength(64);
+    expect(second.theme.id.length).toBeLessThanOrEqual(64);
+    expect(second.theme.id).toMatch(/^a+-2$/);
+    expect(second.theme.id).not.toBe(first.theme.id);
+  });
 });

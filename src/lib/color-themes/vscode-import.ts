@@ -5,7 +5,7 @@
  * imported themes.
  */
 import { parse, type ParseError } from 'jsonc-parser';
-import { normalizeColorTheme, type ColorTheme, type ColorThemeType } from '@overdeck/contracts';
+import { normalizeColorTheme, toOpaqueHex, type ColorTheme, type ColorThemeType } from '@overdeck/contracts';
 
 export class ColorThemeImportError extends Error {
   constructor(message: string) {
@@ -36,7 +36,7 @@ function stringAt(colors: Record<string, unknown>, key: string): string | undefi
 /** Relative-luminance-based dark/light guess for a theme with no `type`. */
 function luminanceType(hex: string | undefined): ColorThemeType | undefined {
   if (hex === undefined) return undefined;
-  const digits = hex.replace('#', '');
+  const digits = toOpaqueHex(hex).replace('#', '');
   if (digits.length < 6) return undefined;
   const r = parseInt(digits.slice(0, 2), 16) / 255;
   const g = parseInt(digits.slice(2, 4), 16) / 255;

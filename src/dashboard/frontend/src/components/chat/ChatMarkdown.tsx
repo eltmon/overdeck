@@ -19,7 +19,6 @@ import React, {
   useContext,
   useState,
   useCallback,
-  useRef,
   useEffect,
   useMemo,
   type ReactNode,
@@ -182,17 +181,20 @@ interface CodeBlockProps {
 function CodeBlock({ code, lang, isStreaming }: CodeBlockProps) {
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const abortRef = useRef(false);
   const mode = useTheme((s) => s.resolvedTheme);
   const activeTheme = useColorTheme((s) => s.activeTheme(mode));
   const themeName = syntaxThemeName(activeTheme);
 
   useEffect(() => {
-    abortRef.current = false;
+    // A local flag per effect run (not a shared ref) — a shared flag would
+    // get reset to "not cancelled" by a newer run while an older run's
+    // promise chain is still in flight, letting a stale highlight overwrite
+    // a newer one once it resolves out of order (PAN-4644 review).
+    let cancelled = false;
     void ensureSyntaxTheme(activeTheme).then(() => highlightCode(code, lang, isStreaming, themeName)).then((html) => {
-      if (!abortRef.current) setHighlighted(html);
+      if (!cancelled) setHighlighted(html);
     });
-    return () => { abortRef.current = true; };
+    return () => { cancelled = true; };
   }, [code, lang, isStreaming, activeTheme, themeName]);
 
   const sanitizedHtml = useMemo(

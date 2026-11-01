@@ -899,15 +899,20 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     }
 
     if (config.ui?.color_theme !== undefined) {
-      const colorThemeIdRe = /^[a-z0-9][a-z0-9-]{0,63}$/;
-      for (const mode of ['light', 'dark'] as const) {
-        const value = config.ui.color_theme[mode];
-        if (value === undefined) continue;
-        if (typeof value === 'string' && colorThemeIdRe.test(value)) {
-          result.ui.colorTheme[mode] = value;
-        } else {
-          console.warn(`config.yaml: ui.color_theme.${mode} must be a theme id; ignoring`);
+      const rawColorTheme = config.ui.color_theme;
+      if (typeof rawColorTheme === 'object' && rawColorTheme !== null && !Array.isArray(rawColorTheme)) {
+        const colorThemeIdRe = /^[a-z0-9][a-z0-9-]{0,63}$/;
+        for (const mode of ['light', 'dark'] as const) {
+          const value = rawColorTheme[mode];
+          if (value === undefined) continue;
+          if (typeof value === 'string' && colorThemeIdRe.test(value)) {
+            result.ui.colorTheme[mode] = value;
+          } else {
+            console.warn(`config.yaml: ui.color_theme.${mode} must be a theme id; ignoring`);
+          }
         }
+      } else {
+        console.warn('config.yaml: ui.color_theme must be a map of theme ids; ignoring');
       }
     }
 

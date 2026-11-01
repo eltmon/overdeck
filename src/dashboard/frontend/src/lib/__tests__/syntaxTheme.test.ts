@@ -67,6 +67,18 @@ describe('ensureSyntaxTheme', () => {
     expect(nameBefore).not.toBe(nameAfter);
     expect(registerCustomThemeMock).toHaveBeenCalledTimes(2);
   });
+
+  it('a failed registration is never marked registered, so a later call retries it', async () => {
+    const flaky = theme({ id: 'flaky', type: 'dark', syntax: { tokenColors: [{ settings: { foreground: '#555555' } }] } });
+    registerCustomThemeMock.mockImplementationOnce(() => { throw new Error('registration failed'); });
+
+    await expect(ensureSyntaxTheme(flaky)).rejects.toThrow('registration failed');
+    expect(registerCustomThemeMock).toHaveBeenCalledTimes(1);
+
+    const name = await ensureSyntaxTheme(flaky);
+    expect(registerCustomThemeMock).toHaveBeenCalledTimes(2);
+    expect(name.startsWith('overdeck-flaky-')).toBe(true);
+  });
 });
 
 describe('highlight', () => {

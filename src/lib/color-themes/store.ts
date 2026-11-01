@@ -73,8 +73,9 @@ export async function listColorThemes(): Promise<{ themes: ColorTheme[]; warning
 }
 
 export async function getColorTheme(id: string): Promise<ColorTheme | undefined> {
-  const builtin = (BUILTIN_COLOR_THEMES as Record<string, ColorTheme>)[id];
-  if (builtin !== undefined) return builtin;
+  if (Object.hasOwn(BUILTIN_COLOR_THEMES, id)) {
+    return (BUILTIN_COLOR_THEMES as Record<string, ColorTheme>)[id];
+  }
 
   if (!COLOR_THEME_ID_RE.test(id)) return undefined;
 
@@ -93,14 +94,20 @@ export async function getColorTheme(id: string): Promise<ColorTheme | undefined>
 }
 
 async function nextAvailableId(baseId: string): Promise<string> {
-  let candidate = baseId;
+  if (!RESERVED_COLOR_THEME_IDS.includes(baseId) && !(await fileExists(themeFilePath(baseId)))) {
+    return baseId;
+  }
   let suffix = 2;
   // eslint-disable-next-line no-constant-condition
   while (true) {
+    // Truncate the base so `<base>-<suffix>` never exceeds the 64-char id cap
+    // (COLOR_THEME_ID_RE) — slugifyThemeId alone can produce a 64-char id,
+    // which a bare "-2" suffix would push past the limit.
+    const suffixText = `-${suffix}`;
+    const candidate = `${baseId.slice(0, 64 - suffixText.length)}${suffixText}`;
     if (!RESERVED_COLOR_THEME_IDS.includes(candidate) && !(await fileExists(themeFilePath(candidate)))) {
       return candidate;
     }
-    candidate = `${baseId}-${suffix}`;
     suffix += 1;
   }
 }

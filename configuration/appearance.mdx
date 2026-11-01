@@ -93,7 +93,7 @@ Choose **Import VS Code theme** next to the pickers and pick a `.json` theme fil
 | `descriptionForeground` | `ui.muted` |
 | `focusBorder` | `ui.accent` |
 
-A theme with no `type` field is classified by the luminance of `editor.background`. Importing a `.vsix` extension package is tracked separately (#4659); a duplicate-and-edit color-picker editor for themes already in the store is tracked separately too (#4660) — until then, edit the JSON file by hand.
+A theme with no `type` field is classified by the luminance of `editor.background`; a theme with neither a `type` field nor an `editor.background` color defaults to `dark`, with a warning. Importing a `.vsix` extension package is tracked separately (#4659); a duplicate-and-edit color-picker editor for themes already in the store is tracked separately too (#4660) — until then, edit the JSON file by hand.
 
 ### What color themes never change
 

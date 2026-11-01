@@ -21,7 +21,6 @@ const registeredThemeNames = new Set<string>();
 export async function ensureSyntaxTheme(theme: ColorTheme): Promise<string> {
   const name = syntaxThemeName(theme);
   if (name === FALLBACK_THEME_NAME || registeredThemeNames.has(name)) return name;
-  registeredThemeNames.add(name);
 
   const { registerCustomTheme } = await import('@pierre/diffs');
   const syntax = theme.syntax!;
@@ -31,6 +30,10 @@ export async function ensureSyntaxTheme(theme: ColorTheme): Promise<string> {
     colors: syntax.colors ?? {},
     tokenColors: syntax.tokenColors,
   }));
+  // Mark registered only after registerCustomTheme succeeds — if the dynamic
+  // import above throws, the name must stay unregistered so a later call
+  // retries it instead of serving a permanently-unregistered theme name.
+  registeredThemeNames.add(name);
   return name;
 }
 

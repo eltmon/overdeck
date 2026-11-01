@@ -74,6 +74,26 @@ describe('color theme selection', () => {
     expect(written).toContain('dark: ayu-dark');
   });
 
+  it('saveColorThemeSelection does not throw when ui.color_theme is a null scalar (e.g. "ui:\\n  color_theme:\\n")', async () => {
+    writeFileSync(configPath(), 'ui:\n  color_theme:\n', 'utf8');
+    const { saveColorThemeSelection } = await import('../selection-write.js');
+
+    await saveColorThemeSelection('dark', 'ayu-dark');
+
+    const written = readFileSync(configPath(), 'utf8');
+    expect(written).toContain('dark: ayu-dark');
+  });
+
+  it('saveColorThemeSelection does not throw when ui itself is a null scalar (e.g. "ui:\\n")', async () => {
+    writeFileSync(configPath(), 'ui:\n', 'utf8');
+    const { saveColorThemeSelection } = await import('../selection-write.js');
+
+    await saveColorThemeSelection('dark', 'ayu-dark');
+
+    const written = readFileSync(configPath(), 'utf8');
+    expect(written).toContain('dark: ayu-dark');
+  });
+
   it('a fresh load after saveColorThemeSelection resolves the saved selection', async () => {
     const themesDir = join(testHome, 'themes');
     mkdirSync(themesDir, { recursive: true });
