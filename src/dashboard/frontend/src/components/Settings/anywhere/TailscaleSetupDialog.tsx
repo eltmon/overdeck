@@ -14,6 +14,7 @@ import { X } from 'lucide-react';
 
 import { XTerminal } from '../../XTerminal';
 import { ANYWHERE_STATUS_QUERY_KEY, apiError, isOk } from './anywhereApi';
+import { TailscalePhoneQr } from './TailscalePhoneQr';
 import {
   TAILSCALE_STATUS_QUERY_KEY,
   createPane,
@@ -32,11 +33,13 @@ const ADMIN_DNS_URL = 'https://login.tailscale.com/admin/dns';
 interface TailscaleSetupDialogProps {
   open: boolean;
   onClose: () => void;
+  /** The ready step's Pair a device: the host closes this dialog and opens the pair dialog. */
+  onPair?: () => void;
 }
 
-export function TailscaleSetupDialog({ open, onClose }: TailscaleSetupDialogProps) {
+export function TailscaleSetupDialog({ open, onClose, onPair }: TailscaleSetupDialogProps) {
   if (!open) return null;
-  return <TailscaleSetupDialogBody onClose={onClose} />;
+  return <TailscaleSetupDialogBody onClose={onClose} onPair={onPair} />;
 }
 
 function CopyableCommand({ command }: { command: string }) {
@@ -48,7 +51,7 @@ function CopyableCommand({ command }: { command: string }) {
   );
 }
 
-function TailscaleSetupDialogBody({ onClose }: { onClose: () => void }) {
+function TailscaleSetupDialogBody({ onClose, onPair }: { onClose: () => void; onPair?: () => void }) {
   const queryClient = useQueryClient();
   const [userspace, setUserspace] = useState(false);
   const { data: result, isLoading } = useQuery({
@@ -200,6 +203,7 @@ function TailscaleSetupDialogBody({ onClose }: { onClose: () => void }) {
               operatorFromLogin={operatorOverride}
               onServe={() => void turnOnServe()}
               onCheck={refresh}
+              onPair={onPair}
             />
           )}
           {message && (
@@ -233,6 +237,7 @@ interface StepPanelProps {
   operatorFromLogin: boolean;
   onServe: () => void;
   onCheck: () => void;
+  onPair?: () => void;
 }
 
 function StepPanel(props: StepPanelProps) {
@@ -354,6 +359,7 @@ function StepPanel(props: StepPanelProps) {
         <div className="space-y-2" data-testid="tailscale-ready">
           <p className="text-xs text-muted-foreground">Other devices on your tailnet can open this dashboard at:</p>
           {body.state.serveUrl && <CopyableCommand command={body.state.serveUrl} />}
+          {props.onPair && <TailscalePhoneQr loginName={body.state.loginName} onPair={props.onPair} />}
         </div>
       );
   }

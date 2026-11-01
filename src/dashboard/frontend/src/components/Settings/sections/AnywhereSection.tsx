@@ -66,7 +66,14 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
         {status?.tailscale?.nextStep === 'ready' && <TailscalePeersPanel />}
       </div>
       <PairDeviceDialog open={open} onClose={() => setOpen(false)} />
-      <TailscaleSetupDialog open={tailscaleOpen} onClose={() => setTailscaleOpen(false)} />
+      <TailscaleSetupDialog
+        open={tailscaleOpen}
+        onClose={() => setTailscaleOpen(false)}
+        onPair={() => {
+          setTailscaleOpen(false);
+          setOpen(true);
+        }}
+      />
     </SettingsSection>
   );
 }
