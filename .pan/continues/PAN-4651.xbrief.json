@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:33:53.134Z",
+  "updated": "2026-11-01T21:34:06.772Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -382,6 +382,10 @@
     "wi13-worker-cli-machine.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T21:33:53.134Z"
+    },
+    "wi14-start-cli-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:34:06.771Z"
     }
   }
 }
