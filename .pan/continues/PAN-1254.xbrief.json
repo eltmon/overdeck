@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T09:09:08.536Z",
+  "updated": "2026-11-01T09:09:35.840Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -420,6 +420,10 @@
       "claimedBy": "agent-pan-1254",
       "claimedAt": "2026-11-01T09:08:16.784Z",
       "doneAt": "2026-11-01T09:09:08.535Z"
+    },
+    "docs-cli-tailscale.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:09:35.839Z"
     }
   }
 }
