@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4626",
   "created": "2026-11-01T05:58:08.711Z",
-  "updated": "2026-11-01T07:07:56.766Z",
+  "updated": "2026-11-01T07:08:15.333Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "uat-screenshots.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:07:56.766Z"
+    },
+    "uat-screenshots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:08:15.332Z"
     }
   }
 }
