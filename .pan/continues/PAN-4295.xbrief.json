@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4295",
+  "created": "2026-11-01T05:48:47.966Z",
+  "updated": "2026-11-01T05:48:47.966Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "restore-credential-refresh": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4295",
+      "claimedAt": "2026-11-01T05:48:47.966Z"
+    }
+  }
+}
