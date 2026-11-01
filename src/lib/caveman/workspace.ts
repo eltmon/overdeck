@@ -217,10 +217,12 @@ async function post(path, body, timeoutMs) {
   }
 }
 function internalToken() {
-  if (process.env.OVERDECK_INTERNAL_TOKEN) return process.env.OVERDECK_INTERNAL_TOKEN;
   const path = join(process.env.OVERDECK_HOME || join(homedir(), '.overdeck'), 'internal-token');
-  if (!existsSync(path)) return '';
-  return readFileSync(path, 'utf8').trim();
+  if (existsSync(path)) {
+    const value = readFileSync(path, 'utf8').trim();
+    if (value) return value;
+  }
+  return process.env.OVERDECK_INTERNAL_TOKEN || '';
 }
 `;
 }

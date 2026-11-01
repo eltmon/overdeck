@@ -415,3 +415,13 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   package.json test:frontend-subset line, each costing a re-review. PAN-4697
   fixes it; land it first. (Use `git pull --rebase origin main` here: a
   multi-branch `git fetch` makes a bare `git pull --rebase` fail.)
+- 2026-11-01 09:35 UTC: PAN-4702 (strike). GitHub stamped some records about
+  an hour ahead today (mergedAt, review submitted_at; US DST change). The merge
+  gate's `latestTrustedVerdicts` (`pr-facts.ts` ~785) ranks by submittedAt, so
+  a stale ancestor-commit approval with a future stamp hid the head approval
+  on #4699, #4692, #4686 ("not approved at PR HEAD" though GitHub shows it).
+  Dismissing does not help (DISMISSED counts as a verdict). Fallback: after
+  ~10:00 UTC re-request review so a fresh head approval outranks them.
+- Verification-stuck cap: after 3/3 failed verification attempts the pipeline
+  pauses the work agent as an operator signal (PAN-4628). When the failure is
+  concrete, `pan unpause agent-<id>` resumes it and delivers queued mail.

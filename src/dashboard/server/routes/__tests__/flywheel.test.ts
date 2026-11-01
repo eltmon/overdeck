@@ -4,11 +4,14 @@
  * route wiring, the typed-error mapping, and the origin gate.
  */
 
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 
 const mocks = vi.hoisted(() => ({
   deriveFlywheelStatus: vi.fn(),
@@ -78,6 +81,7 @@ function trustedPost(body: unknown = {}): RequestInit {
 describe('/api/flywheel routes (PAN-3964 FR-7)', () => {
   beforeEach(() => {
     process.env.OVERDECK_INTERNAL_TOKEN = 'test-dashboard-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     for (const mock of Object.values(mocks)) mock.mockReset();
     mocks.resolveFlywheelProjectRoot.mockResolvedValue({ projectRoot: '/repos/overdeck', planHome: '/repos/plan' });
