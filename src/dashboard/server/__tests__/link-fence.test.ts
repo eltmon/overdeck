@@ -18,6 +18,7 @@ import {
   MACHINE_TOKEN_SCOPES,
 } from '../../../lib/access-tokens.js';
 import { _resetInternalTokenCacheForTests } from '../../../lib/internal-token.js';
+import { closeOverdeckDatabase } from '../../../lib/overdeck/infra.js';
 import { invalidateRemoteAccessConfig } from '../../../lib/remote-access/config.js';
 import type { ChannelMarker } from '../channel-peer.js';
 import { linkActorFence } from '../link-fence.js';
@@ -44,6 +45,7 @@ function machine(actor: DashboardCredential extends infer C ? C extends { kind: 
 
 beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), 'pan-4650-link-fence-'));
+  closeOverdeckDatabase();
   process.env.OVERDECK_HOME = home;
   process.env.OVERDECK_INTERNAL_TOKEN = 'link-fence-internal-token';
   _resetInternalTokenCacheForTests();
@@ -57,6 +59,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  closeOverdeckDatabase();
   await _settleAccessTokenWritesForTests();
   _resetAccessTokensForTests();
   _resetInternalTokenCacheForTests();
@@ -105,8 +108,61 @@ describe('agent fence (PAN-4650 D-4650-7)', () => {
     expect(linkActorFence(agent, 'POST', '/api/conversations')).toBe('agent-fenced');
     expect(linkActorFence(agent, 'DELETE', '/api/conversations/x/scheduled-messages/1')).toBe('agent-fenced');
     expect(linkActorFence(agent, 'HEAD', '/api/conversations/x')).toBeNull();
-    expect(linkActorFence(agent, 'POST', '/api/lanes')).toBeNull();
+    expect(linkActorFence(agent, 'POST', '/api/lanes')).toBe('agent-fenced');
     expect(linkActorFence(machine('operator'), 'GET', '/ws/terminal')).toBeNull();
     expect(linkActorFence({ kind: 'root-session' }, 'POST', '/api/conversations/x/message')).toBeNull();
+  });
+});
+
+describe('provenance fence (PAN-4651 D-4651-2)', () => {
+  const startedBy: Record<string, string> = { 'conv-a': 'env-laptop', 'conv-c': 'env-desk' };
+  const deps = { conversationStartedBy: (name: string) => startedBy[name] ?? null };
+  const agentOf = (environmentId: string): DashboardCredential => ({
+    kind: 'machine', tokenId: 't', environmentId, scopes: MACHINE_TOKEN_SCOPES('operator'), actor: { agentId: 'agent-pan-1' }, access: 'operator',
+  });
+
+  it('ac1: an agent actor changes only conversations its own machine started', () => {
+    expect(linkActorFence(agentOf('env-laptop'), 'POST', '/api/conversations/conv-a/message', deps)).toBeNull();
+    expect(linkActorFence(agentOf('env-laptop'), 'POST', '/api/conversations/conv-a/stop', deps)).toBeNull();
+    expect(linkActorFence(agentOf('env-other'), 'POST', '/api/conversations/conv-a/message', deps)).toBe('agent-fenced');
+    expect(linkActorFence(agentOf('env-laptop'), 'POST', '/api/conversations/conv-c/message', deps)).toBe('agent-fenced');
+    expect(linkActorFence(agentOf('env-laptop'), 'POST', '/api/conversations/conv-b/message', deps)).toBe('agent-fenced');
+    expect(linkActorFence(agentOf('env-laptop'), 'DELETE', '/api/conversations', deps)).toBe('agent-fenced');
+    expect(linkActorFence(agentOf('env-laptop'), 'POST', '/api/conversations/@desk/conv-a/message', deps)).toBe('agent-fenced');
+  });
+
+  it('ac2: work-door creates pass; bare creates, the project door, terminals and forwards stay refused', () => {
+    const agent = agentOf('env-laptop');
+    expect(linkActorFence(agent, 'POST', '/api/machines/work/conversations', deps)).toBeNull();
+    expect(linkActorFence(agent, 'POST', '/api/machines/work/workers', deps)).toBeNull();
+    expect(linkActorFence(agent, 'POST', '/api/machines/work/issues/PAN-7/start', deps)).toBeNull();
+    expect(linkActorFence(agent, 'POST', '/api/workers/agent-pan-7-w1/stop', deps)).toBeNull();
+    expect(linkActorFence(agent, 'POST', '/api/machines/work/projects', deps)).toBe('agent-fenced');
+    expect(linkActorFence(agent, 'POST', '/api/conversations', deps)).toBe('agent-fenced');
+    expect(linkActorFence(agent, 'POST', '/api/workers', deps)).toBe('agent-fenced');
+    expect(linkActorFence(agent, 'POST', '/api/lanes', deps)).toBe('agent-fenced');
+    expect(linkActorFence(agent, 'GET', '/ws/terminal', deps)).toBe('agent-fenced');
+    expect(linkActorFence(agent, 'GET', '/ws/forward', deps)).toBe('agent-fenced');
+  });
+
+  it('ac3: an operator actor keeps every right, provenance or not', () => {
+    const operator = machine('operator');
+    expect(linkActorFence(operator, 'POST', '/api/conversations/conv-b/message', deps)).toBeNull();
+    expect(linkActorFence(operator, 'POST', '/api/conversations', deps)).toBeNull();
+    expect(linkActorFence(operator, 'POST', '/api/machines/work/projects', deps)).toBeNull();
+  });
+
+  it('fails closed when the provenance read throws', () => {
+    const broken = { conversationStartedBy: () => { throw new Error('db unavailable'); } };
+    expect(linkActorFence(agentOf('env-laptop'), 'POST', '/api/conversations/conv-a/message', broken)).toBe('agent-fenced');
+  });
+
+  it('the remote request gate reads the provenance door by default', async () => {
+    const { createConversation } = await import('../../../lib/overdeck/conversations.js');
+    const { markConversationStartedBy } = await import('../../../lib/overdeck/conversation-provenance.js');
+    createConversation({ name: 'conv-linked', tmuxSession: 'conv-linked', cwd: home, harness: 'claude-code' });
+    markConversationStartedBy('conv-linked', 'env-laptop');
+    expect(remoteGateRejection(request('POST', '/api/conversations/conv-linked/message', 'agent:agent-pan-1'), LINK)).toBeNull();
+    expect(remoteGateRejection(request('POST', '/api/conversations/conv-unstamped/message', 'agent:agent-pan-1'), LINK)).toEqual({ status: 403, code: 'agent-fenced' });
   });
 });

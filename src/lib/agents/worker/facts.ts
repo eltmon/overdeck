@@ -15,6 +15,8 @@ export interface WorkerFacts {
   branch: string | null;
   name: string | null;
   startedAt: string;
+  /** PAN-4651 D-4651-1: the linked machine (and its parent) that started this worker through a work door; absent or null = started here. */
+  startedBy?: { environmentId: string; parentId: string | null } | null;
 }
 
 export async function writeWorkerFacts(facts: WorkerFacts): Promise<void> {
