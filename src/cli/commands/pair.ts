@@ -5,6 +5,7 @@
  *   pan pair [--label <name>] [--url <base>] [--json]
  *   pan devices list [--json]
  *   pan devices revoke <id>
+ *   pan machines link|list|unlink   (PAN-4645, `machines.ts`, registered from here)
  *
  * Asks the running dashboard (with the internal token) for a one-time pairing
  * credential and prints `<base>/#pair=<credential>`. The credential is always
@@ -23,6 +24,8 @@ import chalk from 'chalk';
 import type { Command } from 'commander';
 
 import { isLoopbackOrigin as isLoopbackBase } from '../../lib/remote-access/loopback.js';
+import { callDashboard, errorText, isDashboardUnreachable } from './dashboard-call.js';
+import { registerMachinesCommands } from './machines.js';
 
 /** True when the base URL only resolves on this machine (PAN-4445 D-7: one check, shared with the server). */
 export { isLoopbackBase };
@@ -39,36 +42,12 @@ export function pairingUrl(base: string, credential: string): string {
   return `${base.replace(/\/+$/, '')}/#pair=${credential}`;
 }
 
-class DashboardUnreachableError extends Error {}
-
-/** Call the running dashboard with the internal token. Throws DashboardUnreachableError when nothing answers. */
-export async function callDashboard(path: string, init: { method: string; body?: unknown }): Promise<Response> {
-  const { getDashboardApiUrl } = await import('../../lib/config.js');
-  const { ensureInternalToken, INTERNAL_TOKEN_HEADER } = await import('../../lib/internal-token.js');
-  try {
-    return await fetch(`${getDashboardApiUrl()}${path}`, {
-      method: init.method,
-      headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: ensureInternalToken() },
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
-    });
-  } catch (error) {
-    throw new DashboardUnreachableError((error as Error).message);
-  }
-}
-
-export function isDashboardUnreachable(error: unknown): boolean {
-  return error instanceof DashboardUnreachableError;
-}
+export { callDashboard, isDashboardUnreachable } from './dashboard-call.js';
 
 async function fail(message: string): Promise<never> {
   console.error(chalk.red(message));
   const { exitCli } = await import('../exit.js');
   return exitCli(1);
-}
-
-async function errorText(response: Response): Promise<string> {
-  const body = await response.json().catch(() => null) as { error?: unknown } | null;
-  return typeof body?.error === 'string' ? body.error : `HTTP ${response.status}`;
 }
 
 export async function runPair(options: PairOptions): Promise<void> {
@@ -174,4 +153,7 @@ export function registerPairCommands(program: Command): void {
     .command('revoke <id>')
     .description('Revoke a paired device and close its live connections')
     .action((id: string) => runDevicesRevoke(id));
+
+  // PAN-4645: `pan machines` registers here so `src/cli/index.ts` does not grow.
+  registerMachinesCommands(program);
 }
