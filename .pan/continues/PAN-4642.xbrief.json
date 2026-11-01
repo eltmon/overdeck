@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4642",
   "created": "2026-11-01T04:49:54.715Z",
-  "updated": "2026-11-01T05:37:18.958Z",
+  "updated": "2026-11-01T05:41:49.760Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
       "claimedBy": "agent-pan-4642",
       "claimedAt": "2026-11-01T05:35:59.703Z",
       "doneAt": "2026-11-01T05:37:18.958Z"
+    },
+    "extract-attachment-strip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:41:49.759Z"
     }
   }
 }
