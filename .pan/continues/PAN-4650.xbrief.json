@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T16:30:50.165Z",
+  "updated": "2026-11-01T16:31:15.358Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,9 +148,10 @@
       "doneAt": "2026-11-01T16:30:48.879Z"
     },
     "wi23-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4650",
-      "claimedAt": "2026-11-01T16:30:50.165Z"
+      "claimedAt": "2026-11-01T16:30:50.165Z",
+      "doneAt": "2026-11-01T16:31:15.357Z"
     }
   },
   "agentModel": "claude-opus-5-5"
