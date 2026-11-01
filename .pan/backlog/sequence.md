@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T18:11:31.073431Z · model: claude-opus-5-5 · open: 857_
+_Last sequenced: 2026-11-01T18:24:34.254924Z · model: claude-opus-5-5 · open: 858_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 2 | PAN-4732 | S | critical | ok |  |  | Browser+Vite e2e spec in default unit shards timed out and turned main red; move heavy e2e to slow lane, keep fast component test. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
@@ -869,6 +870,10 @@ _Last sequenced: 2026-11-01T18:11:31.073431Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
+### PAN-4732 (rank 2)
+
+New substrate bug with a verified root cause: vitest.config.ts includes tests/e2e/*.spec.ts in the default shards, so PAN-4650's linked-conversation-title-bar spec cold-compiles the app under shard load and timed out on main (run 41335061342). A red main empties the merge gate for every approved PR, and this is the third flaky turn-red today, so it takes the free rank-2 slot ahead of routine work. It is already in the pipeline with a live workspace.
+
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1181,10 +1186,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 
 Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
 
-### PAN-3043 (rank 84)
-
-Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1192,10 +1193,10 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T18:11:31.073431Z",
+  "generatedAt": "2026-11-01T18:24:34.254924Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 857,
+  "openCount": 858,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -11877,6 +11878,19 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "rationale": "New issue: follow-up to in-pipeline PAN-4727 (blocked by it), slotted into a free rank among comparable medium features.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4732",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Browser+Vite e2e spec in default unit shards timed out and turned main red; move heavy e2e to slow lane, keep fast component test.",
+      "rationale": "New substrate bug with a verified root cause: vitest.config.ts includes tests/e2e/*.spec.ts in the default shards, so PAN-4650's linked-conversation-title-bar spec cold-compiles the app under shard load and timed out on main (run 41335061342). A red main empties the merge gate for every approved PR, and this is the third flaky turn-red today, so it takes the free rank-2 slot ahead of routine work. It is already in the pipeline with a live workspace.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13209,6 +13223,13 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4650",
+      "to": "PAN-4732",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.9
     }
   ]
 }
