@@ -1,0 +1,174 @@
+{
+  "version": "1",
+  "issueId": "PAN-4640",
+  "created": "2026-11-01T04:51:29.241Z",
+  "updated": "2026-11-01T05:56:38.816Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "schedule-recurrence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4640",
+      "claimedAt": "2026-11-01T04:51:29.241Z",
+      "doneAt": "2026-11-01T04:57:33.925Z"
+    },
+    "schedule-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4640",
+      "claimedAt": "2026-11-01T04:57:43.898Z",
+      "doneAt": "2026-11-01T05:05:03.955Z"
+    },
+    "resume-cause-override": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4640",
+      "claimedAt": "2026-11-01T05:05:11.185Z",
+      "doneAt": "2026-11-01T05:10:44.839Z"
+    },
+    "schedule-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4640",
+      "claimedAt": "2026-11-01T05:10:50.814Z",
+      "doneAt": "2026-11-01T05:14:18.190Z"
+    },
+    "schedule-sweep": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4640",
+      "claimedAt": "2026-11-01T05:14:23.257Z",
+      "doneAt": "2026-11-01T05:19:53.883Z"
+    },
+    "schedule-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4640",
+      "claimedAt": "2026-11-01T05:19:59.015Z",
+      "doneAt": "2026-11-01T05:27:57.502Z"
+    },
+    "schedule-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4640",
+      "claimedAt": "2026-11-01T05:28:03.386Z",
+      "doneAt": "2026-11-01T05:30:28.734Z"
+    },
+    "schedule-recurrence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:45:16.997Z"
+    },
+    "schedule-recurrence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:45:39.673Z"
+    },
+    "schedule-recurrence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:46:01.035Z"
+    },
+    "schedule-recurrence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:46:23.325Z"
+    },
+    "schedule-recurrence.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:46:42.357Z"
+    },
+    "schedule-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:47:00.509Z"
+    },
+    "schedule-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:47:22.324Z"
+    },
+    "schedule-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:47:45.808Z"
+    },
+    "schedule-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:48:05.474Z"
+    },
+    "schedule-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:48:25.794Z"
+    },
+    "schedule-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:48:44.022Z"
+    },
+    "schedule-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:49:01.851Z"
+    },
+    "schedule-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:49:21.045Z"
+    },
+    "schedule-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:49:41.244Z"
+    },
+    "resume-cause-override.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:50:01.042Z"
+    },
+    "resume-cause-override.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:50:21.081Z"
+    },
+    "schedule-sweep.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:50:39.443Z"
+    },
+    "schedule-sweep.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:51:01.246Z"
+    },
+    "schedule-sweep.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:51:21.784Z"
+    },
+    "schedule-sweep.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:51:43.012Z"
+    },
+    "schedule-sweep.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:52:01.769Z"
+    },
+    "schedule-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:52:21.015Z"
+    },
+    "schedule-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:52:46.104Z"
+    },
+    "schedule-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:53:10.022Z"
+    },
+    "schedule-cli.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:53:28.936Z"
+    },
+    "schedule-cli.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:53:48.315Z"
+    },
+    "schedule-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:54:11.438Z"
+    },
+    "schedule-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:54:42.048Z"
+    },
+    "schedule-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:55:02.870Z"
+    },
+    "schedule-sweep.ac6": {
+      "status": "cancelled"
+    }
+  }
+}

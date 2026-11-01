@@ -10,14 +10,44 @@ import {
   shell,
 } from "electron";
 
-import { createTray, destroyTray } from "./tray.js";
+import { createTray, destroyTray, refreshTrayMode } from "./tray.js";
 import { loadDesktopSettings, getDesktopSettings, updateDesktopSetting } from "./settings.js";
 import { startServer, stopServer } from "./server.js";
-import { configureApplicationMenu } from "./menu.js";
+import { configureApplicationMenu, refreshApplicationMenu } from "./menu.js";
 import { initializeNotifications, registerNotificationHandlers } from "./notifications.js";
 import { handleAutoStartNag } from "./autostart.js";
 import { registerDesktopProtocol } from "./protocol.js";
 import { initializeAutoUpdater, checkForUpdates, downloadUpdate, quitAndInstall, getUpdateStatus, onUpdateStatusChange } from "./updater.js";
+import { planBoot } from "./boot.js";
+import {
+  type MachineRecord,
+  deleteMachineRecord,
+  loadMachineRecord,
+  readMachineToken,
+  setMachineActive,
+} from "./machine-store.js";
+import {
+  type MachineClientDeps,
+  deviceLabel,
+  lookupAllAddresses,
+  pairWithMachine,
+  preflightMachine,
+  revokeOwnDevice,
+} from "./machine-client.js";
+import {
+  dashboardFetch,
+  getActiveDashboard,
+  isSameOrigin,
+  prepareRemoteSession,
+  setLocalDashboard,
+  setRemoteDashboard,
+} from "./connection.js";
+import {
+  type ConnectActionResult,
+  closeConnectWindow,
+  openConnectWindow,
+  registerConnectIpc,
+} from "./connect-window.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -55,6 +85,15 @@ export let serverUrl = "";
 export let serverWsUrl = "";
 export let isQuitting = false;
 const terminalWindows = new Map<string, BrowserWindow>();
+let localServerStarted = false;
+let autoStartNagHandled = false;
+/** Set by Use This Computer: close the connect window once the local window opens. */
+let closeConnectWhenLocalReady = false;
+
+const machineClientDeps: MachineClientDeps = {
+  fetchImpl: (input, init) => fetch(input, init),
+  lookupAll: lookupAllAddresses,
+};
 
 // ─── Single instance lock ─────────────────────────────────────────────────────
 // A second launch must not boot another full app (window, tray, embedded
@@ -117,6 +156,12 @@ export function resolveWindowUrl(): string {
   if (isDevelopment) {
     return process.env.VITE_DEV_SERVER_URL!;
   }
+  // Remote mode loads the chosen machine's own origin, so the unchanged
+  // frontend's relative fetches and sockets reach that machine (PAN-4402 D-2).
+  const active = getActiveDashboard();
+  if (active.kind === "remote") {
+    return active.baseUrl;
+  }
   // Serve the window from the embedded server's HTTP origin so the frontend's
   // relative /api fetches and /ws/* sockets are same-origin, exactly like the
   // browser dashboard. The overdeck:// protocol page has no working data
@@ -138,10 +183,12 @@ function createTerminalWindow(sessionName: string, title: string): BrowserWindow
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      ...remotePartitionPreference(),
     },
     show: false,
   });
 
+  guardRemoteNavigation(win);
   win.once("ready-to-show", () => win.show());
   void win.loadURL(`${resolveWindowUrl()}?terminal=${encodeURIComponent(sessionName)}&title=${encodeURIComponent(title)}`);
   return win;
@@ -166,14 +213,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.OPEN_EXTERNAL, async (_event, url: unknown) => {
     if (typeof url !== "string") return;
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return;
-    }
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return;
-    await shell.openExternal(parsed.toString());
+    await openExternalSafe(url);
   });
 
   ipcMain.handle(IPC.GET_DESKTOP_SETTINGS, () => getDesktopSettings());
@@ -235,6 +275,10 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(IPC.RESTART_DASHBOARD, async () => {
+    const active = getActiveDashboard();
+    if (active.kind === "remote") {
+      throw new Error(`This window shows ${active.label}. Restart its dashboard on that machine.`);
+    }
     console.log("[main] manual dashboard restart requested");
     stopServer();
     // Brief delay so SIGTERM has a chance to land before we re-spawn.
@@ -243,9 +287,208 @@ function registerIpcHandlers(): void {
       serverPort = port;
       serverUrl = `http://127.0.0.1:${port}`;
       serverWsUrl = wsUrl;
+      setLocalDashboard(serverUrl);
       console.log(`[main] dashboard restarted on ${serverUrl}`);
     });
   });
+
+  registerConnectIpc({
+    getState: () => {
+      const record = loadMachineRecord();
+      return {
+        mode: getActiveDashboard().kind,
+        machine: record ? { label: record.label, baseUrl: record.baseUrl } : null,
+        canUseThisComputer: getActiveDashboard().kind === "remote" || !localServerStarted,
+      };
+    },
+    pair: async (link) => {
+      const result = await pairWithMachine(link, machineClientDeps);
+      if (!result.ok) return result;
+      return openRemoteDashboard(result.record);
+    },
+    openMachine: async () => {
+      const record = loadMachineRecord();
+      if (!record) return { ok: false, error: "No machine is paired with this computer." };
+      return openRemoteDashboard(record);
+    },
+    useLocal: async () => switchToLocal({ closeConnectWindow: true }),
+    forget: async () => forgetMachine(),
+  });
+}
+
+// ─── Remote mode (PAN-4402) ───────────────────────────────────────────────────
+
+async function openExternalSafe(url: string): Promise<void> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return;
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return;
+  await shell.openExternal(parsed.toString());
+}
+
+function remotePartitionPreference(): { partition?: string } {
+  const active = getActiveDashboard();
+  return active.kind === "remote" ? { partition: active.partition } : {};
+}
+
+/** D-9: a remote window stays on the chosen machine; other origins open in the browser. */
+function guardRemoteNavigation(win: BrowserWindow): void {
+  const active = getActiveDashboard();
+  if (active.kind !== "remote") return;
+  const base = active.baseUrl;
+  const keepOnMachine = (event: { url: string; preventDefault(): void }) => {
+    if (isSameOrigin(event.url, base)) return;
+    event.preventDefault();
+    void openExternalSafe(event.url);
+  };
+  win.webContents.on("will-navigate", keepOnMachine);
+  win.webContents.on("will-redirect", keepOnMachine);
+  win.webContents.on("did-create-window", (child) => guardRemoteNavigation(child));
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSameOrigin(url, base)) return { action: "allow" };
+    void openExternalSafe(url);
+    return { action: "deny" };
+  });
+}
+
+/** A window's partition cannot change, so a mode switch recreates every dashboard window (H-4). */
+function destroyDashboardWindows(): void {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy();
+  mainWindow = null;
+  for (const win of terminalWindows.values()) {
+    if (!win.isDestroyed()) win.destroy();
+  }
+  terminalWindows.clear();
+}
+
+function refreshModeUi(): void {
+  refreshApplicationMenu();
+  refreshTrayMode();
+}
+
+function startLocalServer(): void {
+  localServerStarted = true;
+  startServer(onLocalServerReady);
+}
+
+function stopLocalServer(): void {
+  localServerStarted = false;
+  stopServer();
+}
+
+function handleAutoStartNagOnce(): void {
+  if (autoStartNagHandled) return;
+  autoStartNagHandled = true;
+  handleAutoStartNag();
+}
+
+function onLocalServerReady(port: number, wsUrl: string): void {
+  serverPort = port;
+  serverUrl = `http://127.0.0.1:${port}`;
+  serverWsUrl = wsUrl;
+  // A late callback after a switch to remote mode must not repoint anything.
+  if (getActiveDashboard().kind === "remote") return;
+  setLocalDashboard(serverUrl);
+  // The ready callback fires again after every server crash-restart. One
+  // window per callback multiplied windows under a crash loop (PAN-2570) —
+  // reuse the existing window and repoint it at the current server URL.
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    void mainWindow.loadURL(resolveWindowUrl());
+    return;
+  }
+  mainWindow = createWindow();
+  handleAutoStartNagOnce();
+  if (closeConnectWhenLocalReady) {
+    closeConnectWhenLocalReady = false;
+    closeConnectWindow();
+  }
+}
+
+/** D-6: preflight first; only a 200 session mint stops the local server and opens the machine. */
+async function openRemoteDashboard(record: MachineRecord): Promise<ConnectActionResult> {
+  const result = await preflightMachine(record, machineClientDeps);
+  if (!result.ok) {
+    openConnectWindow(result.error);
+    return { ok: false, error: result.error };
+  }
+
+  const previous = getActiveDashboard();
+  setRemoteDashboard(record, result.token);
+  const active = getActiveDashboard();
+  try {
+    if (active.kind === "remote") await prepareRemoteSession(active);
+  } catch (err) {
+    if (previous.kind === "local") setLocalDashboard(previous.baseUrl);
+    const error = err instanceof Error ? err.message : String(err);
+    openConnectWindow(error);
+    return { ok: false, error };
+  }
+
+  stopLocalServer();
+  setMachineActive(true);
+  closeConnectWhenLocalReady = false;
+  destroyDashboardWindows();
+  mainWindow = createWindow();
+  handleAutoStartNagOnce();
+  closeConnectWindow();
+  refreshModeUi();
+  return { ok: true };
+}
+
+/**
+ * Use This Computer: mark the record inactive and run the embedded server.
+ * The connect window stays open until the local window exists, so closing it
+ * never leaves the app with no window (window-all-closed would quit).
+ */
+function switchToLocal(options: { closeConnectWindow: boolean }): ConnectActionResult {
+  setMachineActive(false);
+  if (getActiveDashboard().kind === "local" && localServerStarted) {
+    if (options.closeConnectWindow) closeConnectWindow();
+    refreshModeUi();
+    return { ok: true };
+  }
+  // The connect window is the one window that survives the switch. From the
+  // menu or tray no window would be left, and window-all-closed quits the app
+  // on Linux and Windows; the window closes again once the local window opens.
+  openConnectWindow();
+  destroyDashboardWindows();
+  serverUrl = "";
+  setLocalDashboard("");
+  closeConnectWhenLocalReady = options.closeConnectWindow;
+  startLocalServer();
+  refreshModeUi();
+  return { ok: true };
+}
+
+/** FR-9: best-effort self-revoke, then delete the record whatever the result. */
+async function forgetMachine(): Promise<ConnectActionResult> {
+  const record = loadMachineRecord();
+  if (!record) return switchToLocal({ closeConnectWindow: false });
+
+  let revoked = false;
+  try {
+    revoked = await revokeOwnDevice(record, readMachineToken(record), machineClientDeps);
+  } catch {
+    revoked = false;
+  }
+  deleteMachineRecord();
+  switchToLocal({ closeConnectWindow: false });
+  if (revoked) return { ok: true };
+  return {
+    ok: true,
+    message: `Removed from this computer. ${record.label} could not be reached; revoke "${deviceLabel()}" in its Settings → Anywhere → Devices.`,
+  };
+}
+
+export function openConnectWindowFromMenu(): void {
+  openConnectWindow();
+}
+
+export function useThisComputer(): void {
+  switchToLocal({ closeConnectWindow: true });
 }
 
 // ─── Window ───────────────────────────────────────────────────────────────────
@@ -262,10 +505,12 @@ export function createWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      ...remotePartitionPreference(),
     },
     show: false,
   });
 
+  guardRemoteNavigation(win);
   win.once("ready-to-show", () => win.show());
 
   win.on("close", (event) => {
@@ -313,8 +558,8 @@ export function dispatchMenuAction(action: string): void {
 // ─── Server API helper ────────────────────────────────────────────────────────
 
 export function callServerApi(path: string, method: string): void {
-  if (!serverUrl) return;
-  fetch(`${serverUrl}${path}`, { method }).catch((err: unknown) => {
+  if (!getActiveDashboard().baseUrl) return;
+  dashboardFetch(path, { method }).catch((err: unknown) => {
     console.error("[desktop] server API call failed:", err);
   });
 }
@@ -360,20 +605,10 @@ app.on("ready", () => {
 
   createTray();
 
-  startServer((port, wsUrl) => {
-    serverPort = port;
-    serverUrl = `http://127.0.0.1:${port}`;
-    serverWsUrl = wsUrl;
-    // The ready callback fires again after every server crash-restart. One
-    // window per callback multiplied windows under a crash loop (PAN-2570) —
-    // reuse the existing window and repoint it at the current server URL.
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      void mainWindow.loadURL(resolveWindowUrl());
-      return;
-    }
-    mainWindow = createWindow();
-    handleAutoStartNag();
-  });
+  // D-7: with an active chosen machine the embedded server never starts.
+  const plan = planBoot(loadMachineRecord(), isDevelopment);
+  if (plan.kind === "remote") void openRemoteDashboard(plan.record);
+  else startLocalServer();
 });
 
 app.on("window-all-closed", () => {

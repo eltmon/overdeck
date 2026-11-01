@@ -11,7 +11,14 @@
 import { app, Menu, shell } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 
-import { callServerApi, showOrCreateWindow, dispatchMenuAction, serverUrl } from "./main.js";
+import {
+  callServerApi,
+  showOrCreateWindow,
+  dispatchMenuAction,
+  openConnectWindowFromMenu,
+  useThisComputer,
+} from "./main.js";
+import { dashboardFetch, getActiveDashboard } from "./connection.js";
 import { quitAndInstall, onUpdateStatusChange } from "./updater.js";
 
 // ─── Workspace submenu (refreshed on open) ────────────────────────────────────
@@ -22,9 +29,8 @@ interface WorkspaceSummary {
 }
 
 async function fetchActiveWorkspaces(): Promise<WorkspaceSummary[]> {
-  if (!serverUrl) return [];
   try {
-    const resp = await fetch(`${serverUrl}/api/workspaces`, { signal: AbortSignal.timeout(2_000) });
+    const resp = await dashboardFetch("/api/workspaces", { signal: AbortSignal.timeout(2_000) });
     if (!resp.ok) return [];
     const data = (await resp.json()) as { workspaces?: WorkspaceSummary[] };
     return data.workspaces?.slice(0, 10) ?? [];
@@ -148,9 +154,13 @@ function buildMenuTemplate(): MenuItemConstructorOptions[] {
   template.push({ role: "windowMenu" as const });
 
   // Overdeck
+  const active = getActiveDashboard();
   template.push({
     label: "Overdeck",
     submenu: [
+      ...(active.kind === "remote"
+        ? [{ label: `Showing ${active.label}`, enabled: false }, { type: "separator" as const }]
+        : []),
       {
         label: "Start Cloister",
         click: () => callServerApi("/api/cloister/start", "POST"),
@@ -162,6 +172,16 @@ function buildMenuTemplate(): MenuItemConstructorOptions[] {
       {
         label: "Emergency Stop All Agents",
         click: () => callServerApi("/api/agents/emergency-stop", "POST"),
+      },
+      { type: "separator" },
+      {
+        label: "Connect to a Machine…",
+        click: () => openConnectWindowFromMenu(),
+      },
+      {
+        label: "Use This Computer",
+        enabled: active.kind === "remote",
+        click: () => useThisComputer(),
       },
       { type: "separator" },
       {
@@ -233,6 +253,11 @@ function buildMenuTemplate(): MenuItemConstructorOptions[] {
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
+
+/** Rebuild after a switch between this computer and the chosen machine. */
+export function refreshApplicationMenu(): void {
+  rebuildMenu();
+}
 
 export function configureApplicationMenu(): void {
   const menu = Menu.buildFromTemplate(buildMenuTemplate());
