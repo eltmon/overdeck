@@ -1,0 +1,115 @@
+{
+  "version": "1",
+  "issueId": "PAN-4697",
+  "created": "2026-11-01T09:15:31.379Z",
+  "updated": "2026-11-01T09:37:06.590Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "subset-runner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4697",
+      "claimedAt": "2026-11-01T09:15:31.379Z",
+      "doneAt": "2026-11-01T09:19:31.166Z"
+    },
+    "subset-list-file": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4697",
+      "claimedAt": "2026-11-01T09:19:57.141Z",
+      "doneAt": "2026-11-01T09:21:21.266Z"
+    },
+    "package-script-flip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4697",
+      "claimedAt": "2026-11-01T09:21:29.088Z",
+      "doneAt": "2026-11-01T09:27:59.078Z"
+    },
+    "union-merge-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4697",
+      "claimedAt": "2026-11-01T09:28:05.119Z",
+      "doneAt": "2026-11-01T09:29:45.813Z"
+    },
+    "docs-subset-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4697",
+      "claimedAt": "2026-11-01T09:29:50.388Z",
+      "doneAt": "2026-11-01T09:30:59.390Z"
+    },
+    "subset-runner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:32:35.077Z"
+    },
+    "subset-runner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:32:50.808Z"
+    },
+    "subset-runner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:33:05.818Z"
+    },
+    "subset-runner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:33:21.049Z"
+    },
+    "subset-list-file.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:33:36.459Z"
+    },
+    "subset-list-file.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:33:54.174Z"
+    },
+    "subset-list-file.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:34:06.521Z"
+    },
+    "package-script-flip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:34:22.541Z"
+    },
+    "package-script-flip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:34:37.901Z"
+    },
+    "package-script-flip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:34:55.479Z"
+    },
+    "union-merge-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:35:15.960Z"
+    },
+    "union-merge-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:35:34.582Z"
+    },
+    "union-merge-rule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:35:52.554Z"
+    },
+    "union-merge-rule.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:36:07.434Z"
+    },
+    "docs-subset-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:36:22.425Z"
+    },
+    "docs-subset-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:36:37.329Z"
+    },
+    "docs-subset-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:36:51.685Z"
+    },
+    "docs-subset-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:37:06.590Z"
+    }
+  }
+}
