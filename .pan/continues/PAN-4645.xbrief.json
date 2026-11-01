@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T11:19:09.714Z",
+  "updated": "2026-11-01T11:19:21.703Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -460,6 +460,10 @@
     "wi21-two-machine-smoke.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T11:19:09.713Z"
+    },
+    "wi21-two-machine-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:19:21.703Z"
     }
   }
 }
