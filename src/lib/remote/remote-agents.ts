@@ -622,6 +622,11 @@ async function spawnRemoteAgentWithoutConsentClaim(
 
   saveRemoteAgentState(state);
 
+  // The VM runs everything as root, and Claude Code refuses the bypass
+  // permission mode as root unless IS_SANDBOX=1 says it is in a sandbox
+  // (PAN-4295 smoke test). A Fly machine is that sandbox.
+  const sandboxExport = 'export IS_SANDBOX=1';
+
   // Write prompt to file on remote VM if provided
   let claudeCmd: string;
 
@@ -641,7 +646,7 @@ async function spawnRemoteAgentWithoutConsentClaim(
       promptFile,
       baseCommand: 'claude',
       permissionFlags: getClaudePermissionFlags(),
-      extraEnvExports: [`export OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)}`],
+      extraEnvExports: [sandboxExport, `export OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)}`],
       extraArgs: `--effort ${workEffort.effort}`,
       model,
     });
@@ -653,7 +658,7 @@ async function spawnRemoteAgentWithoutConsentClaim(
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
-    claudeCmd = `OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)} claude ${getClaudePermissionFlagsString()} --model ${model} --effort ${workEffort.effort}`;
+    claudeCmd = `IS_SANDBOX=1 OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)} claude ${getClaudePermissionFlagsString()} --model ${model} --effort ${workEffort.effort}`;
   }
 
   console.log(`[claude-invoke] purpose=remote-agent | model=${model} | effort=${workEffort.effort} | source=remote-agents.ts | vm=${vmName} | agent=${agentId} | command="${claudeCmd}"`);
