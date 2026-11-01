@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T20:40:49.361Z",
+  "updated": "2026-11-01T20:41:03.201Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -280,6 +280,10 @@
     "wi13-route-and-cli.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T20:40:49.360Z"
+    },
+    "wi13-route-and-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:41:03.201Z"
     }
   }
 }
