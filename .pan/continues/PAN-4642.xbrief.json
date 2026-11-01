@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4642",
   "created": "2026-11-01T04:49:54.715Z",
-  "updated": "2026-11-01T05:52:01.620Z",
+  "updated": "2026-11-01T05:52:20.837Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,6 +180,10 @@
     "citation-highlight.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T05:52:01.620Z"
+    },
+    "citation-highlight.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:52:20.836Z"
     }
   }
 }
