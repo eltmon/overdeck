@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:08:49.604Z",
+  "updated": "2026-11-01T23:09:02.803Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "owner-lane-doors.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T23:08:49.603Z"
+    },
+    "owner-lane-doors.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T23:09:02.803Z"
     }
   }
 }
