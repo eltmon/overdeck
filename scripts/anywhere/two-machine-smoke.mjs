@@ -41,7 +41,7 @@
 // Not in CI (D-4645-22): it binds two LAN-visible ports for about two minutes.
 import { execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
 import { connect, createServer } from 'node:net';
@@ -62,6 +62,12 @@ const LIVE_CLAUDE = process.argv.includes('--live-claude');
 const OPEN_BUDGET_BYTES = 1_114_112;
 const SEED = { name: 'smoke-desk', sessionId: '6f1c4650-0000-4000-8000-000000000001', vaultId: '6f1c4650-0000-4000-8000-0000000000aa' };
 const SEED_CWD = resolve(HOMES.b, 'project');
+/**
+ * --live-claude: a harness's PTY supervisor socket lives under OVERDECK_HOME, and the
+ * smoke homes are too deep for the 107-byte Unix socket limit. Live servers use these
+ * short symlinks to the same homes (created at start, removed at cleanup).
+ */
+const LIVE_HOME_LINKS = { a: '/tmp/pan4650-smoke-a', b: '/tmp/pan4650-smoke-b' };
 
 const started = Date.now();
 const log = (line) => console.log(`[${((Date.now() - started) / 1000).toFixed(1).padStart(6)} s] ${line}`);
@@ -109,7 +115,7 @@ function serverEnv(home, port) {
     // smoke's sessions never share the operator's server (each home would need its own
     // Herdr session server otherwise).
     ...(LIVE_CLAUDE ? { OVERDECK_TERMINAL_BACKEND: 'tmux' } : {}),
-    OVERDECK_HOME: home,
+    OVERDECK_HOME: LIVE_CLAUDE ? LIVE_HOME_LINKS[home === HOMES.a ? 'a' : 'b'] : home,
     API_PORT: String(port),
     PORT: String(port),
     OVERDECK_DASHBOARD_URL: `http://127.0.0.1:${port}`,
@@ -295,7 +301,7 @@ async function getA(path) {
 }
 
 async function postA(path, body) {
-  const response = await fetch(`http://127.0.0.1:${PORT_A}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const response = await fetch(`http://127.0.0.1:${PORT_A}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', origin: `http://127.0.0.1:${PORT_A}` }, body: JSON.stringify(body) });
   return { status: response.status, json: await response.json().catch(() => null) };
 }
 
@@ -393,9 +399,11 @@ async function liveClaudeSteps(selfB) {
     await git('-c', 'user.email=smoke@overdeck.invalid', '-c', 'user.name=smoke', 'commit', '-q', '--allow-empty', '-m', 'init');
     await git('add', 'README.md');
     await git('-c', 'user.email=smoke@overdeck.invalid', '-c', 'user.name=smoke', 'commit', '-q', '-m', 'readme');
+    // A conversation with a cwd needs a registered project on B.
+    writeFileSync(resolve(HOMES.b, 'projects.yaml'), `projects:\n  smoke:\n    name: smoke\n    path: ${liveCwd}\n`);
     const created = await fetch(`http://127.0.0.1:${PORT_B}/api/conversations`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message: 'Answer with one short line: hello.', cwd: liveCwd }),
+      method: 'POST', headers: { 'content-type': 'application/json', origin: `http://127.0.0.1:${PORT_B}` },
+      body: JSON.stringify({ message: 'Answer with one short line: hello.', cwd: liveCwd, projectKey: 'smoke' }),
     });
     const conv = await created.json();
     if (!created.ok || !conv?.name) throw new Error(`B could not start a conversation: ${created.status} ${JSON.stringify(conv)}`);
@@ -427,13 +435,13 @@ async function liveClaudeSteps(selfB) {
       throw new Error(`the uncommitted change is not in A's checkout ${row?.cwd}`);
     }
     const refused = await fetch(`http://127.0.0.1:${PORT_B}/api/conversations/${encodeURIComponent(ownerName)}/message`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: 'still there?' }),
+      method: 'POST', headers: { 'content-type': 'application/json', origin: `http://127.0.0.1:${PORT_B}` }, body: JSON.stringify({ message: 'still there?' }),
     });
     const body = await refused.json().catch(() => null);
     if (refused.status !== 409 || body?.code !== 'conversation-released') throw new Error(`B answered ${refused.status} ${JSON.stringify(body)} after the pull`);
     log(`pulled to A as ${job.conversation.name} (cwd ${row.cwd}); B answers 409 conversation-released`);
     // Leave no Claude session running behind the smoke.
-    await fetch(`http://127.0.0.1:${PORT_A}/api/conversations/${encodeURIComponent(job.conversation.name)}/stop`, { method: 'POST' }).catch(() => undefined);
+    await fetch(`http://127.0.0.1:${PORT_A}/api/conversations/${encodeURIComponent(job.conversation.name)}/stop`, { method: 'POST', headers: { origin: `http://127.0.0.1:${PORT_A}` } }).catch(() => undefined);
   });
 }
 
@@ -444,12 +452,18 @@ async function cleanup() {
   running.proxy = null;
   if (running.dev) await new Promise((done) => running.dev.close(() => done()));
   running.dev = null;
+  await Promise.all([...running.servers.keys()].map((name) => stopServer(name)));
+  // After the servers stop, so neither recreates a home under a removed link.
   // --live-claude seeds into the real ~/.claude; remove only the smoke project's directory.
   if (LIVE_CLAUDE) {
+    rmSync('/tmp/pan4650-smoke-a', { force: true });
+    rmSync('/tmp/pan4650-smoke-b', { force: true });
     const { dir } = seedTranscriptPath();
     if (/-tmp-anywhere-b-project$/.test(dir)) rmSync(dir, { recursive: true, force: true });
+    // The live conversation's own transcripts (B's run, and A's after the pull).
+    const liveDir = claudeProjectDir(process.env.HOME, resolve(HOMES.b, 'live-project'));
+    if (/-tmp-anywhere-b-live-project$/.test(liveDir)) rmSync(liveDir, { recursive: true, force: true });
   }
-  await Promise.all([...running.servers.keys()].map((name) => stopServer(name)));
 }
 
 async function main() {
@@ -461,6 +475,14 @@ async function main() {
   await step('start', async () => {
     freshHome(HOMES.a);
     freshHome(HOMES.b);
+    // A live harness's PTY supervisor puts its socket here; a fresh home has none yet.
+    if (LIVE_CLAUDE) {
+      for (const name of ['a', 'b']) {
+        mkdirSync(resolve(HOMES[name], 'sockets'), { recursive: true });
+        rmSync(LIVE_HOME_LINKS[name], { force: true });
+        symlinkSync(HOMES[name], LIVE_HOME_LINKS[name]);
+      }
+    }
     startServer('a', HOMES.a, PORT_A);
     startServer('b', HOMES.b, PORT_B);
     await Promise.all([waitListening('a', PORT_A, 90_000), waitListening('b', PORT_B, 90_000)]);
