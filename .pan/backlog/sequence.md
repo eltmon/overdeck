@@ -1,16 +1,16 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T08:18:54Z · model: claude-opus-5-5 · open: 872_
+_Last sequenced: 2026-11-01T08:23:39Z · model: claude-opus-5-5 · open: 872_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
 | 2 | PAN-4639 | L | medium | ok |  |  | In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions. |
+| 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4663 | XS | critical | ok |  |  | In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts |
 | 5 | PAN-4670 | S | high | ok |  |  | In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs. |
 | 6 | PAN-4672 | S | high | ok |  |  | In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout. |
-| 7 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 7 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 8 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 9 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -168,10 +168,10 @@ _Last sequenced: 2026-11-01T08:18:54Z · model: claude-opus-5-5 · open: 872_
 | 161 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
 | 162 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
 | 163 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
-| 165 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
-| 166 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
+| 164 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
+| 165 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
+| 166 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
 | 167 | PAN-4628 | S | high | ok |  |  | npx pan serve mints a per-run token never written to disk; Herdr panes keep a stale one, so pane CLI calls to the dashboard get 401. |
-| 167 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
 | 168 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 169 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
 | 170 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
@@ -226,12 +226,12 @@ _Last sequenced: 2026-11-01T08:18:54Z · model: claude-opus-5-5 · open: 872_
 | 219 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 220 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 221 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
+| 222 | PAN-4656 | M | medium | needs-refinement |  | PAN-4645, PAN-4628 | pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending. |
+| 223 | PAN-4650 | XL | medium | needs-refinement |  | PAN-4645, PAN-4646 | Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending. |
+| 224 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 225 | PAN-4645 | XL | high | needs-refinement |  |  | Anywhere build step 1: machine keys, Noise channel, machine tokens, owner column, links. Everything else needs it. Body pending. |
-| 225 | PAN-4656 | M | medium | needs-refinement |  | PAN-4645, PAN-4628 | pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
-| 226 | PAN-4650 | XL | medium | needs-refinement |  | PAN-4645, PAN-4646 | Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending. |
 | 227 | PAN-4646 | S | medium | needs-refinement |  |  | Interactive mockup for machine-aware conversation UI (title bar, chips, offline banner); D-6 needs it approved first. Body pending. |
-| 227 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 228 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 229 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
 | 230 | PAN-4348 | S | medium | ok |  |  | Verification emits warn-first evidence of changed files outside every item's files_scope, so scope creep is visible |
@@ -269,10 +269,10 @@ _Last sequenced: 2026-11-01T08:18:54Z · model: claude-opus-5-5 · open: 872_
 | 262 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
 | 263 | PAN-2186 | S | high | ok |  |  | Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557. |
 | 264 | PAN-4632 | S | medium | ok |  |  | Markdown chip 'Open in File Manager' xdg-opens the file in its MIME app and sticks as the left-click default; drop it, repair stored pref. |
-| 266 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
-| 267 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
+| 265 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
+| 266 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
+| 267 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
 | 268 | PAN-4295 | M | medium | ok |  | PAN-1775 | Anywhere W-FLY1: restore Fly auto-reap, heartbeat, credential refresh; start-now item that PAN-4652 (Fly VMs as machines) waits for |
-| 268 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
 | 269 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 270 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
 | 271 | PAN-4654 | M | medium | needs-refinement |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
@@ -294,10 +294,10 @@ _Last sequenced: 2026-11-01T08:18:54Z · model: claude-opus-5-5 · open: 872_
 | 286 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
 | 287 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
 | 288 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
-| 290 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
-| 291 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
+| 289 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
+| 290 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
+| 291 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
 | 292 | PAN-4648 | M | medium | ok |  | PAN-4645 | Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending. |
-| 292 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
 | 293 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
 | 294 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
 | 295 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
@@ -312,10 +312,10 @@ _Last sequenced: 2026-11-01T08:18:54Z · model: claude-opus-5-5 · open: 872_
 | 304 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
 | 305 | PAN-4683 | M | medium | ok |  |  | pan start --remote misses specs on feature branches and re-plans; planning never pushes branch; post-plan work starts local. |
 | 306 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
-| 308 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
-| 309 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
+| 307 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
+| 308 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
+| 309 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
 | 310 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
-| 310 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
 | 311 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 312 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 313 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
@@ -324,10 +324,10 @@ _Last sequenced: 2026-11-01T08:18:54Z · model: claude-opus-5-5 · open: 872_
 | 316 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
 | 317 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
 | 318 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
-| 320 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
-| 321 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
+| 319 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
+| 320 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
+| 321 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
 | 322 | PAN-4330 | M | medium | ok |  |  | Sign-in client: pan account, Settings → Anywhere, device token; entry point for shared sessions and cross-machine continue |
-| 322 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
 | 323 | PAN-4473 | M | medium | ok |  | PAN-4330 | Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service |
 | 324 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 325 | PAN-1504 | M | high | ok |  |  | pan hygiene |
@@ -655,26 +655,26 @@ _Last sequenced: 2026-11-01T08:18:54Z · model: claude-opus-5-5 · open: 872_
 | 647 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
 | 648 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
 | 649 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 651 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
-| 652 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 650 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
+| 651 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 652 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
 | 653 | PAN-2354 | M | low | ok |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
-| 653 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
 | 654 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
 | 655 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 656 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 657 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 659 | PAN-4661 | S | low | ok |  | PAN-2355 | Phone PWA third tab: read-only phase-grouped pipeline list at /m/pipeline; waits on the PAN-2355 /m shell |
-| 660 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 661 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
+| 658 | PAN-4661 | S | low | ok |  | PAN-2355 | Phone PWA third tab: read-only phase-grouped pipeline list at /m/pipeline; waits on the PAN-2355 /m shell |
+| 659 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 660 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
+| 661 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 662 | PAN-2355 | M | low | ok |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
-| 662 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 663 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 666 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651, PAN-4652 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
-| 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 664 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651, PAN-4652 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
+| 665 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 666 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 667 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
 | 668 | PAN-4643 | M | medium | ok |  |  | pan diagnose: redacted diagnostics bundle (needs doctor --json) handed to a Claude Code or Codex session; works with dashboard down. |
-| 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 669 | PAN-4641 | M | medium | ok |  |  | Server-held 'send when limits reset' composer message; needs a parsed reset time; usage-window data would come from #2065. |
-| 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
 | 670 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
 | 671 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
 | 672 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
@@ -828,12 +828,12 @@ _Last sequenced: 2026-11-01T08:18:54Z · model: claude-opus-5-5 · open: 872_
 | 820 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
 | 821 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
 | 822 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 824 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 825 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 826 | PAN-4658 | S | low | needs-refinement |  |  | Cite text from the EditorPane markdown preview; needs a decision on how the preview picks its target conversation. #4642 shipped. |
-| 827 | PAN-4659 | M | low | ok |  | PAN-4644 | Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, waits for #4644 to merge. |
+| 823 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 824 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 825 | PAN-4658 | S | low | needs-refinement |  |  | Cite text from the EditorPane markdown preview; needs a decision on how the preview picks its target conversation. #4642 shipped. |
+| 826 | PAN-4659 | M | low | ok |  | PAN-4644 | Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, waits for #4644 to merge. |
+| 827 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 828 | PAN-4644 | L | low | ok |  |  | Import VS Code themes and custom color themes for UI tokens, terminal palette and syntax highlighting; cosmetic, large surface. |
-| 828 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 829 | PAN-4660 | M | low | ok |  | PAN-4644 | Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, waits for #4644 to merge. |
 | 830 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 831 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
@@ -888,6 +888,10 @@ New in-pipeline follow-up to the merged #4584 with a decided design, so it is pi
 
 New in-pipeline issue with a live workspace, so it is pinned near the top beside PAN-4626 per the in-pipeline rule; it also offers a non-destructive path for the idle cleanup asked in PAN-1485.
 
+### PAN-4636 (rank 3)
+
+New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
+
 ### PAN-4663 (rank 4)
 
 New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.
@@ -899,10 +903,6 @@ New in-pipeline substrate bug (live workspace) with a decided two-part fix and c
 ### PAN-4672 (rank 6)
 
 New in-pipeline substrate-improvement bug filed after the prior run; pinned in the in-pipeline top tier at rank 6 (ranks 6-14 shift down one into the free rank 15).
-
-### PAN-4636 (rank 7)
-
-New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
 ### PAN-4690 (rank 7)
 
@@ -1207,7 +1207,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T08:18:54Z",
+  "generatedAt": "2026-11-01T08:23:39Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 872,
@@ -1279,7 +1279,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4636",
-      "rank": 7,
+      "rank": 3,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -3317,7 +3317,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3833",
-      "rank": 165,
+      "rank": 164,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3330,7 +3330,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3902",
-      "rank": 166,
+      "rank": 165,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3343,7 +3343,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4629",
-      "rank": 167,
+      "rank": 166,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4076,7 +4076,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4656",
-      "rank": 225,
+      "rank": 222,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -4092,7 +4092,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4650",
-      "rank": 226,
+      "rank": 223,
       "size": "XL",
       "importance": "medium",
       "score": 54,
@@ -4108,7 +4108,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3510",
-      "rank": 227,
+      "rank": 224,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4595,7 +4595,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2241",
-      "rank": 266,
+      "rank": 265,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4607,7 +4607,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2242",
-      "rank": 267,
+      "rank": 266,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4619,7 +4619,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2240",
-      "rank": 268,
+      "rank": 267,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4899,7 +4899,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1710",
-      "rank": 290,
+      "rank": 289,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4911,7 +4911,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1558",
-      "rank": 291,
+      "rank": 290,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4923,7 +4923,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1766",
-      "rank": 292,
+      "rank": 291,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5117,7 +5117,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1253",
-      "rank": 308,
+      "rank": 307,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5130,7 +5130,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1357",
-      "rank": 309,
+      "rank": 308,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5142,7 +5142,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1915",
-      "rank": 310,
+      "rank": 309,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5270,7 +5270,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1219",
-      "rank": 320,
+      "rank": 319,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5283,7 +5283,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1451",
-      "rank": 321,
+      "rank": 320,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5296,7 +5296,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1452",
-      "rank": 322,
+      "rank": 321,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -9351,7 +9351,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2505",
-      "rank": 651,
+      "rank": 650,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9363,7 +9363,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2504",
-      "rank": 652,
+      "rank": 651,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9375,7 +9375,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2449",
-      "rank": 653,
+      "rank": 652,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9453,7 +9453,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4661",
-      "rank": 659,
+      "rank": 658,
       "size": "S",
       "importance": "low",
       "score": 22,
@@ -9468,7 +9468,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2353",
-      "rank": 660,
+      "rank": 659,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9481,7 +9481,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4294",
-      "rank": 661,
+      "rank": 660,
       "size": "L",
       "importance": "low",
       "score": 22,
@@ -9494,7 +9494,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3133",
-      "rank": 662,
+      "rank": 661,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9547,7 +9547,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4638",
-      "rank": 666,
+      "rank": 664,
       "size": "L",
       "importance": "medium",
       "score": 38,
@@ -9563,7 +9563,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2282",
-      "rank": 667,
+      "rank": 665,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9575,7 +9575,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2091",
-      "rank": 668,
+      "rank": 666,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9587,7 +9587,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2085",
-      "rank": 669,
+      "rank": 667,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -11488,7 +11488,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3244",
-      "rank": 824,
+      "rank": 823,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11501,7 +11501,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2775",
-      "rank": 825,
+      "rank": 824,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11514,7 +11514,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4658",
-      "rank": 826,
+      "rank": 825,
       "size": "S",
       "importance": "low",
       "score": 22,
@@ -11527,7 +11527,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4659",
-      "rank": 827,
+      "rank": 826,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -11542,7 +11542,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3505",
-      "rank": 828,
+      "rank": 827,
       "size": "XS",
       "importance": "low",
       "score": 20,
