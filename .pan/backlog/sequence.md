@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T05:12:21Z · model: claude-opus-5-5 · open: 861_
+_Last sequenced: 2026-11-01T05:14:05Z · model: claude-opus-5-5 · open: 861_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -643,7 +643,7 @@ _Last sequenced: 2026-11-01T05:12:21Z · model: claude-opus-5-5 · open: 861_
 | 650 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
 | 651 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
 | 652 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 653 | PAN-2354 | M | low | needs-refinement |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
+| 653 | PAN-2354 | M | low | ok |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
 | 654 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
 | 655 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
 | 656 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
@@ -1196,7 +1196,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T05:12:21Z",
+  "generatedAt": "2026-11-01T05:14:05Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 861,
@@ -9207,7 +9207,7 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
       "size": "M",
       "importance": "low",
       "score": 26,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
       "why": "Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later)",
       "rationale": "Rank 661->651 (slot swap within the Anywhere set) to follow PAN-2350's 2026-09-28 recommended order; no other node moved.",
