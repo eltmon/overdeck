@@ -179,6 +179,12 @@ its own. The button therefore sends `dashboardMutationJsonHeaders()`, with no
 argument: that helper resolves a WebSocket RPC URL internally, so passing it a
 relative REST path would throw in `new URL(...)`.
 
+Every browser-side mutation follows the same contract, not only this button.
+The simple-mode actions (`src/dashboard/frontend/src/lib/simple/useSimpleActions.ts`,
+helper `postJson`) send `credentials: 'include'` and
+`await dashboardMutationJsonHeaders()`; a raw `fetch` with only `Content-Type`
+gets `403 Invalid CSRF token` (PAN-4670).
+
 The kickoff prompt never tells the conversation to read per-issue records.
 Instead the server gathers that evidence itself, before the conversation
 exists, and embeds it at `{{EVIDENCE}}` under the template's `## Record
