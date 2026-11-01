@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T19:14:00.578Z",
+  "updated": "2026-11-01T19:15:46.122Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,11 @@
       "claimedBy": "agent-pan-4652",
       "claimedAt": "2026-11-01T19:09:59.437Z",
       "doneAt": "2026-11-01T19:14:00.578Z"
+    },
+    "wi11-heartbeat-and-sweep": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:15:46.122Z"
     }
   }
 }
