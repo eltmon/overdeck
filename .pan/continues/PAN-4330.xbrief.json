@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4330",
   "created": "2026-11-01T04:59:32.820Z",
-  "updated": "2026-11-01T07:36:03.255Z",
+  "updated": "2026-11-01T07:36:20.862Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "account-token-store.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:36:03.255Z"
+    },
+    "account-token-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:36:20.862Z"
     }
   }
 }
