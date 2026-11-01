@@ -319,5 +319,6 @@ export function machineLinkView(link: MachineLink, peerVersion: string | null, s
     incident: live.incident,
     peerVersion: live.peerVersion ?? peerVersion,
     createdAt: link.createdAt,
+    hidden: link.hidden === true,
   };
 }

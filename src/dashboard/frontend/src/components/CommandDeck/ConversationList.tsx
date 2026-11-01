@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ForkModal } from './ForkModal';
 import { ConversationRow } from './ConversationRow';
+import { HiddenMachinesFooter } from './LinkedConversationRow';
 import { buildConversationTree, groupSummary, isConversationActive, type ConversationTreeNode } from './conversation-tree';
 import { partitionConversationSections, SECTION_ORDER, snoozePresets, type ConversationSectionId } from './conversation-triage';
 import { useConversationMutations, type ConversationMutations } from './useConversationMutations';
@@ -21,6 +22,8 @@ import type { LinkedConversationFields, PullRequestLink } from '@overdeck/contra
 type LinkedRowFields = Partial<Omit<LinkedConversationFields, 'origin'>> & {
   gitOrigin?: string | null;
   pullable?: boolean;
+  /** When the saved copy of a linked row was last settled. */
+  savedCopyAt?: string | null;
   /** Where the owner pulled this conversation from (finds a released copy's continuation). */
   pulledFrom?: { environmentId: string; nativeSessionId: string } | null;
 };
@@ -807,6 +810,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
           </AnimatePresence>
         </div>
       )}
+      <HiddenMachinesFooter />
 
       {mutations.forkTarget && (
         <ForkModal

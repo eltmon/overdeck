@@ -459,6 +459,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/linked-conversations/pull/:pullId', kind: 'http', disposition: 'READ',        door: 'conversation-pull.getPull (in-memory job) (PAN-4650)' },
   { surface: 'POST /api/machines/:id/reconnect',           kind: 'http', disposition: 'WRITE',       door: 'link-supervisor.reconnect (PAN-4645)' },
   { surface: 'POST /api/machines/:id/routes',              kind: 'http', disposition: 'WRITE',       door: 'link-store.setLinkRoutes (manual route) (PAN-4645, closes #4403)' },
+  { surface: 'PATCH /api/machines/:id',                     kind: 'http', disposition: 'WRITE',       door: 'link-store.setLinkHidden (Hide this machine) (PAN-4650)' },
   { surface: 'GET /api/anywhere/status',                  kind: 'http', disposition: 'AGGREGATE',   door: 'environment-identity + trusted origins + access-tokens + vault config (PAN-4445)' },
   { surface: 'GET /api/tailscale/status',                 kind: 'http', disposition: 'AGGREGATE',   door: 'lib/tailscale/state.readTailscaleState + installer.resolveInstallPlan (PAN-1254)' },
   { surface: 'GET /api/tailscale/peers',                  kind: 'http', disposition: 'AGGREGATE',   door: 'lib/tailscale/state.readTailscaleState + peers.discoverTailnetPeers (PAN-1254)' },

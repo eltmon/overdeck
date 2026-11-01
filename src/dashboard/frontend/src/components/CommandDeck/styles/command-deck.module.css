@@ -6597,3 +6597,36 @@
 .conversationTitleEditBtn[hidden] {
   display: none;
 }
+
+/* PAN-4650 WI-13: linked conversation rows. The machine chip is tinted while
+   the machine is online and a hairline outline while it is offline; an
+   offline row's title is muted. Surface tones only, never status colors. */
+.linkedMachineChipOnline {
+  background: var(--surface-remote);
+}
+
+.linkedMachineChipOffline {
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.linkedRowOffline .conversationName,
+.linkedRowOffline .projectConvLabel {
+  color: var(--muted-foreground);
+}
+
+.hiddenMachinesFooter {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  border-top: 1px solid var(--border);
+}
+
+.hiddenMachinesShow {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary-ink, var(--primary));
+  cursor: pointer;
+  font-size: inherit;
+}

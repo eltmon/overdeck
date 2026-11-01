@@ -9,6 +9,12 @@ import { ConversationList, updateConversationTitle } from '../ConversationList';
 import { __resetTriageUndoStackForTests } from '../useConversationMutations';
 import { DialogProvider } from '../../DialogProvider';
 
+// PAN-4650: the hidden-machines footer reads the machine list; keep it off the fetch these tests count.
+vi.mock('../../Settings/anywhere/machinesApi', () => ({
+  MACHINES_QUERY_KEY: ['anywhere-machines'],
+  fetchMachines: async () => ({ status: 200, body: { links: [] } }),
+  setMachineHidden: async () => ({ status: 200, body: {} }),
+}));
 vi.mock('../../DialogProvider', () => ({
   DialogProvider: ({ children }: { children: React.ReactNode }) => children,
   useConfirm: () => vi.fn().mockResolvedValue(true),

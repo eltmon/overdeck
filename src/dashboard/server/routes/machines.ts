@@ -26,7 +26,7 @@ import {
   revokeAccessToken,
 } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
-import { getLink, listLinks, type MachineLink, removeLink, setLinkRoutes } from '../../../lib/anywhere/link-store.js';
+import { getLink, listLinks, type MachineLink, removeLink, setLinkHidden, setLinkRoutes } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
 import { classifyHost, parseRouteUrl } from '../../../lib/anywhere/routes.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
@@ -316,6 +316,34 @@ const addRouteRoute = HttpRouter.add(
   }),
 );
 
+/** PAN-4650 D-4650-15: `PATCH /api/machines/:id { hidden }` shows or hides a machine's conversations. */
+export async function handleSetHidden(idOrEnvOrLabel: string, bodyText: string): Promise<HttpServerResponse.HttpServerResponse> {
+  const link = await getLink(idOrEnvOrLabel);
+  if (!link) return jsonResponse({ error: `no machine link matches ${idOrEnvOrLabel}` }, { status: 404 });
+  let hidden: unknown;
+  try {
+    hidden = (JSON.parse(bodyText || '{}') as { hidden?: unknown }).hidden;
+  } catch {
+    return jsonResponse({ error: 'body is not JSON' }, { status: 400 });
+  }
+  if (typeof hidden !== 'boolean') return jsonResponse({ error: 'body must be { hidden: boolean }' }, { status: 400 });
+  const updated = await setLinkHidden(link.id, hidden);
+  return jsonResponse(machineLinkView(updated ?? link, null, statusSource ?? undefined));
+}
+
+const setHiddenRoute = HttpRouter.add(
+  'PATCH',
+  '/api/machines/:id',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = refuseChannel(request) ?? rejectUnsafeDashboardMutationRequest(request);
+    if (refused) return refused;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const text = yield* request.text;
+    return yield* Effect.promise(() => handleSetHidden(id, text));
+  }),
+);
+
 const inboundRevokeRoute = HttpRouter.add(
   'DELETE',
   '/api/machines/inbound/:tokenId',
@@ -328,4 +356,4 @@ const inboundRevokeRoute = HttpRouter.add(
   }),
 );
 
-export const machinesRouteLayer = Layer.mergeAll(linkRoute, listRoute, selfRevokeRoute, unlinkRoute, reconnectRoute, addRouteRoute, inboundRevokeRoute);
+export const machinesRouteLayer = Layer.mergeAll(linkRoute, listRoute, selfRevokeRoute, unlinkRoute, reconnectRoute, addRouteRoute, setHiddenRoute, inboundRevokeRoute);

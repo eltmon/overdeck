@@ -44,7 +44,7 @@ function linkedListRow(
   record: LinkedConversationRecord,
   link: MachineLink,
   presence: LinkPresence,
-  savedCopyName: string | null,
+  savedCopy: ListRow | null,
 ): Record<string, unknown> {
   const row: SharedConversationRow = record.row;
   return {
@@ -78,7 +78,9 @@ function linkedListRow(
     machineLabel: link.label,
     machineState: presence.state,
     machineLastSeenAt: presence.lastSeenAt ?? record.cachedAt,
-    savedCopyName,
+    savedCopyName: savedCopy?.name ?? null,
+    /** When the saved copy was last settled (the row shows "offline · saved HH:MM"). */
+    savedCopyAt: (savedCopy?.endedAt as string | null | undefined) ?? null,
     releasedTo: row.releasedTo,
   };
 }
@@ -118,13 +120,12 @@ export function mergeConversationRows(input: MergeConversationRowsInput): Array<
   kept.push(...bySession.values());
   kept.sort((a, b) => a.record.id - b.record.id);
 
-  const vaultCopyNames = new Set(input.vaultCopies.map((row) => row.name));
+  const vaultCopiesByName = new Map(input.vaultCopies.map((row) => [row.name, row]));
   const linkedRows = kept.map(({ record, link }) => {
     const vaultId = record.row.vaultId;
     if (vaultId) claimedVaultIds.add(vaultId);
-    const copyName = vaultId ? `${VAULT_BROWSE_PREFIX}${vaultId}` : null;
-    const savedCopyName = copyName && vaultCopyNames.has(copyName) ? copyName : null;
-    return linkedListRow(record, link, input.presence(link), savedCopyName);
+    const savedCopy = vaultId ? vaultCopiesByName.get(`${VAULT_BROWSE_PREFIX}${vaultId}`) ?? null : null;
+    return linkedListRow(record, link, input.presence(link), savedCopy);
   });
 
   const vaultCopies = input.vaultCopies.filter((row) => !claimedVaultIds.has(row.name.slice(VAULT_BROWSE_PREFIX.length)));

@@ -76,6 +76,8 @@ export const MachineLinkView = Schema.Struct({
   incident: Schema.NullOr(LinkIncident),
   peerVersion: Schema.NullOr(Schema.String),
   createdAt: Schema.String,
+  /** PAN-4650: Hide this machine — its conversations are left out of the conversation list. */
+  hidden: Schema.Boolean,
 })
 export type MachineLinkView = typeof MachineLinkView.Type
 
