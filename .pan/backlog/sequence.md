@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T15:00:11Z · model: claude-opus-5-5 · open: 860_
+_Last sequenced: 2026-11-01T15:01:38Z · model: claude-opus-5-5 · open: 861_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -276,6 +276,7 @@ _Last sequenced: 2026-11-01T15:00:11Z · model: claude-opus-5-5 · open: 860_
 | 272 | PAN-4654 | M | medium | ok |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 275 | PAN-4722 | S | medium | ok |  | PAN-4654, PAN-4656 | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix instead. Follow-up to PAN-4654/4656. |
 | 276 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
 | 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
 | 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
@@ -1195,10 +1196,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T15:00:11Z",
+  "generatedAt": "2026-11-01T15:01:38Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 860,
+  "openCount": 861,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -11929,6 +11930,22 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "rationale": "New in-pipeline follow-up to PAN-4714 (merged as #4716) fixing an unreviewed CodeRabbit finding; pinned into a free top-tier slot next to its parent and not re-ranked.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4722",
+      "rank": 275,
+      "size": "S",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4654",
+        "PAN-4656"
+      ],
+      "why": "Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix instead. Follow-up to PAN-4654/4656.",
+      "rationale": "New issue: a correctness bug in in-pipeline PAN-4654's Update all for runtime installs from PAN-4656; ranked beside the fleet work it fixes.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13359,6 +13376,20 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-4654",
+      "to": "PAN-4722",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4656",
+      "to": "PAN-4722",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
     }
   ]
 }
