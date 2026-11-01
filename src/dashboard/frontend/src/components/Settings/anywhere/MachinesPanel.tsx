@@ -38,6 +38,7 @@ import {
 } from './machinesApi';
 import { RemoveSshMachineDialog } from './RemoveSshMachineDialog';
 import { SharingSwitches } from './SharingSwitches';
+import { CompareSettingsDialog } from './CompareSettingsDialog';
 import { AddProjectToMachineDialog } from '../../sidebar/AddProjectToMachineDialog';
 import { unlinkMachineKeepingServer } from './sshMachinesApi';
 
@@ -109,6 +110,7 @@ function MachineLoadText({ view }: { view: Pick<MachineLinkView, 'load' | 'tags'
 function MachineLinkRow({ link, onChanged, thisLabel }: { link: MachineLinkView; onChanged: () => Promise<void>; thisLabel: string }) {
   const confirm = useConfirm();
   const [addProjectOpen, setAddProjectOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [routesOpen, setRoutesOpen] = useState(false);
   const [routeUrl, setRouteUrl] = useState('');
@@ -203,6 +205,11 @@ function MachineLinkRow({ link, onChanged, thisLabel }: { link: MachineLinkView;
               Reconnect
             </button>
           )}
+          {link.state === 'online' && (
+            <button type="button" onClick={() => setCompareOpen(true)} className={buttonClass}>
+              Compare settings
+            </button>
+          )}
           {link.state === 'online' && link.access === 'operator' && (
             <button type="button" onClick={() => setAddProjectOpen(true)} className={buttonClass}>
               Add a project
@@ -250,6 +257,7 @@ function MachineLinkRow({ link, onChanged, thisLabel }: { link: MachineLinkView;
       {removeOpen && ssh && (
         <RemoveSshMachineDialog link={{ ...link, ssh }} onCancel={() => setRemoveOpen(false)} onConfirm={(keepServer) => void handleRemoveSsh(keepServer)} />
       )}
+      {compareOpen && <CompareSettingsDialog machine={link.environmentId} label={link.label} onClose={() => setCompareOpen(false)} />}
       {addProjectOpen && (
         <AddProjectToMachineDialog target={{ direction: 'there', machine: link.environmentId, machineLabel: link.label, thisLabel }} onClose={() => setAddProjectOpen(false)} />
       )}

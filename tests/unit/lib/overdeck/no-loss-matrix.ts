@@ -474,6 +474,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/costs/request-digest',               kind: 'http', disposition: 'READ',        door: 'costs/request-digest.readRequestDigest (events.jsonl month window, hashed request ids) (PAN-4651)' },
   { surface: 'GET /api/fleet/usage',                        kind: 'http', disposition: 'AGGREGATE',   door: 'request-digest.readLocalUsage + linkFetch summary/digest per online link + fleet-usage-cache.json (PAN-4651)' },
   { surface: 'GET /api/settings/resolved',                 kind: 'http', disposition: 'READ',        door: 'settings-resolved.readResolvedSettings (config.yaml flattened, secrets as set/not set) (PAN-4651)' },
+  { surface: 'GET /api/fleet/settings-compare/:machine',    kind: 'http', disposition: 'AGGREGATE',   door: 'settings-resolved.readResolvedSettings here + linkFetch GET /api/settings/resolved there, compared (PAN-4651)' },
   { surface: 'GET /api/machines/projects/:key/source',      kind: 'http', disposition: 'READ',        door: 'projects/ignored-files.listIgnoredFiles + projectCloneUrl (operator-level link, operator actor) (PAN-4651)' },
   { surface: 'GET /api/machines/projects/:key/file',        kind: 'http', disposition: 'READ',        door: 'projects/ignored-files.readProjectFile (operator-level link, operator actor) (PAN-4651)' },
   { surface: 'GET /api/workers/:id/status',                kind: 'http', disposition: 'READ',        door: 'agents/liveness.isAlive + agents/worker/report.listWorkerReports (PAN-4651)' },

@@ -173,6 +173,21 @@ export async function loadAddProjectJob(jobId: string, machine?: string): Promis
   return result.body;
 }
 
+/** PAN-4651 D-4651-20: one config.yaml value as Compare settings shows it. */
+export type ResolvedSetting = { value: string } | { secret: true; set: boolean };
+
+export interface SettingsCompare {
+  machine: { environmentId: string; label: string };
+  dashboardUrl: string | null;
+  differences: Array<{ key: string; here: ResolvedSetting | null; there: ResolvedSetting | null; copyLine: string | null }>;
+}
+
+export async function loadSettingsCompare(machine: string): Promise<SettingsCompare> {
+  const result = await readResult<SettingsCompare>(await fetch(`/api/fleet/settings-compare/${encodeURIComponent(machine)}`));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body;
+}
+
 /** PAN-4650: Hide this machine (or show it again) in the conversation list. */
 export async function setMachineHidden(id: string, hidden: boolean): Promise<ApiResult<MachineLinkView>> {
   return readResult(await fetch(`/api/machines/${encodeURIComponent(id)}`, {

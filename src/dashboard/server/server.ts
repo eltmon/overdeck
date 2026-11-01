@@ -81,6 +81,7 @@ import { fleetAwarenessRouteLayer } from './routes/fleet-awareness.js'
 import { costsDigestRouteLayer } from './routes/costs-digest.js'
 import { fleetUsageRouteLayer } from './routes/fleet-usage.js'
 import { settingsResolvedRouteLayer } from './routes/settings-resolved.js'
+import { fleetSettingsRouteLayer } from './routes/fleet-settings.js'
 import { directoryRouteLayer } from './routes/directory.js'
 import { directoryApprovalRouteLayer } from './routes/directory-approval.js'
 import { pushRouteLayer } from './routes/push.js'
@@ -441,6 +442,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   costsDigestRouteLayer,
   fleetUsageRouteLayer,
   settingsResolvedRouteLayer,
+  fleetSettingsRouteLayer,
   directoryRouteLayer,
   directoryApprovalRouteLayer,
   pushRouteLayer,
