@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:30:43.824Z",
+  "updated": "2026-11-01T23:31:04.093Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
       "claimedBy": "agent-pan-4638",
       "claimedAt": "2026-11-01T23:24:40.574Z",
       "doneAt": "2026-11-01T23:30:43.824Z"
+    },
+    "lanes-route-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T23:31:04.092Z"
     }
   }
 }
