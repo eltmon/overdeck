@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:39:27.695Z",
+  "updated": "2026-11-01T21:39:41.525Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -474,6 +474,10 @@
     "wi19-add-project-there.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T21:39:27.695Z"
+    },
+    "wi20-fleet-needs-you.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:39:41.524Z"
     }
   }
 }
