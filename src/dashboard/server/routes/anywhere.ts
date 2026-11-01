@@ -31,6 +31,7 @@ import {
   type AnywhereViewerKind,
 } from '../../../lib/remote-access/anywhere-status.js';
 import { isLoopbackOrigin } from '../../../lib/remote-access/loopback.js';
+import { invalidateRemoteAccessConfig, readRemoteAccessConfig } from '../../../lib/remote-access/config.js';
 import { addSavedTrustedOrigin } from '../../../lib/remote-access/trusted-origins.js';
 import { jsonResponse } from '../http-helpers.js';
 import {
@@ -89,6 +90,7 @@ const addTrustedOriginRoute = HttpRouter.add(
     }
     if (added.added) {
       invalidateTrustedOriginsCache();
+      invalidateRemoteAccessConfig(); // PAN-4645 D-4645-12: a remote address turns require_token_mint on.
       emitActivityEntry({ source: 'dashboard', level: 'info', message: `Added trusted address ${added.origin}`, details: '{}' });
     }
     return noStore(jsonResponse({ origin: added.origin, added: added.added }));
@@ -109,11 +111,13 @@ async function buildAnywhereStatus(viewerKind: AnywhereViewerKind | null): Promi
   // A record with no kind is a device (PAN-2351 FR-10).
   const active = records.filter((record) => (record.kind ?? 'device') === 'device' && !record.revokedAt).length;
   const vault = await readAnywhereVaultState();
+  const mint = readRemoteAccessConfig();
   return {
     machine,
     addresses,
     devices: { active },
     vault,
+    tokenMint: { effective: mint.requireTokenMint, configured: mint.configured, autoReasons: [...mint.autoReasons] },
     problems: computeAnywhereProblems({ identityError, addresses, vault }),
     viewer: { kind: viewerKind },
   };

@@ -25,6 +25,7 @@ export function Toggle({ checked, onChange, disabled = false, locked = false }: 
       onClick={handleClick}
       role="switch"
       aria-checked={checked}
+      aria-disabled={disabled || locked}
     >
       <span
         className={cn(

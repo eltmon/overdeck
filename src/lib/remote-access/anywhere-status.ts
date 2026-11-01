@@ -31,6 +31,8 @@ export interface AnywhereStatus {
   addresses: Array<{ origin: string; loopback: boolean }>;
   devices: { active: number };
   vault: { state: AnywhereVaultState; backend: string | null };
+  /** PAN-4645 D-4645-12: the enforced `require_token_mint`, the YAML value, and why it is on by itself. */
+  tokenMint: { effective: boolean; configured: boolean; autoReasons: string[] };
   problems: AnywhereProblem[];
   /** Who is asking (PAN-4455 D-3); null when no credential resolves (a loopback peer with no session). */
   viewer: { kind: AnywhereViewerKind | null };
