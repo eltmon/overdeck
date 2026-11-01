@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4697",
   "created": "2026-11-01T09:15:31.379Z",
-  "updated": "2026-11-01T09:34:55.480Z",
+  "updated": "2026-11-01T09:35:15.960Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "package-script-flip.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T09:34:55.479Z"
+    },
+    "union-merge-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:35:15.960Z"
     }
   }
 }
