@@ -112,3 +112,16 @@ $ bun test test/pack-browser.test.ts test/pack-browser-guards.test.ts test/pack-
  2998 expect() calls
 Ran 188 tests across 11 files. [38.48s]
 ```
+
+## Fork: publish
+
+Branch `overdeck/pack-browser` pushed to `https://github.com/eltmon/gstack`. PR opened inside the fork with `gh pr create --repo eltmon/gstack --base main --head overdeck/pack-browser`; not merged (operator's call). No upstream contact.
+
+```
+$ gh pr view --repo eltmon/gstack overdeck/pack-browser --json baseRefName,headRefName,state,isCrossRepository,url
+{"baseRefName":"main","headRefName":"overdeck/pack-browser","isCrossRepository":false,"state":"OPEN","url":"https://github.com/eltmon/gstack/pull/2"}
+```
+
+PR: https://github.com/eltmon/gstack/pull/2
+
+**Pack-browser SHA** (used by the live acceptance): `fb781f7177b9edc8bca724ea6180611462e9f6fd`
