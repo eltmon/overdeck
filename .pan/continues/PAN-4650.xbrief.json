@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T16:52:30.197Z",
+  "updated": "2026-11-01T16:52:44.654Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -280,6 +280,10 @@
     "wi7-ws-pipes.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T16:52:30.197Z"
+    },
+    "wi8-remote-frontend.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:52:44.653Z"
     }
   },
   "agentModel": "claude-opus-5-5"
