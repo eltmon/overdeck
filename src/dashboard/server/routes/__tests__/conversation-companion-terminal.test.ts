@@ -4,6 +4,8 @@
  * The lifecycle and the conversation door are mocked; the auth guard, the body
  * whitelist, and the owner resolution run for real.
  */
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -15,6 +17,7 @@ import {
   dashboardSessionCookieHeader,
 } from '../dashboard-auth.js';
 import { _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 
 const lifecycle = vi.hoisted(() => ({
   open: vi.fn(),
@@ -87,6 +90,7 @@ describe('companion terminal routes', () => {
     getConversationByName.mockImplementation((name: string) => (name === CONV.name ? CONV : null));
     process.env.OVERDECK_INTERNAL_TOKEN = 'test-dashboard-token';
     process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
   });
