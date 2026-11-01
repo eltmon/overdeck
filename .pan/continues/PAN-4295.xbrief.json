@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4295",
   "created": "2026-11-01T05:48:47.966Z",
-  "updated": "2026-11-01T05:54:02.668Z",
+  "updated": "2026-11-01T05:54:21.383Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4295",
       "claimedAt": "2026-11-01T05:48:47.966Z",
       "doneAt": "2026-11-01T05:54:02.667Z"
+    },
+    "heartbeat-exit-code": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4295",
+      "claimedAt": "2026-11-01T05:54:21.383Z"
     }
   }
 }
