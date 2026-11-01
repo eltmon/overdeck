@@ -28,13 +28,16 @@ function createDeps(): AddProjectDeps & { resolveIntent: ReturnType<typeof vi.fn
   };
 }
 
-async function settled(jobId: string) {
-  for (let i = 0; i < 200; i += 1) {
+/**
+ * The job writes real files, so it settles after real I/O: wait on a time
+ * bound, not a count of event-loop turns (a loaded CI runner needs more turns).
+ */
+function settled(jobId: string) {
+  return vi.waitFor(() => {
     const job = getAddProjectJob(jobId);
-    if (job?.step === 'done' || job?.step === 'failed') return job;
-    await new Promise((resolve) => setImmediate(resolve));
-  }
-  throw new Error('add job did not settle');
+    if (job?.step !== 'done' && job?.step !== 'failed') throw new Error(`add job ${jobId} did not settle (step ${job?.step ?? 'missing'})`);
+    return job;
+  }, { timeout: 10_000, interval: 5 });
 }
 
 beforeEach(() => {
