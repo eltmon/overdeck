@@ -4,17 +4,17 @@
     "created": "2026-11-01T04:44:53Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4643: Add pan diagnose: collect diagnostics and hand them to Claude Code or Codex",
-    "updated": "2026-11-01T04:51:59.027Z"
+    "updated": "2026-11-01T04:53:05.810Z"
   },
   "plan": {
     "id": "pan-4643",
     "title": "Add pan diagnose: collect diagnostics and hand them to Claude Code or Codex",
-    "status": "proposed",
+    "status": "running",
     "uid": "599825df-7fd3-4ed2-932d-22a75c1b0d22",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T04:44:53Z",
-    "updated": "2026-11-01T04:51:59.027Z",
+    "updated": "2026-11-01T04:53:05.810Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4643",
@@ -885,5 +885,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
