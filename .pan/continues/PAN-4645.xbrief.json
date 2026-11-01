@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T10:39:37.611Z",
+  "updated": "2026-11-01T10:49:10.580Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -433,6 +433,10 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4645",
       "claimedAt": "2026-11-01T10:39:37.611Z"
+    },
+    "wi20-machines-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:49:10.579Z"
     }
   }
 }
