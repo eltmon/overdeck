@@ -27,3 +27,22 @@ Ran 158 tests across 7 files. [13.84s]
 ```
 
 Related CLI suites (`browse/test/cli-*.test.ts`, `browse/test/server-no-import-side-effects.test.ts`, `make-pdf/test/cli-*.test.ts`, `design/test/cli-*.test.ts`): 47 pass, 6 fail. All six fail on packages missing from the clone's `node_modules` (`Cannot find package 'socks'` from `browse/src/socks-bridge.ts`; `Cannot find package 'html-to-vdom'` from `make-pdf/src/docx-images.ts`), in modules this item does not touch. The fork clone has no `node_modules` at all (both packages are in `package.json` `dependencies`); `bun install` was not run (network, and it would change the clone outside this item).
+
+## Fork: render guards
+
+Fork commit: `0b6671215a96cd6711a213b3272ed2c2030bab7d` — `feat(pack-browser): pack renders never install themselves`.
+
+Files: `bin/gstack-browser-ensure`, `setup`, `test/pack-browser-guards.test.ts` (new).
+
+Notes on the plan:
+
+- `bin/gstack-browser-ensure`: `PACK=1` when `$ROOT/.gstack-pack.json` exists (`ROOT` = the script's `bin/..`). The two install points route to `fail "pack browser runtime not built" "pan skills pack browser gstack on"`. After a failed probe the reason also carries the probe's first line (`pack browser runtime not built, or Chromium did not launch via <engine> (<line>)`), since a built runtime can still fail to launch (sandbox, missing system libraries). The `--help` range moved from `3,24p` to `3,26p` for the two added header lines.
+- `setup`: the guard sits directly after the parser loop and before the `--pack-root` dispatch. It already names `${PACK_BROWSER:-}${PACK_BROWSER_CACHE:-}`, so WI-F4 only adds the parser flags. `--help` and `--status` short-circuit above the parser and still run inside a render.
+
+```
+$ bun test test/pack-browser-guards.test.ts test/setup-help.test.ts test/gstack-browser-ensure.test.ts test/pack-mode.test.ts test/free-seed-ratchet.test.ts test/test-free-shards.test.ts test/free-fixtures.test.ts test/state-root-ratchet.test.ts test/exercised-map.test.ts test/helpers/hermetic-env.test.ts
+ 189 pass
+ 0 fail
+ 2954 expect() calls
+Ran 189 tests across 10 files. [31.14s]
+```
