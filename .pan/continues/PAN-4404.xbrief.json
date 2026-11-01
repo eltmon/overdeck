@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:36:32.005Z",
+  "updated": "2026-11-01T14:36:44.459Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,10 @@
     "wi8-ssh-routes.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:36:32.005Z"
+    },
+    "wi9-machines-routes-boot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:36:44.458Z"
     }
   }
 }
