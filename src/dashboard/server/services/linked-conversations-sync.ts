@@ -153,3 +153,14 @@ export function createLinkedConversationsSync(overrides: Partial<LinkedConversat
     },
   };
 }
+
+let current: LinkedConversationsSync | null = null;
+
+/** PAN-4651: the primary dashboard's sync (set in `startAnywhere`), so a fleet spawn can list its new row at once. */
+export function currentLinkedConversationsSync(): LinkedConversationsSync | null {
+  return current;
+}
+
+export function setLinkedConversationsSync(sync: LinkedConversationsSync | null): void {
+  current = sync;
+}

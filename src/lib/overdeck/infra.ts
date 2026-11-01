@@ -164,6 +164,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `settled_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `settle_reason` text');
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `snoozed_until` integer');
+  // PAN-4651 D-4651-1: the linked machine (environment id) that started this row through a work door; null = started here.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `started_by_environment_id` text');
 }
 
 /** `app_settings` key recording that the pipeline-mirror drop already ran. */

@@ -11,14 +11,17 @@
 import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
+import { toast } from 'sonner';
 import { EFFORT_LEVELS } from '@overdeck/contracts';
 import { HarnessSelect, ModelSelect, pickerEffortLevels, useAvailableModels, type Harness } from '../shared/ModelPicker';
 import { loadStoredHarness, loadStoredModel, MODEL_EFFORT_SUPPORT } from '../chat/ModelPicker';
 import { fetchRegisteredProjects, type RegisteredProject } from '../CommandDeck/UnknownProjectState';
+import { buildConversationUrl } from '../../App/routes';
 import { ConversationSkillsField } from './ConversationSkillsField';
 import { IssuePickerField } from './IssuePickerField';
-import { buildNewConversationPayload, createConversationWithOptions, fetchEffortDefault } from './newConversationApi';
+import { buildNewConversationPayload, createConversationWithOptions, createFleetConversation, fetchEffortDefault } from './newConversationApi';
 import { useNewConversationDialogStore } from './newConversationDialogStore';
+import { MachineField, type MachineChoice, parseNeedsInput, THIS_MACHINE } from './MachineField';
 import styles from './NewConversationDialog.module.css';
 
 /** D7: match the preset by yaml key, then by display name. */
@@ -61,6 +64,7 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
   const [skillOverrides, setSkillOverrides] = useState<Record<string, boolean>>({});
   const [issueId, setIssueId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [machine, setMachine] = useState<MachineChoice>(THIS_MACHINE);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -118,7 +122,7 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
     setSubmitting(true);
     setError(null);
     try {
-      const conv = await createConversationWithOptions(buildNewConversationPayload({
+      const payload = buildNewConversationPayload({
         projectKey,
         projectPath: project?.path ?? null,
         cwd,
@@ -130,10 +134,19 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
         skillOverrides,
         issueId,
         message,
-      }));
+      });
+      // PAN-4651 D-4651-23: another machine, or Auto, goes through the fleet route.
+      let route: string;
+      if (machine.machine === '') {
+        route = `/conv/${(await createConversationWithOptions(payload)).id}`;
+      } else {
+        const created = await createFleetConversation(payload, machine.machine, parseNeedsInput(machine.needs));
+        if (created.reason) toast(created.reason);
+        route = buildConversationUrl(created.conversation);
+      }
       onClose();
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      window.history.pushState({}, '', `/conv/${conv.id}`);
+      window.history.pushState({}, '', route);
       window.dispatchEvent(new PopStateEvent('popstate'));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -169,13 +182,15 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
             </select>
           </label>
 
+          <MachineField value={machine} onChange={setMachine} />
+
           <label className={styles.row}>
             <span className={styles.label}>Working directory</span>
             <input
               aria-label="Working directory"
               className={styles.control}
               value={cwd}
-              disabled={!projectKey}
+              disabled={!projectKey || machine.machine !== ''}
               placeholder={projectKey ? '' : 'Default working directory'}
               onChange={(e) => setCwd(e.target.value)}
             />

@@ -47,8 +47,30 @@
 //                  port answers port-refused.
 //      --live-claude adds remote-reply and pull (real Claude sessions; see liveClaudeSteps),
 //                  runs with the real HOME and PATH, and skips versions and update-all.
+//   PAN-4651 (work across machines), after the PAN-4650 steps:
+//      load        A's `pan machines list --json` shows B's load sample and its tags
+//                  (B's config.yaml sets anywhere.machine.tags: [smoke-tag]) within 20 s.
+//      projects    B registers a project with github_repo smoke/repo (projects.yaml);
+//                  A's GET /api/fleet/projects lists it under github.com/smoke/repo.
+//      needs       POST /api/fleet/placement on A with needs [smoke-tag] picks B.
+//      compare     A's and B's resources.quality_gate_slots differ (2 vs 4): Compare
+//                  settings lists that key with a copy line, and B's api_keys entry only
+//                  as "set" (its value never reaches A).
+//      usage       A's GET /api/fleet/usage lists both machines and All machines equals
+//                  the sum of the rows.
+//      mcp         an odk_ token minted on A lists B through list_machines, sees B's
+//                  conversation in list_conversations, reaches it with send_message, and
+//                  gets 403 on PUT /api/settings.
+//      remote-worker `pan worker run --machine <B> --detach` on A (tmux backend, the fake
+//                  claude) starts a worker on B through a stand-in; a report written on B
+//                  is printed by `pan worker wait <localId>` on A.
+//      worker-offline B is SIGSTOPped for 25 s during a wait; the wait keeps waiting and
+//                  prints B's next report after SIGCONT.
 //   8. kill B      A shows the link offline within 30 s.
-//   9. restart B   A shows it online again within 60 s.
+//   9. restart B   A shows it online again within 60 s. B restarts with
+//                  OVERDECK_TEST_FORCE_CPU_SATURATED=1 (the smoke hook machine-load.ts reads).
+//      auto        once A sees B saturated, POST /api/fleet/placement on A picks A and its
+//                  reason names A.
 //  10. no-http     the proxy capture contains no "HTTP/1.1": everything that crossed
 //                  the pairing route was the secure channel.
 //  11. stop        both servers are stopped. Nothing outside .tmp/anywhere-a|b is touched.
@@ -140,7 +162,14 @@ function fakeClis(home) {
     const entry = resolve(dir, fake.entry);
     mkdirSync(dirname(entry), { recursive: true });
     writeFileSync(resolve(dir, 'VERSION'), `${fake.from}\n`);
-    writeFileSync(entry, `#!/bin/sh\ndir=$(dirname "$(readlink -f "$0")")\necho "${fake.banner}"\n`, { mode: 0o755 });
+    // A version probe prints the banner. Anything else (a worker pane, PAN-4651) runs a copy of
+    // `sleep` named after the harness for 5 minutes, so the liveness oracle (which matches the
+    // process name) sees a live harness.
+    const runtime = resolve(dir, 'runtime', fake.bin);
+    mkdirSync(dirname(runtime), { recursive: true });
+    copyFileSync(['/usr/bin/sleep', '/bin/sleep'].find((path) => existsSync(path)), runtime);
+    chmodSync(runtime, 0o755);
+    writeFileSync(entry, `#!/bin/sh\ndir=$(dirname "$(readlink -f "$0")")\ncase "$1" in --version|-v|version) echo "${fake.banner}" ;; *) exec "$dir/../runtime/${fake.bin}" 300 ;; esac\n`, { mode: 0o755 });
     symlinkSync(entry, resolve(prefix, 'bin', fake.bin));
     installCases.push(`    ${fake.pkg}@latest) echo ${fake.to} > "$4/lib/node_modules/${fake.pkg}/VERSION" ;;`);
   }
@@ -177,7 +206,17 @@ function isolatedNode() {
   }
 }
 
-function serverEnv(home, port) {
+function smokeTmuxSocket(home) {
+  return home === HOMES.a ? 'pan-smoke-a' : 'pan-smoke-b';
+}
+
+/** Kill the smoke-only tmux servers (they hold worker panes); absent servers are fine. */
+async function killSmokeTmux() {
+  if (LIVE_CLAUDE) return;
+  await Promise.all(['pan-smoke-a', 'pan-smoke-b'].map((socket) => execFileAsync('tmux', ['-L', socket, 'kill-server']).catch(() => undefined)));
+}
+
+function serverEnv(home, port, extra = {}) {
   const env = { ...process.env };
   // Inherited values that would point the smoke servers or CLIs at the operator's dashboard.
   for (const key of ['OVERDECK_INTERNAL_TOKEN', 'OVERDECK_AGENT_ID', 'OVERDECK_DASHBOARD_SPAWNED_BY', 'DASHBOARD_URL', 'HOST']) delete env[key];
@@ -193,7 +232,10 @@ function serverEnv(home, port) {
     // Live harnesses run on tmux: its socket name is derived from OVERDECK_HOME, so the
     // smoke's sessions never share the operator's server (each home would need its own
     // Herdr session server otherwise).
-    ...(LIVE_CLAUDE ? { OVERDECK_TERMINAL_BACKEND: 'tmux' } : {}),
+    // PAN-4651: the remote-worker step launches a worker pane on B too, on a smoke-only
+    // tmux server (killed at start and in cleanup, so no pane outlives a run).
+    OVERDECK_TERMINAL_BACKEND: 'tmux',
+    ...(LIVE_CLAUDE ? {} : { OVERDECK_TMUX_SOCKET_NAME: smokeTmuxSocket(home) }),
     OVERDECK_HOME: LIVE_CLAUDE ? LIVE_HOME_LINKS[home === HOMES.a ? 'a' : 'b'] : home,
     API_PORT: String(port),
     PORT: String(port),
@@ -204,12 +246,13 @@ function serverEnv(home, port) {
     OVERDECK_DISABLE_DEACON: '1',
     OVERDECK_ANYWHERE_SUPERVISOR: '1',
     OVERDECK_NO_RESUME: '1',
+    ...extra,
   };
 }
 
-function startServer(name, home, port) {
+function startServer(name, home, port, extra = {}) {
   const logFd = openSync(resolve(home, 'server.log'), 'a');
-  const child = spawn(NODE, [SERVER], { env: serverEnv(home, port), stdio: ['ignore', logFd, logFd] });
+  const child = spawn(NODE, [SERVER], { env: serverEnv(home, port, extra), stdio: ['ignore', logFd, logFd] });
   running.servers.set(name, child);
   child.on('exit', (code, signal) => {
     if (running.servers.get(name) === child) running.servers.delete(name);
@@ -526,6 +569,186 @@ async function liveClaudeSteps(selfB) {
   });
 }
 
+// ─── PAN-4651: work across machines ────────────────────────────────────────
+
+const SMOKE_ISSUE = 'SMK-1';
+const SMOKE_ORIGIN = 'github.com/smoke/repo';
+
+/** config.yaml for each machine: different gate slots (compare), B's tag and a secret (compare, needs). */
+function machineConfigs() {
+  writeFileSync(resolve(HOMES.a, 'config.yaml'), 'resources:\n  quality_gate_slots: 2\n');
+  writeFileSync(resolve(HOMES.b, 'config.yaml'), [
+    'resources:', '  quality_gate_slots: 4',
+    'api_keys:', '  quantumllama: smoke-not-a-real-key',
+    'anywhere:', '  machine:', '    tags: [smoke-tag]', '',
+  ].join('\n'));
+  // A holds the same repository, so a worker for SMK-1 resolves its git origin here.
+  const projectA = resolve(HOMES.a, 'project');
+  mkdirSync(projectA, { recursive: true });
+  writeFileSync(resolve(HOMES.a, 'projects.yaml'), projectsYaml(projectA));
+}
+
+function projectsYaml(path) {
+  return ['projects:', '  smoke:', '    name: Smoke', `    path: ${path}`, '    github_repo: smoke/repo', '    issue_prefix: SMK', ''].join('\n');
+}
+
+function internalToken(name) {
+  return readFileSync(resolve(HOMES[name], 'internal-token'), 'utf8').trim();
+}
+
+/** A dashboard call on A with its internal token (fleet routes need a credential). */
+async function apiA(method, path, body) {
+  const response = await fetch(`http://127.0.0.1:${PORT_A}${path}`, {
+    method,
+    headers: { 'x-overdeck-internal-token': internalToken('a'), ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  return { status: response.status, json: await response.json().catch(() => null) };
+}
+
+let mcpId = 0;
+async function mcpTool(token, name, args = {}) {
+  mcpId += 1;
+  const response = await fetch(`http://127.0.0.1:${PORT_A}/mcp`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, accept: 'application/json, text/event-stream', 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: mcpId, method: 'tools/call', params: { name, arguments: args } }),
+  });
+  const json = await response.json();
+  const result = json.result ?? {};
+  return { isError: result.isError === true, text: result.content?.[0]?.text ?? JSON.stringify(json) };
+}
+
+async function fleetWorkSteps(selfA, selfB) {
+  await step('load', () => pollUntil('A sees B\'s load and tags', 20_000, async () => {
+    const link = linkTo(await cli('a', ['machines', 'list', '--json']), selfB.environmentId);
+    const detail = `load ${JSON.stringify(link?.load ?? null)}, tags ${JSON.stringify(link?.tags ?? [])}`;
+    if (link?.load && link.tags?.includes('smoke-tag')) {
+      log(`A sees B: ${detail}`);
+      return { ok: true, value: detail };
+    }
+    return { ok: false, detail };
+  }));
+
+  await step('projects', async () => {
+    const projectB = SEED_CWD;
+    mkdirSync(resolve(projectB, 'workspaces', `feature-${SMOKE_ISSUE.toLowerCase()}`), { recursive: true });
+    writeFileSync(resolve(HOMES.b, 'projects.yaml'), projectsYaml(projectB));
+    await pollUntil(`A lists B under ${SMOKE_ORIGIN}`, 45_000, async () => {
+      const { json } = await apiA('GET', '/api/fleet/projects');
+      const row = json?.projects?.find((project) => project.gitOrigin?.toLowerCase() === SMOKE_ORIGIN);
+      const onB = row?.machines?.some((machine) => machine.environmentId === selfB.environmentId);
+      if (onB) log(`${SMOKE_ORIGIN}: local ${row.local?.key ?? 'none'}, machines ${row.machines.map((machine) => machine.label).join(', ')}`);
+      return onB ? { ok: true, value: row } : { ok: false, detail: JSON.stringify(json?.projects ?? json) };
+    });
+  });
+
+  await step('needs', async () => {
+    const { status, json } = await apiA('POST', '/api/fleet/placement', { gitOrigin: null, needs: ['smoke-tag'] });
+    if (status !== 200 || !json?.ok || json.environmentId !== selfB.environmentId) throw new Error(`placement answered ${status}: ${JSON.stringify(json)}`);
+    log(`needs smoke-tag -> ${json.label}: ${json.reason}`);
+  });
+
+  await step('compare', async () => {
+    const { status, json } = await apiA('GET', `/api/fleet/settings-compare/${encodeURIComponent(selfB.environmentId)}`);
+    if (status !== 200) throw new Error(`compare answered ${status}: ${JSON.stringify(json)}`);
+    const relevant = json.differences.filter((row) => row.key.startsWith('resources.') || row.key.startsWith('api_keys.'));
+    const slots = relevant.find((row) => row.key === 'resources.quality_gate_slots');
+    if (relevant.filter((row) => !row.key.startsWith('api_keys.')).length !== 1 || slots?.copyLine !== 'pan admin config set resources.quality_gate_slots 2') {
+      throw new Error(`expected one quality_gate_slots difference with its copy line, got ${JSON.stringify(relevant)}`);
+    }
+    const secret = relevant.find((row) => row.key === 'api_keys.quantumllama');
+    if (!secret || JSON.stringify(secret.there) !== JSON.stringify({ secret: true, set: true }) || secret.copyLine !== null) throw new Error(`secret row wrong: ${JSON.stringify(secret)}`);
+    if (JSON.stringify(json).includes('smoke-not-a-real-key')) throw new Error('a secret value reached A');
+    log(`compare: ${json.differences.length} difference(s); ${slots.copyLine}`);
+  });
+
+  await step('usage', async () => {
+    const { status, json } = await apiA('GET', '/api/fleet/usage');
+    if (status !== 200 || json.machines.length !== 2) throw new Error(`usage answered ${status}: ${JSON.stringify(json)}`);
+    for (const window of ['today', 'week', 'month']) {
+      const sum = json.machines.reduce((total, row) => total + (row[window]?.totalCost ?? 0), 0);
+      if (Math.abs(sum - json.allMachines[window].totalCost) > 1e-9) throw new Error(`${window}: All machines ${json.allMachines[window].totalCost} != sum ${sum}`);
+    }
+    log(`usage rows: ${json.machines.map((row) => `${row.label}${row.cached ? ' (cached)' : ''} $${row.month?.totalCost ?? 'n/a'}`).join(', ')}`);
+  });
+
+  await step('mcp', async () => {
+    const { token } = await cli('a', ['token', 'create', 'smoke-mcp', '--scopes', 'read:state,read:conversations,tell', '--json']);
+    // The dashboard reads the token registry every 5 s (ACCESS_TOKEN_REFRESH_MS).
+    const listed = await pollUntil('A accepts the new token', 15_000, async () => {
+      const answer = await mcpTool(token, 'list_machines');
+      return answer.isError || !answer.text.startsWith('[') ? { ok: false, detail: answer.text.slice(0, 200) } : { ok: true, value: answer };
+    });
+    const machines = JSON.parse(listed.text);
+    if (!Array.isArray(machines)) throw new Error(`list_machines answered ${listed.text}`);
+    if (!machines.some((machine) => machine.environmentId === selfB.environmentId)) throw new Error(`list_machines missed B: ${listed.text}`);
+    const linkedName = `@${selfB.environmentId}/${SEED.name}`;
+    const rows = JSON.parse((await mcpTool(token, 'list_conversations', { limit: 200 })).text);
+    if (!rows.some((row) => row.name === linkedName)) throw new Error(`list_conversations missed ${linkedName}`);
+    const sent = await mcpTool(token, 'send_message', { conversation: linkedName, message: 'smoke via mcp' });
+    if (/insufficient_scope|no-chained-hops|no-link/.test(sent.text)) throw new Error(`send_message did not reach B: ${sent.text}`);
+    const settings = await fetch(`http://127.0.0.1:${PORT_A}/api/settings`, { method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: '{}' });
+    if (settings.status !== 403) throw new Error(`PUT /api/settings answered ${settings.status}, not 403`);
+    log(`mcp: B listed, ${linkedName} reached (${sent.isError ? 'owner answered an error' : 'delivered'}: ${sent.text.slice(0, 80)}), settings 403`);
+  });
+
+  const worker = await step('remote-worker', async () => {
+    // By environment id: both smoke dashboards run on one host, so they share its label.
+    const run = await cliRaw('a', ['worker', 'run', '--machine', selfB.environmentId, '--issue', SMOKE_ISSUE, '--prompt', 'smoke brief', '--read-only',
+      '--parent', 'conv-smoke', '--harness', 'claude-code', '--model', 'claude-opus-5-5', '--ignore-unpushed', '--detach'], 120_000);
+    if (run.code !== 0) throw new Error(`pan worker run --machine failed (${run.code}): ${run.stderr || run.stdout}`);
+    const localId = run.stdout.trim().split('\n').pop();
+    const standIn = JSON.parse(readFileSync(resolve(HOMES.a, 'agents', localId, 'remote.json'), 'utf8'));
+    log(`stand-in ${localId} for ${standIn.remoteId} on ${standIn.label}`);
+    await reportOnB(standIn.remoteId, 'smoke report one');
+    const wait = await cliRaw('a', ['worker', 'wait', localId, '--timeout', '60'], 90_000);
+    if (wait.code !== 0 || !wait.stdout.includes('smoke report one')) throw new Error(`wait on the stand-in answered ${wait.code}: ${wait.stdout} ${wait.stderr}`);
+    log(`A printed B's report: ${wait.stdout.trim()}`);
+    return { localId, remoteId: standIn.remoteId };
+  });
+
+  await step('worker-offline', async () => {
+    const waiting = cliRaw('a', ['worker', 'wait', worker.localId, '--after', '1', '--timeout', '150'], 180_000);
+    const b = running.servers.get('b');
+    await sleep(2_000);
+    b.kill('SIGSTOP');
+    log('B stopped (SIGSTOP) for 25 s');
+    await sleep(25_000);
+    b.kill('SIGCONT');
+    log('B continued (SIGCONT)');
+    await reportOnB(worker.remoteId, 'smoke report two');
+    const wait = await waiting;
+    if (wait.code !== 0 || !wait.stdout.includes('smoke report two')) throw new Error(`the wait across B's pause answered ${wait.code}: ${wait.stdout} ${wait.stderr}`);
+    log('the wait survived B\'s pause and printed report two');
+    // Stop B's worker through the fleet route (the stand-in's owner), so no pane outlives the smoke.
+    const stopped = await apiA('POST', `/api/fleet/workers/${encodeURIComponent(worker.localId)}/stop`, {});
+    if (stopped.status !== 200) throw new Error(`stopping the remote worker answered ${stopped.status}: ${JSON.stringify(stopped.json)}`);
+    log(`stopped ${worker.remoteId} on B through the fleet route`);
+  });
+}
+
+async function reportOnB(remoteId, body) {
+  const file = resolve(HOMES.b, `${remoteId}-report.md`);
+  writeFileSync(file, `${body}\n`);
+  const report = await cliRaw('b', ['worker', 'report', remoteId, '--file', file]);
+  if (report.code !== 0) throw new Error(`pan worker report on B failed: ${report.stderr}`);
+}
+
+async function autoStep(selfA, selfB) {
+  await step('auto', async () => {
+    await pollUntil('A sees B saturated', 40_000, async () => {
+      const link = linkTo(await cli('a', ['machines', 'list', '--json']), selfB.environmentId);
+      return link?.load?.cpuSaturated ? { ok: true, value: link.load } : { ok: false, detail: JSON.stringify(link?.load ?? null) };
+    });
+    const { status, json } = await apiA('POST', '/api/fleet/placement', { gitOrigin: null, needs: [] });
+    if (status !== 200 || !json?.ok || json.environmentId !== selfA.environmentId || !json.reason.includes(selfA.label)) {
+      throw new Error(`Auto did not pick A: ${status} ${JSON.stringify(json)}`);
+    }
+    log(`${json.reason}; rejected ${json.rejections.map((rejection) => `${rejection.label}: ${rejection.reason}`).join('; ')}`);
+  });
+}
+
 async function cleanup() {
   for (const socket of running.proxySockets) socket.destroy();
   running.proxySockets.clear();
@@ -534,6 +757,7 @@ async function cleanup() {
   if (running.dev) await new Promise((done) => running.dev.close(() => done()));
   running.dev = null;
   await Promise.all([...running.servers.keys()].map((name) => stopServer(name)));
+  await killSmokeTmux();
   // After the servers stop, so neither recreates a home under a removed link.
   // --live-claude seeds into the real ~/.claude; remove only the smoke project's directory.
   if (LIVE_CLAUDE) {
@@ -553,12 +777,14 @@ async function main() {
   }
   const capture = [];
 
-  await step('fake-clis', () => {
+  await step('fake-clis', async () => {
+    await killSmokeTmux();
     isolatedNode();
     for (const home of [HOMES.a, HOMES.b]) {
       freshHome(home);
       fakeClis(home);
     }
+    machineConfigs();
   });
 
   await step('start', async () => {
@@ -643,6 +869,7 @@ async function main() {
   });
 
   await conversationSteps(selfB);
+  if (!LIVE_CLAUDE) await fleetWorkSteps(selfA, selfB);
 
   await step('kill B', async () => {
     const child = running.servers.get('b');
@@ -663,7 +890,8 @@ async function main() {
   });
 
   await step('restart B', async () => {
-    startServer('b', HOMES.b, PORT_B);
+    // PAN-4651: B comes back reporting a saturated CPU, so Auto must avoid it (step auto).
+    startServer('b', HOMES.b, PORT_B, LIVE_CLAUDE ? {} : { OVERDECK_TEST_FORCE_CPU_SATURATED: '1' });
     await waitListening('b', PORT_B, 90_000);
     const upAt = Date.now();
     await pollUntil('A shows B online again', 60_000, async () => {
@@ -676,6 +904,8 @@ async function main() {
       return { ok: false, detail };
     });
   });
+
+  if (!LIVE_CLAUDE) await autoStep(selfA, selfB);
 
   if (INJECT_PLAIN_HTTP) {
     await step('inject plain http', async () => {

@@ -25,7 +25,8 @@ const SECRET_KEY_SUBSTRINGS = [
   'cookie',
 ];
 
-function isSecretKeyName(key: string): boolean {
+/** True when a config key name looks like it holds a secret (also used by PAN-4651 Compare settings). */
+export function isSecretKeyName(key: string): boolean {
   const lower = key.toLowerCase();
   return SECRET_KEY_SUBSTRINGS.some((substring) => lower.includes(substring));
 }

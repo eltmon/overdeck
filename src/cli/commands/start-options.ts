@@ -33,4 +33,9 @@ export interface IssueOptions {
   /** Bypass the plan-freshness preflight (PAN-3917) and spawn against a plan
    *  that names files no longer on disk. Prints a one-line warning. */
   skipFreshness?: boolean;
+  /** PAN-4651: start the issue agent on a linked machine (label or environment id), or `auto`. */
+  machine?: string;
+  needs?: string;
+  pushFirst?: boolean;
+  ignoreUnpushed?: boolean;
 }

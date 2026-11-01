@@ -20,6 +20,7 @@ import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { canonicalPathAsync, isWithin } from '../projects/path-containment.js';
 import { isResumableHarness } from '../vault/resumable.js';
 import { readAnywhereSettings } from './anywhere-settings.js';
+import { gitOriginOf } from './project-origin.js';
 
 /** Same page the conversation list asks for by default, so both share one enrichment. */
 export const SHARED_CONVERSATIONS_LIMIT = 500;
@@ -71,12 +72,6 @@ const defaultDeps: SharedConversationsDeps = {
 export function sharedConversationsHash(rows: readonly SharedConversationRow[]): string {
   const sorted = [...rows].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   return createHash('sha256').update(JSON.stringify(sorted)).digest('hex').slice(0, 16);
-}
-
-function gitOriginOf(config: ProjectConfig | undefined): string | null {
-  if (config?.github_repo) return `github.com/${config.github_repo}`;
-  if (config?.gitlab_repo) return `gitlab.com/${config.gitlab_repo}`;
-  return null;
 }
 
 /** Resolves a cwd to its project key (deepest root wins), canonicalizing each root once. */

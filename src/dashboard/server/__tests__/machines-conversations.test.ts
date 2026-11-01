@@ -151,9 +151,10 @@ describe('GET /api/machines/conversations (PAN-4650 WI-2)', () => {
   });
 
   it('reads the sharing switch from anywhere.json, on by default', async () => {
-    expect(await readAnywhereSettings()).toEqual({ shareConversations: true });
+    // PAN-4651 D-4651-13 added combineRepositories (default on) to the same file.
+    expect(await readAnywhereSettings()).toEqual({ shareConversations: true, combineRepositories: true });
     await writeAnywhereSettings({ shareConversations: false });
-    expect(await readAnywhereSettings()).toEqual({ shareConversations: false });
+    expect(await readAnywhereSettings()).toEqual({ shareConversations: false, combineRepositories: true });
     const { readSharing: _fromFile, ...fileSharing } = deps([enriched('conv-a')]);
     const { json } = await read(await handleSharedConversations(MACHINE, fileSharing));
     expect(json.sharing).toBe(false);

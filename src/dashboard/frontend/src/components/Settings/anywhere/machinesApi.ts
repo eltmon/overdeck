@@ -4,13 +4,15 @@
  * call. Every fetcher returns `{ status, body }` (see anywhereApi.ts) so the
  * panel can show the server's error text.
  */
-import type { FleetUpdateMode, FleetUpdateResponse, FleetVersionsResponse, LinkAccess, MachineLinkView, MachinesResponse } from '@overdeck/contracts';
+import type { FleetProjectsResponse, FleetUpdateMode, FleetUpdateResponse, FleetVersionsResponse, LinkAccess, MachineLinkView, MachinesResponse } from '@overdeck/contracts';
 
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import { apiError, type ApiResult, isOk } from './anywhereApi';
 
 export type {
   FleetComponent,
+  FleetProjectRow,
+  FleetProjectsResponse,
   FleetUpdateJob,
   FleetUpdateResponse,
   FleetVersionRow,
@@ -18,6 +20,7 @@ export type {
   InboundMachineView,
   LinkAccess,
   LinkState,
+  LoadSample,
   MachineLinkView,
   MachinesResponse,
   SshLinkInfo,
@@ -92,6 +95,97 @@ export async function setShareConversations(conversations: boolean): Promise<Api
     headers: await dashboardMutationJsonHeaders(),
     body: JSON.stringify({ conversations }),
   }));
+}
+
+/** PAN-4651 D-4651-13: Combine matching repositories across machines (or stop). */
+export async function setCombineRepositories(combineRepositories: boolean): Promise<ApiResult<{ conversations: boolean; combineRepositories: boolean }>> {
+  return readResult(await fetch('/api/machines/sharing', {
+    method: 'PUT',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ combineRepositories }),
+  }));
+}
+
+export const FLEET_PROJECTS_QUERY_KEY = ['fleet-projects'] as const;
+
+/** Query function for `['fleet-projects']`: projects grouped by git origin across machines. */
+export async function loadFleetProjects(): Promise<FleetProjectsResponse> {
+  const result = await readResult<FleetProjectsResponse>(await fetch('/api/fleet/projects'));
+  if (!isOk(result)) throw new Error(apiError(result));
+  const body = result.body as Partial<FleetProjectsResponse> | null;
+  return { combine: body?.combine !== false, projects: Array.isArray(body?.projects) ? body.projects : [] };
+}
+
+/** PAN-4651 D-4651-14: a project's source facts and copyable ignored files on a linked machine. */
+export interface OwnerProjectSource {
+  key: string;
+  name: string;
+  issuePrefix: string | null;
+  gitOrigin: string | null;
+  cloneUrl: string | null;
+  ignoredFiles: Array<{ path: string; bytes: number; preselected: boolean }>;
+}
+
+export interface AddProjectJob {
+  step: 'clone' | 'files' | 'done' | 'failed';
+  error?: string;
+  projectKey?: string;
+  files?: Array<{ path: string; result: 'written' | 'skipped' | 'failed' }>;
+}
+
+export async function loadOwnerProjectSource(machine: string, projectKey: string): Promise<OwnerProjectSource> {
+  const params = new URLSearchParams({ machine, projectKey });
+  const result = await readResult<OwnerProjectSource>(await fetch(`/api/fleet/projects/source?${params.toString()}`));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body;
+}
+
+/** This machine's source facts for one of its projects (Add there). */
+export async function loadLocalProjectSource(projectKey: string): Promise<OwnerProjectSource> {
+  const result = await readResult<OwnerProjectSource>(await fetch(`/api/fleet/projects/local-source?projectKey=${encodeURIComponent(projectKey)}`));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body;
+}
+
+/** Add there: clone one of this machine's projects on a linked machine and copy `files`. */
+export async function addProjectThere(input: { machine: string; projectKey: string; files: string[] }): Promise<ApiResult<{ jobId: string; machine: string }>> {
+  return readResult(await fetch('/api/fleet/projects/add-there', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(input),
+  }));
+}
+
+/** Add here: clone the linked machine's project to this machine and copy `files`. */
+export async function addProjectHere(input: { machine: string; projectKey: string; files: string[] }): Promise<ApiResult<{ jobId: string }>> {
+  return readResult(await fetch('/api/fleet/projects/add-here', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(input),
+  }));
+}
+
+/** An add job here, or (with `machine`) one running on that linked machine. */
+export async function loadAddProjectJob(jobId: string, machine?: string): Promise<AddProjectJob> {
+  const query = machine ? `?machine=${encodeURIComponent(machine)}` : '';
+  const result = await readResult<AddProjectJob>(await fetch(`/api/fleet/projects/add-jobs/${encodeURIComponent(jobId)}${query}`));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body;
+}
+
+/** PAN-4651 D-4651-20: one config.yaml value as Compare settings shows it. */
+export type ResolvedSetting = { value: string } | { secret: true; set: boolean };
+
+export interface SettingsCompare {
+  machine: { environmentId: string; label: string };
+  dashboardUrl: string | null;
+  differences: Array<{ key: string; here: ResolvedSetting | null; there: ResolvedSetting | null; copyLine: string | null }>;
+}
+
+export async function loadSettingsCompare(machine: string): Promise<SettingsCompare> {
+  const result = await readResult<SettingsCompare>(await fetch(`/api/fleet/settings-compare/${encodeURIComponent(machine)}`));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body;
 }
 
 /** PAN-4650: Hide this machine (or show it again) in the conversation list. */

@@ -61,8 +61,9 @@ describe('Hide this machine (PAN-4650 WI-13)', () => {
   it('PAN-4650 WI-15 ac3: PUT sharing writes anywhere.json; the machines view and the shared list follow it', async () => {
     expect(((await buildMachinesResponse()) as { self: { shareConversations: boolean } }).self.shareConversations).toBe(true);
     const turnedOff = await read(await handleSetSharing(JSON.stringify({ conversations: false })));
-    expect(turnedOff).toEqual({ status: 200, json: { conversations: false } });
-    expect(JSON.parse(await readFile(join(home, 'anywhere.json'), 'utf8'))).toEqual({ v: 1, shareConversations: false });
+    // PAN-4651 D-4651-13: the answer and the file carry the Combine switch too (default on).
+    expect(turnedOff).toEqual({ status: 200, json: { conversations: false, combineRepositories: true } });
+    expect(JSON.parse(await readFile(join(home, 'anywhere.json'), 'utf8'))).toEqual({ v: 1, shareConversations: false, combineRepositories: true });
     expect(((await buildMachinesResponse()) as { self: { shareConversations: boolean } }).self.shareConversations).toBe(false);
     const shared = await buildSharedConversations({ environmentId: async () => 'env-self', listRows: async () => [] });
     expect(shared).toMatchObject({ sharing: false, rows: [], hash: 'sharing-off' });

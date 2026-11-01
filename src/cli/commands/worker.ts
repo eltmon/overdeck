@@ -42,6 +42,15 @@ import {
   type WorkerReportStatus,
 } from '../../lib/agents/worker/index.js';
 import {
+  defaultRemoteWorkerCliDeps,
+  parseNeedsFlag,
+  resolveMachineFlag,
+  type RemoteWorkerCliDeps,
+  startRemoteWorker,
+  stopRemoteWorker,
+  waitForAnyWorker,
+} from './worker-remote.js';
+import {
   parseExternalRegisterFields,
   performExternalRegistration,
   type ExternalRegisterRequest,
@@ -67,6 +76,8 @@ export interface WorkerCliDeps {
   env: NodeJS.ProcessEnv;
   stdout: (text: string) => void;
   stderr: (text: string) => void;
+  /** PAN-4651: the fleet calls behind `--machine`; absent ⇒ the defaults. */
+  remote?: RemoteWorkerCliDeps;
 }
 
 async function readAllStdin(): Promise<string> {
@@ -78,7 +89,8 @@ async function readAllStdin(): Promise<string> {
 export function defaultWorkerCliDeps(): WorkerCliDeps {
   return {
     startWorker: (options) => startWorker(options),
-    waitForWorkerReport: (id, options) => waitForWorkerReport(id, options),
+    // PAN-4651 D-4651-6: a stand-in waits on its remote.json; a local worker on the liveness oracle.
+    waitForWorkerReport: (id, options) => waitForAnyWorker(id, options, waitForWorkerReport),
     writeWorkerReport: (id, report) => writeWorkerReport(id, report),
     listWorkers: (filter) => listWorkers(filter),
     isAlive: (id) => livenessIsAlive(id),
@@ -176,6 +188,11 @@ export interface WorkerRunOptions {
   timeout?: string;
   stopAfterReport?: boolean;
   effort?: string;
+  /** PAN-4651: a linked machine's label or environment id, or `auto`. */
+  machine?: string;
+  needs?: string;
+  pushFirst?: boolean;
+  ignoreUnpushed?: boolean;
 }
 
 export async function workerRunCommand(options: WorkerRunOptions, deps: WorkerCliDeps): Promise<number> {
@@ -218,6 +235,11 @@ export async function workerRunCommand(options: WorkerRunOptions, deps: WorkerCl
     }
   }
 
+  if (options.machine) {
+    const code = await runOnMachine(options, { issueId: resolveIssueId(options.issue), prompt, parentId, timeoutMs }, deps);
+    if (code !== null) return code;
+  }
+
   let started: StartedWorker;
   try {
     started = await deps.startWorker({
@@ -250,6 +272,59 @@ export async function workerRunCommand(options: WorkerRunOptions, deps: WorkerCl
   const code = reportOutcome(started.id, outcome, deps);
   if (options.stopAfterReport && outcome.kind === 'report') {
     await deps.stopWorker(started.id).catch((error: unknown) => {
+      deps.stderr(`Could not stop ${started.id}: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }
+  return code;
+}
+
+/**
+ * `--machine` (PAN-4651 FR-2): null when the target is this machine (the local
+ * path continues), else the exit code of the remote run and its wait.
+ */
+async function runOnMachine(
+  options: WorkerRunOptions,
+  input: { issueId: string; prompt: string; parentId: string | null; timeoutMs: number | null },
+  deps: WorkerCliDeps,
+): Promise<number | null> {
+  const remote = deps.remote ?? defaultRemoteWorkerCliDeps();
+  const needs = parseNeedsFlag(options.needs);
+  let target;
+  try {
+    target = await resolveMachineFlag(options.machine!, needs, await remote.issueOrigin(input.issueId), remote);
+  } catch (error) {
+    deps.stderr(`Could not reach the dashboard to place the worker: ${(error as Error).message}`);
+    return WORKER_EXIT.usage;
+  }
+  if (target.kind === 'error') {
+    deps.stderr(target.message);
+    return WORKER_EXIT.usage;
+  }
+  if (target.kind === 'self') {
+    if (target.reason) deps.stderr(target.reason);
+    return null;
+  }
+  if (options.cwd) {
+    deps.stderr(`--cwd names a directory on this machine; ${target.label} picks the worker's directory itself. Drop --cwd.`);
+    return WORKER_EXIT.usage;
+  }
+  const started = await startRemoteWorker({
+    machine: target.machine, needs, issueId: input.issueId, prompt: input.prompt, parentId: input.parentId,
+    model: options.model, harness: options.harness, effort: options.effort, readOnly: options.readOnly === true, name: options.name,
+    cwd: deps.cwd(), pushFirst: options.pushFirst === true, ignoreUnpushed: options.ignoreUnpushed === true,
+  }, target, remote, deps.stderr);
+  if ('error' in started) {
+    deps.stderr(started.error);
+    return WORKER_EXIT.usage;
+  }
+  if (options.detach) {
+    deps.stdout(started.id);
+    return WORKER_EXIT.done;
+  }
+  const outcome = await deps.waitForWorkerReport(started.id, { afterSeq: 0, timeoutMs: input.timeoutMs });
+  const code = reportOutcome(started.id, outcome, deps);
+  if (options.stopAfterReport && outcome.kind === 'report') {
+    await stopRemoteWorker(started.id, remote).catch((error: unknown) => {
       deps.stderr(`Could not stop ${started.id}: ${error instanceof Error ? error.message : String(error)}`);
     });
   }
@@ -452,6 +527,10 @@ export function registerWorkerCommands(program: Command, deps: () => WorkerCliDe
     .option('--detach', 'Print the worker id and return without waiting')
     .option('--timeout <seconds>', 'Stop waiting after this many seconds (exit 3; the worker keeps running)')
     .option('--stop-after-report', 'Stop the worker after its first report')
+    .option('--machine <label|auto>', 'Run on a linked machine (label or environment id), or auto to place it by load')
+    .option('--needs <tags>', 'Comma-separated capability tags the machine must have (docker, gpu, ios-sim, …)')
+    .option('--push-first', 'With --machine: push unpushed commits before starting on the other machine')
+    .option('--ignore-unpushed', 'With --machine: start even though local commits are not pushed')
     .action(async (options: WorkerRunOptions) => exitCli(await workerRunCommand(options, deps())));
 
   worker

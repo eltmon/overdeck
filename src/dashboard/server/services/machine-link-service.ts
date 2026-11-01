@@ -43,6 +43,7 @@ import type { ChannelSocket } from '../../../lib/anywhere/channel/channel-socket
 import { currentAdvertisedEndpoints } from '../../../lib/anywhere/endpoints.js';
 import { ChannelOpenError, openChannel, type TransportUrl } from '../../../lib/anywhere/channel/open.js';
 import { type MachineLink, upsertLink } from '../../../lib/anywhere/link-store.js';
+import { UNKNOWN_PEER_MACHINE_FACTS } from '../../../lib/anywhere/machine-capabilities.js';
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
 import { type LinkRoute, mergeAdvertised, parseRouteUrl, routeFromPairingUrl } from '../../../lib/anywhere/routes.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
@@ -304,7 +305,7 @@ export async function createMachineLink(
 export interface UnsupportedInstall { version: string; on: 'this-machine' | 'peer' }
 
 export interface LinkStatusSource {
-  status(linkId: string): Pick<MachineLinkView, 'state' | 'stateDetail' | 'currentRoute' | 'lastHeartbeatAt' | 'incident' | 'peerVersion'> & {
+  status(linkId: string): Pick<MachineLinkView, 'state' | 'stateDetail' | 'currentRoute' | 'lastHeartbeatAt' | 'incident' | 'peerVersion' | 'load' | 'tags' | 'placement'> & {
     routeStatus: (url: string) => MachineLinkView['routes'][number]['status'];
     /** Set while the link is `unsupported`; not part of `MachineLinkView`. */
     unsupported: UnsupportedInstall | null;
@@ -320,7 +321,7 @@ export interface LinkStatusSource {
 }
 
 export const connectingStatusSource: LinkStatusSource = {
-  status: () => ({ state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, unsupported: null, routeStatus: () => 'untried' }),
+  status: () => ({ state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, ...UNKNOWN_PEER_MACHINE_FACTS, unsupported: null, routeStatus: () => 'untried' }),
 };
 
 /** The public face of a link: never the token. `peerVersion` falls back to what the caller learned when the source has none. */
@@ -342,5 +343,8 @@ export function machineLinkView(link: MachineLink, peerVersion: string | null, s
     peerVersion: live.peerVersion ?? peerVersion,
     createdAt: link.createdAt,
     hidden: link.hidden === true,
+    load: live.load ?? null,
+    tags: live.tags ?? [],
+    placement: live.placement ?? 'auto',
   };
 }

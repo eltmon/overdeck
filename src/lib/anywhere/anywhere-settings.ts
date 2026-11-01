@@ -2,7 +2,9 @@
  * Anywhere settings door (PAN-4650 D-4650-15).
  *
  * The single read/write door for `${OVERDECK_HOME}/anywhere.json`
- * (`{ "v": 1, "shareConversations": true }`, 0600). It lives outside
+ * (`{ "v": 1, "shareConversations": true, "combineRepositories": true }`, 0600).
+ * PAN-4651 D-4651-13: `combineRepositories` (default on) shows one project per
+ * git origin across machines. It lives outside
  * `config.yaml` because the Settings whole-document save is lossy. An absent
  * file means the defaults (sharing on, D-4). A corrupt file shares nothing and
  * logs once; a write refuses to overwrite it until it is repaired.
@@ -17,9 +19,10 @@ export const ANYWHERE_SETTINGS_FILENAME = 'anywhere.json';
 
 export interface AnywhereSettings {
   shareConversations: boolean;
+  combineRepositories: boolean;
 }
 
-const DEFAULTS: AnywhereSettings = { shareConversations: true };
+const DEFAULTS: AnywhereSettings = { shareConversations: true, combineRepositories: true };
 
 let lastError: string | null = null;
 let writeQueue: Promise<unknown> = Promise.resolve();
@@ -35,14 +38,17 @@ function parseSettings(raw: string, path: string): AnywhereSettings {
   } catch {
     throw new Error(`Anywhere settings ${path} is not valid JSON`);
   }
-  const record = body as { v?: unknown; shareConversations?: unknown } | null;
+  const record = body as { v?: unknown; shareConversations?: unknown; combineRepositories?: unknown } | null;
   if (!record || typeof record !== 'object' || record.v !== 1) {
     throw new Error(`Anywhere settings ${path} has an unknown format (expected v: 1)`);
   }
-  if (record.shareConversations !== undefined && typeof record.shareConversations !== 'boolean') {
-    throw new Error(`Anywhere settings ${path}: shareConversations must be a boolean`);
+  for (const key of ['shareConversations', 'combineRepositories'] as const) {
+    if (record[key] !== undefined && typeof record[key] !== 'boolean') throw new Error(`Anywhere settings ${path}: ${key} must be a boolean`);
   }
-  return { shareConversations: record.shareConversations ?? DEFAULTS.shareConversations };
+  return {
+    shareConversations: (record.shareConversations as boolean | undefined) ?? DEFAULTS.shareConversations,
+    combineRepositories: (record.combineRepositories as boolean | undefined) ?? DEFAULTS.combineRepositories,
+  };
 }
 
 /** Strict read: absent ⇒ defaults; unreadable or corrupt ⇒ throws naming the path. */

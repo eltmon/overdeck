@@ -259,6 +259,8 @@ export interface LinkForwardInit {
   headers?: Record<string, string>;
   body?: Buffer;
   actor?: LinkActorInit;
+  /** PAN-4651 D-4651-17: scopes the linked machine must not exceed (an MCP token's own scopes). */
+  ceiling?: AccessTokenScope[];
   signal?: AbortSignal;
   timeoutMs?: number;
   /** Test seams, as on `linkFetch`. */
@@ -293,7 +295,7 @@ export async function linkForward(environmentId: string, init: LinkForwardInit):
         headers: {
           ...init.headers,
           authorization: `Bearer ${info.token}`,
-          ...linkActorHeaders(init.actor),
+          ...linkActorHeaders(init.actor, init.ceiling),
           ...(init.body ? { 'content-length': String(init.body.length) } : {}),
         },
         ...(init.signal ? { signal: init.signal } : {}),

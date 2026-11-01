@@ -46,6 +46,7 @@ import { ChannelOpenError, openChannel, type TransportUrl } from '../../../lib/a
 import type { LinkRouteInfo, LinkRouteSource } from '../../../lib/anywhere/link-client.js';
 import { linksSnapshot, type MachineLink, markLinkRevoked, setLinkRoutes } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey, type MachineKeyPair } from '../../../lib/anywhere/machine-key.js';
+import { type PeerMachineFacts, peerMachineFacts, UNKNOWN_PEER_MACHINE_FACTS } from '../../../lib/anywhere/machine-capabilities.js';
 import { type LinkRoute, mergeAdvertised, rankRoutes } from '../../../lib/anywhere/routes.js';
 import { channelRequest, type LinkStatusSource, type UnsupportedInstall } from './machine-link-service.js';
 import { type HeartbeatHandle, type HeartbeatHandlers, type HeartbeatPayload, openHeartbeatOverChannel } from './link-heartbeat.js';
@@ -163,6 +164,8 @@ interface Entry {
   lastEndpointsHash: string | null;
   incident: LinkIncident | null;
   peerVersion: string | null;
+  /** PAN-4651 D-4651-8: load, tags and placement from the last heartbeat. */
+  machine: PeerMachineFacts;
   attempt: number;
   backoffKind: 'network' | 'identity';
   retryTimer: NodeJS.Timeout | null;
@@ -250,7 +253,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
   status(linkId: string): ReturnType<LinkStatusSource['status']> {
     const entry = this.entries.get(linkId);
     if (!entry) {
-      return { state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, unsupported: null, routeStatus: () => 'untried' };
+      return { state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, ...UNKNOWN_PEER_MACHINE_FACTS, unsupported: null, routeStatus: () => 'untried' };
     }
     return {
       state: entry.state,
@@ -259,6 +262,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       lastHeartbeatAt: entry.lastHeartbeatAt === null ? null : new Date(entry.lastHeartbeatAt).toISOString(),
       incident: entry.incident,
       peerVersion: entry.peerVersion,
+      ...entry.machine,
       unsupported: entry.unsupported,
       routeStatus: (url) => (url === entry.currentRoute && entry.state === 'online' ? 'current' : entry.routeStatus.get(url) ?? 'untried'),
     };
@@ -376,7 +380,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
   private makeEntry(link: MachineLink): Entry {
     return {
       link, state: 'connecting', stateDetail: null, unsupported: null, currentRoute: null, channel: null, heartbeat: null,
-      lastHeartbeatAt: null, lastEndpointsHash: null, incident: null, peerVersion: null, attempt: 0,
+      lastHeartbeatAt: null, lastEndpointsHash: null, incident: null, peerVersion: null, machine: UNKNOWN_PEER_MACHINE_FACTS, attempt: 0,
       backoffKind: 'network', retryTimer: null, lateTimer: null, deadTimer: null, betterTimer: null,
       probing: null, routeStatus: new Map(), onlineWaiters: new Set(), generation: 0,
     };
@@ -689,6 +693,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     }
     entry.lastHeartbeatAt = now;
     entry.peerVersion = payload.serverVersion;
+    entry.machine = peerMachineFacts(payload);
     if (entry.state === 'connecting') {
       // The old channel is alive after all: stop probing and keep it.
       entry.probing?.abort();
@@ -766,4 +771,4 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
 }
 
 /** The view fields a supervisor-backed status adds on top of the link record. */
-export type SupervisedLinkView = Pick<MachineLinkView, 'state' | 'stateDetail' | 'currentRoute' | 'lastHeartbeatAt' | 'incident' | 'peerVersion'>;
+export type SupervisedLinkView = Pick<MachineLinkView, 'state' | 'stateDetail' | 'currentRoute' | 'lastHeartbeatAt' | 'incident' | 'peerVersion' | 'load' | 'tags' | 'placement'>;

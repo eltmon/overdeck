@@ -37,6 +37,7 @@ and critics.
 pan lane start (--key <key> | --for <builder key>) --role <role> (--brief <file> | --prompt <text>)
                [--run <key>] [--parent <conv>] [--project <key>] [--model <m>] [--harness <h>] [--effort <e>]
                [--title <t>] [--branch <b>] [--from <ref>] [--at <ref>] [--reuse] [--replace] [--no-wait] [--json]
+               [--machine <label|environment-id|auto>] [--needs <tag,…>]
 pan lane list  [--run <key>] [--parent <conv>] [--json]
 pan lane show  (<lane> | --run <key> --key <key>) [--json]
 pan lane wait  <lane> [--after <seq>] [--timeout <s>]
@@ -48,6 +49,11 @@ pan lane reap  <lane> [--park] [--keep]
 ```
 
 `<lane>` accepts a conversation id, a conversation name or `conv-<name>`.
+
+`--machine` and `--needs` choose where the lane runs. Today a lane runs only on this
+machine: `--machine auto` launches here when [Auto placement](/configuration/linked-machines#auto-placement)
+picks this machine, and any choice of another machine is refused with a message naming
+PAN-4638, which adds lanes on other machines.
 
 | Command | What it does |
 |---------|--------------|

@@ -34,12 +34,16 @@ import {
   type FleetUpdateResponse,
   type FleetVersionRow,
   type FleetVersionsResponse,
+  formatMachineLoad,
+  formatMachineProfile,
   type MachineLinkView,
   type MachinesResponse,
 } from '@overdeck/contracts';
 
 import { callDashboard, errorText, isDashboardUnreachable } from './dashboard-call.js';
 import { call, fail, NEEDS_PAN_UP, NOT_RUNNING } from './machines-call.js';
+import { registerMachinesAddProjectCommand } from './machines-add-project.js';
+import { registerMachinesWhoCommand } from './machines-who.js';
 import { registerMachinesSshCommands } from './machines-ssh.js';
 import { registerMachinesFlyCommands } from './machines-fly.js';
 
@@ -107,21 +111,28 @@ export async function runMachinesList(options: { json?: boolean }): Promise<void
     return;
   }
   console.log(`This machine: ${machines.self.label} (${machines.self.fingerprint})`);
-  if (machines.links.length === 0) {
-    console.log('No linked machines. Link one with `pan machines link <pairing-url>` using a `pan pair` link from the other machine.');
-  } else {
-    console.log('');
-    table(
-      ['LABEL', 'STATE', 'ROUTE', 'ACCESS', 'SSH', 'FINGERPRINT'],
-      machines.links.map((link) => [
+  console.log('');
+  // PAN-4651 FR-6/FR-7: this machine first, then each link, with load and capability tags.
+  const loadCell = (view: { load?: MachineLinkView['load']; tags?: MachineLinkView['tags']; placement?: MachineLinkView['placement'] }) =>
+    [formatMachineLoad(view.load) ?? '-', formatMachineProfile(view.tags, view.placement)?.replace(/^tags: /, '') ?? '-'];
+  table(
+    ['LABEL', 'STATE', 'ROUTE', 'ACCESS', 'SSH', 'FINGERPRINT', 'LOAD', 'TAGS'],
+    [
+      [`${machines.self.label} (this machine)`, 'self', '-', '-', '-', machines.self.fingerprint, ...loadCell(machines.self)],
+      ...machines.links.map((link) => [
         link.label,
         formatLinkState(link),
         link.currentRoute ?? link.routes[0]?.url ?? '-',
         link.access,
         link.ssh ? `${link.ssh.destination} (${link.ssh.forward}, ${link.ssh.launch})` : '-',
         link.fingerprint,
+        ...loadCell(link),
       ]),
-    );
+    ],
+  );
+  if (machines.links.length === 0) {
+    console.log('');
+    console.log('No linked machines. Link one with `pan machines link <pairing-url>` using a `pan pair` link from the other machine.');
   }
   console.log('');
   if (machines.inbound.length === 0) {
@@ -501,5 +512,7 @@ export function registerMachinesCommands(program: Command): void {
     .option('--json', 'Print { started, skipped } as JSON')
     .action((options: MachinesUpdateOptions) => runMachinesUpdate(options));
   registerMachinesSshCommands(machines);
+  registerMachinesAddProjectCommand(machines);
+  registerMachinesWhoCommand(machines);
   registerMachinesFlyCommands(machines);
 }

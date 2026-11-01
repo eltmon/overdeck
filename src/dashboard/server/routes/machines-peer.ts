@@ -8,11 +8,12 @@
  * environment's previous one, D-4645-18) and, when the caller sent a reverse
  * token, writes this machine's own link back to it.
  */
-import { Effect, Layer, Stream } from 'effect';
+import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { type AdvertisedEndpoint, ROUTE_KINDS } from '@overdeck/contracts';
 
 import { MACHINE_ACCESS_LEVELS, type MachineAccess } from '../../../lib/access-tokens.js';
+import { listMachineProjects } from '../../../lib/anywhere/project-origin.js';
 import { sharedConversations, type SharedConversationsDeps } from '../../../lib/anywhere/shared-conversations.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
@@ -20,6 +21,8 @@ import { endStreamOnDeviceRevocation } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import { currentApprovalService } from '../services/directory-approval.js';
 import { startHeartbeatSource } from '../services/link-heartbeat.js';
+import { issueActivity } from '../services/issue-activity.js';
+import { buildNeedsYou } from '../services/needs-you-feed.js';
 import { grantMachineLink, GrantMachineLinkError } from '../services/machine-link-grant.js';
 import { type DashboardCredential, resolveRequestCredential } from './dashboard-auth.js';
 import { buildEnvironmentDescriptor } from './environment.js';
@@ -213,4 +216,84 @@ const sharedConversationsRoute = HttpRouter.add(
   }),
 );
 
-export const machinesPeerRouteLayer = Layer.mergeAll(exchangeRoute, approvalExchangeRoute, heartbeatRoute, sharedConversationsRoute);
+/**
+ * `GET /api/machines/projects` (PAN-4651 WI-3, D-4651-11): every project this
+ * machine has registered as `{ key, name, gitOrigin }` — never a path — for a
+ * linked machine's placement and project grouping. Machine credential only.
+ */
+export async function handleMachineProjects(
+  credential: DashboardCredential | null,
+  listProjects: typeof listMachineProjects = listMachineProjects,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'machine') {
+    return jsonResponse({ error: 'the project list is for linked machines only' }, { status: 403 });
+  }
+  try {
+    return jsonResponse({ projects: await listProjects() });
+  } catch (error) {
+    console.error('[machines] project list failed:', error instanceof Error ? error.message : String(error));
+    return jsonResponse({ error: 'the project list could not be built' }, { status: 500 });
+  }
+}
+
+const machineProjectsRoute = HttpRouter.add(
+  'GET',
+  '/api/machines/projects',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.promise(() => handleMachineProjects(resolveRequestCredential(request)));
+  }),
+);
+
+/**
+ * `GET /api/machines/needs-you` (PAN-4651 WI-20, D-4651-15): this machine's
+ * conversations and agents waiting on the operator, for a linked machine's
+ * Needs-You list. Machine credential only.
+ */
+export async function handleNeedsYou(
+  credential: DashboardCredential | null,
+  build: typeof buildNeedsYou = buildNeedsYou,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'machine') {
+    return jsonResponse({ error: 'the Needs-You feed is for linked machines only' }, { status: 403 });
+  }
+  try {
+    return jsonResponse(await build());
+  } catch (error) {
+    console.error('[machines] Needs-You feed failed:', error instanceof Error ? error.message : String(error));
+    return jsonResponse({ error: 'the Needs-You feed could not be built' }, { status: 500 });
+  }
+}
+
+const needsYouRoute = HttpRouter.add(
+  'GET',
+  '/api/machines/needs-you',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.promise(() => handleNeedsYou(resolveRequestCredential(request)));
+  }),
+);
+
+/** `GET /api/machines/issue-activity?issue=<id>` (PAN-4651 WI-22): this machine's agents and conversations for an issue. */
+export async function handleIssueActivity(
+  credential: DashboardCredential | null,
+  issueId: string,
+  read: typeof issueActivity = issueActivity,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'machine') return jsonResponse({ error: 'issue activity is for linked machines only' }, { status: 403 });
+  if (!/^[A-Za-z][A-Za-z0-9]*-\d+$/.test(issueId)) return jsonResponse({ error: 'issue must be an issue id like PAN-7' }, { status: 400 });
+  return jsonResponse(await read(issueId));
+}
+
+const issueActivityRoute = HttpRouter.add(
+  'GET',
+  '/api/machines/issue-activity',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const url = HttpServerRequest.toURL(request);
+    const issueId = Option.isSome(url) ? url.value.searchParams.get('issue') ?? '' : '';
+    return yield* Effect.promise(() => handleIssueActivity(resolveRequestCredential(request), issueId));
+  }),
+);
+
+export const machinesPeerRouteLayer = Layer.mergeAll(exchangeRoute, approvalExchangeRoute, heartbeatRoute, sharedConversationsRoute, machineProjectsRoute, needsYouRoute, issueActivityRoute);

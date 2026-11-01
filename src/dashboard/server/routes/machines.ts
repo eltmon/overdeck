@@ -35,6 +35,7 @@ import { getLink, listLinks, type MachineLink, removeLink, setLinkHidden, setLin
 import { invalidateSharedConversations } from '../../../lib/anywhere/shared-conversations.js';
 import { LinkUnavailableError } from '../../../lib/anywhere/link-client.js';
 import { ForwardRefusedError, listForwards, startForward, stopForward } from '../services/port-forwards.js';
+import { currentMachineProfile } from '../../../lib/anywhere/machine-capabilities.js';
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
 import { classifyHost, parseRouteUrl } from '../../../lib/anywhere/routes.js';
 import { FLY_MACHINE_ERROR_STATUS, FlyMachineError } from '../../../lib/anywhere/fly/provision.js';
@@ -46,6 +47,7 @@ import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import { createMachineLink, type LinkStatusSource, MachineLinkError, machineLinkView } from '../services/machine-link-service.js';
 import { type FlyRemoval, removeFlyMachineForLink } from '../services/fly-machine-service.js';
+import { currentMachineLoad } from '../services/machine-load.js';
 import {
   reconnectSshMachine,
   removeSshMachineForLink,
@@ -103,6 +105,11 @@ export async function buildMachinesResponse(): Promise<MachinesResponse> {
       label: identity.label,
       fingerprint: machineKeyFingerprint(key.publicKey),
       shareConversations: settings.shareConversations,
+      combineRepositories: settings.combineRepositories,
+      // PAN-4651 D-4651-8: this machine's own load sample, tags and placement mode.
+      load: currentMachineLoad(),
+      tags: currentMachineProfile()?.tags ?? [],
+      placement: currentMachineProfile()?.placement ?? 'auto',
     },
     links: links.map((link, index) => {
       const view = statusSource ? machineLinkView(link, null, statusSource) : machineLinkView(link, null);
@@ -375,19 +382,27 @@ const addRouteRoute = HttpRouter.add(
 );
 
 /** PAN-4650 D-4/D-4650-15: `PUT /api/machines/sharing { conversations }` turns Share my conversations on or off. */
+/** `PUT /api/machines/sharing { conversations?, combineRepositories? }` (PAN-4651 D-4651-13: each optional, at least one). */
 export async function handleSetSharing(bodyText: string): Promise<HttpServerResponse.HttpServerResponse> {
-  let conversations: unknown;
+  let body: { conversations?: unknown; combineRepositories?: unknown };
   try {
-    conversations = (JSON.parse(bodyText || '{}') as { conversations?: unknown }).conversations;
+    body = JSON.parse(bodyText || '{}') as typeof body;
   } catch {
     return jsonResponse({ error: 'body is not JSON' }, { status: 400 });
   }
-  if (typeof conversations !== 'boolean') return jsonResponse({ error: 'body must be { conversations: boolean }' }, { status: 400 });
+  const { conversations, combineRepositories } = body;
+  const valid = (value: unknown) => value === undefined || typeof value === 'boolean';
+  if (!valid(conversations) || !valid(combineRepositories) || (conversations === undefined && combineRepositories === undefined)) {
+    return jsonResponse({ error: 'body must be { conversations?: boolean, combineRepositories?: boolean } with at least one' }, { status: 400 });
+  }
   try {
-    const settings = await writeAnywhereSettings({ shareConversations: conversations });
+    const settings = await writeAnywhereSettings({
+      ...(conversations !== undefined ? { shareConversations: conversations as boolean } : {}),
+      ...(combineRepositories !== undefined ? { combineRepositories: combineRepositories as boolean } : {}),
+    });
     // Linked machines see the change on their next heartbeat (a new list hash).
-    invalidateSharedConversations();
-    return jsonResponse({ conversations: settings.shareConversations });
+    if (conversations !== undefined) invalidateSharedConversations();
+    return jsonResponse({ conversations: settings.shareConversations, combineRepositories: settings.combineRepositories });
   } catch (error) {
     return jsonResponse({ error: (error as Error).message }, { status: 500 });
   }

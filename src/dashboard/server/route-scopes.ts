@@ -72,6 +72,43 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/machines/heartbeat', scope: 'read:state' },
   // PAN-4650 WI-2: the shared conversation list a linked machine caches.
   { method: 'GET', path: '/api/machines/conversations', scope: 'read:conversations' },
+  // PAN-4651 WI-3: the project list (key, name, git origin) a linked machine caches.
+  { method: 'GET', path: '/api/machines/projects', scope: 'read:state' },
+  // PAN-4651 WI-4: work doors — a linked machine starts work here (machine credential only, checked by the routes).
+  { method: 'POST', path: '/api/machines/work/conversations', scope: 'operate' },
+  { method: 'POST', path: '/api/machines/work/workers', scope: 'operate' },
+  { method: 'POST', path: '/api/machines/work/issues/:id/start', scope: 'operate' },
+  // PAN-4651 WI-8: Auto placement (read-only; fleet routes refuse channel callers).
+  { method: 'POST', path: '/api/fleet/placement', scope: 'read:state' },
+  // PAN-4651 WI-10: fleet spawns (operate, so an MCP token can start work on any machine).
+  { method: 'POST', path: '/api/fleet/conversations', scope: 'operate' },
+  { method: 'POST', path: '/api/fleet/workers', scope: 'operate' },
+  { method: 'POST', path: '/api/fleet/workers/:id/stop', scope: 'operate' },
+  { method: 'POST', path: '/api/fleet/issues/:id/start', scope: 'operate' },
+  // PAN-4651 WI-29: the MCP list_machines tool (no routes, fingerprints or access levels).
+  { method: 'GET', path: '/api/fleet/machines', scope: 'read:state' },
+  // PAN-4651 WI-17: a linked machine's operator reads a project's source facts and ignored files (operator-level link only, checked by the routes).
+  { method: 'GET', path: '/api/machines/projects/:key/source', scope: 'read:state' },
+  { method: 'GET', path: '/api/machines/projects/:key/file', scope: 'read:state' },
+  // PAN-4651 WI-19: Add this project there (operator actor on an operator-level link only, checked by the route).
+  { method: 'POST', path: '/api/machines/work/projects', scope: 'operate' },
+  { method: 'GET', path: '/api/machines/work/projects/:jobId', scope: 'read:state' },
+  // PAN-4651 WI-20: fleet Needs-You (owner feed for linked machines; the viewer's combined list).
+  { method: 'GET', path: '/api/machines/needs-you', scope: 'read:conversations' },
+  { method: 'GET', path: '/api/fleet/needs-you', scope: 'read:conversations' },
+  // PAN-4651 WI-21: palette search across linked machines.
+  { method: 'GET', path: '/api/fleet/search', scope: 'read:conversations' },
+  // PAN-4651 WI-22: which machine is working on an issue.
+  { method: 'GET', path: '/api/machines/issue-activity', scope: 'read:state' },
+  { method: 'GET', path: '/api/fleet/issues/:id/activity', scope: 'read:state' },
+  // PAN-4651 WI-23: a linked machine reads this machine's usage for fleet totals.
+  { method: 'GET', path: '/api/costs/summary', scope: 'read:costs' },
+  { method: 'GET', path: '/api/costs/request-digest', scope: 'read:costs' },
+  // PAN-4651 WI-25: resolved settings (secrets as set/not set) for a linked machine's Compare settings.
+  { method: 'GET', path: '/api/settings/resolved', scope: 'read:settings' },
+  // PAN-4651 WI-5: a linked machine follows (and stops) a worker it delegated here.
+  { method: 'GET', path: '/api/workers/:id/status', scope: 'read:state' },
+  { method: 'POST', path: '/api/workers/:id/stop', scope: 'operate' },
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },
@@ -159,8 +196,22 @@ function pathMatches(pattern: string, pathname: string): boolean {
   return expected.every((segment, index) => (segment.startsWith(':') ? actual[index] !== '' : segment === actual[index]));
 }
 
-/** The scope a registry credential needs for `METHOD pathname`; unlisted routes need `admin`. */
+const LINKED_CONVERSATION_PREFIX = '/api/conversations/@';
+
+/**
+ * The scope a registry credential needs for `METHOD pathname`; unlisted routes need `admin`.
+ * PAN-4651 D-4651-17: a linked conversation `/api/conversations/@<machine>/<rest>`
+ * needs what `/api/conversations/<rest>` needs here, so a token's scopes reach
+ * the same surfaces on a linked machine. The proxy refuses channel callers
+ * itself (no chained hops), since this mapping lifts the old admin-only guard.
+ */
 export function requiredScopeFor(method: string, pathname: string): AccessTokenScope {
-  const row = ROUTE_SCOPES.find((entry) => entry.method === method && pathMatches(entry.path, pathname));
+  let path = pathname;
+  if (path.startsWith(LINKED_CONVERSATION_PREFIX)) {
+    const segments = path.split('/');
+    if (segments.length < 6) return 'admin';
+    path = [...segments.slice(0, 3), ...segments.slice(4)].join('/');
+  }
+  const row = ROUTE_SCOPES.find((entry) => entry.method === method && pathMatches(entry.path, path));
   return row?.scope ?? 'admin';
 }
