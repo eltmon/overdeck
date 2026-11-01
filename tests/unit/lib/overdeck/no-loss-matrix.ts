@@ -66,6 +66,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/agents/:id/subagents',                            kind: 'http', disposition: 'RELOCATE',   door: 'Transcripts (agent subagents, PAN-3920)' },
   { surface: 'GET /api/agent-directory',                                  kind: 'http', disposition: 'AGGREGATE',  door: 'Agents Directory read model: agent states + backend panes + conversations + transcripts, derived on read (PAN-3920)' },
   { surface: 'POST /api/workers/register',                               kind: 'http', disposition: 'WRITE',      door: 'External agent registry: write-once ext-* registration + sessions.json transcript link, shared with pan worker register (PAN-3920 W19)' },
+  { surface: 'POST /api/workers',                                        kind: 'http', disposition: 'WRITE',      door: 'agents/worker/start.startWorker, shared with pan worker run (PAN-4649)' },
   { surface: 'POST /api/lanes',                                          kind: 'http', disposition: 'WRITE',      door: 'Lane door launchLane: write-once lane facts on a new conversation row, shared with pan lane start (PAN-4223)' },
   { surface: 'GET /api/lanes',                                           kind: 'http', disposition: 'AGGREGATE',  door: 'Lane views: lane rows + list liveness + worker reports + git facts, derived on read (PAN-4223)' },
   { surface: 'GET /api/lanes/:name',                                     kind: 'http', disposition: 'AGGREGATE',  door: 'Lane views: one lane, derived on read (PAN-4223)' },
