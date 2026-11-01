@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4732",
+  "created": "2026-11-01T18:35:44.841Z",
+  "updated": "2026-11-01T18:35:44.841Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "quarantine-title-bar-spec": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4732",
+      "claimedAt": "2026-11-01T18:35:44.841Z"
+    }
+  }
+}
