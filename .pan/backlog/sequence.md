@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T21:40:23.338288Z · model: claude-opus-5-5 · open: 861_
+_Last sequenced: 2026-11-01T21:45:20.462512Z · model: claude-opus-5-5 · open: 859_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -147,7 +147,7 @@ _Last sequenced: 2026-11-01T21:40:23.338288Z · model: claude-opus-5-5 · open: 
 | 143 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
 | 144 | PAN-4302 | M | high | ok |  |  | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
 | 145 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
-| 146 | PAN-4734 | L | high | ok |  | PAN-4652 | pan start --remote work agents launch as linked conversations on the Fly VM, live at home; closes PAN-1775. After PAN-4652. |
+| 146 | PAN-4734 | L | high | ok |  |  | pan start --remote work agents launch as linked conversations on the Fly VM, live at home; closes PAN-1775. Unblocked. |
 | 147 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
 | 148 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
 | 149 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
@@ -224,7 +224,6 @@ _Last sequenced: 2026-11-01T21:40:23.338288Z · model: claude-opus-5-5 · open: 
 | 220 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 221 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 222 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 223 | PAN-4727 | L | medium | ok |  |  | In pipeline: gstack skill pack with full runtime via eltmon/gstack fork pack mode; on/off per scope, clean removal. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
 | 227 | PAN-4646 | S | medium | needs-refinement |  |  | Interactive mockup for machine-aware conversation UI (title bar, chips, offline banner); D-6 needs it approved first. Body pending. |
@@ -275,9 +274,9 @@ _Last sequenced: 2026-11-01T21:40:23.338288Z · model: claude-opus-5-5 · open: 
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
-| 276 | PAN-4651 | L | medium | ok |  | PAN-4652 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
+| 276 | PAN-4651 | L | medium | ok |  |  | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
 | 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
-| 278 | PAN-4730 | L | medium | ok |  | PAN-4727 | Opt-in gstack browser/design/PDF runtime so 21 needs-binary skills (qa, browse) mount; blocked on PAN-4727; scope open for PRD |
+| 278 | PAN-4730 | L | medium | ok |  |  | Opt-in gstack browser/design/PDF runtime so 21 needs-binary skills (qa, browse) mount; blocked on PAN-4727; scope open for PRD |
 | 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
@@ -565,7 +564,6 @@ _Last sequenced: 2026-11-01T21:40:23.338288Z · model: claude-opus-5-5 · open: 
 | 564 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
 | 565 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
 | 566 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 567 | PAN-4652 | L | medium | ok |  |  | Fly VMs as machines: pan serve on the VM, linked at spawn; link foundation PAN-4645 merged, so W-FLY2 is unblocked. Body pending. |
 | 568 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 569 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
 | 570 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
@@ -601,7 +599,7 @@ _Last sequenced: 2026-11-01T21:40:23.338288Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 603 | PAN-4296 | L | medium | ok |  | PAN-1676, PAN-4652 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
+| 603 | PAN-4296 | L | medium | ok |  | PAN-1676 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
 | 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -662,7 +660,7 @@ _Last sequenced: 2026-11-01T21:40:23.338288Z · model: claude-opus-5-5 · open: 
 | 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 666 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651, PAN-4652 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
+| 666 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
@@ -1196,10 +1194,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T21:40:23.338288Z",
+  "generatedAt": "2026-11-01T21:45:20.462512Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 861,
+  "openCount": 859,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -4531,9 +4529,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4652"
-      ],
+      "dependsOn": [],
       "why": "Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending.",
       "rationale": "Rank held: dependency PAN-4645 closed as completed on 2026-11-01; PAN-4650 still gates this issue, so order is unchanged.",
       "gate": "auto",
@@ -8054,19 +8050,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "planning": "auto"
     },
     {
-      "issue": "PAN-4652",
-      "rank": 567,
-      "size": "L",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fly VMs as machines: pan serve on the VM, linked at spawn; link foundation PAN-4645 merged, so W-FLY2 is unblocked. Body pending.",
-      "rationale": "Rank held: its only dependency PAN-4645 closed as completed on 2026-11-01, so it is now unblocked, but the body is still a placeholder (needs-refinement).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1754",
       "rank": 568,
       "size": "M",
@@ -8498,8 +8481,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 34,
       "condition": "ok",
       "dependsOn": [
-        "PAN-1676",
-        "PAN-4652"
+        "PAN-1676"
       ],
       "why": "Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time",
       "rationale": "Rank held; gained dependsOn PAN-1676 from the build order in PAN-2350's 2026-09-28 rebaseline.",
@@ -9249,11 +9231,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 38,
       "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-4651",
-        "PAN-4652"
+        "PAN-4651"
       ],
       "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
-      "rationale": "Rank 668->670: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
+      "rationale": "Rank held: dependency PAN-4652 closed as completed on 2026-11-01; PAN-4651 still gates this issue, so order is unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11826,28 +11807,13 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "planning": "auto"
     },
     {
-      "issue": "PAN-4727",
-      "rank": 223,
-      "size": "L",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: gstack skill pack with full runtime via eltmon/gstack fork pack mode; on/off per scope, clean removal.",
-      "rationale": "New issue already in planning, so it is pinned in a free mid-tier slot next to the other in-pipeline medium work. It is self-contained feature work on the skill-pack system with clear operator decisions and acceptance criteria, but needs a fork-side pack mode first, so it sizes L.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4730",
       "rank": 278,
       "size": "L",
       "importance": "medium",
       "score": 45,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4727"
-      ],
+      "dependsOn": [],
       "why": "Opt-in gstack browser/design/PDF runtime so 21 needs-binary skills (qa, browse) mount; blocked on PAN-4727; scope open for PRD",
       "rationale": "New issue: follow-up to in-pipeline PAN-4727 (blocked by it), slotted into a free rank among comparable medium features.",
       "gate": "auto",
@@ -11873,11 +11839,9 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "importance": "high",
       "score": 76,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4652"
-      ],
-      "why": "pan start --remote work agents launch as linked conversations on the Fly VM, live at home; closes PAN-1775. After PAN-4652.",
-      "rationale": "New issue split from in-pipeline PAN-4652 that takes over PAN-1775's outcome (remote work agents visible live in the issue tree), so it inherits PAN-1775's rank slot. Blocked on PAN-4652, which is being worked now.",
+      "dependsOn": [],
+      "why": "pan start --remote work agents launch as linked conversations on the Fly VM, live at home; closes PAN-1775. Unblocked.",
+      "rationale": "Rank held: its only dependency PAN-4652 (Fly VMs as machines) closed as completed on 2026-11-01, so this issue is now unblocked and ready to plan.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13097,13 +13061,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 1
     },
     {
-      "from": "PAN-2350",
-      "to": "PAN-4652",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4655",
       "to": "PAN-1485",
       "type": "informs",
@@ -13111,29 +13068,8 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 1
     },
     {
-      "from": "PAN-4652",
-      "to": "PAN-4651",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4651",
       "to": "PAN-4638",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4638",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4296",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
@@ -13165,13 +13101,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4685",
-      "to": "PAN-4652",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-4685",
@@ -13216,23 +13145,9 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 0.6
     },
     {
-      "from": "PAN-4727",
-      "to": "PAN-4730",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4651",
       "to": "PAN-4405",
       "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4734",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13242,41 +13157,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-1775",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4739",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4738",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4740",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4741",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
     },
     {
       "from": "PAN-4740",
