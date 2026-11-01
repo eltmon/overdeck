@@ -1,13 +1,17 @@
-import type { MouseEvent, ReactNode } from 'react';
+import { useContext, type MouseEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { resolveTrackerIssueId, type TrackerIssueProject, type TrackerIssueUrlRef } from '@overdeck/contracts';
 import { useDashboardStore } from '../../lib/store';
+import { IssueDrawerAvailableContext } from '../drawer/issueDrawerAvailableContext';
 
 /**
  * PAN-4714: a tracker issue link inside a conversation transcript opens that
  * issue's drawer on a plain click. Modified clicks, middle-click and the context
  * menu keep the browser's new-tab behaviour; a link no registered project
- * resolves stays a plain link.
+ * resolves stays a plain link. In a host that doesn't mount `<IssueDrawer />`
+ * (the standalone pop-outs, `/m`), `IssueDrawerAvailableContext` is `false`
+ * and the link stays a plain anchor — a review fix after PAN-4714's first
+ * cycle found the click was otherwise swallowed there.
  */
 export function TranscriptIssueLink({ href, issueRef, className, children }: {
   href: string;
@@ -15,6 +19,7 @@ export function TranscriptIssueLink({ href, issueRef, className, children }: {
   className?: string;
   children: ReactNode;
 }) {
+  const drawerAvailable = useContext(IssueDrawerAvailableContext);
   const openIssue = useDashboardStore((s) => s.openIssue);
   const { data } = useQuery<unknown>({
     queryKey: ['registered-projects'],
@@ -24,7 +29,15 @@ export function TranscriptIssueLink({ href, issueRef, className, children }: {
       return res.json();
     },
     staleTime: 60_000,
+    enabled: drawerAvailable,
   });
+  if (!drawerAvailable) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+        {children}
+      </a>
+    );
+  }
   const projects = Array.isArray(data) ? (data as TrackerIssueProject[]) : [];
   const issueId = resolveTrackerIssueId(issueRef, projects);
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {

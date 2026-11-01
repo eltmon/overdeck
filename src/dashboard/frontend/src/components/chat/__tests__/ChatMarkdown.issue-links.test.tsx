@@ -5,32 +5,38 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // PAN-4714: a plain click on a resolvable tracker issue link inside a
 // conversation transcript opens the issue drawer instead of a new tab;
-// modified clicks, unresolved links, PR links and links outside a
-// conversation keep today's new-tab behaviour.
+// modified clicks, unresolved links, PR links, links outside a conversation,
+// and links in a host that doesn't mount <IssueDrawer /> keep today's
+// new-tab behaviour.
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../../lib/wsTransport', () => ({ getTransport: () => ({ request: vi.fn(), resolveFilePathExists: vi.fn() }) }));
 
 import { ChatMarkdown } from '../ChatMarkdown';
 import { ConversationPullRequestProvider } from '../TranscriptPullRequestLink';
+import { IssueDrawerAvailableContext } from '../../drawer/issueDrawerAvailableContext';
 import { useDashboardStore } from '../../../lib/store';
 
 const REGISTERED_PROJECTS = [
   { key: 'panopticon-cli', name: 'Overdeck', path: '/p', linearTeam: 'PAN', githubRepo: 'eltmon/overdeck', tracker: 'github' },
   { key: 'lexerra', name: 'Lexerra', path: '/l', linearTeam: 'LEX', githubRepo: 'eltmon/lexerra', tracker: 'linear' },
+  { key: 'mind-your-now', name: 'MYN', path: '/m', linearTeam: 'MIN', githubRepo: null, tracker: 'linear' },
 ];
 
 const originalOpenIssue = useDashboardStore.getState().openIssue;
 const openIssueMock = vi.fn();
 const fetchMock = vi.fn();
 
-function renderIn(children: ReactNode, inConversation = true) {
+function renderIn(children: ReactNode, { inConversation = true, drawerAvailable = true } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const tree = inConversation
+    ? <ConversationPullRequestProvider conversation={{ name: 'conv-a', pullRequest: null }}>{children}</ConversationPullRequestProvider>
+    : children;
   render(
     <QueryClientProvider client={client}>
-      {inConversation
-        ? <ConversationPullRequestProvider conversation={{ name: 'conv-a', pullRequest: null }}>{children}</ConversationPullRequestProvider>
-        : children}
+      <IssueDrawerAvailableContext.Provider value={drawerAvailable}>
+        {tree}
+      </IssueDrawerAvailableContext.Provider>
     </QueryClientProvider>,
   );
 }
@@ -67,13 +73,29 @@ describe('ChatMarkdown issue links (PAN-4714)', () => {
     expect(window.open).not.toHaveBeenCalled();
   });
 
-  it('keeps the new tab on Ctrl-click and Cmd-click', async () => {
+  it('opens the issue drawer on a plain click of a resolvable Linear URL', async () => {
+    renderIn(<ChatMarkdown text="See [MIN-663](https://linear.app/mindyournow/issue/min-663/some-title) please." />);
+    const link = await screen.findByRole('link', { name: 'MIN-663' });
+    await waitFor(() => expect(link).toHaveAttribute('data-issue-id', 'MIN-663'));
+
+    expect(fireEvent.click(link)).toBe(false);
+
+    expect(openIssueMock).toHaveBeenCalledOnce();
+    expect(openIssueMock).toHaveBeenCalledWith('MIN-663', 'overview');
+  });
+
+  it('keeps the new tab on every modifier and middle-click', async () => {
     renderIn(<ChatMarkdown text="See [PAN-4645](https://github.com/eltmon/overdeck/issues/4645) please." />);
     const link = await screen.findByRole('link', { name: 'PAN-4645' });
     await waitFor(() => expect(link).toHaveAttribute('data-issue-id', 'PAN-4645'));
 
     expect(fireEvent.click(link, { ctrlKey: true })).toBe(true);
     expect(fireEvent.click(link, { metaKey: true })).toBe(true);
+    expect(fireEvent.click(link, { shiftKey: true })).toBe(true);
+    expect(fireEvent.click(link, { altKey: true })).toBe(true);
+    // Browsers fire `auxclick`, not `click`, for the middle button; `onClick`
+    // never runs, so the default anchor navigation always applies.
+    expect(fireEvent(link, new MouseEvent('auxclick', { bubbles: true, button: 1 }))).toBe(true);
 
     expect(openIssueMock).not.toHaveBeenCalled();
     expect(link).toHaveAttribute('target', '_blank');
@@ -85,9 +107,13 @@ describe('ChatMarkdown issue links (PAN-4714)', () => {
       <ChatMarkdown text={[
         '[unregistered](https://github.com/someone/else/issues/7)',
         '[mismatch](https://github.com/eltmon/lexerra/issues/1)',
+        '[control](https://github.com/eltmon/overdeck/issues/4645)',
       ].join(' ')} />,
     );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/registered-projects'));
+    const control = await screen.findByRole('link', { name: 'control' });
+    // The resolvable control link proves the registered-projects query has
+    // resolved before asserting the other two links stayed unresolved.
+    await waitFor(() => expect(control).toHaveAttribute('data-issue-id', 'PAN-4645'));
 
     const unregistered = screen.getByRole('link', { name: 'unregistered' });
     const mismatch = screen.getByRole('link', { name: 'mismatch' });
@@ -111,10 +137,20 @@ describe('ChatMarkdown issue links (PAN-4714)', () => {
   });
 
   it('keeps a plain link outside a conversation', async () => {
-    renderIn(<ChatMarkdown text="See [PAN-4645](https://github.com/eltmon/overdeck/issues/4645) please." />, false);
+    renderIn(<ChatMarkdown text="See [PAN-4645](https://github.com/eltmon/overdeck/issues/4645) please." />, { inConversation: false });
     const link = screen.getByRole('link', { name: 'PAN-4645' });
 
     expect(link).not.toHaveAttribute('data-issue-id');
+    expect(fireEvent.click(link)).toBe(true);
+    expect(openIssueMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps a plain link in a conversation host with no issue drawer mounted', async () => {
+    renderIn(<ChatMarkdown text="See [PAN-4645](https://github.com/eltmon/overdeck/issues/4645) please." />, { drawerAvailable: false });
+    const link = screen.getByRole('link', { name: 'PAN-4645' });
+
+    expect(link).not.toHaveAttribute('data-issue-id');
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/registered-projects');
     expect(fireEvent.click(link)).toBe(true);
     expect(openIssueMock).not.toHaveBeenCalled();
   });
