@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4296",
   "created": "2026-11-01T21:43:56.125Z",
-  "updated": "2026-11-01T21:49:49.883Z",
+  "updated": "2026-11-01T21:50:05.842Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4296",
       "claimedAt": "2026-11-01T21:46:27.023Z",
       "doneAt": "2026-11-01T21:49:49.883Z"
+    },
+    "wi4-provision-codex": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4296",
+      "claimedAt": "2026-11-01T21:50:05.842Z"
     }
   }
 }
