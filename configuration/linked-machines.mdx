@@ -81,12 +81,54 @@ it answered last time.
 | **Online** | Heartbeats arrive every 15 s over the channel. |
 | **Connecting** | A heartbeat is late (17.5 s); every route is being tried while the old channel stays open. |
 | **Offline** | No heartbeat for 20 s and no route answered. Retries back off from 1 s to 45 s; the link comes back within a minute of the other machine returning. |
-| **Unsupported** | The other machine runs an Overdeck without machine links, or another link protocol. The state names the version to install; **Reconnect** tries again. |
+| **Unsupported** | The other machine runs an Overdeck without machine links, or another link protocol. The state names the exact version, where to install it, and the `npm install -g @overdeck/core@<version>` command. It is not retried until **Reconnect** or a restart. |
 | **Revoked** | The other machine removed this machine's access. Link again with a new pairing link. |
 
 When a link drops, the row says why. **froze** means the other dashboard's event loop
 stalled (it reports its own stalls in the next heartbeat, so a frozen machine is told
 apart from a dead network); **network** means nothing arrived.
+
+## Fleet versions and Update all
+
+**Settings → Anywhere → Fleet versions** (or `pan machines versions`) shows one row per
+machine, this machine first: the Overdeck version and the version of each harness CLI
+installed there (Claude Code, Codex CLI, Kimi Code CLI, OpenCode, Muse Code, Prime Agent,
+OhMyPi). A linked machine that is not online shows its last known Overdeck version. A
+linked machine on an Overdeck from before fleet updates shows the version to install and
+its command.
+
+**Update all** (or `pan machines update`) asks every online machine to update itself:
+
+1. **Wait for running turns.** Each machine waits until no agent or conversation is in the
+   middle of a turn there, checking every 5 s. It never starts on its own while a turn
+   works. After 30 minutes the row says it is still waiting. **Update now** on that row
+   (or `pan machines update --now`) starts it at once; **Cancel** (or
+   `pan machines update --cancel`) stops a waiting update.
+2. **Update each harness CLI** with its own command. A CLI installed with npm is updated
+   with npm into the same prefix. A failure in one CLI does not stop the next; the row
+   shows the command's output.
+3. **Update Overdeck last** on a machine where it was installed with
+   `npm install -g @overdeck/core`, then restart that machine's dashboard. A repository
+   checkout (`pan reload` deployments) or the desktop app keeps its Overdeck and still
+   updates the CLIs.
+
+Each version shows `before → after` once it changed. Update all always installs the
+latest version; it never lets anyone pick a version.
+
+| CLI | Update command | Notes |
+| --- | --- | --- |
+| Claude Code | `claude update` | npm installs: `npm install -g --prefix <prefix> @anthropic-ai/claude-code@latest` |
+| Codex CLI | `codex update` | npm installs: `npm install -g --prefix <prefix> @openai/codex@latest` |
+| Kimi Code CLI | `kimi upgrade --yes` | |
+| OpenCode | `opencode upgrade` | npm installs: `npm install -g --prefix <prefix> opencode-ai@latest` |
+| Muse Code | none | Listed with its version; Overdeck does not update it. |
+| Prime Agent | none | Overdeck pins it to 0.8, so it is not updated to latest. |
+| OhMyPi | none | Listed with its version; Overdeck does not update it. |
+
+Homebrew installs, Windows, and an npm prefix Overdeck cannot write show the command to
+run yourself instead of running it. Offline, connecting, unsupported and revoked machines
+are skipped, and so is a machine reached over an agent-fenced link: Update all needs an
+operator-level link.
 
 ## Unlink
 
@@ -100,6 +142,14 @@ connections.
 
 - **Unsupported**: update Overdeck on the machine the state names, then **Reconnect**.
 - **Revoked**: the other side unlinked. Create a new pairing link there and link again.
+- **Update all skipped a machine**: the toast and `pan machines update` name the reason.
+  An offline or unsupported machine is never updated; bring it online (or install the
+  named Overdeck version) and run Update all again. "agent-fenced" means this machine's
+  link to it is agent-fenced; link again at operator level to update it from here.
+- **A CLI update failed**: the row shows `Failed: <CLI>`, and the Update cell's tooltip
+  (or `pan machines versions --json`) holds the command's output. Fix the cause on that
+  machine (often permissions on the npm prefix) and run Update all again; the other CLIs
+  were still updated.
 - **Offline with "ECONNREFUSED"**: the other dashboard is not running, or no advertised
   address reaches it from here. Add a route you know works.
 - **Offline with "closed the connection before proving the pinned machine key"**: every
