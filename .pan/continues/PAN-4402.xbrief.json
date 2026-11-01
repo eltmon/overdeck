@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4402",
   "created": "2026-11-01T05:03:16.844Z",
-  "updated": "2026-11-01T05:39:29.527Z",
+  "updated": "2026-11-01T05:39:44.177Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "machine-client.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T05:39:29.527Z"
+    },
+    "machine-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:39:44.177Z"
     }
   }
 }
