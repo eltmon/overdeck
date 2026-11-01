@@ -82,6 +82,18 @@ const deft = (): MountPack => ({
   skills: [{ name: 'glossary', dir: 'content/skills/deft-directive-glossary' }],
 });
 const beta = (): MountPack => ({ id: 'beta', commit: COMMIT_B, root: rootB, skills: [{ name: 'three', dir: 'skills/three' }] });
+const COMMIT_G = 'c'.repeat(40);
+const rootGstack = join(scratch, 'gstack-render');
+mkdirSync(join(rootGstack, 'review'), { recursive: true });
+const GSTACK_REVIEW_MD = `---\nname: review\ndescription: Review.\n---\nRun ${rootGstack}/bin/gstack-skill-start --skill "review"\n`;
+writeFileSync(join(rootGstack, 'review', 'SKILL.md'), GSTACK_REVIEW_MD);
+const gstack = (): MountPack => ({
+  id: 'gstack',
+  commit: COMMIT_G,
+  root: rootGstack,
+  transform: 'gstack-runtime',
+  skills: [{ name: 'review', dir: 'review' }],
+});
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -168,6 +180,30 @@ describe('buildMount', () => {
   it('covers the transform in the hash', () => {
     const { transform: _transform, ...plain } = deft();
     expect(mountHash({ packs: [deft()] })).not.toBe(mountHash({ packs: [plain] }));
+  });
+
+  it('mounts gstack-runtime skills verbatim from the render root', async () => {
+    const mount = await buildMount({ packs: [gstack()] });
+    if (!mount) throw new Error('expected a mount');
+    expect(readFileSync(join(mount.path, 'plugins', 'gstack', 'skills', 'review', 'SKILL.md'), 'utf8')).toBe(GSTACK_REVIEW_MD);
+  });
+
+  it('covers the gstack-runtime transform and its render version in the hash', async () => {
+    const { transform: _transform, ...plain } = gstack();
+    const hash = mountHash({ packs: [gstack()] });
+    expect(hash).not.toBe(mountHash({ packs: [plain] }));
+    vi.resetModules();
+    vi.doMock('../gstack.js', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('../gstack.js')>()),
+      GSTACK_RENDER_VERSION: 2,
+    }));
+    try {
+      const fresh = await import('../mount.js');
+      expect(fresh.mountHash({ packs: [gstack()] })).not.toBe(hash);
+    } finally {
+      vi.doUnmock('../gstack.js');
+      vi.resetModules();
+    }
   });
 
   it('rejects an unknown transform', async () => {

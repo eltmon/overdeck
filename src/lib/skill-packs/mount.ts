@@ -19,6 +19,7 @@ import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, 
 import { dirname, isAbsolute, join, posix } from 'node:path';
 import { getOverdeckHome } from '../paths.js';
 import { applyDeftHostNotice, DEFT_HOST_NOTICE_VERSION } from './deft.js';
+import { GSTACK_RENDER_VERSION } from './gstack.js';
 import { PACK_ID_PATTERN, packsHome } from './sources.js';
 
 export const MOUNT_FORMAT_VERSION = 2;
@@ -31,13 +32,24 @@ export const CLAUDE_PLUGIN_LINK_NAME = 'skill-packs';
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 
-/** `deft-readonly`: rename each SKILL.md to the stripped name and insert the Deft host notice. */
-export type MountTransform = 'deft-readonly';
+/**
+ * `deft-readonly`: rename each SKILL.md to the stripped name and insert the Deft host notice.
+ * `gstack-runtime`: copy verbatim from the gstack render root (PAN-4727); the tag keys the hash on
+ * GSTACK_RENDER_VERSION.
+ */
+export type MountTransform = 'deft-readonly' | 'gstack-runtime';
+
+/** The transform's part of a mount hash entry, versioned so a contract change yields new mounts. */
+function transformTag(transform: MountTransform | undefined): string {
+  if (transform === 'deft-readonly') return `deft-readonly.${DEFT_HOST_NOTICE_VERSION}`;
+  if (transform === 'gstack-runtime') return `gstack-runtime.${GSTACK_RENDER_VERSION}`;
+  return '';
+}
 
 export interface MountPack {
   id: string;
   commit: string;
-  /** Extraction dir of the pack at `commit`. */
+  /** Extraction dir of the pack at `commit` (the render dir for `gstack-runtime`). */
   root: string;
   transform?: MountTransform;
   skills: Array<{ name: string; dir: string }>;
@@ -60,10 +72,7 @@ export function mountsDir(): string {
 export function mountHash(selection: MountSelection): string {
   const entries = selection.packs
     .flatMap((pack) =>
-      pack.skills.map(
-        (skill) =>
-          `${pack.id}@${pack.commit}:${skill.name}:${pack.transform ? `${pack.transform}.${DEFT_HOST_NOTICE_VERSION}` : ''}`,
-      ),
+      pack.skills.map((skill) => `${pack.id}@${pack.commit}:${skill.name}:${transformTag(pack.transform)}`),
     )
     .sort();
   return createHash('sha256').update(JSON.stringify({ v: MOUNT_FORMAT_VERSION, s: entries })).digest('hex');
@@ -72,7 +81,7 @@ export function mountHash(selection: MountSelection): string {
 function assertMountPack(pack: MountPack): void {
   if (!PACK_ID_PATTERN.test(pack.id)) throw new Error(`invalid pack id: ${JSON.stringify(pack.id)}`);
   if (!COMMIT_PATTERN.test(pack.commit)) throw new Error(`invalid pack commit: ${JSON.stringify(pack.commit)}`);
-  if (pack.transform !== undefined && pack.transform !== 'deft-readonly') {
+  if (pack.transform !== undefined && pack.transform !== 'deft-readonly' && pack.transform !== 'gstack-runtime') {
     throw new Error(`invalid pack transform: ${JSON.stringify(pack.transform)}`);
   }
   for (const skill of pack.skills) {
