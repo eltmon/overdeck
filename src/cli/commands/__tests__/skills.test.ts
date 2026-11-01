@@ -711,14 +711,12 @@ describe('pan skills pack', () => {
     expect(errors.join('\n')).toContain('pack b: unreachable');
   });
 
-  it('skips orphaned pack state with a warning when the registry cannot be read', async () => {
-    mocks.gcMounts.mockResolvedValue({ removedMounts: [], removedLinks: [], referencedMounts: [] });
-    mocks.renderRootsUsedBy.mockResolvedValue(new Set());
+  it('aborts before removing anything when the registry cannot be read', async () => {
     mocks.readPackRegistry.mockResolvedValue({ readable: false, packs: new Map() });
-    mocks.gcPackRenders.mockResolvedValue({ removedRenders: [], removedStates: [] });
-    await run('pack', 'gc');
-    expect(mocks.gcPackRenders).toHaveBeenCalledWith(expect.objectContaining({ registryReadable: false }));
-    expect(errors.join('\n')).toContain('Skipped orphaned pack state: the global config.yaml could not be read or parsed.');
+    await expect(run('pack', 'gc')).rejects.toThrow('exit 1');
+    expect(mocks.gcMounts).not.toHaveBeenCalled();
+    expect(mocks.gcPackRenders).not.toHaveBeenCalled();
+    expect(errors.join('\n')).toContain('Nothing removed: the global config.yaml could not be read or parsed');
   });
 
   it('reports sweep failures after removing a pack and exits 1', async () => {

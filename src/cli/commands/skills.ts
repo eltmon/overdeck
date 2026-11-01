@@ -490,13 +490,16 @@ export async function skillsPackGcCommand(options: PackGcOptions): Promise<void>
     import('../../lib/skill-packs/render.js'),
     import('../../lib/skill-packs/sources.js'),
   ]);
-  const maxAgeMs = days * 24 * 60 * 60 * 1000;
-  const { removedMounts, removedLinks, referencedMounts } = await gcMounts({ maxAgeMs });
-  // Strict read: a config that does not parse must never make a registered pack look orphaned.
+  // Strict read first: a config that cannot be read or parsed must never make a registered pack look
+  // orphaned, so gc stops before it removes anything.
   const registry = await readPackRegistry();
   if (!registry.readable) {
-    console.error(chalk.yellow('Skipped orphaned pack state: the global config.yaml could not be read or parsed.'));
+    console.error(chalk.red('Nothing removed: the global config.yaml could not be read or parsed, so registered packs are unknown.'));
+    console.error(chalk.red('Fix config.yaml, then run pan skills pack gc again.'));
+    process.exit(1);
   }
+  const maxAgeMs = days * 24 * 60 * 60 * 1000;
+  const { removedMounts, removedLinks, referencedMounts } = await gcMounts({ maxAgeMs });
   // A render that a linked mount's skills call into stays, whatever its age.
   const keep = await renderRootsUsedBy(referencedMounts);
   const { removedRenders, removedStates } = await gcPackRenders({
