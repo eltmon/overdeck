@@ -15,26 +15,34 @@ export function syntaxThemeName(theme: ColorTheme): string {
   return `overdeck-${theme.id}-${fnv1a32(JSON.stringify(theme.syntax)).toString(36)}`;
 }
 
-const registeredThemeNames = new Set<string>();
+// Cache the in-flight registration promise per name (not just a "done" flag)
+// so two concurrent callers for the same new theme share one registration
+// instead of both racing `registerCustomTheme`, and a rejected import drops
+// its entry so the next call retries instead of serving a dead promise
+// (PAN-4644 review).
+const registrations = new Map<string, Promise<string>>();
 
 /** Registers the theme's syntax colors with @pierre/diffs's shared highlighter, once per name. */
-export async function ensureSyntaxTheme(theme: ColorTheme): Promise<string> {
+export function ensureSyntaxTheme(theme: ColorTheme): Promise<string> {
   const name = syntaxThemeName(theme);
-  if (name === FALLBACK_THEME_NAME || registeredThemeNames.has(name)) return name;
+  if (name === FALLBACK_THEME_NAME) return Promise.resolve(name);
 
-  const { registerCustomTheme } = await import('@pierre/diffs');
-  const syntax = theme.syntax!;
-  registerCustomTheme(name, async () => ({
-    name,
-    type: theme.type,
-    colors: syntax.colors ?? {},
-    tokenColors: syntax.tokenColors,
-  }));
-  // Mark registered only after registerCustomTheme succeeds — if the dynamic
-  // import above throws, the name must stay unregistered so a later call
-  // retries it instead of serving a permanently-unregistered theme name.
-  registeredThemeNames.add(name);
-  return name;
+  let pending = registrations.get(name);
+  if (pending === undefined) {
+    const syntax = theme.syntax!;
+    pending = import('@pierre/diffs').then(({ registerCustomTheme }) => {
+      registerCustomTheme(name, async () => ({
+        name,
+        type: theme.type,
+        colors: syntax.colors ?? {},
+        tokenColors: syntax.tokenColors,
+      }));
+      return name;
+    });
+    pending.catch(() => registrations.delete(name));
+    registrations.set(name, pending);
+  }
+  return pending;
 }
 
 /** Highlights `code` with the given (already-registered) theme name. */

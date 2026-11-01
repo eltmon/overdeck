@@ -81,6 +81,22 @@ describe('color theme store', () => {
     expect(await getColorTheme('constructor')).toBeUndefined();
   });
 
+  it('two concurrent saves of the same name never collide on one id (PAN-4644 review)', async () => {
+    const { saveColorTheme } = await import('../store.js');
+    const [first, second] = await Promise.all([
+      saveColorTheme({ name: 'Ayu Dark', type: 'dark' }),
+      saveColorTheme({ name: 'Ayu Dark', type: 'dark' }),
+    ]);
+    if ('errors' in first || 'errors' in second) throw new Error('expected saved themes');
+    expect(first.theme.id).not.toBe(second.theme.id);
+    expect([first.theme.id, second.theme.id].sort()).toEqual(['ayu-dark', 'ayu-dark-2']);
+
+    const onDisk = JSON.parse(readFileSync(join(testHome, 'themes', 'ayu-dark.json'), 'utf8'));
+    expect(onDisk.name).toBe('Ayu Dark');
+    const onDisk2 = JSON.parse(readFileSync(join(testHome, 'themes', 'ayu-dark-2.json'), 'utf8'));
+    expect(onDisk2.name).toBe('Ayu Dark');
+  });
+
   it('a 64-char base name collision gets a truncated, still-valid id (never exceeds 64 chars)', async () => {
     const { saveColorTheme } = await import('../store.js');
     const longName = 'a'.repeat(64);

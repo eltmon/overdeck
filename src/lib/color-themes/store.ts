@@ -1,4 +1,5 @@
-import { readdir, readFile, stat } from 'fs/promises';
+import { randomBytes } from 'crypto';
+import { link, mkdir, readdir, readFile, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import {
   BUILTIN_COLOR_THEMES,
@@ -9,7 +10,6 @@ import {
   type ColorTheme,
 } from '@overdeck/contracts';
 import { getOverdeckHome } from '../paths.js';
-import { writeFileAtomic } from '../model-presets/state.js';
 
 export function getColorThemesDir(): string {
   return join(getOverdeckHome(), 'themes');
@@ -17,16 +17,6 @@ export function getColorThemesDir(): string {
 
 function themeFilePath(id: string): string {
   return join(getColorThemesDir(), `${id}.json`);
-}
-
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw err;
-  }
 }
 
 /** Reads the themes directory fresh on every call — built-ins first, then user themes sorted by id. */
@@ -93,22 +83,39 @@ export async function getColorTheme(id: string): Promise<ColorTheme | undefined>
   return result.theme;
 }
 
-async function nextAvailableId(baseId: string): Promise<string> {
-  if (!RESERVED_COLOR_THEME_IDS.includes(baseId) && !(await fileExists(themeFilePath(baseId)))) {
-    return baseId;
-  }
-  let suffix = 2;
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    // Truncate the base so `<base>-<suffix>` never exceeds the 64-char id cap
-    // (COLOR_THEME_ID_RE) — slugifyThemeId alone can produce a 64-char id,
-    // which a bare "-2" suffix would push past the limit.
-    const suffixText = `-${suffix}`;
-    const candidate = `${baseId.slice(0, 64 - suffixText.length)}${suffixText}`;
-    if (!RESERVED_COLOR_THEME_IDS.includes(candidate) && !(await fileExists(themeFilePath(candidate)))) {
-      return candidate;
+/**
+ * Claims an unused id for a new theme file and writes `text` to it in one
+ * atomic step. `link()` fails with EEXIST if the target already exists, so
+ * probing and writing can't be split into separate check-then-write calls —
+ * closing a race where two concurrent saves both see a candidate id as free
+ * and the second write silently replaces the first (PAN-4644 review).
+ */
+async function claimThemeFile(baseId: string, text: string, mode: number): Promise<string> {
+  const dir = getColorThemesDir();
+  await mkdir(dir, { recursive: true });
+  const tempPath = join(dir, `.tmp-${process.pid}-${randomBytes(4).toString('hex')}`);
+  await writeFile(tempPath, text, { mode });
+  try {
+    let suffix = 1;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      // Truncate the base so `<base>-<suffix>` never exceeds the 64-char id cap
+      // (COLOR_THEME_ID_RE) — slugifyThemeId alone can produce a 64-char id,
+      // which a bare "-2" suffix would push past the limit.
+      const suffixText = suffix === 1 ? '' : `-${suffix}`;
+      const candidate = suffix === 1 ? baseId : `${baseId.slice(0, 64 - suffixText.length)}${suffixText}`;
+      if (!RESERVED_COLOR_THEME_IDS.includes(candidate)) {
+        try {
+          await link(tempPath, themeFilePath(candidate));
+          return candidate;
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+        }
+      }
+      suffix += 1;
     }
-    suffix += 1;
+  } finally {
+    await rm(tempPath, { force: true });
   }
 }
 
@@ -125,13 +132,10 @@ export async function saveColorTheme(
   if ('errors' in probe) return probe;
 
   const baseId = opts.preferredId ?? slugifyThemeId(probe.theme.name);
-  const id = await nextAvailableId(baseId);
+  const { id: _id, builtin: _builtin, ...fileContents } = probe.theme;
+  const text = `${JSON.stringify(fileContents, null, 2)}\n`;
 
-  const result = normalizeColorTheme(file, id);
-  if ('errors' in result) return result;
+  const id = await claimThemeFile(baseId, text, 0o644);
 
-  const { id: _id, builtin: _builtin, ...fileContents } = result.theme;
-  await writeFileAtomic(themeFilePath(id), `${JSON.stringify(fileContents, null, 2)}\n`, 0o644);
-
-  return result;
+  return { theme: { ...probe.theme, id }, warnings: probe.warnings };
 }

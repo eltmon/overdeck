@@ -101,6 +101,10 @@ describe("readableForeground", () => {
   it("returns white text on a dark background", () => {
     expect(readableForeground("#000000")).toBe("#ffffff")
   })
+
+  it("picks the higher-contrast color by ratio, not a flat luminance cutoff (#888888 -> black, ~5.9:1 beats white's ~3.5:1)", () => {
+    expect(readableForeground("#888888")).toBe("#000000")
+  })
 })
 
 describe("builtinFor", () => {

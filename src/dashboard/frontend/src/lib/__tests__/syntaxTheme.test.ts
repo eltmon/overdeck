@@ -68,6 +68,15 @@ describe('ensureSyntaxTheme', () => {
     expect(registerCustomThemeMock).toHaveBeenCalledTimes(2);
   });
 
+  it('two concurrent calls for a new theme share one registration instead of racing it (PAN-4644 review)', async () => {
+    const concurrent = theme({ id: 'concurrent-theme', type: 'dark', syntax: { tokenColors: [{ settings: { foreground: '#666666' } }] } });
+
+    const [first, second] = await Promise.all([ensureSyntaxTheme(concurrent), ensureSyntaxTheme(concurrent)]);
+
+    expect(first).toBe(second);
+    expect(registerCustomThemeMock).toHaveBeenCalledTimes(1);
+  });
+
   it('a failed registration is never marked registered, so a later call retries it', async () => {
     const flaky = theme({ id: 'flaky', type: 'dark', syntax: { tokenColors: [{ settings: { foreground: '#555555' } }] } });
     registerCustomThemeMock.mockImplementationOnce(() => { throw new Error('registration failed'); });

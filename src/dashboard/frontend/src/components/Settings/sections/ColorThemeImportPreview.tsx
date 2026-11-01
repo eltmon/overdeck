@@ -31,7 +31,7 @@ function ThemePreviewCard({ theme }: { theme: ColorTheme }) {
     let cancelled = false;
     void ensureSyntaxTheme(theme).then((name) => highlight(SAMPLE_CODE, 'ts', name)).then((html) => {
       if (!cancelled) setSampleHtml(html);
-    });
+    }).catch(() => { /* registration or highlighting failed; keep the unhighlighted sample */ });
     return () => { cancelled = true; };
   }, [theme]);
 

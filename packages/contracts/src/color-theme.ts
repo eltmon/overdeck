@@ -162,7 +162,7 @@ export function toOpaqueHex(hex: string): string {
   return lower
 }
 
-/** Relative-luminance-based readable text color for a background hex. */
+/** WCAG-contrast-based readable text color for a background hex: whichever of black/white has the higher contrast ratio. */
 export function readableForeground(hex: string): string {
   const opaque = toOpaqueHex(hex)
   const r = parseInt(opaque.slice(1, 3), 16) / 255
@@ -170,7 +170,13 @@ export function readableForeground(hex: string): string {
   const b = parseInt(opaque.slice(5, 7), 16) / 255
   const channel = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))
   const luminance = 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
-  return luminance > 0.5 ? "#000000" : "#ffffff"
+  // WCAG contrast ratio: (lighter + 0.05) / (darker + 0.05). Black has
+  // luminance 0, white has luminance 1 — compare both ratios instead of a
+  // flat 0.5 cutoff, which picks white over black for e.g. #888888 even
+  // though black has the higher actual contrast (PAN-4644 review).
+  const contrastWithWhite = (1 + 0.05) / (luminance + 0.05)
+  const contrastWithBlack = (luminance + 0.05) / (0 + 0.05)
+  return contrastWithBlack >= contrastWithWhite ? "#000000" : "#ffffff"
 }
 
 /** Lowercase slug: runs of non-[a-z0-9] become "-", trimmed, capped at 64 chars, "theme" if empty. */

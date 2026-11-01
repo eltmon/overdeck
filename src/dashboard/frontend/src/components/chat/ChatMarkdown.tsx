@@ -193,7 +193,7 @@ function CodeBlock({ code, lang, isStreaming }: CodeBlockProps) {
     let cancelled = false;
     void ensureSyntaxTheme(activeTheme).then(() => highlightCode(code, lang, isStreaming, themeName)).then((html) => {
       if (!cancelled) setHighlighted(html);
-    });
+    }).catch(() => { /* registration or highlighting failed; keep the plain-text fallback */ });
     return () => { cancelled = true; };
   }, [code, lang, isStreaming, activeTheme, themeName]);
 
