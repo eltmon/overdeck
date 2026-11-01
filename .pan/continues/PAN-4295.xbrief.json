@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4295",
   "created": "2026-11-01T05:48:47.966Z",
-  "updated": "2026-11-01T05:59:36.785Z",
+  "updated": "2026-11-01T06:06:27.791Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-01T05:58:27.626Z"
     },
     "reap-positive-evidence": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4295",
-      "claimedAt": "2026-11-01T05:59:36.785Z"
+      "claimedAt": "2026-11-01T05:59:36.785Z",
+      "doneAt": "2026-11-01T06:06:27.790Z"
     }
   }
 }
