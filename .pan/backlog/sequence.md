@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T06:11:19Z · model: claude-opus-5-5 · open: 864_
+_Last sequenced: 2026-11-01T06:12:59Z · model: claude-opus-5-5 · open: 866_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -19,6 +19,8 @@ _Last sequenced: 2026-11-01T06:11:19Z · model: claude-opus-5-5 · open: 864_
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 14 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
+| 15 | PAN-4672 | S | high | ok |  |  | In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout. |
+| 16 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
 | 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 22 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
@@ -928,6 +930,14 @@ Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls th
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.
 
+### PAN-4672 (rank 15)
+
+New in-pipeline substrate bug with four concrete, test-backed fixes; the hold-timeout gap reopens the original dashboard request hang, so it sits in the first free slot below the pinned tier.
+
+### PAN-4671 (rank 16)
+
+New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
+
 ### PAN-4572 (rank 21)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
@@ -1184,14 +1194,6 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
 
 Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (502) after pan reload.
 
-### PAN-2935 (rank 88)
-
-Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.
-
-### PAN-2337 (rank 89)
-
-Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1199,10 +1201,10 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T06:11:19Z",
+  "generatedAt": "2026-11-01T06:12:59Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 864,
+  "openCount": 866,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -12021,6 +12023,32 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4672",
+      "rank": 15,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout.",
+      "rationale": "New in-pipeline substrate bug with four concrete, test-backed fixes; the hold-timeout gap reopens the original dashboard request hang, so it sits in the first free slot below the pinned tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4671",
+      "rank": 16,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff.",
+      "rationale": "New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13703,6 +13731,13 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4671",
+      "to": "PAN-4672",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }
