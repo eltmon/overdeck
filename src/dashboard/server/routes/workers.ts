@@ -151,8 +151,10 @@ const unknownWorker = (): HttpServerResponse.HttpServerResponse => jsonResponse(
 /** `GET /api/workers/:id/status?after=<seq>`. */
 export async function handleWorkerStatus(id: string, after: number, deps: WorkerFollowDeps = defaultFollowDeps): Promise<HttpServerResponse.HttpServerResponse> {
   if (!(await deps.readFacts(id))) return unknownWorker();
-  const [verdict, reports] = await Promise.all([deps.isAlive(id), deps.listReports(id)]);
+  const verdict = await deps.isAlive(id);
   const confirmedDead = isConfirmedDead(verdict);
+  // Read reports after liveness: a worker that reported in the moment before it exited is never missed.
+  const reports = await deps.listReports(id);
   return jsonResponse({
     id,
     liveness: { alive: verdict.alive, confirmedDead },
