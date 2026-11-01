@@ -87,6 +87,81 @@ export const SshLinkInfo = Schema.Struct({
 })
 export type SshLinkInfo = typeof SshLinkInfo.Type
 
+/** PAN-4651 D-4651-8: a machine's load, sampled every 15 s and carried in the link heartbeat. */
+export const LoadSample = Schema.Struct({
+  /** CPU PSI `some avg10` (percent); null off Linux. */
+  cpuPsiSomeAvg10: Schema.NullOr(Schema.Number),
+  cpuSaturated: Schema.Boolean,
+  memAvailableBytes: Schema.NullOr(Schema.Number),
+  workingAgents: Schema.Number,
+  sampledAt: Schema.String,
+})
+export type LoadSample = typeof LoadSample.Type
+
+/** PAN-4651 FR-7: `on-request` reserves a machine — Auto skips it unless only it has a needed tag. */
+export const MachinePlacementMode = Schema.Literals(["auto", "on-request"])
+export type MachinePlacementMode = typeof MachinePlacementMode.Type
+
+/** PAN-4651 FR-6: `CPU 3% · 41 GB · 2 agents` (unknown parts `n/a`); null without a sample. */
+export function formatMachineLoad(load: LoadSample | null | undefined): string | null {
+  if (!load) return null
+  const cpu = load.cpuPsiSomeAvg10 === null ? "n/a" : `${Math.round(load.cpuPsiSomeAvg10)}%`
+  const memory = load.memAvailableBytes === null ? "n/a" : `${Math.floor(load.memAvailableBytes / 2 ** 30)}`
+  return `CPU ${cpu} · ${memory} GB · ${load.workingAgents} agents`
+}
+
+/** PAN-4651 FR-7: `tags: docker, linux · reserved`; null when there is neither. */
+export function formatMachineProfile(tags: readonly string[] | undefined, placement: MachinePlacementMode | undefined): string | null {
+  const parts = [...(tags && tags.length > 0 ? [`tags: ${tags.join(", ")}`] : []), ...(placement === "on-request" ? ["reserved"] : [])]
+  return parts.length > 0 ? parts.join(" · ") : null
+}
+
+/** PAN-4651 D-4651-9: why Auto placement skipped one machine. */
+export const PlacementRejection = Schema.Struct({
+  environmentId: Schema.String,
+  label: Schema.String,
+  /** `offline`, `unsupported`, `no project`, `no <tag>`, `CPU saturated` or `reserved`. */
+  reason: Schema.String,
+})
+export type PlacementRejection = typeof PlacementRejection.Type
+
+/** PAN-4651 D-4651-9: the machine Auto chose (with the one-line reason), or why none fits. */
+export const PlacementAnswer = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    environmentId: Schema.String,
+    label: Schema.String,
+    self: Schema.Boolean,
+    reason: Schema.String,
+    rejections: Schema.Array(PlacementRejection),
+  }),
+  Schema.Struct({ ok: Schema.Literal(false), rejections: Schema.Array(PlacementRejection) }),
+])
+export type PlacementAnswer = typeof PlacementAnswer.Type
+
+/** PAN-4651 D-4651-11: one project a machine has registered, as linked machines see it (never a path). */
+export const MachineProject = Schema.Struct({
+  key: Schema.String,
+  name: Schema.String,
+  /** `github.com/<owner>/<repo>` or `gitlab.com/<path>`; null when the project has no remote repo. */
+  gitOrigin: Schema.NullOr(Schema.String),
+})
+export type MachineProject = typeof MachineProject.Type
+
+/** PAN-4651 D-4651-13: one repository across machines, as `GET /api/fleet/projects` lists it. */
+export const FleetProjectRow = Schema.Struct({
+  /** The git origin slug; null for a local project without one (its own row). */
+  gitOrigin: Schema.NullOr(Schema.String),
+  name: Schema.String,
+  /** This machine's project for the slug, or null when only other machines have it. */
+  local: Schema.NullOr(Schema.Struct({ key: Schema.String })),
+  machines: Schema.Array(Schema.Struct({ environmentId: Schema.String, label: Schema.String, key: Schema.String, state: LinkState })),
+})
+export type FleetProjectRow = typeof FleetProjectRow.Type
+
+export const FleetProjectsResponse = Schema.Struct({ combine: Schema.Boolean, projects: Schema.Array(FleetProjectRow) })
+export type FleetProjectsResponse = typeof FleetProjectsResponse.Type
+
 /** One outbound link as shown by `GET /api/machines` and `pan machines list`. */
 export const MachineLinkView = Schema.Struct({
   id: Schema.String,
@@ -107,6 +182,11 @@ export const MachineLinkView = Schema.Struct({
   hidden: Schema.optional(Schema.Boolean),
   /** Present only on links this server set up over SSH. */
   ssh: Schema.optional(SshLinkInfo),
+  /** PAN-4651: the peer's last heartbeat load sample; null before one arrives or from a peer that predates it. */
+  load: Schema.optional(Schema.NullOr(LoadSample)),
+  /** PAN-4651: the peer's capability tags (detected plus `anywhere.machine.tags`). */
+  tags: Schema.optional(Schema.Array(Schema.String)),
+  placement: Schema.optional(MachinePlacementMode),
 })
 export type MachineLinkView = typeof MachineLinkView.Type
 
@@ -129,6 +209,12 @@ export const MachinesResponse = Schema.Struct({
     fingerprint: Schema.String,
     /** PAN-4650 D-4: linked machines list this machine's conversations (anywhere.json, default on). */
     shareConversations: Schema.Boolean,
+    /** PAN-4651 D-4651-13: one project per git origin across machines (anywhere.json, default on). */
+    combineRepositories: Schema.optional(Schema.Boolean),
+    /** PAN-4651: this machine's own load sample, tags and placement mode. */
+    load: Schema.optional(Schema.NullOr(LoadSample)),
+    tags: Schema.optional(Schema.Array(Schema.String)),
+    placement: Schema.optional(MachinePlacementMode),
   }),
   links: Schema.Array(MachineLinkView),
   inbound: Schema.Array(InboundMachineView),

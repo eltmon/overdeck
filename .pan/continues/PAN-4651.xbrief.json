@@ -1,0 +1,665 @@
+{
+  "version": "1",
+  "issueId": "PAN-4651",
+  "created": "2026-11-01T18:35:52.116Z",
+  "updated": "2026-11-01T22:12:45.684Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T22:04Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T22:04:56.723Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T22:08:12.599Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T22:12Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T22:12:45.683Z"
+    }
+  ],
+  "items": {
+    "wi1-provenance-fence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T18:35:52.116Z",
+      "doneAt": "2026-11-01T18:41:58.441Z"
+    },
+    "wi2-load-tags-heartbeat": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T18:42:06.073Z",
+      "doneAt": "2026-11-01T18:52:34.553Z"
+    },
+    "wi3-project-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T18:52:42.487Z",
+      "doneAt": "2026-11-01T18:56:12.913Z"
+    },
+    "wi4-work-door-conversations": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T18:56:17.611Z",
+      "doneAt": "2026-11-01T18:59:44.295Z"
+    },
+    "wi5-work-door-workers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T18:59:49.622Z",
+      "doneAt": "2026-11-01T19:03:55.178Z"
+    },
+    "wi6-work-door-issue-start": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:03:59.926Z",
+      "doneAt": "2026-11-01T19:12:09.557Z"
+    },
+    "wi7-placement-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:12:14.139Z",
+      "doneAt": "2026-11-01T19:14:05.854Z"
+    },
+    "wi8-placement-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:14:14.812Z",
+      "doneAt": "2026-11-01T19:16:57.519Z"
+    },
+    "wi9-machines-list-load": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:17:01.834Z",
+      "doneAt": "2026-11-01T19:20:00.078Z"
+    },
+    "wi10-fleet-conversations": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:20:01.495Z",
+      "doneAt": "2026-11-01T19:22:59.339Z"
+    },
+    "wi11-machine-field-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:23:00.396Z",
+      "doneAt": "2026-11-01T19:25:14.533Z"
+    },
+    "wi12-remote-worker-follower": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:25:23.694Z",
+      "doneAt": "2026-11-01T19:35:00.754Z"
+    },
+    "wi13-worker-cli-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:35:04.513Z",
+      "doneAt": "2026-11-01T19:40:46.648Z"
+    },
+    "wi14-start-cli-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:40:51.106Z",
+      "doneAt": "2026-11-01T19:45:35.681Z"
+    },
+    "wi15-lane-cli-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:45:40.063Z",
+      "doneAt": "2026-11-01T19:48:29.390Z"
+    },
+    "wi16-repo-grouping": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:48:33.420Z",
+      "doneAt": "2026-11-01T19:55:10.349Z"
+    },
+    "wi17-owner-project-files": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:55:15.960Z",
+      "doneAt": "2026-11-01T19:58:01.912Z"
+    },
+    "wi18-add-project-here": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:58:06.288Z",
+      "doneAt": "2026-11-01T20:05:57.977Z"
+    },
+    "wi19-add-project-there": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:06:01.977Z",
+      "doneAt": "2026-11-01T20:14:11.904Z"
+    },
+    "wi20-fleet-needs-you": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:14:15.876Z",
+      "doneAt": "2026-11-01T20:23:54.364Z"
+    },
+    "wi21-fleet-search": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:23:59.366Z",
+      "doneAt": "2026-11-01T20:29:11.165Z"
+    },
+    "wi22-which-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:29:15.937Z",
+      "doneAt": "2026-11-01T20:33:28.336Z"
+    },
+    "wi23-owner-usage": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:33:32.443Z",
+      "doneAt": "2026-11-01T20:34:57.179Z"
+    },
+    "wi24-fleet-usage": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:35:01.703Z",
+      "doneAt": "2026-11-01T20:38:42.520Z"
+    },
+    "wi25-resolved-settings": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:38:47.047Z",
+      "doneAt": "2026-11-01T20:40:37.860Z"
+    },
+    "wi26-config-set": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:40:43.133Z",
+      "doneAt": "2026-11-01T20:43:26.577Z"
+    },
+    "wi27-compare-settings": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:43:30.197Z",
+      "doneAt": "2026-11-01T20:46:20.061Z"
+    },
+    "wi28-proxy-token-ceiling": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:46:25.209Z",
+      "doneAt": "2026-11-01T20:50:17.948Z"
+    },
+    "wi29-mcp-fleet-tools": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:50:22.996Z",
+      "doneAt": "2026-11-01T20:54:26.039Z"
+    },
+    "wi30-two-machine-smoke": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T20:54:30.748Z",
+      "doneAt": "2026-11-01T21:09:24.039Z"
+    },
+    "wi31-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T21:09:32.035Z",
+      "doneAt": "2026-11-01T21:12:05.203Z"
+    },
+    "wi1-provenance-fence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:22:24.681Z"
+    },
+    "wi1-provenance-fence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:22:39.941Z"
+    },
+    "wi1-provenance-fence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:22:54.545Z"
+    },
+    "wi1-provenance-fence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:23:08.823Z"
+    },
+    "wi2-load-tags-heartbeat.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:23:24.277Z"
+    },
+    "wi2-load-tags-heartbeat.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:23:37.930Z"
+    },
+    "wi2-load-tags-heartbeat.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:23:51.081Z"
+    },
+    "wi2-load-tags-heartbeat.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:24:05.533Z"
+    },
+    "wi3-project-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:24:21.151Z"
+    },
+    "wi3-project-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:24:34.436Z"
+    },
+    "wi3-project-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:24:48.591Z"
+    },
+    "wi4-work-door-conversations.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:25:01.898Z"
+    },
+    "wi4-work-door-conversations.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:25:16.541Z"
+    },
+    "wi4-work-door-conversations.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:25:32.667Z"
+    },
+    "wi5-work-door-workers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:25:48.456Z"
+    },
+    "wi5-work-door-workers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:26:03.316Z"
+    },
+    "wi5-work-door-workers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:26:18.053Z"
+    },
+    "wi5-work-door-workers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:26:34.264Z"
+    },
+    "wi6-work-door-issue-start.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:26:49.733Z"
+    },
+    "wi6-work-door-issue-start.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:27:03.742Z"
+    },
+    "wi6-work-door-issue-start.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:27:18.365Z"
+    },
+    "wi7-placement-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:27:33.518Z"
+    },
+    "wi7-placement-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:27:49.790Z"
+    },
+    "wi7-placement-rule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:28:06.013Z"
+    },
+    "wi7-placement-rule.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:28:21.962Z"
+    },
+    "wi8-placement-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:28:38.002Z"
+    },
+    "wi8-placement-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:28:53.385Z"
+    },
+    "wi8-placement-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:29:09.710Z"
+    },
+    "wi8-placement-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:29:26.496Z"
+    },
+    "wi9-machines-list-load.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:29:42.638Z"
+    },
+    "wi9-machines-list-load.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:29:58.039Z"
+    },
+    "wi9-machines-list-load.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:30:14.536Z"
+    },
+    "wi10-fleet-conversations.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:30:30.671Z"
+    },
+    "wi10-fleet-conversations.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:30:47.053Z"
+    },
+    "wi10-fleet-conversations.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:31:03.424Z"
+    },
+    "wi10-fleet-conversations.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:31:19.639Z"
+    },
+    "wi11-machine-field-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:31:33.645Z"
+    },
+    "wi11-machine-field-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:31:48.013Z"
+    },
+    "wi11-machine-field-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:32:01.604Z"
+    },
+    "wi12-remote-worker-follower.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:32:15.093Z"
+    },
+    "wi12-remote-worker-follower.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:32:28.668Z"
+    },
+    "wi12-remote-worker-follower.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:32:42.688Z"
+    },
+    "wi12-remote-worker-follower.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:32:56.949Z"
+    },
+    "wi13-worker-cli-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:33:11.193Z"
+    },
+    "wi13-worker-cli-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:33:25.927Z"
+    },
+    "wi13-worker-cli-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:33:39.442Z"
+    },
+    "wi13-worker-cli-machine.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:33:53.134Z"
+    },
+    "wi14-start-cli-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:34:06.771Z"
+    },
+    "wi14-start-cli-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:34:22.001Z"
+    },
+    "wi14-start-cli-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:34:36.440Z"
+    },
+    "wi14-start-cli-machine.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:34:52.946Z"
+    },
+    "wi15-lane-cli-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:35:09.460Z"
+    },
+    "wi15-lane-cli-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:35:26.420Z"
+    },
+    "wi15-lane-cli-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:35:41.735Z"
+    },
+    "wi16-repo-grouping.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:35:57.478Z"
+    },
+    "wi16-repo-grouping.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:36:12.163Z"
+    },
+    "wi16-repo-grouping.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:36:26.990Z"
+    },
+    "wi16-repo-grouping.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:36:40.714Z"
+    },
+    "wi17-owner-project-files.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:36:55.183Z"
+    },
+    "wi17-owner-project-files.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:37:08.646Z"
+    },
+    "wi17-owner-project-files.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:37:22.577Z"
+    },
+    "wi17-owner-project-files.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:37:35.709Z"
+    },
+    "wi18-add-project-here.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:37:49.589Z"
+    },
+    "wi18-add-project-here.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:38:02.586Z"
+    },
+    "wi18-add-project-here.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:38:16.637Z"
+    },
+    "wi18-add-project-here.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:38:30.219Z"
+    },
+    "wi19-add-project-there.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:38:44.153Z"
+    },
+    "wi19-add-project-there.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:38:58.041Z"
+    },
+    "wi19-add-project-there.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:39:13.372Z"
+    },
+    "wi19-add-project-there.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:39:27.695Z"
+    },
+    "wi20-fleet-needs-you.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:39:41.524Z"
+    },
+    "wi20-fleet-needs-you.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:39:55.118Z"
+    },
+    "wi20-fleet-needs-you.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:40:10.365Z"
+    },
+    "wi21-fleet-search.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:40:26.276Z"
+    },
+    "wi21-fleet-search.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:40:41.401Z"
+    },
+    "wi21-fleet-search.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:40:56.930Z"
+    },
+    "wi22-which-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:41:12.411Z"
+    },
+    "wi22-which-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:41:26.562Z"
+    },
+    "wi22-which-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:41:39.643Z"
+    },
+    "wi23-owner-usage.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:41:53.156Z"
+    },
+    "wi23-owner-usage.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:42:06.148Z"
+    },
+    "wi23-owner-usage.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:42:19.941Z"
+    },
+    "wi24-fleet-usage.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:42:33.840Z"
+    },
+    "wi24-fleet-usage.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:42:48.570Z"
+    },
+    "wi24-fleet-usage.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:43:03.012Z"
+    },
+    "wi24-fleet-usage.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:43:19.817Z"
+    },
+    "wi25-resolved-settings.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:43:35.740Z"
+    },
+    "wi25-resolved-settings.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:43:51.243Z"
+    },
+    "wi25-resolved-settings.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:44:07.680Z"
+    },
+    "wi26-config-set.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:44:23.403Z"
+    },
+    "wi26-config-set.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:44:40.210Z"
+    },
+    "wi26-config-set.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:44:56.794Z"
+    },
+    "wi27-compare-settings.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:45:13.110Z"
+    },
+    "wi27-compare-settings.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:45:29.402Z"
+    },
+    "wi27-compare-settings.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:45:45.370Z"
+    },
+    "wi28-proxy-token-ceiling.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:46:01.093Z"
+    },
+    "wi28-proxy-token-ceiling.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:46:16.448Z"
+    },
+    "wi28-proxy-token-ceiling.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:46:32.789Z"
+    },
+    "wi28-proxy-token-ceiling.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:46:48.871Z"
+    },
+    "wi29-mcp-fleet-tools.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:47:04.407Z"
+    },
+    "wi29-mcp-fleet-tools.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:47:19.645Z"
+    },
+    "wi29-mcp-fleet-tools.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:47:34.691Z"
+    },
+    "wi29-mcp-fleet-tools.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:47:48.791Z"
+    },
+    "wi30-two-machine-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:48:01.951Z"
+    },
+    "wi30-two-machine-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:48:15.031Z"
+    },
+    "wi30-two-machine-smoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:48:28.205Z"
+    },
+    "wi31-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:48:41.599Z"
+    },
+    "wi31-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:48:55.324Z"
+    },
+    "wi31-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:49:08.257Z"
+    },
+    "wi31-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:49:21.733Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T22:12:45Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4651\n\nPull request: https://github.com/eltmon/overdeck/pull/4744 (head `90a2bb85`)\n\nSource: check_run:test-shard (1/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (1/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124994328823/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41355388386/job/124994328823  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/__tests__/fleet-add-project.test.ts\u001b[2m > \u001b[22mstartAddProject (D-4651-14)\u001b[2m > \u001b[22mac18: an existing local .env is reported skipped and not overwritten\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/__tests__/fleet-add-project.test.ts\u001b[2m > \u001b[22mstartAddProject (D-4651-14)\u001b[2m > \u001b[22mac18: an existing local .env is reported skipped and not overwritten\n\u001b[31m\u001b[1mError\u001b[22m: add job did not settle\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m settled src/dashboard/server/__tests__/fleet-add-project.test.ts:\u001b[2m37:9\u001b[22m\u001b[39m\n    \u001b[90m 35|\u001b[39m     \u001b[35mawait\u001b[39m \u001b[35mnew\u001b[39m \u001b[33mPromise\u001b[39m((resolve) \u001b[33m=>\u001b[39m \u001b[34msetImmediate\u001b[39m(resolve))\u001b[33m;\u001b[39m\n    \u001b[90m 36|\u001b[39m   }\n    \u001b[90m 37|\u001b[39m   \u001b[35mthrow\u001b[39m \u001b[35mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m'add job did not settle'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m         \u001b[31m^\u001b[39m\n    \u001b[90m 38|\u001b[39m }\n    \u001b[90m 39|\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m src/dashboard/server/__tests__/fleet-add-project.test.ts:\u001b[2m62:17\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m540 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m2 skipped\u001b[39m\u001b[90m (543)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

@@ -1,6 +1,7 @@
 /**
  * Requests behind the new-conversation options dialog (PAN-4486): the default
- * effort with its source, the create payload, and the create POST.
+ * effort with its source, the create payload, and the create POST. PAN-4651:
+ * a conversation on another machine (or Auto) goes through the fleet route.
  */
 import type { EffortSource } from '@overdeck/contracts';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
@@ -62,4 +63,30 @@ export async function createConversationWithOptions(payload: Record<string, unkn
   const body = await res.json().catch(() => ({})) as { id?: number; name?: string; error?: string };
   if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
   return body as { id: number; name: string };
+}
+
+export interface FleetConversationResult {
+  /** `<name>` on this machine, `@<env>/<name>` on a linked one. */
+  conversation: string;
+  machine: { environmentId: string; label: string; self: boolean };
+  /** The Auto line (`Auto → desk (CPU pressure 3%, …)`); null for an explicit machine. */
+  reason: string | null;
+}
+
+/** The fleet route's fields of a dialog payload: the options a linked machine accepts. */
+const FLEET_FIELDS = ['projectKey', 'model', 'harness', 'effort', 'issueId'] as const;
+
+/** PAN-4651 D-4651-23: POST /api/fleet/conversations for a machine choice other than this machine. */
+export async function createFleetConversation(payload: Record<string, unknown>, machine: string, needs: readonly string[]): Promise<FleetConversationResult> {
+  const body: Record<string, unknown> = { machine, message: typeof payload.message === 'string' ? payload.message : '' };
+  for (const key of FLEET_FIELDS) if (payload[key] !== undefined) body[key] = payload[key];
+  if (needs.length > 0) body.needs = needs;
+  const res = await fetch('/api/fleet/conversations', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(body),
+  });
+  const answer = await res.json().catch(() => ({})) as Partial<FleetConversationResult> & { error?: string };
+  if (!res.ok) throw new Error(answer.error || `HTTP ${res.status}`);
+  return answer as FleetConversationResult;
 }

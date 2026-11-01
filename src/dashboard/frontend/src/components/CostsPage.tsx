@@ -5,7 +5,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, AlertTriangle, TrendingUp, Zap, X, BarChart3, FlaskConical } from 'lucide-react';
+import { DollarSign, AlertTriangle, TrendingUp, Zap, X, BarChart3, FlaskConical, Server } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import {
   Chart as ChartJS,
@@ -20,6 +20,7 @@ import {
   type ChartOptions,
 } from 'chart.js';
 import { costBucketLabel } from '../lib/cost-bucket-labels';
+import { FleetUsagePanel } from './costs/FleetUsagePanel';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Filler, Tooltip);
 
@@ -630,7 +631,7 @@ function IssuesTabContent({ costs, globalTrends }: { costs: CostsResponse; globa
 // ============== Main Page ==============
 
 export function CostsPage() {
-  const [activeTab, setActiveTab] = useState<'issues' | 'experiments'>('issues');
+  const [activeTab, setActiveTab] = useState<'issues' | 'experiments' | 'machines'>('issues');
 
   const { data: costs, isLoading } = useQuery({
     queryKey: ['costs-by-issue'],
@@ -711,7 +712,23 @@ export function CostsPage() {
             Experiments
           </div>
         </button>
+        <button
+          onClick={() => setActiveTab('machines')}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === 'machines'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Server className="w-4 h-4" />
+            Machines
+          </div>
+        </button>
       </div>
+
+      {/* Machines Tab (PAN-4651) */}
+      {activeTab === 'machines' && <FleetUsagePanel />}
 
       {/* Experiments Tab */}
       {activeTab === 'experiments' && (

@@ -118,6 +118,10 @@ export interface Decision {
   turnEndAssessment?: PendingInputSubject['turnEndAssessment'];
   /** PAN-4596 — the handoff focus of a held kickoff, shown as its prompt. */
   heldKickoffFocus?: string;
+  /** PAN-4651 D-4651-15 — set on a row from a linked machine: its label, shown as "on <label>". */
+  machineLabel?: string;
+  /** PAN-4651 — the subject lives on a linked machine: open it there; no inline answer here. */
+  remote?: boolean;
 }
 
 /**
@@ -154,6 +158,65 @@ export function fetchConversationPendingInput(signal?: AbortSignal): Promise<Con
   return fetchWithTimeout('/api/conversations/pending-input', { signal })
     .then((res) => (res.ok ? res.json() : []))
     .catch(() => []);
+}
+
+/** PAN-4651 D-4651-15 — `GET /api/fleet/needs-you`: what waits on the operator on each online linked machine. */
+export interface FleetNeedsYouMachine {
+  environmentId: string;
+  label: string;
+  conversations: ConversationPendingInputRow[];
+  agents: Array<{ id: string; issueId: string | null; pendingInputKinds: string[] }>;
+}
+
+export function fetchFleetNeedsYou(signal?: AbortSignal): Promise<FleetNeedsYouMachine[]> {
+  return fetchWithTimeout('/api/fleet/needs-you', { signal })
+    .then((res) => (res.ok ? res.json() : { machines: [] }))
+    .then((body: { machines?: unknown }) => (Array.isArray(body?.machines) ? body.machines as FleetNeedsYouMachine[] : []))
+    .catch(() => []);
+}
+
+/** Linked machines' rows as decisions: names become `@<env>/<name>`, each labelled with its machine. */
+export function fleetDecisions(machines: ReadonlyArray<FleetNeedsYouMachine>): Decision[] {
+  const out: Decision[] = [];
+  for (const machine of machines) {
+    for (const c of Array.isArray(machine.conversations) ? machine.conversations : []) {
+      const kinds = conversationKinds(c);
+      if (kinds.length === 0) continue;
+      out.push({
+        id: `@${machine.environmentId}/${c.name}`,
+        source: 'conversation',
+        label: c.title || c.name,
+        issueId: c.issueId ?? undefined,
+        kinds,
+        harness: c.harness ?? null,
+        pendingAskUserQuestion: c.pendingAskUserQuestion,
+        pendingProposedPlan: c.pendingProposedPlan,
+        pendingPaneChoice: c.pendingPaneChoice,
+        permissionSummary: permissionSummary(c),
+        permissionCommand: permissionCommand(c),
+        since: conversationSince(c),
+        blocking: isBlockingDecision(kinds),
+        heldKickoffFocus: c.heldKickoff?.focus,
+        machineLabel: machine.label,
+        remote: true,
+      });
+    }
+    for (const agent of Array.isArray(machine.agents) ? machine.agents : []) {
+      if (agent.pendingInputKinds.length === 0) continue;
+      out.push({
+        id: `@${machine.environmentId}/${agent.id}`,
+        source: 'agent',
+        label: formatIssueRef(agent.issueId ?? undefined, undefined) ?? agent.id,
+        issueId: agent.issueId ?? undefined,
+        kinds: agent.pendingInputKinds,
+        since: '',
+        blocking: isBlockingDecision(agent.pendingInputKinds),
+        machineLabel: machine.label,
+        remote: true,
+      });
+    }
+  }
+  return out;
 }
 
 /**
@@ -216,8 +279,15 @@ export function useDecisions(): Decision[] {
     refetchInterval: 5000,
   });
 
+  // PAN-4651 D-4651-15 — linked machines' rows, served from this machine's cache (no cross-machine poll).
+  const { data: fleetMachines = [] } = useQuery({
+    queryKey: ['fleet-needs-you'],
+    queryFn: ({ signal }) => fetchFleetNeedsYou(signal),
+    refetchInterval: 5000,
+  });
+
   return useMemo(() => {
-    const out: Decision[] = [];
+    const out: Decision[] = [...fleetDecisions(fleetMachines)];
 
     for (const s of agentSubjects) {
       const issueTitle = s.issueId ? titleByIssueId.get(s.issueId) : undefined;
@@ -271,5 +341,5 @@ export function useDecisions(): Decision[] {
       return a.since.localeCompare(b.since);
     });
     return out;
-  }, [agentSubjects, convRows, titleByIssueId]);
+  }, [agentSubjects, convRows, fleetMachines, titleByIssueId]);
 }

@@ -34,6 +34,8 @@ pan start PAN-123 --model gpt-5.6-sol --effort high  # Pin the work model and Cl
 pan start PAN-123 --plan-model k3 --model k3  # Auto-plan AND work on Kimi k3
 pan start PAN-123 --remote --tier durable  # Remote Fly.io workspace with persistent volume
 pan start PAN-123 --remote --tier ephemeral  # Remote Fly.io workspace that winds down on stale heartbeat
+pan start PAN-123 --machine desk  # Start the issue agent on the linked machine "desk"
+pan start PAN-123 --machine auto --needs docker --push-first  # Auto placement by load, docker required
 ```
 
 ## What It Does
@@ -86,6 +88,13 @@ run `pan untroubled <id>`; `--force` clears the troubled gate and starts anyway.
 For projects with workspace Docker configured, `pan start` checks stack health before
 spawning. Use `--host` only as an explicit break-glass override; interactive shells always
 prompt, while non-interactive callers must pass `--yes` to confirm.
+
+`--machine <label|auto>` starts the issue agent on a linked machine instead (PAN-4651): that machine
+needs a project with the same repository and starts from its view of `origin`, so unpushed commits in
+the issue's local workspace refuse the start unless you pass `--push-first` or `--ignore-unpushed`.
+`--machine auto` picks a machine by load (`--needs <tags>` restricts it to machines with those
+capability tags) and prints the choice; when it picks this machine the normal local start runs.
+`--machine fly` is refused until PAN-4652.
 
 If a stopped agent has a saved Claude session, `pan start` refuses and points you to
 `pan resume <id>` (continue that session) or `pan reset-session <id>` (clear mutable

@@ -15,6 +15,7 @@
  */
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatMachineLoad, formatMachineProfile } from '@overdeck/contracts';
 import { toast } from 'sonner';
 
 import { formatRelativeTime } from '../../../lib/dashboard-utils';
@@ -32,13 +33,14 @@ import {
   type MachineLinkView,
   reconnectMachine,
   removeInboundMachine,
-  setShareConversations,
   type SshLinkInfo,
   unlinkMachine,
 } from './machinesApi';
 import { RemoveSshMachineDialog } from './RemoveSshMachineDialog';
+import { SharingSwitches } from './SharingSwitches';
+import { CompareSettingsDialog } from './CompareSettingsDialog';
+import { AddProjectToMachineDialog } from '../../sidebar/AddProjectToMachineDialog';
 import { unlinkMachineKeepingServer } from './sshMachinesApi';
-import { Toggle } from '../Shared/Toggle';
 
 const STATE_LABEL: Record<LinkState, string> = {
   online: 'Online',
@@ -99,8 +101,16 @@ export function sshLine(ssh: SshLinkInfo): string {
   return `SSH ${ssh.destination} · forward ${ssh.forward}${detail} · ${launch}`;
 }
 
-function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged: () => Promise<void> }) {
+/** PAN-4651 FR-6/FR-7: ` · CPU 3% · 41 GB · 2 agents · tags: docker, linux · reserved` (muted, part of the meta line). */
+function MachineLoadText({ view }: { view: Pick<MachineLinkView, 'load' | 'tags' | 'placement'> }) {
+  const text = [formatMachineLoad(view.load), formatMachineProfile(view.tags, view.placement)].filter(Boolean).join(' · ');
+  return text ? <span data-testid="machine-load">{' · '}{text}</span> : null;
+}
+
+function MachineLinkRow({ link, onChanged, thisLabel }: { link: MachineLinkView; onChanged: () => Promise<void>; thisLabel: string }) {
   const confirm = useConfirm();
+  const [addProjectOpen, setAddProjectOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [routesOpen, setRoutesOpen] = useState(false);
   const [routeUrl, setRouteUrl] = useState('');
@@ -180,6 +190,7 @@ function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged:
             {' · '}{ACCESS_LABEL[link.access]}
             {link.peerVersion ? <>{' · '}Overdeck {link.peerVersion}</> : null}
             {link.lastHeartbeatAt ? <>{' · '}heartbeat {formatRelativeTime(link.lastHeartbeatAt)}</> : null}
+            <MachineLoadText view={link} />
           </p>
           {ssh && <p className="text-xs text-muted-foreground mt-0.5 truncate" data-testid={`machine-ssh-${link.id}`}>{sshLine(ssh)}</p>}
           {link.stateDetail && <p className="text-xs text-muted-foreground mt-0.5">{link.stateDetail}</p>}
@@ -192,6 +203,16 @@ function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged:
           {showReconnect && (
             <button type="button" disabled={busy} onClick={() => void run(() => reconnectMachine(link.id), `Could not reconnect ${link.label}`)} className={buttonClass}>
               Reconnect
+            </button>
+          )}
+          {link.state === 'online' && (
+            <button type="button" onClick={() => setCompareOpen(true)} className={buttonClass}>
+              Compare settings
+            </button>
+          )}
+          {link.state === 'online' && link.access === 'operator' && (
+            <button type="button" onClick={() => setAddProjectOpen(true)} className={buttonClass}>
+              Add a project
             </button>
           )}
           <button type="button" disabled={busy} onClick={() => void handleUnlink()} className={destructiveButtonClass}>
@@ -235,6 +256,10 @@ function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged:
       )}
       {removeOpen && ssh && (
         <RemoveSshMachineDialog link={{ ...link, ssh }} onCancel={() => setRemoveOpen(false)} onConfirm={(keepServer) => void handleRemoveSsh(keepServer)} />
+      )}
+      {compareOpen && <CompareSettingsDialog machine={link.environmentId} label={link.label} onClose={() => setCompareOpen(false)} />}
+      {addProjectOpen && (
+        <AddProjectToMachineDialog target={{ direction: 'there', machine: link.environmentId, machineLabel: link.label, thisLabel }} onClose={() => setAddProjectOpen(false)} />
       )}
     </li>
   );
@@ -282,29 +307,6 @@ function InboundRow({ inbound, onChanged }: { inbound: InboundMachineView; onCha
 }
 
 /** PAN-4650 D-4: Share my conversations, under this machine's label. */
-function ShareConversationsRow({ checked, onChanged }: { checked: boolean; onChanged: () => Promise<void> }) {
-  const [saving, setSaving] = useState(false);
-  const change = async (next: boolean) => {
-    setSaving(true);
-    try {
-      const result = await setShareConversations(next);
-      if (!isOk(result)) toast.error(`Could not change sharing: ${apiError(result)}`);
-      await onChanged();
-    } finally {
-      setSaving(false);
-    }
-  };
-  return (
-    <div className="flex items-start justify-between gap-4 px-4 mb-3" data-testid="share-conversations">
-      <div>
-        <p className="text-xs text-foreground">Share my conversations</p>
-        <p className="text-xs text-muted-foreground">Linked machines list this machine's conversations. Turn off to hide them on the next sync.</p>
-      </div>
-      <Toggle checked={checked} onChange={(next) => void change(next)} disabled={saving} />
-    </div>
-  );
-}
-
 export function MachinesPanel() {
   const queryClient = useQueryClient();
   const [linkOpen, setLinkOpen] = useState(false);
@@ -338,9 +340,10 @@ export function MachinesPanel() {
       {data && (
         <p className="text-xs text-muted-foreground px-4 mb-2">
           This machine: {data.self.label} · fingerprint <span className="font-mono">{data.self.fingerprint}</span>
+          <MachineLoadText view={data.self} />
         </p>
       )}
-      {data && <ShareConversationsRow checked={data.self.shareConversations} onChanged={refresh} />}
+      {data && <SharingSwitches self={data.self} onChanged={refresh} />}
       {isLoading ? (
         <p className="text-xs text-muted-foreground px-4 py-3">Loading machines…</p>
       ) : error ? (
@@ -349,7 +352,7 @@ export function MachinesPanel() {
         <p className="text-xs text-muted-foreground px-4 py-3">No machines are linked yet. Pair another Overdeck machine and paste its pairing link here.</p>
       ) : (
         <ul className="space-y-1">
-          {data.links.map((link) => <MachineLinkRow key={link.id} link={link} onChanged={refresh} />)}
+          {data.links.map((link) => <MachineLinkRow key={link.id} link={link} onChanged={refresh} thisLabel={data.self.label} />)}
         </ul>
       )}
 

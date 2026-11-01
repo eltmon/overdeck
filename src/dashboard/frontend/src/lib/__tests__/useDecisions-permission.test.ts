@@ -34,6 +34,7 @@ function permissionRow(name: string, since: string, agentLabel = 'Subagent: Rese
 function renderWithRows<T>(hook: () => T, rows: ConversationPendingInputRow[]) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   queryClient.setQueryData(['conv-ask-user-question'], rows);
+  queryClient.setQueryData(['fleet-needs-you'], []); // PAN-4651: no linked machines
   return renderHook(hook, {
     wrapper: ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children),
   });

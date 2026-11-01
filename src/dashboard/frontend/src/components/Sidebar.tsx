@@ -22,6 +22,7 @@ import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from '../lib/expe
 import { useFlywheelRunning } from '../lib/flywheelApi';
 import type { Issue } from '../types';
 import type { Tab } from './Header';
+import { OtherMachineProjects, ProjectMachineCount } from './sidebar/OtherMachineProjects';
 
 type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'todo';
 const PIPELINE_PHASES: PipelineIssuePhase[] = ['todo', 'plan', 'work', 'review', 'ship'];
@@ -714,6 +715,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                         aria-hidden="true"
                       />
                       <span className="truncate">{project.name}</span>
+                      <ProjectMachineCount projectKey={project.key} />
                       {visibleFeatures.length > 0 && (
                         <span className="ml-auto text-[11px] text-muted-foreground">{visibleFeatures.length}</span>
                       )}
@@ -738,6 +740,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                 <span className="h-2 w-2 rounded-full shrink-0 bg-muted-foreground/30" aria-hidden="true" />
                 <span className="truncate italic">{NO_PROJECT_LABEL}</span>
               </button>
+              <OtherMachineProjects />
             </div>
           ) : (
             <div className="h-px mx-2 bg-border my-2" />

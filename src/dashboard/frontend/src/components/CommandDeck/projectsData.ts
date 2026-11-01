@@ -20,16 +20,39 @@ export interface RegisteredProjectLite {
   path: string;
 }
 
+/**
+ * PAN-4651 D-4651-13: which local project holds each git origin slug (lower
+ * case), and whether Combine matching repositories across machines is on.
+ * `useFleetProjects` (sidebar/OtherMachineProjects.tsx) keeps it current from
+ * `GET /api/fleet/projects`; until that answers, nothing is combined.
+ */
+export interface FleetProjectIndex {
+  combine: boolean;
+  localKeyByOrigin: ReadonlyMap<string, string>;
+}
+
+let fleetProjectIndex: FleetProjectIndex = { combine: true, localKeyByOrigin: new Map() };
+
+export function setFleetProjectIndex(index: FleetProjectIndex): void {
+  fleetProjectIndex = index;
+}
+
 /** The project a conversation effectively belongs to (PAN-1577): the explicit
  * `projectKey` override when set, otherwise the registered project whose path
  * contains `cwd`. Null when neither resolves — the single source of truth for
  * every "is this conversation already in project X" check (grouping, the move
  * pickers' current-project indicator, and drag-drop's no-op detection) so they
- * can't disagree with each other. */
+ * can't disagree with each other. PAN-4651: with Combine on, a linked
+ * machine's conversation belongs to the local project with its git origin. */
 export function resolveEffectiveProjectKey(
-  conv: { cwd?: string | null; projectKey?: string | null },
+  conv: { cwd?: string | null; projectKey?: string | null; origin?: string | null; gitOrigin?: string | null },
   registeredProjects: readonly RegisteredProjectLite[],
+  fleet: FleetProjectIndex = fleetProjectIndex,
 ): string | null {
+  if (conv.origin === 'linked' && fleet.combine && conv.gitOrigin) {
+    const local = fleet.localKeyByOrigin.get(conv.gitOrigin.toLowerCase());
+    if (local) return local;
+  }
   if (conv.projectKey) return conv.projectKey;
   const cwd = conv.cwd;
   if (!cwd) return null;
