@@ -6,6 +6,7 @@
  *   pan devices list [--json]
  *   pan devices revoke <id>
  *   pan machines link|list|unlink   (PAN-4645, `machines.ts`, registered from here)
+ *   pan connect [--url <base>] [--label <name>] [--json]   (PAN-4656, `connect.ts`, registered from here)
  *
  * Asks the running dashboard (with the internal token) for a one-time pairing
  * credential and prints `<base>/#pair=<credential>`. The credential is always
@@ -16,16 +17,19 @@
  * connections can be open then). See configuration/remote-access.mdx.
  *
  * `src/cli/index.ts` imports this module at startup to register the verbs, so
- * it imports only Commander types, chalk and the import-free
- * `lib/remote-access/loopback.ts` statically. Config and token modules load
- * inside each handler.
+ * it imports only Commander types, chalk, the import-free
+ * `lib/remote-access/loopback.ts` and `../lazy-action.ts` statically. Config
+ * and token modules load inside each handler; `connect.ts` loads through
+ * `lazyAction` only when `pan connect` runs.
  */
 import chalk from 'chalk';
 import type { Command } from 'commander';
 
 import { isLoopbackOrigin as isLoopbackBase } from '../../lib/remote-access/loopback.js';
+import { lazyAction } from '../lazy-action.js';
 import { callDashboard, errorText, isDashboardUnreachable } from './dashboard-call.js';
 import { registerMachinesCommands } from './machines.js';
+import { LOOPBACK_WARNING, NOT_RUNNING, requestPairingLink, TOKEN_REJECTED } from './pairing-link.js';
 
 /** True when the base URL only resolves on this machine (PAN-4445 D-7: one check, shared with the server). */
 export { isLoopbackBase };
@@ -33,16 +37,8 @@ export { isLoopbackBase };
 export interface PairOptions { label?: string; url?: string; json?: boolean }
 
 const DOCS_PAGE = 'configuration/remote-access.mdx';
-const NOT_RUNNING = 'Overdeck dashboard is not running; start it with `pan up`.';
-const TOKEN_REJECTED = 'The dashboard rejected this machine\'s internal token (from $OVERDECK_HOME/internal-token, default ~/.overdeck/internal-token). '
-  + 'The running dashboard holds a different token: it uses another OVERDECK_HOME, or it was started before that file existed. '
-  + 'Restart it with `pan up` or `npx @overdeck/core`, then run this command again.';
-const LOOPBACK_WARNING = 'This URL only works on this machine. Pass --url with an address another device can reach, and add that origin to OVERDECK_TRUSTED_ORIGINS.';
-
-/** `<base>/#pair=<credential>`: the credential rides in the fragment only. */
-export function pairingUrl(base: string, credential: string): string {
-  return `${base.replace(/\/+$/, '')}/#pair=${credential}`;
-}
+// Shared with `pan connect` (PAN-4656) from a leaf module, so connect.ts never imports this file.
+export { LOOPBACK_WARNING, pairingUrl, requestPairingLink, type PairingLinkResult } from './pairing-link.js';
 
 export { callDashboard, isDashboardUnreachable } from './dashboard-call.js';
 
@@ -50,35 +46,6 @@ async function fail(message: string): Promise<never> {
   console.error(chalk.red(message));
   const { exitCli } = await import('../exit.js');
   return exitCli(1);
-}
-
-export type PairingLinkResult =
-  | { ok: true; url: string; credential: string; expiresAt: string; base: string }
-  | { ok: false; message: string };
-
-/**
- * Asks the local dashboard for a one-time pairing credential and builds
- * `<base>/#pair=<credential>`. `base` defaults to this dashboard's API URL;
- * `pan connect` passes an address another machine can reach (PAN-4656).
- */
-export async function requestPairingLink(options: { label?: string; base?: string }): Promise<PairingLinkResult> {
-  let response: Response;
-  try {
-    response = await callDashboard('/api/pairing/credentials', {
-      method: 'POST',
-      body: options.label ? { label: options.label } : {},
-    });
-  } catch (error) {
-    if (isDashboardUnreachable(error)) return { ok: false, message: NOT_RUNNING };
-    throw error;
-  }
-  if (response.status === 401) return { ok: false, message: TOKEN_REJECTED };
-  if (!response.ok) return { ok: false, message: `pan pair failed: ${await errorText(response)}` };
-
-  const { credential, expiresAt } = await response.json() as { credential: string; expiresAt: string };
-  const { getDashboardApiUrl } = await import('../../lib/config.js');
-  const base = options.base ?? getDashboardApiUrl();
-  return { ok: true, url: pairingUrl(base, credential), credential, expiresAt, base };
 }
 
 export async function runPair(options: PairOptions): Promise<void> {
@@ -173,4 +140,13 @@ export function registerPairCommands(program: Command): void {
 
   // PAN-4645: `pan machines` registers here so `src/cli/index.ts` does not grow.
   registerMachinesCommands(program);
+
+  // PAN-4656: likewise `pan connect`.
+  program
+    .command('connect')
+    .description('Install this machine\'s server as a lasting service and print one link that links it from another machine (see cli/machines.mdx)')
+    .option('--url <base>', 'Address another machine reaches this one at (default: picked automatically)')
+    .option('--label <name>', 'Name recorded for the pairing in the activity log')
+    .option('--json', 'Print the result as JSON')
+    .action(lazyAction(() => import('./connect.js'), 'connectCommand'));
 }
