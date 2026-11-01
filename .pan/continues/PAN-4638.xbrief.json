@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:54:16.374Z",
+  "updated": "2026-11-01T23:58:43.658Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -246,9 +246,10 @@
       "doneAt": "2026-11-01T23:53:56.797Z"
     },
     "two-machine-smoke-lanes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4638",
-      "claimedAt": "2026-11-01T23:54:16.373Z"
+      "claimedAt": "2026-11-01T23:54:16.373Z",
+      "doneAt": "2026-11-01T23:58:43.658Z"
     }
   }
 }
