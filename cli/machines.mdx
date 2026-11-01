@@ -1,6 +1,6 @@
 ---
 title: pan machines
-description: Link this machine's dashboard to another machine, list the links, or remove one
+description: Link this machine's dashboard to another machine, list or remove the links, and see or update versions on every machine
 ---
 
 # `pan machines`
@@ -170,3 +170,66 @@ Left the Overdeck server on vps running (in-use).
 | --- | --- |
 | `--keep-server` | For an SSH machine this dashboard started: leave its Overdeck server running. |
 | `--json` | Print `{ ok, peerNotified, ssh }` as JSON. |
+
+## versions
+
+```bash
+pan machines versions [--json]
+```
+
+Shows the Overdeck version and the version of each installed harness CLI on every
+machine: this machine first, then each linked machine. A linked machine that is not
+`online` shows its last known Overdeck version and no CLI versions.
+
+```
+MACHINE  STATE         OVERDECK  CLAUDE         CODEX               KIMI   UPDATE
+studio   this machine  0.73.0    2.1.0 → 2.1.5  0.150.0 → 0.159.0   2.0.2  done
+desk     online        0.73.0    2.1.293        0.159.0             -      waiting (2 turns)
+attic    unsupported   0.71.0    -              -                   -      -
+
+attic: install Overdeck 0.73.0 on attic: npm install -g @overdeck/core@0.73.0
+```
+
+There is one column per harness CLI found on any machine. While an update job has
+changed a version, the cell shows `before → after`. The UPDATE cell shows the machine's
+update job: `waiting (N turns)` while it waits for running turns to end (after 30
+minutes, `waiting (N turns, M min: use --now)`), then `updating`, `restarting`, `done`,
+`failed: <component>` or `cancelled`. After the table, each machine that needs another
+Overdeck version gets one line with the exact install command.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Print `{ rows }` as JSON. |
+
+Exit codes: 0 when the table printed; 1 when the dashboard is not running or refused the request.
+
+## update
+
+```bash
+pan machines update [--now] [--machine <label>]... [--cancel] [--json]
+```
+
+Starts **Update all**: each online machine updates its installed harness CLIs (Claude
+Code, Codex CLI, Kimi Code CLI, OpenCode) with their own update commands, then updates
+Overdeck itself on an `npm install -g` install and restarts its dashboard. By default each
+machine waits until no turn is running there. A development checkout or the desktop app
+keeps its Overdeck and still updates the CLIs. Offline, connecting, unsupported and
+revoked machines are skipped with the reason, and so is a machine whose link is
+agent-fenced: Update all needs an operator-level link.
+
+```
+Started on desk (when-idle)
+Started on studio (when-idle)
+Skipped attic: attic is unsupported: Install Overdeck 0.73.0 on attic: npm install -g @overdeck/core@0.73.0
+Run `pan machines versions` to follow the update.
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--now` | Do not wait for running turns to end. On a machine already waiting, this starts its update at once. |
+| `--machine <label>` | Only this machine; repeat for more. An unknown label prints `No machine named <label>` and exits 1. |
+| `--cancel` | Cancel waiting updates (on every machine, or on the `--machine` ones). |
+| `--json` | Print `{ started, skipped }` as JSON. |
+
+Exit codes: 0 when the request went out, even if some machines were skipped; 1 when the
+dashboard is not running, refused the request, or a `--machine` label is unknown.

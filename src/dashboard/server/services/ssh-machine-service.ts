@@ -25,7 +25,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import type { LinkAccess, MachineLinkView, SshLinkInfo, SshMachineErrorCode, SshTestResult } from '@overdeck/contracts';
+import { type LinkAccess, type MachineLinkView, overdeckInstallCommand, type SshLinkInfo, type SshMachineErrorCode, type SshTestResult } from '@overdeck/contracts';
 
 import type { MachineLink } from '../../../lib/anywhere/link-store.js';
 import {
@@ -43,7 +43,6 @@ import {
   type HelperFailure,
   type HelperStartResult,
   type HelperStopReason,
-  panInstallCommand,
   parseHelperResult,
   parseVersionOutput,
   remoteCommand,
@@ -156,7 +155,7 @@ function requireSupervisor(deps: SshMachineServiceDeps): SshForwards {
 function versionMismatch(dest: string, remote: string, local: string): SshMachineError {
   return new SshMachineError(
     'version-mismatch',
-    `${dest} has pan ${remote} and this machine has ${local}. Install the same version there with: ${panInstallCommand(local)}`,
+    `${dest} has pan ${remote} and this machine has ${local}. Install the same version there with: ${overdeckInstallCommand(local)}`,
     { destination: dest, remoteVersion: remote, localVersion: local },
   );
 }

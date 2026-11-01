@@ -18,7 +18,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join } from 'node:path';
 
-import { SSH_HELPER_PROTOCOL, type SshLaunch, type SshMachineErrorCode } from '@overdeck/contracts';
+import { overdeckInstallCommand, SSH_HELPER_PROTOCOL, type SshLaunch, type SshMachineErrorCode } from '@overdeck/contracts';
 
 import { UUID_V4_LOWERCASE } from '../../environment-identity.js';
 
@@ -176,11 +176,6 @@ export function sshForwardArgv(dest: string, localPort: number, remotePort: numb
 
 // ── Failure classification ────────────────────────────────────────────────
 
-/** The install command named by `pan-missing` and `version-mismatch`. */
-export function panInstallCommand(version: string): string {
-  return `npm install -g @overdeck/core@${version}`;
-}
-
 function lastLines(text: string, count: number): string {
   return text
     .split(/\r?\n/)
@@ -224,7 +219,7 @@ export function classifySshFailure(exitCode: number | null, stderr: string, ctx:
     return new SshMachineError('unreachable', `Could not connect to ${dest}: ${lastLines(stderr, 1)}`, detail);
   }
   if (exitCode === 127 || /command not found|pan: not found/.test(stderr)) {
-    const remedy = ctx.localVersion ? ` Install it there with: ${panInstallCommand(ctx.localVersion)}` : '';
+    const remedy = ctx.localVersion ? ` Install it there with: ${overdeckInstallCommand(ctx.localVersion)}` : '';
     return new SshMachineError('pan-missing', `pan was not found on ${dest}.${remedy}`, detail);
   }
   return new SshMachineError(
