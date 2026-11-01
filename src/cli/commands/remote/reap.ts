@@ -29,6 +29,7 @@ export async function reapCommand(options: ReapOptions): Promise<void> {
     const color =
       result.status === 'handed-off' ? chalk.green :
       result.status === 'still-running' ? chalk.cyan :
+      result.status === 'indeterminate' ? chalk.yellow :
       result.status === 'stale' ? chalk.dim : chalk.red;
     console.log(color(`${result.agentId} (${result.issueId}): ${result.status}`));
     for (const detail of result.details) {
