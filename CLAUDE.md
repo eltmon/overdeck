@@ -67,6 +67,7 @@
 | Overdeck Anywhere: machine links, secure channel, routes | [docs/ANYWHERE-ARCHITECTURE.md](docs/ANYWHERE-ARCHITECTURE.md) |
 | The no-loss map: every deleted verb/route/view and its new home | [docs/THE-CUT.md](docs/THE-CUT.md) |
 | overdeck.ai account service (Cloudflare Worker, D1, invite-only admin) | [docs/ACCOUNT-SERVICE.md](docs/ACCOUNT-SERVICE.md) |
+| overdeck.ai directory, relay and webhook inbox (Cloudflare Worker, Durable Objects) | [docs/CONNECT-SERVICE.md](docs/CONNECT-SERVICE.md) |
 
 ## Small But Sharp
 
