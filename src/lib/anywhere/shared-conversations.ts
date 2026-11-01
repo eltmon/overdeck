@@ -14,6 +14,7 @@ import type { SharedConversationRow, SharedConversationsResponse } from '@overde
 
 import { ensureEnvironmentIdentity } from '../environment-identity.js';
 import { getEnrichedConversationList } from '../overdeck/conversation-list.js';
+import { listPulledFrom, type PulledFrom } from '../overdeck/conversation-release.js';
 import { loadVaultContinuityLookup, vaultIdForConversation, type VaultContinuityLookup } from '../overdeck/conversation-vault-continuity.js';
 import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { canonicalPathAsync, isWithin } from '../projects/path-containment.js';
@@ -52,6 +53,7 @@ export interface SharedConversationsDeps {
   listProjects: () => Promise<Array<{ key: string; config: ProjectConfig }>>;
   environmentId: () => Promise<string>;
   vaultLookup: () => Promise<VaultContinuityLookup>;
+  pulledFrom: () => Map<string, PulledFrom>;
   now: () => number;
 }
 
@@ -61,6 +63,7 @@ const defaultDeps: SharedConversationsDeps = {
   listProjects: listProjectsAsync,
   environmentId: async () => (await ensureEnvironmentIdentity()).environmentId,
   vaultLookup: () => loadVaultContinuityLookup(),
+  pulledFrom: listPulledFrom,
   now: () => Date.now(),
 };
 
@@ -95,6 +98,7 @@ async function projectResolver(projects: Array<{ key: string; config: ProjectCon
 async function buildRows(deps: SharedConversationsDeps): Promise<SharedConversationRow[]> {
   const [rows, projects, vaultLookup] = await Promise.all([deps.listRows(), deps.listProjects(), deps.vaultLookup()]);
   const configs = new Map(projects.map(({ key, config }) => [key, config]));
+  const pulledFrom = deps.pulledFrom();
   const projectOf = await projectResolver(projects);
   const shared: SharedConversationRow[] = [];
   for (const row of rows as readonly EnrichedConversationInput[]) {
@@ -119,6 +123,7 @@ async function buildRows(deps: SharedConversationsDeps): Promise<SharedConversat
       createdAt: row.createdAt,
       pullable: row.harness !== null && isResumableHarness(row.harness),
       vaultId: vaultIdForConversation(row, vaultLookup),
+      pulledFrom: pulledFrom.get(row.name) ?? null,
     });
   }
   return shared;

@@ -11,13 +11,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../../../tests/helpers/overdeck-test-db.js';
 import { MACHINE_TOKEN_SCOPES } from '../../../../lib/access-tokens.js';
-import { createConversation, getConversationByName } from '../../../../lib/overdeck/conversations.js';
+import { LinkUnavailableError } from '../../../../lib/anywhere/link-client.js';
+import { markConversationReleased } from '../../../../lib/overdeck/conversation-release.js';
+import { createConversation, getConversationByName, setConversationClaudeSessionId } from '../../../../lib/overdeck/conversations.js';
 import type { SettleOptions, SettleResult } from '../../../../lib/vault/settle.js';
 import type { DashboardCredential } from '../../routes/dashboard-auth.js';
 import { handleRelease, handleReleaseComplete, handleReleaseUndo } from '../../routes/conversation-pull.js';
 import {
   PULL_TRANSFERS_DIRNAME,
   readTransferPack,
+  reclaimRelease,
   sweepTransfers,
   TRANSFER_TTL_MS,
   TURN_WAIT_MAX_MS,
@@ -175,5 +178,45 @@ describe('owner release (PAN-4650 WI-9)', () => {
     now += TRANSFER_TTL_MS;
     expect(await sweepTransfers(deps)).toBe(1);
     expect(await readTransferPack(NAME, released.body.transferId as string, deps)).toBeNull();
+  });
+
+  describe('reclaim (D-4650-10)', () => {
+    function sharedRow(overrides: Record<string, unknown>) {
+      return {
+        name: 'conv-y', title: null, nativeSessionId: 's-new', harness: 'claude-code', model: null, status: 'active', sessionAlive: true,
+        isWorking: false, lastActivityAt: null, projectKey: null, gitOrigin: null, cwd: null, issueId: null, tmuxSession: null,
+        releasedTo: null, createdAt: '2026-11-01T10:00:00.000Z', pullable: true, vaultId: null, pulledFrom: null, ...overrides,
+      };
+    }
+    const shared = (rows: unknown[]) => async () => ({ status: 200, json: { environmentId: VIEWER, sharing: true, hash: 'h', rows } });
+
+    beforeEach(() => {
+      setConversationClaudeSessionId(NAME, 's-desk');
+      markConversationReleased(NAME, VIEWER);
+    });
+
+    it('ac3: refuses still-running-there when the target runs the pulled copy, and keeps released_to', async () => {
+      const result = await reclaimRelease(NAME, { force: false }, fakeDeps({
+        fetchShared: shared([sharedRow({ pulledFrom: { environmentId: 'env-desk', nativeSessionId: 's-desk' } })]),
+      }));
+      expect(result).toMatchObject({ status: 409, body: { code: 'still-running-there', remoteName: 'conv-y' } });
+      expect(getConversationByName(NAME)?.releasedTo).toBe(VIEWER);
+    });
+
+    it('ac4: refuses target-offline without force and clears released_to with force', async () => {
+      const offline = fakeDeps({ fetchShared: async () => { throw new LinkUnavailableError('machine-offline', 'laptop is offline'); } });
+      expect(await reclaimRelease(NAME, { force: false }, offline)).toMatchObject({ status: 409, body: { code: 'target-offline' } });
+      expect(getConversationByName(NAME)?.releasedTo).toBe(VIEWER);
+      expect(await reclaimRelease(NAME, { force: true }, offline)).toEqual({ status: 200, body: { ok: true } });
+      expect(getConversationByName(NAME)?.releasedTo).toBeNull();
+    });
+
+    it('reclaims when the target lists it ended or not at all', async () => {
+      const result = await reclaimRelease(NAME, { force: false }, fakeDeps({
+        fetchShared: shared([sharedRow({ sessionAlive: false, pulledFrom: { environmentId: 'env-desk', nativeSessionId: 's-desk' } }), sharedRow({ name: 'other' })]),
+      }));
+      expect(result.status).toBe(200);
+      expect(getConversationByName(NAME)?.releasedTo).toBeNull();
+    });
   });
 });

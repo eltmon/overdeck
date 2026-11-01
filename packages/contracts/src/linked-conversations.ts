@@ -33,6 +33,12 @@ export interface SharedConversationRow {
    * The viewer's saved copy of it is the browse row `vault-<vaultId>` (FR-2).
    */
   vaultId: string | null
+  /**
+   * Where the owner pulled this conversation from (adoption mints a new
+   * session id, so this is how the old owner recognises it); absent from
+   * owners older than PAN-4650 WI-11.
+   */
+  pulledFrom?: { environmentId: string; nativeSessionId: string } | null
 }
 
 /** The owner's answer to `GET /api/machines/conversations`. */

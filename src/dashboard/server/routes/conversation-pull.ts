@@ -11,6 +11,10 @@
  *   POST /api/conversations/:name/release/undo
  *   POST /api/conversations/:name/release/complete
  *
+ * Local operator (WI-11, D-4650-10), admin: `pan conv reclaim`.
+ *
+ *   POST /api/conversations/:name/reclaim   { force }
+ *
  * Viewer side (WI-10, D-4650-12), admin (no route-scope row): the Pull here job.
  *
  *   POST /api/linked-conversations/pull   { conversation: '@<machine>/<name>', whenTurnRunning }  → 202 { pullId }
@@ -25,6 +29,7 @@ import { getPull, startPull } from '../services/conversation-pull.js';
 import {
   completeRelease,
   readTransferPack,
+  reclaimRelease,
   releaseConversation,
   undoRelease,
   type ReleaseServiceDeps,
@@ -136,6 +141,16 @@ const completeRoute = HttpRouter.add(
   }),
 );
 
+const reclaimRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/reclaim',
+  Effect.gen(function* () {
+    const name = decodeURIComponent((yield* HttpRouter.params)['name'] ?? '');
+    const body = yield* readJsonBody;
+    return answer(yield* Effect.promise(() => reclaimRelease(name, { force: body['force'] === true })));
+  }),
+);
+
 const startPullRoute = HttpRouter.add(
   'POST',
   '/api/linked-conversations/pull',
@@ -166,4 +181,4 @@ const getPullRoute = HttpRouter.add(
   }),
 );
 
-export const conversationPullRouteLayer = Layer.mergeAll(releaseRoute, transferRoute, undoRoute, completeRoute, startPullRoute, getPullRoute);
+export const conversationPullRouteLayer = Layer.mergeAll(releaseRoute, transferRoute, undoRoute, completeRoute, reclaimRoute, startPullRoute, getPullRoute);

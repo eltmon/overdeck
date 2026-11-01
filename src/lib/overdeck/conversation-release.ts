@@ -47,17 +47,34 @@ export function markPulledFrom(name: string, from: PulledFrom): void {
   getOverdeckDatabase().prepare('UPDATE conversations SET pulled_from = ? WHERE name = ?').run(JSON.stringify(from), name);
 }
 
-export function readPulledFrom(name: string): PulledFrom | null {
-  const row = getOverdeckDatabase().prepare('SELECT pulled_from FROM conversations WHERE name = ?').get<{ pulled_from: string | null }>(name);
-  if (!row?.pulled_from) return null;
+function parsePulledFrom(raw: string | null | undefined): PulledFrom | null {
+  if (!raw) return null;
   try {
-    const value = JSON.parse(row.pulled_from) as Partial<PulledFrom>;
+    const value = JSON.parse(raw) as Partial<PulledFrom>;
     return typeof value.environmentId === 'string' && typeof value.nativeSessionId === 'string'
       ? { environmentId: value.environmentId, nativeSessionId: value.nativeSessionId }
       : null;
   } catch {
     return null;
   }
+}
+
+export function readPulledFrom(name: string): PulledFrom | null {
+  const row = getOverdeckDatabase().prepare('SELECT pulled_from FROM conversations WHERE name = ?').get<{ pulled_from: string | null }>(name);
+  return parsePulledFrom(row?.pulled_from);
+}
+
+/** Every pulled conversation's origin, by name, in one query (the shared list reads it). */
+export function listPulledFrom(): Map<string, PulledFrom> {
+  const rows = getOverdeckDatabase()
+    .prepare('SELECT name, pulled_from FROM conversations WHERE pulled_from IS NOT NULL')
+    .all<{ name: string; pulled_from: string }>();
+  const result = new Map<string, PulledFrom>();
+  for (const row of rows) {
+    const from = parsePulledFrom(row.pulled_from);
+    if (from) result.set(row.name, from);
+  }
+  return result;
 }
 
 /** The label of the machine a conversation was released to, else the start of its environment id. */

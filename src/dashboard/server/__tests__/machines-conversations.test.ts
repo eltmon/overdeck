@@ -71,6 +71,7 @@ function deps(rows: unknown[], overrides: Partial<SharedConversationsDeps> = {})
       owned: { '/home/desk/.claude/projects/x/session-conv-a.jsonl': { vaultId: 'vault-id-a', harness: 'claude-code', tail: {} as never } },
       listCache: [],
     }, '/home/desk/.overdeck'),
+    pulledFrom: () => new Map([['conv-b', { environmentId: 'env-laptop', nativeSessionId: 's-old' }]]),
     ...overrides,
   };
 }
@@ -127,8 +128,10 @@ describe('GET /api/machines/conversations (PAN-4650 WI-2)', () => {
       createdAt: '2026-11-01T10:00:00.000Z',
       pullable: true,
       vaultId: 'vault-id-a',
+      pulledFrom: null,
     });
-    expect(json.rows[1]).toMatchObject({ projectKey: 'myn', gitOrigin: 'gitlab.com/myn/app', releasedTo: 'env-laptop', isWorking: true, pullable: false, vaultId: null });
+    expect(json.rows[1]).toMatchObject({ projectKey: 'myn', gitOrigin: 'gitlab.com/myn/app', releasedTo: 'env-laptop', isWorking: true, pullable: false, vaultId: null,
+      pulledFrom: { environmentId: 'env-laptop', nativeSessionId: 's-old' } });
     expect(json.hash).toMatch(/^[0-9a-f]{16}$/);
   });
 

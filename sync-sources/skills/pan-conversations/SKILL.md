@@ -1,6 +1,6 @@
 ---
 name: pan-conversations
-description: "pan conversations scan/search/list/show/current/cost/enrich/embed/move/link-pr/schedule — discover, index, search, reassign, link PRs to, and schedule prompts in Claude Code session history"
+description: "pan conversations scan/search/list/show/current/cost/enrich/embed/move/link-pr/schedule/pull/reclaim — discover, index, search, reassign, link PRs to, schedule prompts in, and pull conversations between machines in Claude Code session history"
 triggers:
   - pan conversations
   - pan conv
@@ -9,6 +9,8 @@ triggers:
   - conversations move
   - conv link-pr
   - conv schedule
+  - conv pull
+  - conv reclaim
 allowed-tools:
   - Bash
   - Read
@@ -39,6 +41,8 @@ pan conversations schedule list [conv] [--json]
 pan conversations schedule pause <id>
 pan conversations schedule resume <id>
 pan conversations schedule rm <id>
+pan conversations pull <conv> [--stop-turn] [--json]
+pan conversations reclaim <conv> [--force]
 pan conversations current [--json]
 pan conversations cost [--since <time>] [--workspace <path>] [--by <field>] [--json]
 pan conversations embed [ids...] [--regenerate] [--status] [--provider <name>] [--model <name>] [--max-parallel <n>]
@@ -98,6 +102,18 @@ pan conversations enrich [ids...] [--tier <n>] [--deep] [--full] [--upgrade] [--
   restarts: a stopped session is resumed first, missed runs collapse into one,
   and a failed run is recorded, not retried. Agent conversations and vault
   copies cannot be scheduled. Writes work with the dashboard down.
+- **`pull`** (PAN-4650) makes this machine own a conversation that runs on a
+  linked machine. Name it `@<machine>/<conv>` (label or environment id). It
+  prints each step (`release`, `transfer`, `adopt`, `finish`) and then
+  `Pulled: /conv/<id>`; the old machine keeps a read-only copy. A running turn
+  is waited for (up to 30 minutes) unless `--stop-turn`. When the owner is
+  offline it continues this machine's Session Vault saved copy instead, and
+  fails `owner-offline-no-saved-copy` without one. Pushing back is a `pull`
+  from the other machine. Needs the dashboard.
+- **`reclaim`** (PAN-4650) takes back a conversation this machine released
+  when the machine it went to does not run it. It refuses with
+  `still-running-there` while that machine runs it (pull it back instead), and
+  with `target-offline` when that machine cannot be asked, unless `--force`.
 - **`enrich`**/**`embed`** call out to an LLM/embedding provider and cost money;
   `enrich` prompts for confirmation unless `--yes` is passed. `--tier 3`
   (`--deep`) and `--full` are the expensive, most-thorough options.

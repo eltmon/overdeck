@@ -20,6 +20,9 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import type { SharedConversationsResponse } from '@overdeck/contracts';
+
+import { linkFetch, LinkUnavailableError } from '../../../lib/anywhere/link-client.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { conversationHarnessAlive } from '../../../lib/overdeck/conversation-liveness.js';
 import { getEnrichedConversationList } from '../../../lib/overdeck/conversation-list.js';
@@ -88,6 +91,8 @@ export interface ReleaseServiceDeps {
   home: () => string;
   now: () => number;
   sleep: (ms: number) => Promise<void>;
+  /** Reclaim asks the machine a conversation was released to for its shared list. */
+  fetchShared: (environmentId: string) => Promise<{ status: number; json: unknown }>;
 }
 
 async function isWorkingFromList(name: string): Promise<boolean> {
@@ -108,6 +113,7 @@ const defaultDeps: ReleaseServiceDeps = {
   home: getOverdeckHome,
   now: () => Date.now(),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  fetchShared: (environmentId) => linkFetch(environmentId, '/api/machines/conversations', { actor: 'operator' }),
 };
 
 function withDefaults(deps: Partial<ReleaseServiceDeps>): ReleaseServiceDeps {
@@ -283,6 +289,41 @@ export async function completeRelease(name: string, overrides: Partial<ReleaseSe
   const conv = deps.getConversation(name);
   if (!conv) return { status: 404, body: { error: 'Conversation not found' } };
   if (!conv.releasedTo) return { status: 409, body: { error: 'This conversation is not released', code: 'not-released' } };
+  for (const id of await transfersOf(deps, name)) await rm(transferDir(deps, id), { recursive: true, force: true });
+  return { status: 200, body: { ok: true } };
+}
+
+/**
+ * `pan conv reclaim` (D-4650-10): take back a released conversation when the
+ * machine it went to does not run it. Refused when that machine lists it live
+ * and unreleased (`still-running-there`), or cannot be asked
+ * (`target-offline`) unless `force`. Matched by the pulled copy's
+ * `pulledFrom` (adoption gave it a new session id) or by the session id.
+ */
+export async function reclaimRelease(name: string, input: { force: boolean }, overrides: Partial<ReleaseServiceDeps> = {}): Promise<ServiceAnswer> {
+  const deps = withDefaults(overrides);
+  const conv = deps.getConversation(name);
+  if (!conv) return { status: 404, body: { error: 'Conversation not found' } };
+  const target = conv.releasedTo;
+  if (!target) return { status: 409, body: { error: 'This conversation is not released', code: 'not-released' } };
+  let shared: SharedConversationsResponse | null = null;
+  try {
+    const response = await deps.fetchShared(target);
+    if (response.status === 200) shared = response.json as SharedConversationsResponse;
+  } catch (error) {
+    if (!(error instanceof LinkUnavailableError)) throw error;
+  }
+  if (!shared && !input.force) {
+    return { status: 409, body: { error: 'The machine it was released to cannot be asked; pass --force to take it back anyway', code: 'target-offline' } };
+  }
+  const self = await deps.environmentId();
+  const session = conv.claudeSessionId;
+  const running = (shared?.rows ?? []).find((row) => row.sessionAlive && row.releasedTo === null && session !== null
+    && (row.nativeSessionId === session || (row.pulledFrom?.environmentId === self && row.pulledFrom.nativeSessionId === session)));
+  if (running) {
+    return { status: 409, body: { error: `It is still running there as ${running.name}; pull it back instead`, code: 'still-running-there', remoteName: running.name } };
+  }
+  clearConversationRelease(name);
   for (const id of await transfersOf(deps, name)) await rm(transferDir(deps, id), { recursive: true, force: true });
   return { status: 200, body: { ok: true } };
 }
