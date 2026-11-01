@@ -1,0 +1,364 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T06:10:32Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4670: Simple issue page offers Start work while the work agent runs, and every simple-mode action fails with 'Invalid CSRF token'",
+    "updated": "2026-11-01T11:01:49.314Z"
+  },
+  "plan": {
+    "id": "pan-4670",
+    "title": "Simple issue page offers Start work while the work agent runs, and every simple-mode action fails with 'Invalid CSRF token'",
+    "status": "running",
+    "uid": "73be4ba3-c417-46ce-9b4f-560f092e0d97",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-01T06:10:32Z",
+    "updated": "2026-11-01T11:01:49.314Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4670",
+        "label": "PAN-4670",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4670.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "simple-mode",
+      "csrf",
+      "bug"
+    ],
+    "metadata": {
+      "sizeJustification": "Four small items across 7 files in one subsystem (dashboard frontend simple mode) plus docs.",
+      "canonicalFilename": "2026-11-01-PAN-4670-simple-issue-page-offers-start-work-while-the-work-agent-runs-and-every-simple-mode-action-fails-with-invalid-csrf-token.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Two independent defects on the simple-mode issue page. (1) postJson in src/dashboard/frontend/src/lib/simple/useSimpleActions.ts sends no x-overdeck-csrf-token header and no credentials, so every simple action (tell, answer, recover, unpause, merge, startWork, startPlanning) gets 403 Invalid CSRF token. (2) isPlanReadyToStart in src/dashboard/frontend/src/lib/simple/derive.ts returns true for any written plan whose plan agent idles at a bare turn end, and baseStateFor lets that override the real pipeline state, so PAN-4643 showed 'The plan is ready / Start work' while its work agent was running. Making isPlanReadyToStart false alone is not enough: the idle planner is still picked as pendingInputAgent, so showsQuestion turns true and the page would render 'Question for you'.",
+      "Proposal": "WI-1: postJson sends credentials: 'include' and await dashboardMutationJsonHeaders(); useSimpleActions.test.tsx mocks ../wsTransport and asserts the header for all seven actions. WI-2: add that test file to the root test:frontend-subset script so CI runs it. WI-3: add hasWorkAgent(pipelineState, panes) = live work pane OR a post-work pipeline state (in_review_*, ready_to_merge, merged, done, canceled); isPlanReadyToStart takes a required workAgentExists flag and returns false when it is true; deriveSimpleIssue skips a plan agent at a bare turn end when choosing pendingInputAgent once a work agent exists. in_progress_work_idle alone does not count, because finalize commits the plan to the feature branch and that alone derives as 'working'. WI-4: document the CSRF contract for simple mode in docs/DASHBOARD-ARCHITECTURE.md and the plan-ready rule in docs/ISSUE-VIEW.md, and fix the stale planReadyToStart doc comment in userFacingState.ts. Per the plan critique, WI-3 also adds simplePipelineState(base, panes): a live work pane turns a pre-work state (generic, planning_active, planning_done_awaiting_work) into in_progress_work_running, so a missing or still-planned derived state cannot offer Start work while the work agent runs.",
+      "NonGoals": "- Changing derivePipelineState (issuePipelineState.ts) or the server's deriveState; the live-work-pane override is simple-mode only, in derive.ts\n- Hiding the plan-ready card for a dead work agent (exited work pane); Start work then reaches the server's 409 Resume / Start fresh dialog\n- Reading AgentSnapshot.status to decide whether a work agent exists\n- Changing CSRF handling on non-simple-mode fetches, or adding a CSRF header to the GET in SimpleTerminalExcerpt.tsx\n- Any logic change in SimpleIssuePage.tsx, SimpleHomePage.tsx, NeedsYouStrip.tsx or userFacingState.ts (userFacingState.ts gets a doc-comment edit only)\n- New server routes or store fields\n- Treating in_progress_work_idle by itself as proof that a work agent exists"
+    },
+    "autoDecisions": [
+      {
+        "summary": "A work agent exists when the issue has a live work pane or the pipeline is in a post-work state (in_review_*, ready_to_merge, merged, done, canceled); in_progress_work_idle alone does not count.",
+        "rationale": "pan plan finalize commits the PRD and spec to the feature branch, so a planned-but-unstarted branch is ahead of origin/main and the server derives 'working' (verified on feature/pan-1224, 1832, 1894, 1901, 1934, 2093). Counting in_progress_work_idle would hide the plan-ready card in the exact case it exists for and break the issue's own third acceptance criterion."
+      },
+      {
+        "summary": "'generic' pipeline state does not prove a work agent.",
+        "rationale": "generic means the derived state is missing or backlog/parked; flipping the card off on missing data would be a guess."
+      },
+      {
+        "summary": "isPlanReadyToStart gets a required third parameter workAgentExists rather than a defaulted one.",
+        "rationale": "A default would let a future call site silently reintroduce the bug; the only other caller is one test line, updated in the same item."
+      },
+      {
+        "summary": "Once a work agent exists, deriveSimpleIssue skips a plan agent at a bare turn end when choosing pendingInputAgent.",
+        "rationale": "Without it, showsQuestion returns true and the page renders 'Question for you' instead of 'Writing code', failing the issue's second acceptance criterion. Consumers of pendingInputAgent read it only for needs-you and answering, where a planner that asked nothing must not be a target."
+      },
+      {
+        "summary": "Pane inventory, not AgentSnapshot.status, decides work-agent existence; a dead work agent with an idle planner keeps the plan-ready card.",
+        "rationale": "The terminal backend is the authority for liveness and the issue names the live work pane; Start work in that case reaches the existing 409 recovery dialog, which is the right next step."
+      },
+      {
+        "summary": "Add useSimpleActions.test.tsx to the root test:frontend-subset script.",
+        "rationale": "CI runs only listed frontend files (conventions.md); without it the CSRF test the issue requires would never run in CI."
+      },
+      {
+        "summary": "A live work pane outranks a missing or still-planned derived state in simple mode (simplePipelineState in derive.ts), leaving the shared derivePipelineState unchanged.",
+        "rationale": "Plan critique round 1: generic and planning states map to Start work without consulting panes, and SimpleIssuePage passes an optional derived lookup alongside the live pane inventory; keeping the override in simple mode avoids changing Advanced-mode surfaces."
+      }
+    ],
+    "items": [
+      {
+        "id": "csrf-headers",
+        "title": "Simple-mode postJson sends the CSRF header and credentials",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T06:10:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4670",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/simple/useSimpleActions.ts",
+            "src/dashboard/frontend/src/lib/simple/useSimpleActions.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/simple/useSimpleActions.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "useSimpleActions.test.tsx passes, including one CSRF case per action and the header-failure case",
+            "typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 (.pan/drafts/PAN-4670.md). In src/dashboard/frontend/src/lib/simple/useSimpleActions.ts import { dashboardMutationJsonHeaders } from '../wsTransport' and change the fetch in postJson to { method: 'POST', credentials: 'include', headers: await dashboardMutationJsonHeaders(), body: ... }. Call dashboardMutationJsonHeaders with no argument. Leave the 409 recovery and error-message code unchanged. In useSimpleActions.test.tsx add vi.mock('../wsTransport', () => ({ dashboardMutationJsonHeaders: vi.fn(async () => ({ 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'test-csrf' })) })) so the existing unpause test keeps passing (the real module keeps the token at module scope and would throw 'Dashboard CSRF token unavailable'). Also add vi.mock('../refresh-dashboard-state', () => ({ refreshDashboardState: vi.fn(async () => {}) })), because refreshDashboardState imports getTransport from wsTransport, which the first mock does not provide; each success case asserts the mocked refreshDashboardState was called after isSuccess. Add an it.each over tell, answer, recover, unpause, merge, startWork, startPlanning with the inputs and URLs in the PRD table, asserting fetch was called with expect.objectContaining({ method: 'POST', credentials: 'include', headers: expect.objectContaining({ 'x-overdeck-csrf-token': 'test-csrf' }) }). Add one test where the mock rejects once with Error('Dashboard CSRF token unavailable'): startWork ends with isError true, that error message, and no fetch to /api/agents."
+        },
+        "items": [
+          {
+            "id": "csrf-headers.ac1",
+            "title": "Given each of the seven simple actions is mutated, when fetch is called, then the call includes credentials: 'include' and an x-overdeck-csrf-token header, and the mocked refreshDashboardState runs after success (asserted per action in useSimpleActions.test.tsx)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "csrf-headers.ac2",
+            "title": "Given dashboardMutationJsonHeaders rejects with 'Dashboard CSRF token unavailable', when startWork is mutated, then the mutation ends in an error state with that message and fetch is never called for /api/agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "csrf-headers.ac3",
+            "title": "The existing unpause exact-agent test still passes and postJson still opens the Resume / Start fresh dialog on a 409 with a resumable body (409 branch unchanged in the diff)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-subset-simple-actions",
+        "title": "Run useSimpleActions.test.tsx in the CI frontend subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T06:10:32Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4670",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'src/lib/simple/useSimpleActions.test.tsx' package.json"
+          ],
+          "expected_outputs": [
+            "grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In root package.json, script test:frontend-subset (line 141), insert ' src/lib/simple/useSimpleActions.test.tsx' immediately after ' src/lib/simple/uiMode.test.ts'. Change nothing else in package.json. CI (.github/workflows/ci.yml line 245) runs only files listed in this script."
+        },
+        "items": [
+          {
+            "id": "ci-subset-simple-actions.ac1",
+            "title": "Root package.json test:frontend-subset contains src/lib/simple/useSimpleActions.test.tsx exactly once (grep -c prints 1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-subset-simple-actions.ac2",
+            "title": "The package.json diff changes only the test:frontend-subset line and preserves every previously listed test path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-ready-gate",
+        "title": "Plan-ready card and planner turn-end are suppressed while a work agent exists",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T06:10:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4670",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/simple/derive.ts",
+            "src/dashboard/frontend/src/lib/__tests__/simple-derive.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/simple-derive.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/__tests__/fr7-conversation-pending-input.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "simple-derive.test.ts passes, including the PAN-4643 reproduction, the planning-commits production shape, post-work states, real-question, live-work-pane-over-lagging-derived, simplePipelineState and hasWorkAgent cases",
+            "fr7-conversation-pending-input.test.tsx passes unchanged",
+            "typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-9",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "acJustification": "Six ACs: the critique added the live-work-pane override (FR-9), which shares derive.ts and simple-derive.test.ts with the other cases and cannot ship separately without leaving Start work reachable."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly. In src/dashboard/frontend/src/lib/simple/derive.ts: import hasLivePane from '../issuePipelineState'; add POST_WORK_PIPELINE_STATES = { in_review_reviewers_running, in_review_changes_requested, in_review_approved, ready_to_merge, merged, done, canceled } and export hasWorkAgent(pipelineState, panes) = hasLivePane(panes, 'work') || POST_WORK_PIPELINE_STATES.has(pipelineState), with the PRD doc comment explaining why in_progress_work_idle alone does not count (finalize commits the plan to the feature branch; any live pane reads as working). Add PRE_WORK_PIPELINE_STATES = { generic, planning_active, planning_done_awaiting_work } and export simplePipelineState(base, panes) = hasLivePane(panes, 'work') && PRE_WORK_PIPELINE_STATES.has(base) ? 'in_progress_work_running' : base; in deriveSimpleIssue wrap the existing derivePipelineState call with it so the returned pipelineState, rail and display all use the overridden value. Give isPlanReadyToStart a required third parameter workAgentExists: boolean that returns false when true. In deriveSimpleIssue compute pipelineState before pendingInputAgent, compute workAgentExists = hasWorkAgent(pipelineState, panes), choose pendingInputAgent = agents.find(a => hasPendingInput(a) && !(workAgentExists && a.role === 'plan' && isBareTurnEnd(a))), and pass planReadyToStart: isPlanReadyToStart(issue, pendingInputAgent, workAgentExists). Update the pendingInputAgent field comment. In simple-derive.test.ts change the line-74 call to pass false and add the five test groups listed in PRD WI-3 step 6 (PAN-4643 reproduction with planner first in the array; production shape derived('working') + idle plan pane only -> 'The plan is ready'; post-work states; real question from the work agent still wins; live work pane with derived undefined or planned -> 'Writing code'; simplePipelineState unit cases; hasWorkAgent unit cases). Do not change userFacingState.ts logic, derivePipelineState, or any page component."
+        },
+        "items": [
+          {
+            "id": "plan-ready-gate.ac1",
+            "title": "Given hasPlan true, agents [idle planner at bare turn end, running work agent], derived('working') and panes [plan idle, work working], when deriveSimpleIssue runs, then pipelineState is in_progress_work_running, display.title is 'Writing code', display.primaryAction is null and display.needsYouReason is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-ready-gate.ac2",
+            "title": "Given hasPlan true, agents [idle planner at bare turn end], derived('working') and panes [plan idle] only, when deriveSimpleIssue runs, then pipelineState is in_progress_work_idle and display returns title 'The plan is ready' with primaryAction 'Start work'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-ready-gate.ac3",
+            "title": "Given an idle planner and derived state in-review, ready or merged, when deriveSimpleIssue runs, then display.primaryAction is not 'Start work' and needsYouReason is neither 'start-work' nor 'question'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-ready-gate.ac4",
+            "title": "Given an idle planner listed before a work agent with a pending AskUserQuestion, when deriveSimpleIssue runs, then pendingInputAgent is the work agent and display.needsYouReason is 'question'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-ready-gate.ac5",
+            "title": "hasWorkAgent returns false for ('in_progress_work_idle', [plan idle]), ('generic', []) and ('planning_active', [work exited]), and returns true for ('in_progress_work_idle', [work idle]) and ('in_review_approved', []); all pre-existing simple-derive tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-ready-gate.ac6",
+            "title": "Given an idle planner, a running work agent and a live work pane, when deriveSimpleIssue runs with derived undefined or derived('planned'), then pipelineState is in_progress_work_running, display.title is 'Writing code' and display.primaryAction is null; simplePipelineState returns ready_to_merge unchanged for ('ready_to_merge', [work working]) and generic for ('generic', [work exited])",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-simple-mode",
+        "title": "Document the simple-mode CSRF contract and the plan-ready rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T06:10:32Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4670",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/ISSUE-VIEW.md",
+            "src/dashboard/frontend/src/lib/simple/userFacingState.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'useSimpleActions.ts' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -c 'hasWorkAgent' docs/ISSUE-VIEW.md",
+            "grep -c 'simplePipelineState' docs/ISSUE-VIEW.md",
+            "grep -c 'whatever the raw pipeline state says' src/dashboard/frontend/src/lib/simple/userFacingState.ts || true",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "DASHBOARD-ARCHITECTURE.md count is at least 1",
+            "ISSUE-VIEW.md count is at least 1",
+            "ISSUE-VIEW.md simplePipelineState count is at least 1",
+            "userFacingState.ts count is 0",
+            "typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. (1) docs/DASHBOARD-ARCHITECTURE.md: after the paragraph at lines 172-179 that begins 'Because the endpoint spawns a billable model session' and ends 'would throw in `new URL(...)`.', add the PRD's paragraph saying every browser mutation follows that contract and the simple-mode actions in src/dashboard/frontend/src/lib/simple/useSimpleActions.ts (helper postJson) send credentials: 'include' and await dashboardMutationJsonHeaders(); a raw fetch with only Content-Type gets 403 Invalid CSRF token (PAN-4670). (2) docs/ISSUE-VIEW.md: append to '## Recovery start contract' (line 226) the PRD paragraph that the simple page shows 'The plan is ready' with Start work only when the issue has a plan and no work agent exists (no live work pane; pipeline not in review, ready, merged, done or canceled; hasWorkAgent in derive.ts), that once a work agent exists an idle finished planner is neither a plan-ready signal nor a question, that a live work pane outranks a missing or still-planned derived state (simplePipelineState), and that in_progress_work_idle alone does not count because finalize commits the plan to the feature branch. (3) src/dashboard/frontend/src/lib/simple/userFacingState.ts lines 20-25: replace 'so what this needs is the start button, whatever the raw pipeline state says.' with 'and no work agent exists for the issue — so what this needs is the start button. See `isPlanReadyToStart` and `hasWorkAgent` in ./derive.ts.' No code change in that file."
+        },
+        "items": [
+          {
+            "id": "docs-simple-mode.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md names useSimpleActions.ts and states that simple-mode actions send credentials: 'include' and dashboardMutationJsonHeaders(), and that a request without the header returns 403 Invalid CSRF token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-simple-mode.ac2",
+            "title": "docs/ISSUE-VIEW.md 'Recovery start contract' names hasWorkAgent and simplePipelineState and states that 'The plan is ready' with Start work renders only when no work agent exists, and that in_progress_work_idle alone does not count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-simple-mode.ac3",
+            "title": "userFacingState.ts no longer contains 'whatever the raw pipeline state says', its planReadyToStart comment references hasWorkAgent, and the file's non-comment code is unchanged in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "csrf-headers",
+        "to": "ci-subset-simple-actions",
+        "type": "informs"
+      },
+      {
+        "from": "plan-ready-gate",
+        "to": "docs-simple-mode",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -379,3 +379,27 @@ describe('resolveVm — public method', () => {
     await expect(provider.resolveVm('nonexistent')).rejects.toThrow('No Fly machine found');
   });
 });
+
+describe('configureClaudeCode', () => {
+  it('pre-accepts onboarding, the /workspace trust dialog and the bypass disclaimer', async () => {
+    process.env.FLY_API_TOKEN = 'test-token';
+    const provider = createFlyProvider({ app: 'test-app', org: 'test-org', region: 'iad' });
+    const commands: string[] = [];
+    (provider as unknown as { sshImpl: (vm: string, command: string) => Promise<unknown> }).sshImpl =
+      async (_vm: string, command: string) => {
+        commands.push(command);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      };
+
+    await provider.configureClaudeCode('vm-1');
+
+    const scripts = commands
+      .map((command) => command.match(/^echo '([A-Za-z0-9+/=]+)' \| base64 -d \| python3$/)?.[1])
+      .filter((b64): b64 is string => !!b64)
+      .map((b64) => Buffer.from(b64, 'base64').toString('utf8'));
+    expect(scripts).toHaveLength(1);
+    expect(scripts[0]).toContain('data["hasCompletedOnboarding"] = True');
+    expect(scripts[0]).toContain('ws["hasTrustDialogAccepted"] = True');
+    expect(scripts[0]).toContain('data["bypassPermissionsModeAccepted"] = True');
+  });
+});

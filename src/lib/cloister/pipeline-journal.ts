@@ -50,7 +50,7 @@ export interface PipelineJournalEntry {
   at: string;
   type: PipelineJournalEntryType;
   issueId: string;
-  /** Who acted, e.g. 'pan-done' | 'pan-review-request' | 'webhook' | 'deacon-lite' | 'merge-button' | 'complete-planning'. */
+  /** Who acted, e.g. 'pan-done' | 'pan-review-request' | 'webhook' | 'deacon-lite' | 'remote-reap' | 'merge-button' | 'complete-planning'. */
   source?: string;
   data?: Record<string, unknown>;
 }

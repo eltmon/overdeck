@@ -154,6 +154,7 @@ src/lib/__tests__/useDecisions.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts
 src/lib/sessionOutcome.test.ts
 src/lib/simple/uiMode.test.ts
+src/lib/simple/useSimpleActions.test.tsx
 src/pages/__tests__/NewProjectPage.no-loss.test.tsx
 src/pages/__tests__/NewWorkspacePage.test.tsx
 src/test-utils/renderCounter.test.tsx

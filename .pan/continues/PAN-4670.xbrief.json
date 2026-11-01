@@ -1,0 +1,108 @@
+{
+  "version": "1",
+  "issueId": "PAN-4670",
+  "created": "2026-11-01T11:02:32.150Z",
+  "updated": "2026-11-01T11:34:28.927Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T11:34Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T11:34:28.927Z"
+    }
+  ],
+  "items": {
+    "csrf-headers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4670",
+      "claimedAt": "2026-11-01T11:02:32.150Z",
+      "doneAt": "2026-11-01T11:09:27.636Z"
+    },
+    "ci-subset-simple-actions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4670",
+      "claimedAt": "2026-11-01T11:09:34.382Z",
+      "doneAt": "2026-11-01T11:10:24.098Z"
+    },
+    "plan-ready-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4670",
+      "claimedAt": "2026-11-01T11:10:56.281Z",
+      "doneAt": "2026-11-01T11:14:50.039Z"
+    },
+    "docs-simple-mode": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4670",
+      "claimedAt": "2026-11-01T11:14:53.500Z",
+      "doneAt": "2026-11-01T11:16:00.843Z"
+    },
+    "csrf-headers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:16:39.467Z"
+    },
+    "csrf-headers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:16:51.631Z"
+    },
+    "csrf-headers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:17:03.415Z"
+    },
+    "ci-subset-simple-actions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:17:18.187Z"
+    },
+    "ci-subset-simple-actions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:17:29.816Z"
+    },
+    "plan-ready-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:17:44.625Z"
+    },
+    "plan-ready-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:17:58.008Z"
+    },
+    "plan-ready-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:18:10.961Z"
+    },
+    "plan-ready-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:18:24.367Z"
+    },
+    "plan-ready-gate.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:18:37.105Z"
+    },
+    "plan-ready-gate.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:18:50.358Z"
+    },
+    "docs-simple-mode.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:19:06.747Z"
+    },
+    "docs-simple-mode.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:19:18.756Z"
+    },
+    "docs-simple-mode.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:19:30.596Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T11:34:28Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4670\n\nPull request: https://github.com/eltmon/overdeck/pull/4712 (head `46039602`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124834587992/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41301961410/job/124834587992  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on Pipeline, Board, Command Deck, and Agents routes\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on Pipeline, Board, Command Deck, and Agents routes\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 45000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/e2e/styleguide-conformance.spec.ts:\u001b[2m416:3\u001b[22m\u001b[39m\n    \u001b[90m414|\u001b[39m\n    \u001b[90m415|\u001b[39m \u001b[34mdescribe\u001b[39m(\u001b[32m'styleguide rendered surface conformance'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m416|\u001b[39m   it('renders shared primitives on Pipeline, Board, Command Deck, and …\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m417|\u001b[39m     \u001b[35mconst\u001b[39m pipeline \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mopenRoute\u001b[39m(\u001b[32m'/pipeline'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m418|\u001b[39m     await expect.poll(() => pipeline.page.locator('[data-component=\"to…\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m507 passed\u001b[39m\u001b[22m\u001b[90m (508)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

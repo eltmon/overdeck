@@ -59,10 +59,13 @@ endpoint; port tunnelling uses `fly proxy`.
    Overdeck will:
    - Create a Fly Machine in your configured app
    - Wait up to 120 s for it to reach `started`
-   - Clone the repository and check out the feature branch
-   - Install beads CLI and copy your local skills
    - Sync Claude Code and GitHub credentials from your local machine
+   - Clone the repository over HTTPS into `/workspace` and check out the feature branch
+   - Configure Claude Code and copy your local skills
    - Save workspace metadata to `~/.overdeck/workspaces/<id>.yaml`
+
+   No SSH private key is copied to the VM. Git authenticates over HTTPS with the
+   synced `gh` token.
 
 4. **Check status at any time:**
 
@@ -154,7 +157,10 @@ Every Fly Machine runs the `pan-workspace` image defined in
 - pnpm
 - Claude Code CLI (`@anthropic-ai/claude-code`)
 - flyctl
-- git, tmux, build-essential, openssh-server, python3, jq
+- git, tmux, build-essential, python3, jq
+
+The image runs no sshd: Fly's hallpass provides `fly ssh console`, sftp and the
+Machines exec API.
 
 ### Build and push
 
@@ -252,18 +258,47 @@ API and base64 encoding:
 
 | Credential | Local source | Remote destination |
 |---|---|---|
-| Claude Code OAuth | macOS Keychain (`Claude Code-credentials`) | `~/.claude/.credentials.json` |
-| GitHub CLI | `~/.config/gh/hosts.yml` | `~/.config/gh/hosts.yml` |
-| GitLab CLI | `~/.config/glab-cli/config.yml` | `~/.config/glab-cli/config.yml` |
+| Claude Code OAuth | `~/.claude/.credentials.json` on Linux, the macOS Keychain item `Claude Code-credentials` on macOS | `~/.claude/.credentials.json` |
+| GitHub | `gh auth token` | `gh auth login --with-token` + `gh auth setup-git` (git over HTTPS) |
+
+GitLab projects are not supported on Fly: without an SSH key, a GitLab clone needs a
+`glab` credential helper, and the image ships no `glab`.
+
+Overdeck never copies `~/.ssh/*` or `~/.overdeck/ssh/*` to a VM.
 
 Claude Code is also configured for autonomous operation: `~/.claude/settings.json` is
-written with `permissions.defaultMode = "bypassPermissions"` and onboarding is marked
-complete in `~/.claude.json`.
+written from your resolved Overdeck permission mode and onboarding is marked complete
+in `~/.claude.json`.
 
 If Claude auth fails on the remote agent, re-authenticate locally (`claude`) then sync:
 
 ```bash
 pan workspace sync-auth PAN-42
+```
+
+---
+
+## Automatic loops
+
+The deacon child keeps remote agents alive, authenticated and moving with three
+loops (PAN-4295). With no active remote agent, none of them calls the Fly API.
+
+| Loop | Cadence | What it does | Deacon frozen |
+|---|---|---|---|
+| Host heartbeat | every 60 s, ephemeral tier only | Writes the current time to `/workspace/.pan/host-heartbeat`. The VM watchdog stops the machine when the file is older than 300 s, so an ephemeral machine stops itself about 5 minutes after the host goes away. | keeps running |
+| Credential refresh | checked every 60 s | Copies host Claude credentials to each active VM when the host credentials file changes, or every 15 min at most. A failed copy is retried on the next check. | keeps running |
+| Reap | every 60 s deacon-lite tick | On `REMOTE_DONE`, materializes `workspaces/feature-<id>`, opens the PR, destroys the machine and requests review. On a crash (no session, no sentinel, or a stopped machine), salvages unpushed work, stops the machine and marks the agent `error`. An unreachable Fly API or a failed exec leaves the agent alone until the next tick. `starting` agents are skipped. | skipped |
+
+The heartbeat and credential refresh run in `src/lib/cloister/hygiene-scheduler.ts`;
+the reap runs last in `runDeaconLite()` through `src/lib/cloister/remote-reap-routine.ts`.
+Before the reap destroys or stops a machine, it copies the session transcripts and
+`continue.json` back with `fly ssh sftp`, so `fly` must be on the deacon child's
+`PATH`. A failed copy is recorded in the reap's details; it does not stop the hand-off.
+
+To force a reap, or to recover one agent whatever its state, run:
+
+```bash
+pan admin remote reap [--issue <id>] [--dry-run]
 ```
 
 ---
@@ -351,3 +386,37 @@ refused.
    fly ssh console -a pan-workspaces -C "ss -tlnp"
    ```
 3. Ensure `flyctl` is on your `$PATH` — `FlyProvider.tunnel()` spawns it directly.
+
+---
+
+## Live verification
+
+PAN-4295 was smoke-tested live on 2026-11-01, before merge, with the feature
+branch's own `dist/` build (`node dist/cli/index.js`). The throwaway issue was
+PAN-4677 ([#4677](https://github.com/eltmon/overdeck/issues/4677)); its agent
+ran on machine `080ee717f272e8` (`pan-pan-4677-ws`, app `pan-workspaces`,
+ephemeral tier, image rebuilt the same day with Claude Code 2.1.316).
+
+| Check | Result |
+|---|---|
+| O1: key-free VM | `/root/.ssh` and `/.ssh` do not exist; `find / -xdev` finds no `id_rsa*`, `id_ed25519*`, `id_ecdsa*` or `exe-dev-key`. |
+| O2: positive evidence mid-work | `admin remote reap --issue PAN-4677` printed `still-running`; the machine stayed `started`. |
+| O3: hand-off | After `REMOTE_DONE`, `--dry-run` printed `handed-off` ("Dry run — would hand off to review"); the real run printed `handed-off`, opened PR [#4694](https://github.com/eltmon/overdeck/pull/4694), destroyed the machine and logged "Requested review through the dashboard review route". The journal recorded `review.requested` with `source: "api"`, as expected before the route change deploys. The run also logged "Copied 1/1 session JSONL(s)" and "Copied continue.json back from VM", but nothing was copied: `remote-sessions/` stayed empty. Both `copyFromVm` calls awaited an Effect without running it, so the remote transcript was lost with the machine. That bug is fixed in this branch (`Effect.runPromise`, with a test that fails unless the copy runs). |
+
+The first real reap failed once with `cannot lock ref 'refs/remotes/origin/feature/pan-4677'`.
+A concurrent fetch had updated the same ref. That failure writes no state and
+leaves the machine running, so the next tick (or a rerun) hands off; the rerun did.
+
+The run found and fixed, in this branch: the clone outlasting the 60 s exec
+deadline ([#4685](https://github.com/eltmon/overdeck/issues/4685), now cloned in
+the background), Claude Code refusing bypass mode as root (`IS_SANDBOX=1`), and
+the first-run Bypass Permissions disclaimer (`bypassPermissionsModeAccepted`).
+It also filed [#4682](https://github.com/eltmon/overdeck/issues/4682) (the
+default image name does not exist; set `[remote.fly] image =
+"registry.fly.io/pan-workspaces:latest"`) and
+[#4683](https://github.com/eltmon/overdeck/issues/4683) (`pan start --remote`
+re-plans a planned issue, and the post-planning auto-start runs locally).
+
+The automatic 60 s tick, the `remote-reap` journal source and the heartbeat
+file are checked after deploy in
+[#4696](https://github.com/eltmon/overdeck/issues/4696).

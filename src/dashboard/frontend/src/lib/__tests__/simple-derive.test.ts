@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { AgentSnapshot } from '@overdeck/contracts';
-import { bucketSimpleHome, deriveExpectation, deriveSimpleIssue, isBareTurnEnd, isPlanReadyToStart } from '../simple/derive';
+import { bucketSimpleHome, deriveExpectation, deriveSimpleIssue, hasWorkAgent, isBareTurnEnd, isPlanReadyToStart, simplePipelineState } from '../simple/derive';
 import { simpleStepIndex } from '../simple/phases';
 import type { BackendPane, DerivedIssueState, DerivedIssueStateName, Issue } from '../../types';
 
@@ -71,7 +71,7 @@ describe('isBareTurnEnd — turn-end assessment override (PAN-4371)', () => {
       pendingInputKinds: ['agentTurnEnded'],
       turnEndAssessment: { kind: 'asks_operator', confidence: 0.9, needsAnswer: true, model: 'm' },
     });
-    expect(isPlanReadyToStart(issue, planAgent)).toBe(false);
+    expect(isPlanReadyToStart(issue, planAgent, false)).toBe(false);
   });
 });
 
@@ -293,6 +293,128 @@ describe('deriveSimpleIssue', () => {
   it('no workStart at all carries no workStartError', () => {
     const d = deriveSimpleIssue(makeIssue(), [agent()], derived('working'), WORK);
     expect(d.workStartError).toBeNull();
+  });
+
+  // PAN-4670 — PAN-4643 showed "The plan is ready / Start work" while its work
+  // agent was running: a plan agent idling at a bare turn end overrode a live
+  // work agent. These lock the fix: a work agent (live pane, or a pipeline
+  // state only work can produce) always outranks that idle planner.
+  const IDLE_PLANNER = agent({ id: 'planning-pan-1', role: 'plan', status: 'running', pendingInputKinds: ['agentTurnEnded'], pendingInputCount: 1 });
+  const WORKER = agent({ id: 'agent-pan-1', role: 'work', status: 'running' });
+
+  it('PAN-4643 reproduction: idle planner + live work agent → working, not plan-ready', () => {
+    const d = deriveSimpleIssue(
+      makeIssue({ hasPlan: true, hasTasks: true }),
+      [IDLE_PLANNER, WORKER],
+      derived('working'),
+      [pane('plan', 'idle'), pane('work', 'working')],
+    );
+    expect(d.pipelineState).toBe('in_progress_work_running');
+    expect(d.display.state).toBe('working');
+    expect(d.display.title).toBe('Writing code');
+    expect(d.display.primaryAction).toBeNull();
+    expect(d.display.needsYouReason).toBeNull();
+    expect(d.pendingInputAgent).toBeUndefined();
+    expect(d.primaryAgent?.id).toBe('agent-pan-1');
+  });
+
+  it('production shape of a finished plan (branch carries only planning commits) → plan is ready', () => {
+    const d = deriveSimpleIssue(
+      makeIssue({ hasPlan: true, hasTasks: true }),
+      [IDLE_PLANNER],
+      derived('working'),
+      [pane('plan', 'idle')],
+    );
+    expect(d.pipelineState).toBe('in_progress_work_idle');
+    expect(d.display.title).toBe('The plan is ready');
+    expect(d.display.primaryAction).toBe('Start work');
+    expect(d.display.needsYouReason).toBe('start-work');
+  });
+
+  it.each([
+    ['in-review', derived('in-review')],
+    ['ready', derived('ready', { pr: { url: 'https://github.com/x/y/pull/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true } })],
+    ['merged', derived('merged')],
+  ] as const)('post-work state (%s) + idle planner never offers Start work or a question', (_label, derivedState) => {
+    const d = deriveSimpleIssue(
+      makeIssue({ hasPlan: true, hasTasks: true }),
+      [IDLE_PLANNER],
+      derivedState,
+      [pane('plan', 'idle')],
+    );
+    expect(d.display.primaryAction).not.toBe('Start work');
+    expect(d.display.needsYouReason).not.toBe('start-work');
+    expect(d.display.needsYouReason).not.toBe('question');
+  });
+
+  it('a real question from the work agent still wins over the idle planner', () => {
+    const d = deriveSimpleIssue(
+      makeIssue({ hasPlan: true, hasTasks: true }),
+      [IDLE_PLANNER, agent({
+        id: 'agent-pan-1',
+        role: 'work',
+        status: 'running',
+        pendingAskUserQuestion: { toolUseId: 't', askedAt: '', questions: [] },
+        pendingInputKinds: ['askUserQuestion'],
+        pendingInputCount: 1,
+      })],
+      derived('working'),
+      [pane('plan', 'idle'), pane('work', 'blocked')],
+    );
+    expect(d.display.needsYouReason).toBe('question');
+    expect(d.pendingInputAgent?.id).toBe('agent-pan-1');
+  });
+
+  it.each([undefined, derived('planned')] as const)(
+    'a live work pane outranks a lagging derived state (FR-9)',
+    (derivedState) => {
+      const d = deriveSimpleIssue(
+        makeIssue({ hasPlan: true, hasTasks: true }),
+        [IDLE_PLANNER, WORKER],
+        derivedState,
+        [pane('plan', 'idle'), pane('work', 'working')],
+      );
+      expect(d.pipelineState).toBe('in_progress_work_running');
+      expect(d.display.title).toBe('Writing code');
+      expect(d.display.primaryAction).toBeNull();
+    },
+  );
+});
+
+describe('simplePipelineState', () => {
+  it('a live work pane promotes a pre-work state to in_progress_work_running', () => {
+    expect(simplePipelineState('generic', [pane('work')])).toBe('in_progress_work_running');
+    expect(simplePipelineState('planning_done_awaiting_work', [pane('work')])).toBe('in_progress_work_running');
+  });
+
+  it('a post-work state is left alone even with a live work pane', () => {
+    expect(simplePipelineState('ready_to_merge', [pane('work')])).toBe('ready_to_merge');
+  });
+
+  it('no live work pane leaves the base state alone', () => {
+    expect(simplePipelineState('generic', [pane('work', 'exited')])).toBe('generic');
+  });
+});
+
+describe('hasWorkAgent', () => {
+  it('an idle work pane state alone proves nothing without a live pane or post-work state', () => {
+    expect(hasWorkAgent('in_progress_work_idle', [pane('plan', 'idle')])).toBe(false);
+  });
+
+  it('a live work pane always counts', () => {
+    expect(hasWorkAgent('in_progress_work_idle', [pane('work', 'idle')])).toBe(true);
+  });
+
+  it('a post-work pipeline state counts even with no panes', () => {
+    expect(hasWorkAgent('in_review_approved', [])).toBe(true);
+  });
+
+  it('a pre-work state with no panes does not count', () => {
+    expect(hasWorkAgent('generic', [])).toBe(false);
+  });
+
+  it('a pre-work state with only an exited work pane does not count', () => {
+    expect(hasWorkAgent('planning_active', [pane('work', 'exited')])).toBe(false);
   });
 });
 
