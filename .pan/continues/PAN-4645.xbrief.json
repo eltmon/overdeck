@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T07:43:58.917Z",
+  "updated": "2026-11-01T07:44:34.582Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,11 @@
     "wi4-machine-credential.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T07:43:58.917Z"
+    },
+    "wi5-route-scope-rows": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T07:44:34.582Z"
     }
   }
 }
