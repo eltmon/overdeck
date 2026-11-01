@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T09:05:17.300Z",
+  "updated": "2026-11-01T09:06:36.806Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -394,9 +394,10 @@
       "doneAt": "2026-11-01T09:04:52.783Z"
     },
     "docs-tailscale-page": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-1254",
-      "claimedAt": "2026-11-01T09:05:17.299Z"
+      "claimedAt": "2026-11-01T09:05:17.299Z",
+      "doneAt": "2026-11-01T09:06:36.805Z"
     }
   }
 }
