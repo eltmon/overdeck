@@ -237,6 +237,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/conversations/:name/bookmarks',                   kind: 'http', disposition: 'READ',        door: 'conversation-bookmarks.listConversationBookmarks (PAN-4498)' },
   { surface: 'PUT /api/conversations/:name/bookmarks/:messageId',        kind: 'http', disposition: 'WRITE',       door: 'conversation-bookmarks.upsertConversationBookmark (PAN-4498)' },
   { surface: 'DELETE /api/conversations/:name/bookmarks/:messageId',     kind: 'http', disposition: 'WRITE',       door: 'conversation-bookmarks.removeConversationBookmark (PAN-4498)' },
+  { surface: 'POST /api/conversations/triage',                           kind: 'http', disposition: 'WRITE',       door: 'conversation-triage-store.applyTriageUpdate (PAN-4639)' },
   { surface: 'GET /api/conversations/:name/scheduled-messages',          kind: 'http', disposition: 'READ',        door: 'conversation-scheduled-messages.listScheduledMessages (PAN-4641)' },
   { surface: 'POST /api/conversations/:name/scheduled-messages',         kind: 'http', disposition: 'WRITE',       door: 'conversation-scheduled-messages.scheduleConversationMessage (PAN-4641)' },
   { surface: 'PATCH /api/conversations/:name/scheduled-messages/:id',    kind: 'http', disposition: 'WRITE',       door: 'conversation-scheduled-messages.editScheduledMessage (PAN-4641)' },

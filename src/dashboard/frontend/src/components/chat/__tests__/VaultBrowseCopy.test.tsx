@@ -83,6 +83,8 @@ const mutations: ConversationMutations = {
   move: vi.fn(),
   linkPullRequest: vi.fn(),
   unlinkPullRequest: vi.fn(),
+  triage: vi.fn(),
+  undoLastTriage: vi.fn(() => false),
   openForkModal: vi.fn(),
   submitFork: vi.fn(),
   forkTarget: null,

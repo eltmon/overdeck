@@ -29,12 +29,21 @@ function makeConv(overrides: Partial<Conversation> & { name: string }): Conversa
 // ─── getSortKey ───────────────────────────────────────────────────────────────
 
 describe('getSortKey', () => {
-  it('lastActivity — returns lastAttachedAt when present', () => {
+  it('lastActivity — returns lastActivityAt when present, even over lastAttachedAt', () => {
+    const conv = makeConv({
+      name: 'a',
+      lastActivityAt: '2026-04-15T00:00:00.000Z',
+      lastAttachedAt: '2026-04-10T00:00:00.000Z',
+    });
+    expect(getSortKey(conv, 'lastActivity')).toBe('2026-04-15T00:00:00.000Z');
+  });
+
+  it('lastActivity — falls back to lastAttachedAt when lastActivityAt is absent', () => {
     const conv = makeConv({ name: 'a', lastAttachedAt: '2026-04-10T00:00:00.000Z' });
     expect(getSortKey(conv, 'lastActivity')).toBe('2026-04-10T00:00:00.000Z');
   });
 
-  it('lastActivity — falls back to createdAt when lastAttachedAt is null', () => {
+  it('lastActivity — falls back to createdAt when neither lastActivityAt nor lastAttachedAt is set', () => {
     const conv = makeConv({ name: 'a', lastAttachedAt: null, createdAt: '2026-03-01T00:00:00.000Z' });
     expect(getSortKey(conv, 'lastActivity')).toBe('2026-03-01T00:00:00.000Z');
   });
