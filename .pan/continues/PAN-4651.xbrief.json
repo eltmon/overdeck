@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:44:56.795Z",
+  "updated": "2026-11-01T21:45:13.110Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -562,6 +562,10 @@
     "wi26-config-set.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T21:44:56.794Z"
+    },
+    "wi27-compare-settings.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:45:13.110Z"
     }
   }
 }
