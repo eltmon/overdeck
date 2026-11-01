@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T06:44:34.505Z",
+  "updated": "2026-11-01T07:04:06.163Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-11-01T06:44:08.855Z"
     },
     "wi3-channel-listener": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4645",
-      "claimedAt": "2026-11-01T06:44:34.504Z"
+      "claimedAt": "2026-11-01T06:44:34.504Z",
+      "doneAt": "2026-11-01T07:04:06.162Z"
     }
   }
 }
