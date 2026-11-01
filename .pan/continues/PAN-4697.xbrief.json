@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4697",
   "created": "2026-11-01T09:15:31.379Z",
-  "updated": "2026-11-01T09:32:50.808Z",
+  "updated": "2026-11-01T09:33:05.818Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,10 @@
     "subset-runner.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T09:32:50.808Z"
+    },
+    "subset-runner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:33:05.818Z"
     }
   }
 }
