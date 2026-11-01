@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4330",
   "created": "2026-11-01T04:59:32.820Z",
-  "updated": "2026-11-01T07:43:22.485Z",
+  "updated": "2026-11-01T07:43:41.837Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "account-import-guard.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T07:43:22.485Z"
+    },
+    "account-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:41.837Z"
     }
   }
 }
