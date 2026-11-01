@@ -13,6 +13,11 @@
  *   linked-list fetch so the new row lists at once. Answers 201
  *   `{ conversation: '<name>' | '@<env>/<name>', machine: { environmentId, label, self }, reason }`.
  *
+ * - `POST /api/fleet/workers { machine, needs?, issueId, prompt, model?, harness?, effort?, readOnly?, name?, parentId? }`
+ *   → this machine: `startWorker`; another machine: a stand-in directory with
+ *   a local id, the owner's worker work door, then `remote.json` and the
+ *   follower. Answers `{ id, machine, reason, remote }`.
+ *
  * The actor a forwarded call carries: `operator` for the browser and operator
  * CLIs, `{ agentId }` for an agent sender (`x-overdeck-sender`), and for an
  * `odk_` token credential `operator` with a ceiling of the token's scopes
@@ -22,20 +27,26 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
 
 import type { AccessTokenScope } from '../../../lib/access-tokens.js';
+import { agentsRoot, allocateWorkerId, workerDir } from '../../../lib/agents/worker/ids.js';
+import { type RemoteStandIn, writeRemoteStandIn } from '../../../lib/agents/worker/remote-standin.js';
+import { PARENT_ID_RE, startWorker, type StartWorkerOptions } from '../../../lib/agents/worker/start.js';
+import { removeAgentStateDir } from '../../../lib/agents/state-dir-removal.js';
 import { type LinkActorInit, linkFetch } from '../../../lib/anywhere/link-client.js';
 import type { MachineLink } from '../../../lib/anywhere/link-store.js';
 import { TAG_PATTERN } from '../../../lib/anywhere/machine-capabilities.js';
 import { gitOriginOf } from '../../../lib/anywhere/project-origin.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
-import { getProjectSync } from '../../../lib/projects.js';
+import { getProjectSync, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { channelOfRequest } from '../channel-peer.js';
 import { jsonResponse } from '../http-helpers.js';
 import { actorForSender, SENDER_HEADER } from '../linked-conversation-proxy.js';
 import { defaultFleetTargetDeps, type FleetTarget, type FleetTargetDeps, placeAuto, resolveTargetMachine } from '../services/fleet-target.js';
 import { currentLinkedConversationsSync } from '../services/linked-conversations-sync.js';
+import { currentRemoteWorkerFollower } from '../services/remote-worker-follower.js';
 import { credentialScopes, type DashboardCredential, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
 import { refuseFleetRequest } from './machines-fleet.js';
 import { readJsonResponse } from './machines-work.js';
+import { parseStartWorkerBody } from './workers.js';
 
 /** `needs` as a list of capability tags; a comma-separated string is accepted too. */
 export function parseNeeds(raw: unknown): string[] | string {
@@ -196,6 +207,78 @@ export async function handleFleetConversation(raw: unknown, caller: FleetCaller,
   return jsonResponse({ conversation: `@${target.environmentId}/${name}`, machine: machineOf(target), reason: target.reason }, { status: 201 });
 }
 
+export interface FleetWorkerDeps extends FleetSpawnDeps {
+  issueOrigin: (issueId: string) => Promise<{ gitOrigin: string | null } | null>;
+  startLocal: (options: StartWorkerOptions) => Promise<{ id: string }>;
+  allocate: (issueId: string) => Promise<string>;
+  writeStandIn: (localId: string, standIn: RemoteStandIn) => Promise<void>;
+  dropStandIn: (localId: string) => Promise<void>;
+  follow: (localId: string) => void;
+  now: () => Date;
+}
+
+export const defaultFleetWorkerDeps = (): FleetWorkerDeps => ({
+  ...defaultFleetSpawnDeps(),
+  issueOrigin: async (issueId) => {
+    const resolved = await Effect.runPromise(resolveProjectFromIssue(issueId)).catch(() => null);
+    const project = resolved ? getProjectSync(resolved.projectKey) : null;
+    return project ? { gitOrigin: gitOriginOf(project) } : null;
+  },
+  startLocal: (options) => startWorker(options),
+  allocate: allocateWorkerId,
+  writeStandIn: writeRemoteStandIn,
+  dropStandIn: (localId) => removeAgentStateDir(workerDir(localId), agentsRoot()).then(() => undefined),
+  follow: (localId) => currentRemoteWorkerFollower()?.track(localId),
+  now: () => new Date(),
+});
+
+/** `POST /api/fleet/workers`. */
+export async function handleFleetWorker(raw: unknown, caller: FleetCaller, deps: FleetWorkerDeps = defaultFleetWorkerDeps()): Promise<HttpServerResponse.HttpServerResponse> {
+  const body = asObject(raw);
+  if (!body) return jsonResponse({ error: 'body must be an object' }, { status: 400 });
+  const { machine, needs: rawNeeds, parentId: rawParent, ...workerFields } = body;
+  if (machine !== undefined && machine !== null && typeof machine !== 'string') return jsonResponse({ error: 'machine must be a string' }, { status: 400 });
+  const needs = parseNeeds(rawNeeds);
+  if (typeof needs === 'string') return jsonResponse({ error: needs }, { status: 400 });
+  const parentId = rawParent ?? null;
+  if (parentId !== null && (typeof parentId !== 'string' || !PARENT_ID_RE.test(parentId))) {
+    return jsonResponse({ error: 'parentId must be an agent id or conversation' }, { status: 400 });
+  }
+  const parsed = parseStartWorkerBody(workerFields);
+  if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+  const { issueId } = parsed.value;
+  const project = await deps.issueOrigin(issueId);
+  const gitOrigin = project?.gitOrigin ?? null;
+
+  const target = await deps.resolveTarget(typeof machine === 'string' ? machine : undefined, gitOrigin, needs);
+  if (!target.ok) return jsonResponse(target.body, { status: target.status });
+  if (target.self) {
+    try {
+      const { id } = await deps.startLocal({ ...parsed.value, parentId });
+      return jsonResponse({ id, machine: machineOf(target), reason: target.reason, remote: false });
+    } catch (error) {
+      return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+    }
+  }
+  if (!project || gitOrigin === null) {
+    return jsonResponse({ code: 'project-has-no-origin', error: `${issueId}'s project has no github_repo or gitlab_repo here, so ${target.label} cannot find it` }, { status: 409 });
+  }
+  const localId = await deps.allocate(issueId);
+  const { parentId: _ignored, ...door } = parsed.value;
+  const answer = await postWorkDoor(deps, target.link, '/api/machines/work/workers', { ...door, gitOrigin, parentId }, caller);
+  const remoteId = (answer.json as { id?: unknown } | null)?.id;
+  if (answer.status !== 200 || typeof remoteId !== 'string') {
+    await deps.dropStandIn(localId).catch(() => undefined);
+    return ownerRefusal(answer.status, answer.json, target.link, { thisLabel: await deps.thisLabel(), projectKey: null });
+  }
+  await deps.writeStandIn(localId, {
+    v: 1, environmentId: target.environmentId, label: target.label, remoteId, parentId, issueId: issueId.toUpperCase(),
+    createdAt: deps.now().toISOString(), state: 'running', lastSeq: 0, lastSeenAt: null, lastAssistantMessage: null, idleAgeMs: null, unreachableSince: null,
+  });
+  deps.follow(localId);
+  return jsonResponse({ id: localId, machine: machineOf(target), reason: target.reason, remote: true });
+}
+
 export const readFleetBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
@@ -243,4 +326,17 @@ const conversationsRoute = HttpRouter.add(
   }),
 );
 
-export const fleetWorkRouteLayer = Layer.mergeAll(placementRoute, conversationsRoute);
+const workersRoute = HttpRouter.add(
+  'POST',
+  '/api/fleet/workers',
+  Effect.gen(function* () {
+    const refused = yield* fleetWriteGate;
+    if (refused) return refused;
+    const caller = yield* fleetCallerOf;
+    if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
+    const body = yield* readFleetBody;
+    return yield* Effect.promise(() => handleFleetWorker(body, caller));
+  }),
+);
+
+export const fleetWorkRouteLayer = Layer.mergeAll(placementRoute, conversationsRoute, workersRoute);
