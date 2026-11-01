@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2355",
   "created": "2026-11-01T05:47:25.756Z",
-  "updated": "2026-11-01T07:39:30.055Z",
+  "updated": "2026-11-01T07:39:50.076Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "pwa-manifest.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:39:30.055Z"
+    },
+    "pwa-manifest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:39:50.075Z"
     }
   }
 }
