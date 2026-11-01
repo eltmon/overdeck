@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4626",
   "created": "2026-11-01T05:58:08.711Z",
-  "updated": "2026-11-01T07:02:51.966Z",
+  "updated": "2026-11-01T07:03:11.341Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "row-leaving-css.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T07:02:51.966Z"
+    },
+    "row-leaving-state.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:03:11.340Z"
     }
   }
 }
