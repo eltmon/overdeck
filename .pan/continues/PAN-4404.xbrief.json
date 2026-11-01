@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:33:59.251Z",
+  "updated": "2026-11-01T14:34:14.077Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "wi5-forward-supervisor.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T14:33:59.250Z"
+    },
+    "wi6-link-transport.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:34:14.077Z"
     }
   }
 }
