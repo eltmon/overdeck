@@ -10,9 +10,11 @@
  * snapshots, never over raw bytes.
  *
  * This module holds the snapshot parser, that decision, the VM read (D-8) and
- * push (D-7) helpers over the Machines exec API, the atomic home write, and
+ * push (D-7) helpers over the Machines exec API, the atomic home write,
  * `readHomeCodexState()`, which says whether home can prepare Codex at all
- * (D-2: a codex binary, its version, and a valid native sign-in).
+ * (D-2: a codex binary, its version, and a valid native sign-in), and
+ * `prepareFlyCodex()`, provisioning's step 6b: pin the VM's Codex CLI to home's
+ * version (D-6) and push home's sign-in to `$HOME/.codex/auth.json` (D-4).
  *
  * No `auth.json` content, token, or base64 of either appears in a log line, an
  * error message, or an error detail (NFR-2). `app-server-manager.js` pulls in
@@ -25,6 +27,7 @@ import { dirname, join } from 'node:path';
 import { classifyNativeCodexAuth, getNativeCodexAuthPath } from '../../codex-auth.js';
 import { resolveHarnessBinary } from '../../harness-binary.js';
 import { shellQuote } from '../../remote/remote-tmux.js';
+import { detached, FlyMachineError, type FlyMachineErrorCode, INSTALL_POLL, pollUntil } from './provision-shared.js';
 
 export type CodexAuthMode = 'chatgpt' | 'api-key' | 'unknown';
 
@@ -59,7 +62,18 @@ export interface HomeCodexDeps {
   readAuth: () => Promise<string | null>;
 }
 
+export interface PrepareFlyCodexDeps {
+  now: () => number;
+  sleep: (ms: number) => Promise<void>;
+  log: (message: string) => void;
+  homeCodex: () => Promise<HomeCodexState | null>;
+}
+
 const MISSING_MARKER = '__MISSING__';
+const PROBE_TIMEOUT_SECONDS = 60;
+/** `$HOME` in Fly's exec shell is `/`, so this prints `//.codex` there (D-4); `//` is collapsed. */
+const CODEX_HOME_PROBE = 'printf %s "$HOME/.codex"';
+export const NO_HOME_CODEX_MESSAGE = 'This machine has no usable Codex CLI sign-in (~/.codex/auth.json) or no codex binary; run codex login here, then try again.';
 const READ_TIMEOUT_SECONDS = 30;
 const PUSH_TIMEOUT_SECONDS = 30;
 /**
@@ -223,4 +237,66 @@ export async function readHomeCodexState(overrides: Partial<HomeCodexDeps> = {})
   const authRaw = await deps.readAuth();
   if (authRaw === null || classifyNativeCodexAuth(authRaw).status !== 'valid') return null;
   return { binary, version, authRaw };
+}
+
+async function vmCodexVersion(exec: FlyExec): Promise<string | null> {
+  const result = await exec('codex --version', PROBE_TIMEOUT_SECONDS).catch(() => null);
+  if (result === null || result.exit_code !== 0) return null;
+  const { parseCodexCliVersion } = await import('../../codex/app-server-manager.js');
+  return parseCodexCliVersion(result.stdout) ?? null;
+}
+
+/**
+ * Provisioning step 6b (PAN-4296 WI-4): make the VM's Codex CLI home's version,
+ * then copy home's sign-in to `$HOME/.codex/auth.json` on the VM. Returns that
+ * path, or null when Codex was not prepared. For a `codex` machine every miss
+ * throws a `FlyMachineError`; for any other harness it is logged.
+ */
+export async function prepareFlyCodex(
+  exec: FlyExec,
+  deps: PrepareFlyCodexDeps,
+  options: { harness: 'claude-code' | 'codex'; machineId: string },
+): Promise<string | null> {
+  const { harness, machineId } = options;
+  const skip = (code: FlyMachineErrorCode, message: string, detail: Record<string, unknown> = {}): null => {
+    if (harness === 'codex') throw new FlyMachineError(code, message, detail);
+    deps.log(`${message} Fly machine ${machineId} is not prepared for Codex conversations.`);
+    return null;
+  };
+
+  const home = await deps.homeCodex();
+  if (home === null) return skip('credentials-failed', NO_HOME_CODEX_MESSAGE);
+
+  const probe = await exec(CODEX_HOME_PROBE, PROBE_TIMEOUT_SECONDS).catch(() => null);
+  const dir = probe !== null && probe.exit_code === 0 ? probe.stdout.trim().replace(/\/+/g, '/') : '';
+  if (!dir.startsWith('/')) {
+    return skip('credentials-failed', `Fly machine ${machineId} reported no absolute Codex home (got "${dir}").`);
+  }
+
+  // D-6: version equality by install, like pan's (PAN-4652 D-7).
+  let have = await vmCodexVersion(exec);
+  if (have !== home.version) {
+    const install = `npm install -g ${shellQuote(`@openai/codex@${home.version}`)} > /tmp/codex-install.log 2>&1; echo $? > /tmp/codex-install.exit`;
+    const started = await exec(`rm -f /tmp/codex-install.exit && ${detached(install)}`, PROBE_TIMEOUT_SECONDS).catch(() => null);
+    if (started !== null && started.exit_code === 0) {
+      await pollUntil(deps, INSTALL_POLL, async () => (await exec('cat /tmp/codex-install.exit', PROBE_TIMEOUT_SECONDS)).stdout.trim() !== '');
+    }
+    have = await vmCodexVersion(exec);
+    if (have !== home.version) {
+      return skip(
+        'version-mismatch',
+        `The Fly machine runs Codex ${have ?? '(none)'}, but this machine runs ${home.version}; npm install -g @openai/codex@${home.version} did not fix it (see /tmp/codex-install.log on the VM).`,
+        { home: home.version, vm: have },
+      );
+    }
+  }
+
+  const authPath = `${dir}/auth.json`;
+  try {
+    await pushVmCodexAuth(exec, authPath, home.authRaw);
+  } catch (error) {
+    // pushVmCodexAuth's message names the path and exit code only (NFR-2).
+    return skip('credentials-failed', `Could not copy the Codex sign-in to Fly machine ${machineId}: ${(error as Error).message}.`);
+  }
+  return authPath;
 }
