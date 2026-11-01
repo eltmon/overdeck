@@ -270,6 +270,18 @@ export function removeTrigger(id: string): Promise<boolean> {
   });
 }
 
+/** Attach (or clear) a trigger's directory inbox. Returns null when no record has that id. */
+export function setTriggerInbox(id: string, inbox: TriggerInbox | null): Promise<PublicTrigger | null> {
+  return mutate((records) => {
+    const index = records.findIndex((record) => record.id === id);
+    if (index === -1) return { records, result: null };
+    const updated: TriggerRecord = { ...records[index]!, inbox };
+    const next = [...records];
+    next[index] = updated;
+    return { records: next, result: toPublicTrigger(updated) };
+  });
+}
+
 /** Replace a trigger's signing secret. Returns null when no record has that id. */
 export function setTriggerSigningSecret(id: string, secret: string): Promise<PublicTrigger | null> {
   if (typeof secret !== 'string') return Promise.reject(new Error('Signing secret must be text'));

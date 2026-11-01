@@ -88,6 +88,7 @@ export function TriggersPanel() {
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {targetText(trigger)}
                   {' · '}{verifyText(trigger)}
+                  {trigger.inbox ? ' · inbox' : ''}
                   {' · '}created {formatRelativeTime(trigger.createdAt)}
                 </p>
               </div>

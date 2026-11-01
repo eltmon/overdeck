@@ -16,6 +16,7 @@ import {
   listPublicTriggers,
   listTriggers,
   removeTrigger,
+  setTriggerInbox,
   setTriggerSigningSecret,
   toPublicTrigger,
   triggersPath,
@@ -124,5 +125,46 @@ describe('trigger store (PAN-4648)', () => {
   it('throws naming the path when the file does not parse', async () => {
     await writeFile(triggersPath(), 'not json', 'utf8');
     await expect(listTriggers()).rejects.toThrow(`Cannot read trigger store ${triggersPath()}`);
+  });
+});
+
+describe('trigger inbox (PAN-2356 WI-20)', () => {
+  it('parses a triggers.json written before the inbox field existed', async () => {
+    const legacy = {
+      v: 1,
+      triggers: [{
+        id: 'trg_0123456789ab',
+        name: 'old',
+        secretHash: '0'.repeat(64),
+        target: { kind: 'conversation', conversation: '20261101-0001' },
+        template: null,
+        verify: 'none',
+        signingSecret: null,
+        createdAt: '2026-10-01T00:00:00.000Z',
+      }],
+    };
+    await writeFile(triggersPath(), JSON.stringify(legacy));
+    const [record] = await listTriggers();
+    expect(record?.id).toBe('trg_0123456789ab');
+    expect(record?.inbox).toBeUndefined();
+  });
+
+  it('attaches and clears an inbox, and the public record shows it', async () => {
+    const created = await createTrigger({ name: 'held', target: { kind: 'conversation', conversation: '20261101-0001' } });
+    const inbox = { id: 'ib_0123456789abcdef', createdAt: '2026-11-01T00:00:00.000Z' };
+    expect(await setTriggerInbox(created.trigger.id, inbox)).toMatchObject({ id: created.trigger.id, inbox });
+    expect((await listTriggers())[0]?.inbox).toEqual(inbox);
+    await setTriggerInbox(created.trigger.id, null);
+    expect((await listTriggers())[0]?.inbox).toBeNull();
+    expect(await setTriggerInbox('trg_ffffffffffff', inbox)).toBeNull();
+  });
+
+  it('refuses a store whose inbox handle is malformed', async () => {
+    const created = await createTrigger({ name: 'held', target: { kind: 'conversation', conversation: '20261101-0001' } });
+    const file = JSON.parse(await readFile(triggersPath(), 'utf8')) as { triggers: Array<Record<string, unknown>> };
+    file.triggers[0]!.inbox = { id: 'not-an-inbox', createdAt: 'x' };
+    await writeFile(triggersPath(), JSON.stringify(file));
+    await expect(listTriggers()).rejects.toThrow('unexpected shape');
+    expect(created.trigger.id).toMatch(/^trg_/);
   });
 });
