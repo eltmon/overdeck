@@ -5,12 +5,15 @@
  * review-mode record write and the per-item tier escalation — is gone.
  */
 
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DerivedIssueState } from '@overdeck/contracts';
 
 import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../../lib/internal-token.js';
+import { getOverdeckHome } from '../../../../../lib/paths.js';
 
 const routeMocks = vi.hoisted(() => ({
   getProjectPath: vi.fn(),
@@ -138,6 +141,7 @@ const trigger = (init: RequestInit = {}) => post('/api/review/PAN-3340/trigger',
 
 beforeEach(() => {
   process.env.OVERDECK_INTERNAL_TOKEN = 'test-internal-token';
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   _resetInternalTokenCacheForTests();
   _resetAutoRequeueCountsForTests();
   for (const mock of Object.values(routeMocks)) mock.mockReset();

@@ -33,13 +33,18 @@ const OPERATE_ROWS: ReadonlyArray<[string, string]> = [
   ['POST', '/api/conversations'],
   ['POST', '/api/conversations/conv-1/stop'],
   ['POST', '/api/conversations/conv-1/abort'],
+  ['POST', '/api/lanes'],
+];
+
+// PAN-4649 moved the approval routes to their own `approve` grant; an
+// operator-level link holds it, an agent-fenced link does not.
+const APPROVE_ROWS: ReadonlyArray<[string, string]> = [
   ['POST', '/api/conversations/conv-1/permission'],
   ['POST', '/api/conversations/conv-1/codex-approval'],
   ['POST', '/api/conversations/conv-1/pane-choice'],
   ['POST', '/api/conversations/conv-1/pi-ask-answer'],
   ['POST', '/api/agents/pan-1/answer-question'],
   ['POST', '/api/agents/pan-1/permissions/req-9/respond'],
-  ['POST', '/api/lanes'],
 ];
 
 const ADMIN_ONLY: ReadonlyArray<[string, string]> = [
@@ -92,9 +97,12 @@ afterEach(async () => {
 });
 
 describe('route-scope rows for machine credentials (PAN-4645 WI-5)', () => {
-  it('maps every new operate surface to operate in the table', () => {
+  it('maps every new operate surface to operate and the approval routes to approve in the table', () => {
     for (const [method, path] of OPERATE_ROWS) {
       expect(requiredScopeFor(method, path), `${method} ${path}`).toBe('operate');
+    }
+    for (const [method, path] of APPROVE_ROWS) {
+      expect(requiredScopeFor(method, path), `${method} ${path}`).toBe('approve');
     }
     expect(requiredScopeFor('GET', '/api/conversations/conv-1/stop')).toBe('admin');
     expect(requiredScopeFor('POST', '/api/conversations/conv-1/stop/extra')).toBe('admin');
@@ -103,6 +111,11 @@ describe('route-scope rows for machine credentials (PAN-4645 WI-5)', () => {
   it.each(OPERATE_ROWS)('lets a machine credential over its channel through %s %s', (method, path) => {
     expect(remoteGateRejection(request(method, path, operatorToken), LINK)).toBeNull();
     expect(remoteGateRejection(request(method, path, fencedToken), LINK)).toBeNull();
+  });
+
+  it.each(APPROVE_ROWS)('lets only an operator-level machine credential answer prompts on %s %s', (method, path) => {
+    expect(remoteGateRejection(request(method, path, operatorToken), LINK)).toBeNull();
+    expect(remoteGateRejection(request(method, path, fencedToken), LINK)).toEqual({ status: 403, missingScope: 'approve' });
   });
 
   it.each(ADMIN_ONLY)('answers 403 insufficient_scope admin for a machine credential on %s %s', (method, path) => {
@@ -119,6 +132,7 @@ describe('route-scope rows for machine credentials (PAN-4645 WI-5)', () => {
       expect(remoteGateRejection(plain(method, path), null), `${method} ${path}`).toBeNull();
     }
     expect(remoteGateRejection(plain('PUT', '/api/settings'), null)).toEqual({ status: 403, missingScope: 'admin' });
+    expect(remoteGateRejection(plain('POST', '/api/conversations/conv-1/permission'), null)).toEqual({ status: 403, missingScope: 'approve' });
 
     const tellOnly = (await createAccessToken({ name: 'tell', kind: 'token', scopes: ['tell'] })).token;
     const tellRequest = HttpServerRequest

@@ -33,7 +33,7 @@ import { buildChildEnv } from './child-env.js';
 import { MessageDeliveryFailed, TmuxError } from './errors.js';
 
 export { MessageDeliveryFailed } from './errors.js';
-import { getUiTheme, TERMINAL_BG } from './ui-theme.js';
+import { resolveTerminalBackground } from './color-themes/terminal-background.js';
 import { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
 import { paneHasBlockingChoiceMenu } from './pane-choice-menu.js';
 import { deliveryVerifyLine, type PaneViewport } from './pane-composer.js';
@@ -948,11 +948,11 @@ export const createSession = (
       // agents get no answer and fall back to dark regardless of the
       // dashboard theme (conv 2547).
       try {
-        const theme = await getUiTheme();
+        const background = await resolveTerminalBackground();
         // window-style is a window option: the trailing ':' targets the
         // session's (only) window — a bare '=name' fails with "no such window".
         await tmuxExecAsync(
-          ['set-option', '-t', `${exactSession(name)}:`, 'window-style', `bg=${TERMINAL_BG[theme]}`],
+          ['set-option', '-t', `${exactSession(name)}:`, 'window-style', `bg=${background}`],
           { encoding: 'utf-8' },
         );
       } catch {

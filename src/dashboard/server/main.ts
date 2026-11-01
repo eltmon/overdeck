@@ -13,6 +13,9 @@ import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
+import { startNeedsYouPushService, stopNeedsYouPushService } from './services/needs-you-push-service.js';
+import { conversationReadDependencies } from './routes/conversations.js';
+import { getConversationsPendingInputFeed } from '../../lib/overdeck/conversation-reads.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
 import {
   enqueueProjectsResourceRefreshStaggered,
@@ -66,11 +69,13 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 import { startConflictRepairPatrol, stopConflictRepairPatrol } from './services/conflict-repair-patrol.js';
 import { startBlockerWakePatrol, stopBlockerWakePatrol } from './services/blocker-wake-patrol.js';
+import { startScheduledMessagePatrol, stopScheduledMessagePatrol } from './services/scheduled-message-patrol.js';
 import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backend-health.js';
 import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { startConversationRescanScheduler, stopConversationRescanScheduler } from './services/conversation-rescan-scheduler.js';
 import { startPullRequestSyncService, stopPullRequestSyncService } from './services/pull-request-sync-service.js';
+import { startConversationScheduleService, stopConversationScheduleService } from './services/conversation-schedule-service.js';
 import { startVaultService, stopVaultService } from './services/vault-service.js';
 import { startVaultBrowseService } from './services/vault-browse-service.js';
 import { startGitHubQuotaSampler } from '../../lib/github-quota/sampler.js';
@@ -271,6 +276,11 @@ if (isPeerDashboard) {
 // PAN-3931: in a peer dashboard those events stay in memory (emitOnly).
 startAgentEnrichmentService();
 console.log(`[overdeck] AgentEnrichmentService started${isPeerDashboard ? ' (peer: in-memory events only)' : ''}`);
+// PAN-2354: needs-you push to phones (Web Push, optional ntfy). Primary only —
+// a peer dashboard would send every notification twice.
+if (!isPeerDashboard) {
+  startNeedsYouPushService({ readConversationFeed: () => getConversationsPendingInputFeed(conversationReadDependencies) });
+}
 
 // Enable demand-driven agent output capture. The poller starts only while an
 // RPC or public SSE subscriber has expressed output interest.
@@ -595,6 +605,12 @@ if (!isPeerDashboard) {
   startPullRequestSyncService();
   console.log('[pr-sync] started (boot +30s, 60s sweep)');
 }
+// PAN-4640: fire due conversation schedules. Writes overdeck.db and resumes
+// sessions, so a peer dashboard never runs it.
+if (!isPeerDashboard) {
+  startConversationScheduleService();
+  console.log('[schedules] started (boot +30s, 60s sweep)');
+}
 // PAN-4436 D-12: OVERDECK_VAULT_IN_PEER=1 is for isolated UAT fixtures that own a throwaway home.
 if (!isPeerDashboard || process.env.OVERDECK_VAULT_IN_PEER === '1') {
   startVaultBrowseService();
@@ -768,6 +784,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   clearInterval(attachmentCleanupTimer);
   stopResourceRefreshServices();
   stopAgentEnrichmentService();
+  stopNeedsYouPushService();
   stopAgentOutputService();
   stopConversationLifecycleService();
   stopCodexPluginImporter();
@@ -777,6 +794,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopAutoMergeExecutor();
   stopConflictRepairPatrol();
   stopBlockerWakePatrol();
+  stopScheduledMessagePatrol();
   stopEventLoopMonitor();
   stopTranscriptPoller();
   stopCostReconcileService();
@@ -799,6 +817,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   await stopConversationRescanScheduler();
   await stopVaultService().catch((err) => console.warn('[vault] shutdown failed:', err));
   stopPullRequestSyncService();
+  stopConversationScheduleService();
   stopGitHubQuotaSampler();
   stopGitHubQuotaPublisher();
   stopGitHubQuotaTelemetry();
@@ -934,6 +953,15 @@ if (startBlockerWakePatrol()) {
   console.log('[overdeck] Blocker-wake patrol SKIPPED — peer dashboard spawns nothing');
 } else {
   console.log('[overdeck] Blocker-wake patrol SKIPPED (OVERDECK_DISABLE_BLOCKER_WAKE=1)');
+}
+
+// PAN-4641: delivers operator messages queued until a usage limit resets.
+if (startScheduledMessagePatrol()) {
+  console.log('[overdeck] Scheduled-message patrol started');
+} else if (isPeerDashboard) {
+  console.log('[overdeck] Scheduled-message patrol SKIPPED — peer dashboard spawns nothing');
+} else {
+  console.log('[overdeck] Scheduled-message patrol SKIPPED (OVERDECK_DISABLE_SCHEDULED_MESSAGES=1)');
 }
 
 // PAN-3917: boot used to reset verification runs left `running` by a worker

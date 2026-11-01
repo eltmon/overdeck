@@ -14,7 +14,15 @@ import { embedAction } from './embed.js';
 import { jsonlAction } from './jsonl.js';
 import { moveAction } from './move.js';
 import { autoArchiveOnMergeAction, linkPrAction, prsAction, unlinkPrAction } from './pull-requests.js';
+import {
+  scheduleAddAction,
+  scheduleListAction,
+  scheduleRemoveAction,
+  scheduleSetEnabledAction,
+  type ScheduleAddOptions,
+} from './schedule.js';
 import { healAction } from './heal.js';
+import { pendingAction } from './pending.js';
 
 function collectRepeatable(value: string, previous: string[] = []): string[] {
   return [...previous, value];
@@ -101,6 +109,13 @@ export function registerConversationsCommands(program: Command): void {
     .option('--json', 'Output status/path as JSON; read the status field')
     .action((id: string, opts: { json?: boolean }) => jsonlAction(id, opts));
 
+  // ── pending (PAN-4641) ──────────────────────────────────────────────────────
+  conversations
+    .command('pending <conv>')
+    .description('List messages queued to send when the conversation\'s usage limit resets')
+    .option('--json', 'Print JSON')
+    .action((conv: string, opts: { json?: boolean }) => pendingAction(conv, opts));
+
   // ── move ────────────────────────────────────────────────────────────────────
   conversations
     .command('move <query> <projectKey>')
@@ -126,6 +141,30 @@ export function registerConversationsCommands(program: Command): void {
     .command('auto-archive-on-merge [value]')
     .description('Show or set (on|off) archiving operator conversations once all their linked PRs are merged or closed (default off)')
     .action((value?: string) => autoArchiveOnMergeAction(value));
+
+  // ── schedules (PAN-4640) ────────────────────────────────────────────────────
+  const schedule = conversations
+    .command('schedule')
+    .description('Run a prompt in a conversation on a recurring schedule (Overdeck fires it, even after restarts)');
+  schedule
+    .command('add <conv>')
+    .description('Add a schedule; <conv> is self, a conversation number, a name, or a title match')
+    .option('--cron <expr>', '5-field cron expression, evaluated in --tz')
+    .option('--hourly', 'Every hour on the hour')
+    .option('--daily <HH:MM>', 'Every day at HH:MM')
+    .option('--weekdays <HH:MM>', 'Monday to Friday at HH:MM')
+    .option('--weekly <spec>', 'Once a week: "<day> HH:MM", e.g. "mon 09:00"')
+    .option('--prompt <text>', 'The prompt to send')
+    .option('--prompt-file <path>', 'Read the prompt from a file')
+    .option('--tz <zone>', 'IANA time zone (default: this machine\'s zone)')
+    .option('--paused', 'Create the schedule paused')
+    .option('--json', 'Output the created schedule as JSON')
+    .action((conv: string, opts: ScheduleAddOptions) => scheduleAddAction(conv, opts));
+  schedule.command('list [conv]').description('List schedules (all, or one conversation\'s)').option('--json', 'Output as JSON')
+    .action((conv: string | undefined, opts: { json?: boolean }) => scheduleListAction(conv, opts));
+  schedule.command('pause <id>').description('Pause a schedule').action((id: string) => scheduleSetEnabledAction(id, false));
+  schedule.command('resume <id>').description('Resume a paused schedule; the next run is computed from now').action((id: string) => scheduleSetEnabledAction(id, true));
+  schedule.command('rm <id>').description('Delete a schedule').action((id: string) => scheduleRemoveAction(id));
 
   conversations
     .command('heal <query>')

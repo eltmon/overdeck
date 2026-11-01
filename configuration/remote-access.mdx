@@ -40,6 +40,19 @@ Do not expose a dashboard on a network until `GET /api/environment` reports
 (terminals, RPC, voice) requires a credential.
 </Warning>
 
+## Reach this machine with Tailscale
+
+Another device first needs an address that reaches this machine. Tailscale is
+the recommended route: it puts your machines and phone on one private network
+and serves the dashboard over HTTPS at the machine's tailnet name, such as
+`https://desk.tailnet-1234.ts.net`.
+
+**Settings → Anywhere → Set up Tailscale** (or `pan tailscale setup`) installs
+Tailscale, signs this machine in, turns on Tailscale Serve HTTPS for the
+dashboard, trusts the new address, and turns on token sign-in. It then lists
+the other Overdeck machines on your tailnet. See
+[Tailscale](/configuration/tailscale) for each step.
+
 ## Pair a device
 
 ### From the dashboard
@@ -83,9 +96,34 @@ Without `--url`, `pan pair` uses this machine's own dashboard address. When
 that address is `localhost` (or `127.0.0.1`, `::1`, `*.localhost`), the URL only
 works on this machine, and `pan pair` says so.
 
-`pan pair` talks to a dashboard started by `pan up`, which shares this
-machine's internal token. A paired device cannot create more pairing
+`pan pair` talks to the running dashboard with this machine's internal
+token, read from `~/.overdeck/internal-token`. Dashboards started by
+`pan up` and by `npx @overdeck/core` both use that file. If `pan pair`
+reports that the dashboard rejected the token, the dashboard was started
+with a different `OVERDECK_HOME` or before the file existed: restart it
+and run `pan pair` again. A paired device cannot create more pairing
 credentials.
+
+### From the desktop app
+
+The desktop app can show one other machine's dashboard instead of running its
+own, for example your desktop's dashboard from a laptop over Tailscale.
+
+1. On the machine, create a pairing link from **Settings → Anywhere → Pair a
+   device**, or with `pan pair --url <its Tailscale address>`.
+2. In the desktop app, choose **Connect to a Machine…** from the Overdeck menu
+   or the tray, paste the whole link, and click **Connect**.
+
+The app stores the machine's address and a revocable device credential in
+`remote-machine.json` in its user-data folder, with the credential encrypted by
+the operating system's credential store (Keychain, Windows credential
+protection, GNOME Keyring or KWallet). It refuses to pair when no such store is
+available. While it shows the other machine, the desktop app runs no local
+server; **Use This Computer** switches back. It sends the credential only over
+HTTPS, a Tailscale address, or this computer's loopback, and refuses any other
+`http:` address. See
+[Open another machine](https://github.com/eltmon/overdeck/blob/main/docs/DESKTOP-APP.md#open-another-machine)
+for the launch checks, **Forget**, and the error messages.
 
 ### Open one conversation on another screen
 
@@ -163,6 +201,8 @@ appears in **Settings → Anywhere** and on the **Health** page, and shows:
 - **Reachable at:** the trusted addresses another device can open, or "Only
   this machine".
 - **Paired devices:** how many device sessions are active (not revoked).
+- **Tailscale:** "Not installed", "Signed out", "Needs HTTPS", "Ready" with the
+  Serve address, or "Set up unfinished". See [Tailscale](/configuration/tailscale).
 - **Session Vault:** "Not set up", "Locked on this machine", "Key rotation
   unfinished", or "Ready" with its backend. **Set up** opens Settings → Session
   Vault, which shows the `pan vault setup <git-url>` command to run in a
@@ -174,6 +214,7 @@ Below that, the card lists each problem with its fix:
 
 | Problem | Fix |
 | --- | --- |
+| Tailscale Serve sends tailnet visitors to this dashboard, but a token is not required to sign in. | **Protect the dashboard** opens Set up Tailscale, which turns on token sign-in. |
 | No address another device can reach is trusted yet. | **Add an address** opens the pair dialog, where you can add one. |
 | Session Vault is set up, but this machine cannot open it. | **Open Session Vault** goes to Settings → Session Vault, which shows the command to run in a terminal on this machine: `pan vault join <backend>`, then the vault passphrase or the recovery phrase. Unlocking from the dashboard is planned: [PAN-4446](https://github.com/eltmon/overdeck/issues/4446). |
 | A vault key rotation started on this machine has not finished. | **How to fix** links to [Session Vault](/configuration/session-vault). Finish the rotation on this machine before syncing again. |
@@ -206,9 +247,10 @@ The scopes:
 | --- | --- |
 | `read:events` | The live event stream (`GET /events/stream`) and `GET /events/version`. |
 | `read:state` | Issue, agent, agent-directory, Flywheel and pipeline reads. |
-| `read:conversations` | Conversation lists, one conversation, its messages and its summary. |
+| `read:conversations` | Conversation lists, one conversation, its messages and its summary, and conversation search. |
 | `tell` | Sending a message to an agent or a conversation. |
-| `operate` | Everything `tell` allows, plus terminal WebSockets (`/ws/terminal`). |
+| `operate` | Everything `tell` allows, plus terminal WebSockets (`/ws/terminal`) and starting a conversation or a worker. |
+| `approve` | Answering blocking prompts: permission prompts, menus, pi asks, Codex approvals, plan approvals and agent questions. Off unless you add it. |
 | `admin` | Everything, like a paired device. |
 
 Anything not in the table needs `admin`. A request whose token lacks the scope
@@ -294,6 +336,12 @@ in **Settings → Access Tokens → Require a token to sign in**. A Settings cha
 applies at once. A hand edit of `config.yaml` needs a dashboard restart. The key
 is read only from the global `~/.overdeck/config.yaml`, never from a project
 `.pan.yaml`.
+
+**Set up Tailscale** turns this setting on automatically when it enables
+Tailscale Serve, before Serve starts forwarding. While Serve forwards to the
+dashboard, a Settings save that turns it off keeps it on; turn Serve off first
+(`tailscale serve --https=443 off`). See
+[Serve HTTPS and token sign-in](/configuration/tailscale#serve-https-and-token-sign-in).
 
 ### On automatically
 

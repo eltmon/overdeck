@@ -1,12 +1,14 @@
 /**
  * Client for the Overdeck Anywhere routes (PAN-4445): paired devices, pairing
  * links, trusted addresses and the Anywhere status. These call the same server
- * routes as `pan pair` and `pan devices`.
+ * routes as `pan pair` and `pan devices`. Webhook triggers (PAN-4648) use
+ * `/api/triggers`, the routes behind `pan triggers`.
  *
  * Every fetcher returns `{ status, body }` so a caller can branch on 403 (a
  * paired device's session cannot create pairing links or add addresses).
  */
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
+import { AccessTokensForbiddenError, type AccessTokenRecord } from '../sections/accessTokensShared';
 
 export interface DeviceRow {
   id: string;
@@ -22,10 +24,23 @@ export type AnywhereVaultState = 'off' | 'locked' | 'rotation-pending' | 'ready'
 export type AnywhereAction =
   | { kind: 'pair-dialog' }
   | { kind: 'settings-section'; section: 'session-vault' }
+  | { kind: 'tailscale-setup' }
   | { kind: 'none'; docsUrl?: string };
 
+/** Mirrors `TailscaleNextStep` in src/lib/tailscale/state.ts, plus `not-installed`. */
+export type AnywhereTailscaleStep =
+  | 'not-installed'
+  | 'install'
+  | 'start-daemon'
+  | 'operator'
+  | 'login'
+  | 'enable-https'
+  | 'serve'
+  | 'protect'
+  | 'ready';
+
 export interface AnywhereProblem {
-  code: 'identity-unreadable' | 'no-reachable-address' | 'vault-locked' | 'vault-rotation-pending';
+  code: 'identity-unreadable' | 'no-reachable-address' | 'vault-locked' | 'vault-rotation-pending' | 'tailscale-serve-unprotected';
   message: string;
   action: AnywhereAction;
 }
@@ -39,6 +54,8 @@ export interface AnywhereStatus {
   /** PAN-4645: the enforced require_token_mint and why it is on by itself; absent on older servers. */
   tokenMint?: { effective: boolean; configured: boolean; autoReasons: string[] };
   problems: AnywhereProblem[];
+  /** Tailscale on this machine (PAN-1254 FR-9). */
+  tailscale: { nextStep: AnywhereTailscaleStep; serveUrl: string | null; magicDnsName: string | null };
   /** Who is asking (PAN-4455 D-3); null when no credential resolves. */
   viewer: { kind: 'root-session' | 'device' | 'token' | 'internal-token' | 'machine' | null };
 }
@@ -56,6 +73,35 @@ export interface ApiResult<T> {
 
 export const ANYWHERE_DEVICES_QUERY_KEY = ['anywhere-devices'] as const;
 export const ANYWHERE_STATUS_QUERY_KEY = ['anywhere-status'] as const;
+/** Shared with `sections/AccessTokensSection` so a revoke or mint refreshes both surfaces. */
+export const ANYWHERE_ACCESS_TOKENS_QUERY_KEY = ['access-tokens'] as const;
+export const ANYWHERE_TRIGGERS_QUERY_KEY = ['anywhere-triggers'] as const;
+
+/** The default scopes of an MCP token (PAN-4649 D-4649-3); mirrors MCP_DEFAULT_SCOPES in src/lib/mcp/server.ts. */
+export const MCP_DEFAULT_SCOPES = ['read:state', 'read:conversations', 'operate'] as const;
+
+export interface CreatedAccessToken {
+  token: string;
+  record: { id: string; name: string; scopes: string[] };
+}
+
+/** Mirrors `PublicTrigger` in src/lib/triggers/store.ts. No secret ever reaches the client in a list. */
+export interface TriggerRow {
+  id: string;
+  name: string;
+  target:
+    | { kind: 'conversation'; conversation: string }
+    | { kind: 'project'; projectKey: string; model?: string; harness?: string; effort?: string };
+  template: string | null;
+  verify: 'none' | 'github' | 'stripe';
+  signingSecretSet: boolean;
+  createdAt: string;
+}
+
+export interface TriggersList {
+  triggers: TriggerRow[];
+  funnel: { port: number; baseUrl: string | null; command: string };
+}
 
 async function readResult<T>(response: Response): Promise<ApiResult<T>> {
   const body = (await response.json().catch(() => null)) as T | { error?: string } | null;
@@ -115,4 +161,84 @@ export async function loadAnywhereStatus(): Promise<AnywhereStatus> {
   const result = await fetchAnywhereStatus();
   if (!isOk(result)) throw new Error(apiError(result));
   return result.body;
+}
+
+/** Mint a `kind: 'token'` access token (PAN-4649). Only a root browser may; a paired device gets 403. */
+export async function createAccessToken(name: string, scopes: readonly string[]): Promise<ApiResult<CreatedAccessToken>> {
+  return readResult(await fetch('/api/access-tokens', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ name, scopes }),
+  }));
+}
+
+/** A client config carrying the MCP URL and its Authorization header; the token never goes in the URL. */
+export function mcpClientConfig(url: string, token: string): string {
+  return JSON.stringify({ mcpServers: { overdeck: { type: 'http', url, headers: { Authorization: `Bearer ${token}` } } } }, null, 2);
+}
+
+/** Query function for the access-token rows (`kind: 'token'` only); a 403 throws `AccessTokensForbiddenError`. */
+export async function loadAccessTokens(): Promise<AccessTokenRecord[]> {
+  const result = await readResult<{ tokens: AccessTokenRecord[] }>(await fetch('/api/access-tokens'));
+  if (result.status === 403) throw new AccessTokensForbiddenError(apiError(result));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body.tokens ?? [];
+}
+
+export async function revokeAccessToken(id: string): Promise<ApiResult<{ ok: true }>> {
+  return readResult(await fetch(`/api/access-tokens/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: await dashboardMutationJsonHeaders(),
+  }));
+}
+
+export async function fetchTriggers(): Promise<ApiResult<TriggersList>> {
+  return readResult(await fetch('/api/triggers'));
+}
+
+export async function removeTrigger(id: string): Promise<ApiResult<{ removed: true }>> {
+  return readResult(await fetch(`/api/triggers/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: await dashboardMutationJsonHeaders(),
+  }));
+}
+
+export interface CreateTriggerInput {
+  name: string;
+  target: { kind: 'conversation'; conversation: string } | { kind: 'project'; projectKey: string };
+  template: string | null;
+  verify: TriggerRow['verify'];
+  signingSecret: string | null;
+}
+
+/** The create response: the only time the URL secret and a generated signing secret are shown. */
+export interface CreatedTriggerBody {
+  trigger: TriggerRow;
+  hookPath: string;
+  url: string | null;
+  urlSecretShownOnce: true;
+  generatedSigningSecret: string | null;
+}
+
+export async function createTrigger(input: CreateTriggerInput): Promise<ApiResult<CreatedTriggerBody>> {
+  return readResult(await fetch('/api/triggers', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(input),
+  }));
+}
+
+export async function setTriggerSigningSecret(id: string, secret: string): Promise<ApiResult<{ trigger: TriggerRow }>> {
+  return readResult(await fetch(`/api/triggers/${encodeURIComponent(id)}/signing-secret`, {
+    method: 'PUT',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ secret }),
+  }));
+}
+
+/** Query function for `['anywhere-triggers']`: the triggers and Funnel facts, or a thrown error. */
+export async function loadTriggers(): Promise<TriggersList> {
+  const result = await fetchTriggers();
+  if (!isOk(result)) throw new Error(apiError(result));
+  return { ...result.body, triggers: result.body.triggers ?? [] };
 }

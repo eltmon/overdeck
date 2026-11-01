@@ -24,7 +24,8 @@ import {
   rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
 } from './dashboard-auth.js';
-import { validateOriginHeaders } from './origin-validation.js';
+import { isTailscaleFunnelRequest } from './dashboard-auth.js';
+import { validateOriginHeaders, type HeaderMap } from './origin-validation.js';
 
 export interface KnowledgeViewerRouteDependencies {
   getStatus?: (projectKey: string) => Promise<KnowledgeViewerStatus>;
@@ -291,6 +292,16 @@ export const knowledgeViewerRouteLayer = Layer.mergeAll(
   legacyProxyRedirectRoute,
 );
 
+/**
+ * The viewer project a raw Node request addresses, or null. A Tailscale Funnel
+ * request never reaches a viewer: it falls through to the dashboard, whose
+ * remote gate lets Funnel reach only `POST /hooks/*` (PAN-4648 FR-9).
+ */
+function viewerProjectForRequest(request: http.IncomingMessage): string | null {
+  if (isTailscaleFunnelRequest(request.headers as HeaderMap)) return null;
+  return projectFromKnowledgeViewerHost(request.headers.host);
+}
+
 export function setupKnowledgeViewerProxy(
   server: http.Server,
   routeHandlers: KnowledgeViewerRouteHandlers = handlers,
@@ -301,7 +312,7 @@ export function setupKnowledgeViewerProxy(
   server.on = function(event: string, listener: (...args: unknown[]) => void) {
     if (event === 'request') {
       const wrapped = (request: http.IncomingMessage, response: http.ServerResponse) => {
-        const projectKey = projectFromKnowledgeViewerHost(request.headers.host);
+        const projectKey = viewerProjectForRequest(request);
         if (projectKey) {
           void proxyKnowledgeViewerHttp(request, response, projectKey, routeHandlers);
           return;
@@ -312,7 +323,7 @@ export function setupKnowledgeViewerProxy(
     }
     if (event === 'upgrade') {
       const wrapped = (request: http.IncomingMessage, socket: Socket, head: Buffer) => {
-        if (projectFromKnowledgeViewerHost(request.headers.host)) return;
+        if (viewerProjectForRequest(request)) return;
         (listener as (req: http.IncomingMessage, socket: Socket, head: Buffer) => void)(request, socket, head);
       };
       return originalOn(event, wrapped as never);
@@ -321,7 +332,7 @@ export function setupKnowledgeViewerProxy(
   } as typeof server.on;
 
   originalOn('upgrade', (request: http.IncomingMessage, socket: Socket, head: Buffer) => {
-    const projectKey = projectFromKnowledgeViewerHost(request.headers.host);
+    const projectKey = viewerProjectForRequest(request);
     if (!projectKey) return;
     const access = authorizeViewerRequest(request, projectKey);
     if (!access.ok) {

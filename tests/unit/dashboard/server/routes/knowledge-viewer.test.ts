@@ -1,10 +1,13 @@
 import http from 'node:http';
+import { rmSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { _resetInternalTokenCacheForTests } from '../../../../../src/lib/internal-token.js';
+import { getOverdeckHome } from '../../../../../src/lib/paths.js';
 import {
   createKnowledgeViewerRouteHandlers,
   filterKnowledgeViewerRequestHeaders,
@@ -94,6 +97,7 @@ beforeEach(() => {
   process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = 'test-session-token';
   process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
   process.env.DASHBOARD_URL = 'https://overdeck.localhost';
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
   _resetTrustedOriginsForTests();
@@ -270,6 +274,32 @@ describe('origin-isolated knowledge viewer proxy', () => {
       expect(JSON.parse(beta.body)).toEqual({ project: 'beta', path: '/api/config' });
     } finally {
       await Promise.all([close(proxy), close(upstreamAlpha), close(upstreamBeta)]);
+    }
+  });
+
+  it('never serves a Tailscale Funnel request from a viewer host (PAN-4648)', async () => {
+    const upstream = http.createServer((_request, response) => response.end('viewer'));
+    const upstreamPort = await listen(upstream);
+    const handlers = createKnowledgeViewerRouteHandlers({
+      getStatus: async (projectKey) => runningStatus(projectKey, { url: `http://127.0.0.1:${upstreamPort}` }),
+    });
+    const proxy = http.createServer();
+    setupKnowledgeViewerProxy(proxy, handlers);
+    proxy.on('request', (_request, response) => {
+      response.writeHead(404);
+      response.end('dashboard');
+    });
+    const proxyPort = await listen(proxy);
+
+    try {
+      const viewer = new URL(`http:${knowledgeViewerProxyUrl('alpha', `localhost:${proxyPort}`)}`);
+      const funneled = await hostRequest(proxyPort, viewer.host, `/api/config${viewer.search}`, { 'tailscale-funnel-request': '?1' });
+      expect(funneled).toMatchObject({ status: 404, body: 'dashboard' });
+      // Without the marker the same host reaches the viewer, which asks for its own access.
+      const direct = await hostRequest(proxyPort, viewer.host, '/api/config');
+      expect(direct.status).toBe(401);
+    } finally {
+      await Promise.all([close(proxy), close(upstream)]);
     }
   });
 

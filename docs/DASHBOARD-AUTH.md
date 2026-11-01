@@ -10,7 +10,12 @@ defend, and what they do not. User-facing guide:
 - **Internal token** — the root secret at `~/.overdeck/internal-token` (mode
   `0600`), read by `getInternalToken()` (`src/lib/internal-token.ts`). Sent as
   the header `x-overdeck-internal-token` or `Authorization: Bearer <token>`.
-  Generated once, on first server start, and never rotated automatically.
+  Resolution order: the file first; `OVERDECK_INTERNAL_TOKEN` only when no
+  file exists, and the first `ensureInternalToken()` (dashboard boot,
+  `pan serve`, or a CLI sender) writes that value, or a random one, to the
+  file. A pane can inherit a stale `OVERDECK_INTERNAL_TOKEN` from a
+  long-lived Herdr or tmux server, so the env value never overrides the
+  file (PAN-4628). Never rotated automatically.
 - **Session cookie** — `overdeck_session`
   (`DASHBOARD_SESSION_COOKIE`, `src/dashboard/server/routes/dashboard-auth.ts`).
   Its value is an HMAC of the internal token (context
@@ -69,6 +74,9 @@ Every registry credential (device or token) carries scopes from
 - `operate` satisfies `tell`.
 - `read:events`, `read:state`, `read:conversations` and `tell` are independent
   grants; only `admin` implies them.
+- `approve` (PAN-4649) is an independent grant to answer blocking prompts:
+  permission prompts, pane-choice menus, pi asks, Codex approvals, plan
+  approvals and agent questions. Only `admin` implies it; `operate` does not.
 - An unknown scope string in the registry file parses but satisfies nothing
   (`scopeSatisfies`), so a hand-edited record fails closed.
 
@@ -81,9 +89,10 @@ does not list needs `admin` (D-6):
 | --- | --- |
 | `read:events` | `GET /events/stream`, `GET /events/version` |
 | `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership` |
-| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about` |
+| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search` |
 | `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message` |
-| `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`) |
+| `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers` |
+| `approve` | `POST /api/conversations/:id/permission`, `POST /api/conversations/:id/pane-choice`, `POST /api/conversations/:id/pi-ask-answer`, `POST /api/conversations/:id/codex-approval`, `POST /api/conversations/:name/plan-action`, `POST /api/agents/:id/answer-question`, `POST /api/agents/:id/plan-action`, `POST /api/agents/:id/permissions/:requestId/respond` |
 | `admin` | everything else, including `/ws/rpc`, `/ws/voice`, `/ws/autopreso` |
 
 A `:param` segment matches exactly one non-empty segment; matching is exact and
@@ -98,6 +107,25 @@ narrow token from `127.0.0.1` still gets 403 on an `admin` route. A credential
 without the required scope gets **403**
 `{ "error": "insufficient_scope", "missingScope": "<scope>" }` (HTTP) or a 403
 upgrade rejection. A missing or invalid credential stays **401**.
+
+### `/mcp` (PAN-4649)
+
+`/mcp` serves the MCP tool module (`src/lib/mcp/`) over streamable HTTP. It is
+outside the gate's `/api/` and `/events/` prefixes, so the gate does not see it,
+and it is not in the route-scope table: `rejectUnauthorizedDashboardRequest`
+would demand `admin` for it. The route checks the credential itself, in order:
+an untrusted `Origin` that is present → 403, no internal token configured →
+503, no credential → 401, a credential that is not `kind: 'token'` (the
+internal token, the root session, a paired device) → 403, a token carrying
+`admin` → 403. MCP never runs with a root credential (parent PRD D-21).
+
+Each tool then calls an ordinary dashboard route over the loopback URL with the
+caller's own Bearer token, so the route that tool proxies enforces its scope
+through this table and a revoked token fails its next request. The one check
+the tool layer adds is `approve` on `answer_question`, because that tool posts
+to the `tell`-scoped message route. The endpoint is stateless (a fresh MCP
+server per `POST`, no session); `GET /mcp` and `DELETE /mcp` answer 405 with
+`Allow: POST`. See [configuration/mcp.mdx](../configuration/mcp.mdx).
 
 Only root credentials may create or revoke access tokens, issue pairing
 credentials, or revoke a device other than the caller's own (D-11). A device or
@@ -135,8 +163,16 @@ Otherwise the mint passes when any of these is true:
   (`rejectUnauthorizedDashboardRequest`), so a mint from an already-trusted
   caller just refreshes the cookie's rolling `Max-Age`.
 
-Peer trust reads only the real TCP peer (`request.remoteAddress`), never
-`X-Forwarded-For`, which a caller could spoof. With
+Peer trust reads the real TCP peer (`request.remoteAddress`). A
+Docker-bridge peer is the one exception (PAN-4299): Traefik connects from a
+bridge IP for every client it forwards, LAN clients included, so a bridge peer
+is trusted only when its rightmost `X-Forwarded-For` entry is loopback or a
+host Docker-bridge IP, or the header is absent (`forwardedClientIsLocal`).
+Traefik appends that rightmost entry itself, so a caller can prepend fake
+entries but cannot replace it. A local browser shows up there as the bridge
+gateway (for example `172.23.0.1`), because it reaches Traefik through
+docker-proxy. Literal-loopback and in-container peers do not read the header.
+With
 `dashboard.require_token_mint: true` (see "Remote request gate"), the loopback
 bullet no longer applies: only the internal token or an existing credential
 mints.
@@ -369,6 +405,8 @@ The server binds `0.0.0.0`, and many routes check only `Origin`.
 middleware, merged into `makeRoutesLayer`, that decides whether a request may
 reach any route at all:
 
+0. A Tailscale Funnel request may reach only `POST /hooks/*`; anything else is
+   **404** (see "Webhook triggers and Tailscale Funnel").
 1. The path is not under `/api/` or `/events/` (the static SPA): pass.
 2. `METHOD path` is on `REMOTE_GATE_ALLOWLIST`: pass. The list is
    `GET /api/health`, `GET /api/environment`, `OPTIONS` and
@@ -395,6 +433,39 @@ a Settings save calls `invalidateRemoteAccessConfig()`, so the Settings toggle
 (Access Tokens section) applies at once; a hand edit needs a restart.
 `GET /api/settings` reports the enforced value.
 
+## Webhook triggers and Tailscale Funnel
+
+PAN-4648 adds webhook triggers (`src/lib/triggers/`, user docs
+`configuration/triggers.mdx`). Two auth rules come with them.
+
+**The hook route is outside the gate by path.** `POST /hooks/:id/:secret`
+(`routes/trigger-hooks.ts`) is not under `/api/` or `/events/`, so rule 1 of the
+remote request gate passes it with no credential and `REMOTE_GATE_ALLOWLIST`
+does not change. The URL secret is the authorization: the route hashes it with
+SHA-256 and compares it to the stored hash with `timingSafeEqual`, and an
+unknown id and a wrong secret get the same `404`. The management routes
+(`/api/triggers`, `routes/triggers.ts`) stay behind the gate at the default
+`admin` scope.
+
+**A Funnel request reaches only `POST /hooks/*`.** Tailscale Funnel proxies
+public traffic to `127.0.0.1`, so with the default `require_token_mint: false` a
+funneled request would look like the local operator. Every funneled request
+carries `Tailscale-Funnel-Request: ?1`: tailscaled deletes any client-sent copy
+and sets it (`ipn/ipnlocal/serve.go` `addTailscaleIdentityHeaders`), so the
+header cannot be forged through Funnel. `isTailscaleFunnelRequest` in
+`routes/dashboard-auth.ts` detects it, and:
+
+- the remote request gate answers **404** `{ "error": "not found" }` to a Funnel
+  request for any method or (normalized) path other than `POST /hooks/*`, before
+  any credential check, and `isTrustedLocalRequest` is never true for one;
+- the session mint (`rejectUnauthorizedDashboardSessionMintRequest`) never
+  treats a Funnel request as a trusted peer;
+- `authorizeDashboardUpgrade` answers **403** to a Funnel request before any
+  other check, so no `/ws/*` socket opens.
+
+The gate keys on the Funnel marker, never on `X-Forwarded-*`, because Traefik
+and Tailscale Serve add those for legitimate local and tailnet visitors too.
+
 ## Threat model
 
 **Defends:**
@@ -412,15 +483,25 @@ a Settings save calls `invalidateRemoteAccessConfig()`, so the Settings toggle
 - A leaked access token: it reaches only the routes its scopes name, can never
   mint a session, a pairing credential or another token, and revoking it ends
   its access and open connections at once.
+- LAN clients reaching the dashboard through Traefik with a forged `Host`
+  header (PAN-4299). Traefik publishes 80/443/8080 on `127.0.0.1` by default
+  (`traefik.bind` in `~/.overdeck/config.toml`), so other machines cannot
+  connect. Even with `bind = "all"`, a Docker-bridge peer whose rightmost
+  `X-Forwarded-For` entry is not loopback or a host Docker-bridge IP gets
+  **401** from the session mint and from the remote request gate. With
+  `bind = "all"`, Overdeck writes the 80, 443 and 8080 port lines with the
+  explicit IPv4 host address `0.0.0.0`, which requests no IPv6 `[::]` listener
+  for those ports. A port line you add without a host address
+  publishes on IPv6 as well, and IPv6 clients on it reach Traefik through
+  docker-proxy as the bridge gateway. A container created from a compose file
+  older than PAN-4299 still publishes the managed ports on `[::]` until
+  `pan restart --traefik` recreates it; `pan doctor` reports that as
+  **Traefik port binding**.
 
 **Does NOT defend:**
 - Any process running on this machine. It can mint a session as a loopback
   peer with zero credentials, then use that cookie on every upgrade — this
   gate closes the LAN hole, not the local-machine trust boundary.
-- LAN clients reaching the dashboard through Traefik with a forged `Host`
-  header, because the shipped Traefik template publishes ports 80/443/8080 on
-  all interfaces (`sync-sources/templates/traefik/docker-compose.yml`), not
-  `127.0.0.1` — tracked as [PAN-4299](https://github.com/eltmon/overdeck/issues/4299).
 - Exposure through a local reverse proxy or tunnel while
   `dashboard.require_token_mint` is `false` (the default): the proxy connects
   from loopback, so every visitor is a trusted local caller. Turn the switch on

@@ -37,6 +37,7 @@ colleague.
 | **Copy link** | Grab the `overdeck.localhost/conv/<id>` URL to share or reopen a conversation |
 | **Context window meter** | See how much of the window is used — your cue that a handoff is coming |
 | **Bookmarks** | Mark a message by clicking the icon beside it, then reopen the list from the header to jump back to it |
+| **Citations** | Select text in a reply (or your own message), click **Cite** (or press `C`), add an optional comment, and it goes out with your next prompt |
 
 A new conversation's effort is chosen with an effort picker next to the model picker, both on the Home composer and the Command Deck sidebar. The **New conversation with options…** dialog (below) has its own effort field, which defaults to the effort the conversation would get anyway and shows where that default comes from, for example `Default: high (default)` or `Default: medium (project)`.
 
@@ -244,6 +245,43 @@ vision-capable model (for example, MiMo V2.5) to include images.
 - Maximum message length: **50,000** characters.
 - Unsupported or binary file types are rejected at selection time with a toast.
 
+## Citations
+
+To push back on part of a reply, select the text — in an assistant message or
+your own — and click the **Cite** button that appears over the selection (or
+press `C` while nothing else has focus). Write an optional comment explaining
+what's wrong or what to change, then save. The citation becomes a chip above
+the composer; the quoted text stays highlighted in its row until the citation
+is sent or removed.
+
+Chips can be expanded to show the full quote and edit the comment, or removed
+with the ✕. Citations persist across switching conversations and reloading the
+page — they live in the browser, not the agent's transcript, so they survive
+until you send or remove them.
+
+On send, every pending citation is prepended to your prompt as a block:
+
+```
+Notes on your previous reply:
+1. > First line
+   > second line
+   I don't agree
+2. > Use X
+
+Please revise.
+```
+
+Numbering follows add order; a quote with no comment gets no comment line. If
+the send fails, the citations stay attached to the retry-outbox entry rather
+than being lost — Retry resends the same block. Typing a slash command (for
+example `/compact`) sends the bare command and leaves any pending citations
+untouched. You can only cite settled message text — not tool output, plan
+cards, choice cards, or a reply still streaming in.
+
+Cite is offered only when the conversation has a composer: it does not appear
+while the conversation shows the resume bar, is a read-only vault copy, was
+cleared into another conversation, or is still forking.
+
 ## Bookmarks
 
 Click the icon beside an assistant or user message to bookmark it, using its
@@ -258,6 +296,51 @@ stored by Overdeck and never written into the agent's own transcript, and
 they stay with this conversation — a handoff or fork does not copy them. If
 a bookmarked message is no longer in the loaded transcript, its row in the
 list shows "This message is not in the loaded transcript."
+
+## Scheduled runs
+
+A schedule sends a stored prompt to a conversation on a recurring timetable,
+for example every evening at 21:00. Overdeck keeps the schedule and fires it
+from the dashboard, so it keeps working after the agent's session stops and
+after the dashboard restarts. A harness's own wakeup or cron tools stop when
+its process stops; a schedule does not.
+
+```bash
+pan conv schedule add self --daily 21:00 --prompt "Summarize today's merged PRs"
+pan conv schedule list
+pan conv schedule pause 3
+pan conv schedule resume 3
+pan conv schedule rm 3
+```
+
+`<conv>` is `self` (also `.`, `current` or `me`) when you run the command
+inside a conversation, a conversation number (the `/conv/<n>` id), a name, or
+a unique title match. Pass exactly one recurrence:
+
+- `--hourly` runs on the hour.
+- `--daily HH:MM`, `--weekdays HH:MM` (Monday to Friday) and `--weekly "mon 09:00"` use a 24-hour time.
+- `--cron "<expr>"` takes a standard 5-field cron expression (`minute hour day-of-month month day-of-week`). Six- and seven-field patterns and nicknames such as `@daily` are refused.
+
+Pass the prompt with `--prompt` or `--prompt-file`. The schedule runs in the
+time zone given by `--tz` (an IANA zone such as `America/New_York`); without
+it, the zone of the machine that creates the schedule is stored on the
+schedule. Runs must be at least 15 minutes apart, so a frontier-model
+conversation cannot be sent a prompt every minute. Add `--paused` to create a
+schedule without arming it.
+
+How a schedule fires:
+
+- While the dashboard runs, a due schedule fires within a minute of its time. The prompt arrives with a `[Scheduled run · schedule <id> · <cron> · <zone>]` header so the agent knows why it arrived.
+- If the conversation's session has stopped, Overdeck resumes it first, then delivers the prompt. The run uses the conversation's current model and effort.
+- If the dashboard was down across several run times, the schedule fires once when it comes back, not once per missed time.
+- A paused schedule never fires. Resuming it computes the next run from now, so it does not catch up on runs missed while paused.
+- A schedule on an archived conversation is skipped and moves to its next run. Unarchiving does not trigger a catch-up run.
+- A failed run (for example, the agent is waiting on a permission answer) is recorded and is not retried. `pan conv schedule list` shows the last outcome and error.
+
+Agent conversations and Session Vault browse copies cannot be scheduled, and
+a conversation can hold at most 20 schedules. The schedule dialog in the
+conversation menu and the next-run badge on the conversation row arrive with
+[#4657](https://github.com/eltmon/overdeck/issues/4657).
 
 ## Why hand off?
 
@@ -604,7 +687,8 @@ Arrives in the next release (v0.65.0), and needs Session Vault set up on this ma
 
 Claude Code and Codex conversations that another machine saved to the vault appear in the
 conversation list with a "from `<machine>`" chip. Hovering it reads "Read-only copy from
-`<machine>`".
+`<machine>`". Pipeline agents (work, review, test, planning and the other Overdeck agents)
+saved on another machine appear there too, titled `<issue> <role> agent (<agent id>)`.
 
 Opening one shows the transcript. The composer is replaced by "Read-only copy from
 `<machine>`.", the command `pan vault resume <id>`, and a **Continue here** button.
@@ -652,14 +736,57 @@ change. It applies to the diff in every view, and the panel remembers it in this
 browser. A turn's file list can still name a file whose only change was
 whitespace; opening it then shows no net changes.
 
-## Archiving a conversation
+## Settling and snoozing conversations
 
-Archive is in the row menu, the tab menu, and the conversation header menu.
-After you confirm, the row shows a spinner and the Archive action reads
-"Archiving…" and is disabled while Overdeck ends the session; on success a
-toast says `Archived "<title>"`, the row leaves the list and its tab closes;
-on failure an error toast shows the server's message and the row and tab
-stay.
+The conversation list groups rows into four sections, top to bottom: **Needs
+you**, **Inbox**, **Snoozed**, and **Settled**. A group with any pending
+question, plan-mode prompt, or approval request always shows in Needs you,
+regardless of its stored settle or snooze state — the group returns to
+Snoozed or Settled once the question is answered. Inbox has no header.
+Snoozed and Settled each show a count and are collapsed by default; click
+the header to expand.
+
+**Settling** marks a conversation done for now without stopping it — the
+session keeps running, and nothing about it changes except where it sits in
+the list. This is different from [stopping or archiving](#stopping-or-archiving-a-conversation),
+which end the session. Settle (and Unsettle) are available from the row's
+checkbox, the row's overflow menu, and the tab menu.
+
+**Snoozing** hides a conversation until a chosen time, after which it moves
+back to Inbox on its own — there is no server timer and no dashboard restart
+can lose or delay it, since the wake check runs on the client against the
+stored time. Choose **Snooze** from either menu for presets (1 hour, this
+evening, tomorrow morning, next week) or **Custom…** for any future date and
+time; **Unsnooze** clears it early. A snoozed row shows when it comes back,
+such as "back tomorrow 09:00".
+
+Every settle, unsettle, snooze, and unsnooze shows a toast with an **Undo**
+action, and `Cmd+Z`/`Ctrl+Z` undoes the most recent one while focus is
+anywhere in the list (but not while typing in a text field).
+
+Shift-click and `Cmd`/`Ctrl`-click select multiple rows; with a selection
+active, a bulk bar above the list offers Settle, Unsettle, and Snooze for
+every selected conversation in one action.
+
+Auto-settle — settling a conversation automatically when its pull request
+merges, or when it has been idle for a while — is tracked separately:
+on merge in [PAN-4653](https://github.com/eltmon/overdeck/issues/4653), and
+on idle in [PAN-4655](https://github.com/eltmon/overdeck/issues/4655).
+
+## Stopping or archiving a conversation
+
+Stop is the `X` on the row or "Stop agent" in the row menu, the tab menu, or
+the conversation header menu; Archive is in those same menus. After you stop
+or confirm archive, the row dims and stops responding to clicks, and its
+second line reads "Stopping…" or "Archiving…" (a nested row shows the label
+after the title instead); the row's `X` becomes a spinner. The conversation
+header shows the same status. The row stays dimmed until the conversation
+list has refreshed — then a stopped row shows its stopped (gray) dot, and an
+archived row leaves the list with a toast reading `Archived "<title>"` and
+its tab closes. On failure, an error toast shows the server's message and
+the row returns to normal. Both end the session; settling (above) does not
+— a settled conversation keeps running and can still be unsettled back to
+Inbox.
 
 ## See also
 

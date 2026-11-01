@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { capture } from './lib/telemetry';
@@ -82,6 +82,10 @@ export {
 } from './App/routes';
 export type { ConversationViewModeMap } from './App/routes';
 
+// PAN-2355 (D-4) — the phone shell loads in its own chunk; the desktop bundle
+// carries only this lazy import.
+const MobileApp = lazy(() => import('./components/mobile/MobileApp'));
+
 export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'overdeck.ui.sessionFeedSidebarOpen';
 
 function readSessionFeedSidebarOpen(): boolean {
@@ -130,6 +134,10 @@ export default function App() {
 
   if (terminalPath === '/popout/diff') {
     return <StandaloneDiffPopoutRoute />;
+  }
+
+  if (terminalPath === '/m' || terminalPath === '/m/') {
+    return <Suspense fallback={null}><MobileApp /></Suspense>;
   }
 
   const [activeTab, setActiveTabState] = useState<Tab>(() => getConversationRouteState().tab);

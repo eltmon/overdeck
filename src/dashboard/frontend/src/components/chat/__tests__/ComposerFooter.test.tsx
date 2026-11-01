@@ -249,9 +249,9 @@ describe('ComposerFooter attachments', () => {
       mode: 'handoff',
       focus: 'make it fast',
     });
-    // PAN-4499: the held-kickoff poll (GET …/kickoff) fires on every mount
-    // regardless of the slash command; only a send-type fetch would be a bug here.
-    expect(vi.mocked(fetch).mock.calls.filter(([url]) => !String(url).includes('/kickoff'))).toEqual([]);
+    // PAN-4499 / PAN-4641: the held-kickoff and scheduled-messages polls fire on every
+    // mount regardless of the slash command; only a send-type fetch would be a bug here.
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => !/\/(kickoff|scheduled-messages)$/.test(String(url)))).toEqual([]);
     expect(onSend).not.toHaveBeenCalled();
     window.removeEventListener('overdeck:open-fork-modal', openModal);
   });

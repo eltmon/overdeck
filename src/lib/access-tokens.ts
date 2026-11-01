@@ -8,8 +8,9 @@
  * SHA-256 hex digest is stored, and comparison is constant-time.
  *
  * Every record carries scopes from `ACCESS_TOKEN_SCOPES`. `admin` satisfies
- * every scope, `operate` satisfies `tell`, and the `read:*` scopes are
- * independent grants (`scopeSatisfies`). Pairing always grants `['admin']`.
+ * every scope, `operate` satisfies `tell`, and the `read:*` scopes and
+ * `approve` (answering blocking prompts, PAN-4649) are independent grants
+ * (`scopeSatisfies`). Pairing always grants `['admin']`.
  * `createAccessToken` accepts only known scopes, but a record read from the
  * file may hold any string: an unknown scope parses and satisfies nothing.
  *
@@ -58,6 +59,7 @@ export const ACCESS_TOKEN_SCOPES = [
   'read:settings',
   'tell',
   'operate',
+  'approve',
   'forward',
   'admin',
 ] as const;
@@ -90,7 +92,8 @@ export interface AccessTokenRecord {
 /** The scopes a `machine` token carries (FR-7): never `admin`; `forward` only on operator-level links. */
 export function MACHINE_TOKEN_SCOPES(access: MachineAccess): AccessTokenScope[] {
   const scopes: AccessTokenScope[] = ['read:events', 'read:state', 'read:conversations', 'read:costs', 'read:settings', 'tell', 'operate'];
-  return access === 'operator' ? [...scopes, 'forward'] : scopes;
+  // Operator-level links answer the other machine's prompts (`approve`, PAN-4649) and forward; fenced links do neither.
+  return access === 'operator' ? [...scopes, 'approve', 'forward'] : scopes;
 }
 
 /** A record as shown to callers: never carries the hash. */

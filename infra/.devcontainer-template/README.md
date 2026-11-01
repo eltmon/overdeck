@@ -47,6 +47,19 @@ When `pan workspace create PAN-XXX` is run:
 | frontend | Vite dev server with HMR | `https://{{FEATURE_FOLDER}}.overdeck.localhost` |
 | server | Express API with tsx watch | `https://api-{{FEATURE_FOLDER}}.overdeck.localhost` |
 | dev | VS Code attach container | - |
+| init-perms | One-shot: chowns the `container-node-modules` volume as root; `network_mode: none` | - |
+| init | One-shot: `bun install` and server build; on `devnet` | - |
+
+### Networks
+
+The stack creates one network, `overdeck-<FEATURE_FOLDER>_devnet`, and joins
+the external `overdeck` network. Every service in this template must list at
+least one named network under `networks:` or set `network_mode:`. Because the
+other services already use `devnet`, a service with neither (or with an empty
+`networks:`) makes Compose create an extra `<project>_default` network, and
+each one uses one of Docker's ~31 bridge subnets (PAN-4663). Stacks rendered
+before the fix keep their empty `_default` network until their next rebuild or
+teardown removes it.
 
 ## Usage
 

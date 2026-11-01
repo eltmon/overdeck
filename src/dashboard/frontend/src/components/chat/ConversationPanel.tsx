@@ -51,6 +51,7 @@ import { SubagentTranscript } from './SubagentTranscript';
 import { ForkProgressView } from './ForkProgressView';
 import { HeldHandoffView, HeldKickoffLookupFailedView } from './HeldHandoffView';
 import { useHeldKickoff } from './heldKickoff';
+import { scheduledToChatMessages, useScheduledMessages } from './scheduledMessages';
 import { TranscriptLoadingSkeleton } from './TranscriptLoadingSkeleton';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
 import { ViewToggle } from '../shared/ViewToggle';
@@ -802,9 +803,9 @@ export function ConversationPanel({
                 </button>
               )}
 
-              {archivePending && (
-                <span className={styles.conversationAboutToggle} role="status" aria-live="polite">
-                  <Loader2 size={14} className={styles.spinnerIcon} /><span>Archiving…</span>
+              {(archivePending || convMutations.isStopPending(conversation.name)) && (
+                <span className={styles.conversationAboutToggle} role="status" aria-live="polite" aria-label={archivePending ? 'Archiving conversation' : 'Stopping conversation'}>
+                  <Loader2 size={14} className={styles.spinnerIcon} /><span>{archivePending ? 'Archiving…' : 'Stopping…'}</span>
                 </span>
               )}
               {/* Copy link */}
@@ -1231,7 +1232,8 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
   const { onSend: handleMessageSent, contextWindowUsage } = useStableComposerProps({ conversation, data, serverMessages, addOptimistic });
 
   const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages, data?.subagents ?? [], data?.streaming ?? false);
-  const messages = [...serverMessages, ...visibleOptimistic, ...commandResults];
+  const scheduled = useScheduledMessages(conversation.name, !agentId);
+  const messages = [...serverMessages, ...visibleOptimistic, ...scheduledToChatMessages(scheduled.messages), ...commandResults];
 
   // PAN-4268: only Claude Code's agent selector says where typed input goes.
   // Agent-backed panels carry no inputTarget; their sends still switch.
@@ -1468,6 +1470,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           targetMessageNonce={targetMessageNonce}
           onTargetMessageHandled={onTargetMessageHandled}
           bookmarksEnabled
+          citationsEnabled={!hideComposer && !onResume && !isForking && !conversation.clearedToConvId && conversation.origin !== 'vault'}
           history={olderHistory}
           onLoadOlder={olderHistory.loadOlder}
           onLoadOlderUntil={olderHistory.loadOlderUntil}

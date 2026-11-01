@@ -861,7 +861,9 @@
 
   #root {
     height: 100vh;
-    width: 100vw;
+    /* 100%, not 100vw: on a phone 100vw can exceed the page width, so the
+       browser zooms out and the /m shell pans (PAN-2355). */
+    width: 100%;
     overflow-y: hidden;
     overflow-x: hidden;
     overscroll-behavior-y: none;
@@ -1335,3 +1337,6 @@ body::after {
                           background: color-mix(in srgb, currentColor 10%, transparent);
                           padding: 0.1em 0.3em; border-radius: 3px; }
 .prose-notes a          { color: var(--primary); text-decoration: underline; }
+
+/* PAN-4642: highlights a pending citation's quoted text in its message row. */
+::highlight(overdeck-citation) { background-color: color-mix(in srgb, var(--primary) 22%, transparent); }

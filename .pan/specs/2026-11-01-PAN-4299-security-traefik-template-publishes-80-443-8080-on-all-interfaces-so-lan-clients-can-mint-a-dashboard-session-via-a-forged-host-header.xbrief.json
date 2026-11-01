@@ -1,0 +1,655 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T04:57:05Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4299: security: Traefik template publishes 80/443/8080 on all interfaces, so LAN clients can mint a dashboard session via a forged Host header",
+    "updated": "2026-11-01T05:05:16.070Z"
+  },
+  "plan": {
+    "id": "pan-4299",
+    "title": "security: Traefik template publishes 80/443/8080 on all interfaces, so LAN clients can mint a dashboard session via a forged Host header",
+    "status": "running",
+    "uid": "c9b81f4d-755b-4978-af94-b06c839fab16",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T04:57:05Z",
+    "updated": "2026-11-01T05:05:16.070Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4299",
+        "label": "PAN-4299",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4299.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-2350.md",
+        "label": "Epic PRD W-SEC3",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "security",
+      "traefik",
+      "dashboard-auth",
+      "anywhere",
+      "W-SEC3"
+    ],
+    "narratives": {
+      "Problem": "The Traefik template publishes 80/443/8080 on every interface, and isLoopbackPeer trusts every Docker-bridge peer, which is what every Traefik-forwarded request is. A LAN client that sends Host: overdeck.localhost to https://<lan-ip>/api/dashboard/session gets a root overdeck_session cookie, and every uncredentialed /api/* call passes the remote request gate. This was reproduced on the planning host on 2026-11-01: HTTP 200 plus Set-Cookie, with Traefik logging source 192.168.1.64.",
+      "Proposal": "Publish Traefik on 127.0.0.1 by default, with an explicit [traefik] bind = \"all\" opt-in. Migrate existing compose files through one helper (migrateTraefikCompose) that runs from pan install, pan sync, pan up (which recreates a running container on change), pan dev and startTraefikBody. In the dashboard, trust a Docker-bridge peer only when its rightmost X-Forwarded-For entry is loopback or a host Docker-bridge IP, so a LAN request through an exposed Traefik gets 401 from both the mint and the remote gate. pan doctor reports a container still published on all interfaces. Document the new posture in DASHBOARD-AUTH.md, docker-setup.mdx and DNS_SETUP.md.",
+      "NonGoals": "- No Traefik ipAllowList middleware (it answers 403, not the epic's 401, and duplicates the dashboard check)\n- No change to api.insecure on :8080 beyond loopback binding\n- No change to the in-container trust branch peerIsLocalContainerNetwork\n- No change to literal-loopback peer trust behind Tailscale Serve or cloudflared (W-SEC4, PAN-4645, owns require_token_mint auto-enable)\n- No defense against host-local containers that call the API directly with a self-set X-Forwarded-For (existing local-machine trust boundary)\n- No rewrite of infra/wsl2hosts/sync-wsl2hosts.ps1\n- No [::1] port bindings\n- No automatic restart of the live overdeck-traefik container by the work agent\n- No allowlist raise in scripts/file-size-allowlist.txt"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Default bind is 127.0.0.1 for every install, with no special case for WSL2",
+        "rationale": "The issue asks for loopback as the default. Under the forwarded-client rule, a WSL2 Windows browser is a non-local client in both bind modes, so special-casing WSL2 would not restore its auto-mint."
+      },
+      {
+        "summary": "LAN exposure is an explicit opt-in: [traefik] bind = \"loopback\" | \"all\" in config.toml",
+        "rationale": "The issue says to make LAN exposure an explicit opt-in config key if that access is wanted. infra/wsl2hosts/sync-wsl2hosts.ps1 maps hostnames to the WSL VM IP, so some users do need non-loopback binding. An enum, not a free-form IP, keeps config from injecting text into the compose file."
+      },
+      {
+        "summary": "IPv4 loopback only, no [::1] bindings",
+        "rationale": "A [::1] binding fails container start on hosts with IPv6 disabled. Browsers, curl and Node 22 fetch fall back from a refused ::1 to 127.0.0.1, and the DNS methods write 127.0.0.1."
+      },
+      {
+        "summary": "The dashboard reads the rightmost X-Forwarded-For entry for Docker-bridge peers only",
+        "rationale": "Traefik appends the client it saw, so the last entry cannot be forged. The planning probe showed LAN source 192.168.1.64 and local source 172.23.0.1 (the bridge gateway), so loopback-or-bridge-IP separates them. Literal-loopback proxies belong to W-SEC4."
+      },
+      {
+        "summary": "The in-container trust branch stays unchanged",
+        "rationale": "Traefik's ingress gateway (172.23.0.0/16 on the planning host) is not on the overdeck network (192.168.48.0/20). Applying the rule inside UAT containers could re-break their session mint (PAN-1737). Loopback binding already closes their LAN path."
+      },
+      {
+        "summary": "Docs are in scope despite the issue body's 'Docs: None'",
+        "rationale": "docs/DASHBOARD-AUTH.md names PAN-4299 under 'Does NOT defend', the original issue AC requires that section to change, and finalize requires a docs item."
+      },
+      {
+        "summary": "Add a pan doctor check instead of auto-restarting Traefik on pan reload",
+        "rationale": "pan reload restarts only the dashboard. A doctor error with the fix 'pan restart --traefik' makes a stale exposed container visible without the CLI recreating the operator's proxy unasked."
+      }
+    ],
+    "items": [
+      {
+        "id": "template-loopback-ports",
+        "title": "Publish the Traefik template's 80/443/8080 on 127.0.0.1",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:57:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4299",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/templates/traefik/docker-compose.yml",
+            "sync-sources/templates/traefik/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "docker compose -f sync-sources/templates/traefik/docker-compose.yml config --format json"
+          ],
+          "expected_outputs": [
+            "the ports array lists host_ip 127.0.0.1 for published 80, 443 and 8080"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-1 (.pan/drafts/PAN-4299.md). Replace the three port lines with \"127.0.0.1:80:80\", \"127.0.0.1:443:443\", \"127.0.0.1:8080:8080\" and keep their comments. Add the two-line comment naming PAN-4299 and [traefik] bind = \"all\". Add no [::1] lines (PRD D-2). Change the README 'Exposes ports 80, 443, 8080' bullet to say they publish on 127.0.0.1 only unless bind = \"all\"."
+        },
+        "items": [
+          {
+            "id": "template-loopback-ports.ac1",
+            "title": "Given the template, when `docker compose -f sync-sources/templates/traefik/docker-compose.yml config --format json` runs, then every entry in services.traefik.ports shows host_ip \"127.0.0.1\" for published ports 80, 443 and 8080",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "template-loopback-ports.ac2",
+            "title": "Given the template diff, then it contains no `[::1]` or `0.0.0.0` port binding and keeps the HTTP/HTTPS/Traefik Dashboard comments",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "template-loopback-ports.ac3",
+            "title": "Given sync-sources/templates/traefik/README.md, then its Docker Compose section states that the ports publish on 127.0.0.1 only and names `bind = \"all\"` as the opt-in",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compose-migration-helper",
+        "title": "Add migrateTraefikCompose and the traefik.bind config key",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:57:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4299",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/traefik.ts",
+            "src/lib/config.ts",
+            "tests/lib/traefik.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/traefik.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/traefik.test.ts passes including the new PAN-4299 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ],
+          "foundationFor": [
+            "wire-install-sync",
+            "wire-up-dev",
+            "wire-lifecycle",
+            "doctor-traefik-binding"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-2. In src/lib/config.ts add `bind?: 'loopback' | 'all'` to the traefik interface. In src/lib/traefik.ts add the exported functions resolveTraefikBindAddress, rewriteTraefikComposePorts, rewriteTraefikComposeNetwork and migrateTraefikCompose, exactly as specified in the PRD snippet. The network rewrite is moved verbatim from install.ts/cli/index.ts. Add the PRD's listed test cases to tests/lib/traefik.test.ts using inline compose strings and temp files (OVERDECK_HOME temp dir + config.toml), never reading the template file."
+        },
+        "items": [
+          {
+            "id": "compose-migration-helper.ac1",
+            "title": "Given compose content with \"80:80\", \"443:443\" and \"8080:8080\" lines, when rewriteTraefikComposePorts runs with 127.0.0.1, then it returns \"127.0.0.1:80:80\", \"127.0.0.1:443:443\", \"127.0.0.1:8080:8080\" and preserves each trailing comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compose-migration-helper.ac2",
+            "title": "Given lines \"8443:443\" and \"3000:3000\", when rewriteTraefikComposePorts runs, then those lines are returned unchanged, and a second rewrite of already-rewritten content returns identical content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compose-migration-helper.ac3",
+            "title": "Given config.toml with [traefik] bind = \"all\", when migrateTraefikCompose runs on a legacy file, then it writes 0.0.0.0:<port>:<port> lines and returns true, and a second call returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compose-migration-helper.ac4",
+            "title": "Given config.toml with bind unset or bind = \"lan\", when resolveTraefikBindAddress runs, then it returns \"127.0.0.1\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compose-migration-helper.ac5",
+            "title": "Given a legacy compose with `driver: bridge` under networks.overdeck, when migrateTraefikCompose runs, then the file contains `external: true`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-install-sync",
+        "title": "Call migrateTraefikCompose from pan install and pan sync",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:57:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4299",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/install.ts",
+            "src/cli/commands/sync.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-3. In install.ts replace the inline `driver: bridge` regex patch block (search 'Check if existing docker-compose.yml needs migration') with a migrateTraefikCompose() call that prints a spinner.info line when it returns true. In sync.ts, after the mkcert block and before '// Enforce Overdeck-managed MCP server defaults', add the guarded call from the PRD: it runs only when loadConfigSync().traefik?.enabled, never runs docker, prints the `pan restart --traefik` hint on change, and swallows errors."
+        },
+        "items": [
+          {
+            "id": "wire-install-sync.ac1",
+            "title": "Given src/cli/commands/install.ts after the change, then it no longer contains the `driver: bridge` regex and calls migrateTraefikCompose() inside the Traefik setup step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-install-sync.ac2",
+            "title": "Given src/cli/commands/sync.ts after the change, when traefik is enabled and migrateTraefikCompose returns true, then sync prints a line naming `pan restart --traefik` and runs no docker command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-install-sync.ac3",
+            "title": "Given a migrateTraefikCompose failure during pan sync, then sync continues and exits as it did before (error swallowed by try/catch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-up-dev",
+        "title": "Migrate and recreate Traefik from pan up and pan dev",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:57:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4299",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/dev.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "wc -l src/cli/index.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors (file-size guard passes)",
+            "src/cli/index.ts line count is <= its origin/main count"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4. In src/cli/index.ts replace the `if (existsSync(composeFile)) { ...driver: bridge... }` block (search 'Ensure network is marked as external') with `const migrated = (await import('../lib/traefik.js')).migrateTraefikCompose(composeFile);` and make the 'Traefik already running' branch apply only when `!migrated`, so a changed file runs `docker compose up -d`. The file must not grow. In dev.ts call migrateTraefikCompose() before the unconditional `docker compose up -d` (search 'Starting Traefik...')."
+        },
+        "items": [
+          {
+            "id": "wire-up-dev.ac1",
+            "title": "Given src/cli/index.ts after the change, then `wc -l` reports no more lines than `git show origin/main:src/cli/index.ts | wc -l` and the inline `driver: bridge` regex is gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-up-dev.ac2",
+            "title": "Given a running overdeck-traefik container and migrateTraefikCompose returning true, when pan up reaches the Traefik step, then it runs `docker compose up -d` instead of printing 'Traefik already running'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-up-dev.ac3",
+            "title": "Given src/cli/commands/dev.ts after the change, then migrateTraefikCompose() is called before `docker compose up -d` in the Traefik start block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-lifecycle",
+        "title": "Migrate the compose file in startTraefikBody before docker compose up",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:57:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4299",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/platform-lifecycle.ts",
+            "tests/unit/lib/platform-lifecycle-traefik.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/platform-lifecycle-traefik.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/platform-lifecycle-traefik.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-5. In startTraefikBody (src/lib/platform-lifecycle.ts), after the traefikDir existence check and before execAsync('docker compose up -d'), call migrateTraefikCompose(join(config.traefikDir, 'docker-compose.yml')) in its own try/catch that logs and continues. Add a new test file that vi.mocks ../traefik.js (or the resolved module path) and child_process exec, then calls startTraefik with traefikEnabled true and a temp traefikDir, and asserts call order."
+        },
+        "items": [
+          {
+            "id": "wire-lifecycle.ac1",
+            "title": "Given startTraefik with traefikEnabled true and an existing traefikDir, when it runs, then migrateTraefikCompose is called with <traefikDir>/docker-compose.yml before `docker compose up -d` executes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-lifecycle.ac2",
+            "title": "Given migrateTraefikCompose throws, when startTraefik runs, then it still executes `docker compose up -d` and resolves without a StageError from the migration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "forwarded-client-check",
+        "title": "Reject a non-local X-Forwarded-For client from a Docker-bridge peer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:57:05Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4299",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/routes/dashboard-auth.ts",
+            "src/dashboard/server/routes/__tests__/dashboard-auth.test.ts",
+            "src/dashboard/server/routes/__tests__/dashboard-auth-forwarded.test.ts",
+            "src/dashboard/server/__tests__/remote-request-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/dashboard-auth.test.ts src/dashboard/server/routes/__tests__/dashboard-auth-forwarded.test.ts src/dashboard/server/__tests__/remote-request-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "docs-traefik-loopback"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-6. Add the exported pure function forwardedClientIsLocal(headers, interfaces) exactly as in the PRD: it reads the RIGHTMOST x-forwarded-for entry, strips ::ffff:, accepts 127.0.0.1/::1 or peerIsHostLocalDockerBridge, and returns true when the header is absent. In isLoopbackPeer, call networkInterfaces() once and return forwardedClientIsLocal(...) for a Docker-bridge peer. Leave the literal-loopback and in-container (peerIsLocalContainerNetwork) branches unchanged (PRD D-6, D-7). Rewrite the isLoopbackPeer doc comment's 'never X-Forwarded-For' sentence. Put the node:os-mocked mint and gate cases in the new dashboard-auth-forwarded.test.ts (preferred) so existing suites keep the real os module; pure forwardedClientIsLocal cases may go in dashboard-auth.test.ts."
+        },
+        "items": [
+          {
+            "id": "forwarded-client-check.ac1",
+            "title": "Given a peer 172.18.0.2 inside a mocked br-* 172.18.0.0/16 bridge and `x-forwarded-for: 192.168.1.50`, when POST /api/dashboard/session is gated by rejectUnauthorizedDashboardSessionMintRequest, then it returns a 401 response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forwarded-client-check.ac2",
+            "title": "Given the same bridge peer with `x-forwarded-for: 127.0.0.1, 192.168.1.50` (spoofed prefix), when forwardedClientIsLocal runs, then it returns false; with `192.168.1.50, 172.18.0.1` it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forwarded-client-check.ac3",
+            "title": "Given the same bridge peer with `x-forwarded-for: 172.18.0.1` or no x-forwarded-for header, when the mint gate runs, then it returns null (mint allowed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forwarded-client-check.ac4",
+            "title": "Given the remote request gate and an uncredentialed GET /api/issues from bridge peer 172.18.0.2 with `x-forwarded-for: 192.168.1.50`, then it responds 401; with `x-forwarded-for: 172.18.0.1` the request reaches the route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forwarded-client-check.ac5",
+            "title": "Given a literal 127.0.0.1 peer with any x-forwarded-for value and require_token_mint false, when the mint gate runs, then it returns null exactly as before this change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-traefik-binding",
+        "title": "pan doctor reports Traefik published on all interfaces",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:57:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4299",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-traefik.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor-traefik.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-traefik.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "doctor-traefik.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors (doctor.ts stays <= 1042 lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-7. New module doctor-traefik.ts following doctor-inotify.ts (local CheckResult re-declaration). Export classifyTraefikPorts(portsLine, bind) and checkTraefikPortBinding(). The check returns [] when traefik is not enabled in config.toml or docker ps fails/finds no container, uses execAsync (never execSync), and runs `docker ps --filter name=overdeck-traefik --format '{{.Ports}}'`. Exposed = a host part starting with 0.0.0.0:, [::]: or :::. Add one import and one call line in doctor.ts next to checkInotify."
+        },
+        "items": [
+          {
+            "id": "doctor-traefik-binding.ac1",
+            "title": "Given portsLine `0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp, 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp` and bind unset, when classifyTraefikPorts runs, then it returns status 'error', name 'Traefik port binding', fix 'Run: pan restart --traefik'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-traefik-binding.ac2",
+            "title": "Given portsLine `127.0.0.1:80->80/tcp, 127.0.0.1:443->443/tcp, 127.0.0.1:8080->8080/tcp`, when classifyTraefikPorts runs, then it returns status 'ok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-traefik-binding.ac3",
+            "title": "Given the exposed portsLine and bind 'all', when classifyTraefikPorts runs, then it returns status 'warn' with a message naming traefik.bind = \"all\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-traefik-binding.ac4",
+            "title": "Given traefik disabled in config.toml, when checkTraefikPortBinding runs, then it returns an empty array and runs no docker command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-traefik-loopback",
+        "title": "Document loopback Traefik, traefik.bind and the forwarded-client rule",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:57:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4299",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-AUTH.md",
+            "guides/docker-setup.mdx",
+            "docs/DNS_SETUP.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-4299' docs/DASHBOARD-AUTH.md",
+            "grep -n 'bind = \"all\"' guides/docker-setup.mdx docs/DNS_SETUP.md"
+          ],
+          "expected_outputs": [
+            "DASHBOARD-AUTH.md mentions PAN-4299 only in the defended list / mint section, not under 'Does NOT defend'",
+            "both guides/docker-setup.mdx and docs/DNS_SETUP.md contain bind = \"all\""
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2",
+            "FR-4",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-8. docs/DASHBOARD-AUTH.md: delete the 'LAN clients reaching the dashboard through Traefik with a forged Host' bullet under 'Does NOT defend'; add the defended-list bullet from the PRD (loopback default, traefik.bind, rightmost X-Forwarded-For rule for Docker-bridge peers, IPv6 caveat); rewrite the mint section's 'never X-Forwarded-For' sentence to describe the Docker-bridge exception. guides/docker-setup.mdx Traefik Configuration: loopback default, [traefik] bind = \"all\" opt-in with its risk, which commands rewrite existing compose files, and the pan doctor check. docs/DNS_SETUP.md wsl2hosts section: WSL2 needs bind = \"all\" and the Windows browser mints via the pan up token bootstrap (PRD D-9)."
+        },
+        "items": [
+          {
+            "id": "docs-traefik-loopback.ac1",
+            "title": "Given docs/DASHBOARD-AUTH.md, then the 'Does NOT defend' list no longer contains a bullet about LAN clients reaching the dashboard through Traefik, and the defended list contains a bullet naming 127.0.0.1, traefik.bind and the rightmost X-Forwarded-For rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-traefik-loopback.ac2",
+            "title": "Given docs/DASHBOARD-AUTH.md's mint section, then it describes that a Docker-bridge peer is trusted only when its rightmost X-Forwarded-For entry is loopback or a host Docker-bridge IP",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-traefik-loopback.ac3",
+            "title": "Given guides/docker-setup.mdx, then its Traefik section states ports publish on 127.0.0.1 by default, shows `[traefik]` with `bind = \"all\"`, and names `pan restart --traefik` and `pan doctor`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-traefik-loopback.ac4",
+            "title": "Given docs/DNS_SETUP.md's wsl2hosts section, then it states WSL2 users need `bind = \"all\"` and that the Windows browser mints through the pan up token bootstrap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "compose-migration-helper",
+        "to": "wire-install-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "compose-migration-helper",
+        "to": "wire-up-dev",
+        "type": "blocks"
+      },
+      {
+        "from": "compose-migration-helper",
+        "to": "wire-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "compose-migration-helper",
+        "to": "doctor-traefik-binding",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "20 files. The subsystem count of 9 is inflated because the lint counts each depth-2 doc file (docs/DASHBOARD-AUTH.md, docs/DNS_SETUP.md, guides/docker-setup.mdx) and each test root (tests/lib, tests/unit) as its own subsystem. The real surface is one security fix, W-SEC3, whose loopback binding, compose migration, dashboard forwarded-client check, doctor check and docs must ship together to close the LAN mint hole without stranding existing installs.",
+      "canonicalFilename": "2026-11-01-PAN-4299-security-traefik-template-publishes-80-443-8080-on-all-interfaces-so-lan-clients-can-mint-a-dashboard-session-via-a-forged-host-header.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

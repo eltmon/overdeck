@@ -66,6 +66,10 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/agents/:id/subagents',                            kind: 'http', disposition: 'RELOCATE',   door: 'Transcripts (agent subagents, PAN-3920)' },
   { surface: 'GET /api/agent-directory',                                  kind: 'http', disposition: 'AGGREGATE',  door: 'Agents Directory read model: agent states + backend panes + conversations + transcripts, derived on read (PAN-3920)' },
   { surface: 'POST /api/workers/register',                               kind: 'http', disposition: 'WRITE',      door: 'External agent registry: write-once ext-* registration + sessions.json transcript link, shared with pan worker register (PAN-3920 W19)' },
+  { surface: 'POST /api/workers',                                        kind: 'http', disposition: 'WRITE',      door: 'agents/worker/start.startWorker, shared with pan worker run (PAN-4649)' },
+  { surface: 'POST /mcp',                                                kind: 'http', disposition: 'AGGREGATE',  door: "lib/mcp tool module proxying the dashboard routes with the caller's token (PAN-4649)" },
+  { surface: 'GET /mcp',                                                 kind: 'http', disposition: 'READ',       door: '405 Allow: POST (stateless MCP, PAN-4649)' },
+  { surface: 'DELETE /mcp',                                              kind: 'http', disposition: 'READ',       door: '405 Allow: POST (stateless MCP, PAN-4649)' },
   { surface: 'POST /api/lanes',                                          kind: 'http', disposition: 'WRITE',      door: 'Lane door launchLane: write-once lane facts on a new conversation row, shared with pan lane start (PAN-4223)' },
   { surface: 'GET /api/lanes',                                           kind: 'http', disposition: 'AGGREGATE',  door: 'Lane views: lane rows + list liveness + worker reports + git facts, derived on read (PAN-4223)' },
   { surface: 'GET /api/lanes/:name',                                     kind: 'http', disposition: 'AGGREGATE',  door: 'Lane views: one lane, derived on read (PAN-4223)' },
@@ -80,6 +84,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/agents/:id/classify-completion',                 kind: 'http', disposition: 'RELOCATE',   door: 'Orchestration' },
   { surface: 'POST /api/internal/agents/:id/permissions/request',        kind: 'http', disposition: 'RELOCATE',   door: 'AgentPermissionsWriter.request' },
   { surface: 'POST /api/agents/:id/permissions/:requestId/respond',      kind: 'http', disposition: 'RELOCATE',   door: 'AgentPermissionsWriter.resolve' },
+  { surface: 'POST /api/agents/:id/plan-action',                         kind: 'http', disposition: 'RELOCATE',   door: 'ExitPlanMode keystrokes, agent mirror of conversation plan-action (PAN-1520)' },
   { surface: 'GET /api/agents/:id/runtime',                              kind: 'http', disposition: 'READ',       door: 'AgentsResolver.getRuntime' },
   { surface: 'GET /api/agents/:id/git-info',                             kind: 'http', disposition: 'RELOCATE',   door: 'Workspace/git' },
   { surface: 'GET /api/agents/:id/activity',                             kind: 'http', disposition: 'RELOCATE',   door: 'Transcripts/runtime' },
@@ -232,6 +237,15 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/conversations/:name/bookmarks',                   kind: 'http', disposition: 'READ',        door: 'conversation-bookmarks.listConversationBookmarks (PAN-4498)' },
   { surface: 'PUT /api/conversations/:name/bookmarks/:messageId',        kind: 'http', disposition: 'WRITE',       door: 'conversation-bookmarks.upsertConversationBookmark (PAN-4498)' },
   { surface: 'DELETE /api/conversations/:name/bookmarks/:messageId',     kind: 'http', disposition: 'WRITE',       door: 'conversation-bookmarks.removeConversationBookmark (PAN-4498)' },
+  { surface: 'POST /api/conversations/triage',                           kind: 'http', disposition: 'WRITE',       door: 'conversation-triage-store.applyTriageUpdate (PAN-4639)' },
+  { surface: 'GET /api/conversations/:name/scheduled-messages',          kind: 'http', disposition: 'READ',        door: 'conversation-scheduled-messages.listScheduledMessages (PAN-4641)' },
+  { surface: 'POST /api/conversations/:name/scheduled-messages',         kind: 'http', disposition: 'WRITE',       door: 'conversation-scheduled-messages.scheduleConversationMessage (PAN-4641)' },
+  { surface: 'PATCH /api/conversations/:name/scheduled-messages/:id',    kind: 'http', disposition: 'WRITE',       door: 'conversation-scheduled-messages.editScheduledMessage (PAN-4641)' },
+  { surface: 'DELETE /api/conversations/:name/scheduled-messages/:id',   kind: 'http', disposition: 'WRITE',       door: 'conversation-scheduled-messages.cancelScheduledMessage (PAN-4641)' },
+  { surface: 'GET /api/conversations/:name/schedules',                   kind: 'http', disposition: 'READ',        door: 'conversation-schedules.listConversationSchedules (PAN-4640)' },
+  { surface: 'POST /api/conversations/:name/schedules',                  kind: 'http', disposition: 'WRITE',       door: 'conversation-schedules.createConversationSchedule (PAN-4640)' },
+  { surface: 'PATCH /api/conversations/:name/schedules/:id',             kind: 'http', disposition: 'WRITE',       door: 'conversation-schedules.updateConversationSchedule (PAN-4640)' },
+  { surface: 'DELETE /api/conversations/:name/schedules/:id',            kind: 'http', disposition: 'WRITE',       door: 'conversation-schedules.removeConversationSchedule (PAN-4640)' },
   { surface: 'POST /api/conversations/:name/plan-action',                kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.planAction' },
   { surface: 'POST /api/conversations/:name/companion-terminal/open',    kind: 'http', disposition: 'RELOCATE',    door: 'CompanionTerminalLifecycle.open (tmux companion session; generation stamped on the session, nothing stored; PAN-3974)' },
   { surface: 'POST /api/conversations/:name/companion-terminal/close',   kind: 'http', disposition: 'RELOCATE',    door: 'CompanionTerminalLifecycle.close (kills only the companion session; stale generation refused; PAN-3974)' },
@@ -437,6 +451,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/machines/:id/reconnect',           kind: 'http', disposition: 'WRITE',       door: 'link-supervisor.reconnect (PAN-4645)' },
   { surface: 'POST /api/machines/:id/routes',              kind: 'http', disposition: 'WRITE',       door: 'link-store.setLinkRoutes (manual route) (PAN-4645, closes #4403)' },
   { surface: 'GET /api/anywhere/status',                  kind: 'http', disposition: 'AGGREGATE',   door: 'environment-identity + trusted origins + access-tokens + vault config (PAN-4445)' },
+  { surface: 'GET /api/tailscale/status',                 kind: 'http', disposition: 'AGGREGATE',   door: 'lib/tailscale/state.readTailscaleState + installer.resolveInstallPlan (PAN-1254)' },
+  { surface: 'GET /api/tailscale/peers',                  kind: 'http', disposition: 'AGGREGATE',   door: 'lib/tailscale/state.readTailscaleState + peers.discoverTailnetPeers (PAN-1254)' },
+  { surface: 'POST /api/tailscale/userspace',             kind: 'http', disposition: 'WRITE',       door: 'lib/tailscale/userspace.installUserspaceTailscale / restartUserspaceDaemon (PAN-1254)' },
+  { surface: 'POST /api/tailscale/login',                 kind: 'http', disposition: 'WRITE',       door: 'lib/tailscale/login.startTailscaleLogin (PAN-1254)' },
+  { surface: 'POST /api/tailscale/serve',                 kind: 'http', disposition: 'WRITE',       door: 'lib/tailscale/serve.enableTailscaleServe (PAN-1254)' },
   { surface: 'GET /api/access-tokens',                    kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind token)' },
   { surface: 'POST /api/access-tokens',                   kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (kind token)' },
   { surface: 'DELETE /api/access-tokens/:id',             kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken' },
@@ -576,6 +595,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'PUT /api/jev/settings',                                kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via jev settings path-scoped write (PAN-4508)' },
   { surface: 'GET /api/jev/usage',                                   kind: 'http', disposition: 'READ',        door: 'jev usage log summary, read-only (PAN-4508)' },
 
+  // ── color-themes.ts (PAN-4644) ───────────────────────────────────────────
+  { surface: 'GET /api/color-themes',                                kind: 'http', disposition: 'READ',        door: 'color theme store + selection resolve (PAN-4644)' },
+  { surface: 'PUT /api/color-themes/selection',                      kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via color theme selection path-scoped write (PAN-4644)' },
+  { surface: 'POST /api/color-themes/import/preview',                kind: 'http', disposition: 'READ',        door: 'VS Code theme mapping preview; writes nothing (PAN-4644)' },
+  { surface: 'POST /api/color-themes',                               kind: 'http', disposition: 'WRITE',       door: 'color theme store save, under OVERDECK_HOME/themes (PAN-4644)' },
+
   // ── vault.ts ──────────────────────────────────────────────────────────────
   { surface: 'GET /api/vault/status',                                kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via vault-service snapshot (PAN-4307)' },
   { surface: 'GET /api/vault/eviction-batch',                        kind: 'http', disposition: 'READ',        door: 'FILE via src/lib/vault/evict.ts batch read (PAN-4307)' },
@@ -636,6 +661,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/terminals',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Terminal management; outside 8 remodel domains' },
   { surface: 'DELETE /api/terminals/:name',               kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Terminal management; outside 8 remodel domains' },
 
+  // ── push.ts ───────────────────────────────────────────────────────────────
+  { surface: 'GET /api/push/vapid-public-key',          kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
+  { surface: 'GET /api/push/status',                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
+  { surface: 'POST /api/push/subscriptions',            kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
+  { surface: 'DELETE /api/push/subscriptions/:id',      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
+  { surface: 'POST /api/push/test',                     kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
   // ── tts.ts ────────────────────────────────────────────────────────────────
   { surface: 'GET /api/tts/status',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TTS service; outside 8 remodel domains' },
   { surface: 'POST /api/tts/speak',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TTS service; outside 8 remodel domains' },
@@ -660,6 +691,15 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
 
   // ── webhooks.ts ───────────────────────────────────────────────────────────
   { surface: 'POST /api/webhooks/github',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.setPr + IssueWriter.setBlockers' },
+
+  // ── trigger-hooks.ts ──────────────────────────────────────────────────────
+  { surface: 'POST /hooks/:id/:secret',                   kind: 'http', disposition: 'WRITE',       door: 'deliverTriggerEvent → handleConversationMessage | handleConversationCreate' },
+
+  // ── triggers.ts ───────────────────────────────────────────────────────────
+  { surface: 'GET /api/triggers',                         kind: 'http', disposition: 'READ',        door: 'src/lib/triggers/store.ts' },
+  { surface: 'POST /api/triggers',                        kind: 'http', disposition: 'WRITE',       door: 'src/lib/triggers/store.ts' },
+  { surface: 'DELETE /api/triggers/:id',                  kind: 'http', disposition: 'WRITE',       door: 'src/lib/triggers/store.ts' },
+  { surface: 'PUT /api/triggers/:id/signing-secret',      kind: 'http', disposition: 'WRITE',       door: 'src/lib/triggers/store.ts' },
 
   // ── workspaces.ts ─────────────────────────────────────────────────────────
   { surface: 'GET /api/workspace-stack-health',                      kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + stack health' },

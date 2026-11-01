@@ -1,0 +1,278 @@
+{
+  "version": "1",
+  "issueId": "PAN-4648",
+  "created": "2026-11-01T05:50:45.229Z",
+  "updated": "2026-11-01T10:15:03.865Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T08:56Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-01T08:56:16.498Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T09:22Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-11-01T09:22:45.549Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T09:56:33.153Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T10:15:03.865Z"
+    }
+  ],
+  "items": {
+    "trigger-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4648",
+      "claimedAt": "2026-11-01T05:50:45.229Z",
+      "doneAt": "2026-11-01T05:57:13.616Z"
+    },
+    "trigger-signatures": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4648",
+      "claimedAt": "2026-11-01T05:57:30.937Z",
+      "doneAt": "2026-11-01T06:00:31.448Z"
+    },
+    "trigger-envelope": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4648",
+      "claimedAt": "2026-11-01T06:00:33.110Z",
+      "doneAt": "2026-11-01T06:04:05.322Z"
+    },
+    "trigger-deliver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4648",
+      "claimedAt": "2026-11-01T06:04:43.736Z",
+      "doneAt": "2026-11-01T06:10:47.893Z"
+    },
+    "hooks-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4648",
+      "claimedAt": "2026-11-01T06:11:50.886Z",
+      "doneAt": "2026-11-01T06:14:01.322Z"
+    },
+    "funnel-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4648",
+      "claimedAt": "2026-11-01T06:14:47.014Z",
+      "doneAt": "2026-11-01T06:20:15.544Z"
+    },
+    "triggers-admin-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4648",
+      "claimedAt": "2026-11-01T06:21:05.449Z",
+      "doneAt": "2026-11-01T06:30:27.184Z"
+    },
+    "cli-triggers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4648",
+      "claimedAt": "2026-11-01T06:31:12.971Z",
+      "doneAt": "2026-11-01T06:51:13.995Z"
+    },
+    "settings-triggers-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4648",
+      "claimedAt": "2026-11-01T06:51:16.064Z",
+      "doneAt": "2026-11-01T06:56:54.675Z"
+    },
+    "settings-triggers-add": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4648",
+      "claimedAt": "2026-11-01T06:56:57.072Z",
+      "doneAt": "2026-11-01T07:08:37.629Z"
+    },
+    "docs-triggers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4648",
+      "claimedAt": "2026-11-01T07:08:39.405Z",
+      "doneAt": "2026-11-01T07:12:31.781Z"
+    },
+    "trigger-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:49:36.192Z"
+    },
+    "trigger-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:49:55.126Z"
+    },
+    "trigger-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:50:16.659Z"
+    },
+    "trigger-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:50:39.379Z"
+    },
+    "trigger-signatures.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:50:59.801Z"
+    },
+    "trigger-signatures.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:51:25.314Z"
+    },
+    "trigger-signatures.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:51:43.951Z"
+    },
+    "trigger-envelope.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:52:00.670Z"
+    },
+    "trigger-envelope.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:52:24.702Z"
+    },
+    "trigger-envelope.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:52:47.875Z"
+    },
+    "trigger-envelope.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:53:05.583Z"
+    },
+    "trigger-deliver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:53:21.237Z"
+    },
+    "trigger-deliver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:53:38.284Z"
+    },
+    "trigger-deliver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:53:55.970Z"
+    },
+    "trigger-deliver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:54:14.477Z"
+    },
+    "trigger-deliver.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:54:30.326Z"
+    },
+    "hooks-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:54:45.063Z"
+    },
+    "hooks-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:55:03.200Z"
+    },
+    "hooks-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:55:22.780Z"
+    },
+    "hooks-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:55:57.262Z"
+    },
+    "triggers-admin-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:56:31.799Z"
+    },
+    "triggers-admin-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:57:01.723Z"
+    },
+    "triggers-admin-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:57:22.752Z"
+    },
+    "triggers-admin-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:57:44.557Z"
+    },
+    "funnel-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:58:05.412Z"
+    },
+    "funnel-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:58:29.875Z"
+    },
+    "funnel-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:58:52.295Z"
+    },
+    "funnel-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:59:08.278Z"
+    },
+    "cli-triggers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:59:25.638Z"
+    },
+    "cli-triggers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:59:48.789Z"
+    },
+    "cli-triggers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:00:21.805Z"
+    },
+    "cli-triggers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:00:47.693Z"
+    },
+    "settings-triggers-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:01:12.556Z"
+    },
+    "settings-triggers-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:01:33.775Z"
+    },
+    "settings-triggers-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:01:55.376Z"
+    },
+    "settings-triggers-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:02:14.895Z"
+    },
+    "settings-triggers-add.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:02:33.544Z"
+    },
+    "settings-triggers-add.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:02:54.201Z"
+    },
+    "settings-triggers-add.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:03:11.023Z"
+    },
+    "settings-triggers-add.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:03:30.219Z"
+    },
+    "docs-triggers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:03:57.571Z"
+    },
+    "docs-triggers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:04:30.389Z"
+    },
+    "docs-triggers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:05:01.014Z"
+    },
+    "docs-triggers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:05:37.844Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

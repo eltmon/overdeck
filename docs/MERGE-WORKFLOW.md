@@ -302,16 +302,19 @@ CI on a conflicting PR, so the patrol does not wait for CI before the repair
 after the merge, treat the failing check as the evidence: fix it and let
 review and verification run again.
 
-Two files are union-merged in `.gitattributes`:
-`.overdeck/context/codebase/concerns.md` and `.beads/issues.jsonl`. When two
-PRs append to them, git keeps both sides' lines, so the merge door's server
-rebase and a local `git merge` or `git merge-tree` report no conflict. Git does
-not dedupe, so a concerns.md merge can leave two `<!-- last-verified -->` lines
-when both PRs stamped different dates. A `pan sync-main` merge into a branch
-created before the attribute landed (PAN-4614) can still conflict once.
-GitHub's own mergeable check may ignore the attribute and still report the PR
-conflicting; that path is tracked in PAN-4616. JSON state files under `.pan/`
-never get union.
+Three files are union-merged in `.gitattributes`:
+`.overdeck/context/codebase/concerns.md`, `.beads/issues.jsonl`, and
+`scripts/frontend-test-subset.txt` (the CI frontend test list, PAN-4697). When
+two PRs append to them, git keeps both sides' lines, so the merge door's
+server rebase and a local `git merge` or `git merge-tree` report no conflict.
+Git does not dedupe, so a concerns.md merge can leave two
+`<!-- last-verified -->` lines when both PRs stamped different dates. A
+`pan sync-main` merge into a branch created before the attribute landed
+(PAN-4614) can still conflict once. GitHub's own mergeable check may ignore
+the attribute and still report the PR conflicting; that path is tracked in
+PAN-4616. For the frontend test list this residual case needs two PRs that
+add tests sorting into the same gap; inserts into different gaps merge
+cleanly even without union. JSON state files under `.pan/` never get union.
 
 An agent that parked an item with `pan task block <issue> <item> --on <ref>...`
 gets one `BLOCKERS MERGED` message within about two minutes of the last of
@@ -364,6 +367,13 @@ Docker cleanup happens at merge time because orphaned networks from merged
 workspaces accumulate and eventually block new workspace creation ("all
 predefined address pools have been fully subnetted" — Docker's default pool
 supports ~31 bridge networks). NEVER remove this cleanup step.
+
+An Overdeck workspace stack creates one bridge network (`_devnet`); before
+PAN-4663 the template's `init-perms` service also created an empty `_default`
+network, which halved how many stacks fit in the pool. Existing `_default`
+networks are removed on the stack's next rebuild (its `down` runs against the
+old compose file) or by teardown's `removeComposeProjectNetworks`;
+`pan workspace reap` leaves them alone while the workspace directory exists.
 
 Every workspace teardown path removes the stack's compose networks, not only
 its containers (PAN-3900). `docker compose down` alone leaks the network when
