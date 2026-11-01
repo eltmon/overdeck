@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4656",
   "created": "2026-11-01T13:30:21.841Z",
-  "updated": "2026-11-01T14:05:37.016Z",
+  "updated": "2026-11-01T14:05:57.949Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,10 @@
     "connect-core.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T14:05:37.015Z"
+    },
+    "connect-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:05:57.949Z"
     }
   }
 }
