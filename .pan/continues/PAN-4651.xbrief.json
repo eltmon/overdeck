@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:35:09.461Z",
+  "updated": "2026-11-01T21:35:26.421Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -402,6 +402,10 @@
     "wi15-lane-cli-machine.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T21:35:09.460Z"
+    },
+    "wi15-lane-cli-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:35:26.420Z"
     }
   }
 }
