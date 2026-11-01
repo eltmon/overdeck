@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T10:16:46Z · model: claude-opus-5-5 · open: 873_
+_Last sequenced: 2026-11-01T10:39:10Z · model: claude-opus-5-5 · open: 874_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -33,6 +33,7 @@ _Last sequenced: 2026-11-01T10:16:46Z · model: claude-opus-5-5 · open: 873_
 | 25 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 26 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 26 | PAN-4681 | S | high | ok |  |  | In pipeline: CodeRabbit fixes lost at #4667 merge: messageRows test not in CI subset; cite toolbar shown with no composer. |
+| 27 | PAN-4708 | M | high | needs-refinement |  |  | docs.json nav is a hot file: concurrent docs PRs conflict, each costing a merge-main and re-review. Pick a fix option first. |
 | 28 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
 | 29 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 30 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
@@ -993,6 +994,10 @@ New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criter
 
 New in-pipeline follow-up to the merged PAN-4642 PR: an unregistered frontend test and a citation toggle without a mounted composer; placed in free slot 26 beside PAN-4671, its root cause.
 
+### PAN-4708 (rank 27)
+
+New substrate-improvement issue, the second hot-file conflict source after in-pipeline PAN-4697; on 2026-11-01 it forced merge-main cycles and fresh head reviews on three PRs. It takes the free rank 27 beside its sibling so no other node moves, and it stays needs-refinement because the body asks for a decision among three fixes (frontmatter-generated nav, per-group fragments, JSON merge driver) before work starts.
+
 ### PAN-4229 (rank 28)
 
 New bug filed from PAN-4222: after all eleven top-level items were closed through pan task done, pan done refused on 39 pending acceptance-criterion children that pan task next never surfaced, and the agent had to make 39 empty trailer commits to get through. It blocks completion of every issue planned with nested ACs, the default planner shape, so it ranks critical beside PAN-4217 and PAN-4219. It is marked needs-refinement because it describes the same missing AC-status writer as PAN-4217 and PAN-4219; the three should be fixed by one change and the extras closed as duplicates.
@@ -1197,10 +1202,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
-### PAN-3106 (rank 79)
-
-New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1208,10 +1209,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T10:16:46Z",
+  "generatedAt": "2026-11-01T10:39:10Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 873,
+  "openCount": 874,
   "nodes": [
     {
       "issue": "PAN-4639",
@@ -12139,6 +12140,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4708",
+      "rank": 27,
+      "size": "M",
+      "importance": "high",
+      "score": 74,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "docs.json nav is a hot file: concurrent docs PRs conflict, each costing a merge-main and re-review. Pick a fix option first.",
+      "rationale": "New substrate-improvement issue, the second hot-file conflict source after in-pipeline PAN-4697; on 2026-11-01 it forced merge-main cycles and fresh head reviews on three PRs. It takes the free rank 27 beside its sibling so no other node moves, and it stays needs-refinement because the body asks for a decision among three fixes (frontmatter-generated nav, per-group fragments, JSON merge driver) before work starts.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13873,13 +13887,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "from": "PAN-4702",
-      "to": "PAN-4641",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4702",
       "to": "PAN-3946",
       "type": "informs",
       "source": "ai-inferred",
@@ -13891,6 +13898,13 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4697",
+      "to": "PAN-4708",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
     }
   ]
 }

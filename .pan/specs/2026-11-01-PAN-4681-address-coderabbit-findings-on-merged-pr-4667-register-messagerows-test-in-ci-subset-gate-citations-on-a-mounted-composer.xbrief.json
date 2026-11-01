@@ -1,0 +1,243 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T07:19:11Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4681: Address CodeRabbit findings on merged PR #4667: register messageRows test in CI subset, gate citations on a mounted composer",
+    "updated": "2026-11-01T07:24:47.361Z"
+  },
+  "plan": {
+    "id": "pan-4681",
+    "title": "Address CodeRabbit findings on merged PR #4667: register messageRows test in CI subset, gate citations on a mounted composer",
+    "status": "running",
+    "uid": "882dcbbc-3ec9-4139-a422-4e1281d1e292",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T07:19:11Z",
+    "updated": "2026-11-01T07:24:47.361Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4681",
+        "label": "PAN-4681",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/4667",
+        "label": "PR #4667 (PAN-4642)",
+        "type": "pull_request"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "citations",
+      "ci",
+      "coderabbit-followup"
+    ],
+    "narratives": {
+      "Problem": "Two CodeRabbit findings on merged PR #4667 are unaddressed on main: messageRows.test.tsx (which holds PAN-4642's cite-row and data-cited tests) is not in the root package.json test:frontend-subset so CI never runs it; and ConversationPanel.tsx passes citationsEnabled={!hideComposer}, so the Cite toolbar appears for resumable ended conversations, vault copies, cleared conversations, and forking conversations where no composer is mounted to show the resulting citation chip.",
+      "Proposal": "Append messageRows.test.tsx to test:frontend-subset. Replace the citationsEnabled expression with CodeRabbit's one-line mirror of the ComposerFooter branch condition (!hideComposer && !onResume && !isForking && !conversation.clearedToConvId && conversation.origin !== 'vault'), keeping ConversationPanel.tsx at 1521 lines under its 1531 cap, and cover resume-bar, vault, and mounted-composer cases in ConversationPanel.test.tsx via the existing timelineMock.props capture. Document the gate in features/conversations.mdx and docs/DASHBOARD-ARCHITECTURE.md.",
+      "NonGoals": "- Fixing the merge-before-late-review race (PAN-4671)\n- Registering other unlisted frontend tests such as messagesTimeline/dividers.test.tsx\n- Clearing citations already saved in localStorage for ended or vault conversations\n- Changing MessagesTimeline, CiteSelectionToolbar, or ComposerFooter behavior\n- Refactoring the footer ternary chain or adding a composerMounted helper constant\n- Raising the file-size allowlist cap for ConversationPanel.tsx"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Gate citations on all four non-composer footer states (onResume, vault, isForking, clearedToConvId), not only the two the issue AC names",
+        "rationale": "The issue title asks to gate on a mounted composer; CodeRabbit's proposed one-liner is exactly the ComposerFooter branch condition. The AC's two cases are the minimum tested set."
+      },
+      {
+        "summary": "Single-line edit, no composerMounted helper",
+        "rationale": "ConversationPanel.tsx is a god file at 1521 of 1531 allowed lines; a helper adds lines and does not simplify the footer ternary, which chooses between different footers."
+      },
+      {
+        "summary": "Add the gate tests to the existing ConversationPanel.test.tsx",
+        "rationale": "It is already in the CI subset and already captures MessagesTimeline props via timelineMock and has resume/ended fixtures, so no new subset entry is needed."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-01-PAN-4681-address-coderabbit-findings-on-merged-pr-4667-register-messagerows-test-in-ci-subset-gate-citations-on-a-mounted-composer.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "register-messagerows-test",
+        "title": "Register messageRows.test.tsx in the CI frontend test subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T07:19:11Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4681",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -o 'src/components/chat/messagesTimeline/messageRows.test.tsx' package.json | wc -l",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/messagesTimeline/messageRows.test.tsx"
+          ],
+          "expected_outputs": [
+            "grep count prints 1",
+            "messageRows.test.tsx: Test Files 1 passed, Tests 19 passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In root package.json line 141, append ' src/components/chat/messagesTimeline/messageRows.test.tsx' to the end of the test:frontend-subset file list, immediately after 'src/components/chat/citations/__tests__/citationHighlight.test.ts' and before the closing quote. Path is relative to src/dashboard/frontend like its siblings. Change nothing else in package.json. See PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "register-messagerows-test.ac1",
+            "title": "package.json test:frontend-subset contains src/components/chat/messagesTimeline/messageRows.test.tsx exactly once (grep count returns 1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-messagerows-test.ac2",
+            "title": "When CI's frontend job runs npm run test:frontend-subset, its Vitest output lists messageRows.test.tsx as passed with 19 tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-citations-on-composer",
+        "title": "Gate citationsEnabled on a mounted composer in ConversationView, with tests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T07:19:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4681",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck",
+            "wc -l src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "expected_outputs": [
+            "ConversationPanel.test.tsx passes including the 3 new 'citation gate (PAN-4681)' tests",
+            "file-size guard passed",
+            "typecheck completes without errors",
+            "ConversationPanel.tsx is 1521 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In ConversationPanel.tsx line 1471 replace `citationsEnabled={!hideComposer}` with `citationsEnabled={!hideComposer && !onResume && !isForking && !conversation.clearedToConvId && conversation.origin !== 'vault'}` — one line, no new constant, no new import (file-size cap 1531, file is 1521). Then in __tests__/ConversationPanel.test.tsx add describe('ConversationPanel citation gate (PAN-4681)') after the 'resume message control' block, copying its beforeEach/afterEach shape, using a workLog-only messages fixture (like resumeMessagesData) and reading timelineMock.props.mock.calls.at(-1)?.[0]. Three tests: (1) ended conversation (sessionAlive false) → await 'Resume Session' button → citationsEnabled false; (2) { ...mockConversation, origin: 'vault' } → await composer-footer testid → citationsEnabled false; (3) active conversation (sessionAlive true, status 'active', endedAt null) → composer-footer present, no Resume Session button, citationsEnabled true. Exact fixtures in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "gate-citations-on-composer.ac1",
+            "title": "ConversationPanel.tsx renders MessagesTimeline with citationsEnabled={!hideComposer && !onResume && !isForking && !conversation.clearedToConvId && conversation.origin !== 'vault'} and the file stays at 1521 lines (lint-file-size.sh passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-citations-on-composer.ac2",
+            "title": "Given an ended conversation showing the Resume Session bar, when ConversationPanel renders, then MessagesTimeline receives citationsEnabled false (new test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-citations-on-composer.ac3",
+            "title": "Given a conversation with origin 'vault', when ConversationPanel renders, then MessagesTimeline receives citationsEnabled false (new test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-citations-on-composer.ac4",
+            "title": "Given a live conversation (sessionAlive true) that renders the composer-footer, when ConversationPanel renders, then MessagesTimeline receives citationsEnabled true (new test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "document-cite-gate",
+        "title": "Document that Cite appears only when the composer is mounted",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T07:19:11Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4681",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'resume bar' features/conversations.mdx",
+            "grep -n 'PAN-4681' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "the new sentence appears inside the ## Citations section of features/conversations.mdx",
+            "the composer-mounted gate sentence appears in the Composer citations bullet of docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In features/conversations.mdx '## Citations' section, after the sentence ending 'or a reply still streaming in.', add: 'Cite is offered only when the conversation has a composer: it does not appear while the conversation shows the resume bar, is a read-only vault copy, was cleared into another conversation, or is still forking.' In docs/DASHBOARD-ARCHITECTURE.md, in the 'Composer citations (PAN-4642)' bullet (lines 540-554), add one sentence: ConversationView passes citationsEnabled only when the composer branch of the footer chain renders (!hideComposer, no onResume, not forking, no clearedToConvId, not a vault copy) (PAN-4681)."
+        },
+        "items": [
+          {
+            "id": "document-cite-gate.ac1",
+            "title": "features/conversations.mdx Citations section renders a sentence stating Cite does not appear while the conversation shows the resume bar, is a read-only vault copy, was cleared, or is forking",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-cite-gate.ac2",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when grepping for PAN-4681, then the Composer citations bullet renders a sentence stating citationsEnabled is passed only when the composer footer branch renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}
