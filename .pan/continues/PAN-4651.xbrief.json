@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T18:56:12.914Z",
+  "updated": "2026-11-01T18:56:17.611Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4651",
       "claimedAt": "2026-11-01T18:52:42.487Z",
       "doneAt": "2026-11-01T18:56:12.913Z"
+    },
+    "wi4-work-door-conversations": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T18:56:17.611Z"
     }
   }
 }
