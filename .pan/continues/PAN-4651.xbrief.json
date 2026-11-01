@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T19:25:14.533Z",
+  "updated": "2026-11-01T19:25:23.694Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
       "claimedBy": "agent-pan-4651",
       "claimedAt": "2026-11-01T19:23:00.396Z",
       "doneAt": "2026-11-01T19:25:14.533Z"
+    },
+    "wi12-remote-worker-follower": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4651",
+      "claimedAt": "2026-11-01T19:25:23.694Z"
     }
   }
 }
