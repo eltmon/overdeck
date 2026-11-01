@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T22:38:51.041739Z · model: claude-opus-5-5 · open: 861_
+_Last sequenced: 2026-11-01T22:42:51.462550Z · model: claude-opus-5-5 · open: 860_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -275,7 +275,7 @@ _Last sequenced: 2026-11-01T22:38:51.041739Z · model: claude-opus-5-5 · open: 
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
-| 276 | PAN-4651 | L | medium | ok |  |  | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
+| 276 | PAN-4743 | M | medium | ok |  |  | Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; PAN-4651 merged, so this is now unblocked. |
 | 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
 | 278 | PAN-4730 | L | medium | ok |  |  | Opt-in gstack browser/design/PDF runtime so 21 needs-binary skills (qa, browse) mount; blocked on PAN-4727; scope open for PRD |
 | 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
@@ -323,7 +323,6 @@ _Last sequenced: 2026-11-01T22:38:51.041739Z · model: claude-opus-5-5 · open: 
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 324 | PAN-4743 | M | medium | ok |  | PAN-4651 | Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; gap left by PAN-4651/4652 PRDs. Follows PAN-4651. |
 | 325 | PAN-4473 | M | medium | ok |  |  | Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
@@ -662,7 +661,7 @@ _Last sequenced: 2026-11-01T22:38:51.041739Z · model: claude-opus-5-5 · open: 
 | 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 666 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
+| 666 | PAN-4638 | L | medium | needs-refinement |  |  | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
@@ -1196,10 +1195,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T22:38:51.041739Z",
+  "generatedAt": "2026-11-01T22:42:51.462550Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 861,
+  "openCount": 860,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -4642,19 +4641,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "planning": "auto"
     },
     {
-      "issue": "PAN-4651",
-      "rank": 276,
-      "size": "L",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending.",
-      "rationale": "Rank held: dependency PAN-4645 closed as completed on 2026-11-01; PAN-4650 still gates this issue, so order is unchanged.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4682",
       "rank": 277,
       "size": "XS",
@@ -5239,16 +5225,14 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-4743",
-      "rank": 324,
+      "rank": 276,
       "size": "M",
       "importance": "medium",
-      "score": 45,
+      "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4651"
-      ],
-      "why": "Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; gap left by PAN-4651/4652 PRDs. Follows PAN-4651.",
-      "rationale": "New issue: closes the ownership gap between PAN-4651 and PAN-4652 for Fly VMs in the Machine field; ranked just behind the Anywhere work queue because it needs PAN-4651 merged first.",
+      "dependsOn": [],
+      "why": "Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; PAN-4651 merged, so this is now unblocked.",
+      "rationale": "Moved up from rank 324 into the vacated PAN-4651 slot: its only dependency PAN-4651 closed as completed on 2026-11-01, so it is next in the Anywhere queue.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9415,9 +9399,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "importance": "medium",
       "score": 38,
       "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4651"
-      ],
+      "dependsOn": [],
       "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
       "rationale": "Rank held: dependency PAN-4652 closed as completed on 2026-11-01; PAN-4651 still gates this issue, so order is unchanged.",
       "gate": "auto",
@@ -13084,23 +13066,9 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "confidence": 1
     },
     {
-      "from": "PAN-2350",
-      "to": "PAN-4651",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4655",
       "to": "PAN-1485",
       "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4651",
-      "to": "PAN-4638",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13175,13 +13143,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "confidence": 0.6
     },
     {
-      "from": "PAN-4651",
-      "to": "PAN-4405",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4734",
       "to": "PAN-1775",
       "type": "unblocks",
@@ -13194,13 +13155,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4651",
-      "to": "PAN-4743",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.95
     },
     {
       "from": "PAN-4705",
