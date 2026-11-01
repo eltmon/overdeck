@@ -4,17 +4,17 @@
     "created": "2026-11-01T15:07:01Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4723: Flaky create-workspace-row test turned main red: an unmocked git call fails in the non-git temp dir",
-    "updated": "2026-11-01T15:13:35.111Z"
+    "updated": "2026-11-01T15:14:13.287Z"
   },
   "plan": {
     "id": "pan-4723",
     "title": "Flaky create-workspace-row test turned main red: an unmocked git call fails in the non-git temp dir",
-    "status": "proposed",
+    "status": "running",
     "uid": "c193e7ef-0bbe-4bf0-853e-81c0a0eaac36",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T15:07:01Z",
-    "updated": "2026-11-01T15:13:35.111Z",
+    "updated": "2026-11-01T15:14:13.287Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4723",
@@ -240,5 +240,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
