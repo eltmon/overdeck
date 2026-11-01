@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T16:56:32.485Z",
+  "updated": "2026-11-01T16:56:46.262Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -352,6 +352,10 @@
     "wi12-title-bar-states.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T16:56:32.485Z"
+    },
+    "wi12-title-bar-states.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:56:46.262Z"
     }
   },
   "agentModel": "claude-opus-5-5"
