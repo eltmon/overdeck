@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T15:50:00.241Z",
+  "updated": "2026-11-01T15:50:09.594Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,11 @@
       "claimedBy": "agent-pan-4650",
       "claimedAt": "2026-11-01T15:45:34.276Z",
       "doneAt": "2026-11-01T15:50:00.240Z"
+    },
+    "wi19-preview-ui": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T15:50:09.594Z"
     }
   },
   "agentModel": "claude-opus-5-5"
