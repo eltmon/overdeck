@@ -34,6 +34,8 @@ import {
   type FleetUpdateResponse,
   type FleetVersionRow,
   type FleetVersionsResponse,
+  formatMachineLoad,
+  formatMachineProfile,
   type MachineLinkView,
   type MachinesResponse,
 } from '@overdeck/contracts';
@@ -106,21 +108,28 @@ export async function runMachinesList(options: { json?: boolean }): Promise<void
     return;
   }
   console.log(`This machine: ${machines.self.label} (${machines.self.fingerprint})`);
-  if (machines.links.length === 0) {
-    console.log('No linked machines. Link one with `pan machines link <pairing-url>` using a `pan pair` link from the other machine.');
-  } else {
-    console.log('');
-    table(
-      ['LABEL', 'STATE', 'ROUTE', 'ACCESS', 'SSH', 'FINGERPRINT'],
-      machines.links.map((link) => [
+  console.log('');
+  // PAN-4651 FR-6/FR-7: this machine first, then each link, with load and capability tags.
+  const loadCell = (view: { load?: MachineLinkView['load']; tags?: MachineLinkView['tags']; placement?: MachineLinkView['placement'] }) =>
+    [formatMachineLoad(view.load) ?? '-', formatMachineProfile(view.tags, view.placement)?.replace(/^tags: /, '') ?? '-'];
+  table(
+    ['LABEL', 'STATE', 'ROUTE', 'ACCESS', 'SSH', 'FINGERPRINT', 'LOAD', 'TAGS'],
+    [
+      [`${machines.self.label} (this machine)`, 'self', '-', '-', '-', machines.self.fingerprint, ...loadCell(machines.self)],
+      ...machines.links.map((link) => [
         link.label,
         formatLinkState(link),
         link.currentRoute ?? link.routes[0]?.url ?? '-',
         link.access,
         link.ssh ? `${link.ssh.destination} (${link.ssh.forward}, ${link.ssh.launch})` : '-',
         link.fingerprint,
+        ...loadCell(link),
       ]),
-    );
+    ],
+  );
+  if (machines.links.length === 0) {
+    console.log('');
+    console.log('No linked machines. Link one with `pan machines link <pairing-url>` using a `pan pair` link from the other machine.');
   }
   console.log('');
   if (machines.inbound.length === 0) {

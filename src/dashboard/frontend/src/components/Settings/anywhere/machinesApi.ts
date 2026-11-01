@@ -18,6 +18,7 @@ export type {
   InboundMachineView,
   LinkAccess,
   LinkState,
+  LoadSample,
   MachineLinkView,
   MachinesResponse,
   SshLinkInfo,

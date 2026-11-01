@@ -102,6 +102,20 @@ export type LoadSample = typeof LoadSample.Type
 export const MachinePlacementMode = Schema.Literals(["auto", "on-request"])
 export type MachinePlacementMode = typeof MachinePlacementMode.Type
 
+/** PAN-4651 FR-6: `CPU 3% · 41 GB · 2 agents` (unknown parts `n/a`); null without a sample. */
+export function formatMachineLoad(load: LoadSample | null | undefined): string | null {
+  if (!load) return null
+  const cpu = load.cpuPsiSomeAvg10 === null ? "n/a" : `${Math.round(load.cpuPsiSomeAvg10)}%`
+  const memory = load.memAvailableBytes === null ? "n/a" : `${Math.floor(load.memAvailableBytes / 2 ** 30)}`
+  return `CPU ${cpu} · ${memory} GB · ${load.workingAgents} agents`
+}
+
+/** PAN-4651 FR-7: `tags: docker, linux · reserved`; null when there is neither. */
+export function formatMachineProfile(tags: readonly string[] | undefined, placement: MachinePlacementMode | undefined): string | null {
+  const parts = [...(tags && tags.length > 0 ? [`tags: ${tags.join(", ")}`] : []), ...(placement === "on-request" ? ["reserved"] : [])]
+  return parts.length > 0 ? parts.join(" · ") : null
+}
+
 /** PAN-4651 D-4651-9: why Auto placement skipped one machine. */
 export const PlacementRejection = Schema.Struct({
   environmentId: Schema.String,

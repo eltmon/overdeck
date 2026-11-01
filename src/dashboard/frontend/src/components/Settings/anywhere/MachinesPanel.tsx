@@ -15,6 +15,7 @@
  */
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatMachineLoad, formatMachineProfile } from '@overdeck/contracts';
 import { toast } from 'sonner';
 
 import { formatRelativeTime } from '../../../lib/dashboard-utils';
@@ -99,6 +100,12 @@ export function sshLine(ssh: SshLinkInfo): string {
   return `SSH ${ssh.destination} · forward ${ssh.forward}${detail} · ${launch}`;
 }
 
+/** PAN-4651 FR-6/FR-7: ` · CPU 3% · 41 GB · 2 agents · tags: docker, linux · reserved` (muted, part of the meta line). */
+function MachineLoadText({ view }: { view: Pick<MachineLinkView, 'load' | 'tags' | 'placement'> }) {
+  const text = [formatMachineLoad(view.load), formatMachineProfile(view.tags, view.placement)].filter(Boolean).join(' · ');
+  return text ? <span data-testid="machine-load">{' · '}{text}</span> : null;
+}
+
 function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged: () => Promise<void> }) {
   const confirm = useConfirm();
   const [removeOpen, setRemoveOpen] = useState(false);
@@ -180,6 +187,7 @@ function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged:
             {' · '}{ACCESS_LABEL[link.access]}
             {link.peerVersion ? <>{' · '}Overdeck {link.peerVersion}</> : null}
             {link.lastHeartbeatAt ? <>{' · '}heartbeat {formatRelativeTime(link.lastHeartbeatAt)}</> : null}
+            <MachineLoadText view={link} />
           </p>
           {ssh && <p className="text-xs text-muted-foreground mt-0.5 truncate" data-testid={`machine-ssh-${link.id}`}>{sshLine(ssh)}</p>}
           {link.stateDetail && <p className="text-xs text-muted-foreground mt-0.5">{link.stateDetail}</p>}
@@ -338,6 +346,7 @@ export function MachinesPanel() {
       {data && (
         <p className="text-xs text-muted-foreground px-4 mb-2">
           This machine: {data.self.label} · fingerprint <span className="font-mono">{data.self.fingerprint}</span>
+          <MachineLoadText view={data.self} />
         </p>
       )}
       {data && <ShareConversationsRow checked={data.self.shareConversations} onChanged={refresh} />}
