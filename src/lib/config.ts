@@ -194,6 +194,8 @@ export interface OverdeckConfig {
     dashboard_port?: number;
     domain?: string;
     dns_sync_method?: 'wsl2hosts' | 'hosts_file' | 'dnsmasq';
+    /** Host IP Traefik publishes on (PAN-4299): 'loopback' (default) = 127.0.0.1, 'all' = 0.0.0.0. */
+    bind?: 'loopback' | 'all';
   };
   remote?: RemoteConfig;
   shadow: ShadowConfig;

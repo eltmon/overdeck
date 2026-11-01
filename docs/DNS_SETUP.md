@@ -60,6 +60,20 @@ Overdeck uses `~/.wsl2hosts` to sync DNS entries to Windows via a scheduled task
 # Entries are added to ~/.wsl2hosts and synced to Windows hosts file
 ```
 
+The sync maps hostnames to the WSL VM's IP, not `127.0.0.1`. Traefik publishes
+on `127.0.0.1` by default (PAN-4299), so it refuses connections to that IP. On
+this method, set the bind address in `~/.overdeck/config.toml` and run
+`pan restart --traefik`:
+
+```toml
+[traefik]
+bind = "all"
+```
+
+Even then, your Windows browser is not a local client to the dashboard, so it
+does not get a session from peer trust. It mints through the one-time
+`#overdeck_token` bootstrap URL that `pan up` opens.
+
 #### Option 2: dnsmasq (Recommended for wildcard support)
 
 Install and configure dnsmasq for wildcard DNS:

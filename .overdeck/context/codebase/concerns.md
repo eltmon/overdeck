@@ -310,7 +310,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (so every WebSocket upgrade) that carries no `Origin`/`Referer`. Credentials
   are `hasDashboardAuthHeaders` (session cookie or internal token); peer trust
   (`isLoopbackPeer`, incl. Docker-bridge Traefik) belongs only in the session
-  mint. PAN-1166 routes all `/ws/*` upgrades through `ws-auth.ts`.
+  mint and the remote request gate (`isTrustedLocalRequest`,
+  `remote-request-gate.ts`), never in `/ws/*`. PAN-1166 routes all `/ws/*`
+  upgrades through `ws-auth.ts`. Every Traefik-forwarded request is a
+  Docker-bridge peer, so a LAN-reachable Traefik used to make LAN clients look
+  local. PAN-4299 binds Traefik to loopback and trusts a bridge peer only when
+  its rightmost `X-Forwarded-For` entry is local.
 - **Agent-to-pane joins must key by `agentId`** (PAN-4320) — on Herdr a
   `BackendPane`'s `id` (`wKZ:p3`) and `terminalId` (`term_…`) are backend
   handles, never agent ids. Six server sites joined by `terminalId ?? id` and
@@ -485,4 +490,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `sizing attach refused` at launch. Streams now spawn with
   `herdrSearchDirs()` (exported from `select.ts`) as `PATH`. Any new `herdr`
   spawn must do the same or use the probe's resolved absolute path.
-<!-- last-verified: 2026-10-26 -->
+<!-- last-verified: 2026-11-01 -->
