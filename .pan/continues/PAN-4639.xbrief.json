@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T09:37:10.271Z",
+  "updated": "2026-11-01T09:37:25.209Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "list-sections.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T09:37:10.270Z"
+    },
+    "list-sections.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:37:25.209Z"
     }
   }
 }
