@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T22:55:38.474Z",
+  "updated": "2026-11-01T22:56:10.927Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,10 @@
       "claimedBy": "agent-pan-4638",
       "claimedAt": "2026-11-01T22:48:41.855Z",
       "doneAt": "2026-11-01T22:55:38.474Z"
+    },
+    "remote-lane-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:56:10.927Z"
     }
   }
 }
