@@ -16,6 +16,7 @@
  * runtime.
  */
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -89,6 +90,10 @@ function parseMachines(raw: string, path: string): FlyMachineRecord[] {
   return file.machines;
 }
 
+function readFailure(error: unknown, path: string): never {
+  throw new Error(`Cannot read Fly machine store ${path}: ${(error as Error).message}`);
+}
+
 /** Fresh read. Absent ⇒ empty; unreadable or corrupt ⇒ throws naming the path. */
 async function readMachines(path: string): Promise<FlyMachineRecord[]> {
   let raw: string;
@@ -96,7 +101,7 @@ async function readMachines(path: string): Promise<FlyMachineRecord[]> {
     raw = await readFile(path, 'utf8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
-    throw new Error(`Cannot read Fly machine store ${path}: ${(error as Error).message}`);
+    return readFailure(error, path);
   }
   return parseMachines(raw, path);
 }
@@ -136,9 +141,22 @@ export async function listFlyMachines(): Promise<FlyMachineRecord[]> {
   return readMachines(flyMachinesPath());
 }
 
-/** The number of records; counts toward `remote.max_concurrent_agents`. */
-export async function countFlyMachines(): Promise<number> {
-  return (await listFlyMachines()).length;
+/**
+ * The number of records; counts toward `remote.max_concurrent_agents`.
+ * Synchronous because its caller, `checkRemoteSpendCap`, and that function's
+ * callers are synchronous. It reads one small file and spawns nothing. A
+ * corrupt file throws, so the cap fails closed.
+ */
+export function countFlyMachines(): number {
+  const path = flyMachinesPath();
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
+    return readFailure(error, path);
+  }
+  return parseMachines(raw, path).length;
 }
 
 /** The record carrying `linkId`. Never matches a provisional record (`linkId: null`). */

@@ -60,7 +60,7 @@ describe('Fly machine store (PAN-4652 WI-6)', () => {
 
   it('reads a missing file as empty', async () => {
     expect(await store.listFlyMachines()).toEqual([]);
-    expect(await store.countFlyMachines()).toBe(0);
+    expect(store.countFlyMachines()).toBe(0);
   });
 
   it('throws on a corrupt file and leaves it unchanged', async () => {
@@ -69,7 +69,7 @@ describe('Fly machine store (PAN-4652 WI-6)', () => {
     await expect(store.listFlyMachines()).rejects.toThrow(path);
     await expect(store.upsertFlyMachine(record())).rejects.toThrow(path);
     await writeFile(path, '{"v":2,"machines":[]}', 'utf8');
-    await expect(store.countFlyMachines()).rejects.toThrow('unexpected shape');
+    expect(() => store.countFlyMachines()).toThrow('unexpected shape');
     expect(await readFile(path, 'utf8')).toBe('{"v":2,"machines":[]}');
   });
 
@@ -92,7 +92,7 @@ describe('Fly machine store (PAN-4652 WI-6)', () => {
     expect(await store.getFlyMachineByLinkId('link-1')).toBeNull();
     await store.upsertFlyMachine(record());
     await store.upsertFlyMachine(record({ id: 'rec-2', linkId: 'link-2', machineId: 'm2', label: 'fly-m2' }));
-    expect(await store.countFlyMachines()).toBe(2);
+    expect(store.countFlyMachines()).toBe(2);
     expect(await store.getFlyMachineByLinkId('link-2')).toMatchObject({ id: 'rec-2' });
 
     expect(await store.updateFlyMachine('rec-1', { docker: false, environmentId: 'env-2' })).toEqual(record({ docker: false, environmentId: 'env-2' }));
