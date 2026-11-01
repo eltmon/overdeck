@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4641",
   "created": "2026-11-01T05:00:29.700Z",
-  "updated": "2026-11-01T06:56:51.962Z",
+  "updated": "2026-11-01T06:57:12.234Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "usage-limit-state.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T06:56:51.961Z"
+    },
+    "scheduled-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:57:12.234Z"
     }
   }
 }
