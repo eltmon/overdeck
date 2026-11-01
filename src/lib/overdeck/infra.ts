@@ -146,6 +146,10 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // PAN-4436: Session Vault browse copies (`vault-<vaultId>` rows) are origin 'vault'.
   runSchemaTopUp(db, "ALTER TABLE `conversations` ADD COLUMN `origin` text NOT NULL DEFAULT 'local'");
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `vault_owner_label` text');
+  // PAN-4639: operator triage state (settle / snooze) for the conversation list.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `settled_at` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `settle_reason` text');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `snoozed_until` integer');
 }
 
 /** `app_settings` key recording that the pipeline-mirror drop already ran. */

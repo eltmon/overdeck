@@ -6424,6 +6424,64 @@
   padding-left: 28px;
 }
 
+/* ─── Triage sections (PAN-4639) ─────────────────────────────────────────────
+   Needs you / Inbox / Snoozed / Settled headers, the per-row settle control
+   and snooze label, and the multi-select bulk bar. Muted captions, no pill
+   shapes, no decorative color — only the needs-you header uses the
+   needs-you state token. */
+
+.convSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.convSectionHeader:hover {
+  color: var(--foreground);
+}
+
+.convSectionCount {
+  color: var(--muted-foreground);
+}
+
+.conversationSettleBox {
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.conversationSettleBox:hover {
+  color: var(--foreground);
+}
+
+.conversationSnoozeLabel {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+}
+
+.convBulkBar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--muted);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
 .laneLabel {
   flex-shrink: 0;
   font-family: var(--font-mono-ui, var(--font-mono));
