@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:43:42.116Z",
+  "updated": "2026-11-01T23:49:33.277Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,9 +202,10 @@
       "doneAt": "2026-11-01T23:43:22.948Z"
     },
     "lane-cli-machine": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4638",
-      "claimedAt": "2026-11-01T23:43:42.116Z"
+      "claimedAt": "2026-11-01T23:43:42.116Z",
+      "doneAt": "2026-11-01T23:49:33.277Z"
     }
   }
 }
