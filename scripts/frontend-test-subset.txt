@@ -46,6 +46,7 @@ src/components/Settings/anywhere/__tests__/AddTriggerDialog.test.tsx
 src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx
 src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx
 src/components/Settings/anywhere/__tests__/DevicesPanel.test.tsx
+src/components/Settings/anywhere/__tests__/FleetVersionsPanel.test.tsx
 src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx
 src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx
 src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx

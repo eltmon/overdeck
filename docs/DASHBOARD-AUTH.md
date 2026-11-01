@@ -88,10 +88,10 @@ does not list needs `admin` (D-6):
 | Scope | `METHOD path` |
 | --- | --- |
 | `read:events` | `GET /events/stream`, `GET /events/version` |
-| `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership` |
+| `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership`, `GET /api/versions/self` |
 | `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search` |
 | `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message` |
-| `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers` |
+| `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers`, `POST /api/versions/self/update`, `DELETE /api/versions/self/update` |
 | `approve` | `POST /api/conversations/:id/permission`, `POST /api/conversations/:id/pane-choice`, `POST /api/conversations/:id/pi-ask-answer`, `POST /api/conversations/:id/codex-approval`, `POST /api/conversations/:name/plan-action`, `POST /api/agents/:id/answer-question`, `POST /api/agents/:id/plan-action`, `POST /api/agents/:id/permissions/:requestId/respond` |
 | `admin` | everything else, including `/ws/rpc`, `/ws/voice`, `/ws/autopreso` |
 
@@ -393,6 +393,15 @@ Machines and `pan machines`. Rules:
   `read:costs`, `read:settings`, `tell`, `operate`, plus `forward` at operator
   level. An agent-fenced link stamps `x-overdeck-link-actor: agent:<id>` and
   `x-overdeck-link-ceiling` on forwarded requests (`src/lib/anywhere/link-actor.ts`).
+- **Fleet updates (PAN-4654).** `GET /api/versions/self` needs `read:state`.
+  `POST` and `DELETE /api/versions/self/update` carry the `operate` row, and the
+  handler narrows it further (D-10): through a channel only a machine credential
+  on an `operator`-access link with the `operator` actor stamp passes; an
+  `agent:<id>` stamp or an agent-fenced link (whose `operator` stamp is
+  downgraded to `operator-fenced`) gets `403 fleet-update-forbidden`. Locally the
+  CSRF-checked mutation guard applies and a `device` or `token` credential needs
+  `admin`. `GET /api/machines/versions` and `POST /api/machines/update` keep the
+  `admin` default and answer 403 to any request over a channel.
 - Any remote access (trusted remote origin, device, machine link or token) turns
   `require_token_mint` on (`src/lib/remote-access/config.ts`, D-4645-12); a
   plain-HTTP browser on another device gets the Use HTTPS page

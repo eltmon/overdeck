@@ -24,7 +24,7 @@
  * the loop runs on timers only, so tests drive it with fake timers.
  */
 import { Schema } from 'effect';
-import { EnvironmentDescriptor, LINK_PROTOCOL_VERSION, type LinkIncident, type LinkRouteStatus, type LinkState, type MachineLinkView } from '@overdeck/contracts';
+import { EnvironmentDescriptor, LINK_PROTOCOL_VERSION, type LinkIncident, overdeckInstallCommand, type LinkRouteStatus, type LinkState, type MachineLinkView } from '@overdeck/contracts';
 
 import type { ChannelSocket } from '../../../lib/anywhere/channel/channel-socket.js';
 import { ChannelOpenError, openChannel, type TransportUrl } from '../../../lib/anywhere/channel/open.js';
@@ -32,7 +32,7 @@ import type { LinkRouteInfo, LinkRouteSource } from '../../../lib/anywhere/link-
 import { linksSnapshot, type MachineLink, markLinkRevoked, setLinkRoutes } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey, type MachineKeyPair } from '../../../lib/anywhere/machine-key.js';
 import { type LinkRoute, mergeAdvertised, rankRoutes } from '../../../lib/anywhere/routes.js';
-import { channelRequest, type LinkStatusSource } from './machine-link-service.js';
+import { channelRequest, type LinkStatusSource, type UnsupportedInstall } from './machine-link-service.js';
 import { type HeartbeatHandle, type HeartbeatHandlers, type HeartbeatPayload, openHeartbeatOverChannel } from './link-heartbeat.js';
 
 export const HEARTBEAT_INTERVAL_MS = 15_000;
@@ -99,14 +99,33 @@ export function diagnoseGap(
   return { kind: 'network', durationMs: Math.max(0, gapMs - HEARTBEAT_INTERVAL_MS), at: new Date(receivedAt).toISOString() };
 }
 
+export type { UnsupportedInstall };
+
+/**
+ * Which Overdeck to install where when link protocols differ (FR-1): the peer's
+ * version on this machine when the peer speaks a newer link protocol, this
+ * machine's version on the peer otherwise.
+ */
+export function unsupportedInstall(peerLinkProtocol: number | undefined, peerVersion: string | undefined, localVersion: string): UnsupportedInstall {
+  return (peerLinkProtocol ?? 0) > LINK_PROTOCOL_VERSION && peerVersion
+    ? { version: peerVersion, on: 'this-machine' }
+    : { version: localVersion, on: 'peer' };
+}
+
+export function unsupportedDetail(install: UnsupportedInstall, peerLabel: string): string {
+  return `Install Overdeck ${install.version} on ${install.on === 'this-machine' ? 'this machine' : peerLabel}: ${overdeckInstallCommand(install.version)}`;
+}
+
 type ProbeOutcome =
   | { ok: true; channel: ChannelSocket; route: LinkRoute }
-  | { ok: false; failure: 'unreachable' | 'identity-refused' | 'unknown-peer' | 'unsupported'; detail: string };
+  | { ok: false; failure: 'unsupported'; install: UnsupportedInstall }
+  | { ok: false; failure: 'unreachable' | 'identity-refused' | 'unknown-peer'; detail: string };
 
 interface Entry {
   link: MachineLink;
   state: LinkState;
   stateDetail: string | null;
+  unsupported: UnsupportedInstall | null;
   currentRoute: string | null;
   channel: ChannelSocket | null;
   heartbeat: HeartbeatHandle | null;
@@ -181,6 +200,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     if (entry.state === 'unsupported') {
       entry.state = entry.channel ? 'online' : 'offline';
       entry.stateDetail = null;
+      entry.unsupported = null;
     }
     if (!entry.channel) void this.connect(entry);
     else void this.probeBetter(entry);
@@ -191,7 +211,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
   status(linkId: string): ReturnType<LinkStatusSource['status']> {
     const entry = this.entries.get(linkId);
     if (!entry) {
-      return { state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, routeStatus: () => 'untried' };
+      return { state: 'connecting', stateDetail: null, currentRoute: null, lastHeartbeatAt: null, incident: null, peerVersion: null, unsupported: null, routeStatus: () => 'untried' };
     }
     return {
       state: entry.state,
@@ -200,6 +220,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       lastHeartbeatAt: entry.lastHeartbeatAt === null ? null : new Date(entry.lastHeartbeatAt).toISOString(),
       incident: entry.incident,
       peerVersion: entry.peerVersion,
+      unsupported: entry.unsupported,
       routeStatus: (url) => (url === entry.currentRoute && entry.state === 'online' ? 'current' : entry.routeStatus.get(url) ?? 'untried'),
     };
   }
@@ -263,7 +284,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
 
   private makeEntry(link: MachineLink): Entry {
     return {
-      link, state: 'connecting', stateDetail: null, currentRoute: null, channel: null, heartbeat: null,
+      link, state: 'connecting', stateDetail: null, unsupported: null, currentRoute: null, channel: null, heartbeat: null,
       lastHeartbeatAt: null, lastEndpointsHash: null, incident: null, peerVersion: null, attempt: 0,
       backoffKind: 'network', retryTimer: null, lateTimer: null, deadTimer: null, betterTimer: null,
       probing: null, routeStatus: new Map(), onlineWaiters: new Set(), generation: 0,
@@ -308,9 +329,10 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     this.deps.log(`link to ${entry.link.label} revoked: ${detail}`);
   }
 
-  private markUnsupported(entry: Entry, detail: string): void {
+  private markUnsupported(entry: Entry, install: UnsupportedInstall): void {
     entry.state = 'unsupported';
-    entry.stateDetail = detail;
+    entry.unsupported = install;
+    entry.stateDetail = unsupportedDetail(install, entry.link.label);
     this.clearTimer(entry, 'retryTimer');
     this.clearTimer(entry, 'betterTimer');
     this.dropChannel(entry);
@@ -423,7 +445,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     const unsupported = failures.find((failure) => codeOf(failure.error) === 'unsupported');
     if (unsupported) {
       const detail = (unsupported.error as ChannelOpenError).detail;
-      return { ok: false, failure: 'unsupported', detail: `Install Overdeck ${detail.serverVersion ?? this.deps.serverVersion} on ${detail.linkProtocol !== undefined && detail.linkProtocol > LINK_PROTOCOL_VERSION ? 'this machine' : entry.link.label}` };
+      return { ok: false, failure: 'unsupported', install: unsupportedInstall(detail.linkProtocol, detail.serverVersion, this.deps.serverVersion) };
     }
     // A responder that cannot decrypt our pinned-key handshake drops the connection
     // without a word; so does a proxy or port forward whose peer is dead. Only when
@@ -451,7 +473,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     }
     if (!outcome.ok) {
       if (outcome.failure === 'unknown-peer') return this.markRevoked(entry, outcome.detail);
-      if (outcome.failure === 'unsupported') return this.markUnsupported(entry, outcome.detail);
+      if (outcome.failure === 'unsupported') return this.markUnsupported(entry, outcome.install);
       entry.backoffKind = outcome.failure === 'identity-refused' ? 'identity' : 'network';
       if (!entry.channel) {
         entry.state = 'offline';
@@ -502,10 +524,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     entry.peerVersion = descriptor.serverVersion;
     if (descriptor.capabilities.machineLinks !== true || descriptor.linkProtocol !== LINK_PROTOCOL_VERSION) {
       channel.destroy();
-      const peerNewer = (descriptor.linkProtocol ?? 0) > LINK_PROTOCOL_VERSION;
-      return this.markUnsupported(entry, peerNewer
-        ? `Install Overdeck ${descriptor.serverVersion} on this machine`
-        : `Install Overdeck ${this.deps.serverVersion} on ${entry.link.label}`);
+      return this.markUnsupported(entry, unsupportedInstall(descriptor.linkProtocol, descriptor.serverVersion, this.deps.serverVersion));
     }
 
     let heartbeat: HeartbeatHandle;
