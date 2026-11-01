@@ -220,6 +220,19 @@ and refreshes snapshots; links are never deleted, only dismissed. `pan done` /
 from `DerivedIssueState.pr`, not from links; the conversation list's badge
 (`primitives/PullRequestBadge.tsx`) reads the effective link.
 
+## Scheduled messages (PAN-4641)
+
+`conversation_scheduled_messages` (overdeck.db) holds operator messages that wait
+for a Claude Code usage limit to reset; door
+`src/lib/overdeck/conversation-scheduled-messages.ts`. The tick
+`src/lib/overdeck/scheduled-message-delivery.ts` acts on each conversation's head
+row (resume if ended, defer on a choice menu, paste through
+`handleConversationMessage`, then confirm or re-arm from the transcript). It is
+hosted by `services/scheduled-message-patrol.ts` in the dashboard process, not the
+Deacon child, because the delivery and resume doors live there (60 s, skips peer
+dashboards, a frozen Deacon and `OVERDECK_DISABLE_SCHEDULED_MESSAGES=1`). Reset
+times come from `conversation-usage-limit.ts` and `limit-reset-text.ts`.
+
 ## Dashboard auth (verified 2026-09-30)
 
 No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.
