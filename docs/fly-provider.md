@@ -291,6 +291,9 @@ loops (PAN-4295). With no active remote agent, none of them calls the Fly API.
 
 The heartbeat and credential refresh run in `src/lib/cloister/hygiene-scheduler.ts`;
 the reap runs last in `runDeaconLite()` through `src/lib/cloister/remote-reap-routine.ts`.
+Before the reap destroys or stops a machine, it copies the session transcripts and
+`continue.json` back with `fly ssh sftp`, so `fly` must be on the deacon child's
+`PATH`. A failed copy is recorded in the reap's details; it does not stop the hand-off.
 
 To force a reap, or to recover one agent whatever its state, run:
 
@@ -398,7 +401,7 @@ ephemeral tier, image rebuilt the same day with Claude Code 2.1.316).
 |---|---|
 | O1: key-free VM | `/root/.ssh` and `/.ssh` do not exist; `find / -xdev` finds no `id_rsa*`, `id_ed25519*`, `id_ecdsa*` or `exe-dev-key`. |
 | O2: positive evidence mid-work | `admin remote reap --issue PAN-4677` printed `still-running`; the machine stayed `started`. |
-| O3: hand-off | After `REMOTE_DONE`, `--dry-run` printed `handed-off` ("Dry run — would hand off to review"); the real run printed `handed-off`, opened PR [#4694](https://github.com/eltmon/overdeck/pull/4694), copied the session JSONL, destroyed the machine and logged "Requested review through the dashboard review route". The journal recorded `review.requested` with `source: "api"`, as expected before the route change deploys. |
+| O3: hand-off | After `REMOTE_DONE`, `--dry-run` printed `handed-off` ("Dry run — would hand off to review"); the real run printed `handed-off`, opened PR [#4694](https://github.com/eltmon/overdeck/pull/4694), destroyed the machine and logged "Requested review through the dashboard review route". The journal recorded `review.requested` with `source: "api"`, as expected before the route change deploys. The run also logged "Copied 1/1 session JSONL(s)" and "Copied continue.json back from VM", but nothing was copied: `remote-sessions/` stayed empty. Both `copyFromVm` calls awaited an Effect without running it, so the remote transcript was lost with the machine. That bug is fixed in this branch (`Effect.runPromise`, with a test that fails unless the copy runs). |
 
 The first real reap failed once with `cannot lock ref 'refs/remotes/origin/feature/pan-4677'`.
 A concurrent fetch had updated the same ref. That failure writes no state and
