@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-01T23:02:48.552Z",
+  "updated": "2026-11-01T23:03:07.306Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,11 @@
     "owner-lane-executor.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T23:02:48.552Z"
+    },
+    "owner-lane-doors": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4638",
+      "claimedAt": "2026-11-01T23:03:07.306Z"
     }
   }
 }
