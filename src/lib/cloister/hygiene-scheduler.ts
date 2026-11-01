@@ -64,6 +64,25 @@ async function runTranscriptRetention(): Promise<string[]> {
   return sweepTranscriptRetention({ transcriptDays: loadCloisterConfigSync().retention?.transcript_days });
 }
 
+/**
+ * Wrap a routine so a tick that fires while its previous pass is still running is
+ * skipped. A Codex sign-in sync pass reads each VM in turn with no request timeout,
+ * so it can outlast its 60 s interval; two passes deciding from different sign-in
+ * snapshots could push and pull against each other (PAN-4296).
+ */
+function singleFlight(fn: () => Promise<string[]>): () => Promise<string[]> {
+  let running = false;
+  return async () => {
+    if (running) return ['skipped: the previous pass is still running'];
+    running = true;
+    try {
+      return await fn();
+    } finally {
+      running = false;
+    }
+  };
+}
+
 let intervals: ReturnType<typeof setInterval>[] = [];
 
 export function startHygieneScheduler(): void {
@@ -81,8 +100,8 @@ export function startHygieneScheduler(): void {
     ['heartbeatFlyMachines', () => heartbeatFlyMachines(), REMOTE_HEARTBEAT_INTERVAL_MS],
     ['sweepFlyMachines', () => sweepFlyMachines(), REMOTE_HEARTBEAT_INTERVAL_MS],
     // PAN-4296: Codex sign-in sync, outside the freeze too: a VM refresh must reach home
-    // before home's own next refresh, or one side's refresh token is burned.
-    ['syncFlyCodexAuth', () => syncFlyCodexAuth(), REMOTE_HEARTBEAT_INTERVAL_MS],
+    // before home's own next refresh, or one side's refresh token is burned. One pass at a time.
+    ['syncFlyCodexAuth', singleFlight(() => syncFlyCodexAuth()), REMOTE_HEARTBEAT_INTERVAL_MS],
     ['reapOrphanedDashboardServers', reapOrphanedDashboardServers, ORPHAN_DASHBOARD_SERVER_INTERVAL_MS],
     ['reapLeftoverPlaywrightBrowsers', reapLeftoverPlaywrightBrowsers, PLAYWRIGHT_REAPER_INTERVAL_MS],
     ['reapHerdrResiduePanes', reapHerdrResiduePanes, HERDR_RESIDUE_INTERVAL_MS],

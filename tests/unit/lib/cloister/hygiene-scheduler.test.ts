@@ -200,6 +200,24 @@ describe('hygiene-scheduler', () => {
     }
   });
 
+  it('skips a Codex sign-in sync tick while the previous pass is still running (PAN-4296)', async () => {
+    let finish!: () => void;
+    mocks.syncFlyCodexAuth.mockImplementationOnce(() => new Promise<string[]>((resolve) => { finish = () => resolve([]); }));
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    startHygieneScheduler();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mocks.syncFlyCodexAuth).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(mocks.syncFlyCodexAuth).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith('[hygiene-scheduler] syncFlyCodexAuth: skipped: the previous pass is still running');
+
+    finish();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(mocks.syncFlyCodexAuth).toHaveBeenCalledTimes(2);
+    log.mockRestore();
+  });
+
   it('starting twice does not double-schedule', async () => {
     startHygieneScheduler();
     startHygieneScheduler();
