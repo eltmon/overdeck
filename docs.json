@@ -59,10 +59,12 @@
               "anywhere",
               "configuration/session-vault",
               "configuration/remote-access",
+              "configuration/triggers",
               "cli/vault",
               "cli/pair",
               "cli/devices",
-              "cli/token"
+              "cli/token",
+              "cli/triggers"
             ]
           }
         ]
