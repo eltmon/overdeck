@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T21:45:45.370Z",
+  "updated": "2026-11-01T21:46:01.094Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -574,6 +574,10 @@
     "wi27-compare-settings.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T21:45:45.370Z"
+    },
+    "wi28-proxy-token-ceiling.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:46:01.093Z"
     }
   }
 }
