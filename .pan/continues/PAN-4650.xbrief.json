@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T16:58:59.824Z",
+  "updated": "2026-11-01T16:59:13.321Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -396,6 +396,10 @@
     "wi14-pull-ui.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T16:58:59.824Z"
+    },
+    "wi15-share-toggle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:59:13.321Z"
     }
   },
   "agentModel": "claude-opus-5-5"
