@@ -100,4 +100,12 @@ describe('pan pair (PAN-3762)', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('http://localhost:3011/api/pairing/credentials');
     expect(stdout).toEqual([]);
   });
+
+  it('requestPairingLink resolves { ok: false } with the token message on a 401 (PAN-4656)', async () => {
+    answer(401, { error: 'unauthorized' });
+    const result = await requestPairingLink({ base: 'http://203.0.113.7:3011' });
+    expect(result.ok).toBe(false);
+    expect(result.ok ? '' : result.message).toContain('The running dashboard holds a different token');
+    expect(stderr).toEqual([]);
+  });
 });

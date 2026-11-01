@@ -157,8 +157,11 @@ Waiting for lingering to turn on… (press Enter to continue without it)
 
 It waits (checking every 2 seconds) until lingering is on, then carries on. Press Enter to
 continue without it. Without a terminal, or with `--json`, it does not wait. Continuing
-without lingering is not an error, and the output says what it means: "Lingering is off for
-alice, so the server stops when you log out and starts again only when you log in."
+without lingering is not an error, and the output says what it means:
+
+```
+Lingering is off for alice, so the server stops when you log out and starts again only when you log in. Turn it on with: sudo loginctl enable-linger alice
+```
 
 ### macOS
 

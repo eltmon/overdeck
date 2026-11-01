@@ -136,6 +136,14 @@ describe('pan connect: platform and runtime', () => {
     expect(plain(stdout).split('\n').at(-1)).toBe('To run pan on this machine: /home/alice/.overdeck/runtime/node_modules/.bin/pan');
   });
 
+  it('never re-execs from an npx root when OVERDECK_CONNECT_REEXEC=1', async () => {
+    const { deps } = fakeDeps({ packageRoot: NPX_ROOT, env: { OVERDECK_CONNECT_REEXEC: '1' } });
+
+    await expect(runConnect({}, deps)).resolves.toBe(0);
+    expect(deps.reexec).not.toHaveBeenCalled();
+    expect(deps.ensureDurableRuntime).not.toHaveBeenCalled();
+  });
+
   it('exits 1 with the npm error when the runtime install fails', async () => {
     const { deps, stderr } = fakeDeps({
       packageRoot: NPX_ROOT,
@@ -149,10 +157,22 @@ describe('pan connect: platform and runtime', () => {
 });
 
 describe('pan connect: dashboard (FR-3, FR-9)', () => {
-  it('leaves a healthy primary dashboard running', async () => {
-    const { deps } = fakeDeps();
+  it('leaves a healthy primary dashboard running and prints a fresh link on every run', async () => {
+    let n = 0;
+    const { deps, stdout } = fakeDeps({
+      requestPairingLink: vi.fn(async ({ base }: { base: string }) => {
+        n += 1;
+        return { ok: true as const, url: `${base}/#pair=odp_${n}`, credential: `odp_${n}`, expiresAt: EXPIRES_AT, base };
+      }),
+    });
 
     await expect(runConnect({}, deps)).resolves.toBe(0);
+    await expect(runConnect({}, deps)).resolves.toBe(0);
+    const links = plain(stdout).split('\n').filter((line) => line.includes('pan machines link'));
+    expect(links).toEqual([
+      "  pan machines link 'http://203.0.113.7:3011/#pair=odp_1'",
+      "  pan machines link 'http://203.0.113.7:3011/#pair=odp_2'",
+    ]);
     expect(deps.waitForDashboardHealth).toHaveBeenCalledWith(3011, { timeoutMs: 2_000, expectedIdentity: PRIMARY });
     expect(deps.restartDashboard).not.toHaveBeenCalled();
     expect(deps.acquireRestartLock).not.toHaveBeenCalled();
@@ -378,6 +398,18 @@ describe('pan connect on Linux (WI-9)', () => {
       'linger?',
     ]);
     expect(deps.tryEnableLinger).not.toHaveBeenCalled();
+  });
+
+  it('runs the Linux steps in order when pan connect dispatches to them', async () => {
+    const { deps, ctx, calls } = linux({ lingerOn: true });
+    const { deps: connectDeps } = fakeDeps({
+      explainSystemdUserUnavailable: vi.fn(async () => null),
+      installLinuxService: (serviceCtx) => installLinuxService({ ...serviceCtx, env: ctx.env }, deps),
+    });
+
+    await expect(runConnect({}, connectDeps)).resolves.toBe(0);
+    expect(calls).toEqual(['unit', 'enable overdeck-supervisor.service', 'path /home/alice/.local/bin:/usr/bin', 'start', 'linger?']);
+    expect(connectDeps.startSupervisorProcess).not.toHaveBeenCalled();
   });
 
   it('turns lingering on itself when loginctl allows it', async () => {
