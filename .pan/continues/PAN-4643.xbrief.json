@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4643",
   "created": "2026-11-01T04:53:44.765Z",
-  "updated": "2026-11-01T06:35:14.806Z",
+  "updated": "2026-11-01T06:35:48.255Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -216,6 +216,10 @@
     "diagnose-cli.ac5": {
       "status": "completed",
       "doneAt": "2026-11-01T06:35:14.806Z"
+    },
+    "diagnose-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:35:48.254Z"
     }
   }
 }
