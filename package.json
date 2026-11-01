@@ -194,6 +194,7 @@
     "ora": "^8.2.0",
     "posthog-node": "^5.53.0",
     "smee-client": "^5.0.0",
+    "sodium-native": "5.2.0",
     "sqlite-vec": "^0.1.9",
     "toml": "^4.3.0",
     "web-push": "3.6.7",
