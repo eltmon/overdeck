@@ -4,17 +4,17 @@
     "created": "2026-11-01T08:23:26Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4697: test:frontend-subset is one 7.4 KB line in package.json, so every pair of PRs adding frontend tests conflicts; move it to a union-merged list file",
-    "updated": "2026-11-01T09:14:10.615Z"
+    "updated": "2026-11-01T09:15:11.511Z"
   },
   "plan": {
     "id": "pan-4697",
     "title": "test:frontend-subset is one 7.4 KB line in package.json, so every pair of PRs adding frontend tests conflicts; move it to a union-merged list file",
-    "status": "proposed",
+    "status": "running",
     "uid": "4f6b51f8-21b9-431b-b621-342627288039",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T08:23:26Z",
-    "updated": "2026-11-01T09:14:10.615Z",
+    "updated": "2026-11-01T09:15:11.511Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4697",
@@ -417,5 +417,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
