@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T08:11:19Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-01T08:18:54Z · model: claude-opus-5-5 · open: 872_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -278,6 +278,7 @@ _Last sequenced: 2026-11-01T08:11:19Z · model: claude-opus-5-5 · open: 871_
 | 271 | PAN-4654 | M | medium | needs-refinement |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
 | 272 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 273 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 274 | PAN-4696 | XS | medium | ok |  | PAN-4295 | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 275 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650, PAN-4649 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
 | 276 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
 | 277 | PAN-4649 | M | medium | ok |  |  | Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending. |
@@ -1206,10 +1207,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T08:11:19Z",
+  "generatedAt": "2026-11-01T08:18:54Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 871,
+  "openCount": 872,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -12111,6 +12112,21 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "rationale": "New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4696",
+      "rank": 274,
+      "size": "XS",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4295"
+      ],
+      "why": "Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build.",
+      "rationale": "New verification-only follow-up; it cannot run until PAN-4295 merges and deploys, so it ranks directly behind PAN-4295 in the Fly cluster.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13800,6 +13816,27 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-4295",
+      "to": "PAN-4696",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4682",
+      "to": "PAN-4696",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4683",
+      "to": "PAN-4696",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
