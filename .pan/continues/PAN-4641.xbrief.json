@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4641",
   "created": "2026-11-01T05:00:29.700Z",
-  "updated": "2026-11-01T07:09:48.677Z",
+  "updated": "2026-11-01T07:10:28.256Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -266,6 +266,10 @@
     "timeline-scheduled-rows.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:09:48.677Z"
+    },
+    "timeline-scheduled-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:10:28.255Z"
     }
   }
 }
