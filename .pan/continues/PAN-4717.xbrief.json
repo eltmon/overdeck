@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4717",
   "created": "2026-11-01T14:07:20.462Z",
-  "updated": "2026-11-01T14:18:24.910Z",
+  "updated": "2026-11-01T14:20:30.935Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-01T14:18:20.038Z"
     },
     "drawer-absent-issue-hydration-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4717",
-      "claimedAt": "2026-11-01T14:18:24.910Z"
+      "claimedAt": "2026-11-01T14:18:24.910Z",
+      "doneAt": "2026-11-01T14:20:30.934Z"
     }
   }
 }
