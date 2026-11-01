@@ -177,8 +177,10 @@ agents; `add-fly` refuses with `cap-reached` when it is full (0 or unset means n
 
 - Claude Code only. Other harnesses on Fly are tracked in
   [#4296](https://github.com/eltmon/overdeck/issues/4296).
-- Docker: the image has Docker, and the VM starts it when it can. `add-fly --json`
-  reports `record.docker` as `true` or `false` for each machine.
+- Docker: the VM runs Docker with the `vfs` storage driver, because the VM's disk cannot
+  host the default overlay driver. Containers run, but images take more disk and start
+  more slowly than on your own machine. `add-fly --json` reports `record.docker` as `true`
+  or `false` for each machine.
 
 ## Access levels
 
