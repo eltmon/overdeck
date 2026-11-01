@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:31:30.695Z",
+  "updated": "2026-11-01T14:31:45.935Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "wi3-ssh-machine-store.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T14:31:30.695Z"
+    },
+    "wi4-ssh-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:31:45.935Z"
     }
   }
 }
