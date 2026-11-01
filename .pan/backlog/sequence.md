@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T12:25:04Z · model: claude-opus-5-5 · open: 864_
+_Last sequenced: 2026-11-01T12:25:42Z · model: claude-opus-5-5 · open: 862_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -294,7 +294,6 @@ _Last sequenced: 2026-11-01T12:25:04Z · model: claude-opus-5-5 · open: 864_
 | 290 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
 | 292 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
-| 292 | PAN-4648 | M | medium | ok |  |  | Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending. |
 | 293 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
 | 296 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
@@ -681,7 +680,7 @@ _Last sequenced: 2026-11-01T12:25:04Z · model: claude-opus-5-5 · open: 864_
 | 683 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
 | 684 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 685 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 686 | PAN-2356 | M | low | needs-refinement |  | PAN-4297, PAN-4645, PAN-4648 | Overdeck Anywhere P3: relay service |
+| 686 | PAN-2356 | M | low | needs-refinement |  | PAN-4297, PAN-4645 | Overdeck Anywhere P3: relay service |
 | 687 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 688 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 689 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -823,10 +822,9 @@ _Last sequenced: 2026-11-01T12:25:04Z · model: claude-opus-5-5 · open: 864_
 | 825 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 826 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 827 | PAN-4658 | S | low | needs-refinement |  |  | Cite text from the EditorPane markdown preview; needs a decision on how the preview picks its target conversation. #4642 shipped. |
-| 828 | PAN-4659 | M | low | ok |  | PAN-4644 | Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, waits for #4644 to merge. |
-| 828 | PAN-4644 | L | low | ok |  |  | Import VS Code themes and custom color themes for UI tokens, terminal palette and syntax highlighting; cosmetic, large surface. |
+| 828 | PAN-4659 | M | low | ok |  |  | Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, #4644 base theme import merged, now unblocked. |
 | 829 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 831 | PAN-4660 | M | low | ok |  | PAN-4644 | Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, waits for #4644 to merge. |
+| 831 | PAN-4660 | M | low | ok |  |  | Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, #4644 base theme import merged, now unblocked. |
 | 832 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
 | 834 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
@@ -1199,10 +1197,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T12:25:04Z",
+  "generatedAt": "2026-11-01T12:25:42Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 864,
+  "openCount": 862,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -4836,19 +4834,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "condition": "ok",
       "dependsOn": [],
       "why": "work agents hang on Claude Code settings-file protection when editing .claude/**",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4648",
-      "rank": 292,
-      "size": "M",
-      "importance": "medium",
-      "score": 42,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending.",
-      "rationale": "New Anywhere child (W-INT1); its Funnel route follows W-TS1 and its inbox follows W-LINK5, so it ranks last of the new children. Body is still a placeholder.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9617,11 +9602,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "condition": "needs-refinement",
       "dependsOn": [
         "PAN-4297",
-        "PAN-4645",
-        "PAN-4648"
+        "PAN-4645"
       ],
       "why": "Overdeck Anywhere P3: relay service",
-      "rationale": "Rank held: dependency PAN-4330 closed as completed on 2026-11-01, so it no longer gates this issue; remaining order is unchanged.",
+      "rationale": "Rank held: dependency PAN-4648 closed as completed on 2026-11-01; PAN-4297 and PAN-4645 still gate this issue.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -11355,11 +11339,9 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "importance": "low",
       "score": 20,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4644"
-      ],
-      "why": "Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, waits for #4644 to merge.",
-      "rationale": "New issue split from #4644 with clear AC; cosmetic and blocked on #4644, so it sits right after that issue.",
+      "dependsOn": [],
+      "why": "Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, #4644 base theme import merged, now unblocked.",
+      "rationale": "Rank held: dependency PAN-4644 closed as completed on 2026-11-01, so this is unblocked; still low-impact cosmetic work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11377,30 +11359,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4644",
-      "rank": 828,
-      "size": "L",
-      "importance": "low",
-      "score": 24,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Import VS Code themes and custom color themes for UI tokens, terminal palette and syntax highlighting; cosmetic, large surface.",
-      "rationale": "New issue: cosmetic appearance work touching many theme surfaces, so it ranks low.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4660",
       "rank": 831,
       "size": "M",
       "importance": "low",
       "score": 20,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4644"
-      ],
-      "why": "Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, waits for #4644 to merge.",
-      "rationale": "New issue split from #4644 with clear AC; cosmetic and blocked on #4644, so it sits right after that issue.",
+      "dependsOn": [],
+      "why": "Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, #4644 base theme import merged, now unblocked.",
+      "rationale": "Rank held: dependency PAN-4644 closed as completed on 2026-11-01, so this is unblocked; still low-impact cosmetic work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13237,13 +13204,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "from": "PAN-2350",
-      "to": "PAN-4648",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
       "to": "PAN-4650",
       "type": "contains",
       "source": "github-ref",
@@ -13341,13 +13301,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 0.6
     },
     {
-      "from": "PAN-4645",
-      "to": "PAN-4648",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-4651",
       "to": "PAN-4638",
       "type": "unblocks",
@@ -13363,13 +13316,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "from": "PAN-4645",
-      "to": "PAN-2356",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4648",
       "to": "PAN-2356",
       "type": "unblocks",
       "source": "github-ref",
@@ -13397,29 +13343,8 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 1
     },
     {
-      "from": "PAN-4644",
-      "to": "PAN-4659",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4644",
-      "to": "PAN-4660",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4663",
       "to": "PAN-4645",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4663",
-      "to": "PAN-4648",
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
