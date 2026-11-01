@@ -142,6 +142,7 @@ the server's message, then exits 1:
 | `harness-unsupported` | Fly machines run Claude Code only. |
 | `bad-request` | `--message` needs `--project`, or a field was empty. |
 | `cap-reached` | `remote.max_concurrent_agents` is full. Unlink a Fly machine, stop a remote agent, or raise the cap. |
+| `credentials-failed` | This machine's Claude Code credentials did not reach the VM. Log in to Claude Code here (`~/.claude/.credentials.json`), then try again. |
 | `version-mismatch` | The VM could not install this machine's Overdeck version; the message names both. |
 | `server-not-ready` | Overdeck on the VM did not answer within 2 minutes. The message carries the last lines of its log. |
 | `pairing-failed` | Overdeck on the VM issued no pairing code. |
