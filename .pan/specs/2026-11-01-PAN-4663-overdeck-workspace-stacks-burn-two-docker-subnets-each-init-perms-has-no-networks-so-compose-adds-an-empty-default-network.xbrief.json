@@ -4,17 +4,17 @@
     "created": "2026-11-01T05:47:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4663: Overdeck workspace stacks burn two Docker subnets each: init-perms has no networks, so Compose adds an empty _default network",
-    "updated": "2026-11-01T05:55:15.930Z"
+    "updated": "2026-11-01T11:01:17.663Z"
   },
   "plan": {
     "id": "pan-4663",
     "title": "Overdeck workspace stacks burn two Docker subnets each: init-perms has no networks, so Compose adds an empty _default network",
-    "status": "proposed",
+    "status": "running",
     "uid": "174e93ef-1a10-4ab3-b9d0-19b56ab73721",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-01T05:47:22Z",
-    "updated": "2026-11-01T05:55:15.930Z",
+    "updated": "2026-11-01T11:01:17.663Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4663",
@@ -256,5 +256,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
