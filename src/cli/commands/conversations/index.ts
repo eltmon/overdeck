@@ -15,6 +15,7 @@ import { jsonlAction } from './jsonl.js';
 import { moveAction } from './move.js';
 import { autoArchiveOnMergeAction, linkPrAction, prsAction, unlinkPrAction } from './pull-requests.js';
 import { healAction } from './heal.js';
+import { pendingAction } from './pending.js';
 
 function collectRepeatable(value: string, previous: string[] = []): string[] {
   return [...previous, value];
@@ -100,6 +101,13 @@ export function registerConversationsCommands(program: Command): void {
     .description('Print the Claude JSONL transcript path for a conversation id (the /conv/<N> number)')
     .option('--json', 'Output status/path as JSON; read the status field')
     .action((id: string, opts: { json?: boolean }) => jsonlAction(id, opts));
+
+  // ── pending (PAN-4641) ──────────────────────────────────────────────────────
+  conversations
+    .command('pending <conv>')
+    .description('List messages queued to send when the conversation\'s usage limit resets')
+    .option('--json', 'Print JSON')
+    .action((conv: string, opts: { json?: boolean }) => pendingAction(conv, opts));
 
   // ── move ────────────────────────────────────────────────────────────────────
   conversations
