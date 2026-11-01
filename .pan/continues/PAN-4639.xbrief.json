@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T09:35:16.678Z",
+  "updated": "2026-11-01T09:35:34.568Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "triage-route.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T09:35:16.678Z"
+    },
+    "list-enrichment.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:35:34.567Z"
     }
   }
 }
