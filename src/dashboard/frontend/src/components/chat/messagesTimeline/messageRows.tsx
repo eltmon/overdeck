@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, ClipboardList, GitBranchPlus } from 'lucide-react';
 import type { ChatMessage, TurnDiffSummary } from '../chat-types';
 import { ChatMarkdown } from '../ChatMarkdown';
@@ -11,6 +11,39 @@ import { openImageLightbox } from '../ImageLightbox';
 import { extractAttachmentImageRefs, formatElapsed, formatTimestamp } from './helpers';
 import { SlashCommandDivider } from './dividers';
 import { MessageRoleIcon } from '../bookmarks/MessageRoleIcon';
+import { useCitationHighlight } from '../citations/citationHighlight';
+
+/** PAN-4642 WI-8: wraps a citable row body, painting pending-citation highlights.
+ *  A separate component (not a conditional hook call) keeps the hook unconditional. */
+function CitableText({
+  conversationName,
+  messageId,
+  text,
+  role,
+  className,
+  children,
+}: {
+  conversationName: string;
+  messageId: string;
+  text: string;
+  role: 'assistant' | 'user';
+  className?: string;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const cited = useCitationHighlight(ref, conversationName, messageId, text);
+  return (
+    <div
+      ref={ref}
+      className={className}
+      data-cite-message-id={messageId}
+      data-cite-role={role}
+      data-cited={cited ? 'true' : undefined}
+    >
+      {children}
+    </div>
+  );
+}
 
 /** PAN-4493: clickable thumbnails for the image attachments a sent message references. */
 function AttachmentThumbnails({ text }: { text: string }) {
@@ -115,9 +148,8 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConver
 
   const isPending = message.id.startsWith('optimistic-') && !message.acknowledged;
   const isOptimistic = message.id.startsWith('optimistic-');
-  const citeProps = citeConversationName && !isPending && !isOptimistic
-    ? { 'data-cite-message-id': message.id, 'data-cite-role': 'user' as const }
-    : undefined;
+  const isCitable = !!citeConversationName && !isPending && !isOptimistic;
+  const userMessageText = <ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} />;
   return (
     <div className={styles.userMessageRow}>
       <div
@@ -125,7 +157,13 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConver
         style={isPending ? { opacity: 0.6 } : undefined}
         title={isPending ? 'Pending — waiting for agent to process' : undefined}
       >
-        <div className={styles.userMessageText} {...citeProps}><ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} /></div>
+        {isCitable ? (
+          <CitableText conversationName={citeConversationName!} messageId={message.id} text={message.text} role="user" className={styles.userMessageText}>
+            {userMessageText}
+          </CitableText>
+        ) : (
+          <div className={styles.userMessageText}>{userMessageText}</div>
+        )}
         <AttachmentThumbnails text={message.text} />
         <span className={styles.messageTimestamp}>
           {isPending ? (
@@ -244,7 +282,9 @@ export function AssistantMessageRow({
       />
       <div className={styles.assistantMessageContent}>
         {citeConversationName && !stillStreaming ? (
-          <div data-cite-message-id={message.id} data-cite-role="assistant">{turnBody}</div>
+          <CitableText conversationName={citeConversationName} messageId={message.id} text={message.text} role="assistant">
+            {turnBody}
+          </CitableText>
         ) : turnBody}
         {turnDiffSummary && turnDiffSummary.files.length > 0 && (
           <div className="mt-2 rounded-md border border-border/50 bg-muted/30 p-2">

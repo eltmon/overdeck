@@ -4,11 +4,12 @@
  * collapse was shipped then rejected), completion messages become structured
  * verdict cards, and the pre-existing work-log group collapse stays.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { AssistantMessageRow, TurnBody, UserMessageRow } from './messageRows';
 import { WorkLogGroup } from './workLogRows';
 import type { ChatMessage, SubagentSummary, WorkLogEntry } from '../chat-types';
+import { addCitation, consumeCitations, resetCitationStore } from '../../../lib/composerCitations.js';
 
 // ChatMarkdown pulls in the syntax-highlight chain; the gate asserts budget
 // behavior, not markdown fidelity.
@@ -185,5 +186,33 @@ describe('PAN-4642 cite-row gate', () => {
   it('does not mark an optimistic user row citable', () => {
     render(<UserMessageRow message={userMessage({ id: 'optimistic-1' })} citeConversationName="conv-a" />);
     expect(document.querySelector('[data-cite-message-id]')).not.toBeInTheDocument();
+  });
+});
+
+describe('PAN-4642 citation highlight (data-cited)', () => {
+  const SOURCE = { kind: 'message' as const, messageId: 'asst-1', role: 'assistant' as const };
+
+  function assistantMessage(): ChatMessage {
+    return { id: 'asst-1', role: 'assistant', text: 'Here is my reply.', createdAt: '2026-11-01T00:00:00Z', completedAt: '2026-11-01T00:00:01Z' };
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    resetCitationStore();
+  });
+
+  it('renders data-cited="true" on an assistant row with a pending citation', () => {
+    addCitation('conv-a', { source: SOURCE, quotedText: 'my reply', comment: '' });
+    render(<AssistantMessageRow message={assistantMessage()} durationStart="2026-11-01T00:00:00Z" isStreaming={false} citeConversationName="conv-a" />);
+    expect(document.querySelector('[data-cite-message-id="asst-1"]')).toHaveAttribute('data-cited', 'true');
+  });
+
+  it('removes data-cited once the citation is consumed', () => {
+    addCitation('conv-a', { source: SOURCE, quotedText: 'my reply', comment: '' });
+    render(<AssistantMessageRow message={assistantMessage()} durationStart="2026-11-01T00:00:00Z" isStreaming={false} citeConversationName="conv-a" />);
+    expect(document.querySelector('[data-cite-message-id="asst-1"]')).toHaveAttribute('data-cited', 'true');
+
+    act(() => { consumeCitations('conv-a'); });
+    expect(document.querySelector('[data-cite-message-id="asst-1"]')).not.toHaveAttribute('data-cited', 'true');
   });
 });
