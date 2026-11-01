@@ -80,9 +80,11 @@ describe('pan pair (PAN-3762)', () => {
     expect(stderr.join('\n')).toContain('Overdeck dashboard is not running; start it with `pan up`.');
   });
 
-  it('explains pan up on a 401', async () => {
+  it('explains a token mismatch on a 401', async () => {
     answer(401, { error: 'unauthorized' });
     await expect(runPair({})).rejects.toThrow('exit 1');
-    expect(stderr.join('\n')).toContain('`pan pair` needs a dashboard started by `pan up`');
+    const output = stderr.join('\n');
+    expect(output).toContain('The running dashboard holds a different token');
+    expect(output).not.toContain('pan serve');
   });
 });
