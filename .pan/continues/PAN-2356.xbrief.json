@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T13:43:57.718Z",
+  "updated": "2026-11-01T13:44:10.600Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,10 @@
     "wi1-contracts.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T13:43:57.717Z"
+    },
+    "wi1-contracts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:44:10.599Z"
     }
   }
 }
