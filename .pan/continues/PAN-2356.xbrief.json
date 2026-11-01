@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:45:39.378Z",
+  "updated": "2026-11-01T14:45:56.203Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -346,6 +346,10 @@
       "claimedBy": "agent-pan-2356",
       "claimedAt": "2026-11-01T14:45:17.465Z",
       "doneAt": "2026-11-01T14:45:39.378Z"
+    },
+    "wi20-inbox-create.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:45:56.202Z"
     }
   }
 }
