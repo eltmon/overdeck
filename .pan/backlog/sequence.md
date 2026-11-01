@@ -1,13 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T06:43:27Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-01T06:45:07Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4626 | S | medium | ok |  |  | In pipeline: stop/archive rows show no distinct pending state after #4588; dim row, label Stopping…/Archiving…, per-row stop pending. |
 | 2 | PAN-4639 | L | medium | ok |  |  | In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions. |
-| 3 | PAN-4640 | L | medium | ok |  | PAN-4639 | In pipeline: Overdeck-owned conversation schedules fired by a deacon-lite tick; resurfaces settled/snoozed rows (needs #4639). |
 | 4 | PAN-4663 | XS | critical | ok |  |  | In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts |
 | 5 | PAN-4670 | S | high | ok |  |  | In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs. |
 | 6 | PAN-4672 | S | high | ok |  |  | In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout. |
@@ -179,7 +178,7 @@ _Last sequenced: 2026-11-01T06:43:27Z · model: claude-opus-5-5 · open: 869_
 | 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 178 | PAN-4655 | M | medium | ok |  | PAN-4639 | Ranked for readiness when #4639 merges: idle auto-settle after N days (default 3); supersedes the #1485 archive part. |
 | 179 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 180 | PAN-4657 | M | medium | ok |  | PAN-4640, PAN-4639 | Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; waits for in-pipeline #4640 and #4639. |
+| 180 | PAN-4657 | M | medium | ok |  | PAN-4639 | Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; #4640 merged, waits on in-pipeline #4639. |
 | 181 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
 | 182 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
 | 183 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
@@ -885,10 +884,6 @@ New in-pipeline follow-up to the merged #4584 with a decided design, so it is pi
 
 New in-pipeline issue with a live workspace, so it is pinned near the top beside PAN-4626 per the in-pipeline rule; it also offers a non-destructive path for the idle cleanup asked in PAN-1485.
 
-### PAN-4640 (rank 3)
-
-New in-pipeline issue with a live workspace, pinned just below PAN-4639 because its resurfacing rule clears the snooze and settle states that PAN-4639 adds.
-
 ### PAN-4663 (rank 4)
 
 New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.
@@ -1197,6 +1192,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 
 Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
 
+### PAN-3043 (rank 85)
+
+Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1204,10 +1203,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T06:43:27Z",
+  "generatedAt": "2026-11-01T06:45:07Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -1232,21 +1231,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "dependsOn": [],
       "why": "In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions.",
       "rationale": "New in-pipeline issue with a live workspace, so it is pinned near the top beside PAN-4626 per the in-pipeline rule; it also offers a non-destructive path for the idle cleanup asked in PAN-1485.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4640",
-      "rank": 3,
-      "size": "L",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4639"
-      ],
-      "why": "In pipeline: Overdeck-owned conversation schedules fired by a deacon-lite tick; resurfaces settled/snoozed rows (needs #4639).",
-      "rationale": "New in-pipeline issue with a live workspace, pinned just below PAN-4639 because its resurfacing rule clears the snooze and settle states that PAN-4639 adds.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3457,11 +3441,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "score": 45,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4640",
         "PAN-4639"
       ],
-      "why": "Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; waits for in-pipeline #4640 and #4639.",
-      "rationale": "New issue split from in-pipeline PAN-4640 with clear acceptance criteria; it ranks beside PAN-4653 and PAN-4655 because it becomes workable once PAN-4639 and PAN-4640 merge.",
+      "why": "Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; #4640 merged, waits on in-pipeline #4639.",
+      "rationale": "Rank held: dependency PAN-4640 closed as completed, leaving only in-pipeline PAN-4639 (snooze and settle) before this slice is workable.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13391,13 +13374,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     },
     {
       "from": "PAN-4639",
-      "to": "PAN-4640",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4639",
       "to": "PAN-1485",
       "type": "informs",
       "source": "github-ref",
@@ -13679,13 +13655,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
     {
       "from": "PAN-4645",
       "to": "PAN-4404",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4640",
-      "to": "PAN-4657",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
