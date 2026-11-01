@@ -52,3 +52,48 @@ export async function readRequestDigest(now: number = Date.now()): Promise<Reque
   const since = monthWindowStart(now);
   return buildRequestDigest(await readEventsSince(since), since);
 }
+
+export interface UsageWindow {
+  totalCost: number;
+  totalTokens: number;
+  entryCount: number;
+}
+
+export interface UsageWindows {
+  today: UsageWindow;
+  week: UsageWindow;
+  month: UsageWindow;
+}
+
+/** The three window starts `GET /api/costs/summary` uses (UTC dates). */
+export function usageWindowStarts(now: number = Date.now()): { today: string; week: string; month: string } {
+  const day = (ms: number) => new Date(ms).toISOString().split('T')[0]!;
+  return { today: day(now), week: day(now - 7 * 24 * 60 * 60 * 1000), month: day(now - MONTH_MS) };
+}
+
+/** Which windows an event at `ts` (ISO or ms) falls in. */
+export function windowsOf(ts: string | number, now: number = Date.now()): Array<keyof UsageWindows> {
+  const iso = typeof ts === 'number' ? new Date(ts).toISOString() : ts;
+  const starts = usageWindowStarts(now);
+  return (['today', 'week', 'month'] as const).filter((window) => iso >= starts[window]);
+}
+
+/** This machine's usage windows and request digest from one scan of the month window (FR-8). */
+export async function readLocalUsage(now: number = Date.now()): Promise<{ windows: UsageWindows; digest: RequestDigest }> {
+  const since = monthWindowStart(now);
+  const events = await readEventsSince(since);
+  const windows: UsageWindows = {
+    today: { totalCost: 0, totalTokens: 0, entryCount: 0 },
+    week: { totalCost: 0, totalTokens: 0, entryCount: 0 },
+    month: { totalCost: 0, totalTokens: 0, entryCount: 0 },
+  };
+  for (const event of events) {
+    const tokens = (event.input || 0) + (event.output || 0) + (event.cacheRead || 0) + (event.cacheWrite || 0);
+    for (const window of event.ts === undefined ? ['today', 'week', 'month'] as const : windowsOf(event.ts, now)) {
+      windows[window].totalCost += event.cost || 0;
+      windows[window].totalTokens += tokens;
+      windows[window].entryCount += 1;
+    }
+  }
+  return { windows, digest: buildRequestDigest(events, since) };
+}
