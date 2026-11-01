@@ -186,7 +186,11 @@ export function MobileNeedsYou({ subjectId }: { subjectId: string | null }) {
     ?? null;
 
   useEffect(() => {
-    if (subjectRow) expandedRef.current?.scrollIntoView({ block: 'start' });
+    // Scroll the list's own container: scrollIntoView also pans the page on a phone.
+    const row = expandedRef.current;
+    const scroller = row?.closest('main');
+    if (!subjectRow || !row || !scroller) return;
+    scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
   }, [subjectRow]);
 
   const now = new Date();

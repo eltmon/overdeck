@@ -72,7 +72,7 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   });
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-background">
+    <div className="flex h-full flex-col bg-background">
       <header className="flex min-h-11 items-center gap-2 border-b border-border px-2 pt-[env(safe-area-inset-top)]">
         <button type="button" onClick={onBack} className="min-h-11 min-w-11 px-2 text-sm font-medium text-foreground">
           Back

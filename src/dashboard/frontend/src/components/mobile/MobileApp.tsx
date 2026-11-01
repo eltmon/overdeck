@@ -148,7 +148,8 @@ export default function MobileApp() {
   const fullScreenConversation = route.tab === 'conversations' && route.conversationId !== null;
 
   return (
-    <div data-component="mobile-app" className="flex h-[100dvh] flex-col bg-background text-foreground">
+    // fixed: the shell never makes the document overflow, so a phone never pans or zooms the page.
+    <div data-component="mobile-app" className="fixed inset-0 flex flex-col bg-background text-foreground">
       <EventRouter />
       {sessionAuthFailed ? (
         <MobilePairScreen />
