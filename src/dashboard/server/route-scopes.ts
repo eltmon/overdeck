@@ -194,8 +194,22 @@ function pathMatches(pattern: string, pathname: string): boolean {
   return expected.every((segment, index) => (segment.startsWith(':') ? actual[index] !== '' : segment === actual[index]));
 }
 
-/** The scope a registry credential needs for `METHOD pathname`; unlisted routes need `admin`. */
+const LINKED_CONVERSATION_PREFIX = '/api/conversations/@';
+
+/**
+ * The scope a registry credential needs for `METHOD pathname`; unlisted routes need `admin`.
+ * PAN-4651 D-4651-17: a linked conversation `/api/conversations/@<machine>/<rest>`
+ * needs what `/api/conversations/<rest>` needs here, so a token's scopes reach
+ * the same surfaces on a linked machine. The proxy refuses channel callers
+ * itself (no chained hops), since this mapping lifts the old admin-only guard.
+ */
 export function requiredScopeFor(method: string, pathname: string): AccessTokenScope {
-  const row = ROUTE_SCOPES.find((entry) => entry.method === method && pathMatches(entry.path, pathname));
+  let path = pathname;
+  if (path.startsWith(LINKED_CONVERSATION_PREFIX)) {
+    const segments = path.split('/');
+    if (segments.length < 6) return 'admin';
+    path = [...segments.slice(0, 3), ...segments.slice(4)].join('/');
+  }
+  const row = ROUTE_SCOPES.find((entry) => entry.method === method && pathMatches(entry.path, path));
   return row?.scope ?? 'admin';
 }

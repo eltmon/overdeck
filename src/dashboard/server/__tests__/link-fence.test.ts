@@ -22,6 +22,7 @@ import { closeOverdeckDatabase } from '../../../lib/overdeck/infra.js';
 import { invalidateRemoteAccessConfig } from '../../../lib/remote-access/config.js';
 import type { ChannelMarker } from '../channel-peer.js';
 import { linkActorFence } from '../link-fence.js';
+import { chainedHopRefusal } from '../linked-conversation-proxy.js';
 import { remoteGateRejection } from '../remote-request-gate.js';
 import { _resetDashboardSessionTokenForTests, type DashboardCredential } from '../routes/dashboard-auth.js';
 
@@ -96,9 +97,13 @@ describe('agent fence (PAN-4650 D-4650-7)', () => {
     expect(remoteGateRejection(request('POST', '/api/conversations/x/compact', 'agent:agent-pan-1'), LINK)).toEqual({ status: 403, code: 'agent-fenced' });
   });
 
-  it('ac4: a machine credential over a channel cannot use the proxy prefix (admin only)', () => {
-    expect(remoteGateRejection(request('POST', '/api/conversations/@desk/conv-x/message', 'operator'), LINK)).toEqual({ status: 403, missingScope: 'admin' });
-    expect(remoteGateRejection(request('GET', '/api/conversations/%40desk%2Fconv-x/messages', 'operator'), LINK)).toEqual({ status: 403, missingScope: 'admin' });
+  it('ac4: a machine credential over a channel cannot use the proxy prefix (PAN-4651: the proxy refuses, no-chained-hops)', () => {
+    // PAN-4651 D-4651-17: the gate now judges the prefix by its inner route, so the
+    // proxy's own channel check is what stops a hop to a third machine.
+    expect(remoteGateRejection(request('POST', '/api/conversations/@desk/conv-x/message', 'operator'), LINK)).toBeNull();
+    expect(remoteGateRejection(request('GET', '/api/conversations/%40desk%2Fconv-x/messages', 'operator'), LINK)).toBeNull();
+    expect(chainedHopRefusal(LINK)?.status).toBe(403);
+    expect(chainedHopRefusal(null)).toBeNull();
   });
 
   it('fences agent actors from terminals, forwards and conversation writes only', () => {

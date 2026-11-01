@@ -27,6 +27,7 @@
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
+import type { AccessTokenScope } from '../../lib/access-tokens.js';
 import {
   LinkForwardTooLargeError,
   linkForward,
@@ -37,10 +38,10 @@ import {
 import { getLink, type MachineLink } from '../../lib/anywhere/link-store.js';
 import type { LinkActor } from '../../lib/anywhere/link-actor.js';
 import { isOperatorConversation } from '../../lib/terminal-backends/prompt-guard.js';
-import { channelOfRequest } from './channel-peer.js';
+import { type ChannelMarker, channelOfRequest } from './channel-peer.js';
 import { jsonResponse } from './http-helpers.js';
 import { remoteGateRejection } from './remote-request-gate.js';
-import { resolveDashboardCredential } from './routes/dashboard-auth.js';
+import { credentialScopes, type DashboardCredential, resolveDashboardCredential, resolveRequestCredential } from './routes/dashboard-auth.js';
 import { type HeaderMap, validateOriginHeaders } from './routes/origin-validation.js';
 
 const PREFIX = '/api/conversations/';
@@ -120,10 +121,15 @@ export function crossSiteWriteRefusal(headers: HeaderMap, method: string): HttpS
 
 /** Forward one admitted request for `target`; always answers. */
 export async function forwardLinkedConversationRequest(
-  input: { method: string; target: LinkedTarget; query: string; contentType?: string; sender?: string; body?: Buffer },
+  input: { method: string; target: LinkedTarget; query: string; contentType?: string; sender?: string; body?: Buffer; credential?: DashboardCredential | null },
   deps: LinkedProxyDeps = defaultDeps,
 ): Promise<HttpServerResponse.HttpServerResponse> {
-  const actor = actorForSender(input.sender);
+  // PAN-4651 D-4651-17: an `odk_` token acts as the operator, limited to its own
+  // scopes on the owner (derived from the resolved credential, never a header).
+  const tokenCeiling = input.credential?.kind === 'token'
+    ? credentialScopes(input.credential).filter((scope): scope is AccessTokenScope => scope !== 'admin') as AccessTokenScope[]
+    : null;
+  const actor = tokenCeiling ? 'operator' : actorForSender(input.sender);
   if (actor === null) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
   const link = await deps.getLink(input.target.target);
   if (!link || link.revokedAt !== null) {
@@ -137,6 +143,7 @@ export async function forwardLinkedConversationRequest(
       ...(input.contentType ? { headers: { 'content-type': input.contentType } } : {}),
       ...(input.body && input.body.length > 0 ? { body: input.body } : {}),
       actor,
+      ...(tokenCeiling ? { ceiling: tokenCeiling } : {}),
     });
     const contentType = response.headers['content-type'];
     return HttpServerResponse.uint8Array(new Uint8Array(response.body), {
@@ -152,17 +159,25 @@ export async function forwardLinkedConversationRequest(
   }
 }
 
+/** A request that arrived through a secure channel never reaches a third machine (PAN-4651 D-4651-17). */
+export function chainedHopRefusal(channel: ChannelMarker | null): HttpServerResponse.HttpServerResponse | null {
+  return channel === null
+    ? null
+    : jsonResponse({ code: 'no-chained-hops', error: 'a linked machine cannot reach a third machine through this one' }, { status: 403 });
+}
+
 export const linkedConversationProxyLayer = HttpRouter.middleware(
   (httpEffect) =>
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
       const url = new URL(request.url, 'http://localhost');
       const target = parseLinkedConversationPath(url.pathname);
+      if (!target) return yield* httpEffect;
+      // PAN-4651 D-4651-17: first, because token scopes now reach this prefix — no chained hops.
+      const chained = chainedHopRefusal(channelOfRequest(request));
+      if (chained) return chained;
       // Only requests the gate admits; the gate itself answers the rest.
-      if (!target || remoteGateRejection(request) !== null) return yield* httpEffect;
-      if (channelOfRequest(request) !== null) {
-        return jsonResponse({ error: 'a linked machine cannot reach a third machine through this one' }, { status: 403 });
-      }
+      if (remoteGateRejection(request) !== null) return yield* httpEffect;
       const refused = crossSiteWriteRefusal(request.headers as HeaderMap, request.method);
       if (refused) return refused;
       const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
@@ -173,6 +188,7 @@ export const linkedConversationProxyLayer = HttpRouter.middleware(
         query: url.search,
         contentType: header(request, 'content-type'),
         sender: header(request, SENDER_HEADER),
+        credential: resolveRequestCredential(request),
         ...(body ? { body } : {}),
       }));
     }),
