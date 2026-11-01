@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4649",
   "created": "2026-11-01T05:49:52.049Z",
-  "updated": "2026-11-01T07:20:36.582Z",
+  "updated": "2026-11-01T07:36:51.884Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
       "claimedBy": "agent-pan-4649",
       "claimedAt": "2026-11-01T07:19:34.187Z",
       "doneAt": "2026-11-01T07:20:36.582Z"
+    },
+    "approve-scope.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:36:51.883Z"
     }
   }
 }
