@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T19:17:01.834Z",
+  "updated": "2026-11-01T19:20:00.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-11-01T19:16:57.519Z"
     },
     "wi9-machines-list-load": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4651",
-      "claimedAt": "2026-11-01T19:17:01.834Z"
+      "claimedAt": "2026-11-01T19:17:01.834Z",
+      "doneAt": "2026-11-01T19:20:00.078Z"
     }
   }
 }
