@@ -9,14 +9,13 @@ import { HiddenMachinesFooter } from '../LinkedConversationRow';
 import type { ConversationMutations } from '../useConversationMutations';
 
 const setMachineHidden = vi.fn(async () => ({ status: 200, body: {} }));
-const fetchMachines = vi.fn(async () => ({
-  status: 200,
-  body: { self: {}, inbound: [], links: [{ id: 'link-desk', label: 'desk', hidden: true, state: 'online' }, { id: 'link-mini', label: 'mini', hidden: false, state: 'online' }] },
+const loadMachines = vi.fn(async () => ({
+  self: {}, inbound: [], links: [{ id: 'link-desk', label: 'desk', hidden: true, state: 'online' }, { id: 'link-mini', label: 'mini', hidden: false, state: 'online' }],
 }));
 
 vi.mock('../../Settings/anywhere/machinesApi', () => ({
   MACHINES_QUERY_KEY: ['anywhere-machines'],
-  fetchMachines: () => fetchMachines(),
+  loadMachines: () => loadMachines(),
   setMachineHidden: (id: string, hidden: boolean) => setMachineHidden(id, hidden),
 }));
 vi.mock('../../../lib/wsTransport', () => ({

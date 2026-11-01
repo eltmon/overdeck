@@ -26,8 +26,10 @@ import {
   type MachineLinkView,
   reconnectMachine,
   removeInboundMachine,
+  setShareConversations,
   unlinkMachine,
 } from './machinesApi';
+import { Toggle } from '../Shared/Toggle';
 
 const STATE_LABEL: Record<LinkState, string> = {
   online: 'Online',
@@ -245,6 +247,30 @@ function InboundRow({ inbound, onChanged }: { inbound: InboundMachineView; onCha
   );
 }
 
+/** PAN-4650 D-4: Share my conversations, under this machine's label. */
+function ShareConversationsRow({ checked, onChanged }: { checked: boolean; onChanged: () => Promise<void> }) {
+  const [saving, setSaving] = useState(false);
+  const change = async (next: boolean) => {
+    setSaving(true);
+    try {
+      const result = await setShareConversations(next);
+      if (!isOk(result)) toast.error(`Could not change sharing: ${apiError(result)}`);
+      await onChanged();
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="flex items-start justify-between gap-4 px-4 mb-3" data-testid="share-conversations">
+      <div>
+        <p className="text-xs text-foreground">Share my conversations</p>
+        <p className="text-xs text-muted-foreground">Linked machines list this machine's conversations. Turn off to hide them on the next sync.</p>
+      </div>
+      <Toggle checked={checked} onChange={(next) => void change(next)} disabled={saving} />
+    </div>
+  );
+}
+
 export function MachinesPanel() {
   const queryClient = useQueryClient();
   const [linkOpen, setLinkOpen] = useState(false);
@@ -274,6 +300,7 @@ export function MachinesPanel() {
           This machine: {data.self.label} · fingerprint <span className="font-mono">{data.self.fingerprint}</span>
         </p>
       )}
+      {data && <ShareConversationsRow checked={data.self.shareConversations} onChanged={refresh} />}
       {isLoading ? (
         <p className="text-xs text-muted-foreground px-4 py-3">Loading machines…</p>
       ) : error ? (

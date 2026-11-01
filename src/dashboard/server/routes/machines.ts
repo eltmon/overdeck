@@ -26,7 +26,9 @@ import {
   revokeAccessToken,
 } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
+import { readAnywhereSettings, writeAnywhereSettings } from '../../../lib/anywhere/anywhere-settings.js';
 import { getLink, listLinks, type MachineLink, removeLink, setLinkHidden, setLinkRoutes } from '../../../lib/anywhere/link-store.js';
+import { invalidateSharedConversations } from '../../../lib/anywhere/shared-conversations.js';
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
 import { classifyHost, parseRouteUrl } from '../../../lib/anywhere/routes.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
@@ -77,9 +79,14 @@ function inboundView(record: PublicAccessTokenRecord): InboundMachineView {
 }
 
 export async function buildMachinesResponse(): Promise<MachinesResponse> {
-  const [identity, key, links] = await Promise.all([ensureEnvironmentIdentity(), ensureMachineKey(), listLinks()]);
+  const [identity, key, links, settings] = await Promise.all([ensureEnvironmentIdentity(), ensureMachineKey(), listLinks(), readAnywhereSettings()]);
   return {
-    self: { environmentId: identity.environmentId, label: identity.label, fingerprint: machineKeyFingerprint(key.publicKey) },
+    self: {
+      environmentId: identity.environmentId,
+      label: identity.label,
+      fingerprint: machineKeyFingerprint(key.publicKey),
+      shareConversations: settings.shareConversations,
+    },
     links: links.map((link) => (statusSource ? machineLinkView(link, null, statusSource) : machineLinkView(link, null))),
     inbound: listActiveRecordsOfKind('machine').map(inboundView),
   };
@@ -316,6 +323,37 @@ const addRouteRoute = HttpRouter.add(
   }),
 );
 
+/** PAN-4650 D-4/D-4650-15: `PUT /api/machines/sharing { conversations }` turns Share my conversations on or off. */
+export async function handleSetSharing(bodyText: string): Promise<HttpServerResponse.HttpServerResponse> {
+  let conversations: unknown;
+  try {
+    conversations = (JSON.parse(bodyText || '{}') as { conversations?: unknown }).conversations;
+  } catch {
+    return jsonResponse({ error: 'body is not JSON' }, { status: 400 });
+  }
+  if (typeof conversations !== 'boolean') return jsonResponse({ error: 'body must be { conversations: boolean }' }, { status: 400 });
+  try {
+    const settings = await writeAnywhereSettings({ shareConversations: conversations });
+    // Linked machines see the change on their next heartbeat (a new list hash).
+    invalidateSharedConversations();
+    return jsonResponse({ conversations: settings.shareConversations });
+  } catch (error) {
+    return jsonResponse({ error: (error as Error).message }, { status: 500 });
+  }
+}
+
+const setSharingRoute = HttpRouter.add(
+  'PUT',
+  '/api/machines/sharing',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = refuseChannel(request) ?? rejectUnsafeDashboardMutationRequest(request);
+    if (refused) return refused;
+    const text = yield* request.text;
+    return yield* Effect.promise(() => handleSetSharing(text));
+  }),
+);
+
 /** PAN-4650 D-4650-15: `PATCH /api/machines/:id { hidden }` shows or hides a machine's conversations. */
 export async function handleSetHidden(idOrEnvOrLabel: string, bodyText: string): Promise<HttpServerResponse.HttpServerResponse> {
   const link = await getLink(idOrEnvOrLabel);
@@ -356,4 +394,4 @@ const inboundRevokeRoute = HttpRouter.add(
   }),
 );
 
-export const machinesRouteLayer = Layer.mergeAll(linkRoute, listRoute, selfRevokeRoute, unlinkRoute, reconnectRoute, addRouteRoute, setHiddenRoute, inboundRevokeRoute);
+export const machinesRouteLayer = Layer.mergeAll(linkRoute, listRoute, selfRevokeRoute, unlinkRoute, reconnectRoute, addRouteRoute, setSharingRoute, setHiddenRoute, inboundRevokeRoute);

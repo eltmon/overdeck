@@ -8,7 +8,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, EyeOff, MonitorSmartphone } from 'lucide-react';
 
-import { fetchMachines, MACHINES_QUERY_KEY, setMachineHidden } from '../Settings/anywhere/machinesApi';
+import { loadMachines, MACHINES_QUERY_KEY, setMachineHidden } from '../Settings/anywhere/machinesApi';
 import { MenuItemButton, MenuSeparator } from '../shared/ContextMenu';
 import styles from './styles/command-deck.module.css';
 
@@ -98,13 +98,13 @@ export function LinkedRowMenuItems({ conv, onCopyLink, onClose }: {
 /** "<label> conversations hidden · Show", one line per hidden machine. */
 export function HiddenMachinesFooter() {
   const queryClient = useQueryClient();
+  // Same key and query function as the Settings machines panel, so the cache holds one shape.
   const { data } = useQuery({
     queryKey: MACHINES_QUERY_KEY,
-    queryFn: fetchMachines,
+    queryFn: loadMachines,
     staleTime: 30_000,
   });
-  const body = data?.body as { links?: Array<{ id: string; label: string; hidden?: boolean; state: string }> } | null | undefined;
-  const hidden = (body?.links ?? []).filter((link) => link.hidden && link.state !== 'revoked');
+  const hidden = (data?.links ?? []).filter((link) => link.hidden && link.state !== 'revoked');
   if (hidden.length === 0) return null;
   const show = async (id: string) => {
     await setMachineHidden(id, false);

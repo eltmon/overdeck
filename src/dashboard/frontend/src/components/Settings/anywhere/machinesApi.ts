@@ -71,6 +71,15 @@ export async function reconnectMachine(id: string): Promise<ApiResult<{ ok: bool
   }));
 }
 
+/** PAN-4650 D-4: Share my conversations with linked machines (or stop). */
+export async function setShareConversations(conversations: boolean): Promise<ApiResult<{ conversations: boolean }>> {
+  return readResult(await fetch('/api/machines/sharing', {
+    method: 'PUT',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ conversations }),
+  }));
+}
+
 /** PAN-4650: Hide this machine (or show it again) in the conversation list. */
 export async function setMachineHidden(id: string, hidden: boolean): Promise<ApiResult<MachineLinkView>> {
   return readResult(await fetch(`/api/machines/${encodeURIComponent(id)}`, {

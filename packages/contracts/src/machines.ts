@@ -98,6 +98,8 @@ export const MachinesResponse = Schema.Struct({
     environmentId: Schema.String,
     label: Schema.String,
     fingerprint: Schema.String,
+    /** PAN-4650 D-4: linked machines list this machine's conversations (anywhere.json, default on). */
+    shareConversations: Schema.Boolean,
   }),
   links: Schema.Array(MachineLinkView),
   inbound: Schema.Array(InboundMachineView),

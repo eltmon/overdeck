@@ -9,7 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
 
 const { _resetLinkStoreForTests, _settleLinkStoreWritesForTests, upsertLink } = await import('../../../../lib/anywhere/link-store.js');
-const { buildMachinesResponse, handleSetHidden } = await import('../machines.js');
+const { buildMachinesResponse, handleSetHidden, handleSetSharing } = await import('../machines.js');
+const { buildSharedConversations } = await import('../../../../lib/anywhere/shared-conversations.js');
 
 const originalHome = process.env.OVERDECK_HOME;
 let home: string;
@@ -55,5 +56,16 @@ describe('Hide this machine (PAN-4650 WI-13)', () => {
     expect((await read(await handleSetHidden('nowhere', '{"hidden":true}'))).status).toBe(404);
     expect((await read(await handleSetHidden('desk', '{"hidden":"yes"}'))).status).toBe(400);
     expect((await read(await handleSetHidden('desk', 'not json'))).status).toBe(400);
+  });
+
+  it('PAN-4650 WI-15 ac3: PUT sharing writes anywhere.json; the machines view and the shared list follow it', async () => {
+    expect(((await buildMachinesResponse()) as { self: { shareConversations: boolean } }).self.shareConversations).toBe(true);
+    const turnedOff = await read(await handleSetSharing(JSON.stringify({ conversations: false })));
+    expect(turnedOff).toEqual({ status: 200, json: { conversations: false } });
+    expect(JSON.parse(await readFile(join(home, 'anywhere.json'), 'utf8'))).toEqual({ v: 1, shareConversations: false });
+    expect(((await buildMachinesResponse()) as { self: { shareConversations: boolean } }).self.shareConversations).toBe(false);
+    const shared = await buildSharedConversations({ environmentId: async () => 'env-self', listRows: async () => [] });
+    expect(shared).toMatchObject({ sharing: false, rows: [], hash: 'sharing-off' });
+    expect((await read(await handleSetSharing('{"conversations":"no"}'))).status).toBe(400);
   });
 });

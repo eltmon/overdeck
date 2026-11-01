@@ -27,7 +27,7 @@ const LAPTOP = {
   incident: { kind: 'network', durationMs: 12_000, at: '2026-11-01T11:50:00.000Z' },
 };
 const MACHINES = {
-  self: { environmentId: 'env-self', label: 'studio', fingerprint: '1111-2222-3333-4444-5555' },
+  self: { environmentId: 'env-self', label: 'studio', fingerprint: '1111-2222-3333-4444-5555', shareConversations: true },
   links: [DESK, LAPTOP],
   inbound: [{ tokenId: 'tok-9', environmentId: 'env-desk', label: 'desk', fingerprint: 'a1b2-c3d4-e5f6-0718-293a', access: 'operator', createdAt: '2026-11-01T00:00:00.000Z', lastUsedAt: '2026-11-01T11:59:00.000Z' }],
 };
@@ -63,6 +63,7 @@ describe('MachinesPanel (PAN-4645 WI-20)', () => {
       if (url === '/api/machines/link' && init?.method === 'POST') return Promise.resolve(jsonResponse(200, { ...DESK, id: 'link-3', label: 'phone-rig' }));
       if (url === '/api/anywhere/status') return Promise.resolve(jsonResponse(200, { machine: null, addresses: [], devices: { active: 0 }, vault: { state: 'off', backend: null }, problems: [], viewer: { kind: 'root-session' } }));
       if (url === '/api/devices') return Promise.resolve(jsonResponse(200, { devices: [] }));
+      if (url === '/api/machines/sharing' && init?.method === 'PUT') return Promise.resolve(jsonResponse(200, { conversations: false }));
       return Promise.resolve(jsonResponse(404, { error: 'not found' }));
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -104,6 +105,17 @@ describe('MachinesPanel (PAN-4645 WI-20)', () => {
     const dialog = await screen.findByRole('alertdialog');
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(callsWith('DELETE').map(([url]) => url)).toContain('/api/machines/inbound/tok-9'));
+  });
+
+  it('PAN-4650 WI-15: Share my conversations shows the server value and PUTs the change', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<MachinesPanel />);
+    const row = await screen.findByTestId('share-conversations');
+    const toggle = within(row).getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(row).toHaveTextContent("Linked machines list this machine's conversations. Turn off to hide them on the next sync.");
+    await user.click(toggle);
+    await waitFor(() => expect(callsWith('PUT')).toEqual([['/api/machines/sharing', expect.objectContaining({ body: JSON.stringify({ conversations: false }) })]]));
   });
 
   it('ac2: Unlink on desk sends DELETE /api/machines/link-1 after the confirm names desk', async () => {
