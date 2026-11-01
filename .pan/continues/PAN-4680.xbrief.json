@@ -1,0 +1,100 @@
+{
+  "version": "1",
+  "issueId": "PAN-4680",
+  "created": "2026-11-01T07:24:32.678Z",
+  "updated": "2026-11-01T09:35:11.058Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T09:35Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T09:35:11.058Z"
+    }
+  ],
+  "items": {
+    "serialize-appends": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4680",
+      "claimedAt": "2026-11-01T07:24:32.678Z",
+      "doneAt": "2026-11-01T08:59:17.757Z"
+    },
+    "queue-order-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4680",
+      "claimedAt": "2026-11-01T08:59:55.640Z",
+      "doneAt": "2026-11-01T09:18:40.804Z"
+    },
+    "queue-rejection-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4680",
+      "claimedAt": "2026-11-01T09:18:47.005Z",
+      "doneAt": "2026-11-01T09:22:51.017Z"
+    },
+    "docs-ledger-order": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4680",
+      "claimedAt": "2026-11-01T09:22:57.176Z",
+      "doneAt": "2026-11-01T09:24:12.600Z"
+    },
+    "serialize-appends.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:26:17.840Z"
+    },
+    "serialize-appends.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:26:50.338Z"
+    },
+    "serialize-appends.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:27:09.450Z"
+    },
+    "serialize-appends.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:27:27.873Z"
+    },
+    "queue-order-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:27:45.112Z"
+    },
+    "queue-order-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:28:03.153Z"
+    },
+    "queue-order-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:28:20.372Z"
+    },
+    "queue-order-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:28:35.421Z"
+    },
+    "queue-rejection-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:28:49.055Z"
+    },
+    "queue-rejection-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:29:03.924Z"
+    },
+    "docs-ledger-order.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:29:18.790Z"
+    },
+    "docs-ledger-order.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:29:32.950Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T09:35:11Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4680\n\nPull request: https://github.com/eltmon/overdeck/pull/4703 (head `e25f2a67`)\n\nSource: check_run:test-shard (2/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (2/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124809203000/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41293416954/job/124809203000  \n```\nhe latest test that might've caused the error is \"keeps a pressured second request waiting until slot 0 frees and pressure clears\". It might mean one of the following:\n- The error was thrown, while Vitest was running this test.\n- If the error occurred after the test had been completed, this was the last documented test before it was thrown.\n\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.0\nTemporarily overriding HOME='/home/runner/work/_temp/365e3e95-713a-43c2-8c73-adbd43dadee9' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}
