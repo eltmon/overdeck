@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4330",
   "created": "2026-11-01T04:59:32.820Z",
-  "updated": "2026-11-01T07:45:14.948Z",
+  "updated": "2026-11-01T07:55:04.889Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -195,5 +195,6 @@
       "status": "completed",
       "doneAt": "2026-11-01T07:45:14.948Z"
     }
-  }
+  },
+  "feedback": []
 }
