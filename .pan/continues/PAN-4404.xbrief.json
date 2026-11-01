@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T14:35:35.501Z",
+  "updated": "2026-11-01T14:35:51.981Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -198,6 +198,14 @@
     "wi7-ssh-machine-service.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:35:35.501Z"
+    },
+    "wi7-ssh-machine-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:35:49.994Z"
+    },
+    "wi8-ssh-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:35:51.981Z"
     }
   }
 }
