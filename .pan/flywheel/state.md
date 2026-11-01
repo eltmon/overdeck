@@ -367,3 +367,10 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   without it. The review context ingests CodeRabbit only at review start, so
   check for newer coderabbitai[bot] inline comments before every merge
   (PAN-4671, needs-handoff). Missed findings on #4662/#4637 → PAN-4672.
+- 2026-11-01 06:35 UTC: PAN-4675 (needs-handoff). A `gh` network timeout in
+  `addLabel` (`merge-agent.ts` ~line 500, `Effect.promise`) aborted
+  PAN-4299's post-merge lifecycle after the merge door had merged it; the
+  door then answers "Already merged". Instance recovery: `pan kill <id>`
+  (stops agent and stack), then `pan close <id> --force` passed with no
+  override. `pan close` blocks on a confirmation prompt: always pass
+  `--force` and `< /dev/null` from the loop.
