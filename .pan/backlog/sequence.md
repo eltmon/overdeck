@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T05:56:04Z · model: claude-opus-5-5 · open: 863_
+_Last sequenced: 2026-11-01T05:59:23Z · model: claude-opus-5-5 · open: 862_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -153,7 +153,6 @@ _Last sequenced: 2026-11-01T05:56:04Z · model: claude-opus-5-5 · open: 863_
 | 157 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
 | 158 | PAN-4487 | XS | high | ok |  |  | cleanAgentState whitelist drops foreman, modelSpawnKey, workspaceId on every state.json write; add fields + round-trip test |
 | 159 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
-| 160 | PAN-4299 | S | high | ok |  |  | Traefik binds 80/443/8080 on all interfaces; a LAN client can mint a dashboard session (PTY access) via forged Host header |
 | 161 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
 | 162 | PAN-3120 | S | high | ok |  |  | A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo. |
 | 163 | PAN-4349 | S | high | ok |  |  | Agent-side GitHub reads prefer REST over GraphQL gh --json until PAN-4302 meters callers; protects the hourly quota |
@@ -1198,10 +1197,10 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T05:56:04Z",
+  "generatedAt": "2026-11-01T05:59:23Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 863,
+  "openCount": 862,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -3089,19 +3088,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "condition": "ok",
       "dependsOn": [],
       "why": "Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4299",
-      "rank": 160,
-      "size": "S",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Traefik binds 80/443/8080 on all interfaces; a LAN client can mint a dashboard session (PTY access) via forged Host header",
-      "rationale": "New since the prior run: a LAN-reachable session mint grants every cookie-gated route and /ws/terminal PTY access, so it ranks beside the other high-importance containment fixes (PAN-3129, PAN-3130); the fix is a small template change plus a LAN opt-in check.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13518,13 +13504,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     {
       "from": "PAN-2350",
       "to": "PAN-4628",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4299",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
