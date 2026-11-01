@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4402",
   "created": "2026-11-01T05:03:16.844Z",
-  "updated": "2026-11-01T05:42:17.931Z",
+  "updated": "2026-11-01T05:42:35.460Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "connect-window.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T05:42:17.931Z"
+    },
+    "connect-window.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:42:35.460Z"
     }
   }
 }
