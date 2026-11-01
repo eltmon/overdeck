@@ -197,6 +197,7 @@ async function provisionAndLink(input: AddFlyMachineInput, deps: FlyMachineServi
         label: `fly-${createdMachine.machineId}`,
         projectKey: input.projectKey ?? null,
         docker: false,
+        codexAuthPath: null,
         createdAt: deps.now(),
       });
       release(); // the record counts toward the cap from here on

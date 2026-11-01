@@ -87,7 +87,7 @@ describe('addFlyMachine (PAN-4652 WI-8)', () => {
     expect(result.link).toBe(VIEW);
     expect(await listFlyMachines()).toEqual([{
       id: 'rec-1', linkId: 'link-1', environmentId: ENV_ID, machineId: VM.machineId, machineName: VM.machineName,
-      appName: 'overdeck-ws', region: 'iad', label: 'fly-148e21ea7e1689', projectKey: 'overdeck', docker: true,
+      appName: 'overdeck-ws', region: 'iad', label: 'fly-148e21ea7e1689', projectKey: 'overdeck', docker: true, codexAuthPath: null,
       createdAt: '2026-11-01T00:00:00.000Z',
     }]);
     expect(result.record.linkId).toBe('link-1');
@@ -182,7 +182,7 @@ describe('removeFlyMachineForLink (PAN-4652 WI-8)', () => {
   beforeEach(async () => {
     await upsertFlyMachine({
       id: 'rec-1', linkId: 'link-1', environmentId: ENV_ID, machineId: VM.machineId, machineName: VM.machineName,
-      appName: 'overdeck-ws', region: 'iad', label: VM.label, projectKey: null, docker: false, createdAt: '2026-11-01T00:00:00.000Z',
+      appName: 'overdeck-ws', region: 'iad', label: VM.label, projectKey: null, docker: false, codexAuthPath: null, createdAt: '2026-11-01T00:00:00.000Z',
     });
   });
 

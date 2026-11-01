@@ -5,7 +5,8 @@
  * record per Fly VM this server provisioned as a linked machine — the Fly app,
  * machine id and region, the id of the machine link it carries, the VM's
  * environment id, its `fly-<machineId>` label, the project it was started for,
- * and whether Docker came up on it.
+ * whether Docker came up on it, and where the VM keeps its Codex sign-in when
+ * Codex was prepared there (PAN-4296; a record written before that reads as null).
  *
  * The write path copies `ssh/machine-store.ts`: mode 0600, temp file in the same
  * directory then rename, and an in-process write queue. Each read-modify-write
@@ -43,6 +44,8 @@ export interface FlyMachineRecord {
   label: string;
   projectKey: string | null;
   docker: boolean;
+  /** `$HOME/.codex/auth.json` on the VM when Codex was prepared (PAN-4296); null otherwise. */
+  codexAuthPath: string | null;
   createdAt: string;
 }
 
@@ -76,6 +79,7 @@ function isRecord(value: unknown): value is FlyMachineRecord {
     isText(r.label) &&
     isNullableText(r.projectKey) &&
     typeof r.docker === 'boolean' &&
+    (r.codexAuthPath === undefined || isNullableText(r.codexAuthPath)) &&
     typeof r.createdAt === 'string'
   );
 }
@@ -93,7 +97,8 @@ function parseMachines(raw: string, path: string): FlyMachineRecord[] {
   if (typeof file !== 'object' || file === null || file.v !== 1 || !Array.isArray(file.machines) || !file.machines.every(isRecord)) {
     throw new Error(`Fly machine store ${path} has an unexpected shape`);
   }
-  return file.machines;
+  // Records written before PAN-4296 have no codexAuthPath; callers always see the field.
+  return file.machines.map((record) => ({ ...record, codexAuthPath: record.codexAuthPath ?? null }));
 }
 
 function readFailure(error: unknown, path: string): never {
