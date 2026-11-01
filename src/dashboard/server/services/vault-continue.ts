@@ -37,6 +37,7 @@ import { readCwdState } from '../../../lib/vault/cwd-state.js';
 import { isPathUnder } from '../../../lib/vault/exclude.js';
 import { isTombstone, readSessionRecord, refName, type SessionRecord } from '../../../lib/vault/format.js';
 import { openVaultContext, type OpenVault } from '../../../lib/vault/open.js';
+import { isResumableHarness } from '../../../lib/vault/resumable.js';
 import { applyWipSnapshot, findLatestWip, isWipPresent, type WipApplyResult } from '../../../lib/vault/wip-apply.js';
 import { performWorkspaceCreate, resolveWorkspaceCreateIntent } from '../../../lib/workspaces/create.js';
 import { enqueueVaultOperation, vaultUnavailableMessage } from './vault-service.js';
@@ -140,10 +141,6 @@ export function ownerToken(environmentId: string): string {
   return createHash('sha256').update(environmentId).digest('hex').slice(0, 16);
 }
 
-function isResumable(harness: string): harness is 'claude-code' | 'codex' {
-  return harness === 'claude-code' || harness === 'codex';
-}
-
 const notFound = (vaultId: string): Outcome => ({ status: 404, body: { error: `No saved conversation matches ${vaultId.slice(0, 8)}.` } });
 const conflict = (code: string, error: string, extra: Record<string, unknown> = {}): Outcome => ({ status: 409, body: { code, error, ...extra } });
 
@@ -191,7 +188,7 @@ export async function previewContinue(vaultId: string, overrides: Partial<VaultC
     vaultId,
     title: record.title,
     harness: record.harness,
-    resumable: isResumable(record.harness),
+    resumable: isResumableHarness(record.harness),
     ownerLabel: record.owner.label,
     ownerToken: ownerToken(record.owner.environmentId),
     ownedHere: record.owner.environmentId === me.environmentId,
@@ -280,7 +277,7 @@ async function runContinue(vaultId: string, body: ContinueBody, deps: VaultConti
   if (!record) return notFound(vaultId);
   const id8 = vaultId.slice(0, 8);
   const harness = record.harness;
-  if (!isResumable(harness)) {
+  if (!isResumableHarness(harness)) {
     return { status: 400, body: { error: `${harness} has no native resume. Run: pan vault resume ${id8}` } };
   }
   const me = await deps.ensureEnvironmentIdentity();

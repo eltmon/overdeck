@@ -4,7 +4,7 @@
  * Server side: `GET /api/machines/heartbeat` (machine credential only) is a
  * `text/event-stream` with one `heartbeat` event at once, one every 15 s and one
  * right after an event-loop stall of 2 s or more. Data:
- * `{ seq, lastStall: { durationMs, endedAgoMs } | null, endpointsHash, serverVersion }`.
+ * `{ seq, lastStall: { durationMs, endedAgoMs } | null, endpointsHash, serverVersion, conversationsHash? }`.
  * Client side: `openHeartbeatOverChannel` sends the request through a secure
  * channel and parses the events; the supervisor consumes them. Both halves share
  * the payload shape and the pure SSE parser here.
@@ -25,13 +25,21 @@ export interface HeartbeatPayload {
   /** SHA-256 (first 16 hex) of this machine's advertised endpoint URLs; '' until WI-19 fills it. */
   endpointsHash: string;
   serverVersion: string;
+  /** PAN-4650 D-4650-2: hash of this machine's shared conversation list; absent from older peers. */
+  conversationsHash?: string;
 }
 
 let endpointsHashSource: () => string = () => '';
+let conversationsHashSource: (() => Promise<string>) | null = null;
 
 /** WI-19 registers the endpoint advertiser's hash here. */
 export function setHeartbeatEndpointsHashSource(source: (() => string) | null): void {
   endpointsHashSource = source ?? (() => '');
+}
+
+/** PAN-4650 registers the shared conversation list's hash here; null leaves it out. */
+export function setHeartbeatConversationsHashSource(source: (() => Promise<string>) | null): void {
+  conversationsHashSource = source;
 }
 
 /** One heartbeat payload. Pure apart from the stall record and hash sources. */
@@ -53,9 +61,21 @@ export function startHeartbeatSource(
   deps: { setInterval?: typeof setInterval; clearInterval?: typeof clearInterval; onStall?: typeof onEventLoopStall } = {},
 ): { stop: () => void } {
   let seq = 0;
+  let stopped = false;
   const send = (): void => {
     seq += 1;
-    emit(encodeHeartbeatEvent(heartbeatPayload(seq, serverVersion)));
+    const payload = heartbeatPayload(seq, serverVersion);
+    const hashSource = conversationsHashSource;
+    if (!hashSource) {
+      emit(encodeHeartbeatEvent(payload));
+      return;
+    }
+    // A failed list build still sends the heartbeat, just without the hash.
+    void hashSource()
+      .then((conversationsHash): HeartbeatPayload => ({ ...payload, conversationsHash }), () => payload)
+      .then((full) => {
+        if (!stopped) emit(encodeHeartbeatEvent(full));
+      });
   };
   send();
   const schedule = deps.setInterval ?? setInterval;
@@ -64,6 +84,7 @@ export function startHeartbeatSource(
   const unsubscribe = (deps.onStall ?? onEventLoopStall)(() => send());
   return {
     stop: () => {
+      stopped = true;
       (deps.clearInterval ?? clearInterval)(timer);
       unsubscribe();
     },

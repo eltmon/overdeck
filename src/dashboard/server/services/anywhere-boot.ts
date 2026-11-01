@@ -12,10 +12,11 @@ import { defaultDiscoverDeps, EndpointAdvertiser, setAdvertisedEndpointsSource }
 import { setLinkRouteSource, linkFetch, closeLinkAgent } from '../../../lib/anywhere/link-client.js';
 import { MACHINE_LINKS_REFRESH_MS, startLinkStoreRefresh, stopLinkStoreRefresh } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey } from '../../../lib/anywhere/machine-key.js';
+import { sharedConversationsHashForHeartbeat } from '../../../lib/anywhere/shared-conversations.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { setLinkStatusSource, setPeerUnlinkNotifier } from '../routes/machines.js';
 import { getOverdeckVersion } from '../routes/misc/shared.js';
-import { setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
+import { setHeartbeatConversationsHashSource, setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
 
 let supervisor: LinkSupervisor | null = null;
@@ -42,6 +43,7 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   advertiser = new EndpointAdvertiser(defaultDiscoverDeps(dashboardPort(), environmentId));
   setAdvertisedEndpointsSource(() => advertiser?.current() ?? []);
   setHeartbeatEndpointsHashSource(() => advertiser?.hash() ?? '');
+  setHeartbeatConversationsHashSource(sharedConversationsHashForHeartbeat);
   await advertiser.start();
 
   supervisor = new LinkSupervisor(defaultLinkSupervisorDeps(await getOverdeckVersion()));
@@ -71,6 +73,7 @@ export function stopAnywhere(): void {
   advertiser = null;
   setAdvertisedEndpointsSource(null);
   setHeartbeatEndpointsHashSource(null);
+  setHeartbeatConversationsHashSource(null);
   setLinkStatusSource(null);
   setLinkRouteSource(null);
   setPeerUnlinkNotifier(null);
