@@ -35,6 +35,7 @@ export const COST_ISSUE_ROLLUP_V1_OBJECTS = [
   'cost_issue_rollup',
   'cost_issue_rollup_key_idx_v1',
   'cost_issue_rollup_ai_v1',
+  'cost_issue_rollup_au_v1',
 ] as const;
 
 /** The grain aggregate over `cost_events`; the backfill source and the test oracle. */
@@ -65,6 +66,51 @@ const ROLLUP_TRIGGERS_SQL: Array<{ name: string; sql: string }> = [
   {
     name: 'cost_issue_rollup_ai_v1',
     sql: `CREATE TRIGGER \`cost_issue_rollup_ai_v1\` AFTER INSERT ON \`cost_events\` BEGIN
+  INSERT INTO cost_issue_rollup (issue_key, model, session_type, provider, last_ts)
+    SELECT UPPER(NEW.issue_id), NEW.model, NEW.session_type, NEW.provider, NEW.ts
+    WHERE NOT EXISTS (SELECT 1 FROM cost_issue_rollup
+      WHERE issue_key IS UPPER(NEW.issue_id) AND model IS NEW.model
+        AND session_type IS NEW.session_type AND provider IS NEW.provider);
+  UPDATE cost_issue_rollup SET
+    calls = calls + 1,
+    cost = cost + COALESCE(NEW.cost, 0),
+    input = input + COALESCE(NEW.input, 0),
+    output = output + COALESCE(NEW.output, 0),
+    cache_read = cache_read + COALESCE(NEW.cache_read, 0),
+    cache_write = cache_write + COALESCE(NEW.cache_write, 0),
+    tokens = tokens + COALESCE(NEW.input + NEW.output + NEW.cache_read + NEW.cache_write, 0),
+    last_ts = MAX(last_ts, NEW.ts)
+  WHERE issue_key IS UPPER(NEW.issue_id) AND model IS NEW.model
+    AND session_type IS NEW.session_type AND provider IS NEW.provider;
+END`,
+  },
+  {
+    // Moves a row's contribution from its OLD grain to its NEW grain. An emptied
+    // grain row is deleted; when the newest row leaves a grain that keeps rows,
+    // last_ts is recomputed (AFTER trigger, so the scan sees the updated table).
+    name: 'cost_issue_rollup_au_v1',
+    sql: `CREATE TRIGGER \`cost_issue_rollup_au_v1\`
+AFTER UPDATE OF ts, issue_id, model, session_type, provider, cost, input, output, cache_read, cache_write
+ON \`cost_events\` BEGIN
+  UPDATE cost_issue_rollup SET
+    calls = calls - 1,
+    cost = cost - COALESCE(OLD.cost, 0),
+    input = input - COALESCE(OLD.input, 0),
+    output = output - COALESCE(OLD.output, 0),
+    cache_read = cache_read - COALESCE(OLD.cache_read, 0),
+    cache_write = cache_write - COALESCE(OLD.cache_write, 0),
+    tokens = tokens - COALESCE(OLD.input + OLD.output + OLD.cache_read + OLD.cache_write, 0)
+  WHERE issue_key IS UPPER(OLD.issue_id) AND model IS OLD.model
+    AND session_type IS OLD.session_type AND provider IS OLD.provider;
+  DELETE FROM cost_issue_rollup
+  WHERE calls <= 0 AND issue_key IS UPPER(OLD.issue_id) AND model IS OLD.model
+    AND session_type IS OLD.session_type AND provider IS OLD.provider;
+  UPDATE cost_issue_rollup SET last_ts = (
+      SELECT MAX(ts) FROM cost_events
+      WHERE UPPER(issue_id) IS UPPER(OLD.issue_id) AND model IS OLD.model
+        AND session_type IS OLD.session_type AND provider IS OLD.provider)
+  WHERE last_ts = OLD.ts AND issue_key IS UPPER(OLD.issue_id) AND model IS OLD.model
+    AND session_type IS OLD.session_type AND provider IS OLD.provider;
   INSERT INTO cost_issue_rollup (issue_key, model, session_type, provider, last_ts)
     SELECT UPPER(NEW.issue_id), NEW.model, NEW.session_type, NEW.provider, NEW.ts
     WHERE NOT EXISTS (SELECT 1 FROM cost_issue_rollup
