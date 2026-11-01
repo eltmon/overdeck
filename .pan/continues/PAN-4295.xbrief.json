@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4295",
   "created": "2026-11-01T05:48:47.966Z",
-  "updated": "2026-11-01T08:13:00.702Z",
+  "updated": "2026-11-01T08:13:23.926Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,10 @@
     "restore-credential-refresh.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T08:13:00.702Z"
+    },
+    "restore-credential-refresh.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:13:23.926Z"
     }
   }
 }
