@@ -1,0 +1,1253 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T04:52:58Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4641: Let the operator queue a message that sends when rate limits reset",
+    "updated": "2026-11-01T05:00:24.720Z"
+  },
+  "plan": {
+    "id": "pan-4641",
+    "title": "Let the operator queue a message that sends when rate limits reset",
+    "status": "running",
+    "uid": "50de3005-3cbd-4972-a348-44166961bfe6",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T04:52:58Z",
+    "updated": "2026-11-01T05:00:24.720Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4641",
+        "label": "PAN-4641",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4641.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "composer",
+      "rate-limits",
+      "scheduling",
+      "cli",
+      "dashboard"
+    ],
+    "metadata": {
+      "sizeJustification": "One feature whose eight acceptance criteria span the composer, a new overdeck.db table and door, a delivery tick and two CLI verbs, all over one table and one HTTP contract. Every item is a vertical slice with its own tests, and the DAG lets the lib parsers, the store, both CLI items and the frontend items run in parallel lanes. A sibling split would put the table and API contract in one issue and every consumer in others, and no sibling except the CLI one could verify an issue AC on its own. The subsystem count is inflated by the metric counting each doc and skill path separately.",
+      "canonicalFilename": "2026-11-01-PAN-4641-let-the-operator-queue-a-message-that-sends-when-rate-limits-reset.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "When a Claude Code conversation hits a usage limit, the operator cannot send anything useful until the window resets, sometimes hours later. Overdeck detects that the last turn is an API error (PAN-4222) but stores no reset time, the composer's held/failed outbox lives only in the browser tab, and the Deacon's API-error recovery covers pipeline agents only. Nothing on the server can hold an operator message and send it when the limit clears.",
+      "Proposal": "Parse the reset time from the Claude Code transcript (quotaLimits.resetsAt seconds, then the 'resets 9am (America/New_York)' text, else a 15-minute fallback probe). Store scheduled messages in a new overdeck.db table conversation_scheduled_messages behind one door. A dashboard-process patrol (PAN-4451 blocker-wake shape: peer skip, Deacon-freeze skip, kill switch OVERDECK_DISABLE_SCHEDULED_MESSAGES) runs every 60 s and acts only on each conversation's head row: when due and not limited it resumes an ended session, defers on a blocking choice menu, and calls the existing delivery door handleConversationMessage; later ticks read the transcript to confirm delivery or re-arm on a second limit. HTTP routes GET/POST /api/conversations/:name/scheduled-messages and PATCH/DELETE …/:id back a composer 'When limits reset' option, a limit notice with a 'Send when limits reset' button, and dimmed timeline rows with Edit and Cancel. The CLI gains pan tell --when-limit-resets and pan conv pending through the same door.",
+      "NonGoals": "- No reset-time parsing or scheduling for Codex, Pi, Kimi, ACP, OpenCode or Muse conversations (#2333, #2065); those harnesses are refused with limit-detection-unsupported.\n- No account usage/headroom panel or per-account window state (#2065).\n- No spacing of deliveries across conversations that wait on the same account.\n- No inbox snooze/settle/resurface mechanics (#4639).\n- No scheduling for agent panes (POST /api/agents/:id/message) or pipeline agents (#675).\n- No 'Send now' action on a scheduled row.\n- No change to checkApiErrorAgents or any deacon-lite routine; the tick does not run in the deacon child.\n- No change to src/dashboard/server/routes/conversations.ts (over the file-size ceiling).\n- No reconciliation of the browser failed-send outbox (#3121).\n- No deliverAs/steer for scheduled messages; pan tell --steer --when-limit-resets is refused.\n- No automatic re-paste of a row whose delivery outcome is unknown."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The delivery tick runs in the dashboard process as a patrol host (blocker-wake-patrol shape), not as a deacon-lite routine in the deacon child.",
+        "rationale": "The deacon child lacks the dashboard's conversation delivery dependencies; PAN-4451 set this precedent and it still honors the Deacon freeze and the 60 s deacon cadence the issue's AC names."
+      },
+      {
+        "summary": "Only Claude Code conversations (transcriptKind 'claude-jsonl') can schedule; other harnesses are refused with code limit-detection-unsupported.",
+        "rationale": "Only Claude Code transcripts carry a reset time Overdeck reads today (quotaLimits.resetsAt, verified on real records); refusing beats delivering blindly into a still-limited session. Codex parsing belongs with #2333/#2065."
+      },
+      {
+        "summary": "Reset-time precedence: quotaLimits.resetsAt (unix seconds) → 'resets …' message text → 15-minute fallback probe; not_before adds a 60 s grace to a known reset.",
+        "rationale": "Matches the issue's 'most precise source first' rule; the grace avoids sending at the exact reset second."
+      },
+      {
+        "summary": "Scheduled messages have no deliverAs column and are always a plain submit.",
+        "rationale": "Steer is meaningless once the turn ended on a limit error, and follow_up is Pi-only, which this issue does not support."
+      },
+      {
+        "summary": "Attachments are stored inside the message text as the composer's @<serverPath> lines.",
+        "rationale": "The delivery door already extracts attachment paths from the text, so storing the composed text stores the attachments with no new column."
+      },
+      {
+        "summary": "The tick calls handleConversationResume and handleConversationMessage directly, not over HTTP and not through withConversationMessageReceipt.",
+        "rationale": "The receipt cache replays a 409 for 24 h; idempotency comes from the row's atomic pending→sending claim."
+      },
+      {
+        "summary": "At-most-once delivery: rows left in 'sending' after a crash become 'unknown', and 5xx/thrown deliveries become 'unknown'; neither is re-pasted automatically.",
+        "rationale": "A duplicate operator message is worse than a visible 'Delivery not confirmed' row the operator can dismiss."
+      },
+      {
+        "summary": "Ordering is per conversation by id; only the head row is acted on, and a failed or unknown head blocks later rows until dismissed.",
+        "rationale": "Satisfies the queue-order AC without guessing whether later messages depend on a failed earlier one."
+      },
+      {
+        "summary": "Delivery-door response taxonomy: 2xx → sent; 409 → back to pending; other 4xx → failed; 5xx/throw → unknown.",
+        "rationale": "409s (permission prompt, input target) are transient; other 4xx are deterministic; 5xx cannot prove delivery."
+      },
+      {
+        "summary": "Outcome check: a newer non-error assistant record confirms delivery; a newer usage-limit error re-arms with attempts+1; no newer record after 10 minutes counts as delivered.",
+        "rationale": "Pins the re-arm-on-second-limit AC to transcript evidence without risking a double paste."
+      },
+      {
+        "summary": "Retries are capped at MAX_SCHEDULED_ATTEMPTS = 24 counted re-arms; then the row becomes failed.",
+        "rationale": "Bounds the 15-minute fallback probe for providers that never report a reset time."
+      },
+      {
+        "summary": "Inbox resurfacing (#4639) is not built; delivery's new user record already advances lastActivityAt so the row moves up the recency-sorted list.",
+        "rationale": "#4639 is open; this issue emits the activity entry and relies on existing recency ordering."
+      },
+      {
+        "summary": "Archived conversations are skipped by the tick; their rows stay pending until unarchived.",
+        "rationale": "Archiving means the operator hid the conversation; delivering into it would surprise them."
+      },
+      {
+        "summary": "Code uses the term 'scheduled message'; the CLI verb stays 'pan conv pending' as the issue specifies.",
+        "rationale": "'pending' already names composer optimistic bubbles and pendingInput in this codebase."
+      },
+      {
+        "summary": "Ship as one issue with plan.metadata.sizeJustification instead of sibling issues.",
+        "rationale": "All eight issue ACs depend on one table and one API; the items are vertical slices with a parallel-friendly DAG."
+      },
+      {
+        "summary": "Scheduling is refused for text starting with /pan, vault browse copies, empty text, text over 50 000 chars, and a 21st undelivered row.",
+        "rationale": "Portable /pan commands run on the dashboard and are never rate-limited; the other limits mirror the message route and keep the queue bounded."
+      }
+    ],
+    "items": [
+      {
+        "id": "reset-text-parser",
+        "title": "Parse the reset instant from a Claude Code limit message",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/limit-reset-text.ts",
+            "src/lib/overdeck/__tests__/limit-reset-text.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/limit-reset-text.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "limit-reset-text.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create the pure function parseLimitResetText(text, at) in src/lib/overdeck/limit-reset-text.ts using the regex, zone validation, wall-time-to-UTC offset algorithm and next-occurrence rule written in the PRD, with the five named test cases."
+        },
+        "items": [
+          {
+            "id": "reset-text-parser.ac1",
+            "title": "Given 'resets Oct 1, 3pm (America/New_York)' and at=2026-09-24T12:00:00Z, parseLimitResetText returns '2026-10-01T19:00:00.000Z'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reset-text-parser.ac2",
+            "title": "Given 'resets 9am (America/New_York)' and at=2026-08-31T20:00:00Z, it returns the next-day instant '2026-09-01T13:00:00.000Z'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reset-text-parser.ac3",
+            "title": "Given an invalid zone '(Mars/Base)' with TZ=UTC, it falls back to the process zone and returns 09:00Z for 'resets 9am'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reset-text-parser.ac4",
+            "title": "Given 'API Error: Request rejected (429) · Provider returned error', it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider-error-usage-limit",
+        "title": "Add usageLimit to the transcript provider error",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-provider-error.ts",
+            "src/lib/overdeck/__tests__/conversation-provider-error.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-provider-error.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-provider-error.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add the ConversationUsageLimit interface and the usageLimit field to ConversationProviderError; classify error=rate_limit or apiErrorStatus=429 as a usage limit; take resetsAt from quotaLimits.resetsAt seconds, else parseLimitResetText, else null; window from quotaLimits.rateLimitType. Add usageLimit: null to the existing exact toEqual assertion."
+        },
+        "items": [
+          {
+            "id": "provider-error-usage-limit.ac1",
+            "title": "Given a record with quotaLimits {resetsAt: 1788354000, rateLimitType: 'five_hour'}, providerErrorFromTranscriptTail returns usageLimit {resetsAt: '2026-09-02T13:00:00.000Z', window: 'five_hour', source: 'quota-limits'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-error-usage-limit.ac2",
+            "title": "Given a 429 record without quotaLimits whose text is 'resets 9am (America/New_York)', it returns usageLimit.source 'message-text' with a non-null resetsAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-error-usage-limit.ac3",
+            "title": "Given the proxied 429 'Request rejected (429) · Provider returned error', it returns usageLimit {resetsAt: null, window: null, source: null}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-error-usage-limit.ac4",
+            "title": "Given a 400 billing error record, it returns usageLimit: null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "usage-limit-state",
+        "title": "Read a conversation's limit state and post-delivery outcome",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-usage-limit.ts",
+            "src/lib/overdeck/__tests__/conversation-usage-limit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-usage-limit.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-usage-limit.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/lib/overdeck/conversation-usage-limit.ts with conversationSupportsScheduledMessages, readConversationUsageLimit, deliveryOutcomeFromTranscriptTail and readDeliveryOutcome, all reads async, every I/O seam injectable."
+        },
+        "items": [
+          {
+            "id": "usage-limit-state.ac1",
+            "title": "Given a transcript ending in a five_hour limit error and now before resetsAt, readConversationUsageLimit returns limited: true with that resetsAt; with now after resetsAt it returns limited: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "usage-limit-state.ac2",
+            "title": "Given a transcript whose last main-chain record is a normal assistant reply, or a codex conversation, readConversationUsageLimit returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "usage-limit-state.ac3",
+            "title": "Given records newer than sentAtMs, deliveryOutcomeFromTranscriptTail returns 'limited-again' for a newer limit error, 'confirmed' for a newer non-error assistant record, and 'waiting' for only a newer user record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "usage-limit-state.ac4",
+            "title": "Given a newer sidechain limit record or only records older than sentAtMs, deliveryOutcomeFromTranscriptTail returns 'waiting'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scheduled-store",
+        "title": "Add the conversation_scheduled_messages table and its door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4641",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "scheduled-routes",
+            "delivery-tick",
+            "cli-tell-when-limit-resets",
+            "cli-conv-pending"
+          ],
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/conversation-scheduled-messages.ts",
+            "src/lib/overdeck/__tests__/conversation-scheduled-messages.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-scheduled-messages.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "conversation-scheduled-messages.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-10",
+            "FR-13",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "It owns its four files exclusively (init SQL, the infra.ts top-up lines, the new door and its test); no other item edits them, and its consumers wait on it through blocks edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add the table and index to the init migration and as CREATE … IF NOT EXISTS top-ups in ensureRuntimeIndexesSync; create the door src/lib/overdeck/conversation-scheduled-messages.ts with exactly the exported constants, types and functions listed in the PRD (schedule with its validation order, list, due-work listing, head, atomic claim, sent/delivered/pending/re-arm/fail transitions, crash recovery, edit, cancel, prune)."
+        },
+        "items": [
+          {
+            "id": "scheduled-store.ac1",
+            "title": "Given a scheduled row, when the test calls closeOverdeckDatabase() and reopens the database, listScheduledMessages still returns the row (survives restart)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduled-store.ac2",
+            "title": "scheduleConversationMessage rejects a codex conversation with code limit-detection-unsupported, '/pan status' with command-not-schedulable, and the 21st undelivered row with queue-full",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduled-store.ac3",
+            "title": "computeNotBefore returns resetsAt+60000 for a known future reset, now+900000 with resetSource 'fallback' for an unknown reset, and now with resetSource null when not limited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduled-store.ac4",
+            "title": "When claimScheduledMessage is called twice for the same pending row, the first returns true and the second returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduled-store.ac5",
+            "title": "cancelScheduledMessage returns already-sent for a sent row, editScheduledMessage returns not-editable for a non-pending row, and recoverInterruptedScheduledMessages turns a sending row into unknown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scheduled-routes",
+        "title": "Expose scheduled messages over HTTP",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversation-scheduled-messages.ts",
+            "src/dashboard/server/routes/__tests__/conversation-scheduled-messages-route.test.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-scheduled-messages-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the route, no-loss-matrix and route-scopes tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create the route module shaped like conversation-bookmarks.ts with GET/POST /api/conversations/:name/scheduled-messages and PATCH/DELETE …/:id and the status codes in the PRD table; register the layer in server.ts; add ROUTE_SCOPES rows (GET read:conversations, others tell) and four no-loss-matrix rows."
+        },
+        "items": [
+          {
+            "id": "scheduled-routes.ac1",
+            "title": "POST /api/conversations/:name/scheduled-messages with {message:'hi'} on a claude-code conversation returns 201, and a following GET returns supported: true and lists the row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduled-routes.ac2",
+            "title": "POST on a codex conversation returns 422 with code limit-detection-unsupported; PATCH on a sent row returns 409 not-editable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduled-routes.ac3",
+            "title": "DELETE …/:id returns 200 {removed: true}, then a second DELETE returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduled-routes.ac4",
+            "title": "no-loss-matrix.test.ts and route-scopes.test.ts pass with the four new routes enumerated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delivery-tick",
+        "title": "Deliver due scheduled messages in order and re-arm on a second limit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4641",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "patrol-host",
+            "docs"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/scheduled-message-delivery.ts",
+            "src/lib/overdeck/__tests__/scheduled-message-delivery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/scheduled-message-delivery.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "scheduled-message-delivery.test.ts passes under fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "FR-14",
+            "NFR-1",
+            "NFR-2",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "It creates two new files that no other item edits; it only imports the store and usage-limit modules, which it waits on through blocks edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Create tickScheduledMessages(deps) and decodeDoorResponse in src/lib/overdeck/scheduled-message-delivery.ts implementing the per-tick algorithm in the PRD step by step: prune; per conversation act on the head row only; outcome check for sent rows; skip until not_before; re-arm without delivering while still limited; claim; resume an ended or dead session; defer on a blocking choice menu; call the delivery door and apply the 2xx/409/4xx/5xx taxonomy; emit activity entries. Default deps call handleConversationResume and handleConversationMessage directly. Implementation checkpoint: if those imports trip lint:circular, make resume and deliver required deps and wire their defaults in scheduled-message-patrol.ts instead."
+        },
+        "items": [
+          {
+            "id": "delivery-tick.ac1",
+            "title": "Given a pending row, a tick before not_before calls deliver zero times, and the first tick after not_before calls deliver exactly once with the row's text and leaves status 'sent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-tick.ac2",
+            "title": "Given two rows for one conversation, deliver is called in order [first, second], and the second is not delivered while the first's outcome is 'waiting'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-tick.ac3",
+            "title": "Given a sent row whose outcome is limited-again with a new resetsAt, the tick persists status 'pending', notBefore = resetsAt + 60 s and attempts 1, and does not deliver again before that time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-tick.ac4",
+            "title": "A cancelled row is never delivered, and a row scheduled before closeOverdeckDatabase() and reopen is delivered after not_before (survives restart)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-tick.ac5",
+            "title": "A 409 response returns the row to 'pending'; a 422 marks it 'failed' and the next row is not delivered; a 502 or a thrown deliver marks it 'unknown'; a blocked pane calls deliver zero times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "patrol-host",
+        "title": "Run the scheduled-message tick every 60 s in the primary dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/scheduled-message-patrol.ts",
+            "src/dashboard/server/services/__tests__/scheduled-message-patrol.test.ts",
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/scheduled-message-patrol.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "scheduled-message-patrol.test.ts passes under fake timers",
+            "typecheck completes without errors",
+            "file-size guard passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Create scheduled-message-patrol.ts copying blocker-wake-patrol.ts: start returns false on OVERDECK_DISABLE_SCHEDULED_MESSAGES=1 or a peer dashboard, runs recoverInterruptedScheduledMessages once, ticks immediately and every SCHEDULED_MESSAGES_INTERVAL_MS, skips an overlapping tick and a frozen Deacon. Start it in main.ts next to the blocker-wake block with the three log lines from the PRD and stop it next to stopBlockerWakePatrol()."
+        },
+        "items": [
+          {
+            "id": "patrol-host.ac1",
+            "title": "With OVERDECK_DISABLE_SCHEDULED_MESSAGES=1, startScheduledMessagePatrol returns false and the injected tick is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-host.ac2",
+            "title": "Given fake timers, when 120 s elapse after start, the patrol calls the injected tick 3 times (immediate + two intervals) and the recovery function exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-host.ac3",
+            "title": "When isFrozen returns true, an interval fires without calling the tick; when a tick is still running, the next interval logs 'previous tick still running' and skips",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-tell-when-limit-resets",
+        "title": "Add pan tell --when-limit-resets",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/tell.ts",
+            "src/cli/commands/__tests__/tell-when-limit-resets.test.ts",
+            "sync-sources/skills/pan-tell/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/tell-when-limit-resets.test.ts src/cli/commands/__tests__/tell.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "both tell test files pass",
+            "typecheck completes without errors",
+            "lint-skills reports no drift"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add the --when-limit-resets option to the tell command in src/cli/index.ts; in tell.ts refuse --steer with it and refuse non-conv targets, otherwise call scheduleConversationMessage and print 'Queued for <conv>: sends at about <time> (<reason>)'. Document it in sync-sources/skills/pan-tell/SKILL.md in the same commit."
+        },
+        "items": [
+          {
+            "id": "cli-tell-when-limit-resets.ac1",
+            "title": "Given a conv-* target, tellCommand with whenLimitResets calls scheduleConversationMessage, prints 'Queued for', and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-tell-when-limit-resets.ac2",
+            "title": "Given an agent-* target, tellCommand with whenLimitResets exits 1 and creates no row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-tell-when-limit-resets.ac3",
+            "title": "Given --steer together with --when-limit-resets, tellCommand exits 1 with the 'cannot be combined' message and creates no row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-conv-pending",
+        "title": "Add pan conv pending <conv>",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/conversations/pending.ts",
+            "src/cli/commands/conversations/index.ts",
+            "src/cli/commands/conversations/__tests__/pending.test.ts",
+            "sync-sources/skills/pan-conversations/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/conversations/__tests__/pending.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "pending.test.ts passes",
+            "typecheck completes without errors",
+            "lint-skills reports no drift"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Create pendingAction in src/cli/commands/conversations/pending.ts, register 'pending <conv>' with --json under the conversations (alias conv) command, and document it in sync-sources/skills/pan-conversations/SKILL.md in the same commit."
+        },
+        "items": [
+          {
+            "id": "cli-conv-pending.ac1",
+            "title": "Given two undelivered rows, pendingAction prints one line per row in id order starting '#<id>  <status>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-conv-pending.ac2",
+            "title": "Given no rows, pendingAction prints 'No queued messages for <conv>.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-conv-pending.ac3",
+            "title": "With --json, pendingAction produces output that JSON.parse accepts as an array of rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-select-extract",
+        "title": "Extract the composer delivery selector into DeliveryModeSelect",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/DeliveryModeSelect.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck",
+            "wc -l src/dashboard/frontend/src/components/chat/ComposerFooter.tsx"
+          ],
+          "expected_outputs": [
+            "ComposerFooter.test.tsx passes unchanged",
+            "typecheck completes without errors",
+            "ComposerFooter.tsx is at most 972 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Move the {showDeliverySelector && <select …>} block of ComposerFooter.tsx into DeliveryModeSelect.tsx with props {value, onChange, steerKind, agentBusy, sessionAlive, steerOptionLabel}; no behavior or markup change."
+        },
+        "items": [
+          {
+            "id": "composer-select-extract.ac1",
+            "title": "After the extraction, ComposerFooter.tsx produces a line count of at most 972 under wc -l",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-select-extract.ac2",
+            "title": "The existing ComposerFooter.test.tsx passes without edits, and the rendered select still offers Auto and the steer option for a claude-code conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scheduled-hook",
+        "title": "Add the scheduled-messages client hook and labels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/scheduledMessages.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/scheduledMessages.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/scheduledMessages.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "scheduledMessages.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Create scheduledMessages.ts with local ScheduledMessage/ConversationLimitState types; useScheduledMessages built on plain fetchWithTimeout + a module-level store read through useSyncExternalStore with one ref-counted 15 s poller per conversation (NOT TanStack useQuery: six test files mount ComposerFooter without a QueryClientProvider); schedule/edit/cancel mutations followed by refreshScheduledMessages(name); scheduledSendLabel with every wording in the PRD; and scheduledToChatMessages."
+        },
+        "items": [
+          {
+            "id": "scheduled-hook.ac1",
+            "title": "scheduledSendLabel returns 'Sends at about 17:00 (when your 5-hour limit resets)' for a five_hour row due at 17:00 today and uses 'weekly limit' for seven_day",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduled-hook.ac2",
+            "title": "scheduledSendLabel returns the 'Tries again at about … (reset time unknown)', 'Not sent: <lastError>' and 'Delivery not confirmed' wordings for fallback, failed and unknown rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduled-hook.ac3",
+            "title": "When schedule, edit and cancel are called, the hook sends POST, PATCH and DELETE to /api/conversations/<name>/scheduled-messages[/<id>] (asserted with a mocked fetch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduled-hook.ac4",
+            "title": "Rendered with no QueryClientProvider ancestor, the hook returns {supported: false, messages: []} on a rejected or non-JSON fetch, and with enabled=false it issues no request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "timeline-scheduled-rows",
+        "title": "Render scheduled rows with Edit and Cancel in the timeline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/chat-types.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/ScheduledMessageRow.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ScheduledMessageRow.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ScheduledMessageRow.test.tsx src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "ScheduledMessageRow and ConversationPanel tests pass",
+            "typecheck completes without errors",
+            "file-size guard passes (ConversationPanel ≤ 1531)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-17",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. Add 'scheduled' to the ChatMessage deliveryState union plus a scheduled field; create ScheduledMessageRow.tsx (dimmed bubble, label, Edit/Save/Discard, Cancel or Dismiss) which calls useScheduledMessages itself; branch to it in UserMessageRow before the held branch; in ConversationPanel append scheduledToChatMessages(...) after visibleOptimistic, gated on !agentId, growing the file by at most 6 lines."
+        },
+        "items": [
+          {
+            "id": "timeline-scheduled-rows.ac1",
+            "title": "A pending scheduled row renders its text and 'Sends at about …' label at the end of the timeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "timeline-scheduled-rows.ac2",
+            "title": "Clicking Cancel issues DELETE …/scheduled-messages/<id>; Edit then Save issues PATCH with the new text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "timeline-scheduled-rows.ac3",
+            "title": "A failed row renders 'Not sent: <lastError>' with Dismiss and no Edit button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "timeline-scheduled-rows.ac4",
+            "title": "An agent pane (agentId set) renders no scheduled rows and issues no scheduled-messages request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-schedule",
+        "title": "Offer 'Send when limits reset' in the composer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/DeliveryModeSelect.tsx",
+            "src/dashboard/frontend/src/components/chat/LimitResetNotice.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.schedule.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ComposerFooter.schedule.test.tsx src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both ComposerFooter test files pass",
+            "typecheck completes without errors",
+            "file-size guard passes (ComposerFooter ≤ 1000)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. Add the 'When limits reset' option to DeliveryModeSelect behind scheduleAvailable; create LimitResetNotice.tsx; in ComposerFooter call useScheduledMessages, render the notice, and add the schedule branch to handleSubmit after submissionMessage is computed (POST, clear editor like the held-kickoff branch, consume attachments, toast on error keeping the text)."
+        },
+        "items": [
+          {
+            "id": "composer-schedule.ac1",
+            "title": "Given supported: true and limit {limited: true, window: 'five_hour'}, the composer renders 'Your 5-hour limit resets at about …' and a 'Send when limits reset' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-schedule.ac2",
+            "title": "When the operator types text and clicks 'Send when limits reset', the composer issues POST …/scheduled-messages with that text and clears the editor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-schedule.ac3",
+            "title": "With 'When limits reset' selected in the delivery selector, Enter issues the POST instead of POST …/message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-schedule.ac4",
+            "title": "Given supported: false, the composer renders neither the option nor the notice; ComposerFooter.tsx stays at most 1000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-test-subset",
+        "title": "Register the new frontend tests in the CI subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'scheduledMessages.test.ts\\|ScheduledMessageRow.test.tsx\\|ComposerFooter.schedule.test.tsx' package.json"
+          ],
+          "expected_outputs": [
+            "the grep finds the test:frontend-subset line containing all three paths"
+          ],
+          "readiness": "ready",
+          "acJustification": "A single mechanical edit to one script line; two ACs cover presence and that the subset still runs.",
+          "traces": [
+            "FR-16",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. Append src/components/chat/__tests__/scheduledMessages.test.ts, src/components/chat/__tests__/ScheduledMessageRow.test.tsx and src/components/chat/__tests__/ComposerFooter.schedule.test.tsx to the root package.json test:frontend-subset script."
+        },
+        "items": [
+          {
+            "id": "frontend-test-subset.ac1",
+            "title": "The root package.json test:frontend-subset script contains all three new test paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-test-subset.ac2",
+            "title": "npm run test:frontend-subset exits 0 with the three new files included in its run output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document scheduled messages in the dashboard architecture doc and codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:52:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Scheduled messages: send when limits reset (PAN-4641)' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'OVERDECK_DISABLE_SCHEDULED_MESSAGES\\|MAX_SCHEDULED_ATTEMPTS' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'scheduled-message-delivery' .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "the heading is found",
+            "both identifiers are found",
+            "the codebase map names the tick module"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15. Add the '## Scheduled messages: send when limits reset (PAN-4641)' section to docs/DASHBOARD-ARCHITECTURE.md after the PAN-4278 held-messages section, covering every point listed in the PRD, add 'scheduled' to the deliveryState bullet, and add one paragraph to .overdeck/context/codebase/architecture.md naming the door, tick and patrol host and the dashboard-process placement."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md renders a section titled 'Scheduled messages: send when limits reset (PAN-4641)' that names quotaLimits.resetsAt, the 15-minute fallback, OVERDECK_DISABLE_SCHEDULED_MESSAGES and MAX_SCHEDULED_ATTEMPTS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The DASHBOARD-ARCHITECTURE.md section contains all four /api/conversations/:name/scheduled-messages route paths with their status codes and states that only Claude Code conversations are supported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": ".overdeck/context/codebase/architecture.md contains the names conversation-scheduled-messages.ts, scheduled-message-delivery.ts and services/scheduled-message-patrol.ts, and preserves exactly one last-verified line at the end",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "reset-text-parser",
+        "to": "provider-error-usage-limit",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-error-usage-limit",
+        "to": "usage-limit-state",
+        "type": "blocks"
+      },
+      {
+        "from": "usage-limit-state",
+        "to": "scheduled-store",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduled-store",
+        "to": "scheduled-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduled-store",
+        "to": "delivery-tick",
+        "type": "blocks"
+      },
+      {
+        "from": "usage-limit-state",
+        "to": "delivery-tick",
+        "type": "blocks"
+      },
+      {
+        "from": "delivery-tick",
+        "to": "patrol-host",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduled-store",
+        "to": "cli-tell-when-limit-resets",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduled-store",
+        "to": "cli-conv-pending",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-select-extract",
+        "to": "composer-schedule",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduled-hook",
+        "to": "timeline-scheduled-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduled-hook",
+        "to": "composer-schedule",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduled-hook",
+        "to": "frontend-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "timeline-scheduled-rows",
+        "to": "frontend-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-schedule",
+        "to": "frontend-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "delivery-tick",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "patrol-host",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduled-routes",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-schedule",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

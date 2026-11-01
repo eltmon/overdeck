@@ -29,6 +29,7 @@ pan conversations list [--workspace <path>] [--model <name>] [--since <time>] [-
 pan conversations show <id> [--json]
 pan conversations jsonl <conv-id> [--json]
 pan conversations move <query> <projectKey>
+pan conversations pending <conv> [--json]
 pan conversations link-pr <query> <url|#42|owner/repo#42> [--source agent|manual]
 pan conversations unlink-pr <query> <url|#42|owner/repo#42>
 pan conversations prs <query> [--json]
@@ -70,6 +71,12 @@ pan conversations enrich [ids...] [--tier <n>] [--deep] [--full] [--upgrade] [--
   candidates. `<projectKey>` is the project's yaml key (from `projects.yaml`),
   not its display name. Requires the dashboard running (`pan up`) — the command
   PATCHes `/api/conversations/:name/move`.
+- **`pending <conv>`** (PAN-4641) lists the messages queued with
+  `pan tell --when-limit-resets` that have not been delivered yet, in queue
+  order: `#<id>  <status>  <not before>  <text preview>`, plus the last error when
+  one is set. `<conv>` takes the same forms as `pan tell` (`conv/2972`, a
+  conversation name, a dashboard URL). `--json` prints the rows. Edit or cancel a
+  queued message from the conversation timeline in the dashboard.
 - **`link-pr` / `unlink-pr` / `prs`** (PAN-3822) link a pull request to a
   conversation so its row and header show the PR badge. `<query>` resolves like
   `move`; `pan conv current` names your own conversation. Only a repository

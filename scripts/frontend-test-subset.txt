@@ -59,6 +59,7 @@ src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
 src/components/__tests__/Sidebar.workspacePullRequest.test.tsx
 src/components/chat/__tests__/ComposerFooter.citations.test.tsx
+src/components/chat/__tests__/ComposerFooter.schedule.test.tsx
 src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
 src/components/chat/__tests__/ConversationAboutDrawer.test.tsx
 src/components/chat/__tests__/ConversationPanel.test.tsx
@@ -67,12 +68,14 @@ src/components/chat/__tests__/HandoffNotice.test.tsx
 src/components/chat/__tests__/HeldHandoffView.test.tsx
 src/components/chat/__tests__/ImageLightbox.test.tsx
 src/components/chat/__tests__/ModelPicker.test.tsx
+src/components/chat/__tests__/ScheduledMessageRow.test.tsx
 src/components/chat/__tests__/VaultBrowseCopy.test.tsx
 src/components/chat/__tests__/VaultContinueDialog.test.tsx
 src/components/chat/__tests__/composerHeldMessages.test.tsx
 src/components/chat/__tests__/conversationHistory.test.ts
 src/components/chat/__tests__/heldKickoff.test.tsx
 src/components/chat/__tests__/resetClippedScroll.test.ts
+src/components/chat/__tests__/scheduledMessages.test.ts
 src/components/chat/__tests__/useFloatingPickerPosition.test.tsx
 src/components/chat/__tests__/useOlderHistory.test.ts
 src/components/chat/citations/__tests__/CitationChips.test.tsx

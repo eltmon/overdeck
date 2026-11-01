@@ -26,6 +26,9 @@ import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { modelSupportsImages, findModelDef } from '../Settings/modelCatalog';
 import { EffortPicker } from './EffortPicker';
+import { DeliveryModeSelect, type DeliverAs } from './DeliveryModeSelect';
+import { LimitResetNotice } from './LimitResetNotice';
+import { useScheduledMessages } from './scheduledMessages';
 import { useComposerEffort, type EffortResolution } from './useComposerEffort';
 import { ContextWindowMeter } from './ContextWindowMeter';
 import { VaultContinueDialog } from './VaultContinueDialog';
@@ -87,11 +90,6 @@ interface ComposerFooterProps {
   /** Agent-backed panels: the agent's launch/pinned effort and its source (PAN-4255). */
   effortResolution?: EffortResolution | null;
 }
-
-type DeliverAs = 'auto' | 'steer' | 'follow_up';
-
-/** PAN-4292 D1: what Steer means for Claude Code, shown on the selector while Steer is chosen. */
-const CLAUDE_STEER_TOOLTIP = 'Steer: interrupt the current turn and send now (Claude Code Ctrl+Enter). Auto queues the message for the running turn.';
 
 function isPiConversation(conversation: Conversation): boolean {
   return conversation.harness === 'ohmypi' || conversation.harness === 'pi';
@@ -394,7 +392,8 @@ function ComposerFooterInput({
     }
   }, []);
 
-  const handleSubmit = useCallback(async (directMessageText?: string, deliverAsOverride?: 'steer') => {
+  const { schedule: scheduleMessage, supported: scheduleSupported, limit: usageLimit } = useScheduledMessages(conversation.name, !agentId);
+  const handleSubmit = useCallback(async (directMessageText?: string, deliverAsOverride?: 'steer', schedule?: boolean) => {
     const editor = editorRef.current;
     if (!editor) {
       console.warn('[ComposerFooter] handleSubmit: editor ref not ready');
@@ -495,9 +494,25 @@ function ComposerFooterInput({
     // Attachments belong to the prompt lane. Portable commands stay in the
     // control-plane lane and leave any uploaded attachments pending.
     const submissionMessage = isPortableCommand ? messageText : composedMessage;
+    // PAN-4641: queue on the server until the usage limit resets, instead of sending now.
+    if (schedule || (!deliverAsOverride && deliverAs === 'when_limit_resets')) {
+      try {
+        await scheduleMessage(submissionMessage);
+        if (!isPortableCommand) consumeAttachmentsForConversation(submitConversationName);
+        if (submitConversationName === currentConversationNameRef.current) {
+          editor.update(() => { $getRoot().clear(); });
+          setText('');
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to queue the message');
+      } finally {
+        setSendingFor(submitConversationName, false);
+      }
+      return;
+    }
     const clientMessageId = crypto.randomUUID();
-    // Follow-up exists only on the Pi control channel.
-    const selectedDeliverAs = deliverAs === 'follow_up' && steerKind !== 'control-channel' ? undefined : deliverAs;
+    // Follow-up exists only on the Pi control channel; "when limits reset" never reaches the send route.
+    const selectedDeliverAs = deliverAs === 'when_limit_resets' || (deliverAs === 'follow_up' && steerKind !== 'control-channel') ? undefined : deliverAs;
     const sendDeliverAs = deliverAsOverride ?? (showDeliverySelector && selectedDeliverAs !== 'auto' ? selectedDeliverAs : undefined);
     try {
       // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
@@ -612,7 +627,7 @@ function ComposerFooterInput({
       // Refocus editor
       editor.focus();
     }
-  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, heldKickoff, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, sending, setSendingFor, showDeliverySelector, steerKind]);
+  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, heldKickoff, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, scheduleMessage, sending, setSendingFor, showDeliverySelector, steerKind]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -704,6 +719,7 @@ function ComposerFooterInput({
   return (
     <div className={styles.composerFooter}>
       {heldKickoff.held && <HeldKickoffNotice />}
+      {!agentId && scheduleSupported && <LimitResetNotice limit={usageLimit} disabled={isDisabled} onSchedule={() => void handleSubmit(undefined, undefined, true)} />}
       {/* Single unified container — T3Chat style */}
       <div className={styles.composerBox} onDrop={handleDrop} onDragOver={handleDragOver}>
         <CitationChips conversationName={conversation.name} />
@@ -788,20 +804,7 @@ function ComposerFooterInput({
           <EffortPicker chip={effortChip} pending={effortPending} title={effortTitle} value={effort} onChange={handleEffortChange} disabled={effortPending || !liveChangeEnabled} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
           {showDeliverySelector && (
-            <select
-              className={styles.deliveryMethodSelect}
-              value={deliverAs}
-              onChange={(event) => setDeliverAs(event.target.value as DeliverAs)}
-              title={steerKind === 'control-channel'
-                ? (agentBusy ? 'Pi delivery mode while busy' : 'Pi delivery mode')
-                : (deliverAs === 'steer' ? CLAUDE_STEER_TOOLTIP : 'Delivery mode')}
-              aria-label={steerKind === 'control-channel' ? 'Pi delivery mode' : 'Delivery mode'}
-              disabled={!conversation.sessionAlive}
-            >
-              <option value="auto">Auto</option>
-              <option value="steer">{steerOptionLabel}</option>
-              {steerKind === 'control-channel' && <option value="follow_up">Follow-up</option>}
-            </select>
+            <DeliveryModeSelect value={deliverAs} onChange={setDeliverAs} steerKind={steerKind} agentBusy={agentBusy} sessionAlive={conversation.sessionAlive} steerOptionLabel={steerOptionLabel} scheduleAvailable={scheduleSupported && !agentId} />
           )}
           {piConversation && !agentId && (
             <>

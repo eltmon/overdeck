@@ -1,0 +1,352 @@
+{
+  "version": "1",
+  "issueId": "PAN-4641",
+  "created": "2026-11-01T05:00:29.700Z",
+  "updated": "2026-11-01T09:49:52.991Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T07:37Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T07:37:16.072Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T07:52Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-01T07:52:03.084Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T07:55:37.722Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T08:51:59.397Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T09:24:14.676Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T09:49:52.991Z"
+    }
+  ],
+  "items": {
+    "reset-text-parser": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T05:00:29.700Z",
+      "doneAt": "2026-11-01T05:06:12.542Z"
+    },
+    "provider-error-usage-limit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T05:06:21.052Z",
+      "doneAt": "2026-11-01T05:11:17.268Z"
+    },
+    "usage-limit-state": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T05:11:23.389Z",
+      "doneAt": "2026-11-01T05:13:48.210Z"
+    },
+    "scheduled-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T05:13:53.255Z",
+      "doneAt": "2026-11-01T05:17:17.644Z"
+    },
+    "scheduled-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T05:17:24.186Z",
+      "doneAt": "2026-11-01T05:20:36.546Z"
+    },
+    "delivery-tick": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T05:20:42.261Z",
+      "doneAt": "2026-11-01T05:25:56.130Z"
+    },
+    "patrol-host": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T05:26:01.947Z",
+      "doneAt": "2026-11-01T05:28:03.016Z"
+    },
+    "cli-tell-when-limit-resets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T05:28:07.518Z",
+      "doneAt": "2026-11-01T05:32:37.943Z"
+    },
+    "cli-conv-pending": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T05:32:39.441Z",
+      "doneAt": "2026-11-01T05:35:29.351Z"
+    },
+    "composer-select-extract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T05:35:35.494Z",
+      "doneAt": "2026-11-01T05:38:56.384Z"
+    },
+    "scheduled-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T05:38:58.165Z",
+      "doneAt": "2026-11-01T05:47:28.251Z"
+    },
+    "timeline-scheduled-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T05:47:34.428Z",
+      "doneAt": "2026-11-01T06:10:08.719Z"
+    },
+    "composer-schedule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T06:10:10.764Z",
+      "doneAt": "2026-11-01T06:20:25.404Z"
+    },
+    "frontend-test-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T06:20:34.056Z",
+      "doneAt": "2026-11-01T06:21:20.221Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4641",
+      "claimedAt": "2026-11-01T06:21:22.218Z",
+      "doneAt": "2026-11-01T06:22:21.043Z"
+    },
+    "reset-text-parser.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:53:03.372Z"
+    },
+    "reset-text-parser.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:53:23.287Z"
+    },
+    "reset-text-parser.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:53:44.159Z"
+    },
+    "reset-text-parser.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:54:04.595Z"
+    },
+    "provider-error-usage-limit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:54:25.410Z"
+    },
+    "provider-error-usage-limit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:54:46.757Z"
+    },
+    "provider-error-usage-limit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:55:10.974Z"
+    },
+    "provider-error-usage-limit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:55:30.640Z"
+    },
+    "usage-limit-state.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:55:52.758Z"
+    },
+    "usage-limit-state.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:56:11.017Z"
+    },
+    "usage-limit-state.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:56:31.409Z"
+    },
+    "usage-limit-state.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:56:51.961Z"
+    },
+    "scheduled-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:57:12.234Z"
+    },
+    "scheduled-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:57:34.390Z"
+    },
+    "scheduled-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:58:08.478Z"
+    },
+    "scheduled-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:58:36.454Z"
+    },
+    "scheduled-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:59:10.728Z"
+    },
+    "scheduled-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:59:39.573Z"
+    },
+    "scheduled-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:00:08.521Z"
+    },
+    "scheduled-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:00:47.635Z"
+    },
+    "scheduled-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:01:17.024Z"
+    },
+    "delivery-tick.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:01:50.329Z"
+    },
+    "delivery-tick.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:02:28.432Z"
+    },
+    "delivery-tick.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:02:58.270Z"
+    },
+    "delivery-tick.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:03:17.704Z"
+    },
+    "delivery-tick.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:03:39.274Z"
+    },
+    "patrol-host.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:04:01.900Z"
+    },
+    "patrol-host.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:04:31.300Z"
+    },
+    "patrol-host.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:05:04.773Z"
+    },
+    "cli-tell-when-limit-resets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:05:37.124Z"
+    },
+    "cli-tell-when-limit-resets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:06:05.583Z"
+    },
+    "cli-tell-when-limit-resets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:06:27.663Z"
+    },
+    "cli-conv-pending.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:06:51.178Z"
+    },
+    "cli-conv-pending.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:07:10.663Z"
+    },
+    "cli-conv-pending.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:07:28.101Z"
+    },
+    "composer-select-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:07:44.985Z"
+    },
+    "composer-select-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:08:03.764Z"
+    },
+    "scheduled-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:08:20.261Z"
+    },
+    "scheduled-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:08:36.945Z"
+    },
+    "scheduled-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:09:00.178Z"
+    },
+    "scheduled-hook.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:09:23.726Z"
+    },
+    "timeline-scheduled-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:09:48.677Z"
+    },
+    "timeline-scheduled-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:10:28.255Z"
+    },
+    "timeline-scheduled-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:11:07.573Z"
+    },
+    "timeline-scheduled-rows.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:11:40.198Z"
+    },
+    "composer-schedule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:12:12.737Z"
+    },
+    "composer-schedule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:12:32.718Z"
+    },
+    "composer-schedule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:12:48.784Z"
+    },
+    "composer-schedule.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:13:13.361Z"
+    },
+    "frontend-test-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:13:33.606Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:13:58.405Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:14:23.923Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:14:45.991Z"
+    },
+    "frontend-test-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:15:47.239Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}
