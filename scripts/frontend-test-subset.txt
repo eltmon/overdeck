@@ -127,6 +127,7 @@ src/components/mobile/__tests__/MobileConversations.test.tsx
 src/components/mobile/__tests__/MobileNeedsYou.test.tsx
 src/components/newConversation/__tests__/ConversationSkillsField.test.tsx
 src/components/newConversation/__tests__/IssuePickerField.test.tsx
+src/components/newConversation/__tests__/MachineField.test.tsx
 src/components/newConversation/__tests__/NewConversationDialog.test.tsx
 src/components/newConversation/__tests__/NewConversationSplitButton.test.tsx
 src/components/palette-conversation-hits.test.ts
