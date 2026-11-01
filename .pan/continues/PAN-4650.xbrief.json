@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T16:59:41.553Z",
+  "updated": "2026-11-01T16:59:54.198Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -408,6 +408,10 @@
     "wi15-share-toggle.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T16:59:41.553Z"
+    },
+    "wi16-tell-remote.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:59:54.198Z"
     }
   },
   "agentModel": "claude-opus-5-5"
