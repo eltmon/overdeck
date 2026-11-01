@@ -23,7 +23,10 @@ const mocks = vi.hoisted(() => {
     saveRemoteAgentState: vi.fn(),
     getRemoteAgentOutput: vi.fn(),
     sendToRemoteAgent: vi.fn(),
+    killRemoteAgent: vi.fn(),
     exec: vi.fn(),
+    requestReviewThroughRoute: vi.fn(),
+    deleteWorkspaceMetadata: vi.fn(),
   };
 });
 
@@ -53,6 +56,7 @@ vi.mock('../../../src/lib/remote/remote-agents.js', () => ({
   ),
   getRemoteAgentOutput: mocks.getRemoteAgentOutput,
   sendToRemoteAgent: mocks.sendToRemoteAgent,
+  killRemoteAgent: mocks.killRemoteAgent,
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
@@ -63,6 +67,19 @@ vi.mock('../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../src/lib/workspace-manager.js', () => ({ createWorkspace: vi.fn() }));
 vi.mock('../../../src/lib/workspace-manager/setup-marker.js', () => ({ workspaceNeedsSetup: () => false }));
+vi.mock('../../../src/lib/review-artifacts.js', () => ({
+  createReviewArtifactsForIssue: vi.fn().mockResolvedValue({ mergeSet: undefined }),
+}));
+vi.mock('../../../src/lib/agents.js', () => ({
+  getAgentState: () => null,
+  saveAgentStateSync: vi.fn(),
+}));
+vi.mock('../../../src/lib/remote/workspace-metadata.js', () => ({
+  deleteWorkspaceMetadata: mocks.deleteWorkspaceMetadata,
+}));
+vi.mock('../../../src/lib/cloister/review-request-route.js', () => ({
+  requestReviewThroughRoute: mocks.requestReviewThroughRoute,
+}));
 
 import { reapCompletedRemoteAgents } from '../../../src/lib/remote/remote-completion.js';
 
@@ -109,8 +126,12 @@ describe('reapCompletedRemoteAgents classification', () => {
     mocks.saveRemoteAgentState.mockReset();
     mocks.getRemoteAgentOutput.mockReset().mockResolvedValue('');
     mocks.sendToRemoteAgent.mockReset();
-    mocks.exec.mockReset().mockImplementation((_cmd: string, _opts: unknown, cb: (err: Error | null, out: unknown) => void) => {
-      cb(null, { stdout: '', stderr: '' });
+    mocks.killRemoteAgent.mockReset().mockResolvedValue(undefined);
+    mocks.deleteWorkspaceMetadata.mockReset();
+    mocks.requestReviewThroughRoute.mockReset().mockResolvedValue({ requested: true });
+    // `git ls-remote` finds the feature branch on origin.
+    mocks.exec.mockReset().mockImplementation((cmd: string, _opts: unknown, cb: (err: Error | null, out: unknown) => void) => {
+      cb(null, { stdout: cmd.includes('ls-remote') ? 'abc123\trefs/heads/feature/pan-0\n' : '', stderr: '' });
     });
   });
 
@@ -196,5 +217,36 @@ describe('reapCompletedRemoteAgents classification', () => {
     const results = await reapCompletedRemoteAgents();
 
     expect(results.map((result) => result.agentId)).toEqual(['agent-pan-7']);
+  });
+
+  it('requests review with source remote-reap after deleting the remote workspace metadata', async () => {
+    mocks.states.set('agent-pan-8', remoteState('PAN-8'));
+    scriptExec({ session: 'exists', sentinel: 'present' });
+
+    const results = await reapCompletedRemoteAgents();
+
+    expect(results[0].status).toBe('handed-off');
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledTimes(1);
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledWith('PAN-8', {
+      source: 'remote-reap',
+      message: expect.any(String),
+    });
+    expect(mocks.requestReviewThroughRoute.mock.invocationCallOrder[0])
+      .toBeGreaterThan(mocks.deleteWorkspaceMetadata.mock.invocationCallOrder[0]);
+    expect(results[0].details).toContain('Requested review through the dashboard review route');
+  });
+
+  it('still reports handed-off when the review route cannot be reached', async () => {
+    mocks.states.set('agent-pan-9', remoteState('PAN-9'));
+    scriptExec({ session: 'exists', sentinel: 'present' });
+    mocks.requestReviewThroughRoute.mockResolvedValue({
+      requested: false,
+      reason: 'dashboard unreachable (ECONNREFUSED)',
+    });
+
+    const results = await reapCompletedRemoteAgents();
+
+    expect(results[0].status).toBe('handed-off');
+    expect(results[0].details.some((detail) => detail.includes('pan review request'))).toBe(true);
   });
 });

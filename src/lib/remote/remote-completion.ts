@@ -7,20 +7,20 @@
  * file (see the REMOTE gate in cloister/prompts/work.md).
  *
  * `reapCompletedRemoteAgents()` is the host-side half of that contract:
- * for every remote agent that has created the sentinel (or exited after
- * pushing its branch), it
+ * for every remote agent that has created the sentinel, it
  *
  *   1. verifies the feature branch exists on origin,
  *   2. materializes the standard local worktree for the branch,
  *   3. copies the remote .pan/continue.json back (best effort),
  *   4. writes a minimal local agent state.json (downstream flows resolve
  *      the workspace through it),
- *   5. creates the review artifact set + review status (same entry the
- *      `pan done` flow uses), writes the `completed` marker that the
- *      cloister's checkCompletionMarkers() patrol consumes,
- *   6. stops the fly machine and marks the remote agent state stopped.
+ *   5. creates the review artifact set (same entry the `pan done` flow
+ *      uses) and writes the `completed` marker other readers use as "work
+ *      agent finished",
+ *   6. destroys the fly machine, marks the remote agent state stopped, and
+ *      requests review through the guarded review route.
  *
- * Invoked via `pan admin remote reap` (and suitable for a deacon patrol).
+ * Invoked every deacon-lite tick and by `pan admin remote reap`.
  */
 
 import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs';
@@ -385,7 +385,8 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
         });
       }
 
-      // 5. Review artifacts + completed marker — same entries pan done uses.
+      // 5. Review artifacts (same entry pan done uses) + the completed marker
+      // other readers use as "work agent finished".
       const { createReviewArtifactsForIssue } = await import('../review-artifacts.js');
       const artifactResult = await createReviewArtifactsForIssue(issueId, workspacePath);
       const primaryArtifact = artifactResult.mergeSet?.repos.find((repo) => !!repo.artifactUrl);
@@ -403,7 +404,7 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
         trackerUpdated: false,
         comment: `Remote agent completed on ${vmName} (reaped)`,
       }));
-      details.push('Wrote completion marker for cloister pickup');
+      details.push('Wrote completion marker');
 
       // 5.5. Preserve the transcript and final pane before the machine goes.
       await captureRemoteForensics(agentId, vmName, details);
@@ -427,6 +428,18 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       deleteWorkspaceMetadata(issueId);
       details.push('Removed remote workspace metadata (pipeline is local from here)');
       saveRemoteAgentState({ ...remoteState, status: 'stopped', lastActivity: new Date().toISOString() });
+
+      // Post-Cut, review starts from POST /api/review/:id/request (what pan done
+      // calls). Must run after deleteWorkspaceMetadata: while the metadata exists
+      // the route still sees a remote workspace and answers 409.
+      const { requestReviewThroughRoute } = await import('../cloister/review-request-route.js');
+      const review = await requestReviewThroughRoute(issueId, {
+        message: `Remote agent finished on ${vmName}; reaped into the local worktree`,
+        source: 'remote-reap',
+      });
+      details.push(review.requested
+        ? 'Requested review through the dashboard review route'
+        : `Review not requested (${review.reason}): run pan review request ${issueId}`);
 
       results.push({ agentId, issueId, status: 'handed-off', details });
     } catch (err: any) {
