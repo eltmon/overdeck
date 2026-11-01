@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4640",
   "created": "2026-11-01T04:51:29.241Z",
-  "updated": "2026-11-01T05:19:53.883Z",
+  "updated": "2026-11-01T05:19:59.015Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4640",
       "claimedAt": "2026-11-01T05:14:23.257Z",
       "doneAt": "2026-11-01T05:19:53.883Z"
+    },
+    "schedule-cli": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4640",
+      "claimedAt": "2026-11-01T05:19:59.015Z"
     }
   }
 }
