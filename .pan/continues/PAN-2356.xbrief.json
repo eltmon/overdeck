@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T13:55:19.494Z",
+  "updated": "2026-11-01T13:55:37.786Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,9 +108,10 @@
       "doneAt": "2026-11-01T13:53:54.899Z"
     },
     "wi7-do-relay": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2356",
-      "claimedAt": "2026-11-01T13:55:19.494Z"
+      "claimedAt": "2026-11-01T13:55:19.494Z",
+      "doneAt": "2026-11-01T13:55:37.786Z"
     }
   }
 }
