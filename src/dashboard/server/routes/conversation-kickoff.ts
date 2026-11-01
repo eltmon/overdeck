@@ -55,6 +55,10 @@ const postConversationKickoffRoute = HttpRouter.add(
         return jsonResponse({ error: 'No held kickoff: the conversation was already started or was never held' }, { status: 409 });
       case 'invalid':
         return jsonResponse({ error: result.error }, { status: 400 });
+      case 'refused': {
+        const { status: _refused, ...refusal } = result;
+        return jsonResponse(refusal, { status: 409 });
+      }
     }
   }),
 );
