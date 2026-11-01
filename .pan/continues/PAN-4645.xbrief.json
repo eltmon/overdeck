@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T10:10:49.473Z",
+  "updated": "2026-11-01T10:11:05.779Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -368,6 +368,10 @@
       "claimedBy": "agent-pan-4645",
       "claimedAt": "2026-11-01T10:05:01.881Z",
       "doneAt": "2026-11-01T10:10:49.472Z"
+    },
+    "wi17-stall-record.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:11:05.778Z"
     }
   }
 }
