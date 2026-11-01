@@ -1,0 +1,133 @@
+/**
+ * PAN-1254 W-8..W-10: the /api/tailscale routes. The Tailscale lib modules are
+ * mocked; credentials go through the real dashboard auth.
+ */
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { Effect } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { InstallPlan } from '../../../lib/tailscale/installer.js';
+import type { TailscaleState } from '../../../lib/tailscale/state.js';
+
+const readTailscaleState = vi.fn<() => Promise<TailscaleState>>();
+const resolveInstallPlan = vi.fn<(opts: { userspace: boolean; port?: number }) => Promise<InstallPlan>>();
+
+vi.mock('../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
+vi.mock('../../../lib/tailscale/state.js', () => ({ readTailscaleState: () => readTailscaleState() }));
+vi.mock('../../../lib/tailscale/installer.js', () => ({
+  resolveInstallPlan: (opts: { userspace: boolean; port?: number }) => resolveInstallPlan(opts),
+  operatorCommand: (name: string) => `sudo tailscale set --operator=${name}`,
+}));
+
+const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
+const { _resetDashboardSessionTokenForTests } = await import('../routes/dashboard-auth.js');
+const { _resetTrustedOriginsForTests } = await import('../routes/origin-validation.js');
+const { tailscaleRouteLayer } = await import('../routes/tailscale.js');
+
+const INTERNAL_TOKEN = 'tailscale-routes-internal-token-0123';
+const SESSION_TOKEN = 'tailscale-routes-session-token-0123';
+const ENV_KEYS = ['OVERDECK_HOME', 'OVERDECK_INTERNAL_TOKEN', 'OVERDECK_DASHBOARD_SESSION_TOKEN', 'OVERDECK_TRUSTED_ORIGINS', 'API_PORT', 'PORT'] as const;
+let savedEnv: Record<string, string | undefined>;
+let home: string;
+
+function state(overrides: Partial<TailscaleState> = {}): TailscaleState {
+  return {
+    installed: true,
+    cli: { bin: '/usr/bin/tailscale', mode: 'system', baseArgs: [] },
+    mode: 'system',
+    version: '1.104.4',
+    daemonRunning: true,
+    statusError: null,
+    backendState: 'Running',
+    authUrl: null,
+    magicDnsName: 'desk.tailnet.ts.net',
+    serveUrl: 'https://desk.tailnet.ts.net',
+    hostName: 'desk',
+    ipv4: ['100.64.0.1'],
+    loginName: 'op@example.com',
+    magicDnsEnabled: true,
+    httpsEnabled: true,
+    tailnetName: 'example.com',
+    operator: 'self',
+    serve: { proxiesDashboard: false, otherHandlerOn443: false, funnelOn443: false },
+    peers: [],
+    port: 3999,
+    requireTokenMint: false,
+    nextStep: 'serve',
+    ...overrides,
+  };
+}
+
+async function call(method: string, path: string, headers: Record<string, string>, body?: unknown) {
+  const init: RequestInit = { method, headers: { ...headers, ...(body === undefined ? {} : { 'content-type': 'application/json' }) } };
+  if (body !== undefined) init.body = JSON.stringify(body);
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, init));
+  const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
+    HttpRouter.toHttpEffect(tailscaleRouteLayer),
+    (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+  )));
+  const raw = response as { status: number; headers: Record<string, string>; body: { body?: Uint8Array } };
+  const text = raw.body?.body ? new TextDecoder().decode(raw.body.body) : '';
+  return { status: raw.status, headers: raw.headers, json: text ? JSON.parse(text) : null };
+}
+
+const ROOT = { cookie: `overdeck_session=${SESSION_TOKEN}` };
+
+beforeEach(async () => {
+  savedEnv = {};
+  for (const key of ENV_KEYS) {
+    savedEnv[key] = process.env[key];
+    delete process.env[key];
+  }
+  home = await mkdtemp(join(tmpdir(), 'pan-1254-tailscale-routes-'));
+  process.env.OVERDECK_HOME = home;
+  process.env.OVERDECK_INTERNAL_TOKEN = INTERNAL_TOKEN;
+  process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = SESSION_TOKEN;
+  process.env.API_PORT = '3999';
+  _resetInternalTokenCacheForTests();
+  _resetDashboardSessionTokenForTests();
+  _resetTrustedOriginsForTests();
+  readTailscaleState.mockReset();
+  resolveInstallPlan.mockReset();
+  readTailscaleState.mockResolvedValue(state());
+  resolveInstallPlan.mockImplementation(async ({ userspace }) => (userspace ? { kind: 'userspace' } : { kind: 'pane', command: 'curl -fsSL https://tailscale.com/install.sh | sh' }));
+});
+
+afterEach(async () => {
+  for (const key of ENV_KEYS) {
+    if (savedEnv[key] === undefined) delete process.env[key];
+    else process.env[key] = savedEnv[key];
+  }
+  _resetInternalTokenCacheForTests();
+  _resetDashboardSessionTokenForTests();
+  _resetTrustedOriginsForTests();
+  await rm(home, { recursive: true, force: true });
+});
+
+describe('GET /api/tailscale/status (PAN-1254)', () => {
+  it('returns state, install plan, operator command and port, not cacheable', async () => {
+    const res = await call('GET', '/api/tailscale/status', ROOT);
+    expect(res.status).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.json.state.nextStep).toBe('serve');
+    expect(res.json.install.kind).toBe('pane');
+    expect(res.json.operatorCommand).toMatch(/^sudo tailscale set --operator=/);
+    expect(res.json.port).toBe(3999);
+    expect(resolveInstallPlan).toHaveBeenCalledWith({ userspace: false, port: 3999 });
+  });
+
+  it('answers 401 without a credential', async () => {
+    expect((await call('GET', '/api/tailscale/status', {})).status).toBe(401);
+    expect(readTailscaleState).not.toHaveBeenCalled();
+  });
+
+  it('asks the install plan for userspace with ?userspace=1', async () => {
+    const res = await call('GET', '/api/tailscale/status?userspace=1', { [INTERNAL_TOKEN_HEADER]: INTERNAL_TOKEN });
+    expect(resolveInstallPlan).toHaveBeenCalledWith({ userspace: true, port: 3999 });
+    expect(res.json.install.kind).toBe('userspace');
+  });
+});
