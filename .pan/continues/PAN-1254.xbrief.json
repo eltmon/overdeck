@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1254",
   "created": "2026-11-01T05:46:21.371Z",
-  "updated": "2026-11-01T08:50:14.207Z",
+  "updated": "2026-11-01T08:50:35.600Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -326,6 +326,11 @@
     "qr-image-extract.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T08:50:14.207Z"
+    },
+    "tailscale-setup-dialog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1254",
+      "claimedAt": "2026-11-01T08:50:35.600Z"
     }
   }
 }
