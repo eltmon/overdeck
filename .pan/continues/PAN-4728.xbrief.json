@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4728",
   "created": "2026-11-01T17:45:22.507Z",
-  "updated": "2026-11-01T18:50:49.401Z",
+  "updated": "2026-11-01T18:51:03.504Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "manifest-plugin-root.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T18:50:49.400Z"
+    },
+    "manifest-plugin-root.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:51:03.504Z"
     }
   }
 }
