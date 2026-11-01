@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T15:51:07Z · model: claude-opus-5-5 · open: 860_
+_Last sequenced: 2026-11-01T16:05:25Z · model: claude-opus-5-5 · open: 858_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,7 +9,6 @@ _Last sequenced: 2026-11-01T15:51:07Z · model: claude-opus-5-5 · open: 860_
 | 2 | PAN-4723 | S | critical | ok |  |  | In pipeline: flaky create-workspace-row test turned main red via an unmocked git call in a non-git temp dir; red main stalls merges |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4724 | M | high | ok |  |  | In pipeline: per-issue cost snapshot rescans all 771k cost_events rows every 15 s (~1.5 s), hogging the dashboard DB poll lane. |
-| 5 | PAN-4717 | S | high | ok |  |  | In pipeline: conversation issue links may open an empty drawer for issues absent from the snapshot; CodeRabbit follow-up to #4716. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -225,7 +224,6 @@ _Last sequenced: 2026-11-01T15:51:07Z · model: claude-opus-5-5 · open: 860_
 | 220 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 221 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 222 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 223 | PAN-4656 | M | medium | ok |  |  | pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending. |
 | 224 | PAN-4650 | XL | medium | ok |  | PAN-4646 | Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
@@ -275,7 +273,7 @@ _Last sequenced: 2026-11-01T15:51:07Z · model: claude-opus-5-5 · open: 860_
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 275 | PAN-4722 | S | medium | ok |  | PAN-4656 | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 merged; waits on PAN-4656. |
+| 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
 | 276 | PAN-4651 | L | medium | needs-refinement |  | PAN-4650 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
 | 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
 | 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
@@ -884,10 +882,6 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 
 New substrate-improvement performance bug already in the pipeline: getCostsByIssue() runs a full GROUP BY over every cost_events row on a 15 s refresh, holding the dashboard database worker's poll lane about 1.5 s per run and growing with every agent turn. The issue gives clear acceptance criteria (equivalence test, under 50 ms refresh at production size, overdeck.db migration path), so its condition is ok. As an in-pipeline issue it takes the free rank 4 and no other node moves; it is a sibling of PAN-4544, which removes the same kind of synchronous cost scan from /api/costs/stream.
 
-### PAN-4717 (rank 5)
-
-New in-pipeline follow-up to PAN-4714 (merged as #4716) fixing an unreviewed CodeRabbit finding; pinned into a free top-tier slot next to its parent and not re-ranked.
-
 ### PAN-4690 (rank 8)
 
 New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).
@@ -1188,6 +1182,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 
 Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
 
+### PAN-3096 (rank 82)
+
+New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1195,10 +1193,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T15:51:07Z",
+  "generatedAt": "2026-11-01T16:05:25Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 860,
+  "openCount": 858,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -3923,19 +3921,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "dependsOn": [],
       "why": "Kimi ACP cancel is sent with id:\"\" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked.",
       "rationale": "Source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. Its prerequisite PAN-4563 (replay fixture and pinned host-replay test) merged in #4576, so the dependency is cleared; the rank stays at 224 because it already sat in the high tier with peers of equal score and nothing else about the issue changed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4656",
-      "rank": 223,
-      "size": "M",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending.",
-      "rationale": "Rank held: dependency PAN-4628 closed as completed on 2026-11-01, so it no longer gates this issue; remaining order is unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11868,30 +11853,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4717",
-      "rank": 5,
-      "size": "S",
-      "importance": "high",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: conversation issue links may open an empty drawer for issues absent from the snapshot; CodeRabbit follow-up to #4716.",
-      "rationale": "New in-pipeline follow-up to PAN-4714 (merged as #4716) fixing an unreviewed CodeRabbit finding; pinned into a free top-tier slot next to its parent and not re-ranked.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4722",
       "rank": 275,
       "size": "S",
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4656"
-      ],
-      "why": "Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 merged; waits on PAN-4656.",
-      "rationale": "Rank held: dependency PAN-4654 closed as completed on 2026-11-01, so the Update all code it fixes is on main; in-pipeline PAN-4656 still gates it.",
+      "dependsOn": [],
+      "why": "Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed.",
+      "rationale": "Dependency PAN-4656 (pan connect) closed 2026-11-01, so its edge is dropped and this is now unblocked; rank held since no body change.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13135,13 +13105,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 1
     },
     {
-      "from": "PAN-2350",
-      "to": "PAN-4656",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4655",
       "to": "PAN-1485",
       "type": "informs",
@@ -13266,20 +13229,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-2356",
-      "to": "PAN-4656",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4656",
-      "to": "PAN-4722",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
     },
     {
       "from": "PAN-4724",

@@ -5,8 +5,9 @@
  * raw TCP to the dashboard port, or `wss://host[:port]/ws/link` inside HTTPS),
  * its kind (`lan < tailnet < ssh < public < direct < relay`, best first) and where
  * it came from (`pairing` URL, `manual` Add route, `advertised` by the peer's
- * descriptor). This issue creates `lan`, `tailnet` and `public` routes; `ssh`,
- * `direct` and `relay` arrive in #4404 and #2356.
+ * descriptor). This issue creates `lan`, `tailnet` and `public` routes. `ssh`
+ * routes are created by `src/lib/anywhere/ssh/` and the SSH machine service
+ * (#4404); `direct` and `relay` arrive in #2356.
  */
 import { ROUTE_KINDS, type RouteKind, type RouteSource } from '@overdeck/contracts';
 

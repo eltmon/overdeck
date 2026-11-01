@@ -1,0 +1,1151 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T13:22:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4404: SSH machines run by the server: launch or adopt pan up over SSH and link it",
+    "updated": "2026-11-01T13:29:12.788Z"
+  },
+  "plan": {
+    "id": "pan-4404",
+    "title": "SSH machines run by the server: launch or adopt pan up over SSH and link it",
+    "status": "running",
+    "uid": "88f57875-2d1c-45c8-ab4d-da03ef32bdd3",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T13:22:00Z",
+    "updated": "2026-11-01T13:29:12.788Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4404",
+        "label": "PAN-4404",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3863",
+        "label": "PAN-3863 (closed by this PR)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2350",
+        "label": "PAN-2350 epic (W-LINK6, FR-17, D-13)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "ssh",
+      "machine-links",
+      "dashboard-server",
+      "cli",
+      "settings-ui"
+    ],
+    "metadata": {
+      "sizeJustification": "The Anywhere epic (pan-2350 rev 5) already split its 30-odd work items into sibling issues and assigned exactly one, W-LINK6, to this issue, with a browser-observable Done-when ('Adding an SSH host from a browser links it; removing it stops the server only if Overdeck started it') and the instruction that this PR closes #3863. A backend-only issue cannot meet that Done-when and a UI-only issue has nothing to call, so the surface (contracts, lib/anywhere/ssh, CLI, server routes and services, the Settings panel, three docs pages and a smoke script) stays one issue. It is decomposed into 13 vertical items whose DAG lets wi1/wi3/wi6 and wi11 run in parallel; most files are new, and the edits to existing files are small (no file approaches the 1000-line ceiling).",
+      "canonicalFilename": "2026-11-01-PAN-4404-ssh-machines-run-by-the-server-launch-or-adopt-pan-up-over-ssh-and-link-it.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck machine links (PAN-4645) can reach another machine only over LAN, Tailscale or a public address given by a pairing link. A machine reachable only over SSH (a VPS, a lab box behind a bastion) cannot be linked without the operator running pan up there, forwarding a port by hand, pairing and adding a manual route, and nothing stops a server the operator started that way. Epic FR-17/D-13 require the linking server to do all of this itself, from any browser.",
+      "Proposal": "Per .pan/drafts/PAN-4404.md: the linking dashboard runs OpenSSH (BatchMode, argv only) to (1) pin the host's pan version, (2) run a hidden `pan machines ssh-helper start` on the host that adopts the running dashboard or starts one with `pan up --detach --no-open --skip-traefik` under a remote lock and launch marker, and mints a pairing credential, (3) keep an `ssh -N -L` forward supervised with back-off, (4) link over tcp://127.0.0.1:<localPort> as a route of kind ssh through createMachineLink's new prepared-transport input, and (5) record the SSH machine in ${OVERDECK_HOME}/ssh-machines.json. Unlink stops the remote server only when the marker proves this machine started it and no other machine links to it. HTTP routes, CLI verbs (add-ssh, test-ssh, unlink --keep-server) and an Add an SSH machine dialog expose it; docs and a fake-ssh smoke script complete it.",
+      "NonGoals": "- Installing or upgrading pan or Node on the SSH host, or running it through npx there.\n- Accepting unknown or changed host keys from the browser; StrictHostKeyChecking=no or accept-new.\n- Password, keyboard-interactive or MFA SSH authentication (BatchMode only).\n- A reverse SSH forward (-R) so the host can reach this machine.\n- Restarting a dead remote server in the background; only an explicit Reconnect starts it again.\n- Stopping sidecars or running `pan down` on the SSH host.\n- Streaming per-step progress for the add request.\n- PAN-3863's direct-SSH mode (SFTP, remote git, Herdr terminal inventory over raw SSH), SSH config import with preview, terminal retention/reset, and the Share/Cloud surfaces.\n- Desktop-app-managed SSH (the previous issue body's design).\n- Windows SSH hosts or a Windows linking machine.\n- Real-OpenSSH or Docker end-to-end tests in CI.\n- Any change to route-scopes.ts that would let a machine token reach the SSH routes."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Pinned version means the host's `pan --version` must equal this machine's version exactly; mismatch or missing pan is an explicit error with `npm install -g @overdeck/core@<local>`, and nothing is installed.",
+        "rationale": "The issue names 'pinned version' and 'an explicit version-mismatch error'; PAN-3863 forbids background installs; the helper verb's protocol rides on the version; upgrades belong to W-LINK7 (#4654)."
+      },
+      {
+        "summary": "The remote half is a hidden CLI verb `pan machines ssh-helper start|stop`, not a shell script sent over SSH.",
+        "rationale": "Keeps operator input out of the remote command line (only fixed tokens, a UUID and a validated path) and puts lock, marker, adopt/start, pairing and stop logic in unit-tested TypeScript."
+      },
+      {
+        "summary": "Removal stops a managed server by SIGTERM (then SIGKILL after 10 s) to the pid the marker records and /api/health confirms, and refuses when another machine holds an active link; `pan down` is not used.",
+        "rationale": "'Stop only what you started': pan down also stops Traefik and review sessions this machine did not start, and stopping a server another machine links to would break that link."
+      },
+      {
+        "summary": "PAN-3863 closes with its scope cut to add/test/remove/reconnect, SSH state on the machine row, and ~/.ssh/config aliases as suggestions; its direct-SSH, import-preview, retention and Share/Cloud surfaces are dropped.",
+        "rationale": "The issue says this PR closes #3863 and that W-LINK6 covers the SSH Hosts UI; under D-13 a linked machine runs a full Overdeck, and remote control of its conversations and terminals arrives through the link (#4650, #4651)."
+      },
+      {
+        "summary": "SSH machines link both ways by default, like `pan machines link`.",
+        "rationale": "Consistent defaults across link verbs; a reverse link the host cannot reach just shows offline there, and a reverse SSH forward is out of scope."
+      },
+      {
+        "summary": "The live check uses a fake `ssh` on PATH that runs commands locally and proxies the forward, exercising only the adopt path against an isolated pre-started server.",
+        "rationale": "Runs on any host without Docker, sshd or touching the operator's live dashboard; `pan up` on a fake remote would collide with shared sidecar ports, so the managed start/stop path is covered by helper unit tests."
+      },
+      {
+        "summary": "Background forward reconnect never starts, replaces or stops a remote server; only Add and an explicit Reconnect run the helper.",
+        "rationale": "PAN-3863: 'background reconnect cannot install, replace or terminate a server'."
+      },
+      {
+        "summary": "The add request is one synchronous POST bounded at about 210 s, with a spinner sentence instead of streamed step progress.",
+        "rationale": "Smallest surface that satisfies 'adding an SSH host from a browser links it'; typed errors name the failed step."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-contracts",
+        "title": "WI-1 SSH machine contracts in packages/contracts/src/machines.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4404",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/machines.ts",
+            "packages/contracts/src/__tests__/machines-ssh.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run packages/contracts/src/__tests__/machines-ssh.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "machines-ssh.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4404.md WI-1 and 'Interfaces'. Append SSH_HELPER_PROTOCOL = 1, SshLaunch, SshForwardState, SshLinkInfo, SSH_MACHINE_ERROR_CODES (13 codes of D-4404-9), SshMachineErrorCode and SshTestResult to packages/contracts/src/machines.ts, and add `ssh: Schema.optional(SshLinkInfo)` to MachineLinkView. Export types with the `typeof X.Type` pattern. Write packages/contracts/src/__tests__/machines-ssh.test.ts."
+        },
+        "items": [
+          {
+            "id": "wi1-contracts.ac1",
+            "title": "Given a MachineLinkView JSON without an ssh field, when it is decoded with the MachineLinkView schema, then decoding succeeds (machines-ssh.test.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-contracts.ac2",
+            "title": "Given a MachineLinkView JSON whose ssh.forward is \"broken\", when it is decoded, then decoding fails, and a view with a complete ssh block decodes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-contracts.ac3",
+            "title": "Given SSH_MACHINE_ERROR_CODES, when the test reads it, then it contains exactly the 13 codes listed in PRD D-4404-9.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-ssh-target",
+        "title": "WI-2 Pure SSH target helpers: destination validation, argv, remote command, failure classifier, config aliases",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4404",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/anywhere/ssh/target.ts",
+            "src/lib/anywhere/ssh/__tests__/target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/anywhere/ssh/__tests__/target.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "target.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-10",
+            "FR-12",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "wi4-ssh-helper",
+            "wi5-forward-supervisor",
+            "wi7-ssh-machine-service"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/lib/anywhere/ssh/target.ts with SshMachineError, validateSshDestination (D-4404-6), sshLockKey, validatePanPath, remoteCommand (D-4404-4: always `sh -c 'exec \"${SHELL:-/bin/sh}\" -lc \"<PAN> <ARGS>\"'`, only fixed tokens + UUID + validated pan path), sshCommandArgv and sshForwardArgv (exact D-4404-5 option lists, destination after `--`), classifySshFailure (D-4404-9 table), parseHelperResult (last line starting with `OVERDECK_SSH_HELPER `), parseVersionOutput (last stdout line matching ^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$, else null), and listSshConfigAliases with injected async readFile/readdir (FR-10). No imports from src/dashboard. Never emit StrictHostKeyChecking=no or accept-new."
+        },
+        "items": [
+          {
+            "id": "wi2-ssh-target.ac1",
+            "title": "Given destinations `-oProxyCommand=x`, `desk; rm`, `desk host`, `$(x)`, `desk:22` and a 256-character host, when validateSshDestination runs, then each throws SshMachineError with code bad-destination, while `desk`, `me@10.0.0.4`, `ssh://me@desk:2222` and `[fe80::1]` are accepted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-ssh-target.ac2",
+            "title": "Given op 'start' with a UUID linker and pan null, when remoteCommand runs, then it returns exactly `sh -c 'exec \"${SHELL:-/bin/sh}\" -lc \"pan machines ssh-helper start --linker <uuid> --json\"'`, and a non-UUID linker or a pan path containing a space or quote throws.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-ssh-target.ac3",
+            "title": "Given destination desk, local port 41234 and remote port 3011, when sshForwardArgv runs, then it returns the D-4404-5 forward list ending in `-N -o ExitOnForwardFailure=yes -L 127.0.0.1:41234:127.0.0.1:3011 -- desk`, and no argv produced by the module contains StrictHostKeyChecking.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-ssh-target.ac4",
+            "title": "Given stderr `Host key verification failed`, `Permission denied (publickey)`, `Could not resolve hostname x` and exit code 127, when classifySshFailure runs, then it returns host-key, auth-failed, unresolvable and pan-missing respectively.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-ssh-target.ac5",
+            "title": "Given an ~/.ssh/config with `Host desk`, `Host *.corp` and `Include config.d/*` whose file defines `Host vps`, when listSshConfigAliases runs, then it returns [desk, vps], and a missing config returns [].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-ssh-machine-store",
+        "title": "WI-3 SSH machine store (${OVERDECK_HOME}/ssh-machines.json)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4404",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/ssh/machine-store.ts",
+            "src/lib/anywhere/ssh/__tests__/machine-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/anywhere/ssh/__tests__/machine-store.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "machine-store.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and 'Interfaces' (SshMachineRecord). Create src/lib/anywhere/ssh/machine-store.ts copying link-store.ts's write path: { v: 1, machines } in ${OVERDECK_HOME}/ssh-machines.json, temp file in same directory with mode 0600 then rename, in-process write queue, corrupt file never overwritten and read as zero records with one console.error naming the path. Functions: sshMachinesPath, listSshMachines, getSshMachineByLinkId (never matches a record whose linkId is null; linkId is string | null), upsertSshMachine (replace by id), removeSshMachine, updateSshMachine."
+        },
+        "items": [
+          {
+            "id": "wi3-ssh-machine-store.ac1",
+            "title": "Given an empty OVERDECK_HOME, when upsertSshMachine writes a record, then listSshMachines returns it and the file mode is 0o600.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-ssh-machine-store.ac2",
+            "title": "Given ssh-machines.json containing `not json`, when listSshMachines runs, then it returns [] and logs one error naming the path, and upsertSshMachine rejects while the file content stays `not json`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-ssh-machine-store.ac3",
+            "title": "Given two concurrent upsertSshMachine calls with different ids, when both settle, then listSshMachines returns both records.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-ssh-helper",
+        "title": "WI-4 Remote helper `pan machines ssh-helper start|stop` (lock, marker, adopt-or-start, pairing, stop rule)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4404",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/anywhere/ssh/helper.ts",
+            "src/lib/anywhere/ssh/__tests__/helper.test.ts",
+            "src/cli/commands/machines-ssh.ts",
+            "src/cli/commands/machines.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/anywhere/ssh/__tests__/helper.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "helper.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "wi7-ssh-machine-service",
+            "wi13-ssh-smoke"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, D-4404-7 and D-4404-8. Create src/lib/anywhere/ssh/helper.ts with runHelperStart({ linker, pair }, deps) and runHelperStop({ linker }, deps), all deps injectable (fetch, spawnPanUp, kill, isAlive, fs ops, now, apiPort from readPlatformConfig().dashboardApiPort, internal token via ensureInternalToken + INTERNAL_TOKEN_HEADER, panVersion). Remote lock = mkdir ${OVERDECK_HOME}/ssh-launch/lock (stale after 180 s, wait up to 30 s polling 500 ms, then busy; always removed in finally). Marker ${OVERDECK_HOME}/ssh-launch/server.json (0600). Start spawns `process.execPath process.argv[1] up --detach --no-open --skip-traefik` only when /api/health on 127.0.0.1:<apiPort> does not answer, with stdio ['ignore','pipe','pipe'] (never inherit) and awaiting the child's exit event, not close (a sidecar left running would otherwise hold the SSH session open). Pairing via POST http://127.0.0.1:<apiPort>/api/pairing/credentials with the internal token. Stop signals only the proven dashboard pid (SIGTERM, 10 s, SIGKILL), never `pan down`, and refuses with `in-use` when GET /api/machines lists another active inbound machine. In src/cli/commands/machines-ssh.ts export registerMachinesSshCommands(machines) registering hidden `ssh-helper start|stop` (`{ hidden: true }`), printing exactly one `OVERDECK_SSH_HELPER <json>` line, exit 0 on ok else 1; call it at the end of registerMachinesCommands in src/cli/commands/machines.ts. Fake timers for every wait."
+        },
+        "items": [
+          {
+            "id": "wi4-ssh-helper.ac1",
+            "title": "Given /api/health answers with pid 4242 and no marker exists, when runHelperStart runs with pair, then the result is ok with launch external, a pairing credential, and no `pan up` spawn occurs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-ssh-helper.ac2",
+            "title": "Given /api/health does not answer, when runHelperStart runs, then it spawns `up --detach --no-open --skip-traefik`, writes server.json with mode 0600 containing the health pid and startedBy = linker, and returns launch managed; with --no-pair the result has pairing null and no pairing request is sent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-ssh-helper.ac3",
+            "title": "Given a fresh lock directory held by another run, when runHelperStart runs under fake timers, then after 30 s it returns { ok: false, error: 'busy' }, and a lock whose mtime is 200 s old is removed and the run proceeds.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-ssh-helper.ac4",
+            "title": "Given each of the five D-4404-8 stop cases, when runHelperStop runs, then it returns reasons not-running, external, restarted, in-use and stopped respectively, and only the stopped case calls kill (SIGTERM, then SIGKILL after 10 s of fake time when the pid is still alive).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-ssh-helper.ac5",
+            "title": "Given `pan machines ssh-helper start --linker not-a-uuid --json`, when the CLI action runs, then it prints one line starting with `OVERDECK_SSH_HELPER ` whose JSON has ok false, and exits 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-forward-supervisor",
+        "title": "WI-5 SSH process runners and the forward supervisor",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4404",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/ssh/run.ts",
+            "src/dashboard/server/services/ssh-forward-supervisor.ts",
+            "src/dashboard/server/services/__tests__/ssh-forward-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/ssh-forward-supervisor.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "ssh-forward-supervisor.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and D-4404-10. Create src/lib/anywhere/ssh/run.ts (runSshCommand with timeout kill and SshMachineError('unreachable') on timeout, spawnSshForward, pickFreeLoopbackPort via listen(0) on 127.0.0.1, waitForLocalPort polling a TCP connect every 250 ms, commandLineOf(pid) via async execFile('ps', ['-o','args=','-p',pid])). Argv comes only from wi2 helpers. Create src/dashboard/server/services/ssh-forward-supervisor.ts: SshForwardSupervisor with injectable deps; start() deletes records whose linkId is null (a crashed add), reaps recorded orphan forward pids whose command line contains `-L 127.0.0.1:<localPort>:` then starts one forward per record; ensure(recordId) waits 15 s for the port else forward-failed; stopForward, status, stop. Exit handling: auth-failed/host-key => attention, no retry; `Address already in use`/`cannot listen to port` => new port, setLinkRoutes with the ssh route URL replaced, link supervisor updateRoutes, record update, immediate retry; otherwise down with back-off 1 s doubling to 60 s, ±20 % jitter, reset after 60 s up. No execSync."
+        },
+        "items": [
+          {
+            "id": "wi5-forward-supervisor.ac1",
+            "title": "Given a forward child that exits with stderr `Permission denied (publickey)`, when 10 minutes of fake time pass, then status is attention and spawnForward was called exactly once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-forward-supervisor.ac2",
+            "title": "Given a forward child that keeps exiting with no recognised error, when fake time advances, then respawns happen after 1 s and 2 s and the delay never exceeds 60 s (with jitter bounds ±20 %), and a forward that stays up 60 s resets the delay to 1 s.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-forward-supervisor.ac3",
+            "title": "Given a forward child that exits with `Address already in use`, when the supervisor handles the exit, then it calls setLinkRoutes with the ssh route URL changed to the new port, calls the link supervisor's updateRoutes, and respawns on the new port.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-forward-supervisor.ac4",
+            "title": "Given a record whose forwardPid is alive with a command line containing `-L 127.0.0.1:41234:`, when start() runs, then that pid receives SIGTERM before the new forward spawns, and a recorded pid with an unrelated command line receives no signal.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-forward-supervisor.ac5",
+            "title": "Given a record with linkId null in the store, when start() runs, then the record is deleted and spawnForward is not called for it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-link-transport",
+        "title": "WI-6 createMachineLink accepts a prepared transport (route kind ssh)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4404",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/machine-link-service.ts",
+            "src/dashboard/server/services/__tests__/machine-link-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/machine-link-service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "machine-link-service.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and the before/after under 'Interfaces'. CreateMachineLinkInput gains optional transport { url: TransportUrl; kind: RouteKind; pairingCode: string } and pairingUrl becomes optional; exactly one is required. With transport, skip routeFromPairingUrl and the loopback refusal, canonicalise the URL with parseRouteUrl, and store the first route as { url, kind: transport.kind, source: 'pairing' }. A pairingCode without the odp_ prefix, or neither input, throws MachineLinkError('bad-pairing-url'). Existing tests stay unchanged and pass."
+        },
+        "items": [
+          {
+            "id": "wi6-link-transport.ac1",
+            "title": "Given transport { url: 'tcp://127.0.0.1:41234', kind: 'ssh', pairingCode: 'odp_x' }, when createMachineLink runs with fake deps, then openChannel receives that URL in pairing mode with that code and upsertLink receives a first route { url: 'tcp://127.0.0.1:41234', kind: 'ssh', source: 'pairing' }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-link-transport.ac2",
+            "title": "Given a transport whose pairingCode is `abc`, or an input with neither pairingUrl nor transport, when createMachineLink runs, then it rejects with MachineLinkError code bad-pairing-url and openChannel is never called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-link-transport.ac3",
+            "title": "Given the existing pairing-URL tests in machine-link-service.test.ts, when the file runs, then every pre-existing test passes unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-ssh-machine-service",
+        "title": "WI-7 SSH machine service: add, test, remove, reconnect with host lock and rollback",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4404",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/ssh-machine-service.ts",
+            "src/dashboard/server/services/__tests__/ssh-machine-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/ssh-machine-service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "ssh-machine-service.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "FR-9",
+            "NFR-5",
+            "NFR-7"
+          ],
+          "foundationFor": [
+            "wi8-ssh-routes",
+            "wi9-machines-routes-boot"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and D-4404-3 (the nine-step add flow plus rollback). Step 5 writes a provisional record with linkId null before forwardSupervisor.ensure(record.id); after ensure, read the local port back from the record (a collision may have moved it) before building the ssh route URL; step 8 sets linkId with updateSshMachine; rollback deletes the provisional record. Create src/dashboard/server/services/ssh-machine-service.ts exporting addSshMachine, testSshHost, removeSshMachineForLink(link, { keepServer }), reconnectSshMachine(link), sshInfoForLink(linkId) and setSshForwardSupervisor. All deps injectable (runSsh, createMachineLink, store functions, forward supervisor, localIdentity, localVersion = getOverdeckVersion). Version probe before any helper call: mismatch => version-mismatch naming both versions and `npm install -g @overdeck/core@<local>`; exit 127 => pan-missing. Helper environmentId equal to ours => self-link (stop again when managed). After a managed start, any later failure runs `ssh-helper stop` best effort (45 s) and stops the forward. Local host lock Map keyed by sshLockKey: a concurrent call for the same key fails busy at once. Remove runs the helper only when launch is managed and keepServer is false. Re-adding the same environmentId removes the older record and stops only its forward. When no forward supervisor is registered (a peer dashboard), sshInfoForLink reports forward 'down' with detail 'the forward runs only on the primary dashboard', and removal skips stopForward."
+        },
+        "items": [
+          {
+            "id": "wi7-ssh-machine-service.ac1",
+            "title": "Given the host reports pan 0.71.0 and this machine runs 0.72.0, when addSshMachine runs, then it rejects with version-mismatch whose message contains 0.71.0, 0.72.0 and `npm install -g @overdeck/core@0.72.0`, and the helper is never run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-ssh-machine-service.ac2",
+            "title": "Given a helper result with launch managed and a createMachineLink that rejects, when addSshMachine runs, then `ssh-helper stop --linker <ourEnvId>` is run, the forward is stopped, the provisional record is deleted, and the link error is returned.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-ssh-machine-service.ac3",
+            "title": "Given a successful add with helper launch managed, when addSshMachine runs, then a provisional record with linkId null exists before forwardSupervisor.ensure is called, and after it resolves the stored record has the link's id, launch managed, and the returned view's first route has kind ssh and url tcp://127.0.0.1:<localPort>.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-ssh-machine-service.ac4",
+            "title": "Given an add for `Desk` still running, when a second add for `desk` starts, then the second rejects at once with busy.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-ssh-machine-service.ac5",
+            "title": "Given an external record, or a managed record removed with keepServer true, when removeSshMachineForLink runs, then no `ssh-helper stop` command is run and the forward is stopped and the record removed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-ssh-routes",
+        "title": "WI-8 HTTP routes POST /api/machines/ssh, POST /api/machines/ssh/test, GET /api/machines/ssh/config-hosts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4404",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines-ssh.ts",
+            "src/dashboard/server/routes/__tests__/machines-ssh.test.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/__tests__/machines-ssh.test.ts tests/unit/lib/overdeck"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "machines-ssh.test.ts and the no-loss matrix tests report all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-9",
+            "FR-10",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 and D-4404-9/D-4404-11. Create src/dashboard/server/routes/machines-ssh.ts exporting machinesSshRouteLayer; merge it next to machinesRouteLayer in src/dashboard/server/server.ts. Every route answers 403 when channelOfRequest(request) !== null, then runs rejectUnsafeDashboardMutationRequest (POST) or rejectUnauthorizedDashboardRequest (GET). Strict body parsing (400 on wrong types). Map SshMachineError and MachineLinkError codes to the D-4404-9 statuses with body { error, message, detail }. Emit `Added SSH machine \"<label>\" (<destination>, <launch>)` on success. Do not add rows to route-scopes.ts. Add the three no-loss-matrix rows named in the PRD."
+        },
+        "items": [
+          {
+            "id": "wi8-ssh-routes.ac1",
+            "title": "Given a POST /api/machines/ssh that arrives through a secure channel, when the route runs, then it answers 403 and the service is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-ssh-routes.ac2",
+            "title": "Given a POST /api/machines/ssh body without host, when the route runs, then it answers 400; and given a service rejection with version-mismatch, it answers 409 with body error version-mismatch and the service message.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-ssh-routes.ac3",
+            "title": "Given a successful add, when POST /api/machines/ssh answers, then the status is 200 and the body is the MachineLinkView with an ssh block; GET /api/machines/ssh/config-hosts answers { hosts } from the service.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-ssh-routes.ac4",
+            "title": "Given the no-loss matrix test, when it runs, then rows for POST /api/machines/ssh, POST /api/machines/ssh/test and GET /api/machines/ssh/config-hosts exist and the suite passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-machines-routes-boot",
+        "title": "WI-9 Unlink, reconnect and GET /api/machines handle SSH machines; forward supervisor starts with the dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4404",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/routes/__tests__/machines-unlink.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/__tests__/machines-unlink.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "machines-unlink.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In routes/machines.ts: buildMachinesResponse adds ssh: sshInfoForLink(link.id) when a record exists; handleMachinesUnlink gains a { keepServer } option and, after notifying the peer and before revoking/removing the link, calls removeSshMachineForLink when a record exists, answering { ok, peerNotified, ssh } (ssh null for plain links); the unlink route reads keepServer=1 from the query; the reconnect route calls reconnectSshMachine first for SSH-backed links and maps its errors per D-4404-9. In anywhere-boot.ts: after the link supervisor starts (primary only), create SshForwardSupervisor wired to the supervisor's updateRoutes, start it and register with setSshForwardSupervisor; stopAnywhere stops and unregisters it."
+        },
+        "items": [
+          {
+            "id": "wi9-machines-routes-boot.ac1",
+            "title": "Given an SSH-backed managed link, when DELETE /api/machines/:id runs without a query, then removeSshMachineForLink receives keepServer false before the link is removed, and the answer contains ssh { stopped: true, reason: 'stopped' }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-machines-routes-boot.ac2",
+            "title": "Given the same link, when DELETE /api/machines/:id?keepServer=1 runs, then removeSshMachineForLink receives keepServer true; and a plain link's unlink answers ssh null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-machines-routes-boot.ac3",
+            "title": "Given one SSH-backed and one plain link, when GET /api/machines runs, then only the SSH-backed view contains an ssh block with destination, launch and forward.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-cli-ssh",
+        "title": "WI-10 CLI pan machines add-ssh, test-ssh, unlink --keep-server and the SSH column in list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4404",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/machines-ssh.ts",
+            "src/cli/commands/machines.ts",
+            "tests/unit/cli/machines-ssh.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/machines-ssh.test.ts tests/unit/cli/machines.test.ts",
+            "npm run generate:slash-commands",
+            "bash scripts/lint-slash-commands.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "machines-ssh.test.ts and machines.test.ts report all tests passed",
+            "lint-slash-commands.sh reports no drift"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-9",
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. In src/cli/commands/machines-ssh.ts add `add-ssh <host>` (--pan-path, --one-way, --agent-fenced, --json; POST /api/machines/ssh) and `test-ssh <host>` (--pan-path, --json; POST /api/machines/ssh/test) with the output sentences given in the PRD. In machines.ts add `--keep-server` to unlink (append ?keepServer=1, print the SSH stop/leave sentence when ssh is not null) and an SSH column to list (`<destination> (<forward>, <launch>)` or `-`). Reuse call()/fail() behavior for 401 and unreachable dashboards. Then run `npm run generate:slash-commands` and commit packages/contracts/src/composer-commands.generated.ts (the hidden ssh-helper verb must not appear)."
+        },
+        "items": [
+          {
+            "id": "wi10-cli-ssh.ac1",
+            "title": "Given `pan machines add-ssh desk --json` against a mocked dashboard, when it runs, then it POSTs /api/machines/ssh with { host: 'desk', bothWays: true, access: 'operator' } and prints the view JSON; with `--one-way --pan-path /opt/pan/bin/pan` the body has bothWays false and panPath.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-cli-ssh.ac2",
+            "title": "Given a 409 response { error: 'version-mismatch', message }, when add-ssh runs, then it prints the message to stderr and exits 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-cli-ssh.ac3",
+            "title": "Given `pan machines unlink desk --keep-server`, when it runs, then it calls DELETE /api/machines/desk?keepServer=1 and prints `Left the Overdeck server on <host> running (<reason>).` when ssh.stopped is false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-cli-ssh.ac4",
+            "title": "Given the regenerated manifest, when scripts/lint-slash-commands.sh runs, then it reports no drift and the manifest contains pan-machines-add-ssh and pan-machines-test-ssh but no ssh-helper entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-ssh-ui",
+        "title": "WI-11 Settings → Anywhere → Machines: Add an SSH machine dialog and SSH rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4404",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/sshMachinesApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/AddSshMachineDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/MachinesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AddSshMachineDialog.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/AddSshMachineDialog.test.tsx src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AddSshMachineDialog.test.tsx and MachinesPanel.test.tsx report all tests passed",
+            "typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 and D-4404-15/16. Load the pan-style-guide skill first. Add sshMachinesApi.ts (addSshMachine, testSshHost, fetchSshConfigHosts, unlinkMachineKeepingServer, sshErrorText) in the machinesApi.ts style with dashboardMutationJsonHeaders(). Add AddSshMachineDialog.tsx following LinkMachineDialog.tsx: host input with a datalist of config-host suggestions, 'Link both ways' checked by default, Advanced 'Path to pan on the host', Test (shows `Reached <host>: pan <v>` plus match/mismatch sentence), Add (spinner text `Connecting to <host>. Starting Overdeck there can take a minute.`, closes and invalidates MACHINES_QUERY_KEY on 200, shows sshErrorText on failure). In MachinesPanel.tsx add the 'Add an SSH machine' button next to 'Link a machine', an SSH line on SSH-backed rows, and the Remove confirmation texts with a 'Leave the server running' checkbox for managed rows. Add the new test path to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "wi11-ssh-ui.ac1",
+            "title": "Given mocked config-hosts [desk, vps], when the dialog opens, then the host input offers desk and vps as datalist options.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-ssh-ui.ac2",
+            "title": "Given a host typed and Add clicked with a mocked 200 response, when the request completes, then the dialog POSTs /api/machines/ssh with { host, bothWays: true } and closes; given a 409 version-mismatch response with a message, then the dialog renders that message.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-ssh-ui.ac3",
+            "title": "Given Test clicked with a mocked SshTestResult { reachable: true, panVersion: '0.72.0', versionMatches: true }, when it resolves, then the dialog renders `Reached <host>: pan 0.72.0`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-ssh-ui.ac4",
+            "title": "Given an SSH-backed row with launch managed, when Remove is clicked and 'Leave the server running' is checked and confirmed, then DELETE /api/machines/<id>?keepServer=1 is called; an external row's confirmation renders `The server on <destination> keeps running.`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-ssh-ui.ac5",
+            "title": "Given scripts/frontend-test-subset.txt, when it is read, then it lists src/components/Settings/anywhere/__tests__/AddSshMachineDialog.test.tsx.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-docs",
+        "title": "WI-12 Documentation: cli/machines.mdx, configuration/linked-machines.mdx, docs/ANYWHERE-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4404",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/machines.mdx",
+            "configuration/linked-machines.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "src/lib/anywhere/routes.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '^## add-ssh' cli/machines.mdx",
+            "grep -n '^## SSH machines' configuration/linked-machines.mdx",
+            "grep -n '^## SSH machines (PAN-4404)' docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints one matching heading line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-7",
+            "FR-9",
+            "FR-12",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. cli/machines.mdx: add `## add-ssh` and `## test-ssh` (synopsis, flags, example, error codes with remedies) and document --keep-server and the SSH output under `## unlink` and the SSH column under `## list`. configuration/linked-machines.mdx: add `## SSH machines` after `## Link a machine` (the five steps, requirements: OpenSSH, an agent or key usable without a prompt by the dashboard process and SSH_AUTH_SOCK, host key already in known_hosts, same pan version; managed vs external; what removal stops and leaves running; in-use; attention), add the ssh kind to `## Routes`, and replace the Add-route `tcp://127.0.0.1:3041` SSH example with a pointer to Add an SSH machine. docs/ANYWHERE-ARCHITECTURE.md: add `## SSH machines (PAN-4404)` before `## Decisions added by sibling issues` covering D-4404-3, D-4404-4, the helper result line, marker and lock files, D-4404-7, D-4404-8, D-4404-10 and the smoke script. Update the routes.ts module header sentence about `ssh` routes arriving in #4404."
+        },
+        "items": [
+          {
+            "id": "wi12-docs.ac1",
+            "title": "Given cli/machines.mdx, when a reader opens it, then `## add-ssh` shows the synopsis `pan machines add-ssh <host> [--pan-path <path>] [--one-way] [--agent-fenced] [--json]` and lists the version-mismatch remedy `npm install -g @overdeck/core@<version>`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-docs.ac2",
+            "title": "Given configuration/linked-machines.mdx, when a reader opens `## SSH machines`, then it states that removal stops the server only when Overdeck started it and no other machine is linked to it, and that the host key must already be in known_hosts; and `## Routes` lists the ssh kind.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-docs.ac3",
+            "title": "Given docs/ANYWHERE-ARCHITECTURE.md, when a reader opens `## SSH machines (PAN-4404)`, then it names ${OVERDECK_HOME}/ssh-launch/server.json, ${OVERDECK_HOME}/ssh-launch/lock, the OVERDECK_SSH_HELPER result line and the command `node scripts/anywhere/ssh-machine-smoke.mjs`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-ssh-smoke",
+        "title": "WI-13 SSH machine smoke script with a fake ssh (live check, adopt path)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:22:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4404",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/anywhere/ssh-machine-smoke.mjs",
+            "scripts/anywhere/fake-ssh.mjs"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "node scripts/anywhere/ssh-machine-smoke.mjs"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "the smoke prints each step name and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. fake-ssh.mjs is copied as `ssh` into .tmp/ssh-smoke/bin and understands exactly the D-4404-5 argv shapes: commands run with `sh -c` and HOME/OVERDECK_HOME = .tmp/ssh-smoke/remote (config.toml dashboard.api_port = 3062); `-N -L 127.0.0.1:<lp>:127.0.0.1:<rp>` runs a TCP proxy until killed. ssh-machine-smoke.mjs (modelled on two-machine-smoke.mjs): start B = dist/dashboard/server.js with OVERDECK_HOME=.tmp/ssh-smoke/remote on 3062, Deacon disabled and OVERDECK_ANYWHERE_SUPERVISOR=1 (a peer-mode server accepts secure channels only with that opt-in); write .tmp/ssh-smoke/remote/bin/pan wrapping node dist/cli/index.js; start A with OVERDECK_HOME=.tmp/ssh-smoke/local on 3061, OVERDECK_ANYWHERE_SUPERVISOR=1, PATH with the fake ssh first; run `pan machines add-ssh fake-remote --pan-path <abs pan wrapper> --json` against A; assert launch external and an ssh route; assert online within 15 s; unlink and assert ssh.reason external and B still healthy; stop both. `--serve` stops after starting A and B and prints A's URL for the browser check. Touch nothing outside .tmp/ssh-smoke. Implementation checkpoint: if step online fails while unit tests pass, record the output in continue.json and the PR body and do not mark this item done."
+        },
+        "items": [
+          {
+            "id": "wi13-ssh-smoke.ac1",
+            "title": "Given a built tree, when `node scripts/anywhere/ssh-machine-smoke.mjs` runs, then step add-ssh returns a view with ssh.launch external and a route of kind ssh, and step online shows the link online within 15 s.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-ssh-smoke.ac2",
+            "title": "Given the linked fake remote, when step unlink runs, then the answer has ssh.reason external and B still answers GET /api/health with 200, and the script exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-ssh-smoke.ac3",
+            "title": "Given `--serve`, when the script runs, then it prints A's dashboard URL and leaves A and B running, and no file outside .tmp/ssh-smoke is created or changed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-contracts",
+        "to": "wi2-ssh-target",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contracts",
+        "to": "wi4-ssh-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-ssh-target",
+        "to": "wi4-ssh-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contracts",
+        "to": "wi5-forward-supervisor",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-ssh-target",
+        "to": "wi5-forward-supervisor",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-ssh-machine-store",
+        "to": "wi5-forward-supervisor",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-ssh-target",
+        "to": "wi7-ssh-machine-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-ssh-machine-store",
+        "to": "wi7-ssh-machine-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-forward-supervisor",
+        "to": "wi7-ssh-machine-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-link-transport",
+        "to": "wi7-ssh-machine-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-ssh-machine-service",
+        "to": "wi8-ssh-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-ssh-machine-service",
+        "to": "wi9-machines-routes-boot",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-ssh-helper",
+        "to": "wi10-cli-ssh",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contracts",
+        "to": "wi10-cli-ssh",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contracts",
+        "to": "wi11-ssh-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-machines-routes-boot",
+        "to": "wi12-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-cli-ssh",
+        "to": "wi12-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-ssh-ui",
+        "to": "wi12-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-ssh-routes",
+        "to": "wi13-ssh-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-machines-routes-boot",
+        "to": "wi13-ssh-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-cli-ssh",
+        "to": "wi13-ssh-smoke",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

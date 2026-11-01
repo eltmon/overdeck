@@ -28,7 +28,8 @@ export interface EnvironmentIdentity {
   createdAt: string;
 }
 
-const UUID_V4_LOWERCASE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+/** Shape of an environment id: a lowercase UUID v4. */
+export const UUID_V4_LOWERCASE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 /** Absolute path of the identity file under the current OVERDECK_HOME. */
 export function environmentIdentityPath(): string {

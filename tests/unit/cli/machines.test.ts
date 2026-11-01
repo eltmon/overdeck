@@ -98,7 +98,7 @@ describe('pan machines (PAN-4645 WI-14)', () => {
     await runMachinesList({});
     const out = stdout.join('\n');
     expect(out).toContain('This machine: laptop (aaaa-bbbb-cccc-dddd-eeee)');
-    expect(out).toMatch(/LABEL\s+STATE\s+ROUTE\s+ACCESS\s+FINGERPRINT/);
+    expect(out).toMatch(/LABEL\s+STATE\s+ROUTE\s+ACCESS\s+SSH\s+FINGERPRINT/);
     expect(out).toContain('online (froze 5.0 s, 2 min ago)');
     expect(out).toContain('tcp://100.101.1.2:3011');
     expect(out).toContain('offline (network 12.0 s, 1 h ago): no route answered');

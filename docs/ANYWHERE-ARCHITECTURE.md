@@ -206,6 +206,126 @@ outside the credential's scopes. Revoking the credential closes its sockets with
 the raw socket found through the request's `IncomingMessage`, for `net.Socket` and
 `ChannelSocket` alike.
 
+## SSH machines (PAN-4404)
+
+An SSH machine is a machine link whose first route is an SSH port forward that the linking
+dashboard set up itself (W-LINK6, epic FR-17, D-13; issue PRD `.pan/drafts/PAN-4404.md`).
+User-facing pages: the `## SSH machines` section of `configuration/linked-machines.mdx` and
+`add-ssh`, `test-ssh` and `unlink --keep-server` in `cli/machines.mdx`.
+
+| Piece | Where |
+| --- | --- |
+| Destination grammar, remote command, argv, failure classifier, helper result and version parsing, `~/.ssh/config` aliases | `src/lib/anywhere/ssh/target.ts` |
+| `ssh` process runners (async `spawn` and `execFile`, with timeouts) | `src/lib/anywhere/ssh/run.ts` |
+| `${OVERDECK_HOME}/ssh-machines.json` (0600, atomic, fail-closed) | `src/lib/anywhere/ssh/machine-store.ts` |
+| Remote helper, `pan machines ssh-helper start\|stop` (hidden) | `src/lib/anywhere/ssh/helper.ts`, `src/cli/commands/machines-ssh.ts` |
+| Forward supervisor | `src/dashboard/server/services/ssh-forward-supervisor.ts` |
+| Add, test, remove, reconnect, the local host lock | `src/dashboard/server/services/ssh-machine-service.ts` |
+| `POST /api/machines/ssh`, `POST /api/machines/ssh/test`, `GET /api/machines/ssh/config-hosts` | `src/dashboard/server/routes/machines-ssh.ts` |
+
+### The add flow (D-4404-3)
+
+1. Validate the destination and take the local host lock (in-process, keyed by the
+   destination lowercased without `ssh://`; a second add, remove or reconnect for it fails
+   at once with `busy`).
+2. Version probe over SSH (20 s): the last bare-semver line of `pan --version` must equal
+   this server's version, or `version-mismatch`.
+3. `ssh-helper start --linker <our environment id> --json` (150 s).
+4. A helper whose environment id is ours is `self-link` (a server it started is stopped again).
+5. Pick a free loopback port and write a **provisional** record (`linkId: null`).
+6. The forward supervisor starts the forward and waits up to 15 s for the port; the port is
+   read back from the record, since a collision may have moved it.
+7. `createMachineLink({ transport: { url: 'tcp://127.0.0.1:<lp>', kind: 'ssh', pairingCode } })`:
+   the PAN-4645 pairing handshake over the forward, with no pairing-URL parsing and no
+   loopback refusal.
+8. Set the record's link id; drop older records for the same environment id (their forward
+   stops; their server never does).
+
+A failure after step 5 stops the forward, deletes the provisional record and, when the
+helper reported `managed`, runs `ssh-helper stop` (45 s, best effort). At boot, a record
+whose link id is still null (the dashboard died mid-add) is deleted.
+
+### The remote command (D-4404-4, D-4404-5)
+
+Every `ssh` call is an argv array with `-T -o BatchMode=yes -o ConnectTimeout=10
+-o ServerAliveInterval=15 -o ServerAliveCountMax=3`, then `-- <destination> <command>`.
+The destination is validated and always follows `--`. The command string is always
+
+```
+sh -c 'exec "${SHELL:-/bin/sh}" -lc "<pan> <args>"'
+```
+
+where `<pan>` is `pan` or a validated absolute path and `<args>` is one of `--version` or
+`machines ssh-helper start|stop --linker <uuid> [--no-pair] --json`. Nothing else can reach
+it. The forward drops `-T` and adds `-N -o ExitOnForwardFailure=yes
+-L 127.0.0.1:<lp>:127.0.0.1:<rp>`. No call ever sets `StrictHostKeyChecking=no` or
+`accept-new`: a host key the operator has not accepted fails with `host-key`.
+
+### Helper protocol, marker and lock
+
+The helper prints exactly one line, `OVERDECK_SSH_HELPER <json>` (protocol `v: 1`); the
+linking side takes the last such line and ignores login banners. Start answers `launch`,
+`apiPort`, `environmentId`, `label`, `serverVersion`, `panVersion` and a one-time pairing
+credential (`null` with `--no-pair`); stop answers `stopped` and `reason`. Helper errors are
+`busy`, `start-failed`, `pair-failed`, `token-rejected`, `stop-failed` and `bad-linker`; the
+linking side keeps `busy` and `start-failed` and maps the rest to `helper-failed`.
+
+- **Remote lock** `${OVERDECK_HOME}/ssh-launch/lock`, a directory made with `mkdir`
+  (atomic). It serializes helpers from every linking machine. A lock older than 180 s is
+  stale and broken once; otherwise the helper waits up to 30 s, then answers `busy`.
+- **Launch marker** `${OVERDECK_HOME}/ssh-launch/server.json` (0600):
+  `{ v: 1, pid, apiPort, version, startedAt, startedBy }`, written after the helper starts a
+  server. `startedBy` is the linking machine's environment id.
+
+### Adopt and stop rules (D-4404-7, D-4404-8)
+
+**Start.** The helper reads the API port from the host's `config.toml` (as `pan up` does)
+and polls `/api/health`. A dashboard that answers with a `pid` is adopted: `managed` when
+the marker names this linker and that pid, else `external` (a marker with another pid is
+stale and deleted). Otherwise it spawns `pan up --detach --no-open --skip-traefik` with
+piped output (so a sidecar it leaves cannot hold the SSH session open), waits for the
+child's `exit` event (120 s), polls health every 500 ms for 30 s, writes the marker and
+reports `managed`; no health is `start-failed` with the last 20 output lines.
+
+**Stop**, under the remote lock, in order: no health ⇒ `not-running` (marker deleted); no
+marker or another linker ⇒ `external`; marker pid differs from the health pid ⇒
+`restarted` (marker deleted); the host's `GET /api/machines` lists an active inbound
+machine other than the linker ⇒ `in-use`; otherwise `SIGTERM` to that pid, `SIGKILL`
+after 10 s, marker deleted, `stopped`. Only the dashboard process is signalled; `pan down`
+is not used because it also stops Traefik and review sessions this machine did not start.
+The linking side runs stop only for a `managed` record when the operator did not ask to
+keep the server; an unreachable host gives `stop-failed` and the removal goes on.
+
+### Forward supervisor (D-4404-10)
+
+It starts in `startAnywhere` right after the link supervisor (primary dashboard only) and
+stops in `stopAnywhere`. States: `starting`, `up` (the local port accepts a connection),
+`down`, `attention`. An exit with `auth-failed` or `host-key` stderr goes to `attention`
+and is not retried until `ensure()` (Reconnect); `Address already in use` or `cannot listen
+to port` picks a new free port, rewrites the link's `ssh` route through `setLinkRoutes`
+and the link supervisor's `updateRoutes`, and respawns at once; any other exit is `down`
+and retries after 1 s doubling to 60 s with ±20 % jitter, the counter resetting after 60 s
+up. The forward pid is recorded; at boot a recorded pid whose `ps -o args=` contains
+`-L 127.0.0.1:<lp>:` is sent `SIGTERM` before a new forward starts.
+
+### Running the SSH machine smoke
+
+```bash
+npm run build
+node scripts/anywhere/ssh-machine-smoke.mjs
+```
+
+It never touches the operator's sshd or dashboard. `scripts/anywhere/fake-ssh.mjs` is
+installed as `.tmp/ssh-smoke/bin/ssh` and put first on A's `PATH`; it runs remote commands
+with `sh -c` under the "remote" home and turns `-N -L …` into a TCP proxy. B (the remote,
+`.tmp/ssh-smoke/remote`, port 3062) and A (`.tmp/ssh-smoke/local`, port 3061) are peer-mode
+dashboards with `OVERDECK_ANYWHERE_SUPERVISOR=1`. Steps: `start`, `start A`, `add-ssh`
+(the view is `external` with an `ssh` route), `online` (within 15 s), `unlink` (reason
+`external`, B still healthy), `stop`. `--serve` stops after `start A`, prints A's URL and
+the remote pan path for a browser check, and keeps both running until Ctrl-C. The managed
+path is not exercised, because `pan up` starts shared sidecars; the helper unit tests cover
+it.
+
 ## Fleet versions and updates (PAN-4654)
 
 Each machine reports itself and runs its own update; the viewing machine keeps no fleet

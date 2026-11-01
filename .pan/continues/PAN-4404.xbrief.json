@@ -1,0 +1,316 @@
+{
+  "version": "1",
+  "issueId": "PAN-4404",
+  "created": "2026-11-01T13:29:30.411Z",
+  "updated": "2026-11-01T15:42:56.997Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T15:07Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T15:07:31.978Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T15:42:56.997Z"
+    }
+  ],
+  "items": {
+    "wi1-contracts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:29:30.411Z",
+      "doneAt": "2026-11-01T13:31:26.725Z"
+    },
+    "wi2-ssh-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:31:39.126Z",
+      "doneAt": "2026-11-01T13:35:49.004Z"
+    },
+    "wi3-ssh-machine-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:35:54.264Z",
+      "doneAt": "2026-11-01T13:36:59.451Z"
+    },
+    "wi4-ssh-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:37:05.075Z",
+      "doneAt": "2026-11-01T13:41:51.107Z"
+    },
+    "wi5-forward-supervisor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:44:16.657Z",
+      "doneAt": "2026-11-01T13:48:07.317Z"
+    },
+    "wi6-link-transport": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:48:12.374Z",
+      "doneAt": "2026-11-01T13:49:27.859Z"
+    },
+    "wi7-ssh-machine-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:50:08.075Z",
+      "doneAt": "2026-11-01T13:52:54.890Z"
+    },
+    "wi8-ssh-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:52:59.252Z",
+      "doneAt": "2026-11-01T13:55:52.997Z"
+    },
+    "wi9-machines-routes-boot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:55:58.409Z",
+      "doneAt": "2026-11-01T13:58:22.637Z"
+    },
+    "wi10-cli-ssh": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T13:58:32.758Z",
+      "doneAt": "2026-11-01T14:01:09.217Z"
+    },
+    "wi11-ssh-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T14:01:16.027Z",
+      "doneAt": "2026-11-01T14:05:16.920Z"
+    },
+    "wi13-ssh-smoke": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T14:05:25.149Z",
+      "doneAt": "2026-11-01T14:11:16.690Z"
+    },
+    "wi12-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4404",
+      "claimedAt": "2026-11-01T14:11:22.315Z",
+      "doneAt": "2026-11-01T14:11:50.874Z"
+    },
+    "wi1-contracts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:28:56.457Z"
+    },
+    "wi1-contracts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:29:11.521Z"
+    },
+    "wi1-contracts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:29:25.293Z"
+    },
+    "wi2-ssh-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:29:40.257Z"
+    },
+    "wi2-ssh-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:29:55.341Z"
+    },
+    "wi2-ssh-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:30:11.660Z"
+    },
+    "wi2-ssh-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:30:27.735Z"
+    },
+    "wi2-ssh-target.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:30:43.478Z"
+    },
+    "wi3-ssh-machine-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:30:59.638Z"
+    },
+    "wi3-ssh-machine-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:31:15.111Z"
+    },
+    "wi3-ssh-machine-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:31:30.695Z"
+    },
+    "wi4-ssh-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:31:45.935Z"
+    },
+    "wi4-ssh-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:32:01.784Z"
+    },
+    "wi4-ssh-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:32:15.688Z"
+    },
+    "wi4-ssh-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:32:29.557Z"
+    },
+    "wi4-ssh-helper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:32:44.225Z"
+    },
+    "wi5-forward-supervisor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:32:58.954Z"
+    },
+    "wi5-forward-supervisor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:33:13.371Z"
+    },
+    "wi5-forward-supervisor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:33:27.537Z"
+    },
+    "wi5-forward-supervisor.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:33:42.947Z"
+    },
+    "wi5-forward-supervisor.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:33:59.250Z"
+    },
+    "wi6-link-transport.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:34:14.077Z"
+    },
+    "wi6-link-transport.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:34:28.680Z"
+    },
+    "wi6-link-transport.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:34:40.876Z"
+    },
+    "wi7-ssh-machine-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:34:54.368Z"
+    },
+    "wi7-ssh-machine-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:35:07.250Z"
+    },
+    "wi7-ssh-machine-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:35:21.306Z"
+    },
+    "wi7-ssh-machine-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:35:35.501Z"
+    },
+    "wi7-ssh-machine-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:41:07.454Z"
+    },
+    "wi8-ssh-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:35:51.981Z"
+    },
+    "wi8-ssh-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:36:06.290Z"
+    },
+    "wi8-ssh-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:36:19.452Z"
+    },
+    "wi8-ssh-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:36:32.005Z"
+    },
+    "wi9-machines-routes-boot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:36:44.458Z"
+    },
+    "wi9-machines-routes-boot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:37:00.100Z"
+    },
+    "wi9-machines-routes-boot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:37:11.367Z"
+    },
+    "wi10-cli-ssh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:37:23.813Z"
+    },
+    "wi10-cli-ssh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:37:37.820Z"
+    },
+    "wi10-cli-ssh.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:37:51.681Z"
+    },
+    "wi10-cli-ssh.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:38:05.949Z"
+    },
+    "wi11-ssh-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:38:19.895Z"
+    },
+    "wi11-ssh-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:38:34.514Z"
+    },
+    "wi11-ssh-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:38:49.519Z"
+    },
+    "wi11-ssh-ui.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:39:04.406Z"
+    },
+    "wi11-ssh-ui.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:39:17.475Z"
+    },
+    "wi12-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:39:31.459Z"
+    },
+    "wi12-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:39:45.384Z"
+    },
+    "wi12-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:39:59.015Z"
+    },
+    "wi13-ssh-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:40:14.725Z"
+    },
+    "wi13-ssh-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:40:30.700Z"
+    },
+    "wi13-ssh-smoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:40:45.937Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T15:07:31Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4404\n\nPull request: https://github.com/eltmon/overdeck/pull/4720 (head `d6a40328`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124884917197/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41318911328/job/124884917197  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on Pipeline, Board, Command Deck, and Agents routes\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on Pipeline, Board, Command Deck, and Agents routes\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 45000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/e2e/styleguide-conformance.spec.ts:\u001b[2m416:3\u001b[22m\u001b[39m\n    \u001b[90m414|\u001b[39m\n    \u001b[90m415|\u001b[39m \u001b[34mdescribe\u001b[39m(\u001b[32m'styleguide rendered surface conformance'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m416|\u001b[39m   it('renders shared primitives on Pipeline, Board, Command Deck, and …\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m417|\u001b[39m     \u001b[35mconst\u001b[39m pipeline \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mopenRoute\u001b[39m(\u001b[32m'/pipeline'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m418|\u001b[39m     await expect.poll(() => pipeline.page.locator('[data-component=\"to…\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m518 passed\u001b[39m\u001b[22m\u001b[90m (519)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}
