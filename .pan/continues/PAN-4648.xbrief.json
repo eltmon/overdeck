@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4648",
   "created": "2026-11-01T05:50:45.229Z",
-  "updated": "2026-11-01T07:55:57.263Z",
+  "updated": "2026-11-01T07:56:31.799Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "hooks-route.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T07:55:57.262Z"
+    },
+    "triggers-admin-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:56:31.799Z"
     }
   }
 }
