@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T13:57:08.570Z",
+  "updated": "2026-11-01T13:57:27.226Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,9 +130,10 @@
       "doneAt": "2026-11-01T13:56:37.805Z"
     },
     "wi4-sealed-box": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2356",
-      "claimedAt": "2026-11-01T13:57:08.570Z"
+      "claimedAt": "2026-11-01T13:57:08.570Z",
+      "doneAt": "2026-11-01T13:57:27.226Z"
     }
   }
 }
