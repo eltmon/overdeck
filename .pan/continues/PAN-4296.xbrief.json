@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4296",
   "created": "2026-11-01T21:43:56.125Z",
-  "updated": "2026-11-01T23:12:37.043Z",
+  "updated": "2026-11-01T23:12:50.155Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "wi1-image-codex.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T23:12:37.043Z"
+    },
+    "wi2-record-codex-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T23:12:50.155Z"
     }
   }
 }
