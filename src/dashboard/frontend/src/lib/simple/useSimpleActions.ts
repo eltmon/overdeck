@@ -10,11 +10,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { refreshDashboardState } from '../refresh-dashboard-state';
 import { useAlert } from '../../components/DialogProvider';
 import { recoveryFromBody, useResumeRecovery } from '../resumeRecovery';
+import { dashboardMutationJsonHeaders } from '../wsTransport';
 
 async function postJson(url: string, body?: unknown): Promise<unknown> {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: await dashboardMutationJsonHeaders(),
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {
