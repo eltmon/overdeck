@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T09:19:30.928Z",
+  "updated": "2026-11-01T09:20:02.282Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -247,6 +247,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4645",
       "claimedAt": "2026-11-01T09:19:30.928Z"
+    },
+    "wi16-use-https-page": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:20:02.282Z"
     }
   }
 }
