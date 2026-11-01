@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4295",
   "created": "2026-11-01T05:48:47.966Z",
-  "updated": "2026-11-01T11:29:09.243Z",
+  "updated": "2026-11-01T11:29:21.916Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,10 @@
     "docs-fly-remote.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T11:29:09.243Z"
+    },
+    "fly-live-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:29:21.916Z"
     }
   }
 }
