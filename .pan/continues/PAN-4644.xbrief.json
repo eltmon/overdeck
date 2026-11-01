@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4644",
   "created": "2026-11-01T04:54:46.297Z",
-  "updated": "2026-11-01T07:28:09.727Z",
+  "updated": "2026-11-01T07:28:29.359Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "selection-resolve.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T07:28:09.726Z"
+    },
+    "terminal-background.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:28:29.358Z"
     }
   }
 }
