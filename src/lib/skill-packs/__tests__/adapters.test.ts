@@ -16,7 +16,7 @@ import {
 } from '../adapters.js';
 import { SAGEOX_DISCLOSURE } from '../../sageox/disclosure.js';
 import { DEFT_SKILL_MAP } from '../deft.js';
-import { GSTACK_DISCLOSURE, GSTACK_OPT_IN_SKILLS, GSTACK_SKILL_MAP } from '../gstack.js';
+import { GSTACK_BROWSER_NEEDED, GSTACK_DISCLOSURE, GSTACK_OPT_IN_SKILLS, GSTACK_SKILL_MAP } from '../gstack.js';
 
 const roots: string[] = [];
 
@@ -255,6 +255,8 @@ describe('gstack-runtime adapter', () => {
       'review/bin/helper.sh': '#!/usr/bin/env bash\n',
       'codex/SKILL.md': skillMd('codex', 'Second opinion from Codex.'),
       'qa/SKILL.md': skillMd('qa', 'QA with the browser.'),
+      'ship/SKILL.md': skillMd('ship', 'Ship a release.'),
+      'pair-agent/SKILL.md': skillMd('pair-agent', 'Pair over a tunnel.'),
       'newskill/SKILL.md': skillMd('newskill', 'Added upstream later.'),
     });
     chmodSync(join(root, 'bin/gstack-x'), 0o755);
@@ -271,9 +273,30 @@ describe('gstack-runtime adapter', () => {
     expect(manifest.excluded).toEqual([
       { name: 'connect-chrome', reason: GSTACK_SKILL_MAP['connect-chrome']!.reason },
       { name: 'newskill', reason: 'unreviewed' },
-      { name: 'qa', reason: GSTACK_SKILL_MAP['qa']!.reason },
+      { name: 'pair-agent', reason: GSTACK_SKILL_MAP['pair-agent']!.reason },
+      { name: 'qa', reason: GSTACK_BROWSER_NEEDED },
+      { name: 'ship', reason: GSTACK_BROWSER_NEEDED },
     ]);
-    expect(GSTACK_SKILL_MAP['qa']!.class).toBe('browser');
+  });
+
+  it('mounts browser skills only with browser: true, browser-opt-in ones as opt-in (PAN-4730)', async () => {
+    const without = await readPackManifest(gstackFixture(), 'gstack-runtime', { browser: false });
+    expect(without.skills.map((s) => s.name)).toEqual(['codex', 'review']);
+    expect(without.capabilities.projectMutatingSkills).toEqual(['codex']);
+
+    const manifest = await readPackManifest(gstackFixture(), 'gstack-runtime', { browser: true });
+    expect(manifest.skills).toEqual([
+      { name: 'codex', dir: 'codex', description: 'Second opinion from Codex.', optIn: true },
+      { name: 'qa', dir: 'qa', description: 'QA with the browser.', optIn: false },
+      { name: 'review', dir: 'review', description: 'Pre-landing review.', optIn: false },
+      { name: 'ship', dir: 'ship', description: 'Ship a release.', optIn: true },
+    ]);
+    expect(manifest.excluded).toEqual([
+      { name: 'connect-chrome', reason: GSTACK_SKILL_MAP['connect-chrome']!.reason },
+      { name: 'newskill', reason: 'unreviewed' },
+      { name: 'pair-agent', reason: GSTACK_SKILL_MAP['pair-agent']!.reason },
+    ]);
+    expect(manifest.capabilities.projectMutatingSkills).toEqual(['codex', 'ship']);
   });
 
   it('lists every runtime executable outside .git, test and node_modules, and requires bun', async () => {

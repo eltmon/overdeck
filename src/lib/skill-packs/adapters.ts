@@ -12,7 +12,15 @@ import { basename, isAbsolute, join, posix } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { SAGEOX_DISCLOSURE } from '../sageox/disclosure.js';
 import { DEFT_READONLY_SKILLS, DEFT_SKILL_PREFIX, DEFT_SKILLS_DIR } from './deft.js';
-import { GSTACK_DISCLOSURE, GSTACK_MOUNTED_SKILLS, GSTACK_OPT_IN_SKILLS, classifyGstackSkill } from './gstack.js';
+import {
+  GSTACK_BROWSER_NEEDED,
+  GSTACK_BROWSER_OPT_IN_SKILLS,
+  GSTACK_BROWSER_SKILLS,
+  GSTACK_DISCLOSURE,
+  GSTACK_MOUNTED_SKILLS,
+  GSTACK_OPT_IN_SKILLS,
+  classifyGstackSkill,
+} from './gstack.js';
 
 export type PackAdapterId = 'plain' | 'claude-plugin' | 'deft-readonly' | 'gstack-runtime';
 
@@ -257,10 +265,17 @@ async function deftReadonlySkillDirs(root: string): Promise<string[]> {
   return dirs;
 }
 
-/** Mounted gstack skills (`<name>/SKILL.md` a regular file) and every other top-level skill dir with its reason. */
-async function gstackSkillDirs(root: string): Promise<{ dirs: string[]; excluded: Array<{ name: string; reason: string }> }> {
+/**
+ * Mounted gstack skills (`<name>/SKILL.md` a regular file) and every other top-level skill dir with its reason.
+ * Browser-class skills mount only when `browser` (the operator consented and the runtime is built, PAN-4730).
+ */
+async function gstackSkillDirs(
+  root: string,
+  browser: boolean,
+): Promise<{ dirs: string[]; excluded: Array<{ name: string; reason: string }> }> {
   const dirs: string[] = [];
-  for (const name of GSTACK_MOUNTED_SKILLS) {
+  const candidates = browser ? [...GSTACK_MOUNTED_SKILLS, ...GSTACK_BROWSER_SKILLS].sort() : GSTACK_MOUNTED_SKILLS;
+  for (const name of candidates) {
     if (await isFile(join(root, name, 'SKILL.md'))) dirs.push(name);
   }
   const excluded: Array<{ name: string; reason: string }> = [];
@@ -270,8 +285,10 @@ async function gstackSkillDirs(root: string): Promise<{ dirs: string[]; excluded
     // A symlinked skill dir (connect-chrome) counts: it is listed as not mounted.
     if (!(await exists(join(root, name, 'SKILL.md')))) continue;
     const entry = classifyGstackSkill(name);
-    const mountable = entry.class === 'default' || entry.class === 'opt-in';
-    excluded.push({ name, reason: mountable ? 'SKILL.md is not a regular file' : entry.reason });
+    const browserClass = entry.class === 'browser' || entry.class === 'browser-opt-in';
+    const mountable = entry.class === 'default' || entry.class === 'opt-in' || (browserClass && browser);
+    const reason = mountable ? 'SKILL.md is not a regular file' : browserClass ? GSTACK_BROWSER_NEEDED : entry.reason;
+    excluded.push({ name, reason });
   }
   return { dirs, excluded };
 }
@@ -320,7 +337,7 @@ async function readLicense(root: string, plugin: Record<string, unknown> | null)
 export async function readPackManifest(
   root: string,
   adapter: PackAdapterId,
-  opts: { optIn?: readonly string[]; skillsRoot?: string; pluginRoot?: string } = {},
+  opts: { optIn?: readonly string[]; skillsRoot?: string; pluginRoot?: string; browser?: boolean } = {},
 ): Promise<PackManifest> {
   let prefix = '';
   if (opts.pluginRoot !== undefined) {
@@ -331,7 +348,7 @@ export async function readPackManifest(
   const base = prefix ? join(root, prefix) : root;
   const plugin = await readPluginJson(base, adapter === 'claude-plugin');
   const deft = adapter === 'deft-readonly';
-  const gstack = adapter === 'gstack-runtime' ? await gstackSkillDirs(base) : null;
+  const gstack = adapter === 'gstack-runtime' ? await gstackSkillDirs(base, opts.browser === true) : null;
   const skillDirs =
     adapter === 'claude-plugin'
       ? await claudePluginSkillDirs(base, plugin ?? {})
@@ -341,7 +358,8 @@ export async function readPackManifest(
           ? gstack.dirs
           : await scanSkillDirs(base, opts.skillsRoot ?? 'skills');
   // gstack opt-in comes from the skill map, so a stale registry entry cannot turn an opt-in skill into a default one.
-  const optIn = new Set(gstack ? GSTACK_OPT_IN_SKILLS : (opts.optIn ?? []));
+  // A browser-opt-in skill is only present when the browser runtime is mounted.
+  const optIn = new Set(gstack ? [...GSTACK_OPT_IN_SKILLS, ...GSTACK_BROWSER_OPT_IN_SKILLS] : (opts.optIn ?? []));
 
   const skills: PackSkill[] = [];
   const seen = new Set<string>();
