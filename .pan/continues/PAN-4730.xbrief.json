@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4730",
   "created": "2026-11-01T20:48:21.313Z",
-  "updated": "2026-11-01T21:24:37.209Z",
+  "updated": "2026-11-01T21:24:52.279Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,11 @@
       "claimedBy": "agent-pan-4730",
       "claimedAt": "2026-11-01T21:23:19.841Z",
       "doneAt": "2026-11-01T21:24:37.209Z"
+    },
+    "gstack-browser-live": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:24:52.278Z"
     }
   }
 }
