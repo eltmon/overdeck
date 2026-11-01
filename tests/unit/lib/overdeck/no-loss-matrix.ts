@@ -453,6 +453,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/machines/work/conversations',      kind: 'http', disposition: 'WRITE',       door: 'conversation-runtime.handleConversationCreate + conversation-provenance.markConversationStartedBy (PAN-4651 work door)' },
   { surface: 'POST /api/machines/work/workers',            kind: 'http', disposition: 'WRITE',       door: 'agents/worker/start.startWorker (worker.json startedBy) (PAN-4651 work door)' },
   { surface: 'POST /api/machines/work/issues/:id/start',   kind: 'http', disposition: 'WRITE',       door: 'routes/agents/spawn-issue.spawnIssueAgentForRoute (same path as POST /api/agents) (PAN-4651 work door)' },
+  { surface: 'POST /api/fleet/placement',                  kind: 'http', disposition: 'AGGREGATE',   door: 'fleet-target.placeAuto -> anywhere/placement.choosePlacement (self sample + link heartbeats) (PAN-4651)' },
   { surface: 'GET /api/workers/:id/status',                kind: 'http', disposition: 'READ',        door: 'agents/liveness.isAlive + agents/worker/report.listWorkerReports (PAN-4651)' },
   { surface: 'POST /api/workers/:id/stop',                 kind: 'http', disposition: 'WRITE',       door: 'agents/termination.stopAgent (operator) (PAN-4651)' },
   { surface: '* /api/conversations/@<machine>/*',          kind: 'http', disposition: 'RELOCATE',    door: "linked-conversation-proxy -> owner's /api/conversations/* over the machine link (PAN-4650)" },

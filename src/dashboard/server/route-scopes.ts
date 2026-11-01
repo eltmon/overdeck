@@ -78,6 +78,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/machines/work/conversations', scope: 'operate' },
   { method: 'POST', path: '/api/machines/work/workers', scope: 'operate' },
   { method: 'POST', path: '/api/machines/work/issues/:id/start', scope: 'operate' },
+  // PAN-4651 WI-8: Auto placement (read-only; fleet routes refuse channel callers).
+  { method: 'POST', path: '/api/fleet/placement', scope: 'read:state' },
   // PAN-4651 WI-5: a linked machine follows (and stops) a worker it delegated here.
   { method: 'GET', path: '/api/workers/:id/status', scope: 'read:state' },
   { method: 'POST', path: '/api/workers/:id/stop', scope: 'operate' },
