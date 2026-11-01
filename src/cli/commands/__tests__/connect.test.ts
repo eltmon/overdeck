@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { waitForLinger } from '../../../lib/systemd-user-session.js';
 import { runConnect, type ConnectDeps, type ServiceContext, type ServiceOutcome } from '../connect.js';
+import { installMacService } from '../connect-launchd.js';
 import { installLinuxService, type LinuxServiceDeps } from '../connect-systemd.js';
 
 const CREDENTIAL = `odp_${'a'.repeat(64)}`;
@@ -437,5 +438,62 @@ describe('pan connect on Linux (WI-9)', () => {
     expect(stdin.listenerCount('data')).toBe(0);
     expect(stdin.pause).toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('pan connect on macOS (WI-10)', () => {
+  function mac() {
+    const installSupervisorAgent = vi.fn(async () => ({ path: '/x', written: true, domain: 'gui/501' }));
+    const installMac = (ctx: ServiceContext) => installMacService(ctx, {
+      execPath: '/opt/homebrew/bin/node',
+      supervisorBundle: () => '/Users/alice/.overdeck/runtime/node_modules/@overdeck/core/dist/supervisor/server.js',
+      workingDirectory: () => '/Users/alice/.overdeck/runtime/node_modules/@overdeck/core',
+      supervisorPort: () => 3012,
+      installSupervisorAgent,
+    });
+    const harness = fakeDeps({
+      platform: 'darwin',
+      overdeckHome: '/Users/alice/.overdeck',
+      env: { PATH: '/opt/homebrew/bin:/usr/bin', SSH_CONNECTION: '198.51.100.4 51234 203.0.113.7 22' },
+      installMacService: installMac,
+    });
+    return { ...harness, installSupervisorAgent };
+  }
+
+  it('dispatches to the launch agent installer with the supervisor render options', async () => {
+    const { deps, installSupervisorAgent } = mac();
+
+    await expect(runConnect({}, deps)).resolves.toBe(0);
+    expect(installSupervisorAgent).toHaveBeenCalledWith({
+      nodePath: '/opt/homebrew/bin/node',
+      supervisorBundle: '/Users/alice/.overdeck/runtime/node_modules/@overdeck/core/dist/supervisor/server.js',
+      workingDirectory: '/Users/alice/.overdeck/runtime/node_modules/@overdeck/core',
+      supervisorPort: 3012,
+      overdeckHome: '/Users/alice/.overdeck',
+      path: '/opt/homebrew/bin:/usr/bin',
+      logPath: '/Users/alice/.overdeck/logs/supervisor.log',
+    });
+    expect(deps.explainSystemdUserUnavailable).not.toHaveBeenCalled();
+    expect(deps.startSupervisorProcess).not.toHaveBeenCalled();
+  });
+
+  it('says the agent starts at login and how to survive a reboot', async () => {
+    const { deps, stdout } = mac();
+
+    await runConnect({}, deps);
+    expect(plain(stdout).split('\n')[0]).toBe(
+      'Overdeck server: launchd agent ai.overdeck.supervisor (~/Library/LaunchAgents/ai.overdeck.supervisor.plist). '
+      + 'It starts when alice logs in; for a Mac that must come back after a reboot with nobody logged in, '
+      + 'turn on automatic login in System Settings → Users & Groups.',
+    );
+  });
+
+  it('reports the launchd manager in --json', async () => {
+    const { deps, stdout } = mac();
+
+    await runConnect({ json: true }, deps);
+    const result = JSON.parse(stdout[0]!) as { service: unknown; linger: unknown };
+    expect(result.service).toEqual({ manager: 'launchd', name: 'ai.overdeck.supervisor', enabled: true });
+    expect(result.linger).toBe('not-applicable');
   });
 });

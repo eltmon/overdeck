@@ -333,6 +333,7 @@ async function defaultDeps(): Promise<ConnectDeps> {
     explainSystemdUserUnavailable: systemd.explainSystemdUserUnavailable,
     startSupervisorProcess: supervisor.startSupervisorProcess,
     installLinuxService: async (ctx) => (await import('./connect-systemd.js')).installLinuxService(ctx),
+    installMacService: async (ctx) => (await import('./connect-launchd.js')).installMacService(ctx),
     requestPairingLink,
   };
 }
