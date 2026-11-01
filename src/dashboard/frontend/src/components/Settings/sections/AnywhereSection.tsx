@@ -7,6 +7,7 @@ import { AnywhereStatusCard } from '../anywhere/AnywhereStatusCard';
 import { ANYWHERE_STATUS_QUERY_KEY, loadAnywhereStatus, type AnywhereAction } from '../anywhere/anywhereApi';
 import { DevicesPanel } from '../anywhere/DevicesPanel';
 import { PairDeviceDialog } from '../anywhere/PairDeviceDialog';
+import { TailscalePeersPanel } from '../anywhere/TailscalePeersPanel';
 import { TailscaleSetupDialog } from '../anywhere/TailscaleSetupDialog';
 
 interface AnywhereSectionProps {
@@ -62,6 +63,7 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
       <div className="space-y-4">
         <AnywhereStatusCard onAction={handleAction} />
         <DevicesPanel />
+        {status?.tailscale?.nextStep === 'ready' && <TailscalePeersPanel />}
       </div>
       <PairDeviceDialog open={open} onClose={() => setOpen(false)} />
       <TailscaleSetupDialog open={tailscaleOpen} onClose={() => setTailscaleOpen(false)} />
