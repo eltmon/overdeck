@@ -46,6 +46,8 @@ export interface MachineLink {
   routes: LinkRoute[];
   createdAt: string;
   revokedAt: string | null;
+  /** PAN-4650 D-4650-15: **Hide this machine** — its conversations leave the merged list; the link stays. */
+  hidden?: boolean;
 }
 
 export interface UpsertLinkInput {

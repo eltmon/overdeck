@@ -20,6 +20,7 @@ import {
   type SharedConversationsDeps,
 } from '../../../lib/anywhere/shared-conversations.js';
 import { readAnywhereSettings, writeAnywhereSettings } from '../../../lib/anywhere/anywhere-settings.js';
+import { buildVaultContinuityLookup } from '../../../lib/overdeck/conversation-vault-continuity.js';
 import type { ProjectConfig } from '../../../lib/projects.js';
 import type { DashboardCredential } from '../routes/dashboard-auth.js';
 import { handleSharedConversations } from '../routes/machines-peer.js';
@@ -66,6 +67,10 @@ function deps(rows: unknown[], overrides: Partial<SharedConversationsDeps> = {})
       { key: 'myn', config: { name: 'MYN', path: join(root, 'myn'), gitlab_repo: 'myn/app' } as ProjectConfig },
     ],
     environmentId: async () => 'env-desk',
+    vaultLookup: async () => buildVaultContinuityLookup({
+      owned: { '/home/desk/.claude/projects/x/session-conv-a.jsonl': { vaultId: 'vault-id-a', harness: 'claude-code', tail: {} as never } },
+      listCache: [],
+    }, '/home/desk/.overdeck'),
     ...overrides,
   };
 }
@@ -121,8 +126,9 @@ describe('GET /api/machines/conversations (PAN-4650 WI-2)', () => {
       releasedTo: null,
       createdAt: '2026-11-01T10:00:00.000Z',
       pullable: true,
+      vaultId: 'vault-id-a',
     });
-    expect(json.rows[1]).toMatchObject({ projectKey: 'myn', gitOrigin: 'gitlab.com/myn/app', releasedTo: 'env-laptop', isWorking: true, pullable: false });
+    expect(json.rows[1]).toMatchObject({ projectKey: 'myn', gitOrigin: 'gitlab.com/myn/app', releasedTo: 'env-laptop', isWorking: true, pullable: false, vaultId: null });
     expect(json.hash).toMatch(/^[0-9a-f]{16}$/);
   });
 

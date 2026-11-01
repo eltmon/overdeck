@@ -34,6 +34,7 @@ function row(name: string, overrides: Partial<SharedConversationRow> = {}): Shar
     releasedTo: null,
     createdAt: '2026-11-01T10:00:00.000Z',
     pullable: true,
+    vaultId: null,
     ...overrides,
   };
 }

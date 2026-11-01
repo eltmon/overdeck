@@ -14,6 +14,7 @@ import type { SharedConversationRow, SharedConversationsResponse } from '@overde
 
 import { ensureEnvironmentIdentity } from '../environment-identity.js';
 import { getEnrichedConversationList } from '../overdeck/conversation-list.js';
+import { loadVaultContinuityLookup, vaultIdForConversation, type VaultContinuityLookup } from '../overdeck/conversation-vault-continuity.js';
 import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { canonicalPathAsync, isWithin } from '../projects/path-containment.js';
 import { isResumableHarness } from '../vault/resumable.js';
@@ -50,6 +51,7 @@ export interface SharedConversationsDeps {
   readSharing: () => Promise<boolean>;
   listProjects: () => Promise<Array<{ key: string; config: ProjectConfig }>>;
   environmentId: () => Promise<string>;
+  vaultLookup: () => Promise<VaultContinuityLookup>;
   now: () => number;
 }
 
@@ -58,6 +60,7 @@ const defaultDeps: SharedConversationsDeps = {
   readSharing: async () => (await readAnywhereSettings()).shareConversations,
   listProjects: listProjectsAsync,
   environmentId: async () => (await ensureEnvironmentIdentity()).environmentId,
+  vaultLookup: () => loadVaultContinuityLookup(),
   now: Date.now,
 };
 
@@ -90,7 +93,7 @@ async function projectResolver(projects: Array<{ key: string; config: ProjectCon
 }
 
 async function buildRows(deps: SharedConversationsDeps): Promise<SharedConversationRow[]> {
-  const [rows, projects] = await Promise.all([deps.listRows(), deps.listProjects()]);
+  const [rows, projects, vaultLookup] = await Promise.all([deps.listRows(), deps.listProjects(), deps.vaultLookup()]);
   const configs = new Map(projects.map(({ key, config }) => [key, config]));
   const projectOf = await projectResolver(projects);
   const shared: SharedConversationRow[] = [];
@@ -115,6 +118,7 @@ async function buildRows(deps: SharedConversationsDeps): Promise<SharedConversat
       releasedTo: row.releasedTo,
       createdAt: row.createdAt,
       pullable: row.harness !== null && isResumableHarness(row.harness),
+      vaultId: vaultIdForConversation(row, vaultLookup),
     });
   }
   return shared;

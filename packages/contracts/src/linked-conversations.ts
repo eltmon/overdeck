@@ -28,6 +28,11 @@ export interface SharedConversationRow {
   createdAt: string
   /** The owner's `isResumableHarness(harness)`; the UI never compares harness names. */
   pullable: boolean
+  /**
+   * The Session Vault record the owner settles this conversation into, or null.
+   * The viewer's saved copy of it is the browse row `vault-<vaultId>` (FR-2).
+   */
+  vaultId: string | null
 }
 
 /** The owner's answer to `GET /api/machines/conversations`. */

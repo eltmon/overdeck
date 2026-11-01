@@ -23,7 +23,7 @@ function row(name: string): SharedConversationRow {
   return {
     name, title: name, nativeSessionId: `s-${name}`, harness: 'claude-code', model: null, status: 'active', sessionAlive: true,
     isWorking: false, lastActivityAt: null, projectKey: null, gitOrigin: null, cwd: '/w', issueId: null, tmuxSession: `conv-${name}`,
-    releasedTo: null, createdAt: '2026-11-01T10:00:00.000Z', pullable: true,
+    releasedTo: null, createdAt: '2026-11-01T10:00:00.000Z', pullable: true, vaultId: null,
   };
 }
 
