@@ -7,6 +7,7 @@
  * paired device's session cannot create pairing links or add addresses).
  */
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
+import { AccessTokensForbiddenError, type AccessTokenRecord } from '../sections/accessTokensShared';
 
 export interface DeviceRow {
   id: string;
@@ -69,6 +70,16 @@ export interface ApiResult<T> {
 
 export const ANYWHERE_DEVICES_QUERY_KEY = ['anywhere-devices'] as const;
 export const ANYWHERE_STATUS_QUERY_KEY = ['anywhere-status'] as const;
+/** Shared with `sections/AccessTokensSection` so a revoke or mint refreshes both surfaces. */
+export const ANYWHERE_ACCESS_TOKENS_QUERY_KEY = ['access-tokens'] as const;
+
+/** The default scopes of an MCP token (PAN-4649 D-4649-3); mirrors MCP_DEFAULT_SCOPES in src/lib/mcp/server.ts. */
+export const MCP_DEFAULT_SCOPES = ['read:state', 'read:conversations', 'operate'] as const;
+
+export interface CreatedAccessToken {
+  token: string;
+  record: { id: string; name: string; scopes: string[] };
+}
 
 async function readResult<T>(response: Response): Promise<ApiResult<T>> {
   const body = (await response.json().catch(() => null)) as T | { error?: string } | null;
@@ -128,4 +139,33 @@ export async function loadAnywhereStatus(): Promise<AnywhereStatus> {
   const result = await fetchAnywhereStatus();
   if (!isOk(result)) throw new Error(apiError(result));
   return result.body;
+}
+
+/** Mint a `kind: 'token'` access token (PAN-4649). Only a root browser may; a paired device gets 403. */
+export async function createAccessToken(name: string, scopes: readonly string[]): Promise<ApiResult<CreatedAccessToken>> {
+  return readResult(await fetch('/api/access-tokens', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ name, scopes }),
+  }));
+}
+
+/** A client config carrying the MCP URL and its Authorization header; the token never goes in the URL. */
+export function mcpClientConfig(url: string, token: string): string {
+  return JSON.stringify({ mcpServers: { overdeck: { type: 'http', url, headers: { Authorization: `Bearer ${token}` } } } }, null, 2);
+}
+
+/** Query function for the access-token rows (`kind: 'token'` only); a 403 throws `AccessTokensForbiddenError`. */
+export async function loadAccessTokens(): Promise<AccessTokenRecord[]> {
+  const result = await readResult<{ tokens: AccessTokenRecord[] }>(await fetch('/api/access-tokens'));
+  if (result.status === 403) throw new AccessTokensForbiddenError(apiError(result));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body.tokens ?? [];
+}
+
+export async function revokeAccessToken(id: string): Promise<ApiResult<{ ok: true }>> {
+  return readResult(await fetch(`/api/access-tokens/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: await dashboardMutationJsonHeaders(),
+  }));
 }

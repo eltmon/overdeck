@@ -3,9 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 
 import { requestSettingsSection } from '../../../lib/settingsSection';
 import { SettingsSection } from '../primitives/SettingsSection';
+import { AccessTokensPanel } from '../anywhere/AccessTokensPanel';
 import { AnywhereStatusCard } from '../anywhere/AnywhereStatusCard';
 import { ANYWHERE_STATUS_QUERY_KEY, loadAnywhereStatus, type AnywhereAction } from '../anywhere/anywhereApi';
 import { DevicesPanel } from '../anywhere/DevicesPanel';
+import { McpUrlDialog } from '../anywhere/McpUrlDialog';
 import { PairDeviceDialog } from '../anywhere/PairDeviceDialog';
 import { SetUpPhoneDialog } from '../anywhere/SetUpPhoneDialog';
 import { PushPanel } from '../anywhere/PushPanel';
@@ -21,6 +23,7 @@ interface AnywhereSectionProps {
 /** Settings → Anywhere: reach this machine from other devices (PAN-4445 FR-8). */
 export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: AnywhereSectionProps = {}) {
   const [localOpen, setLocalOpen] = useState(false);
+  const [mcpOpen, setMcpOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const open = pairDialogOpen ?? localOpen;
   const setOpen = (next: boolean) => {
@@ -55,6 +58,13 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
           )}
           <button
             type="button"
+            onClick={() => setMcpOpen(true)}
+            className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-muted/50 transition-colors"
+          >
+            Copy MCP URL
+          </button>
+          <button
+            type="button"
             onClick={() => setPhoneOpen(true)}
             className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-muted/50 transition-colors"
           >
@@ -74,6 +84,7 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
         <AnywhereStatusCard onAction={handleAction} />
         <DevicesPanel />
         {status?.tailscale?.nextStep === 'ready' && <TailscalePeersPanel />}
+        <AccessTokensPanel />
         <PushPanel />
       </div>
       <PairDeviceDialog open={open} onClose={() => setOpen(false)} />
@@ -85,6 +96,7 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
           setOpen(true);
         }}
       />
+      <McpUrlDialog open={mcpOpen} onClose={() => setMcpOpen(false)} />
       <SetUpPhoneDialog open={phoneOpen} onClose={() => setPhoneOpen(false)} />
     </SettingsSection>
   );

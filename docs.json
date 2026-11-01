@@ -60,6 +60,7 @@
               "configuration/session-vault",
               "configuration/remote-access",
               "configuration/tailscale",
+              "configuration/mcp",
               "configuration/phone",
               "configuration/push-notifications",
               "cli/vault",

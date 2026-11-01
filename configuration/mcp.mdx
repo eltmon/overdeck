@@ -1,0 +1,163 @@
+---
+title: "MCP server"
+description: Drive this machine's Overdeck from another tool over the Model Context Protocol, with a scoped, revocable token
+---
+
+# MCP server
+
+Overdeck serves a Model Context Protocol (MCP) server, so another tool (Claude
+Desktop, another agent harness, a chat bot) can list conversations, read one,
+send a message, start a conversation or a worker, and answer prompts that wait
+on you. It reaches this machine's Overdeck only.
+
+This is separate from the Channels bridge (`overdeck-bridge`), which delivers
+messages into one running agent. The MCP server is a control surface for
+outside tools.
+
+Every tool calls an existing dashboard route with the token the client
+presents, so a tool can do only what that token's scopes allow on that route.
+There is no second path to any operation.
+
+## Tools
+
+| Tool | What it does | Scope the token needs |
+| --- | --- | --- |
+| `list_machines` | Lists the machines this server reaches. Today that is this machine only. | none |
+| `list_conversations` | Lists recent conversations with status, harness, model and pending input. `limit` 1–200, default 50. | `read:conversations` |
+| `search_conversations` | Searches conversations by title and content. `query`, `limit` 1–50, default 20. | `read:conversations` |
+| `read_conversation` | Reads one conversation's messages. Pass a page cursor as `before` for older messages. | `read:conversations` |
+| `send_message` | Sends a message to a running conversation. | `tell` (`operate` includes it) |
+| `start_conversation` | Starts a conversation with a first message. Optional `projectKey`, `model`, `harness`, `effort`, `issueId`, `machine`. | `operate` |
+| `start_worker` | Starts a registered worker on an issue that has a workspace. `issueId`, `prompt`, optional `model`, `harness`, `effort`, `readOnly`, `name`, `machine`. | `operate` |
+| `list_pending_input` | Lists conversations waiting on input: questions, permission prompts, plan approvals and menus. | `read:conversations` |
+| `answer_question` | Answers a Claude Code conversation's pending question. | `tell` and `approve` |
+| `answer_permission` | Answers a Claude Code permission prompt with `allow-once`, `allow-always` or `deny`. | `approve` |
+
+No tool pairs devices, creates or revokes tokens, reads or writes settings, or
+touches the session vault.
+
+When a token lacks a scope, the tool returns an error such as
+`HTTP 403: insufficient_scope (missingScope: approve)`.
+
+## Over HTTP
+
+Open **Settings → Anywhere** on this machine and choose **Copy MCP URL**. The
+dialog:
+
+1. Asks for a name, the address the client will use, and whether to allow
+   answering questions and approving permissions.
+2. Creates an MCP access token and copies the URL, `<address>/mcp`, to the
+   clipboard.
+3. Shows the URL, the `Authorization: Bearer odk_…` header and a ready client
+   config, each with a Copy button. The token is shown once.
+
+The address list holds the machine's trusted addresses that other devices can
+reach, with the first `https://` one selected. When there is none, the dialog
+offers this browser's address, which works only on this machine. Add a
+reachable address (for example a Tailscale address) under Settings → Anywhere
+first.
+
+The token is never part of the URL. Proxy and access logs record URLs, so the
+token travels only in the `Authorization` header. Every common MCP client
+accepts a header. With Claude Code:
+
+```bash
+claude mcp add --transport http overdeck https://desk.tailnet.ts.net/mcp \
+  --header "Authorization: Bearer odk_…"
+```
+
+Or in an `mcp.json`-style config:
+
+```json
+{
+  "mcpServers": {
+    "overdeck": {
+      "type": "http",
+      "url": "https://desk.tailnet.ts.net/mcp",
+      "headers": { "Authorization": "Bearer odk_…" }
+    }
+  }
+}
+```
+
+The endpoint is stateless. Each `POST /mcp` gets its own server and one JSON
+answer; there is no session and no event stream. `GET /mcp` and `DELETE /mcp`
+answer 405. Only a browser on this machine can create the token; a paired
+device's browser sees "Only a browser on this machine can create MCP tokens."
+
+`/mcp` is served by the production dashboard (`pan up`) and its reachable
+addresses. The Vite dev server (`pan dev`) does not proxy it.
+
+## Over stdio
+
+`pan mcp serve` serves the same tools over stdin and stdout. It reads the token
+from the `OVERDECK_MCP_TOKEN` environment variable only, because a command-line
+flag would show in `ps`. Create a token first:
+
+```bash
+pan token create mcp --scopes read:state,read:conversations,operate
+OVERDECK_MCP_TOKEN=odk_… pan mcp serve
+```
+
+The command checks the token before it serves. It exits 1 when the variable is
+unset, or when the token is unknown, revoked, a paired-device credential, or
+carries `admin`. Its stdout carries only JSON-RPC; every message goes to stderr.
+
+A Claude Desktop config:
+
+```json
+{
+  "mcpServers": {
+    "overdeck": {
+      "command": "pan",
+      "args": ["mcp", "serve"],
+      "env": { "OVERDECK_MCP_TOKEN": "odk_…" }
+    }
+  }
+}
+```
+
+The dashboard must be running: each tool calls it.
+
+## Scopes and the approve scope
+
+An MCP token is an ordinary access token. Copy MCP URL gives it `read:state`,
+`read:conversations` and `operate` by default. `operate` covers `tell` and the
+two start tools.
+
+The box **Allow answering questions and approving permissions** adds
+`approve`. It is off by default, and only `approve` or `admin` satisfies it.
+`approve` lets the token answer blocking prompts: the `answer_question` and
+`answer_permission` tools, and the dashboard routes for pane-choice menus, pi
+asks, Codex approvals and plan approvals. See [Remote access](/configuration/remote-access)
+for the full scope table.
+
+<Warning>
+`approve` does not stop text from reaching a conversation that waits on a
+question. A token with `tell` can still send any message with `send_message`.
+What `approve` gates is the keystroke-driven answers and the two answer tools.
+</Warning>
+
+MCP never accepts an `admin` token, the machine's internal token or the
+dashboard's own session. Both transports refuse them.
+
+## Revoking
+
+Revoke an MCP token under **Settings → Anywhere → Access tokens**, under
+**Settings → Access Tokens**, or with `pan token revoke <id>`. A token revoked
+through the dashboard fails its next request at once. A token revoked by
+another process (for example `pan token revoke` while the dashboard is
+unreachable) fails within 5 seconds, when the dashboard rereads its token list.
+
+## This machine only
+
+`list_machines` returns this machine. `machine` on `start_conversation` and
+`start_worker` accepts nothing, `auto`, this machine's label, or its
+environment id; all of them run here. Any other value returns an error that
+names this machine.
+
+### Fleet reach
+
+Linked machines are not reachable through MCP yet. One URL reaching every
+linked machine's conversations is planned in
+[PAN-4651](https://github.com/eltmon/overdeck/issues/4651).

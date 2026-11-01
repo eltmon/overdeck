@@ -36,8 +36,10 @@ src/components/GodView/confluence/__tests__/useConfluenceData.test.ts
 src/components/HealthDashboard.test.tsx
 src/components/IssueActionMenu/__tests__/useIssueActions.render-count.test.tsx
 src/components/Settings/__tests__/ModelPresetsBar.test.tsx
+src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx
 src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx
 src/components/Settings/anywhere/__tests__/DevicesPanel.test.tsx
+src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx
 src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx
 src/components/Settings/anywhere/__tests__/PushPanel.test.tsx
 src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx
