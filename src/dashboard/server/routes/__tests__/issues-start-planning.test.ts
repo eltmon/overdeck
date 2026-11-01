@@ -10,12 +10,20 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 // real event-loop turn for the real fs.readFile() in the internal-token
 // file-first auth check (PAN-4628) without disturbing Effect's own scheduler,
 // which also relies on setImmediate (see warm-idle-reap.test.ts for the same
-// pattern). Two turns, not one: under a loaded host the thread-pool
-// dispatch and the promise-resolution chain can each need their own tick.
+// pattern).
 const realSetImmediate = globalThis.setImmediate;
-async function yieldToRealEventLoop(): Promise<void> {
-  await new Promise((resolve) => realSetImmediate(resolve));
-  await new Promise((resolve) => realSetImmediate(resolve));
+
+/**
+ * Yield real event-loop turns until `check()` is true, instead of guessing a
+ * fixed tick count: the real fs.readFile() in the file-first auth check
+ * (PAN-4628) needs a varying number of real turns to settle depending on
+ * host load (CI and this project's heavily multi-agent dev sandbox both see
+ * this vary). Bounded so a genuine bug still fails fast instead of hanging.
+ */
+async function waitForRealCondition(check: () => boolean, maxTurns = 5000): Promise<void> {
+  for (let i = 0; i < maxTurns && !check(); i++) {
+    await new Promise((resolve) => realSetImmediate(resolve));
+  }
 }
 
 // PAN-3917 W6: the record plane is deleted by W3; these route trees still reach
@@ -281,8 +289,9 @@ describe('POST /api/issues/:id/start-planning GitHub hydration', () => {
     const resultPromise = postStartPlanning('PAN-1993');
     // Let the real event loop's poll phase complete the auth check's real
     // fs.readFile() (PAN-4628) before advancing the fake clock — advancing
-    // fake timers alone never yields to pending real I/O.
-    await yieldToRealEventLoop();
+    // fake timers alone never yields to pending real I/O. Wait for the
+    // actual signal (the first GitHub call) rather than a fixed tick count.
+    await waitForRealCondition(() => mockGitHubGetIssue.mock.calls.length > 0);
     await vi.advanceTimersByTimeAsync(250);
     await vi.advanceTimersByTimeAsync(500);
     const result = await resultPromise;
@@ -300,7 +309,7 @@ describe('POST /api/issues/:id/start-planning GitHub hydration', () => {
     expect(mockSpawnPlanningSession).toHaveBeenCalledWith(expect.objectContaining({
       startedBy: 'operator:dashboard',
     }));
-  });
+  }, 20_000);
 
   it('ignores browser-supplied planning provenance', async () => {
     mockGitHubGetIssue.mockReturnValue(Effect.succeed({
@@ -379,7 +388,7 @@ describe('POST /api/issues/:id/start-planning GitHub hydration', () => {
 
     const resultPromise = postStartPlanning('PAN-1993');
     // See the comment on the equivalent line in the retry-then-succeed test.
-    await yieldToRealEventLoop();
+    await waitForRealCondition(() => mockGitHubGetIssue.mock.calls.length > 0);
     await vi.advanceTimersByTimeAsync(250 + 500 + 750 + 1000);
     const result = await resultPromise;
 
@@ -387,5 +396,5 @@ describe('POST /api/issues/:id/start-planning GitHub hydration', () => {
     expect(result.body.error).toContain('could not fetch PAN-1993 from GitHub after 5 attempts');
     expect(mockGitHubGetIssue).toHaveBeenCalledTimes(5);
     expect(mockSpawnPlanningSession).not.toHaveBeenCalled();
-  });
+  }, 20_000);
 });
