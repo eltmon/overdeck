@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T22:50:42.553804Z · model: claude-opus-5-5 · open: 860_
+_Last sequenced: 2026-11-01T23:15:08.542874Z · model: claude-opus-5-5 · open: 862_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -225,9 +225,11 @@ _Last sequenced: 2026-11-01T22:50:42.553804Z · model: claude-opus-5-5 · open: 
 | 221 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 222 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 223 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
+| 224 | PAN-4748 | M | high | ok |  |  | Fly API uses flyctl's stored token, which expires unrefreshed: loops, clone poll and rollback destroy 403; VMs leak and bill. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
 | 227 | PAN-4646 | S | medium | needs-refinement |  |  | Interactive mockup for machine-aware conversation UI (title bar, chips, offline banner); D-6 needs it approved first. Body pending. |
+| 228 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
 | 229 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 230 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
 | 231 | PAN-4348 | S | medium | ok |  |  | Verification emits warn-first evidence of changed files outside every item's files_scope, so scope creep is visible |
@@ -1195,10 +1197,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T22:50:42.553804Z",
+  "generatedAt": "2026-11-01T23:15:08.542874Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 860,
+  "openCount": 862,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11907,6 +11909,32 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4748",
+      "rank": 224,
+      "size": "M",
+      "importance": "high",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fly API uses flyctl's stored token, which expires unrefreshed: loops, clone poll and rollback destroy 403; VMs leak and bill.",
+      "rationale": "New issue: a lapsed ~/.fly/config.yml token silently stops Fly heartbeats, sweeps and Codex sync and leaks billing VMs on rollback, so it ranks above the Fly-track cluster (272-312) whose live checks it breaks.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4747",
+      "rank": 228,
+      "size": "S",
+      "importance": "high",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053.",
+      "rationale": "New issue: the restart lock let a second reload into a generation slot mid-build; no bad build went live, so it sits just below the Fly token bug and near the reload cluster (PAN-3508 at 206).",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13159,6 +13187,34 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     {
       "from": "PAN-4705",
       "to": "PAN-4746",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4748",
+      "to": "PAN-4296",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4748",
+      "to": "PAN-4734",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4748",
+      "to": "PAN-4739",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4747",
+      "to": "PAN-3508",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
