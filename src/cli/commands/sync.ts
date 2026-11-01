@@ -44,6 +44,7 @@ import { ensureHerdr } from '../../lib/herdr-setup/ensure.js';
 import { renderHerdrReport } from '../herdr-report.js';
 import { checkSyncSourceFreshness } from '../../lib/sync-source-freshness.js';
 import { pruneDanglingGitHookLinks } from '../../lib/git-hooks.js';
+import { migrateTraefikCompose } from '../../lib/traefik.js';
 import { runOperatorMemorySyncStep } from './memory-sync.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
@@ -570,6 +571,16 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     } catch {
       mkcertSpinner.warn('Failed to install mkcert - run: https://github.com/FiloSottile/mkcert/releases');
     }
+  }
+
+  // PAN-4299: rewrite Traefik's published ports to the configured bind address.
+  // File only — the running container picks it up on its next restart.
+  try {
+    if (loadConfigSync().traefik?.enabled && migrateTraefikCompose()) {
+      console.log(chalk.green('✓ Traefik ports now publish on the configured bind address — run `pan restart --traefik` to apply'));
+    }
+  } catch {
+    // Non-fatal — Traefik config is optional
   }
 
   // Enforce Overdeck-managed MCP server defaults: Playwright --isolated
