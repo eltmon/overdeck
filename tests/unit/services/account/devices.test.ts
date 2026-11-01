@@ -148,6 +148,7 @@ describe('verifyDeviceToken (FR-5, FR-6)', () => {
       ok: true,
       userId: 'u-tester',
       githubId: 100,
+      githubLogin: 'user100',
       deviceId: tester.deviceId,
       entitlement: { plan: 'tester', storageBytesCap: 2147483648, maxDevices: null },
     });
@@ -155,6 +156,17 @@ describe('verifyDeviceToken (FR-5, FR-6)', () => {
     await seedUser(rc, 'u-owner', TEST_OWNER_GITHUB_ID);
     const owner = await mintDevice(rc, 'u-owner', 'linux-x64', ENV_A);
     expect(await verifyDeviceToken(rc, owner.token)).toMatchObject({ ok: true, entitlement: { storageBytesCap: 5368709120 } });
+  });
+
+  it('reflects a changed github_login on the next verify (AC2)', async () => {
+    const { rc, db } = setup();
+    await seedUser(rc, 'u-tester', 100);
+    await addGrant(rc, 100, 'tester', {}, 'admin-add');
+    const tester = await mintDevice(rc, 'u-tester', 'linux-x64', ENV_A);
+    expect(await verifyDeviceToken(rc, tester.token)).toMatchObject({ ok: true, githubLogin: 'user100' });
+
+    await db.prepare('UPDATE users SET github_login = ? WHERE user_id = ?').bind('renamed-user', 'u-tester').run();
+    expect(await verifyDeviceToken(rc, tester.token)).toMatchObject({ ok: true, githubLogin: 'renamed-user' });
   });
 
   it('writes last_used_at on first verify, leaves it 4 minutes later and rewrites it 6 minutes later (D-18)', async () => {

@@ -4,17 +4,17 @@
     "created": "2026-11-01T05:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4330: Optional overdeck.ai sign-in client: pan account login, status and logout",
-    "updated": "2026-11-01T04:58:00.089Z"
+    "updated": "2026-11-01T04:59:16.008Z"
   },
   "plan": {
     "id": "pan-4330",
     "title": "Optional overdeck.ai sign-in client: pan account login, status and logout",
-    "status": "proposed",
+    "status": "running",
     "uid": "9e7d0de4-261a-4452-b676-adc2fa1e03a8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T05:30:00Z",
-    "updated": "2026-11-01T04:58:00.089Z",
+    "updated": "2026-11-01T04:59:16.008Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4330",
@@ -821,5 +821,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
