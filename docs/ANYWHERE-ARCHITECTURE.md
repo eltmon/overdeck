@@ -565,13 +565,15 @@ tmux and no Overdeck server; moving those onto this path is
 
 | Piece | Where |
 | --- | --- |
-| Provisioning, `destroyFlyVm`, `FlyMachineError` and its status map | `src/lib/anywhere/fly/provision.ts` |
+| Provisioning and `destroyFlyVm` | `src/lib/anywhere/fly/provision.ts` |
+| `FlyMachineError` and its status map, `pollUntil`, `detached` (re-exported by `provision.ts`) | `src/lib/anywhere/fly/provision-shared.ts` |
+| Codex sign-in: snapshot, newest-refresh-wins decision, VM read/push, home write, provisioning step 6b | `src/lib/anywhere/fly/codex-auth.ts` |
 | Project clone on the VM | `src/lib/anywhere/fly/project.ts` |
 | `${OVERDECK_HOME}/fly-machines.json` (0600, atomic; a corrupt file throws and is never rewritten) | `src/lib/anywhere/fly/machine-store.ts` |
 | `addFlyMachine`, `startFlyConversation`, `removeFlyMachineForLink` (unlink hook) | `src/dashboard/server/services/fly-machine-service.ts` |
 | `POST /api/machines/fly` | `src/dashboard/server/routes/machines-fly.ts` |
 | `pan machines add-fly` | `src/cli/commands/machines-fly.ts` |
-| Heartbeat and sweep loops | `src/lib/remote/fly-machine-loops.ts` (registered in `src/lib/cloister/hygiene-scheduler.ts`) |
+| Heartbeat, sweep and Codex sign-in sync loops | `src/lib/remote/fly-machine-loops.ts` (registered in `src/lib/cloister/hygiene-scheduler.ts`) |
 | Credential refresh | `src/lib/remote/remote-credential-refresh.ts` (Fly machine names join the remote agents' VMs) |
 | Spend cap | `checkRemoteSpendCap` in `src/lib/remote/remote-agents.ts` counts Fly machine records |
 
@@ -620,7 +622,8 @@ as before. On a Fly machine this makes the public URL answer nothing but the lin
 machine: `id`, `linkId` (null while provisioning), `environmentId`, `machineId`,
 `machineName` (`overdeck-machine-<8 hex>`, unique in the app because the Fly provider
 resolves machines by name), `appName`, `region`, `label` (`fly-<machineId>`), `projectKey`,
-`docker` and `createdAt`. It is a separate file from `machine-links.json` because
+`docker`, `codexAuthPath` (PAN-4296; a record written before it reads as `null`) and
+`createdAt`. It is a separate file from `machine-links.json` because
 `upsertLink` rebuilds link records field by field. Unlike `ssh-machines.json`, a corrupt
 file makes every read throw: the cap and the sweep must not act on an empty list that is
 not really empty. `countFlyMachines()` is synchronous because `checkRemoteSpendCap` and its
@@ -645,7 +648,9 @@ longer runs detached (`setsid nohup … &`) and is polled.
    so the server, `pan pair` and the project clone all use `/.overdeck`, and an identity
    written to `/root/.overdeck` is never read.
 6. `syncAllCredentials` and `configureClaudeCode` through the Fly provider (Claude OAuth file
-   and `gh auth token`; no SSH key reaches the VM).
+   and `gh auth token`; no SSH key reaches the VM). A missing Claude credential fails only a
+   `claude-code` machine. Step 6b, `prepareFlyCodex`, pins the Codex CLI and pushes the
+   Codex sign-in (`### Codex (PAN-4296)`).
 7. Docker: when `command -v dockerd` succeeds, `dockerd --storage-driver=vfs` starts
    detached and `docker info` is polled every 2 s for 60 s; the result is the record's
    `docker` field and a failure never fails provisioning. The default overlay driver cannot
@@ -664,7 +669,7 @@ never learns the id of a failed provision.
 ### Adding (`addFlyMachine`)
 
 The early refusals create nothing: `remote.enabled` not true (`remote-disabled`), no Fly token
-(`no-fly-token`), a harness other than Claude Code (`harness-unsupported`, #4296), a message
+(`no-fly-token`), a harness that cannot run on a Fly machine (`harness-unsupported`; Claude Code and Codex can, see `### Codex (PAN-4296)`), a message
 without a project (`bad-request`), and the spend cap (`cap-reached`). Then it provisions,
 writes a provisional record, links (`createMachineLink` with the public route; an
 `unreachable` link names the one-time `fly ips allocate-v4 --shared` / `allocate-v6` fix),
@@ -679,8 +684,8 @@ CLI sends it with `node:http` because Node's fetch gives up on response headers 
 
 ### The loops
 
-The deacon child's hygiene scheduler runs both every 60 s, outside the deacon freeze. With
-zero records neither builds a Fly client.
+The deacon child's hygiene scheduler runs all three every 60 s, outside the deacon freeze.
+With zero records none builds a Fly client.
 
 - `heartbeatFlyMachines` writes `/workspace/.pan/host-heartbeat` on every machine by
   machine id. A failed exec is a failure line, never "refreshed".
@@ -691,15 +696,74 @@ zero records neither builds a Fly client.
   record still has no link 30 minutes after creation. The idle clock is in memory, and the
   sweep reads the linked-conversation cache read-only. A failed destroy keeps the link and
   record for the next tick.
+- `syncFlyCodexAuth` keeps the Codex sign-in in step by newest refresh wins (see
+  `### Codex (PAN-4296)`).
 - The credential refresh copies fresh Claude credentials to Fly machines by name with the
   same per-VM watermark as remote agents.
+
+### Codex (PAN-4296)
+
+A Fly machine also runs Codex conversations (W-FLY3, epic FR-18; issue PRD
+`.pan/drafts/PAN-4296.md`). `CODEX_CAPABILITIES.runsOnFlyMachine` is `true`; every other
+non-Claude harness stays `false`.
+
+- **D-1 No provider routing.** A Codex conversation runs `codex app-server` with the Codex
+  CLI's own sign-in and calls OpenAI directly. It never uses CLIProxy, so nothing installs,
+  starts or tunnels CLIProxy on the VM.
+- **D-2 Codex is prepared whenever home can.** Home can when `resolveHarnessBinary('codex')`
+  finds a binary, `readCodexCliVersion` reads its version, and
+  `classifyNativeCodexAuth(~/.codex/auth.json)` is `valid` (`readHomeCodexState`).
+  Provisioning step 6b (`prepareFlyCodex`) then runs for every Fly machine, so a machine
+  started for Claude Code can take a Codex conversation later. A miss fails provisioning
+  only for `harness: 'codex'` (`credentials-failed` or `version-mismatch`); otherwise it is
+  logged and `codexAuthPath` is `null`. Claude Code credentials, in turn, are required only
+  for `harness: 'claude-code'`.
+- **D-3 Newest refresh wins.** OpenAI rotates the refresh token on every refresh, so a copy
+  of `auth.json` forks the token family and whichever side refreshes second is signed out.
+  `syncFlyCodexAuth` (every 60 s, outside the deacon freeze) reads each Codex-ready VM's
+  file and runs `decideCodexAuthSync(home, vm)` over parsed snapshots. The comparison key is
+  the sign-in's content (`[access_token, id_token, refresh_token, account_id,
+  last_refresh]`, or the `OPENAI_API_KEY`), never the bytes, so whitespace never causes a
+  push. The rules, in order:
+
+  | # | Condition | Action |
+  | --- | --- | --- |
+  | 1 | home missing, or home's mode unknown | none |
+  | 2 | VM missing, or VM's mode unknown | push |
+  | 3 | same mode and same key | none |
+  | 4 | both ChatGPT, same non-empty `account_id`, VM copy has all four tokens, VM `last_refresh` strictly newer | pull |
+  | 5 | anything else | push (home decides which account is signed in) |
+
+  A pull writes home's file atomically (temp file in the same directory, then rename, mode
+  0600), and through a symlinked `auth.json` to its target. A read that exits non-zero or
+  throws is indeterminate and does nothing. A refresh on both sides inside one 60 s window
+  still signs one side out; `codex login` at home fixes it on the next push.
+- **D-4 The VM path comes from the exec shell.** `printf %s "$HOME/.codex"` prints
+  `//.codex` in Fly's exec shell (`HOME=/`); `//` collapses to `/`, and the result must be
+  absolute. That is where `pan serve`, started from the same shell, finds the sign-in:
+  each conversation's managed `CODEX_HOME` symlinks `auth.json` to `$HOME/.codex/auth.json`.
+  The push writes a temp file with mode 0600 and renames it, so those symlinks stay valid.
+- **D-6 Version pin by install.** When the VM's `codex --version` differs from home's,
+  `npm install -g @openai/codex@<home>` runs detached and `/tmp/codex-install.exit` is
+  polled every 5 s for at most 5 min, then the version is checked again. Home's version
+  predicts the VM's, so the model floor `canUseHarness` checks at home holds on the VM.
+- **Checked at home first (D-5).** `addFlyMachine` refuses a Codex request before any VM
+  exists: no `model` is `bad-request` (no default model), a non-OpenAI model or a denied
+  `canUseHarness('codex', …)` is `harness-unsupported`, and no usable home Codex is
+  `credentials-failed`.
+- **The record.** `codexAuthPath` holds the VM path of the sign-in when Codex was prepared,
+  else `null`. `syncFlyCodexAuth` acts only on records with a link and a `codexAuthPath`;
+  with none it builds no Fly client.
+
+No `auth.json` content, token or base64 of either appears in a log line, an activity entry
+or an error: the VM read and push helpers name only the path and the exit code.
 
 ### Split
 
 `pan start --remote` work agents moving onto this path, and their session rows (closing
 PAN-1775), are [PAN-4734](https://github.com/eltmon/overdeck/issues/4734). The Machine
-field, **Fly (new VM)** and `--machine fly` are #4651; lanes on Fly are #4638; other
-harnesses on Fly are #4296.
+field, **Fly (new VM)** and `--machine fly` are #4651; lanes on Fly are #4638. Codex on
+Fly is #4296 (above); other harnesses cannot run on a Fly machine.
 
 ## Decisions added by sibling issues
 

@@ -124,16 +124,19 @@ only ciphertext. Use it to run a conversation on a fresh machine without tying u
 
 ```bash
 pan machines add-fly --project overdeck --message "Fix the flaky retry test"
+pan machines add-fly --project overdeck --harness codex --model gpt-6.1-sol --message "Fix the flaky retry test"
 ```
 
 This one command, which takes a few minutes:
 
 1. Starts a Fly VM from the `pan-workspace` image and makes its `pan` version equal this
    machine's.
-2. Copies your Claude and GitHub credentials to it (no SSH key ever reaches the VM).
+2. Copies your Claude, Codex (when this machine has a Codex sign-in) and GitHub
+   credentials to it (no SSH key ever reaches the VM).
 3. Starts Overdeck there and links to it. Its chip reads `fly-<machineId>`.
 4. With `--project`, clones that project onto the VM (GitHub projects only).
-5. With `--message`, starts a Claude Code conversation there and prints its URL.
+5. With `--message`, starts a Claude Code or Codex conversation (`--harness`) there and
+   prints its URL.
 
 The conversation then streams in this dashboard like any linked conversation: use
 [Remote control](#remote-control) to steer it, or [Pull here](#pull-here) to bring it home.
@@ -173,10 +176,30 @@ Its conversations go with it. [Pull here](#pull-here) first to keep one.
 Fly machines count toward `remote.max_concurrent_agents`, the same cap as remote work
 agents; `add-fly` refuses with `cap-reached` when it is full (0 or unset means no cap).
 
+### Codex
+
+`--harness codex` starts a Codex conversation on the Fly machine instead of a Claude Code
+one:
+
+- It needs `--model` with an OpenAI model id. There is no default model.
+- This machine needs the Codex CLI and a Codex sign-in (`codex login`). `add-fly` checks
+  both, and the model, before it starts a VM.
+- The VM's Codex CLI is pinned to this machine's version.
+- Codex on the VM calls OpenAI directly with your sign-in. It does not use CLIProxy.
+- OpenAI replaces your refresh token each time Codex refreshes its sign-in, so two copies
+  of one sign-in cannot both stay valid. Every 60 seconds this machine compares its
+  sign-in with each Fly machine's, and the newest refresh wins: a newer refresh on the VM
+  is copied here, otherwise this machine's sign-in is copied to the VM.
+- If both machines refresh inside the same minute, one of them can be signed out. Run
+  `codex login` here; the next sync copies the new sign-in to the VM.
+
+Every Fly machine gets Codex when this machine has it, whatever `--harness` you pass, so
+a Fly machine started for Claude Code can also run a Codex conversation later.
+`add-fly` prints `codex: yes` for such a machine.
+
 ### Limits
 
-- Claude Code only. Other harnesses on Fly are tracked in
-  [#4296](https://github.com/eltmon/overdeck/issues/4296).
+- Claude Code and Codex. Other harnesses cannot run on a Fly machine.
 - Docker: the VM runs Docker with the `vfs` storage driver, because the VM's disk cannot
   host the default overlay driver. Containers run, but images take more disk and start
   more slowly than on your own machine. `add-fly --json` reports `record.docker` as `true`
@@ -524,6 +547,10 @@ connections.
   try again. The failed VM was already destroyed.
 - **`add-fly` fails with `version-mismatch`**: the VM could not install this machine's
   Overdeck version from npm. The message names both versions; a development build that is
-  not published on npm cannot be installed there.
+  not published on npm cannot be installed there. With `--harness codex` the message can
+  also name `@openai/codex`: the VM could not install this machine's Codex CLI version.
+  Update the Codex CLI here to a published version, then try again.
+- **`add-fly --harness codex` fails with `credentials-failed`**: this machine has no
+  Codex CLI or no valid Codex sign-in. Run `codex login` here, then try again.
 - The link exists but `require_token_mint` turned itself on: that is expected. Any remote
   access turns it on; see [Remote access](/configuration/remote-access#local-reverse-proxies-require_token_mint).

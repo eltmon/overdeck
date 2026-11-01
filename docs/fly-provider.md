@@ -156,6 +156,8 @@ Every Fly Machine runs the `pan-workspace` image defined in
 - Node.js 22
 - pnpm
 - Claude Code CLI (`@anthropic-ai/claude-code`)
+- Codex CLI (`@openai/codex`). Provisioning a Fly machine reinstalls home's exact Codex
+  version when the VM's differs (PAN-4296).
 - Overdeck (`@overdeck/core`, so `pan` runs on the VM), pinned by the
   `OVERDECK_VERSION` build argument (default `latest`)
 - Docker (`docker.io` and `iptables`), started by Fly machine provisioning, not by
@@ -208,7 +210,7 @@ this page) runs Claude Code in raw tmux and no Overdeck server. Start one with
 | | Remote work agent VM | Fly machine |
 |---|---|---|
 | Started by | `pan start --remote` | `pan machines add-fly`, `POST /api/machines/fly` |
-| Runs | Claude Code in tmux | `pan serve`, then Claude Code conversations through it |
+| Runs | Claude Code in tmux | `pan serve`, then Claude Code or Codex conversations through it |
 | Reached by | Machines exec API | a secure channel over `wss://<app>.fly.dev/ws/link` |
 | State on home | `agents/agent-<issue>/remote-state.json` | `fly-machines.json` plus a machine link |
 | Removed by | the reap, after hand-off | unlink, the idle sweep, the stopped-machine sweep (always destroyed) |
@@ -317,6 +319,17 @@ GitLab projects are not supported on Fly: without an SSH key, a GitLab clone nee
 
 Overdeck never copies `~/.ssh/*` or `~/.overdeck/ssh/*` to a VM.
 
+Fly machines (`pan machines add-fly`) also get the Codex sign-in when home has the Codex
+CLI and a valid sign-in (PAN-4296):
+
+| Credential | Local source | Remote destination |
+|---|---|---|
+| Codex sign-in | `~/.codex/auth.json` | `$HOME/.codex/auth.json` in the VM's exec shell (`/.codex/auth.json`, because `HOME=/` there), mode 0600 |
+
+OpenAI replaces the refresh token on every refresh, so two copies of one sign-in cannot
+both stay valid. The Codex sign-in is therefore not copied one way like Claude's: the
+`syncFlyCodexAuth` loop (below) keeps home and each VM in step by newest refresh wins.
+
 Claude Code is also configured for autonomous operation: `~/.claude/settings.json` is
 written from your resolved Overdeck permission mode and onboarding is marked complete
 in `~/.claude.json`.
@@ -340,13 +353,14 @@ loops (PAN-4295). With no active remote agent, none of them calls the Fly API.
 | Credential refresh | checked every 60 s | Copies host Claude credentials to each active VM when the host credentials file changes, or every 15 min at most. A failed copy is retried on the next check. | keeps running |
 | Reap | every 60 s deacon-lite tick | On `REMOTE_DONE`, materializes `workspaces/feature-<id>`, opens the PR, destroys the machine and requests review. On a crash (no session, no sentinel, or a stopped machine), salvages unpushed work, stops the machine and marks the agent `error`. An unreachable Fly API or a failed exec leaves the agent alone until the next tick. `starting` agents are skipped. | skipped |
 
-Fly machines (PAN-4652, `## Fly machines (linked)` above) have two more loops of their
+Fly machines (PAN-4652, `## Fly machines (linked)` above) have three more loops of their
 own in `src/lib/remote/fly-machine-loops.ts`, and the credential refresh covers them too.
-With no Fly machine record, neither calls the Fly API.
+With no Fly machine record, none calls the Fly API.
 
 | Loop | Cadence | What it does | Deacon frozen |
 |---|---|---|---|
 | `heartbeatFlyMachines` | every 60 s | Writes `/workspace/.pan/host-heartbeat` on every Fly machine, so its watchdog keeps it running while home is up. A failed exec is reported as a failure, never as refreshed. | keeps running |
+| `syncFlyCodexAuth` | every 60 s | For each linked Fly machine whose record has a `codexAuthPath`, reads the VM's Codex `auth.json` and decides by newest refresh wins: copies a newer same-account VM refresh home (atomic write), otherwise copies home's sign-in to the VM when the two differ. A VM that does not answer is skipped until the next tick. With no such record it makes no Fly API call. | keeps running |
 | `sweepFlyMachines` | every 60 s | Destroys the machine, removes its link and deletes its record when the Fly API reports it `stopped`, `destroyed` or `failed` or answers 404; when no unreleased linked conversation on it has been active for `[remote.fly] machine_idle_minutes` (default 30, 0 disables); or when provisioning never linked it within 30 min. Any other API error leaves it alone. | keeps running |
 
 The heartbeat and credential refresh run in `src/lib/cloister/hygiene-scheduler.ts`;
