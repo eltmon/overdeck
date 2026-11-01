@@ -36,6 +36,11 @@ export const COMMAND_GROUPS = {
     load: () => import('./commands/close.js'),
     register: (mod, program) => mod.registerCloseCommand(program),
   }),
+  start: group({
+    names: ['start'],
+    load: () => import('./commands/start-register.js'),
+    register: (mod, program) => mod.registerStartCommand(program),
+  }),
   knowledge: group({
     names: ['knowledge'],
     load: () => import('./commands/knowledge.js'),

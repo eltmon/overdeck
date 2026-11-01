@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { MachineLink } from '../../../lib/anywhere/link-store.js';
-import { type FleetWorkerDeps, handleFleetWorker, handleFleetWorkerStop } from '../routes/fleet-work.js';
+import { type FleetWorkerDeps, handleFleetIssueStart, handleFleetWorker, handleFleetWorkerStop } from '../routes/fleet-work.js';
 import { readJsonResponse } from '../routes/machines-work.js';
 import type { FleetTarget } from '../services/fleet-target.js';
 
@@ -17,7 +17,7 @@ function deps(target: FleetTarget, peer: { status: number; json: unknown } = { s
     createLocal: vi.fn(),
     fetchPeer: vi.fn(async () => peer),
     refreshLinked: vi.fn(),
-    issueOrigin: async (issueId) => (issueId.toUpperCase().startsWith('PAN-') ? { gitOrigin: 'github.com/eltmon/overdeck' } : null),
+    issueOrigin: async (issueId) => (issueId.toUpperCase().startsWith('PAN-') ? { gitOrigin: 'github.com/eltmon/overdeck', projectKey: 'overdeck' } : null),
     startLocal: vi.fn(async () => ({ id: 'agent-pan-9-worker-1' })),
     allocate: vi.fn(async () => 'agent-pan-9-worker-2'),
     writeStandIn: vi.fn(async () => undefined),
@@ -74,5 +74,16 @@ describe('POST /api/fleet/workers (D-4651-5)', () => {
     expect(fetchPeer).toHaveBeenCalledWith('env-desk', '/api/workers/agent-pan-9-worker-4/stop', expect.objectContaining({ method: 'POST', actor: 'operator' }));
     expect(write).toHaveBeenCalledWith('agent-pan-9-worker-2', { ...standIn, state: 'stopped' });
     expect(readJsonResponse(await handleFleetWorkerStop('agent-pan-9-worker-1', { actor: 'operator' }, { read: async () => null, write, fetchPeer })).status).toBe(404);
+  });
+
+  it('starts an issue on a linked machine through its door; this machine answers use-local-start', async () => {
+    const d = deps(REMOTE, { status: 200, json: { issueId: 'PAN-9', agentId: 'agent-pan-9' } });
+    const answer = readJsonResponse(await handleFleetIssueStart('PAN-9', { machine: 'desk', model: 'claude-opus-5-5' }, { actor: 'operator' }, d));
+    expect(answer).toEqual({ status: 200, body: { issueId: 'PAN-9', agentId: 'agent-pan-9', machine: { environmentId: 'env-desk', label: 'desk', self: false }, reason: null } });
+    expect(d.fetchPeer).toHaveBeenCalledWith('env-desk', '/api/machines/work/issues/PAN-9/start', expect.objectContaining({ body: { model: 'claude-opus-5-5', gitOrigin: 'github.com/eltmon/overdeck' } }));
+    const self = readJsonResponse(await handleFleetIssueStart('PAN-9', {}, { actor: 'operator' }, deps({ ok: true, self: true, environmentId: 'env-laptop', label: 'laptop', reason: null })));
+    expect(self).toMatchObject({ status: 400, body: { code: 'use-local-start' } });
+    const missing = readJsonResponse(await handleFleetIssueStart('PAN-9', { machine: 'desk' }, { actor: 'operator' }, deps(REMOTE, { status: 404, json: { code: 'project-missing', gitOrigin: 'github.com/eltmon/overdeck' } })));
+    expect((missing.body as { error: string }).error).toBe('desk has no project for github.com/eltmon/overdeck. Add it with: pan machines add-project laptop overdeck --to desk');
   });
 });

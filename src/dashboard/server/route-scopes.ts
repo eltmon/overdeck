@@ -84,6 +84,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/fleet/conversations', scope: 'operate' },
   { method: 'POST', path: '/api/fleet/workers', scope: 'operate' },
   { method: 'POST', path: '/api/fleet/workers/:id/stop', scope: 'operate' },
+  { method: 'POST', path: '/api/fleet/issues/:id/start', scope: 'operate' },
   // PAN-4651 WI-5: a linked machine follows (and stops) a worker it delegated here.
   { method: 'GET', path: '/api/workers/:id/status', scope: 'read:state' },
   { method: 'POST', path: '/api/workers/:id/stop', scope: 'operate' },

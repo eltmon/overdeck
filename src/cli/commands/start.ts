@@ -714,6 +714,7 @@ async function repairMainBranchWorkspace(workspace: string, normalizedId: string
 import { resolvePanStartSpawnModel } from './start-spawn-model.js';
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
+  if (options.machine && await (await import('./start-machine.js')).startOnMachine(id, options)) return; // PAN-4651
   process.env['OVERDECK_AGENT_STARTED_BY'] = resolveCliStartedBy('operator:cli:pan-start');
   try {
     const model = normalizeModelOverride(options.model);

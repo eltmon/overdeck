@@ -18,6 +18,9 @@
  *   a local id, the owner's worker work door, then `remote.json` and the
  *   follower. Answers `{ id, machine, reason, remote }`.
  *
+ * - `POST /api/fleet/issues/:id/start { machine, needs?, model?, harness?, effort? }`
+ *   → another machine only (this machine answers 400 `use-local-start`; the
+ *   CLI starts locally itself): the owner's issue-start work door.
  * - `POST /api/fleet/workers/:id/stop` → stops the worker a stand-in stands
  *   for on its owner, then marks the stand-in `stopped`.
  *
@@ -211,7 +214,7 @@ export async function handleFleetConversation(raw: unknown, caller: FleetCaller,
 }
 
 export interface FleetWorkerDeps extends FleetSpawnDeps {
-  issueOrigin: (issueId: string) => Promise<{ gitOrigin: string | null } | null>;
+  issueOrigin: (issueId: string) => Promise<{ gitOrigin: string | null; projectKey: string } | null>;
   startLocal: (options: StartWorkerOptions) => Promise<{ id: string }>;
   allocate: (issueId: string) => Promise<string>;
   writeStandIn: (localId: string, standIn: RemoteStandIn) => Promise<void>;
@@ -225,7 +228,7 @@ export const defaultFleetWorkerDeps = (): FleetWorkerDeps => ({
   issueOrigin: async (issueId) => {
     const resolved = await Effect.runPromise(resolveProjectFromIssue(issueId)).catch(() => null);
     const project = resolved ? getProjectSync(resolved.projectKey) : null;
-    return project ? { gitOrigin: gitOriginOf(project) } : null;
+    return resolved && project ? { gitOrigin: gitOriginOf(project), projectKey: resolved.projectKey } : null;
   },
   startLocal: (options) => startWorker(options),
   allocate: allocateWorkerId,
@@ -280,6 +283,28 @@ export async function handleFleetWorker(raw: unknown, caller: FleetCaller, deps:
   });
   deps.follow(localId);
   return jsonResponse({ id: localId, machine: machineOf(target), reason: target.reason, remote: true });
+}
+
+/** `POST /api/fleet/issues/:id/start`. */
+export async function handleFleetIssueStart(issueId: string, raw: unknown, caller: FleetCaller, deps: FleetWorkerDeps = defaultFleetWorkerDeps()): Promise<HttpServerResponse.HttpServerResponse> {
+  const body = asObject(raw) ?? {};
+  const fields = optionalStrings(body, ['machine', 'model', 'harness', 'effort']);
+  if (typeof fields === 'string') return jsonResponse({ error: fields }, { status: 400 });
+  const needs = parseNeeds(body['needs']);
+  if (typeof needs === 'string') return jsonResponse({ error: needs }, { status: 400 });
+  const { machine, ...options } = fields;
+  const project = await deps.issueOrigin(issueId);
+  if (!project) return jsonResponse({ code: 'unknown-project', error: `No project on this machine owns ${issueId}` }, { status: 404 });
+  const target = await deps.resolveTarget(machine, project.gitOrigin, needs);
+  if (!target.ok) return jsonResponse(target.body, { status: target.status });
+  if (target.self) return jsonResponse({ code: 'use-local-start', error: `${issueId} would start on this machine; run pan start ${issueId} without --machine` }, { status: 400 });
+  if (project.gitOrigin === null) {
+    return jsonResponse({ code: 'project-has-no-origin', error: `${project.projectKey} has no github_repo or gitlab_repo, so ${target.label} cannot find it` }, { status: 409 });
+  }
+  const answer = await postWorkDoor(deps, target.link, `/api/machines/work/issues/${encodeURIComponent(issueId)}/start`, { ...options, gitOrigin: project.gitOrigin }, caller);
+  if (answer.status !== 200) return ownerRefusal(answer.status, answer.json, target.link, { thisLabel: await deps.thisLabel(), projectKey: project.projectKey });
+  const started = answer.json as { issueId?: unknown; agentId?: unknown } | null;
+  return jsonResponse({ issueId: started?.issueId ?? issueId.toUpperCase(), agentId: started?.agentId ?? null, machine: machineOf(target), reason: target.reason });
 }
 
 export interface FleetWorkerStopDeps {
@@ -380,4 +405,18 @@ const workerStopRoute = HttpRouter.add(
   }),
 );
 
-export const fleetWorkRouteLayer = Layer.mergeAll(placementRoute, conversationsRoute, workersRoute, workerStopRoute);
+const issueStartRoute = HttpRouter.add(
+  'POST',
+  '/api/fleet/issues/:id/start',
+  Effect.gen(function* () {
+    const refused = yield* fleetWriteGate;
+    if (refused) return refused;
+    const caller = yield* fleetCallerOf;
+    if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
+    const params = yield* HttpRouter.params;
+    const body = yield* readFleetBody;
+    return yield* Effect.promise(() => handleFleetIssueStart(params['id'] ?? '', body, caller));
+  }),
+);
+
+export const fleetWorkRouteLayer = Layer.mergeAll(placementRoute, conversationsRoute, workersRoute, workerStopRoute, issueStartRoute);
