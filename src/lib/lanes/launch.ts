@@ -102,8 +102,12 @@ export interface RemoteLaneTarget {
 export interface LaneLaunchDeps {
   /** PAN-4638 FR-1: launch on this linked machine instead of here. */
   remote?: RemoteLaneTarget;
-  /** PAN-4638: stops a live remote lane on a machine other than `remote` for `--replace`. */
-  stopRemote?: (lane: RemoteLaneFacts) => Promise<void>;
+  /**
+   * PAN-4638: resolves a machine (label, environment id or `auto`) for the
+   * project; null means this machine. Used for `--machine`, for a `--reuse`
+   * whose newest lane ran elsewhere, and to stop a live lane on another machine.
+   */
+  resolveMachine?: (machine: string, needs: readonly string[], projectKey: string) => Promise<RemoteLaneTarget | null>;
   git?: LaneGit;
   resolveConfig?: (project: string) => Promise<LaneConfig>;
   resolveHarness?: (requested: string | undefined, model: string) => Promise<RuntimeName>;
@@ -338,7 +342,7 @@ const REMOTE_LIVE_ACTIVITIES: ReadonlySet<string> = new Set(['working', 'idle', 
 /** D-4638-2: how many times a remote launch retries after the owner answers `name-taken`. */
 const NAME_TAKEN_RETRIES = 3;
 const NAME_ATTEMPTS = 5;
-const OWNER_STATUSES: ReadonlySet<number> = new Set([400, 404, 409, 429]);
+const OWNER_STATUSES: ReadonlySet<number> = new Set([400, 403, 404, 409, 429, 503]);
 
 /** FR-6 for a remote lane, judged from home's stand-in: no mirror yet within the starting grace, or a running mirror, or an unreachable owner. */
 function remoteOccupies(
@@ -371,13 +375,37 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
   const latestReport = deps.latestReport ?? latestWorkerReport;
   const now = deps.now ?? Date.now;
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
-  const { remote } = deps;
+  let remote = deps.remote;
 
   validateRequest(request);
   const { role } = request;
   // D-4638-8: a reuse continues on the newest lane's machine.
   if (request.machine !== undefined && request.reuse) {
     throw new LaneLaunchError(400, "--reuse continues on the newest lane's machine; drop --machine");
+  }
+  // 1-2. Parent (D5), effective launcher (D21) and its D8 standing, run (D4).
+  const parent = resolveParent(request.parent);
+  if (!parent) throw new LaneLaunchError(404, `parent conversation ${request.parent} not found`);
+  const launcher = resolveEffectiveLauncher(parent.name) ?? parent;
+  checkLauncher(role, launcher);
+  const run = resolveRun(request.run, launcher);
+
+  // The critic link (WI-19, FR-31, FR-32, D29): key, judged builder row and default --at.
+  const { key, criticOf, judgedAt } = await resolveCriticLink(request, run, latestReport);
+  const requestAt = request.at ?? judgedAt ?? undefined;
+
+  // 3. Project and its lane config.
+  const project = request.project ?? parent.projectKey;
+  if (!project) throw new LaneLaunchError(400, `parent conversation ${parent.name} has no project: name --project`);
+
+  // The machine (FR-1): --machine, or the machine of the newest lane a --reuse continues (D-4638-8).
+  if (!remote && request.machine !== undefined) {
+    if (!deps.resolveMachine) throw new LaneLaunchError(400, '--machine needs the dashboard: launch through POST /api/lanes');
+    remote = (await deps.resolveMachine(request.machine, request.needs ?? [], project)) ?? undefined;
+  }
+  if (!remote && request.reuse && deps.resolveMachine) {
+    const newestFacts = (await listAllLaneRows({ run, key, role })).at(-1)?.remote?.facts;
+    if (newestFacts) remote = (await deps.resolveMachine(newestFacts.environmentId, [], project)) ?? undefined;
   }
   // D-4638-9: an orchestrator lane on another machine would launch lanes listed only there.
   if (remote && role === 'orchestrator') throw new LaneLaunchError(400, "orchestrator lanes run on the orchestrator's machine");
@@ -394,21 +422,6 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
       );
     }
   }
-
-  // 1-2. Parent (D5), effective launcher (D21) and its D8 standing, run (D4).
-  const parent = resolveParent(request.parent);
-  if (!parent) throw new LaneLaunchError(404, `parent conversation ${request.parent} not found`);
-  const launcher = resolveEffectiveLauncher(parent.name) ?? parent;
-  checkLauncher(role, launcher);
-  const run = resolveRun(request.run, launcher);
-
-  // The critic link (WI-19, FR-31, FR-32, D29): key, judged builder row and default --at.
-  const { key, criticOf, judgedAt } = await resolveCriticLink(request, run, latestReport);
-  const requestAt = request.at ?? judgedAt ?? undefined;
-
-  // 3. Project and its lane config.
-  const project = request.project ?? parent.projectKey;
-  if (!project) throw new LaneLaunchError(400, `parent conversation ${parent.name} has no project: name --project`);
   const config = await (deps.resolveConfig ?? resolveLaneConfig)(project);
 
   // 4. Lanes root (FR-3). A remote lane lives under the owner's lanes root.
@@ -455,7 +468,8 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
       if (!row.remote) return stop(row.local!);
       const { facts } = row.remote;
       if (remote && facts.environmentId === remote.environmentId) return remote.stop(row.name);
-      if (deps.stopRemote) return deps.stopRemote(facts);
+      const owner = deps.resolveMachine ? await deps.resolveMachine(facts.environmentId, [], project) : null;
+      if (owner) return owner.stop(row.name);
       throw new LaneLaunchError(409, `lane ${run}/${key} ${role} is live on ${facts.label} as ${row.name}; stop it there first`);
     };
 
@@ -684,7 +698,9 @@ async function launchOnOwner(plan: OwnerLaunchPlan): Promise<LaneLaunchResult> {
     const code = typeof body['code'] === 'string' ? body['code'] : undefined;
     if (code === 'name-taken' && retry < NAME_TAKEN_RETRIES) continue;
     const error = typeof body['error'] === 'string' ? body['error'] : `HTTP ${status}`;
-    const mapped = (OWNER_STATUSES.has(status) ? status : 500) as 400 | 404 | 409 | 429 | 500;
-    throw new LaneLaunchError(mapped, `${remote.label}: ${error}`, code);
+    const mapped = (OWNER_STATUSES.has(status) ? status : 500) as LaneLaunchError['status'];
+    // Owner refusals often name the machine already (`desk has no project …`).
+    const named = error.startsWith(`${remote.label}:`) || error.startsWith(`${remote.label} `);
+    throw new LaneLaunchError(mapped, named ? error : `${remote.label}: ${error}`, code);
   }
 }

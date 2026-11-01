@@ -164,7 +164,7 @@ describe('launchLane on another machine (PAN-4638 WI-4)', () => {
     const error = await rejection(launchLane(request(root(), { key: 'b2', machine: 'desk' }), deps));
     expect(error.status).toBe(404);
     expect(error.code).toBe('project-missing');
-    expect(error.message).toBe('desk: desk has no project for github.com/eltmon/lexerra');
+    expect(error.message).toBe('desk has no project for github.com/eltmon/lexerra');
     const spec = deps.remote.launch.mock.calls[0]![0] as Spec;
     expect(existsSync(join(remoteLanesRoot(), spec.name))).toBe(false);
   });
