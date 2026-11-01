@@ -52,7 +52,16 @@ async function fail(message: string): Promise<never> {
   return exitCli(1);
 }
 
-export async function runPair(options: PairOptions): Promise<void> {
+export type PairingLinkResult =
+  | { ok: true; url: string; credential: string; expiresAt: string; base: string }
+  | { ok: false; message: string };
+
+/**
+ * Asks the local dashboard for a one-time pairing credential and builds
+ * `<base>/#pair=<credential>`. `base` defaults to this dashboard's API URL;
+ * `pan connect` passes an address another machine can reach (PAN-4656).
+ */
+export async function requestPairingLink(options: { label?: string; base?: string }): Promise<PairingLinkResult> {
   let response: Response;
   try {
     response = await callDashboard('/api/pairing/credentials', {
@@ -60,16 +69,22 @@ export async function runPair(options: PairOptions): Promise<void> {
       body: options.label ? { label: options.label } : {},
     });
   } catch (error) {
-    if (isDashboardUnreachable(error)) return fail(NOT_RUNNING);
+    if (isDashboardUnreachable(error)) return { ok: false, message: NOT_RUNNING };
     throw error;
   }
-  if (response.status === 401) return fail(TOKEN_REJECTED);
-  if (!response.ok) return fail(`pan pair failed: ${await errorText(response)}`);
+  if (response.status === 401) return { ok: false, message: TOKEN_REJECTED };
+  if (!response.ok) return { ok: false, message: `pan pair failed: ${await errorText(response)}` };
 
   const { credential, expiresAt } = await response.json() as { credential: string; expiresAt: string };
   const { getDashboardApiUrl } = await import('../../lib/config.js');
-  const base = options.url ?? getDashboardApiUrl();
-  const url = pairingUrl(base, credential);
+  const base = options.base ?? getDashboardApiUrl();
+  return { ok: true, url: pairingUrl(base, credential), credential, expiresAt, base };
+}
+
+export async function runPair(options: PairOptions): Promise<void> {
+  const link = await requestPairingLink({ label: options.label, base: options.url });
+  if (!link.ok) return fail(link.message);
+  const { url, credential, expiresAt, base } = link;
   const loopback = isLoopbackBase(base);
 
   if (options.json) {
