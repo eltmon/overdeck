@@ -7,16 +7,35 @@
  * - `POST /api/fleet/placement { gitOrigin: string | null, needs: string[] }`
  *   → Auto placement over this machine and its links: `{ ok: true,
  *   environmentId, label, self, reason, rejections }` or `{ ok: false, rejections }`.
+ * - `POST /api/fleet/conversations { machine?, needs?, projectKey?, message, model?, harness?, effort?, issueId? }`
+ *   → this machine: `handleConversationCreate`; another machine: its
+ *   conversation work door with the local project's git origin slug, then one
+ *   linked-list fetch so the new row lists at once. Answers 201
+ *   `{ conversation: '<name>' | '@<env>/<name>', machine: { environmentId, label, self }, reason }`.
+ *
+ * The actor a forwarded call carries: `operator` for the browser and operator
+ * CLIs, `{ agentId }` for an agent sender (`x-overdeck-sender`), and for an
+ * `odk_` token credential `operator` with a ceiling of the token's scopes
+ * (D-4651-17), derived from the resolved credential, never from a header.
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
 
+import type { AccessTokenScope } from '../../../lib/access-tokens.js';
+import { type LinkActorInit, linkFetch } from '../../../lib/anywhere/link-client.js';
+import type { MachineLink } from '../../../lib/anywhere/link-store.js';
 import { TAG_PATTERN } from '../../../lib/anywhere/machine-capabilities.js';
+import { gitOriginOf } from '../../../lib/anywhere/project-origin.js';
+import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import { getProjectSync } from '../../../lib/projects.js';
 import { channelOfRequest } from '../channel-peer.js';
 import { jsonResponse } from '../http-helpers.js';
-import { defaultFleetTargetDeps, type FleetTargetDeps, placeAuto } from '../services/fleet-target.js';
-import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { actorForSender, SENDER_HEADER } from '../linked-conversation-proxy.js';
+import { defaultFleetTargetDeps, type FleetTarget, type FleetTargetDeps, placeAuto, resolveTargetMachine } from '../services/fleet-target.js';
+import { currentLinkedConversationsSync } from '../services/linked-conversations-sync.js';
+import { credentialScopes, type DashboardCredential, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
 import { refuseFleetRequest } from './machines-fleet.js';
+import { readJsonResponse } from './machines-work.js';
 
 /** `needs` as a list of capability tags; a comma-separated string is accepted too. */
 export function parseNeeds(raw: unknown): string[] | string {
@@ -40,6 +59,141 @@ export async function handleFleetPlacement(raw: unknown, deps: FleetTargetDeps =
   const needs = parseNeeds(body['needs']);
   if (typeof needs === 'string') return jsonResponse({ error: needs }, { status: 400 });
   return jsonResponse(await placeAuto(gitOrigin, needs, deps));
+}
+
+/** Who a forwarded fleet call acts for; null for a malformed sender. */
+export interface FleetCaller {
+  actor: LinkActorInit;
+  ceiling?: AccessTokenScope[];
+}
+
+export function fleetCaller(credential: DashboardCredential | null, sender: string | undefined): FleetCaller | null {
+  if (credential?.kind === 'token') {
+    return { actor: 'operator', ceiling: credentialScopes(credential).filter((scope): scope is AccessTokenScope => scope !== 'admin') as AccessTokenScope[] };
+  }
+  const actor = actorForSender(sender);
+  return actor === null ? null : { actor };
+}
+
+/** A work door gets this long to create the conversation or worker on the owner. */
+export const WORK_DOOR_TIMEOUT_MS = 30_000;
+
+export interface FleetSpawnDeps {
+  resolveTarget: (machine: string | undefined, gitOrigin: string | null, needs: readonly string[]) => Promise<FleetTarget>;
+  projectOrigin: (projectKey: string) => { gitOrigin: string | null } | null;
+  thisLabel: () => Promise<string>;
+  createLocal: (body: Record<string, unknown>) => Promise<{ status: number; body: unknown }>;
+  fetchPeer: (environmentId: string, path: string, init: { method: string; body: unknown; actor: LinkActorInit; ceiling?: AccessTokenScope[]; signal: AbortSignal }) => Promise<{ status: number; json: unknown }>;
+  refreshLinked: (link: MachineLink) => Promise<void>;
+}
+
+async function defaultCreateLocal(body: Record<string, unknown>): Promise<{ status: number; body: unknown }> {
+  const [{ handleConversationCreate }, { generateAiTitle }, { conversationReadDependencies }] = await Promise.all([
+    import('../../../lib/overdeck/conversation-runtime.js'),
+    import('../../../lib/overdeck/conversation-reads.js'),
+    import('./conversations.js'),
+  ]);
+  return readJsonResponse(await handleConversationCreate(body, {
+    generateAiTitle: (name, message) => generateAiTitle(name, message, conversationReadDependencies),
+  }));
+}
+
+export const defaultFleetSpawnDeps = (): FleetSpawnDeps => ({
+  resolveTarget: (machine, gitOrigin, needs) => resolveTargetMachine(machine, gitOrigin, needs),
+  projectOrigin: (projectKey) => {
+    const project = getProjectSync(projectKey);
+    return project ? { gitOrigin: gitOriginOf(project) } : null;
+  },
+  thisLabel: async () => (await ensureEnvironmentIdentity()).label,
+  createLocal: defaultCreateLocal,
+  fetchPeer: (environmentId, path, init) => linkFetch(environmentId, path, init),
+  refreshLinked: async (link) => { await currentLinkedConversationsSync()?.onConnect(link); },
+});
+
+/** Post to a work door on the owner with the caller's actor; a timeout answers as an unreachable machine. */
+export async function postWorkDoor(
+  deps: Pick<FleetSpawnDeps, 'fetchPeer'>,
+  link: MachineLink,
+  path: string,
+  body: unknown,
+  caller: FleetCaller,
+): Promise<{ status: number; json: unknown }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), WORK_DOOR_TIMEOUT_MS);
+  try {
+    return await deps.fetchPeer(link.environmentId, path, { method: 'POST', body, actor: caller.actor, ...(caller.ceiling ? { ceiling: caller.ceiling } : {}), signal: controller.signal });
+  } catch (error) {
+    const message = controller.signal.aborted ? `did not answer within ${WORK_DOOR_TIMEOUT_MS / 1000} s` : (error as Error).message;
+    return { status: 503, json: { code: 'machine-unreachable', error: `${link.label}: ${message}` } };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * An owner's refusal, passed through: `project-missing` gains the command that
+ * adds the project there; an owner without work doors (404 without a code, or
+ * the older gate's `403 insufficient_scope admin`) answers `peer-too-old`.
+ */
+export function ownerRefusal(status: number, json: unknown, link: MachineLink, context: { thisLabel: string; projectKey: string | null }): HttpServerResponse.HttpServerResponse {
+  const body = (json ?? {}) as { code?: unknown; error?: unknown; missingScope?: unknown; gitOrigin?: unknown };
+  if (status === 404 && body.code === 'project-missing') {
+    const key = context.projectKey ?? '<project>';
+    const error = `${link.label} has no project for ${String(body.gitOrigin ?? 'this repository')}. Add it with: pan machines add-project ${context.thisLabel} ${key} --to ${link.label}`;
+    return jsonResponse({ ...body, error }, { status: 404 });
+  }
+  if ((status === 404 && body.code === undefined) || (status === 403 && body.error === 'insufficient_scope' && body.missingScope === 'admin')) {
+    return jsonResponse({ code: 'peer-too-old', error: `${link.label} needs a newer Overdeck to start work for another machine` }, { status: 409 });
+  }
+  return jsonResponse(json, { status });
+}
+
+function optionalStrings(body: Record<string, unknown>, keys: readonly string[]): Record<string, string> | string {
+  const fields: Record<string, string> = {};
+  for (const key of keys) {
+    const value = body[key];
+    if (value === undefined || value === null) continue;
+    if (typeof value !== 'string') return `${key} must be a string`;
+    fields[key] = value;
+  }
+  return fields;
+}
+
+const machineOf = (target: Extract<FleetTarget, { ok: true }>) => ({ environmentId: target.environmentId, label: target.label, self: target.self });
+
+/** `POST /api/fleet/conversations`. */
+export async function handleFleetConversation(raw: unknown, caller: FleetCaller, deps: FleetSpawnDeps = defaultFleetSpawnDeps()): Promise<HttpServerResponse.HttpServerResponse> {
+  const body = asObject(raw);
+  if (!body) return jsonResponse({ error: 'body must be an object' }, { status: 400 });
+  if (typeof body['message'] !== 'string') return jsonResponse({ error: 'message must be a string' }, { status: 400 });
+  const fields = optionalStrings(body, ['machine', 'projectKey', 'model', 'harness', 'effort', 'issueId']);
+  if (typeof fields === 'string') return jsonResponse({ error: fields }, { status: 400 });
+  const needs = parseNeeds(body['needs']);
+  if (typeof needs === 'string') return jsonResponse({ error: needs }, { status: 400 });
+  const { machine, projectKey, ...options } = fields;
+  const project = projectKey ? deps.projectOrigin(projectKey) : null;
+  if (projectKey && !project) return jsonResponse({ code: 'unknown-project', error: `No project ${projectKey} on this machine` }, { status: 404 });
+  const gitOrigin = project?.gitOrigin ?? null;
+
+  const target = await deps.resolveTarget(machine, gitOrigin, needs);
+  if (!target.ok) return jsonResponse(target.body, { status: target.status });
+  const message = body['message'];
+  if (target.self) {
+    const created = await deps.createLocal({ ...options, message, ...(projectKey ? { projectKey } : {}) });
+    const name = (created.body as { name?: unknown } | null)?.name;
+    if (created.status !== 201 || typeof name !== 'string') return jsonResponse(created.body, { status: created.status });
+    return jsonResponse({ conversation: name, machine: machineOf(target), reason: target.reason }, { status: 201 });
+  }
+  if (projectKey && gitOrigin === null) {
+    return jsonResponse({ code: 'project-has-no-origin', error: `${projectKey} has no github_repo or gitlab_repo, so ${target.label} cannot find it` }, { status: 409 });
+  }
+  const answer = await postWorkDoor(deps, target.link, '/api/machines/work/conversations', { ...options, message, gitOrigin }, caller);
+  const name = (answer.json as { name?: unknown } | null)?.name;
+  if (answer.status !== 201 || typeof name !== 'string') {
+    return ownerRefusal(answer.status, answer.json, target.link, { thisLabel: await deps.thisLabel(), projectKey: projectKey ?? null });
+  }
+  await deps.refreshLinked(target.link).catch(() => undefined);
+  return jsonResponse({ conversation: `@${target.environmentId}/${name}`, machine: machineOf(target), reason: target.reason }, { status: 201 });
 }
 
 export const readFleetBody = Effect.gen(function* () {
@@ -69,4 +223,24 @@ const placementRoute = HttpRouter.add(
   }),
 );
 
-export const fleetWorkRouteLayer = Layer.mergeAll(placementRoute);
+/** The caller of a fleet spawn route from its credential and sender header. */
+export const fleetCallerOf = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const raw = (request.headers as Record<string, string | string[] | undefined>)[SENDER_HEADER];
+  return fleetCaller(resolveRequestCredential(request), Array.isArray(raw) ? raw[0] : raw);
+});
+
+const conversationsRoute = HttpRouter.add(
+  'POST',
+  '/api/fleet/conversations',
+  Effect.gen(function* () {
+    const refused = yield* fleetWriteGate;
+    if (refused) return refused;
+    const caller = yield* fleetCallerOf;
+    if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
+    const body = yield* readFleetBody;
+    return yield* Effect.promise(() => handleFleetConversation(body, caller));
+  }),
+);
+
+export const fleetWorkRouteLayer = Layer.mergeAll(placementRoute, conversationsRoute);

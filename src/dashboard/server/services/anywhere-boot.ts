@@ -35,7 +35,7 @@ import { setHeartbeatConversationsHashSource, setHeartbeatEndpointsHashSource, s
 import { startTransferSweep } from './conversation-release-service.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
 import { setLinkPresenceSource } from './conversation-list-merged.js';
-import { createLinkedConversationsSync } from './linked-conversations-sync.js';
+import { createLinkedConversationsSync, setLinkedConversationsSync } from './linked-conversations-sync.js';
 import { createLinkedProjectsSync, setLinkedProjectsSync } from './linked-projects-sync.js';
 import { currentMachineLoad, startMachineLoadSampler, stopMachineLoadSampler } from './machine-load.js';
 import { stopForwardsWithoutLink } from './port-forwards.js';
@@ -136,6 +136,7 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
 
   // PAN-4650 WI-3: linked machines' conversation lists, fetched on connect and on a changed hash.
   const linkedConversations = createLinkedConversationsSync();
+  setLinkedConversationsSync(linkedConversations);
   // PAN-4651 WI-3: linked machines' project lists, same trigger rule (connect + changed hash).
   const linkedProjects = createLinkedProjectsSync();
   setLinkedProjectsSync(linkedProjects);
@@ -216,6 +217,7 @@ export function stopAnywhere(): void {
   setHeartbeatConversationsHashSource(null);
   setHeartbeatMachineFactsSource(null);
   setLinkedProjectsSync(null);
+  setLinkedConversationsSync(null);
   stopMachineLoadSampler();
   stopMachineCapabilities();
   setLinkStatusSource(null);
