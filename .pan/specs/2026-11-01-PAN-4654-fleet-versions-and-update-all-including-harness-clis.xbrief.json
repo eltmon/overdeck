@@ -4,17 +4,17 @@
     "created": "2026-11-01T13:20:51Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4654: Fleet versions and Update all, including harness CLIs",
-    "updated": "2026-11-01T13:26:08.129Z"
+    "updated": "2026-11-01T13:26:49.800Z"
   },
   "plan": {
     "id": "pan-4654",
     "title": "Fleet versions and Update all, including harness CLIs",
-    "status": "proposed",
+    "status": "running",
     "uid": "769df306-873f-47cc-8648-4c4617e30a11",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T13:20:51Z",
-    "updated": "2026-11-01T13:26:08.129Z",
+    "updated": "2026-11-01T13:26:49.800Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4654",
@@ -987,5 +987,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
