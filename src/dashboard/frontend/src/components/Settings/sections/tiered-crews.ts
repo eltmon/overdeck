@@ -194,6 +194,34 @@ export function serializeCrews(
   return { ...configRest, tiers, by_kind };
 }
 
+/**
+ * PAN-4674: remove a crew in one write. The heir takes the crew's difficulties
+ * and its kind overrides. With no heir (`null`) the crew must own no
+ * difficulty, and its kind overrides are cleared so those kinds route by
+ * difficulty again.
+ */
+export function removeCrew(
+  crews: readonly Crew[],
+  assign: CrewAssignments,
+  byKind: CrewKindOverrides,
+  crewId: string,
+  heirId: string | null,
+): { crews: Crew[]; assign: CrewAssignments; byKind: CrewKindOverrides } {
+  const nextAssign: CrewAssignments = { ...assign };
+  for (const difficulty of DIFFICULTIES) {
+    if (nextAssign[difficulty] !== crewId) continue;
+    if (heirId === null) throw new Error(`Choose a crew to take ${difficulty} before removing this crew.`);
+    nextAssign[difficulty] = heirId;
+  }
+  const nextByKind: CrewKindOverrides = {};
+  for (const [kind, id] of Object.entries(byKind) as Array<[XBriefItemKind, string | undefined]>) {
+    if (!id) continue;
+    if (id !== crewId) nextByKind[kind] = id;
+    else if (heirId !== null) nextByKind[kind] = heirId;
+  }
+  return { crews: crews.filter((crew) => crew.id !== crewId), assign: nextAssign, byKind: nextByKind };
+}
+
 function modelDefinition(modelId: ModelId, catalog = MODELS_BY_PROVIDER): ModelDef | undefined {
   return Object.values(catalog).flatMap((provider) => provider.models).find((model) => model.id === modelId);
 }

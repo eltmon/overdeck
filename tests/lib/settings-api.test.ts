@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
+import { parse as parseYaml } from 'yaml';
 import { loadConfigSync } from '../../src/lib/config-yaml.js';
 import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getMiniMaxDefaultsApi, getDefaultConversationModelApi, saveOpenRouterFavorites, getOpenRouterFavorites } from '../../src/lib/settings-api.js';
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
@@ -782,6 +783,56 @@ models:
       expect(yamlContent).toContain('supervisor:');
       expect(yamlContent).toContain('replay_threshold: 0.5');
       expect(yamlContent).not.toContain('difficultyToTier');
+    });
+
+    it('drops a removed crew tier from config.yaml and retargets by_kind to the heir tier (PAN-4674)', async () => {
+      const { readFile, writeFile } = await import('fs/promises');
+      vi.mocked(readFile).mockResolvedValueOnce(`tiered_execution:
+  enabled: true
+  tiers:
+    trivial: { model: claude-haiku-4-5, harness: claude-code, difficulties: [trivial] }
+    simple-medium: { model: claude-sonnet-5, harness: claude-code, difficulties: [simple, medium] }
+    complex: { model: claude-opus-5-5, harness: claude-code, difficulties: [complex] }
+    expert: { model: claude-fable-5-1, harness: claude-code, difficulties: [expert] }
+  supervisor: { model: claude-opus-5-5, harness: claude-code, subscribe: all }
+  by_kind: { design: complex, spike: complex }
+  replay_threshold: 0.5
+`);
+      const settings: ApiSettingsConfig = {
+        models: {
+          providers: {
+            anthropic: true,
+            openai: false,
+            google: false,
+            minimax: false,
+            zai: false,
+            kimi: false,
+            openrouter: false,
+            nous: false,
+            dashscope: false,
+          },
+        },
+        api_keys: {},
+        tiered_execution: {
+          ...validTieredExecution,
+          tiers: {
+            trivial: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial'] },
+            'simple-medium': { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['simple', 'medium'] },
+            'complex-expert': { model: 'claude-opus-5-5', harness: 'claude-code', difficulties: ['complex', 'expert'] },
+          },
+          by_kind: { design: 'complex-expert', spike: 'complex-expert' },
+        },
+      };
+
+      await saveSettingsApi(settings);
+
+      const written = parseYaml(String(vi.mocked(writeFile).mock.calls.at(-1)![1])) as {
+        tiered_execution: { tiers: Record<string, { model: string; difficulties: string[] }>; by_kind: Record<string, string> };
+      };
+      expect(Object.keys(written.tiered_execution.tiers)).toEqual(['trivial', 'simple-medium', 'complex-expert']);
+      expect(written.tiered_execution.tiers['complex-expert']).toMatchObject({ model: 'claude-opus-5-5', difficulties: ['complex', 'expert'] });
+      expect(JSON.stringify(written.tiered_execution)).not.toContain('fable');
+      expect(written.tiered_execution.by_kind).toEqual({ design: 'complex-expert', spike: 'complex-expert' });
     });
 
     it('rejects enabled tiered_execution with an incomplete table before writing', async () => {

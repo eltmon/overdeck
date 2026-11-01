@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { TieredExecutionSection } from '../TieredExecutionSection';
-import type { SettingsConfig } from '../../types';
+import type { SettingsConfig, TieredExecutionConfig } from '../../types';
 
 function baseSettings(overrides: Partial<SettingsConfig> = {}): SettingsConfig {
   return {
@@ -337,7 +337,7 @@ describe('TieredExecutionSection', () => {
     expect(screen.queryByText('Assign these difficulties to another crew before removing it.')).toBeNull();
   });
 
-  it('revalidates kind overrides before confirming an open heir prompt', () => {
+  it('hands kind overrides that appear while the heir prompt is open to the heir', () => {
     const onSettingsChange = vi.fn();
     const formData = baseSettings({ tiered_execution: {
       enabled: true,
@@ -369,10 +369,13 @@ describe('TieredExecutionSection', () => {
     );
     onSettingsChange.mockClear();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Give trivial · simple to Claude Sonnet 5 (1M context)' }));
-    expect(screen.getByText('Move or remove these kind overrides before removing this crew.')).toBeTruthy();
-    expect(screen.queryByText('Removing Claude Haiku 4.5 (200K context) — give trivial · simple to:')).toBeNull();
-    expect(onSettingsChange).not.toHaveBeenCalled();
+    expect(screen.getByText('Removing Claude Haiku 4.5 (200K context) — give trivial · simple · docs override to:')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Give trivial · simple · docs override to Claude Sonnet 5 (1M context)' }));
+    expect(screen.queryByText(/^Removing Claude Haiku 4.5/)).toBeNull();
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+    const next = onSettingsChange.mock.calls[0][0] as SettingsConfig;
+    expect(Object.keys(next.tiered_execution?.tiers ?? {})).toEqual(['trivial-simple-medium-complex-expert']);
+    expect(next.tiered_execution?.by_kind).toEqual({ docs: 'trivial-simple-medium-complex-expert' });
   });
 
   it('blocks reassigning the final difficulty from a kind-routed crew', () => {
@@ -392,7 +395,7 @@ describe('TieredExecutionSection', () => {
     expect(onSettingsChange).not.toHaveBeenCalled();
   });
 
-  it('blocks removing a crew referenced solely by a kind override', () => {
+  it('offers to clear the overrides of a crew referenced solely by a kind override', () => {
     const onSettingsChange = vi.fn();
     render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
       enabled: false,
@@ -401,8 +404,15 @@ describe('TieredExecutionSection', () => {
     } })} onSettingsChange={onSettingsChange} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove crew Claude Haiku 4.5 (200K context)' }));
-    expect(screen.getByText('Move or remove these kind overrides before removing this crew.')).toBeTruthy();
+    expect(screen.getByText('Removing Claude Haiku 4.5 (200K context) — give docs override to another crew, or clear it:')).toBeTruthy();
     expect(onSettingsChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove and clear docs override' }));
+
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+    const next = onSettingsChange.mock.calls[0][0] as SettingsConfig;
+    expect(next.tiered_execution?.tiers).toEqual({});
+    expect(next.tiered_execution?.by_kind).toEqual({});
+    expect(screen.queryByRole('button', { name: /^Remove crew / })).toBeNull();
   });
 
   it('blocks removing the last crew because every difficulty needs an owner', () => {
@@ -1071,5 +1081,97 @@ describe('TieredExecutionSection workhorse refs (PAN-4191)', () => {
       harness: 'claude-code',
       difficulties: ['simple', 'medium', 'complex', 'expert'],
     });
+  });
+});
+
+describe('removing and restaffing configured crews (PAN-4674)', () => {
+  const FABLE = 'Claude Fable 5.1 (1M context)';
+  const OPUS = 'Claude Opus 5.5 (1M context)';
+  const SONNET = 'Claude Sonnet 5 (1M context)';
+
+  // The four crews the operator configured, as GET /api/settings returns them
+  // (the validated shape adds the byKind alias and difficultyToTier).
+  function serverShaped(config: TieredExecutionConfig): TieredExecutionConfig {
+    const difficultyToTier = Object.fromEntries(Object.entries(config.tiers).flatMap(([name, tier]) =>
+      (tier.difficulties ?? []).map((difficulty) => [difficulty, name])));
+    return { ...config, byKind: config.by_kind, difficultyToTier } as TieredExecutionConfig;
+  }
+
+  const operatorConfig: TieredExecutionConfig = serverShaped({
+    enabled: true,
+    tiers: {
+      trivial: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial'] },
+      'simple-medium': { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['simple', 'medium'] },
+      complex: { model: 'claude-opus-5-5', harness: 'claude-code', difficulties: ['complex'] },
+      expert: { model: 'claude-fable-5-1', harness: 'claude-code', difficulties: ['expert'] },
+    },
+    supervisor: { model: 'claude-opus-5-5', harness: 'claude-code', subscribe: 'all' },
+    by_kind: { design: 'complex', spike: 'complex' },
+    feed: { callouts: 'off', exclude: [], exclude_subjects: [], max_diff_bytes: null },
+    escalation: { enabled: true, retries_at_tier: 1, max_promotions: 2 },
+    compaction_reroute: 'off',
+    replay_threshold: 0.5,
+  });
+
+  function removeButtons(): string[] {
+    return screen.getAllByRole('button', { name: /^Remove crew .+/ }).map((button) => button.getAttribute('aria-label') ?? '');
+  }
+
+  function crewFor(difficulty: string): string {
+    return (screen.getByLabelText(`crew for ${difficulty}`) as HTMLSelectElement).value;
+  }
+
+  it('removes the Fable crew with an heir, and a reload of the saved config keeps it removed', () => {
+    const onSettingsChange = vi.fn();
+    const { unmount } = render(<TieredExecutionSection formData={baseSettings({ tiered_execution: operatorConfig })} onSettingsChange={onSettingsChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: `Remove crew ${FABLE}` }));
+    fireEvent.click(screen.getByRole('button', { name: `Give expert to ${OPUS}` }));
+
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+    const saved = (onSettingsChange.mock.calls[0][0] as SettingsConfig).tiered_execution!;
+    expect(Object.keys(saved.tiers)).toEqual(['trivial', 'simple-medium', 'complex-expert']);
+    expect(saved.tiers['complex-expert']).toMatchObject({ model: 'claude-opus-5-5', difficulties: ['complex', 'expert'] });
+    expect(saved.by_kind).toEqual({ design: 'complex-expert', spike: 'complex-expert' });
+    expect(removeButtons()).not.toContain(`Remove crew ${FABLE}`);
+
+    unmount();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: serverShaped(saved) })} onSettingsChange={vi.fn()} />);
+    expect(removeButtons()).toEqual([`Remove crew Claude Haiku 4.5 (200K context)`, `Remove crew ${SONNET}`, `Remove crew ${OPUS}`]);
+    expect(crewFor('expert')).toBe(crewFor('complex'));
+  });
+
+  it('removes a crew named in by_kind by handing its difficulties and kind overrides to the heir', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: operatorConfig })} onSettingsChange={onSettingsChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: `Remove crew ${OPUS}` }));
+    expect(screen.getByText(`Removing ${OPUS} — give complex · design override · spike override to:`)).toBeTruthy();
+    expect(screen.queryByText(/Move or remove/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: `Give complex · design override · spike override to ${SONNET}` }));
+
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+    const saved = (onSettingsChange.mock.calls[0][0] as SettingsConfig).tiered_execution!;
+    expect(Object.keys(saved.tiers)).toEqual(['trivial', 'simple-medium-complex', 'expert']);
+    expect(saved.by_kind).toEqual({ design: 'simple-medium-complex', spike: 'simple-medium-complex' });
+    expect(removeButtons()).not.toContain(`Remove crew ${OPUS}`);
+  });
+
+  it('persists a crew model change, and a reload merges the now-identical crews', () => {
+    const onSettingsChange = vi.fn();
+    const { unmount } = render(<TieredExecutionSection formData={baseSettings({ tiered_execution: operatorConfig })} onSettingsChange={onSettingsChange} />);
+
+    const summary = screen.getAllByText(FABLE).find((element) => element.closest('summary'))!.closest('summary')!;
+    fireEvent.click(summary);
+    fireEvent.change(within(summary.closest('details')!).getByLabelText('Model'), { target: { value: 'claude-opus-5-5' } });
+
+    const saved = (onSettingsChange.mock.calls.at(-1)?.[0] as SettingsConfig).tiered_execution!;
+    expect(saved.tiers.expert).toMatchObject({ model: 'claude-opus-5-5', difficulties: ['expert'] });
+    expect(JSON.stringify(saved.tiers)).not.toContain('fable');
+
+    unmount();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: serverShaped(saved) })} onSettingsChange={vi.fn()} />);
+    expect(removeButtons()).toEqual([`Remove crew Claude Haiku 4.5 (200K context)`, `Remove crew ${SONNET}`, `Remove crew ${OPUS}`]);
+    expect(crewFor('expert')).toBe(crewFor('complex'));
   });
 });

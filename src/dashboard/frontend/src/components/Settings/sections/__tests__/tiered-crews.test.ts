@@ -6,6 +6,7 @@ import {
   deriveTierName,
   importCrews,
   providerDefaultHarness,
+  removeCrew,
   renderYamlPreview,
   tierFitnessWarnings,
   serializeCrews,
@@ -268,5 +269,32 @@ describe('workhorse refs in crews (PAN-4191)', () => {
     const warnings = tierFitnessWarnings(config, { models: { providers: { anthropic: true } } as SettingsConfig['models'], workhorses });
     expect(warnings.map((warning) => warning.model)).not.toContain('workhorse:expensive');
     expect(warnings.filter((warning) => warning.code === 'unknown-model')).toEqual([]);
+  });
+});
+
+describe('removeCrew (PAN-4674)', () => {
+  const crews: Crew[] = [
+    { id: 'opus', model: 'claude-opus-5-5', harness: 'claude-code' },
+    { id: 'fable', model: 'claude-fable-5-1', harness: 'claude-code' },
+    { id: 'kinds-only', model: 'claude-haiku-4-5', harness: 'claude-code' },
+  ];
+  const assign = { trivial: 'opus', simple: 'opus', medium: 'opus', complex: 'opus', expert: 'fable' } as const;
+
+  it('hands the difficulties and kind overrides of the removed crew to the heir', () => {
+    const next = removeCrew(crews, assign, { design: 'fable', docs: 'kinds-only' }, 'fable', 'opus');
+    expect(next.crews.map((crew) => crew.id)).toEqual(['opus', 'kinds-only']);
+    expect(next.assign.expert).toBe('opus');
+    expect(next.byKind).toEqual({ design: 'opus', docs: 'kinds-only' });
+  });
+
+  it('clears the kind overrides of a crew that owns no difficulty when there is no heir', () => {
+    const next = removeCrew(crews, assign, { docs: 'kinds-only', design: 'opus' }, 'kinds-only', null);
+    expect(next.crews.map((crew) => crew.id)).toEqual(['opus', 'fable']);
+    expect(next.assign).toEqual(assign);
+    expect(next.byKind).toEqual({ design: 'opus' });
+  });
+
+  it('refuses to drop a difficulty when there is no heir', () => {
+    expect(() => removeCrew(crews, assign, {}, 'fable', null)).toThrow('Choose a crew to take expert before removing this crew.');
   });
 });
