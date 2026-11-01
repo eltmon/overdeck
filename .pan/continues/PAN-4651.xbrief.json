@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T20:50:22.996Z",
+  "updated": "2026-11-01T20:54:26.039Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,9 +178,10 @@
       "doneAt": "2026-11-01T20:50:17.948Z"
     },
     "wi29-mcp-fleet-tools": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4651",
-      "claimedAt": "2026-11-01T20:50:22.996Z"
+      "claimedAt": "2026-11-01T20:50:22.996Z",
+      "doneAt": "2026-11-01T20:54:26.039Z"
     }
   }
 }
