@@ -1476,6 +1476,14 @@ export async function saveDesignLanguage(theme: DesignLanguage): Promise<void> {
   });
 }
 
+/** Turn on `dashboard.require_token_mint` (PAN-1254 D-2) as one serialized settings turn. */
+export async function saveRequireTokenMint(): Promise<void> {
+  await runSettingsWriteSerialized(async () => {
+    const current = loadSettingsApi();
+    await saveSettingsApiPromiseUnlocked({ ...current, dashboard: { ...current.dashboard, require_token_mint: true } });
+  });
+}
+
 /**
  * Get OpenRouter favorites from config
  */

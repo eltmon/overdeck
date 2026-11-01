@@ -124,24 +124,24 @@ describe('parseTailscaleStatus', () => {
 
 describe('parseServeStatus', () => {
   it('recognises the dashboard proxy on <name>:443', () => {
-    expect(parseServeStatus(DASHBOARD_SERVE, NAME, PORT)).toEqual({ proxiesDashboard: true, otherHandlerOn443: false });
+    expect(parseServeStatus(DASHBOARD_SERVE, NAME, PORT)).toEqual({ proxiesDashboard: true, otherHandlerOn443: false, funnelOn443: false });
     const localhost = { Web: { [`${NAME}:443`]: { Handlers: { '/': { Proxy: `http://localhost:${PORT}/` } } } } };
     expect(parseServeStatus(localhost, `${NAME}.`, PORT).proxiesDashboard).toBe(true);
   });
 
   it('treats an empty or absent config as free', () => {
-    expect(parseServeStatus({}, NAME, PORT)).toEqual({ proxiesDashboard: false, otherHandlerOn443: false });
-    expect(parseServeStatus(null, NAME, PORT)).toEqual({ proxiesDashboard: false, otherHandlerOn443: false });
+    expect(parseServeStatus({}, NAME, PORT)).toEqual({ proxiesDashboard: false, otherHandlerOn443: false, funnelOn443: false });
+    expect(parseServeStatus(null, NAME, PORT)).toEqual({ proxiesDashboard: false, otherHandlerOn443: false, funnelOn443: false });
   });
 
   it('flags a proxy to another port', () => {
     const other = { Web: { [`${NAME}:443`]: { Handlers: { '/': { Proxy: 'http://127.0.0.1:8080' } } } } };
-    expect(parseServeStatus(other, NAME, PORT)).toEqual({ proxiesDashboard: false, otherHandlerOn443: true });
+    expect(parseServeStatus(other, NAME, PORT)).toEqual({ proxiesDashboard: false, otherHandlerOn443: true, funnelOn443: false });
   });
 
   it('flags a TCP forward on 443', () => {
     const forward = { TCP: { '443': { TCPForward: '127.0.0.1:8443', TerminateTLS: NAME } } };
-    expect(parseServeStatus(forward, NAME, PORT)).toEqual({ proxiesDashboard: false, otherHandlerOn443: true });
+    expect(parseServeStatus(forward, NAME, PORT)).toEqual({ proxiesDashboard: false, otherHandlerOn443: true, funnelOn443: false });
   });
 
   it('flags an extra web mount besides /', () => {
@@ -149,12 +149,19 @@ describe('parseServeStatus', () => {
       TCP: { '443': { HTTPS: true } },
       Web: { [`${NAME}:443`]: { Handlers: { '/': { Proxy: `http://127.0.0.1:${PORT}` }, '/grafana': { Proxy: 'http://127.0.0.1:3000' } } } },
     };
-    expect(parseServeStatus(extra, NAME, PORT)).toEqual({ proxiesDashboard: true, otherHandlerOn443: true });
+    expect(parseServeStatus(extra, NAME, PORT)).toEqual({ proxiesDashboard: true, otherHandlerOn443: true, funnelOn443: false });
+  });
+
+  it('flags Funnel on <name>:443', () => {
+    const funnel = { ...DASHBOARD_SERVE, AllowFunnel: { [`${NAME}:443`]: true } };
+    expect(parseServeStatus(funnel, NAME, PORT)).toEqual({ proxiesDashboard: true, otherHandlerOn443: false, funnelOn443: true });
+    const otherPort = { ...DASHBOARD_SERVE, AllowFunnel: { [`${NAME}:8443`]: true } };
+    expect(parseServeStatus(otherPort, NAME, PORT).funnelOn443).toBe(false);
   });
 
   it('ignores handlers on other ports', () => {
     const otherPort = { Web: { [`${NAME}:8443`]: { Handlers: { '/': { Proxy: 'http://127.0.0.1:9000' } } } } };
-    expect(parseServeStatus(otherPort, NAME, PORT)).toEqual({ proxiesDashboard: false, otherHandlerOn443: false });
+    expect(parseServeStatus(otherPort, NAME, PORT)).toEqual({ proxiesDashboard: false, otherHandlerOn443: false, funnelOn443: false });
   });
 });
 
@@ -221,7 +228,7 @@ describe('readTailscaleState', () => {
       ipv4: ['100.101.102.103'],
       loginName: 'op@example.com',
       operator: 'self',
-      serve: { proxiesDashboard: true, otherHandlerOn443: false },
+      serve: { proxiesDashboard: true, otherHandlerOn443: false, funnelOn443: false },
       port: PORT,
       nextStep: 'ready',
     });
@@ -278,7 +285,7 @@ describe('readTailscaleState', () => {
 
   it('treats unparseable serve output as no serve config', async () => {
     const { deps } = stateDeps({ ...READY_RESPONSES, 'serve status --json': ok('No serve config\n') });
-    expect(await readTailscaleState(deps)).toMatchObject({ serve: { proxiesDashboard: false, otherHandlerOn443: false }, nextStep: 'serve' });
+    expect(await readTailscaleState(deps)).toMatchObject({ serve: { proxiesDashboard: false, otherHandlerOn443: false, funnelOn443: false }, nextStep: 'serve' });
   });
 
   it('asks to protect the dashboard when serve is on and token mint is off', async () => {

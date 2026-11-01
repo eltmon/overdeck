@@ -67,6 +67,8 @@ export interface TailscaleServeInfo {
   proxiesDashboard: boolean;
   /** Something other than this dashboard is served on port 443 (NFR-5: never clobber it). */
   otherHandlerOn443: boolean;
+  /** Tailscale Funnel publishes `<MagicDNS>:443` on the public internet. */
+  funnelOn443: boolean;
 }
 
 export interface TailscaleState {
@@ -166,11 +168,12 @@ function isDashboardTarget(proxy: unknown, port: number): boolean {
  * Pure reading of `tailscale serve status --json` (C-4 shape:
  * `{ TCP: { "443": { HTTPS: true } }, Web: { "<name>:443": { Handlers: { "/": { Proxy } } } } }`).
  * An empty or absent config is free. When the MagicDNS name is unknown, any
- * `*:443` web entry counts.
+ * `*:443` web entry counts. `AllowFunnel["<name>:443"]` means the same port is
+ * also published on the public internet.
  */
 export function parseServeStatus(json: unknown, magicDnsName: string | null, port: number): TailscaleServeInfo {
   const config = record(json);
-  if (!config) return { proxiesDashboard: false, otherHandlerOn443: false };
+  if (!config) return { proxiesDashboard: false, otherHandlerOn443: false, funnelOn443: false };
 
   let otherHandlerOn443 = false;
   const tcp443 = record(record(config['TCP'])?.['443']);
@@ -187,7 +190,11 @@ export function parseServeStatus(json: unknown, magicDnsName: string | null, por
       else otherHandlerOn443 = true;
     }
   }
-  return { proxiesDashboard, otherHandlerOn443 };
+  const funnelOn443 = Object.entries(record(config['AllowFunnel']) ?? {}).some(([hostPort, allowed]) => {
+    const key = hostPort.toLowerCase();
+    return allowed === true && (wantedKey ? key === wantedKey : key.endsWith(':443'));
+  });
+  return { proxiesDashboard, otherHandlerOn443, funnelOn443 };
 }
 
 export interface NextStepInput {
@@ -297,7 +304,7 @@ async function readUncached(deps: ReadTailscaleStateDeps): Promise<TailscaleStat
     httpsEnabled: false,
     tailnetName: null,
     operator: 'self',
-    serve: { proxiesDashboard: false, otherHandlerOn443: false },
+    serve: { proxiesDashboard: false, otherHandlerOn443: false, funnelOn443: false },
     peers: [],
     port,
     requireTokenMint,
