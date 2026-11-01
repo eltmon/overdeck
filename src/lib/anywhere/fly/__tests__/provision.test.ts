@@ -34,6 +34,8 @@ function harness(respond: Responder = () => undefined): Harness {
   const ok = (stdout = ''): FlyExecResult => ({ stdout, stderr: '', exit_code: 0 });
   const defaults = (command: string): FlyExecResult => {
     if (command === 'pan --version') return ok(`${HOME_VERSION}\n`);
+    // Fly's exec shell runs with HOME=/ (seen live), so the probe prints //.overdeck.
+    if (command.startsWith('printf %s "${OVERDECK_HOME:-')) return ok('//.overdeck');
     if (command === 'pan pair --json') return ok(`${JSON.stringify({ url: `http://localhost:3011/#pair=${PAIRING}`, credential: PAIRING, expiresAt: '2026-11-01T01:00:00Z' })}\n`);
     return ok();
   };
@@ -111,10 +113,10 @@ describe('provisionFlyMachine (PAN-4652 WI-7)', () => {
       (e: string) => e === 'createMachine',
       (e: string) => e === 'waitForState',
       (e: string) => e === 'exec:pan --version',
-      (e: string) => e === 'write:/root/.overdeck/environment-id.json',
+      (e: string) => e === 'write:/.overdeck/environment-id.json',
       (e: string) => e === 'syncAllCredentials',
       (e: string) => e === 'configureClaudeCode',
-      (e: string) => e.startsWith('exec:') && e.includes('dockerd > /var/log/dockerd.log'),
+      (e: string) => e.startsWith('exec:') && e.includes('dockerd --storage-driver=vfs > /var/log/dockerd.log'),
       (e: string) => e.startsWith('exec:') && e.includes('pan serve'),
       (e: string) => e.startsWith('exec:curl'),
       (e: string) => e === 'write:/workspace/.pan/fly-machine-watchdog.js',
@@ -133,11 +135,13 @@ describe('provisionFlyMachine (PAN-4652 WI-7)', () => {
     expect(serve).toContain('OVERDECK_TERMINAL_BACKEND=tmux IS_SANDBOX=1 OVERDECK_PUBLIC_LINK_ONLY=1');
     expect(serve).toContain('pan serve --port 3011 --no-open');
     expect(serve).not.toContain('OVERDECK_DISABLE_DEACON');
+    expect(serve).toContain("> '/.overdeck/fly-serve.log'");
+    expect(h.execs).toContain("chmod 600 '/.overdeck/environment-id.json'");
 
-    const identity = JSON.parse(h.files.get('/root/.overdeck/environment-id.json')!) as Record<string, unknown>;
+    const identity = JSON.parse(h.files.get('/.overdeck/environment-id.json')!) as Record<string, unknown>;
     expect(identity).toMatchObject({ v: 1, environmentId: ENV_ID, label: `fly-${MACHINE_ID}` });
     expect(typeof identity.createdAt).toBe('string');
-    expect(h.events.indexOf('write:/root/.overdeck/environment-id.json')).toBeLessThan(h.events.findIndex((e) => e.includes('pan serve')));
+    expect(h.events.indexOf('write:/.overdeck/environment-id.json')).toBeLessThan(h.events.findIndex((e) => e.includes('pan serve')));
   });
 
   it('installs home\'s version on a mismatch and fails with version-mismatch when it still differs', async () => {
@@ -211,7 +215,7 @@ describe('provisionFlyMachine (PAN-4652 WI-7)', () => {
   it('skips Docker when the image has no dockerd', async () => {
     const h = harness((command) => (command === 'command -v dockerd' ? { exit_code: 1 } : undefined));
     await expect(provisionFlyMachine({}, h.deps)).resolves.toMatchObject({ docker: false });
-    expect(h.execs.some((command) => command.includes('dockerd > /var/log/dockerd.log'))).toBe(false);
+    expect(h.execs.some((command) => command.includes('dockerd --storage-driver'))).toBe(false);
   });
 });
 

@@ -76,8 +76,12 @@ export class FlyMachineError extends Error {
 
 /** Port `pan serve` listens on inside the VM; the Fly proxy forwards 443 to it (D-3). */
 const FLY_MACHINE_SERVE_PORT = 3011;
-const SERVE_LOG = '/root/.overdeck/fly-serve.log';
-const IDENTITY_PATH = '/root/.overdeck/environment-id.json';
+/**
+ * The Overdeck home of every process started through the Machines exec API,
+ * `pan serve` included. Fly's exec shell runs with `HOME=/`, not `/root`, so
+ * the home is read from that shell rather than assumed (PAN-4652 live run).
+ */
+const OVERDECK_HOME_PROBE = 'printf %s "${OVERDECK_HOME:-$HOME/.overdeck}"';
 const WATCHDOG_SCRIPT = `${REMOTE_PAN_DIR}/fly-machine-watchdog.js`;
 const WATCHDOG_LOG = `${REMOTE_PAN_DIR}/fly-machine-watchdog.log`;
 const EXEC_TIMEOUT_SECONDS = 60;
@@ -259,13 +263,17 @@ async function prepareMachine(
     }
   }
 
-  // 5. Identity before the server first starts (D-6).
+  // 5. Identity before the server first starts (D-6), in the home that server will use.
+  const overdeckHome = (await run(OVERDECK_HOME_PROBE, 'Reading the Overdeck home')).trim().replace(/\/+/g, '/');
+  if (!overdeckHome.startsWith('/')) throw new Error(`Fly machine ${machineId} reported no absolute Overdeck home (got "${overdeckHome}")`);
+  const identityPath = `${overdeckHome}/environment-id.json`;
+  const serveLog = `${overdeckHome}/fly-serve.log`;
   const environmentId = deps.newId();
   const label = `fly-${machineId}`;
   const identity = { v: 1, environmentId, label, createdAt: new Date(deps.now()).toISOString() };
-  await run('mkdir -p /root/.overdeck', 'Creating /root/.overdeck');
-  await deps.writeRemoteFile(machineName, IDENTITY_PATH, `${JSON.stringify(identity, null, 2)}\n`);
-  await run(`chmod 600 ${IDENTITY_PATH}`, 'Protecting the identity file');
+  await run(`mkdir -p ${shellQuote(overdeckHome)}`, `Creating ${overdeckHome}`);
+  await deps.writeRemoteFile(machineName, identityPath, `${JSON.stringify(identity, null, 2)}\n`);
+  await run(`chmod 600 ${shellQuote(identityPath)}`, 'Protecting the identity file');
 
   // 6. Credentials and Claude Code settings.
   await deps.syncAllCredentials(machineName);
@@ -274,18 +282,20 @@ async function prepareMachine(
   // 7. Docker when the image has it (D-8). A failure is logged, never fatal.
   let docker = false;
   if (await succeeds('command -v dockerd')) {
-    await run(`${detached('dockerd > /var/log/dockerd.log 2>&1')}`, 'Starting dockerd');
+    // The VM's root filesystem cannot host overlay mounts ("invalid argument"), so
+    // Docker uses the vfs driver: slower and larger on disk, but it runs (PAN-4652 O3).
+    await run(`${detached('dockerd --storage-driver=vfs > /var/log/dockerd.log 2>&1')}`, 'Starting dockerd');
     docker = await pollUntil(deps, DOCKER_POLL, () => succeeds('docker info > /dev/null 2>&1'));
     if (!docker) deps.log(`dockerd did not answer docker info within 60 s on ${machineId}; continuing without Docker`);
   }
 
   // 8. The server, with the D-4 env, then its health.
   const env = `OVERDECK_TERMINAL_BACKEND=tmux IS_SANDBOX=1 OVERDECK_PUBLIC_LINK_ONLY=1 PORT=${FLY_MACHINE_SERVE_PORT}`;
-  await run(`setsid nohup env ${env} pan serve --port ${FLY_MACHINE_SERVE_PORT} --no-open > ${SERVE_LOG} 2>&1 < /dev/null &`, 'Starting pan serve');
+  await run(`setsid nohup env ${env} pan serve --port ${FLY_MACHINE_SERVE_PORT} --no-open > ${shellQuote(serveLog)} 2>&1 < /dev/null &`, 'Starting pan serve');
   const healthy = await pollUntil(deps, HEALTH_POLL, () => succeeds(`curl -fsS http://127.0.0.1:${FLY_MACHINE_SERVE_PORT}/api/health`));
   if (!healthy) {
-    const tail = await exec(`tail -n 40 ${SERVE_LOG}`).then((result) => result.stdout, () => '');
-    throw new FlyMachineError('server-not-ready', `pan serve on Fly machine ${machineId} did not answer /api/health within 120 s. Last lines of ${SERVE_LOG}:\n${tail}`, { log: tail });
+    const tail = await exec(`tail -n 40 ${shellQuote(serveLog)}`).then((result) => result.stdout, () => '');
+    throw new FlyMachineError('server-not-ready', `pan serve on Fly machine ${machineId} did not answer /api/health within 120 s. Last lines of ${serveLog}:\n${tail}`, { log: tail });
   }
 
   // 9. Watchdog: the VM stops itself 300 s after home stops heartbeating (PAN-4295).

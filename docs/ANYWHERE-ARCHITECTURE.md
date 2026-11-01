@@ -638,16 +638,21 @@ longer runs detached (`setsid nohup … &`) and is polled.
 4. Version equality: when the VM's `pan --version` differs from home's `package.json`
    version, `npm install -g @overdeck/core@<home>` runs detached and is polled every 5 s for
    at most 5 min; a second mismatch fails with `version-mismatch`.
-5. Identity: `/root/.overdeck/environment-id.json` with `{ v: 1, environmentId, label:
+5. Identity: `<home>/environment-id.json` with `{ v: 1, environmentId, label:
    "fly-<machineId>", createdAt }`, mode 0600, before the server first starts (the label is
-   fixed at link time).
+   fixed at link time). `<home>` is read from the exec shell
+   (`${OVERDECK_HOME:-$HOME/.overdeck}`), never assumed: Fly's exec shell runs with `HOME=/`,
+   so the server, `pan pair` and the project clone all use `/.overdeck`, and an identity
+   written to `/root/.overdeck` is never read.
 6. `syncAllCredentials` and `configureClaudeCode` through the Fly provider (Claude OAuth file
    and `gh auth token`; no SSH key reaches the VM).
-7. Docker: when `command -v dockerd` succeeds, `dockerd` starts detached and `docker info`
-   is polled every 2 s for 60 s; the result is the record's `docker` field and a failure
-   never fails provisioning.
+7. Docker: when `command -v dockerd` succeeds, `dockerd --storage-driver=vfs` starts
+   detached and `docker info` is polled every 2 s for 60 s; the result is the record's
+   `docker` field and a failure never fails provisioning. The default overlay driver cannot
+   mount on the VM's root filesystem ("invalid argument"); `vfs` runs containers, at the
+   cost of speed and disk.
 8. Server: `pan serve` with the D-4 env, then `curl /api/health` every 2 s for 120 s, or
-   `server-not-ready` with the last 40 lines of `/root/.overdeck/fly-serve.log`.
+   `server-not-ready` with the last 40 lines of `<home>/fly-serve.log`.
 9. Watchdog: the PAN-4295 ephemeral watchdog at `/workspace/.pan/fly-machine-watchdog.js`
    and the first heartbeat; the VM stops itself 300 s after home stops heartbeating.
 10. `pan pair --json`; its `credential` must match `odp_` + 64 hex, else `pairing-failed`.
