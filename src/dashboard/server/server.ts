@@ -38,7 +38,7 @@ import { setupVoiceWebSocket } from './ws-voice.js';
 import { setupAutoPresoWebSocket } from './ws-autopreso.js';
 import { installChannelListener } from './channel-listener.js';
 import { plainHttpNavigationGuard } from './plain-http-guard.js';
-import { recordPairingExchangeFailure } from './pairing-credentials.js';
+import { recordPairingExchangeFailure, takePairingById } from './pairing-credentials.js';
 import { getOverdeckVersion } from './routes/misc/shared.js';
 import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { ensureMachineKey } from '../../lib/anywhere/machine-key.js';
@@ -64,6 +64,8 @@ import { remoteRouteLayer } from './routes/remote.js'
 import { environmentRouteLayer } from './routes/environment.js'
 import { pairingRouteLayer } from './routes/pairing.js'
 import { anywhereRouteLayer } from './routes/anywhere.js'
+import { machinesRouteLayer } from './routes/machines.js'
+import { machinesPeerRouteLayer } from './routes/machines-peer.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { settingsRouteLayer } from './routes/settings.js'
@@ -138,12 +140,15 @@ const HttpServerLive = Layer.unwrap(
       setupAutoPresoWebSocket(nodeServer);
       // PAN-4645: secure machine channels on the dashboard port (primary only).
       // An IK initiator is pinned when an active machine token is bound to its
-      // key; pairing credentials (WI-12) plug in here, refused until they land.
+      // key; a pairing initiator must name a live `pan pair` credential.
       installChannelListener(nodeServer, {
         primary: !isPeerDashboardProcess(),
         localKey: ensureMachineKey,
         isPinnedPeer: (remoteKeyHex) => findActiveMachineTokenByKey(remoteKeyHex) !== null,
-        takePairing: () => 'unknown',
+        takePairing: (pairingId) => {
+          const taken = takePairingById(pairingId);
+          return taken === 'unknown' || taken === 'expired' ? 'unknown' : taken;
+        },
         onPairingFailure: recordPairingExchangeFailure,
         serverVersion: getOverdeckVersion,
       });
@@ -374,6 +379,8 @@ export const makeRoutesLayer = Layer.mergeAll(
   environmentRouteLayer,
   pairingRouteLayer,
   anywhereRouteLayer,
+  machinesRouteLayer,
+  machinesPeerRouteLayer,
   accessTokensRouteLayer,
   staticRouteLayer,
 );
