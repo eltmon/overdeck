@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4295",
   "created": "2026-11-01T05:48:47.966Z",
-  "updated": "2026-11-01T06:30:58.432Z",
+  "updated": "2026-11-01T06:38:03.396Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-4295",
       "claimedAt": "2026-11-01T06:29:50.598Z",
       "doneAt": "2026-11-01T06:30:58.432Z"
+    },
+    "fly-live-smoke": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4295",
+      "claimedAt": "2026-11-01T06:38:03.395Z"
     }
   }
 }
