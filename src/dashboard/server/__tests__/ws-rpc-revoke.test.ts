@@ -176,6 +176,19 @@ describe('/ws/rpc revocation (PAN-4645 WI-7)', () => {
     expect(liveChannelCount()).toBe(0);
   });
 
+  it('interrupts the RPC handler at revocation even when the client never answers the close frame', async () => {
+    const { withRpcRevocation } = await import('../ws-rpc-auth.js');
+    const { closeDeviceConnections } = await import('../device-connections.js');
+    const credential = { kind: 'device', deviceId: 'dev-silent', scopes: ['admin'] } as const;
+    const request = HttpServerRequest.fromWeb(new Request('http://dashboard.test/ws/rpc'));
+    // A handler that would run forever stands in for an RPC stream whose client ignores the close frame.
+    const outcome = Effect.runPromise(withRpcRevocation(Effect.never, credential as never, request)).then((response) => response.status);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(closeDeviceConnections('dev-silent')).toBe(1);
+    const settled = await Promise.race([outcome, new Promise<string>((resolve) => setTimeout(() => resolve('still running'), 1500))]);
+    expect(settled).toBe(204);
+  });
+
   it('finds the ws instance on an upgraded socket and nothing on a plain object', () => {
     const fake = { [Symbol('websocket')]: { close: () => undefined } };
     expect(websocketOfRawSocket(fake)).not.toBeNull();

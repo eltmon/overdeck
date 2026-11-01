@@ -22,8 +22,8 @@
  * for a machine record, every secure channel bound to its key, so a revoke
  * written by another process lands within one refresh (5 s).
  */
-import { Effect } from 'effect';
-import type { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { Deferred, Effect } from 'effect';
+import { HttpServerResponse, type HttpServerRequest } from 'effect/unstable/http';
 import type { Rpc, RpcGroup } from 'effect/unstable/rpc';
 import { PanRpcGroup } from '@overdeck/contracts';
 
@@ -138,10 +138,18 @@ export function withRpcRevocation<E, R>(
 ): Effect.Effect<HttpServerResponse.HttpServerResponse, E, R> {
   const revocableId = revocableCredentialId(credential);
   if (revocableId === null) return rpcHttp;
+  // Queue the 4401 close frame first, then stop the handler fiber: a client that
+  // never answers the close frame must not keep a working RPC channel for the
+  // 30 s `ws` close timeout (D-4645-15 keeps the interrupt main had).
+  const revoked = Deferred.makeUnsafe<void>();
   const unregister = registerDeviceConnection(revocableId, () => {
     closeRpcSocketRevoked(request);
+    Deferred.doneUnsafe(revoked, Effect.void);
   });
-  return rpcHttp.pipe(Effect.ensuring(Effect.sync(unregister)));
+  return Effect.raceFirst(
+    rpcHttp,
+    Deferred.await(revoked).pipe(Effect.as(HttpServerResponse.empty())),
+  ).pipe(Effect.ensuring(Effect.sync(unregister)));
 }
 
 /**
