@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T15:56:51.541Z",
+  "updated": "2026-11-01T16:09:05.600Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,9 +136,10 @@
       "doneAt": "2026-11-01T15:56:45.216Z"
     },
     "wi21-title-bar-e2e": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4650",
-      "claimedAt": "2026-11-01T15:56:51.541Z"
+      "claimedAt": "2026-11-01T15:56:51.541Z",
+      "doneAt": "2026-11-01T16:09:05.599Z"
     }
   },
   "agentModel": "claude-opus-5-5"
