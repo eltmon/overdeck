@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T19:00:26.907Z",
+  "updated": "2026-11-01T19:02:22.720Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-01T19:00:20.137Z"
     },
     "wi10-cap-counts-fly-machines": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4652",
-      "claimedAt": "2026-11-01T19:00:26.907Z"
+      "claimedAt": "2026-11-01T19:00:26.907Z",
+      "doneAt": "2026-11-01T19:02:22.720Z"
     }
   }
 }
