@@ -148,6 +148,20 @@ export const MachineProject = Schema.Struct({
 })
 export type MachineProject = typeof MachineProject.Type
 
+/** PAN-4651 D-4651-13: one repository across machines, as `GET /api/fleet/projects` lists it. */
+export const FleetProjectRow = Schema.Struct({
+  /** The git origin slug; null for a local project without one (its own row). */
+  gitOrigin: Schema.NullOr(Schema.String),
+  name: Schema.String,
+  /** This machine's project for the slug, or null when only other machines have it. */
+  local: Schema.NullOr(Schema.Struct({ key: Schema.String })),
+  machines: Schema.Array(Schema.Struct({ environmentId: Schema.String, label: Schema.String, key: Schema.String, state: LinkState })),
+})
+export type FleetProjectRow = typeof FleetProjectRow.Type
+
+export const FleetProjectsResponse = Schema.Struct({ combine: Schema.Boolean, projects: Schema.Array(FleetProjectRow) })
+export type FleetProjectsResponse = typeof FleetProjectsResponse.Type
+
 /** One outbound link as shown by `GET /api/machines` and `pan machines list`. */
 export const MachineLinkView = Schema.Struct({
   id: Schema.String,
@@ -195,6 +209,8 @@ export const MachinesResponse = Schema.Struct({
     fingerprint: Schema.String,
     /** PAN-4650 D-4: linked machines list this machine's conversations (anywhere.json, default on). */
     shareConversations: Schema.Boolean,
+    /** PAN-4651 D-4651-13: one project per git origin across machines (anywhere.json, default on). */
+    combineRepositories: Schema.optional(Schema.Boolean),
     /** PAN-4651: this machine's own load sample, tags and placement mode. */
     load: Schema.optional(Schema.NullOr(LoadSample)),
     tags: Schema.optional(Schema.Array(Schema.String)),

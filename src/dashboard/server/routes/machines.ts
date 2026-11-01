@@ -102,6 +102,7 @@ export async function buildMachinesResponse(): Promise<MachinesResponse> {
       label: identity.label,
       fingerprint: machineKeyFingerprint(key.publicKey),
       shareConversations: settings.shareConversations,
+      combineRepositories: settings.combineRepositories,
       // PAN-4651 D-4651-8: this machine's own load sample, tags and placement mode.
       load: currentMachineLoad(),
       tags: currentMachineProfile()?.tags ?? [],
@@ -373,19 +374,27 @@ const addRouteRoute = HttpRouter.add(
 );
 
 /** PAN-4650 D-4/D-4650-15: `PUT /api/machines/sharing { conversations }` turns Share my conversations on or off. */
+/** `PUT /api/machines/sharing { conversations?, combineRepositories? }` (PAN-4651 D-4651-13: each optional, at least one). */
 export async function handleSetSharing(bodyText: string): Promise<HttpServerResponse.HttpServerResponse> {
-  let conversations: unknown;
+  let body: { conversations?: unknown; combineRepositories?: unknown };
   try {
-    conversations = (JSON.parse(bodyText || '{}') as { conversations?: unknown }).conversations;
+    body = JSON.parse(bodyText || '{}') as typeof body;
   } catch {
     return jsonResponse({ error: 'body is not JSON' }, { status: 400 });
   }
-  if (typeof conversations !== 'boolean') return jsonResponse({ error: 'body must be { conversations: boolean }' }, { status: 400 });
+  const { conversations, combineRepositories } = body;
+  const valid = (value: unknown) => value === undefined || typeof value === 'boolean';
+  if (!valid(conversations) || !valid(combineRepositories) || (conversations === undefined && combineRepositories === undefined)) {
+    return jsonResponse({ error: 'body must be { conversations?: boolean, combineRepositories?: boolean } with at least one' }, { status: 400 });
+  }
   try {
-    const settings = await writeAnywhereSettings({ shareConversations: conversations });
+    const settings = await writeAnywhereSettings({
+      ...(conversations !== undefined ? { shareConversations: conversations as boolean } : {}),
+      ...(combineRepositories !== undefined ? { combineRepositories: combineRepositories as boolean } : {}),
+    });
     // Linked machines see the change on their next heartbeat (a new list hash).
-    invalidateSharedConversations();
-    return jsonResponse({ conversations: settings.shareConversations });
+    if (conversations !== undefined) invalidateSharedConversations();
+    return jsonResponse({ conversations: settings.shareConversations, combineRepositories: settings.combineRepositories });
   } catch (error) {
     return jsonResponse({ error: (error as Error).message }, { status: 500 });
   }

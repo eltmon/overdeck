@@ -4,13 +4,15 @@
  * call. Every fetcher returns `{ status, body }` (see anywhereApi.ts) so the
  * panel can show the server's error text.
  */
-import type { FleetUpdateMode, FleetUpdateResponse, FleetVersionsResponse, LinkAccess, MachineLinkView, MachinesResponse } from '@overdeck/contracts';
+import type { FleetProjectsResponse, FleetUpdateMode, FleetUpdateResponse, FleetVersionsResponse, LinkAccess, MachineLinkView, MachinesResponse } from '@overdeck/contracts';
 
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import { apiError, type ApiResult, isOk } from './anywhereApi';
 
 export type {
   FleetComponent,
+  FleetProjectRow,
+  FleetProjectsResponse,
   FleetUpdateJob,
   FleetUpdateResponse,
   FleetVersionRow,
@@ -93,6 +95,25 @@ export async function setShareConversations(conversations: boolean): Promise<Api
     headers: await dashboardMutationJsonHeaders(),
     body: JSON.stringify({ conversations }),
   }));
+}
+
+/** PAN-4651 D-4651-13: Combine matching repositories across machines (or stop). */
+export async function setCombineRepositories(combineRepositories: boolean): Promise<ApiResult<{ conversations: boolean; combineRepositories: boolean }>> {
+  return readResult(await fetch('/api/machines/sharing', {
+    method: 'PUT',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ combineRepositories }),
+  }));
+}
+
+export const FLEET_PROJECTS_QUERY_KEY = ['fleet-projects'] as const;
+
+/** Query function for `['fleet-projects']`: projects grouped by git origin across machines. */
+export async function loadFleetProjects(): Promise<FleetProjectsResponse> {
+  const result = await readResult<FleetProjectsResponse>(await fetch('/api/fleet/projects'));
+  if (!isOk(result)) throw new Error(apiError(result));
+  const body = result.body as Partial<FleetProjectsResponse> | null;
+  return { combine: body?.combine !== false, projects: Array.isArray(body?.projects) ? body.projects : [] };
 }
 
 /** PAN-4650: Hide this machine (or show it again) in the conversation list. */
