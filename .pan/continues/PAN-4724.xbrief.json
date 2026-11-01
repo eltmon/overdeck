@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4724",
+  "created": "2026-11-01T16:06:34.998Z",
+  "updated": "2026-11-01T16:06:34.998Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "rollup-install": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4724",
+      "claimedAt": "2026-11-01T16:06:34.998Z"
+    }
+  }
+}
