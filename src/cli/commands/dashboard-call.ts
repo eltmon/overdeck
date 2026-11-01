@@ -7,13 +7,13 @@
 export class DashboardUnreachableError extends Error {}
 
 /** Call the running dashboard with the internal token. Throws DashboardUnreachableError when nothing answers. */
-export async function callDashboard(path: string, init: { method: string; body?: unknown }): Promise<Response> {
+export async function callDashboard(path: string, init: { method: string; body?: unknown; headers?: Record<string, string> }): Promise<Response> {
   const { getDashboardApiUrl } = await import('../../lib/config.js');
   const { ensureInternalToken, INTERNAL_TOKEN_HEADER } = await import('../../lib/internal-token.js');
   try {
     return await fetch(`${getDashboardApiUrl()}${path}`, {
       method: init.method,
-      headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: ensureInternalToken() },
+      headers: { 'Content-Type': 'application/json', ...init.headers, [INTERNAL_TOKEN_HEADER]: ensureInternalToken() },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
     });
   } catch (error) {

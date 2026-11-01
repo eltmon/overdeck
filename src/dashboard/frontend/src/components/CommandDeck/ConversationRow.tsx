@@ -17,6 +17,7 @@ import type { RegisteredProject } from './UnknownProjectState';
 import { resolveEffectiveProjectKey } from './projectsData';
 import { fallbackBadgeTone } from './fallbackBadge';
 import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
+import { isOfflineLinked, LinkedMachineChip, LinkedOfflineMeta, LinkedRowMenuItems } from './LinkedConversationRow';
 import { PullRequestMenuItems } from './PullRequestMenuItems';
 import { TriageMenuItems } from './TriageMenuItems';
 import { formatSnoozeWake, isSnoozed } from './conversation-triage';
@@ -337,9 +338,10 @@ export function ConversationRow({
     if (ok) mutations.archive(conv.name);
   }, [conv.isFavorited, conv.title, conv.name, confirm, mutations]);
 
-  const itemClass = isNested
+  const offlineLinked = isOfflineLinked(conv); // PAN-4650: muted title, hollow dot, offline metadata
+  const itemClass = (offlineLinked ? `${styles.linkedRowOffline} ` : '') + (isNested
     ? `${styles.projectConvItem} ${isSelected ? styles.projectConvItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''}`
-    : `${styles.conversationItem} ${isSelected || isMultiSelected ? styles.conversationItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''}`;
+    : `${styles.conversationItem} ${isSelected || isMultiSelected ? styles.conversationItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''}`);
 
   // Fork / spawn status badges — shared by both row variants.
   const ownerLabel = conv.vaultOwnerLabel ?? 'another machine';
@@ -371,7 +373,7 @@ export function ConversationRow({
       <MonitorSmartphone size={10} />
       <span className={styles.conversationBranchChipText}>{`from ${ownerLabel}`}</span>
     </span>
-  ) : continuityBadge;
+  ) : conv.origin === 'linked' ? <LinkedMachineChip conv={conv} /> : continuityBadge;
   const pullRequestBadge = conv.pullRequest ? (
     <PullRequestBadge
       link={conv.pullRequest}
@@ -568,7 +570,7 @@ export function ConversationRow({
           size={dotSize}
           className={styles.conversationDot}
           style={{
-            fill: conv.sessionAlive ? 'var(--success)' : 'var(--muted-foreground)',
+            fill: offlineLinked ? 'transparent' : conv.sessionAlive ? 'var(--success)' : 'var(--muted-foreground)',
             color: conv.sessionAlive ? 'var(--success)' : 'var(--muted-foreground)',
           }}
         />
@@ -663,7 +665,8 @@ export function ConversationRow({
                 )}
                 <span className={styles.conversationMetaSep} aria-hidden>·</span>
                 <span title={`Harness: ${shortHarness(conv.harness ?? 'claude-code')}`}>{shortHarness(conv.harness ?? 'claude-code')}</span>
-                {conv.model && (
+                {offlineLinked && <LinkedOfflineMeta conv={conv} />}
+                {conv.model && !offlineLinked && (
                   <>
                     <span className={styles.conversationMetaSep} aria-hidden>·</span>
                     <span title={`Model: ${conv.model}`}>{shortModel(conv.model)}</span>
@@ -742,6 +745,7 @@ export function ConversationRow({
           className="fixed z-[1000] min-w-[220px]"
           style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, right: 'auto' }}
         >
+          {conv.origin === 'linked' ? <LinkedRowMenuItems conv={conv} onCopyLink={handleCopyLink} onClose={() => setMenuOpen(false)} /> : <>
           <MenuItemButton
             onClick={() => { beginRename(); setMenuOpen(false); }}
           >
@@ -856,6 +860,7 @@ export function ConversationRow({
             {archivePending ? <Loader2 size={14} className={styles.conversationWorkingSpinner} /> : <Archive size={14} />}
             {archivePending ? 'Archiving…' : 'Archive'}
           </MenuItemButton>
+          </>}
         </MenuSurface>
       </>,
       document.body,

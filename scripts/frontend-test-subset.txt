@@ -7,6 +7,7 @@
 src/App/AppLiveStoreHost.render-count.test.tsx
 src/App/BackendConnectionBoundary.test.tsx
 src/App/api.test.ts
+src/App/routes.linked.test.ts
 src/__tests__/fr7-conversation-pending-input.test.tsx
 src/components/Agents/directory/directory-tree.test.ts
 src/components/Agents/live/live-model.test.ts
@@ -17,6 +18,7 @@ src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx
 src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx
 src/components/CommandDeck/__tests__/ConversationList.sort.test.ts
 src/components/CommandDeck/__tests__/ConversationList.test.tsx
+src/components/CommandDeck/__tests__/ConversationRow.linked.test.tsx
 src/components/CommandDeck/__tests__/ConversationRow.test.tsx
 src/components/CommandDeck/__tests__/DeckEmptyState.test.tsx
 src/components/CommandDeck/__tests__/ForkModal.test.tsx
@@ -71,6 +73,7 @@ src/components/__tests__/DecisionsPanel.test.tsx
 src/components/__tests__/DegradedModeBanner.test.tsx
 src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
+src/components/__tests__/PanOpenInPicker.remote.test.tsx
 src/components/__tests__/Sidebar.workspacePullRequest.test.tsx
 src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx
 src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx
@@ -78,17 +81,21 @@ src/components/chat/__tests__/ComposerFooter.citations.test.tsx
 src/components/chat/__tests__/ComposerFooter.schedule.test.tsx
 src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
 src/components/chat/__tests__/ConversationAboutDrawer.test.tsx
+src/components/chat/__tests__/ConversationMachineBanner.test.tsx
 src/components/chat/__tests__/ConversationPanel.test.tsx
 src/components/chat/__tests__/EffortPicker.test.tsx
 src/components/chat/__tests__/HandoffNotice.test.tsx
 src/components/chat/__tests__/HeldHandoffView.test.tsx
 src/components/chat/__tests__/ImageLightbox.test.tsx
 src/components/chat/__tests__/ModelPicker.test.tsx
+src/components/chat/__tests__/OpenPreviewPopover.test.tsx
+src/components/chat/__tests__/PullHereDialog.test.tsx
 src/components/chat/__tests__/ScheduledMessageRow.test.tsx
 src/components/chat/__tests__/VaultBrowseCopy.test.tsx
 src/components/chat/__tests__/VaultContinueDialog.test.tsx
 src/components/chat/__tests__/composerHeldMessages.test.tsx
 src/components/chat/__tests__/conversationHistory.test.ts
+src/components/chat/__tests__/conversationMachineState.test.ts
 src/components/chat/__tests__/heldKickoff.test.tsx
 src/components/chat/__tests__/resetClippedScroll.test.ts
 src/components/chat/__tests__/scheduledMessages.test.ts
@@ -150,6 +157,7 @@ src/lib/__tests__/issueActions.menu-by-state.test.ts
 src/lib/__tests__/issueActions.no-actions-lost.test.ts
 src/lib/__tests__/issueActions.parity.test.tsx
 src/lib/__tests__/issueActions.test.ts
+src/lib/__tests__/linkedConversation.test.ts
 src/lib/__tests__/pendingInput.test.ts
 src/lib/__tests__/pendingInputAnswer.test.ts
 src/lib/__tests__/selectBackendPanes.render-count.test.tsx

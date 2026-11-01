@@ -79,6 +79,17 @@ The message is stored in the dashboard database and sent by the scheduled-messag
 - **Refused:** `--steer` with `--when-limit-resets` — a queued message has no running turn to interrupt. `/pan` commands cannot be queued.
 - **Check the queue:** `pan conv pending <conv>` lists undelivered queued messages. Edit or cancel them from the conversation timeline in the dashboard.
 
+## A conversation on another machine
+
+To reach a conversation that a linked machine runs, name it `@<machine>/<conv>` (the machine's label or environment id):
+
+```bash
+pan tell @desk/conv-20261101-1234 "Rebase on main before you push."
+pan tell @desk/conv-20261101-1234 "Rebase on main before you push." --message-id rebase-1
+```
+
+The message goes through this machine's dashboard and the machine link (PAN-4650). It prints `Delivered to <conv> on <machine>`, or the owner's error and exits 1. `--message-id <id>` makes a repeat land once (default: a fresh id); on a local target it is the delivery idempotency key. `--steer` works; `--when-limit-resets` and `--force` exit 1 for a remote target. Only conversations are accepted after `@<machine>/` — an agent name exits 1 with "pan tell @<label>/… targets conversations only".
+
 ## Workflow
 
 ### 1. Find the Agent Session

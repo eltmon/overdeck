@@ -727,6 +727,35 @@ After it continues, the conversation opens on this machine as a normal conversat
 See [Session Vault: Continue on another machine](/configuration/session-vault#continue-on-another-machine)
 for the CLI path instead of repeating it.
 
+### Conversations that run on a linked machine
+
+With a [machine link](/configuration/linked-machines), the conversations another machine
+runs appear in the list live, with an "on `<machine>`" chip, and open at
+`/conv/@<environment-id>/<name>`. You control them as if they ran here; the title bar
+shows which machine owns each one.
+
+To move one to this machine, use **Pull here**, or the CLI:
+
+```bash
+pan conv pull @desk/conv-20261101-1234             # waits for a running turn
+pan conv pull @desk/conv-20261101-1234 --stop-turn # stops it instead
+```
+
+It prints each step (`release`, `transfer`, `adopt`, `finish`) and then
+`Pulled: /conv/<id>`; a failure prints the step, its code and the error, and exits 1. The
+other machine keeps a read-only copy that says "Continued on `<this machine>`". When the
+owner is offline it continues this machine's Session Vault saved copy instead.
+
+If a conversation you released never ran on the other machine, take it back:
+
+```bash
+pan conv reclaim conv-20261101-1234          # refuses while the other machine runs it
+pan conv reclaim conv-20261101-1234 --force  # even when the other machine cannot be asked
+```
+
+`reclaim` answers `still-running-there` while the other machine lists the conversation
+live (pull it back instead) and `target-offline` when it cannot be asked.
+
 ## Reviewing changes in the diff panel
 
 Open the diff panel from a conversation to review what changed. Besides

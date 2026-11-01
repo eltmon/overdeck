@@ -23,6 +23,7 @@ import {
 } from './schedule.js';
 import { healAction } from './heal.js';
 import { pendingAction } from './pending.js';
+import { pullAction, reclaimAction } from './pull.js';
 
 function collectRepeatable(value: string, previous: string[] = []): string[] {
   return [...previous, value];
@@ -115,6 +116,20 @@ export function registerConversationsCommands(program: Command): void {
     .description('List messages queued to send when the conversation\'s usage limit resets')
     .option('--json', 'Print JSON')
     .action((conv: string, opts: { json?: boolean }) => pendingAction(conv, opts));
+
+  // ── pull / reclaim (PAN-4650) ───────────────────────────────────────────────
+  conversations
+    .command('pull <conv>')
+    .description('Make this machine own a conversation that runs on a linked machine (@<machine>/<conv>)')
+    .option('--stop-turn', 'Stop a running turn instead of waiting for it')
+    .option('--json', 'Print the final job state as JSON')
+    .action((conv: string, opts: { stopTurn?: boolean; json?: boolean }) => pullAction(conv, opts));
+
+  conversations
+    .command('reclaim <conv>')
+    .description('Take back a conversation this machine released when the other machine does not run it')
+    .option('--force', 'Reclaim even when the other machine cannot be asked')
+    .action((conv: string, opts: { force?: boolean }) => reclaimAction(conv, opts));
 
   // ── move ────────────────────────────────────────────────────────────────────
   conversations

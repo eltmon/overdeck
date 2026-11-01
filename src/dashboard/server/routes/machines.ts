@@ -29,7 +29,11 @@ import {
   revokeAccessToken,
 } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
-import { getLink, listLinks, type MachineLink, removeLink, setLinkRoutes } from '../../../lib/anywhere/link-store.js';
+import { readAnywhereSettings, writeAnywhereSettings } from '../../../lib/anywhere/anywhere-settings.js';
+import { getLink, listLinks, type MachineLink, removeLink, setLinkHidden, setLinkRoutes } from '../../../lib/anywhere/link-store.js';
+import { invalidateSharedConversations } from '../../../lib/anywhere/shared-conversations.js';
+import { LinkUnavailableError } from '../../../lib/anywhere/link-client.js';
+import { ForwardRefusedError, listForwards, startForward, stopForward } from '../services/port-forwards.js';
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
 import { classifyHost, parseRouteUrl } from '../../../lib/anywhere/routes.js';
 import { SshMachineError } from '../../../lib/anywhere/ssh/target.js';
@@ -88,10 +92,15 @@ function inboundView(record: PublicAccessTokenRecord): InboundMachineView {
 }
 
 export async function buildMachinesResponse(): Promise<MachinesResponse> {
-  const [identity, key, links] = await Promise.all([ensureEnvironmentIdentity(), ensureMachineKey(), listLinks()]);
+  const [identity, key, links, settings] = await Promise.all([ensureEnvironmentIdentity(), ensureMachineKey(), listLinks(), readAnywhereSettings()]);
   const sshInfos = await Promise.all(links.map((link) => sshInfoForLink(link.id)));
   return {
-    self: { environmentId: identity.environmentId, label: identity.label, fingerprint: machineKeyFingerprint(key.publicKey) },
+    self: {
+      environmentId: identity.environmentId,
+      label: identity.label,
+      fingerprint: machineKeyFingerprint(key.publicKey),
+      shareConversations: settings.shareConversations,
+    },
     links: links.map((link, index) => {
       const view = statusSource ? machineLinkView(link, null, statusSource) : machineLinkView(link, null);
       const ssh = sshInfos[index];
@@ -357,6 +366,119 @@ const addRouteRoute = HttpRouter.add(
   }),
 );
 
+/** PAN-4650 D-4/D-4650-15: `PUT /api/machines/sharing { conversations }` turns Share my conversations on or off. */
+export async function handleSetSharing(bodyText: string): Promise<HttpServerResponse.HttpServerResponse> {
+  let conversations: unknown;
+  try {
+    conversations = (JSON.parse(bodyText || '{}') as { conversations?: unknown }).conversations;
+  } catch {
+    return jsonResponse({ error: 'body is not JSON' }, { status: 400 });
+  }
+  if (typeof conversations !== 'boolean') return jsonResponse({ error: 'body must be { conversations: boolean }' }, { status: 400 });
+  try {
+    const settings = await writeAnywhereSettings({ shareConversations: conversations });
+    // Linked machines see the change on their next heartbeat (a new list hash).
+    invalidateSharedConversations();
+    return jsonResponse({ conversations: settings.shareConversations });
+  } catch (error) {
+    return jsonResponse({ error: (error as Error).message }, { status: 500 });
+  }
+}
+
+/** PAN-4650 WI-18: `POST /api/machines/:id/forwards { port }` forwards a port of that machine to 127.0.0.1 here. */
+export async function handleStartForward(idOrEnvOrLabel: string, bodyText: string): Promise<HttpServerResponse.HttpServerResponse> {
+  let port: unknown;
+  try {
+    port = (JSON.parse(bodyText || '{}') as { port?: unknown }).port;
+  } catch {
+    return jsonResponse({ error: 'body is not JSON' }, { status: 400 });
+  }
+  if (typeof port !== 'number' || !Number.isInteger(port)) return jsonResponse({ error: 'body must be { port: number }' }, { status: 400 });
+  try {
+    return jsonResponse(await startForward(idOrEnvOrLabel, port));
+  } catch (error) {
+    if (error instanceof ForwardRefusedError) return jsonResponse({ error: error.message, code: error.code }, { status: error.status });
+    if (error instanceof LinkUnavailableError) return jsonResponse({ error: error.message, code: error.code }, { status: 503 });
+    return jsonResponse({ error: (error as Error).message, code: 'forward-failed' }, { status: 502 });
+  }
+}
+
+const startForwardRoute = HttpRouter.add(
+  'POST',
+  '/api/machines/:id/forwards',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = refuseChannel(request) ?? rejectUnsafeDashboardMutationRequest(request);
+    if (refused) return refused;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const text = yield* request.text;
+    return yield* Effect.promise(() => handleStartForward(id, text));
+  }),
+);
+
+const listForwardsRoute = HttpRouter.add(
+  'GET',
+  '/api/machines/forwards',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = refuseChannel(request) ?? rejectUnauthorizedDashboardRequest(request);
+    if (refused) return refused;
+    return jsonResponse({ forwards: listForwards() });
+  }),
+);
+
+const stopForwardRoute = HttpRouter.add(
+  'DELETE',
+  '/api/machines/forwards/:forwardId',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = refuseChannel(request) ?? rejectUnauthorizedDashboardRequest(request);
+    if (refused) return refused;
+    const id = (yield* HttpRouter.params)['forwardId'] ?? '';
+    return stopForward(id) ? jsonResponse({ ok: true }) : jsonResponse({ error: `no forward ${id}` }, { status: 404 });
+  }),
+);
+
+const setSharingRoute = HttpRouter.add(
+  'PUT',
+  '/api/machines/sharing',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = refuseChannel(request) ?? rejectUnsafeDashboardMutationRequest(request);
+    if (refused) return refused;
+    const text = yield* request.text;
+    return yield* Effect.promise(() => handleSetSharing(text));
+  }),
+);
+
+/** PAN-4650 D-4650-15: `PATCH /api/machines/:id { hidden }` shows or hides a machine's conversations. */
+export async function handleSetHidden(idOrEnvOrLabel: string, bodyText: string): Promise<HttpServerResponse.HttpServerResponse> {
+  const link = await getLink(idOrEnvOrLabel);
+  if (!link) return jsonResponse({ error: `no machine link matches ${idOrEnvOrLabel}` }, { status: 404 });
+  let hidden: unknown;
+  try {
+    hidden = (JSON.parse(bodyText || '{}') as { hidden?: unknown }).hidden;
+  } catch {
+    return jsonResponse({ error: 'body is not JSON' }, { status: 400 });
+  }
+  if (typeof hidden !== 'boolean') return jsonResponse({ error: 'body must be { hidden: boolean }' }, { status: 400 });
+  const updated = await setLinkHidden(link.id, hidden);
+  return jsonResponse(machineLinkView(updated ?? link, null, statusSource ?? undefined));
+}
+
+const setHiddenRoute = HttpRouter.add(
+  'PATCH',
+  '/api/machines/:id',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const refused = refuseChannel(request) ?? rejectUnsafeDashboardMutationRequest(request);
+    if (refused) return refused;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const text = yield* request.text;
+    return yield* Effect.promise(() => handleSetHidden(id, text));
+  }),
+);
+
 const inboundRevokeRoute = HttpRouter.add(
   'DELETE',
   '/api/machines/inbound/:tokenId',
@@ -369,4 +491,5 @@ const inboundRevokeRoute = HttpRouter.add(
   }),
 );
 
-export const machinesRouteLayer = Layer.mergeAll(linkRoute, listRoute, selfRevokeRoute, unlinkRoute, reconnectRoute, addRouteRoute, inboundRevokeRoute);
+export const machinesRouteLayer = Layer.mergeAll(linkRoute, listRoute, selfRevokeRoute, unlinkRoute, reconnectRoute, addRouteRoute, setSharingRoute, setHiddenRoute, inboundRevokeRoute,
+  startForwardRoute, listForwardsRoute, stopForwardRoute);

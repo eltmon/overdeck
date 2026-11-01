@@ -32,6 +32,7 @@ import { useScheduledMessages } from './scheduledMessages';
 import { useComposerEffort, type EffortResolution } from './useComposerEffort';
 import { ContextWindowMeter } from './ContextWindowMeter';
 import { VaultContinueDialog } from './VaultContinueDialog';
+import { conversationMachineState, isLiveMachineState, MachineReadOnlyNotice } from './ConversationMachineBanner';
 import { VaultContinuityNotice } from './VaultContinuityNotice';
 import { HandoffNotice } from './HandoffNotice';
 import { HeldKickoffConflictError, HeldKickoffNotice, kickoffUnchanged, startHeldKickoff, useHeldKickoff, useSeedHeldKickoff } from './heldKickoff';
@@ -922,6 +923,8 @@ function VaultReadOnlyNotice({ conversation }: { conversation: Conversation }) {
 // panel, does not re-render the composer toolbar while its props are stable.
 export const ComposerFooter = memo(function ComposerFooter(props: ComposerFooterProps) {
   if (props.conversation.origin === 'vault') return <VaultReadOnlyNotice conversation={props.conversation} />;
+  // PAN-4650: an offline owner's conversation or a released copy takes no input here.
+  if (!isLiveMachineState(conversationMachineState(props.conversation))) return <MachineReadOnlyNotice conversation={props.conversation} />;
   const continuity = props.conversation.vaultContinuity;
   if (continuity) {
     return (

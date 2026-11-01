@@ -4,7 +4,7 @@
  * Server side: `GET /api/machines/heartbeat` (machine credential only) is a
  * `text/event-stream` with one `heartbeat` event at once, one every 15 s and one
  * right after an event-loop stall of 2 s or more. Data:
- * `{ seq, lastStall: { durationMs, endedAgoMs } | null, endpointsHash, serverVersion }`.
+ * `{ seq, lastStall: { durationMs, endedAgoMs } | null, endpointsHash, serverVersion, conversationsHash? }`.
  * Client side: `openHeartbeatOverChannel` sends the request through a secure
  * channel and parses the events; the supervisor consumes them. Both halves share
  * the payload shape and the pure SSE parser here.
@@ -25,13 +25,45 @@ export interface HeartbeatPayload {
   /** SHA-256 (first 16 hex) of this machine's advertised endpoint URLs; '' until WI-19 fills it. */
   endpointsHash: string;
   serverVersion: string;
+  /** PAN-4650 D-4650-2: hash of this machine's shared conversation list; absent from older peers. */
+  conversationsHash?: string;
 }
 
 let endpointsHashSource: () => string = () => '';
+let conversationsHashSource: (() => Promise<string>) | null = null;
+let lastConversationsHash: string | undefined;
+/**
+ * Longest a heartbeat waits for the conversation list hash. The peer flags a
+ * beat later than 17.5 s as a network stall, so a slow list build must never
+ * hold one back: past this wait the beat carries the last known hash.
+ */
+export const HEARTBEAT_HASH_WAIT_MS = 1_000;
 
 /** WI-19 registers the endpoint advertiser's hash here. */
 export function setHeartbeatEndpointsHashSource(source: (() => string) | null): void {
   endpointsHashSource = source ?? (() => '');
+}
+
+/** PAN-4650 registers the shared conversation list's hash here; null leaves it out. */
+export function setHeartbeatConversationsHashSource(source: (() => Promise<string>) | null): void {
+  conversationsHashSource = source;
+  lastConversationsHash = undefined;
+}
+
+/** The conversations hash for one beat: fresh within `HEARTBEAT_HASH_WAIT_MS`, else the last known one. */
+function conversationsHashForBeat(source: () => Promise<string>): Promise<string | undefined> {
+  const fresh = source().then(
+    (hash) => {
+      lastConversationsHash = hash;
+      return hash;
+    },
+    () => lastConversationsHash,
+  );
+  let timer: NodeJS.Timeout | undefined;
+  const fallback = new Promise<string | undefined>((resolve) => {
+    timer = setTimeout(() => resolve(lastConversationsHash), HEARTBEAT_HASH_WAIT_MS);
+  });
+  return Promise.race([fresh, fallback]).finally(() => clearTimeout(timer));
 }
 
 /** One heartbeat payload. Pure apart from the stall record and hash sources. */
@@ -53,9 +85,20 @@ export function startHeartbeatSource(
   deps: { setInterval?: typeof setInterval; clearInterval?: typeof clearInterval; onStall?: typeof onEventLoopStall } = {},
 ): { stop: () => void } {
   let seq = 0;
+  let stopped = false;
   const send = (): void => {
     seq += 1;
-    emit(encodeHeartbeatEvent(heartbeatPayload(seq, serverVersion)));
+    const payload = heartbeatPayload(seq, serverVersion);
+    const hashSource = conversationsHashSource;
+    if (!hashSource) {
+      emit(encodeHeartbeatEvent(payload));
+      return;
+    }
+    // A slow or failed list build still sends the beat, with the last known hash or none.
+    void conversationsHashForBeat(hashSource).then((conversationsHash) => {
+      if (stopped) return;
+      emit(encodeHeartbeatEvent(conversationsHash === undefined ? payload : { ...payload, conversationsHash }));
+    });
   };
   send();
   const schedule = deps.setInterval ?? setInterval;
@@ -64,6 +107,7 @@ export function startHeartbeatSource(
   const unsubscribe = (deps.onStall ?? onEventLoopStall)(() => send());
   return {
     stop: () => {
+      stopped = true;
       (deps.clearInterval ?? clearInterval)(timer);
       unsubscribe();
     },

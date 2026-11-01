@@ -788,7 +788,7 @@ async function fetchCostSummary(): Promise<CostSummaryResponse> {
 }
 
 async function fetchConversations(): Promise<ConversationSummary[]> {
-  const response = await fetch('/api/conversations');
+  const response = await fetch('/api/conversations?linked=0');
   if (!response.ok) throw new Error('Failed to fetch conversations');
   return response.json() as Promise<ConversationSummary[]>;
 }

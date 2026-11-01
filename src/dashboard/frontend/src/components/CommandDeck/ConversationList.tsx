@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ForkModal } from './ForkModal';
 import { ConversationRow } from './ConversationRow';
+import { HiddenMachinesFooter } from './LinkedConversationRow';
 import { buildConversationTree, groupSummary, isConversationActive, type ConversationTreeNode } from './conversation-tree';
 import { partitionConversationSections, SECTION_ORDER, snoozePresets, type ConversationSectionId } from './conversation-triage';
 import { useConversationMutations, type ConversationMutations } from './useConversationMutations';
@@ -13,11 +14,21 @@ import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { fetchRegisteredProjects } from './UnknownProjectState';
 import { MenuItemButton, MenuOverlay, MenuSurface } from '../shared/ContextMenu';
-import type { PullRequestLink } from '@overdeck/contracts';
+import type { LinkedConversationFields, PullRequestLink } from '@overdeck/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface Conversation {
+/** PAN-4650 D-4650-3: the fields a linked row (owned by another machine) carries. */
+type LinkedRowFields = Partial<Omit<LinkedConversationFields, 'origin'>> & {
+  gitOrigin?: string | null;
+  pullable?: boolean;
+  /** When the saved copy of a linked row was last settled. */
+  savedCopyAt?: string | null;
+  /** Where the owner pulled this conversation from (finds a released copy's continuation). */
+  pulledFrom?: { environmentId: string; nativeSessionId: string } | null;
+};
+
+export interface Conversation extends LinkedRowFields {
   id: number;
   name: string;
   tmuxSession: string;
@@ -127,8 +138,8 @@ export interface Conversation {
   workspaceId?: string | null;
   /** PAN-1577: explicit project assignment override. Null = fall back to deriving the project from cwd. */
   projectKey?: string | null;
-  /** PAN-4436: 'vault' = a read-only Session Vault browse copy owned by another machine. */
-  origin?: 'local' | 'vault';
+  /** PAN-4436: 'vault' = a read-only Session Vault browse copy owned by another machine; PAN-4650: 'linked' = a live row another machine owns. */
+  origin?: 'local' | 'vault' | 'linked';
   /** PAN-4436: the owning machine's label for a browse copy. */
   vaultOwnerLabel?: string | null;
   /** PAN-4447: this row's native file moved to another machine, or saved a local P-6 fork of a record another machine now owns. Null for a vault browse row or when neither applies. */
@@ -799,6 +810,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
           </AnimatePresence>
         </div>
       )}
+      <HiddenMachinesFooter />
 
       {mutations.forkTarget && (
         <ForkModal

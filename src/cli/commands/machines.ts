@@ -392,6 +392,37 @@ export async function runMachinesUpdate(options: MachinesUpdateOptions): Promise
   console.log('Run `pan machines versions` to follow the update.');
 }
 
+export interface MachinesForwardOptions { json?: boolean; list?: boolean; stop?: string }
+
+interface ForwardView { id: string; label: string; port: number; localPort: number; url: string; connections: number }
+
+/**
+ * PAN-4650 WI-18: `pan machines forward <label> <port>` forwards a TCP port of a
+ * linked machine to 127.0.0.1 here and prints the URL; `--list` shows the
+ * forwards and `--stop <id>` closes one.
+ */
+export async function runMachinesForward(target: string | undefined, port: string | undefined, options: MachinesForwardOptions): Promise<void> {
+  if (options.list) {
+    const { forwards } = await (await call('forward', '/api/machines/forwards', { method: 'GET' })).json() as { forwards: ForwardView[] };
+    if (options.json) return void console.log(JSON.stringify(forwards));
+    if (forwards.length === 0) return void console.log('No forwards are open.');
+    for (const forward of forwards) {
+      console.log(`${forward.id}  ${forward.label}:${forward.port} → ${forward.url}  (${forward.connections} open)`);
+    }
+    return;
+  }
+  if (options.stop) {
+    await call('forward', `/api/machines/forwards/${encodeURIComponent(options.stop)}`, { method: 'DELETE' });
+    return void console.log(`Stopped forward ${options.stop}.`);
+  }
+  const portNumber = Number(port);
+  if (!target || !Number.isInteger(portNumber)) return fail('Usage: pan machines forward <machine> <port>  (or --list, or --stop <id>)');
+  const forward = await (await call('forward', `/api/machines/${encodeURIComponent(target)}/forwards`, { method: 'POST', body: { port: portNumber } })).json() as ForwardView;
+  if (options.json) return void console.log(JSON.stringify(forward));
+  console.log(`Forwarding ${forward.label}:${forward.port} → ${forward.url}`);
+  console.log(chalk.dim(`  Stop it with: pan machines forward --stop ${forward.id}`));
+}
+
 export function registerMachinesCommands(program: Command): void {
   const machines = program
     .command('machines')
@@ -415,6 +446,13 @@ export function registerMachinesCommands(program: Command): void {
     .option('--keep-server', 'For an SSH machine this dashboard started: leave its Overdeck server running')
     .option('--json', 'Print { ok, peerNotified, ssh } as JSON')
     .action((target: string, options: { json?: boolean; keepServer?: boolean }) => runMachinesUnlink(target, options));
+  machines
+    .command('forward [machine] [port]')
+    .description('Forward a TCP port of a linked machine to 127.0.0.1 here and print the URL (for a dev-server preview)')
+    .option('--list', 'List the open forwards')
+    .option('--stop <id>', 'Close a forward')
+    .option('--json', 'Print JSON')
+    .action((target: string | undefined, port: string | undefined, options: MachinesForwardOptions) => runMachinesForward(target, port, options));
   machines
     .command('directory')
     .description("List this account's machines in the overdeck.ai directory, with pending approvals and joins")

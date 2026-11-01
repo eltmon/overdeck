@@ -298,11 +298,12 @@ describe('browse rows refuse resume (PAN-4436 WI-6)', () => {
     expect(getConversationByName(`vault-${id}`)).toMatchObject({ status: 'ended' });
   });
 
-  it('a message to a browse row is refused by the ended-row guard', async () => {
+  it('a message to a browse row is refused as a read-only copy (PAN-4650 D-4650-8)', async () => {
     const id = vaultId(13);
     upsertVaultBrowseRow(input(id));
-    const { status } = await readResponse(await handleConversationMessage(`vault-${id}`, { message: 'hi' }));
-    expect(status).toBe(422);
+    const { status, body } = await readResponse(await handleConversationMessage(`vault-${id}`, { message: 'hi' }));
+    expect(status).toBe(409);
+    expect(body).toMatchObject({ code: 'vault-browse-copy' });
   });
 });
 
