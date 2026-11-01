@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T08:01:00.240Z",
+  "updated": "2026-11-01T08:01:35.605Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,11 @@
     "wi5-route-scope-rows.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T08:01:00.239Z"
+    },
+    "wi6-ws-rpc-scoped": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T08:01:35.605Z"
     }
   }
 }
