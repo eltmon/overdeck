@@ -4,12 +4,14 @@
  * Server side: `GET /api/machines/heartbeat` (machine credential only) is a
  * `text/event-stream` with one `heartbeat` event at once, one every 15 s and one
  * right after an event-loop stall of 2 s or more. Data:
- * `{ seq, lastStall: { durationMs, endedAgoMs } | null, endpointsHash, serverVersion, conversationsHash? }`.
+ * `{ seq, lastStall: { durationMs, endedAgoMs } | null, endpointsHash, serverVersion, conversationsHash?, load?, tags?, placement? }`.
  * Client side: `openHeartbeatOverChannel` sends the request through a secure
  * channel and parses the events; the supervisor consumes them. Both halves share
  * the payload shape and the pure SSE parser here.
  */
 import { request as httpRequest } from 'node:http';
+
+import type { LoadSample, MachinePlacementMode } from '@overdeck/contracts';
 
 import { channelAgent } from '../../../lib/anywhere/channel/channel-agent.js';
 import type { ChannelSocket } from '../../../lib/anywhere/channel/channel-socket.js';
@@ -27,9 +29,18 @@ export interface HeartbeatPayload {
   serverVersion: string;
   /** PAN-4650 D-4650-2: hash of this machine's shared conversation list; absent from older peers. */
   conversationsHash?: string;
+  /** PAN-4651 D-4651-8: this machine's last load sample; absent from older peers. */
+  load?: LoadSample;
+  /** PAN-4651 D-4651-8: capability tags (never in the public descriptor). */
+  tags?: string[];
+  placement?: MachinePlacementMode;
 }
 
+/** The machine facts a beat carries; every field optional (absent until first sampled). */
+export type HeartbeatMachineFacts = Pick<HeartbeatPayload, 'load' | 'tags' | 'placement'>;
+
 let endpointsHashSource: () => string = () => '';
+let machineFactsSource: () => HeartbeatMachineFacts = () => ({});
 let conversationsHashSource: (() => Promise<string>) | null = null;
 let lastConversationsHash: string | undefined;
 /**
@@ -42,6 +53,11 @@ export const HEARTBEAT_HASH_WAIT_MS = 1_000;
 /** WI-19 registers the endpoint advertiser's hash here. */
 export function setHeartbeatEndpointsHashSource(source: (() => string) | null): void {
   endpointsHashSource = source ?? (() => '');
+}
+
+/** PAN-4651 registers the load sampler and capability profile here; synchronous, so a beat never waits on it. */
+export function setHeartbeatMachineFactsSource(source: (() => HeartbeatMachineFacts) | null): void {
+  machineFactsSource = source ?? (() => ({}));
 }
 
 /** PAN-4650 registers the shared conversation list's hash here; null leaves it out. */
@@ -68,7 +84,7 @@ function conversationsHashForBeat(source: () => Promise<string>): Promise<string
 
 /** One heartbeat payload. Pure apart from the stall record and hash sources. */
 export function heartbeatPayload(seq: number, serverVersion: string): HeartbeatPayload {
-  return { seq, lastStall: getLastEventLoopStall(), endpointsHash: endpointsHashSource(), serverVersion };
+  return { seq, lastStall: getLastEventLoopStall(), endpointsHash: endpointsHashSource(), serverVersion, ...machineFactsSource() };
 }
 
 export function encodeHeartbeatEvent(payload: HeartbeatPayload): string {

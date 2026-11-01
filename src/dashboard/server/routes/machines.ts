@@ -34,6 +34,7 @@ import { getLink, listLinks, type MachineLink, removeLink, setLinkHidden, setLin
 import { invalidateSharedConversations } from '../../../lib/anywhere/shared-conversations.js';
 import { LinkUnavailableError } from '../../../lib/anywhere/link-client.js';
 import { ForwardRefusedError, listForwards, startForward, stopForward } from '../services/port-forwards.js';
+import { currentMachineProfile } from '../../../lib/anywhere/machine-capabilities.js';
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
 import { classifyHost, parseRouteUrl } from '../../../lib/anywhere/routes.js';
 import { SshMachineError } from '../../../lib/anywhere/ssh/target.js';
@@ -43,6 +44,7 @@ import { channelOfRequest } from '../channel-peer.js';
 import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import { createMachineLink, type LinkStatusSource, MachineLinkError, machineLinkView } from '../services/machine-link-service.js';
+import { currentMachineLoad } from '../services/machine-load.js';
 import {
   reconnectSshMachine,
   removeSshMachineForLink,
@@ -100,6 +102,10 @@ export async function buildMachinesResponse(): Promise<MachinesResponse> {
       label: identity.label,
       fingerprint: machineKeyFingerprint(key.publicKey),
       shareConversations: settings.shareConversations,
+      // PAN-4651 D-4651-8: this machine's own load sample, tags and placement mode.
+      load: currentMachineLoad(),
+      tags: currentMachineProfile()?.tags ?? [],
+      placement: currentMachineProfile()?.placement ?? 'auto',
     },
     links: links.map((link, index) => {
       const view = statusSource ? machineLinkView(link, null, statusSource) : machineLinkView(link, null);

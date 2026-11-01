@@ -15,6 +15,7 @@ import { readDirectoryUrl } from '../../../lib/anywhere/directory-config.js';
 import { defaultDiscoverDeps, EndpointAdvertiser, setAdvertisedEndpointsSource } from '../../../lib/anywhere/endpoints.js';
 import { setLinkRouteSource, linkFetch, closeLinkAgent } from '../../../lib/anywhere/link-client.js';
 import { linksSnapshot, MACHINE_LINKS_REFRESH_MS, startLinkStoreRefresh, stopLinkStoreRefresh } from '../../../lib/anywhere/link-store.js';
+import { currentMachineProfile, startMachineCapabilities, stopMachineCapabilities } from '../../../lib/anywhere/machine-capabilities.js';
 import { ensureMachineKey } from '../../../lib/anywhere/machine-key.js';
 import { sharedConversationsHashForHeartbeat } from '../../../lib/anywhere/shared-conversations.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
@@ -29,11 +30,12 @@ import { InboxDedupe } from '../../../lib/triggers/inbox.js';
 import { triggerDeliveryDependencies } from '../routes/trigger-hooks.js';
 import { InboxClient } from './inbox-client.js';
 import { RelayClient, setRelayClient } from './relay-client.js';
-import { setHeartbeatConversationsHashSource, setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
+import { setHeartbeatConversationsHashSource, setHeartbeatEndpointsHashSource, setHeartbeatMachineFactsSource } from './link-heartbeat.js';
 import { startTransferSweep } from './conversation-release-service.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
 import { setLinkPresenceSource } from './conversation-list-merged.js';
 import { createLinkedConversationsSync } from './linked-conversations-sync.js';
+import { currentMachineLoad, startMachineLoadSampler, stopMachineLoadSampler } from './machine-load.js';
 import { stopForwardsWithoutLink } from './port-forwards.js';
 import { defaultSshForwardSupervisorDeps, SshForwardSupervisor } from './ssh-forward-supervisor.js';
 import { setSshForwardSupervisor } from './ssh-machine-service.js';
@@ -69,6 +71,14 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   setAdvertisedEndpointsSource(() => advertiser?.current() ?? []);
   setHeartbeatEndpointsHashSource(() => advertiser?.hash() ?? '');
   setHeartbeatConversationsHashSource(sharedConversationsHashForHeartbeat);
+  // PAN-4651 D-4651-8: load every 15 s, capability tags every 10 min; the heartbeat reads the last values.
+  startMachineLoadSampler();
+  startMachineCapabilities();
+  setHeartbeatMachineFactsSource(() => {
+    const load = currentMachineLoad();
+    const profile = currentMachineProfile();
+    return { ...(load ? { load } : {}), ...(profile ? { tags: profile.tags, placement: profile.placement } : {}) };
+  });
   await advertiser.start();
 
   // WI-9: the overdeck.ai directory socket; a signed-out machine opens none (FR-2356-2).
@@ -193,6 +203,9 @@ export function stopAnywhere(): void {
   setAdvertisedEndpointsSource(null);
   setHeartbeatEndpointsHashSource(null);
   setHeartbeatConversationsHashSource(null);
+  setHeartbeatMachineFactsSource(null);
+  stopMachineLoadSampler();
+  stopMachineCapabilities();
   setLinkStatusSource(null);
   setLinkRouteSource(null);
   setPeerUnlinkNotifier(null);

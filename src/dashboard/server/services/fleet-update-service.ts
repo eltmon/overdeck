@@ -34,8 +34,8 @@ import { detectHarnessClis, type InstalledHarnessCli, readCliVersion } from '../
 import { getOverdeckHome } from '../../../lib/paths.js';
 import { getOverdeckVersion } from '../routes/misc/shared.js';
 import { currentInstallMode, getUpdateManager } from '../routes/misc/updates.js';
-import { getLiveAgentDirectory } from './agent-directory.js';
 import { restartDashboardDetached } from './dashboard-restart.js';
+import { countWorkingTurns } from './machine-load.js';
 
 /** A waiting job re-counts working turns this often (FR-8). */
 export const TURN_POLL_MS = 5_000;
@@ -387,10 +387,6 @@ export class FleetUpdateService {
     });
     return this.writing;
   }
-}
-
-async function countWorkingTurns(): Promise<number> {
-  return (await getLiveAgentDirectory()).entries.filter((entry) => entry.state === 'working').length;
 }
 
 let singleton: FleetUpdateService | null = null;

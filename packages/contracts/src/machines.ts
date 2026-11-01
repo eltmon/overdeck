@@ -87,6 +87,21 @@ export const SshLinkInfo = Schema.Struct({
 })
 export type SshLinkInfo = typeof SshLinkInfo.Type
 
+/** PAN-4651 D-4651-8: a machine's load, sampled every 15 s and carried in the link heartbeat. */
+export const LoadSample = Schema.Struct({
+  /** CPU PSI `some avg10` (percent); null off Linux. */
+  cpuPsiSomeAvg10: Schema.NullOr(Schema.Number),
+  cpuSaturated: Schema.Boolean,
+  memAvailableBytes: Schema.NullOr(Schema.Number),
+  workingAgents: Schema.Number,
+  sampledAt: Schema.String,
+})
+export type LoadSample = typeof LoadSample.Type
+
+/** PAN-4651 FR-7: `on-request` reserves a machine — Auto skips it unless only it has a needed tag. */
+export const MachinePlacementMode = Schema.Literals(["auto", "on-request"])
+export type MachinePlacementMode = typeof MachinePlacementMode.Type
+
 /** One outbound link as shown by `GET /api/machines` and `pan machines list`. */
 export const MachineLinkView = Schema.Struct({
   id: Schema.String,
@@ -107,6 +122,11 @@ export const MachineLinkView = Schema.Struct({
   hidden: Schema.optional(Schema.Boolean),
   /** Present only on links this server set up over SSH. */
   ssh: Schema.optional(SshLinkInfo),
+  /** PAN-4651: the peer's last heartbeat load sample; null before one arrives or from a peer that predates it. */
+  load: Schema.optional(Schema.NullOr(LoadSample)),
+  /** PAN-4651: the peer's capability tags (detected plus `anywhere.machine.tags`). */
+  tags: Schema.optional(Schema.Array(Schema.String)),
+  placement: Schema.optional(MachinePlacementMode),
 })
 export type MachineLinkView = typeof MachineLinkView.Type
 
@@ -129,6 +149,10 @@ export const MachinesResponse = Schema.Struct({
     fingerprint: Schema.String,
     /** PAN-4650 D-4: linked machines list this machine's conversations (anywhere.json, default on). */
     shareConversations: Schema.Boolean,
+    /** PAN-4651: this machine's own load sample, tags and placement mode. */
+    load: Schema.optional(Schema.NullOr(LoadSample)),
+    tags: Schema.optional(Schema.Array(Schema.String)),
+    placement: Schema.optional(MachinePlacementMode),
   }),
   links: Schema.Array(MachineLinkView),
   inbound: Schema.Array(InboundMachineView),
