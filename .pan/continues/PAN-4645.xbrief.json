@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T09:51:09.415Z",
+  "updated": "2026-11-01T09:51:27.575Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -340,6 +340,11 @@
     "wi14-cli-machines.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T09:51:09.415Z"
+    },
+    "wi15-token-mint-auto": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:51:27.575Z"
     }
   }
 }
