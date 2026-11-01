@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T16:53:23.541Z",
+  "updated": "2026-11-01T16:53:36.283Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -296,6 +296,10 @@
     "wi8-remote-frontend.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T16:53:23.541Z"
+    },
+    "wi9-owner-release.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:53:36.283Z"
     }
   },
   "agentModel": "claude-opus-5-5"
