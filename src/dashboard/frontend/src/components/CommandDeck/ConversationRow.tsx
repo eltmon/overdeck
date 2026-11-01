@@ -217,6 +217,9 @@ export function ConversationRow({
   }, [menuOpen]);
 
   const archivePending = mutations.isArchivePending(conv.name);
+  const stopPending = mutations.isStopPending(conv.name);
+  // PAN-4626: archive wins — it ends the session too.
+  const leavingKind: 'archive' | 'stop' | null = archivePending ? 'archive' : stopPending ? 'stop' : null;
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conv.name] ?? false);
   const isAwaitingPermission = useDashboardStore((s) => s.conversationsAwaitingPermissionByName?.[conv.name] ?? false);
   const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
@@ -311,8 +314,8 @@ export function ConversationRow({
   }, [conv.isFavorited, conv.title, conv.name, confirm, mutations]);
 
   const itemClass = isNested
-    ? `${styles.projectConvItem} ${isSelected ? styles.projectConvItemSelected : ''}`
-    : `${styles.conversationItem} ${isSelected ? styles.conversationItemSelected : ''}`;
+    ? `${styles.projectConvItem} ${isSelected ? styles.projectConvItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''}`
+    : `${styles.conversationItem} ${isSelected ? styles.conversationItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''}`;
 
   // Fork / spawn status badges — shared by both row variants.
   const ownerLabel = conv.vaultOwnerLabel ?? 'another machine';
@@ -425,10 +428,11 @@ export function ConversationRow({
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('application/json', JSON.stringify({ name: conv.name, projectKey: conv.projectKey ?? null, cwd: conv.cwd }));
       }}
-      onClick={() => onSelect(conv.name)}
+      onClick={() => { if (leavingKind) return; onSelect(conv.name); }}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        if (leavingKind) return;
         e.currentTarget.focus();
         menuOpenerRef.current = 'row';
         setMenuPos({
@@ -438,31 +442,36 @@ export function ConversationRow({
         setMenuOpen(true);
       }}
       title={conv.name}
-      aria-busy={archivePending || undefined}
+      aria-busy={leavingKind ? true : undefined}
     >
       {/* Stop button */}
       {conv.sessionAlive && (
-        <span
-          role="button"
-          tabIndex={0}
-          className={styles.conversationStopBtn}
-          onClick={e => { e.stopPropagation(); mutations.stop(conv.name); }}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); mutations.stop(conv.name); } }}
-          title="Stop agent"
-          aria-label={`Stop agent for ${conv.name}`}
-        >
-          <X size={iconSize} />
-        </span>
+        stopPending ? (
+          <span
+            className={styles.conversationStopBtn}
+            aria-disabled="true"
+            aria-label={`Stopping agent for ${conv.name}`}
+            title="Stopping…"
+          >
+            <Loader2 size={iconSize} className={styles.conversationLeavingSpinner} />
+          </span>
+        ) : (
+          <span
+            role="button"
+            tabIndex={0}
+            className={styles.conversationStopBtn}
+            onClick={e => { e.stopPropagation(); mutations.stop(conv.name); }}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); mutations.stop(conv.name); } }}
+            title="Stop agent"
+            aria-label={`Stop agent for ${conv.name}`}
+          >
+            <X size={iconSize} />
+          </span>
+        )
       )}
 
       {/* Status indicator */}
-      {archivePending ? (
-        <Loader2
-          size={spinnerSize}
-          className={styles.conversationWorkingSpinner}
-          aria-label={`Archiving ${conv.name}`}
-        />
-      ) : conv.forkStatus && conv.forkStatus !== 'failed' ? (
+      {conv.forkStatus && conv.forkStatus !== 'failed' ? (
         <Loader2
           size={spinnerSize}
           className={styles.conversationWorkingSpinner}
@@ -541,7 +550,7 @@ export function ConversationRow({
           {conv.laneKey && conv.laneRole && (
             <span className={styles.laneLabel}>{`${LANE_GLYPH[conv.laneRole]} ${conv.laneKey} i${conv.laneIteration ?? 1}`}</span>
           )}
-          <span className={`${styles.projectConvLabel} ${archivePending || mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
+          <span className={`${styles.projectConvLabel} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
           {conv.laneKey && conv.laneReport && !(isJudge && conv.laneVerdict) && (
             <span className={`${styles.laneReportBadge} ${LANE_REPORT_TONE[conv.laneReport.status]}`}>
               {conv.laneReport.status.toUpperCase()}
@@ -565,7 +574,7 @@ export function ConversationRow({
       ) : (
         // Flat list rows: title on line 1, muted metadata on line 2.
         <span className={styles.conversationMain}>
-          <span className={`${styles.conversationName} ${archivePending || mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
+          <span className={`${styles.conversationName} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
           <span className={styles.conversationMetaLine}>
             {verdictBadge}
             {conv.branch && (
