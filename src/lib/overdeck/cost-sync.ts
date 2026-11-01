@@ -9,6 +9,7 @@
 import { EFFORT_LEVELS, isEffortLevel, type EffortLevel } from '@overdeck/contracts';
 import type { CostEvent } from '../costs/events.js';
 import { getOverdeckDatabase } from './infra.js';
+import { ensureCostIssueRollup } from './cost-issue-rollup.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
 export { getAgentCostStats, type AgentCostStats } from './cost-agent-stats.js';
 /**
@@ -236,11 +237,70 @@ function getProviderBreakdownForIssueSync(issueId: string): Record<string, numbe
   return result;
 }
 
+type IssueTotalsRow = {
+  issue_id: string;
+  total_cost: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  last_updated: number;
+};
+type IssueModelRow = { issue_id: string; model: string | null; cost: number; calls: number; tokens: number };
+type IssueStageRow = { issue_id: string; stage: string | null; cost: number; calls: number; tokens: number };
+type IssueProviderRow = { issue_id: string; provider: string; cost: number };
+
+/**
+ * PAN-4724: the per-issue aggregate read from the trigger-maintained
+ * `cost_issue_rollup` (~3k grain rows) instead of every `cost_events` row.
+ * Same columns and shapes as the full-scan queries in getCostsByIssueFullScan.
+ */
+export const COST_ISSUE_ROLLUP_READ_SQL = {
+  totals: `SELECT issue_key AS issue_id, SUM(cost) AS total_cost, SUM(input) AS input_tokens,
+                  SUM(output) AS output_tokens, SUM(cache_read) AS cache_read_tokens,
+                  SUM(cache_write) AS cache_write_tokens, MAX(last_ts) AS last_updated
+           FROM cost_issue_rollup GROUP BY issue_key ORDER BY total_cost DESC`,
+  models: `SELECT issue_key AS issue_id, model, SUM(cost) AS cost, SUM(calls) AS calls, SUM(tokens) AS tokens
+           FROM cost_issue_rollup GROUP BY issue_key, model`,
+  stages: `SELECT issue_key AS issue_id, session_type AS stage, SUM(cost) AS cost, SUM(calls) AS calls, SUM(tokens) AS tokens
+           FROM cost_issue_rollup GROUP BY issue_key, session_type`,
+  providers: `SELECT issue_key AS issue_id, COALESCE(provider, 'unknown') AS provider, SUM(cost) AS cost
+              FROM cost_issue_rollup GROUP BY issue_key, COALESCE(provider, 'unknown')`,
+} as const;
+
+let rollupFallbackWarned = false;
+
+function warnRollupFallbackOnce(): void {
+  if (rollupFallbackWarned) return;
+  rollupFallbackWarned = true;
+  console.warn('[cost-issue-rollup] rollup unavailable; using full-scan aggregate');
+}
+
 /**
  * Get aggregated costs by issue. Mirrors getCostsByIssueFromDb from cost-events-db.
  * overdeck stores ts as epoch milliseconds — MAX(ts) is converted to ISO string for lastUpdated.
+ * Reads the cost_issue_rollup; falls back to the full scan when it cannot be installed.
  */
 export function getCostsByIssue(): Record<string, IssueAggregate> {
+  const db = getOverdeckDatabase();
+  if (!ensureCostIssueRollup(db)) {
+    warnRollupFallbackOnce();
+    return getCostsByIssueFullScan();
+  }
+  return shapeIssueAggregates(
+    db.prepare(COST_ISSUE_ROLLUP_READ_SQL.totals).all() as IssueTotalsRow[],
+    db.prepare(COST_ISSUE_ROLLUP_READ_SQL.models).all() as IssueModelRow[],
+    db.prepare(COST_ISSUE_ROLLUP_READ_SQL.stages).all() as IssueStageRow[],
+    db.prepare(COST_ISSUE_ROLLUP_READ_SQL.providers).all() as IssueProviderRow[],
+  );
+}
+
+/**
+ * Reference full-table aggregate (pre-PAN-4724). Used as the fallback when the
+ * rollup is not installed and as the equivalence oracle in tests. Do not call it
+ * on a polling path.
+ */
+export function getCostsByIssueFullScan(): Record<string, IssueAggregate> {
   const db = getOverdeckDatabase();
   const rows = db
     .prepare(
@@ -255,15 +315,7 @@ export function getCostsByIssue(): Record<string, IssueAggregate> {
        GROUP BY UPPER(issue_id)
        ORDER BY total_cost DESC`,
     )
-    .all() as Array<{
-    issue_id: string;
-    total_cost: number;
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_tokens: number;
-    cache_write_tokens: number;
-    last_updated: number;
-  }>;
+    .all() as IssueTotalsRow[];
 
   // PAN-472: fetch per-model, per-stage, and per-provider breakdowns for ALL issues
   // in grouped queries instead of full-table scans per issue. The old N+1 shape
@@ -279,7 +331,7 @@ export function getCostsByIssue(): Record<string, IssueAggregate> {
        FROM cost_events
        GROUP BY UPPER(issue_id), model`,
     )
-    .all() as Array<{ issue_id: string; model: string | null; cost: number; calls: number; tokens: number }>;
+    .all() as IssueModelRow[];
   const stageRows = db
     .prepare(
       `SELECT UPPER(issue_id) AS issue_id,
@@ -290,7 +342,7 @@ export function getCostsByIssue(): Record<string, IssueAggregate> {
        FROM cost_events
        GROUP BY UPPER(issue_id), session_type`,
     )
-    .all() as Array<{ issue_id: string; stage: string | null; cost: number; calls: number; tokens: number }>;
+    .all() as IssueStageRow[];
   const providerRows = db
     .prepare(
       `SELECT UPPER(issue_id) AS issue_id,
@@ -299,8 +351,17 @@ export function getCostsByIssue(): Record<string, IssueAggregate> {
        FROM cost_events
        GROUP BY UPPER(issue_id), COALESCE(provider, 'unknown')`,
     )
-    .all() as Array<{ issue_id: string; provider: string; cost: number }>;
+    .all() as IssueProviderRow[];
 
+  return shapeIssueAggregates(rows, modelRows, stageRows, providerRows);
+}
+
+function shapeIssueAggregates(
+  rows: IssueTotalsRow[],
+  modelRows: IssueModelRow[],
+  stageRows: IssueStageRow[],
+  providerRows: IssueProviderRow[],
+): Record<string, IssueAggregate> {
   const modelsByIssue: Record<string, Record<string, ModelBreakdown>> = {};
   for (const r of modelRows) {
     (modelsByIssue[r.issue_id] ??= {})[r.model ?? 'unknown'] = {

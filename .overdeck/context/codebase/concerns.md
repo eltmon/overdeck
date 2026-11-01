@@ -405,6 +405,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   (`costs/reconciler.ts`, `costs/sync-wal.ts`). `cavemanVariant` was lost this
   way. A new `cost_events` column also needs the init SQL plus a
   `runSchemaTopUp` ALTER in `ensureRuntimeIndexesSync` (PAN-4259).
+  `cost_events` inserts and updates are rolled up into `cost_issue_rollup` by
+  the `cost_issue_rollup_*_v1` triggers (`overdeck/cost-issue-rollup.ts`,
+  PAN-4724), so a new writer needs nothing there. A new *aggregated* column, a
+  changed grain, or any code that DELETEs `cost_events` rows needs a `_v2`
+  install: there is no delete trigger.
 - Reasoning effort resolves only through `resolveEffort` (`src/lib/agents/resolve-effort.ts`),
   which also clamps to model∩harness levels; `npm run lint:effort` ratchets new
   `?? 'high'` fallbacks and level-list copies. Clamping runs before Kimi K3

@@ -102,7 +102,9 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   claude-code, `ohmypi-parser.ts`, `codex-parser.ts`, legacy `pi-parser.ts`),
   `cost.ts` (pricing table, `getPricing`), `overdeck/cost.ts` (the two-door
   CostWriter: `record()` dedupes by requestId/sourceFile → append-only archive →
-  `cost_events` SQLite; `reconcile({source})` sweeps per-agent session dirs).
+  `cost_events` SQLite; `reconcile({source})` sweeps per-agent session dirs),
+  `overdeck/cost-issue-rollup.ts` (trigger-maintained `cost_issue_rollup` table read by
+  `getCostsByIssue`, PAN-4724).
   Live triggers: claude via WAL/transcript sync, ohmypi via
   `cloister/pi-cost-reconciler.ts` (gated on a running ohmypi agent), plus
   `POST /api/costs/reconcile` (`dashboard/server/routes/costs.ts`).

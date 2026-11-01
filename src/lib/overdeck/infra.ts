@@ -24,6 +24,7 @@ import { isPeerDashboardProcess } from '../boot-gates.js';
 import type { ProjectConfig } from '../projects.js';
 import { packageRoot, getOverdeckHome } from '../paths.js';
 import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession, getAgentSessions } from '../tmux.js';
+import { ensureCostIssueRollup } from './cost-issue-rollup.js';
 import { getOverdeckDatabasePath, OVERDECK_MIGRATION_PATH } from './paths.js';
 
 export const overdeckEvents = sqliteTable('events', {
@@ -102,6 +103,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))');
+  // PAN-4724: trigger-maintained per-issue cost rollup (installed once, atomically with its backfill).
+  ensureCostIssueRollup(db);
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `cost_reconcile_file_state` (`path` text PRIMARY KEY NOT NULL, `mtime_ms` integer NOT NULL, `size` integer NOT NULL, `verdict` text NOT NULL)');
   ensureWorkspaceTablesSync(db);
   // PAN-1577: explicit project assignment override for moving a conversation
