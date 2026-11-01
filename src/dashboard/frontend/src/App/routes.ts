@@ -198,7 +198,8 @@ export function normalizeCurrentRoute() {
 
 /** Extract conversation route key from /conv/:key path, or null if not matching. */
 export function getConvIdFromPath(path = window.location.pathname): string | null {
-  const match = path.match(/^\/conv\/([^/]+)$/);
+  // PAN-4650: a linked conversation's key is its linked name, `/conv/@<env>/<name>`.
+  const match = path.match(/^\/conv\/([^/]+)$/) ?? path.match(/^\/conv\/(@[^/]+\/[^/]+)$/);
   if (!match) return null;
   try {
     return decodeURIComponent(match[1] ?? '');

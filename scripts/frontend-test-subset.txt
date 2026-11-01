@@ -7,6 +7,7 @@
 src/App/AppLiveStoreHost.render-count.test.tsx
 src/App/BackendConnectionBoundary.test.tsx
 src/App/api.test.ts
+src/App/routes.linked.test.ts
 src/__tests__/fr7-conversation-pending-input.test.tsx
 src/components/Agents/directory/directory-tree.test.ts
 src/components/Agents/live/live-model.test.ts
@@ -143,6 +144,7 @@ src/lib/__tests__/issueActions.menu-by-state.test.ts
 src/lib/__tests__/issueActions.no-actions-lost.test.ts
 src/lib/__tests__/issueActions.parity.test.tsx
 src/lib/__tests__/issueActions.test.ts
+src/lib/__tests__/linkedConversation.test.ts
 src/lib/__tests__/pendingInput.test.ts
 src/lib/__tests__/pendingInputAnswer.test.ts
 src/lib/__tests__/selectBackendPanes.render-count.test.tsx

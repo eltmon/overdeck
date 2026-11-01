@@ -73,6 +73,8 @@ interface XTerminalProps {
   /** When embedded in a host that owns its own chrome (e.g. the terminal
    * drawer), hide the built-in settings gear to avoid duplicate controls. */
   embedded?: boolean;
+  /** PAN-4650: the terminal WebSocket path; a linked conversation uses `/ws/linked/<env>/terminal`. */
+  wsPath?: string;
 }
 
 type ConnectionStatus = 'connected' | 'reconnecting' | 'restarting' | 'failed';
@@ -95,7 +97,7 @@ const CTRLV_PASTE_STORAGE_KEY = 'overdeck.terminal.ctrlVPaste';
 // Check if platform is Mac
 const isMac = navigator.platform.toLowerCase().includes('mac');
 
-export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: autoCopyProp, embedded }: XTerminalProps) {
+export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: autoCopyProp, embedded, wsPath = '/ws/terminal' }: XTerminalProps) {
   const isDark = useTheme((s) => s.resolvedTheme) !== 'light';
   const designLanguage = useDesignLanguage((s) => s.designLanguage);
   // Per-pane theme override (PAN-1520). 'auto' follows the dashboard; 'dark'/'light'
@@ -546,7 +548,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
 
     // Connect to WebSocket on same port as the page (frontend and API are served together)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let wsUrl = `${protocol}//${window.location.host}/ws/terminal?session=${encodeURIComponent(sessionName)}&heartbeat=1`;
+    let wsUrl = `${protocol}//${window.location.host}${wsPath}?session=${encodeURIComponent(sessionName)}&heartbeat=1`;
     if (token) {
       wsUrl += `&token=${encodeURIComponent(token)}`;
     }
@@ -811,7 +813,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     };
     connectionCleanupRef.current = cleanupConnection;
     })();
-  }, [sessionName, token, autoCopyOnSelect, reconnectJitterMs, handleKeyEvent, handleContextMenu, handleTerminalWheel, handleForcedSelectionMouseDown, handleSelectionContextMouseDown, getMeasuredSize, sendResizeIfNeeded]);
+  }, [sessionName, token, wsPath, autoCopyOnSelect, reconnectJitterMs, handleKeyEvent, handleContextMenu, handleTerminalWheel, handleForcedSelectionMouseDown, handleSelectionContextMouseDown, getMeasuredSize, sendResizeIfNeeded]);
   connectRef.current = connect;
 
   useEffect(() => {

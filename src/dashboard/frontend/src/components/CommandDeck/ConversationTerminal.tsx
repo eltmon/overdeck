@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Circle, Folder, GitFork } from 'lucide-react';
 import { toast } from 'sonner';
 import { XTerminal } from '../XTerminal';
+import { terminalWsPathFor } from '../../lib/linkedConversation';
 import { ContextWindowMeter } from '../chat/ContextWindowMeter';
 import { ConversationResumeControls } from '../chat/ConversationResumeControls';
 import { resumeConversation } from '../chat/conversationResumeApi';
@@ -91,7 +92,7 @@ export function ConversationTerminal({ conversation }: ConversationTerminalProps
       {/* Body: terminal or resume prompt */}
       <div className={styles.conversationTerminalBody}>
         {showTerminal ? (
-          <XTerminal sessionName={conversation.tmuxSession} />
+          <XTerminal sessionName={conversation.tmuxSession} wsPath={terminalWsPathFor(conversation.name) ?? undefined} />
         ) : (
           <div className={styles.conversationResumeOverlay}>
             <p>{SESSION_ENDED_FALLBACK.label}</p>

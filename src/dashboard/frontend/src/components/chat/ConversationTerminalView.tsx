@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { companionTerminalKindFor, type CompanionTerminalUnavailableReason } from '@overdeck/contracts';
 import { XTerminal } from '../XTerminal';
+import { terminalWsPathFor } from '../../lib/linkedConversation';
 import { ViewToggle } from '../shared/ViewToggle';
 import { closeCompanionTerminal, openCompanionTerminal } from './companionTerminalApi';
 import styles from '../CommandDeck/styles/command-deck.module.css';
@@ -47,7 +48,7 @@ const PANE_OPTIONS: Array<{ id: Pane; label: string }> = [
 
 export function ConversationTerminalView({ conversation }: ConversationTerminalViewProps) {
   if (!companionTerminalKindFor(conversation)) {
-    return <XTerminal sessionName={conversation.tmuxSession} />;
+    return <XTerminal sessionName={conversation.tmuxSession} wsPath={terminalWsPathFor(conversation.name) ?? undefined} />;
   }
   return <CompanionTerminalView key={conversation.name} conversation={conversation} />;
 }
@@ -137,11 +138,12 @@ function CompanionTerminalView({ conversation }: ConversationTerminalViewProps) 
         )}
       </div>
       {pane === 'runtime' ? (
-        <XTerminal sessionName={conversation.tmuxSession} />
+        <XTerminal sessionName={conversation.tmuxSession} wsPath={terminalWsPathFor(conversation.name) ?? undefined} />
       ) : state.phase === 'attached' ? (
         <XTerminal
           key={`${state.sessionName}:${state.generation}`}
           sessionName={state.sessionName}
+          wsPath={terminalWsPathFor(conversation.name) ?? undefined}
           onDisconnect={() => setState({ phase: 'ended' })}
         />
       ) : (
