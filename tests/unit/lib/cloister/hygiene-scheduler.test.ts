@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   sweepOrphanedSwarmSlots: vi.fn(async () => [] as string[]),
   patrolDiskPressure: vi.fn(async () => [] as string[]),
   patrolMemoryPressure: vi.fn(async () => [] as string[]),
+  refreshHostHeartbeatForEphemeralVms: vi.fn(async () => [] as string[]),
+  refreshClaudeCredentialsForActiveRemoteAgents: vi.fn(async () => [] as string[]),
   loadCloisterConfigSync: vi.fn(() => ({ retention: { transcript_days: 30 } })),
 }));
 
@@ -47,6 +49,12 @@ vi.mock('../../../../src/lib/cloister/disk-pressure-patrol.js', () => ({
 }));
 vi.mock('../../../../src/lib/cloister/memory-pressure-patrol.js', () => ({
   patrolMemoryPressure: mocks.patrolMemoryPressure,
+}));
+vi.mock('../../../../src/lib/remote/remote-agents.js', () => ({
+  refreshHostHeartbeatForEphemeralVms: mocks.refreshHostHeartbeatForEphemeralVms,
+}));
+vi.mock('../../../../src/lib/remote/remote-credential-refresh.js', () => ({
+  refreshClaudeCredentialsForActiveRemoteAgents: mocks.refreshClaudeCredentialsForActiveRemoteAgents,
 }));
 vi.mock('../../../../src/lib/cloister/config.js', () => ({
   loadCloisterConfigSync: mocks.loadCloisterConfigSync,
@@ -90,6 +98,8 @@ describe('hygiene-scheduler', () => {
     expect(mocks.sweepOrphanedSwarmSlots).toHaveBeenCalledTimes(1);
     expect(mocks.patrolDiskPressure).toHaveBeenCalledTimes(1);
     expect(mocks.patrolMemoryPressure).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshHostHeartbeatForEphemeralVms).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshClaudeCredentialsForActiveRemoteAgents).toHaveBeenCalledTimes(1);
   });
 
   it('fires the 60s-cadence routines on their own interval', async () => {
@@ -107,6 +117,12 @@ describe('hygiene-scheduler', () => {
     // orphan-slot GC that swarmJanitorPass ran on every cycle.
     expect(mocks.reconcileMergedIssueDocker).toHaveBeenCalledTimes(1);
     expect(mocks.sweepOrphanedSwarmSlots).toHaveBeenCalledTimes(1);
+    // PAN-4295: the remote heartbeat and credential refresh, each with no argument
+    // reaching its deps parameter.
+    expect(mocks.refreshHostHeartbeatForEphemeralVms).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshHostHeartbeatForEphemeralVms).toHaveBeenCalledWith();
+    expect(mocks.refreshClaudeCredentialsForActiveRemoteAgents).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshClaudeCredentialsForActiveRemoteAgents).toHaveBeenCalledWith();
     // ~10-minute-cadence routines must not have fired yet.
     expect(mocks.reapOrphanedDashboardServers).not.toHaveBeenCalled();
     expect(mocks.reapLeftoverPlaywrightBrowsers).not.toHaveBeenCalled();
