@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4648",
   "created": "2026-11-01T05:50:45.229Z",
-  "updated": "2026-11-01T07:56:31.799Z",
+  "updated": "2026-11-01T07:57:01.723Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "triggers-admin-routes.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T07:56:31.799Z"
+    },
+    "triggers-admin-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:57:01.723Z"
     }
   }
 }
