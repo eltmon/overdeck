@@ -1,0 +1,889 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T04:44:53Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4643: Add pan diagnose: collect diagnostics and hand them to Claude Code or Codex",
+    "updated": "2026-11-01T04:53:05.810Z"
+  },
+  "plan": {
+    "id": "pan-4643",
+    "title": "Add pan diagnose: collect diagnostics and hand them to Claude Code or Codex",
+    "status": "running",
+    "uid": "599825df-7fd3-4ed2-932d-22a75c1b0d22",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T04:44:53Z",
+    "updated": "2026-11-01T04:53:05.810Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4643",
+        "label": "PAN-4643",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4643.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "cli",
+      "diagnostics",
+      "doctor",
+      "redaction",
+      "harness"
+    ],
+    "narratives": {
+      "Problem": "When Overdeck breaks on a machine there is no single command that collects logs, config, versions and service state, and nothing hands that context to a model that can fix the machine. pan doctor prints text only and the pan-diagnose skill only helps inside a session that already loaded it. The tool is needed most when the dashboard, supervisor or Herdr is down.",
+      "Proposal": "Add `pan doctor --json` (extracting the report and exit logic into doctor-report.ts) and a new `pan diagnose` command. diagnose validates or picks an installed and signed-in harness (Claude Code or Codex), collects a redacted bundle into ~/.overdeck/diagnostics/<stamp>/ (doctor JSON via a child process, environment, dashboard and supervisor reachability, tails of core logs, key-name-redacted config.yaml and projects.yaml, the operator's description, the pan-diagnose skill as TROUBLESHOOTING.md, PROMPT.md, MANIFEST.md), asks for confirmation, then starts the harness interactively in the current terminal with a prompt pointing at the bundle. The prompt asks the model to find and fix local problems and, unless --no-issue, to draft an eltmon/overdeck issue and create it with gh only after explicit operator confirmation. --bundle-only writes the bundle and prints its path. All logic in src/lib/diagnostics/ is dependency-injected and works with every service down.",
+      "NonGoals": "- No dashboard Diagnose button, route or banner action\n- No rename of `pan issues --triage` and no `pan triage` verb\n- No recording of failed pan commands\n- No registration of the diagnose session as an Overdeck agent or conversation, and no Herdr/tmux pane\n- No harnesses other than Claude Code and Codex, and no --model flag\n- No permission-bypass, one-shot (-p, exec) or sandbox-disabling flags on the harness launch\n- No automatic pruning or upload of bundles; the only network write is the model's gh issue create after operator confirmation\n- No change to the shared redactSensitiveText patterns in src/lib/secret-redaction.ts\n- No addition of `diagnose` to TELEMETRY_CLI_VERBS\n- No raise of any cap in scripts/file-size-allowlist.txt"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Verb is `pan diagnose`; `pan triage` and `pan issues --triage` are unchanged.",
+        "rationale": "The issue recommends it: it matches the existing pan-diagnose skill and avoids the tracker meaning of triage."
+      },
+      {
+        "summary": "`pan doctor --json` runs as a child process (process.execPath + argv[1]) inside the bundle, with a 120 s timeout.",
+        "rationale": "Does not need `pan` on PATH (#2630), isolates a hanging or crashing check, and exercises the real flag."
+      },
+      {
+        "summary": "The harness starts with cwd = OVERDECK_HOME and no --add-dir.",
+        "rationale": "Bundle and config both sit inside its workspace; avoids Claude's variadic --add-dir swallowing the prompt."
+      },
+      {
+        "summary": "The pan-diagnose skill is copied into the bundle as TROUBLESHOOTING.md and the prompt points at it.",
+        "rationale": "Works when `pan sync` never ran, which is a common failure this command must handle; harness-agnostic."
+      },
+      {
+        "summary": "Consent: always show the manifest file list and ask before launching; --yes skips; no consent marker file.",
+        "rationale": "The issue asks for a confirmation the first time; asking every time is safer and avoids new state."
+      },
+      {
+        "summary": "Launching a harness requires a TTY; without one the bundle is still written and the command exits 1 naming --bundle-only.",
+        "rationale": "Interactive Claude Code and Codex cannot run without a terminal; one-shot modes are forbidden by repo rules."
+      },
+      {
+        "summary": "An explicit ineligible --harness fails before collecting anything.",
+        "rationale": "Fast, clear failure with the fix; --bundle-only remains for people who only want the bundle."
+      },
+      {
+        "summary": "The no-issue-without-confirmation rule is enforced by prompt text, and tests assert the prompt text.",
+        "rationale": "The model runs `gh issue create`, not Overdeck, so prompt content is the only lever."
+      },
+      {
+        "summary": "Failed pan commands are not collected; MANIFEST.md says Overdeck does not record them.",
+        "rationale": "Nothing records them locally (telemetry is anonymous PostHog only); the issue says 'if recorded'."
+      },
+      {
+        "summary": "Config files get a YAML key-name redaction pass before redactSensitiveText; the shared redactor is unchanged.",
+        "rationale": "LABELLED_SECRET_PATTERN misses keys like linear_api_key and github_token because of word boundaries."
+      },
+      {
+        "summary": "Home directory path is replaced with ~ in every bundle file.",
+        "rationale": "Reduces personal data in a bundle that may be pasted into a public issue."
+      },
+      {
+        "summary": "No dashboard Diagnose button, no telemetry verb, no bundle pruning in this issue.",
+        "rationale": "The CLI must come first because it has to work when the dashboard does not; the rest is follow-up scope."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4643.md",
+      "canonicalFilename": "2026-11-01-PAN-4643-add-pan-diagnose-collect-diagnostics-and-hand-them-to-claude-code-or-codex.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "doctor-json",
+        "title": "Add pan doctor --json via an extracted doctor-report module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:44:53Z",
+        "metadata": {
+          "issueLabel": "pan-4643",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "diagnostics-collect-doctor"
+          ],
+          "files_scope": [
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/doctor-report.ts",
+            "src/cli/index.ts",
+            "sync-sources/skills/pan-doctor/SKILL.md",
+            "tests/unit/cli/commands/doctor-report.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/doctor-report.test.ts",
+            "npm run typecheck",
+            "npm run build && node dist/cli/index.js doctor --json | node -e \"const r=JSON.parse(require('fs').readFileSync(0,'utf8'));if(!Array.isArray(r.checks))process.exit(2)\"",
+            "wc -l src/cli/commands/doctor.ts",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "doctor-report.test.ts reports all tests green",
+            "typecheck completes without errors",
+            "the node JSON.parse pipe exits 0 or 1 (never 2 and never a SyntaxError)",
+            "doctor.ts line count is 1037 or lower",
+            "skill CLI lint passed"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W1 exactly. Create src/cli/commands/doctor-report.ts with doctorExitCode, buildDoctorJsonReport (DoctorJsonReport per FR-1, fix undefined becomes null), printDoctorTextReport (the exact text the old doctor.ts lines 969-1009 printed, including the moved printPatrolBudgetTable) and withStdoutReserved (console.log/info go to stderr while the collection runs). In doctor.ts add json?: boolean to DoctorOptions, split the body into exported collectDoctorChecks (old lines 709-967) and a short doctorCommand that writes the JSON with process.stdout.write and a flush callback before exitCli (NFR-5). Register --json on the doctor command in src/cli/index.ts lines 1186-1190 and leave program.enablePositionalOptions() at line 91 untouched so pan doctor github-quota --json keeps its flag. Add a --json section to sync-sources/skills/pan-doctor/SKILL.md in the same commit. doctor.ts must end at or below 1037 lines; never raise scripts/file-size-allowlist.txt."
+        },
+        "items": [
+          {
+            "id": "doctor-json.ac1",
+            "title": "Given any machine, when an operator runs `pan doctor --json`, then stdout contains exactly one JSON object whose `checks` entries each carry `name`, `status`, `message` and `fix` (null when absent), and no banner or coloured text is printed to stdout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-json.ac2",
+            "title": "Given checks with an `error` status (or `warn` with `--strict`), when `pan doctor --json` runs, then the process exits 1 and the JSON `exitCode` field is 1; with only ok/warn and no `--strict` it exits 0 — the same codes text mode produces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-json.ac3",
+            "title": "When `pan doctor github-quota --json` runs after this change, then it still prints the quota JSON object (the parent `--json` option does not consume the subcommand flag)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-json.ac4",
+            "title": "When `pan doctor` runs without `--json`, then it prints the same banner, per-check lines, patrol budget table and summary sentence as before the refactor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-json.ac5",
+            "title": "`wc -l src/cli/commands/doctor.ts` returns 1037 or fewer lines and `scripts/file-size-allowlist.txt` contains no raised cap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diagnostics-redact",
+        "title": "Add bundle redaction with a YAML key-name pass",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:44:53Z",
+        "metadata": {
+          "issueLabel": "pan-4643",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "diagnostics-bundle-writer",
+            "diagnose-cli"
+          ],
+          "files_scope": [
+            "src/lib/diagnostics/redact.ts",
+            "tests/unit/lib/diagnostics/redact.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/diagnostics/redact.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "redact.test.ts reports all tests green",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W2. Create src/lib/diagnostics/redact.ts exporting redactConfigYaml (FR-7 line-based key-name pass: secret-looking key names get value [REDACTED] unless the value is numeric, boolean, null, ~, empty or starts with $; block scalars collapse to one [REDACTED] line), redactBundleText(text, { kind, home }) which applies redactConfigYaml for kind config, then redactSensitiveText from src/lib/secret-redaction.ts, then replaces the home directory with ~, and countRedactions (occurrences of [REDACTED). Do not change src/lib/secret-redaction.ts. Build every secret fixture at runtime in the test, never as a literal token-shaped string."
+        },
+        "items": [
+          {
+            "id": "diagnostics-redact.ac1",
+            "title": "Given YAML lines `linear_api_key: <runtime sk-ant secret>` and `github_token: \"abc\"`, when redactConfigYaml runs, then it returns both values replaced by `[REDACTED]` with the key names preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-redact.ac2",
+            "title": "Given `max_tokens: 4096`, `enabled: true` and `api_key: $OPENAI_API_KEY`, when redactConfigYaml runs, then it preserves all three lines unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-redact.ac3",
+            "title": "Given `private_key: |` followed by indented lines and then a sibling key, when redactConfigYaml runs, then the block collapses to one `[REDACTED]` line and the sibling key survives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-redact.ac4",
+            "title": "Given log text containing a runtime-built `ghp_` token and the home directory path, when redactBundleText runs with kind text, then the result contains `[REDACTED_TOKEN]` and `~` and does not contain the token or the home path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diagnostics-bundle-writer",
+        "title": "Add the diagnostic bundle writer and MANIFEST.md renderer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:44:53Z",
+        "metadata": {
+          "issueLabel": "pan-4643",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/diagnostics/bundle.ts",
+            "tests/unit/lib/diagnostics/bundle.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/diagnostics/bundle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "bundle.test.ts reports all tests green",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W3. Create src/lib/diagnostics/bundle.ts exporting the BundleEntry, CollectorFailure and CollectorOutcome types, diagnosticsRoot, createBundleDir (UTC stamp YYYYMMDDTHHMMSSZ, mode 0700, -2/-3 suffix on collision), writeDiagnosticBundle (rejects absolute or .. paths and MANIFEST.md, redacts every entry through redactBundleText, writes 0600 files, then writes MANIFEST.md through the same redaction) and renderManifest with the four FR-10 sections. Mode assertions in tests branch on process.platform inside the test body instead of using skipIf."
+        },
+        "items": [
+          {
+            "id": "diagnostics-bundle-writer.ac1",
+            "title": "Given a config entry and a log entry that both contain a runtime-built secret, when writeDiagnosticBundle runs, then each written file contains `[REDACTED` and no written file contains the secret",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-bundle-writer.ac2",
+            "title": "When writeDiagnosticBundle runs on Linux, then the bundle directory has mode 0700 and every written file has mode 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-bundle-writer.ac3",
+            "title": "When writeDiagnosticBundle runs, then MANIFEST.md contains a `## Files` table row per file with its byte and redaction counts, a `## Collection failures` list, a `## What was redacted` section, and a `## Not included` section naming `failed pan commands`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-bundle-writer.ac4",
+            "title": "Given an entry path `../x` or an absolute path, when writeDiagnosticBundle runs, then it throws before writing any file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-bundle-writer.ac5",
+            "title": "Given a bundle directory for the same stamp already exists, when createBundleDir runs, then it returns a new path ending in `-2`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diagnostics-collect-system",
+        "title": "Add the environment and services collector",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:44:53Z",
+        "metadata": {
+          "issueLabel": "pan-4643",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/diagnostics/collect-system.ts",
+            "tests/unit/lib/diagnostics/collect-system.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/diagnostics/collect-system.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "collect-system.test.ts reports all tests green",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-11",
+            "FR-12",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W4. Create src/lib/diagnostics/collect-system.ts exporting collectSystem(deps) that returns environment.json (FR-11: Overdeck version from packageRoot package.json, getBuildInfo fields, os, node, hostTerminalBackendName, claude and codex --version via async execFile with a 5 s timeout) and services.json (FR-12: dashboard /api/health and supervisor pid plus /status, each aborted after 2 s with AbortController and setTimeout). Every probe is wrapped so a failure records null plus a CollectorFailure and never throws. No console output and no execSync in this module."
+        },
+        "items": [
+          {
+            "id": "diagnostics-collect-system.ac1",
+            "title": "Given fetch rejects with ECONNREFUSED and isSupervisorRunning returns false, when collectSystem runs, then it returns both environment.json and services.json entries and services.json records `reachable: false` with the error text for the dashboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-collect-system.ac2",
+            "title": "Given a fetch that never settles, when collectSystem runs under fake timers and 2 s elapse, then the probe is aborted and collectSystem resolves with `reachable: false`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-collect-system.ac3",
+            "title": "Given execFile fails with ENOENT for `codex`, when collectSystem runs, then environment.json records `codex: { installed: false, version: null }`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diagnostics-collect-files",
+        "title": "Add the config, log tail and troubleshooting-skill collector",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:44:53Z",
+        "metadata": {
+          "issueLabel": "pan-4643",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/diagnostics/collect-files.ts",
+            "tests/unit/lib/diagnostics/collect-files.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/diagnostics/collect-files.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "collect-files.test.ts reports all tests green",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W5. Create src/lib/diagnostics/collect-files.ts exporting collectFiles({ overdeckHome, logsDir, skillPath }) that returns config/config.yaml and config/projects.yaml with kind config, logs/<name> entries per FR-9 (core log set plus the 3 newest other .log/.jsonl regular files, lstat skips symlinks, read at most the last 64 KiB with fs.promises.open plus read at an offset, drop a leading partial line, keep the last 200 lines then the last 48 KiB), and TROUBLESHOOTING.md copied from SYNC_SOURCES.skills/pan-diagnose/SKILL.md. Missing files become CollectorFailure rows, never throws."
+        },
+        "items": [
+          {
+            "id": "diagnostics-collect-files.ac1",
+            "title": "Given a 300 KB log file, when collectFiles runs, then its entry contains at most 200 lines and at most 48 KiB and ends with the file's last line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-collect-files.ac2",
+            "title": "Given the core logs plus five other .log files with distinct mtimes and one symlink, when collectFiles runs, then it returns every present core log and only the three newest other logs, and skips the symlink",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-collect-files.ac3",
+            "title": "Given no config.yaml in overdeckHome, when collectFiles runs, then it returns a CollectorFailure for `config/config.yaml` and still returns the other entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-collect-files.ac4",
+            "title": "When collectFiles runs, then the config entries carry `kind: 'config'` and TROUBLESHOOTING.md contains the pan-diagnose skill text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diagnostics-collect-doctor",
+        "title": "Add the out-of-process pan doctor --json collector",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:44:53Z",
+        "metadata": {
+          "issueLabel": "pan-4643",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/diagnostics/collect-doctor.ts",
+            "tests/unit/lib/diagnostics/collect-doctor.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/diagnostics/collect-doctor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "collect-doctor.test.ts reports all tests green",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W6 and decision D2. Create src/lib/diagnostics/collect-doctor.ts exporting collectDoctor({ spawn, execPath, execArgv, cliEntry, timeoutMs = 120000 }) that spawns process.execPath with [...execArgv, argv[1], 'doctor', '--json'], parses stdout as JSON and accepts it when it is an object with schemaVersion 1 and an array checks (shape re-declared structurally; src/lib/diagnostics imports nothing from src/cli), writes doctor.json when it parses (exit 1 with valid JSON is success), else doctor-output.txt with exit code, signal and tails of stdout and stderr plus a CollectorFailure, and kills the child with SIGTERM after the timeout. Drop any --inspect, --inspect-brk or --inspect-port entry from execArgv before spawning."
+        },
+        "items": [
+          {
+            "id": "diagnostics-collect-doctor.ac1",
+            "title": "Given the child prints a valid DoctorJsonReport and exits 1, when collectDoctor runs, then it returns a doctor.json entry and no CollectorFailure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-collect-doctor.ac2",
+            "title": "Given the child prints non-JSON text, when collectDoctor runs, then it returns doctor-output.txt containing that text and a CollectorFailure for `pan doctor --json`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-collect-doctor.ac3",
+            "title": "Given a child that never exits, when 120 s elapse under fake timers, then collectDoctor kills it with SIGTERM and returns a CollectorFailure that says `timed out after 120s`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-collect-doctor.ac4",
+            "title": "When collectDoctor runs, then the spawn argv equals `[...execArgv without --inspect* entries, cliEntry, 'doctor', '--json']` and does not depend on `pan` being on PATH",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diagnostics-harness",
+        "title": "Add harness eligibility checks and foreground launch argv",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:44:53Z",
+        "metadata": {
+          "issueLabel": "pan-4643",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/diagnostics/harness.ts",
+            "tests/unit/lib/diagnostics/harness.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/diagnostics/harness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "harness.test.ts reports all tests green",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-14",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W7 and decisions D3, D4, D10. Create src/lib/diagnostics/harness.ts exporting DiagnoseHarness ('claude-code' | 'codex'), DIAGNOSE_HARNESSES with label, command and the FR-14 fix strings, checkHarnessEligibility, listHarnessEligibility (claude-code then codex) and buildHarnessLaunch(harness, prompt, overdeckHome) returning { command, args: [prompt], cwd: overdeckHome }. Installed uses async execFile('which'); Claude auth uses checkClaudeLogin from src/lib/first-run-checks.ts; Codex auth reads $CODEX_HOME/auth.json when set, else getNativeCodexAuthPath(), and only classifyNativeCodexAuth status valid counts. Never add permission-bypass, -p, exec or --model arguments."
+        },
+        "items": [
+          {
+            "id": "diagnostics-harness.ac1",
+            "title": "Given `which('codex')` fails, when checkHarnessEligibility('codex') runs, then it returns `eligible: false` with fix `Install: npm install -g @openai/codex`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-harness.ac2",
+            "title": "Given claude is installed but checkClaudeLogin returns ok false, when checkHarnessEligibility('claude-code') runs, then it returns `eligible: false` with fix `Run: claude, then /login (or set ANTHROPIC_API_KEY)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-harness.ac3",
+            "title": "Given CODEX_HOME points at a directory with a valid auth.json, when checkHarnessEligibility('codex') runs, then it reads that file and returns `authenticated: true`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-harness.ac4",
+            "title": "When buildHarnessLaunch runs for claude-code and codex, then it returns commands `claude` and `codex` with args equal to `[prompt]`, cwd equal to overdeckHome, and no `--dangerously`, `-p`, `exec` or `--full-auto` argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diagnostics-prompt",
+        "title": "Add the diagnose session prompt builder",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:44:53Z",
+        "metadata": {
+          "issueLabel": "pan-4643",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/diagnostics/prompt.ts",
+            "tests/unit/lib/diagnostics/prompt.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/diagnostics/prompt.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "prompt.test.ts reports all tests green",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W8 and FR-13. Create src/lib/diagnostics/prompt.ts exporting buildDiagnosePrompt({ bundleDir, issueStep }). The prompt starts with the sentence 'Overdeck diagnostic session.', names the absolute bundle dir, tells the model to read MANIFEST.md then description.md then the listed files, follow TROUBLESHOOTING.md, find the cause, fix local problems after explaining the change, and say whether it is a local setup issue or an Overdeck bug. With issueStep true it adds the confirm-before-gh-issue-create section for eltmon/overdeck; with issueStep false it adds the prohibition sentence instead."
+        },
+        "items": [
+          {
+            "id": "diagnostics-prompt.ac1",
+            "title": "When buildDiagnosePrompt runs, then the returned text starts with `Overdeck diagnostic session.` and contains the bundle directory, `MANIFEST.md` and `TROUBLESHOOTING.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-prompt.ac2",
+            "title": "Given issueStep true, when buildDiagnosePrompt runs, then the text contains `gh issue create --repo eltmon/overdeck` and `explicit confirmation`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnostics-prompt.ac3",
+            "title": "Given issueStep false, when buildDiagnosePrompt runs, then the text contains `Do not draft or create an upstream issue` and does not contain `gh issue create`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diagnose-cli",
+        "title": "Add the pan diagnose command and its wrapper skill usage",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:44:53Z",
+        "metadata": {
+          "issueLabel": "pan-4643",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/diagnose.ts",
+            "src/cli/index.ts",
+            "sync-sources/skills/pan-diagnose/SKILL.md",
+            "tests/unit/cli/commands/diagnose.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/diagnose.test.ts",
+            "npm run typecheck",
+            "npm run build && node dist/cli/index.js diagnose --help",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "diagnose.test.ts reports all nine cases green",
+            "typecheck completes without errors",
+            "help output lists --harness, --describe, --bundle-only, --no-issue and --yes",
+            "skill CLI lint passed"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-15",
+            "FR-16",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W9 and decisions D6-D9 and D14. Register `pan diagnose` in src/cli/index.ts with --harness (commander Option choices claude-code and codex; change line 38 to import Option), --describe, --bundle-only, --no-issue and --yes. Create src/cli/commands/diagnose.ts exporting diagnoseCommand(options, deps) with injected IO, collectors, eligibility, spawnForeground (vault resume defaultSpawn pattern with stdio inherit) and signal hooks. Flow: validate an explicit harness first (exit 1, no bundle); otherwise pick on a TTY; read the description; create the bundle dir; run collectSystem, collectFiles and collectDoctor concurrently; write description.md and PROMPT.md; write the bundle; --bundle-only prints the path last and exits 0; no TTY exits 1 with the --bundle-only hint; confirm unless --yes; ignore SIGINT and SIGQUIT while the child runs; exit with the child's code. Add the Run it and When pan diagnose started this session sections to sync-sources/skills/pan-diagnose/SKILL.md in the same commit; every flag there must exist in pan diagnose --help."
+        },
+        "items": [
+          {
+            "id": "diagnose-cli.ac1",
+            "title": "Given the dashboard fetch rejects and the supervisor is not running, when `pan diagnose --bundle-only` runs, then it exits 0 and prints as its last line an existing directory that contains MANIFEST.md and a services.json with `reachable: false`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnose-cli.ac2",
+            "title": "Given a temp config.yaml and logs/dashboard.log that contain the same runtime-built secret, when the bundle is written, then no bundle file contains the secret and both copied files contain `[REDACTED`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnose-cli.ac3",
+            "title": "Given `--harness codex` and `which('codex')` fails, when `pan diagnose` runs, then it prints `Install: npm install -g @openai/codex` to stderr, exits 1, and creates no bundle directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnose-cli.ac4",
+            "title": "Given a TTY and `--harness claude-code --yes`, when `pan diagnose` runs, then it spawns `claude` in the foreground with one argument, the prompt, which contains the bundle path, and cwd equal to OVERDECK_HOME; `--harness codex --yes` spawns `codex` the same way",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnose-cli.ac5",
+            "title": "Given no TTY and no `--bundle-only`, when `pan diagnose` runs, then it writes the bundle, prints a message naming `--bundle-only` to stderr and exits 1 without spawning a harness; given a TTY and the answer `n` at the confirmation prompt, it refuses to spawn and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diagnose-docs",
+        "title": "Document pan diagnose, the bundle contents, and pan doctor --json",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:44:53Z",
+        "metadata": {
+          "issueLabel": "pan-4643",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/DIAGNOSTICS-BUNDLE.md",
+            "cli/core-commands.mdx"
+          ],
+          "verify_commands": [
+            "grep -c 'MANIFEST.md\\|PROMPT.md\\|description.md\\|doctor.json\\|environment.json\\|services.json\\|TROUBLESHOOTING.md' docs/DIAGNOSTICS-BUNDLE.md",
+            "grep -n '## pan diagnose\\|pan doctor --json' cli/core-commands.mdx"
+          ],
+          "expected_outputs": [
+            "grep count is 7 or more",
+            "grep prints the pan diagnose heading and a pan doctor --json line"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-8",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W10. Create docs/DIAGNOSTICS-BUNDLE.md: the five-step flow, a table of every FR-8 bundle file, what is redacted (FR-6, FR-7, home path shown as ~), what stays in the bundle, what is never collected (FR-10 Not included, failed pan commands are not recorded), where bundles live and that deleting old ones is manual, one line per pan diagnose flag, and the pan doctor --json fields. In cli/core-commands.mdx add a pan doctor --json example with the field list under the pan doctor section and a new pan diagnose section after it with the flags, the dashboard-down guarantee, the confirmation step, and a link to the GitHub-hosted docs/DIAGNOSTICS-BUNDLE.md."
+        },
+        "items": [
+          {
+            "id": "diagnose-docs.ac1",
+            "title": "docs/DIAGNOSTICS-BUNDLE.md contains a table row for each of MANIFEST.md, PROMPT.md, description.md, doctor.json, doctor-output.txt, environment.json, services.json, config/config.yaml, config/projects.yaml, logs/ and TROUBLESHOOTING.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnose-docs.ac2",
+            "title": "docs/DIAGNOSTICS-BUNDLE.md contains a redaction section that names config key-name redaction, shape-based secret redaction and the home path shown as `~`, and a section stating that failed pan commands are not recorded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diagnose-docs.ac3",
+            "title": "cli/core-commands.mdx contains a `## pan diagnose` heading listing `--harness`, `--describe`, `--bundle-only`, `--no-issue` and `--yes`, and a `pan doctor --json` example under `## pan doctor`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "diagnostics-redact",
+        "to": "diagnostics-bundle-writer",
+        "type": "blocks"
+      },
+      {
+        "from": "diagnostics-bundle-writer",
+        "to": "diagnostics-collect-system",
+        "type": "blocks"
+      },
+      {
+        "from": "diagnostics-bundle-writer",
+        "to": "diagnostics-collect-files",
+        "type": "blocks"
+      },
+      {
+        "from": "diagnostics-bundle-writer",
+        "to": "diagnostics-collect-doctor",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-json",
+        "to": "diagnostics-collect-doctor",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-json",
+        "to": "diagnose-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "diagnostics-collect-system",
+        "to": "diagnose-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "diagnostics-collect-files",
+        "to": "diagnose-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "diagnostics-collect-doctor",
+        "to": "diagnose-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "diagnostics-harness",
+        "to": "diagnose-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "diagnostics-prompt",
+        "to": "diagnose-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "diagnose-cli",
+        "to": "diagnose-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
