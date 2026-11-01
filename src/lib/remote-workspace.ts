@@ -2,7 +2,8 @@
  * Remote Workspace Creation
  *
  * Shared module for creating remote workspaces.
- * Used by both workspace.ts (explicit creation) and work/issue.ts (auto-creation).
+ * Used by `pan start --remote`, `pan workspace create --remote` and
+ * `pan workspace migrate --to remote`.
  */
 
 import chalk from 'chalk';
@@ -35,7 +36,7 @@ export async function createRemoteWorkspace(
   const remoteConfig = config.remote;
 
   if (!remoteConfig?.enabled) {
-    throw new Error('Remote workspaces not enabled. Run `pan remote setup`');
+    throw new Error('Remote workspaces not enabled. Run `pan admin remote setup`');
   }
 
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
@@ -104,11 +105,12 @@ export async function createRemoteWorkspace(
 
   // Step 3: Clone repository on VM into /workspace (the image WORKDIR — the
   // agent spawn path and prompt both assume /workspace, never ~/workspace).
-  // Use the https URL: VMs have no GitHub SSH key, only the synced gh token.
   if (options.spinner) {
     options.spinner.text = 'Cloning repository on VM...';
   }
-  const httpsRepoUrl = repoUrl.replace(/^git@github\.com:/, 'https://github.com/');
+  // VMs hold no SSH key (PAN-4295): clone over https, authenticated by the
+  // synced gh token's credential helper.
+  const httpsRepoUrl = repoUrl.replace(/^git@([^:]+):/, 'https://$1/');
   const cloneResult = await Effect.runPromise(fly.ssh(vmName, `git clone ${httpsRepoUrl} /workspace`));
   if (cloneResult.exitCode !== 0) {
     await Effect.runPromise(fly.deleteVm(vmName));
