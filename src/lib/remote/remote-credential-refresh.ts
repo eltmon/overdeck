@@ -108,8 +108,9 @@ export async function refreshClaudeCredentialsForActiveRemoteAgents(
           ? `Remote credentials refreshed for ${state.issueId.toUpperCase()} on ${state.vmName}`
           : `Remote credentials refresh skipped for ${state.issueId.toUpperCase()} on ${state.vmName} (no host credentials)`,
       );
-    } catch (err: any) {
-      actions.push(`Remote credentials refresh failed for ${state.issueId.toUpperCase()} on ${state.vmName}: ${err.message}`);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      actions.push(`Remote credentials refresh failed for ${state.issueId.toUpperCase()} on ${state.vmName}: ${reason}`);
     }
   }
 
