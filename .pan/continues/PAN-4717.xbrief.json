@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4717",
   "created": "2026-11-01T14:07:20.462Z",
-  "updated": "2026-11-01T14:16:03.602Z",
+  "updated": "2026-11-01T14:18:20.038Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-01T14:15:33.487Z"
     },
     "transcript-link-passes-href": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4717",
-      "claimedAt": "2026-11-01T14:16:03.602Z"
+      "claimedAt": "2026-11-01T14:16:03.602Z",
+      "doneAt": "2026-11-01T14:18:20.038Z"
     }
   }
 }
