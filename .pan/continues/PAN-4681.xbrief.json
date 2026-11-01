@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4681",
   "created": "2026-11-01T07:25:21.124Z",
-  "updated": "2026-11-01T07:49:51.187Z",
+  "updated": "2026-11-01T08:07:24.561Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -75,5 +75,6 @@
       "claimedAt": "2026-11-01T07:49:30.930Z",
       "doneAt": "2026-11-01T07:49:51.187Z"
     }
-  }
+  },
+  "feedback": []
 }
