@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4647",
   "created": "2026-11-01T04:58:27.549Z",
-  "updated": "2026-11-01T05:19:06.724Z",
+  "updated": "2026-11-01T05:19:20.658Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4647",
       "claimedAt": "2026-11-01T05:11:18.176Z",
       "doneAt": "2026-11-01T05:19:06.724Z"
+    },
+    "two-machine-agent-e2e": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4647",
+      "claimedAt": "2026-11-01T05:19:20.657Z"
     }
   }
 }
