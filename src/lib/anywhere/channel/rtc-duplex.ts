@@ -18,6 +18,9 @@ export const RTC_LOW_WATER_BYTES = 256 * 1024;
 export class RtcDuplex extends Duplex {
   /** `rtc:<first 16 hex of the peer environment id>`, so nothing treats it as an IP address. */
   readonly remoteAddress: string;
+  /** Bytes received and sent on the data channel (ciphertext once the secure channel runs; relay metering). */
+  bytesIn = 0;
+  bytesOut = 0;
   private channelClosed = false;
 
   constructor(
@@ -29,7 +32,9 @@ export class RtcDuplex extends Duplex {
     channel.bufferedAmountLowThreshold = RTC_LOW_WATER_BYTES;
     channel.onMessage.subscribe((data) => {
       if (this.channelClosed) return;
-      this.push(typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data));
+      const bytes = typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data);
+      this.bytesIn += bytes.byteLength;
+      this.push(bytes);
     });
     channel.stateChanged.subscribe((state) => {
       if (state === 'closed') this.onChannelClosed();
@@ -57,6 +62,7 @@ export class RtcDuplex extends Duplex {
       for (let offset = 0; offset < chunk.byteLength; offset += RTC_MAX_MESSAGE_BYTES) {
         this.channel.send(chunk.subarray(offset, offset + RTC_MAX_MESSAGE_BYTES));
       }
+      this.bytesOut += chunk.byteLength;
     } catch (error) {
       callback(error as Error);
       return;

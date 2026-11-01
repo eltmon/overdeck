@@ -16,6 +16,7 @@ import type { DirectoryMachine, DirectoryToMachineFrame, MachineToDirectoryFrame
 import { ChannelOpenError, type RtcDialer, setRtcDialer } from '../../../lib/anywhere/channel/open.js';
 import { type RTCIceServerLike, type RtcSignalingPort, RtcTransport } from '../../../lib/anywhere/channel/rtc-transport.js';
 import { acceptRawChannel } from '../channel-listener.js';
+import type { MeteredTransport } from './relay-client.js';
 
 export const ICE_SERVERS_TIMEOUT_MS = 10_000;
 
@@ -63,6 +64,12 @@ export function directorySignalingPort(directory: DirectoryPort): RtcSignalingPo
   };
 }
 
+/** The relay client's hooks (WI-17): refuse relay dials it does not allow, meter the ones it does. */
+export interface RelayHooks {
+  refusal(): string | null;
+  track(raw: MeteredTransport): void;
+}
+
 export interface DirectoryRtc {
   readonly transport: RtcTransport;
   readonly dialer: RtcDialer;
@@ -70,7 +77,11 @@ export interface DirectoryRtc {
 }
 
 /** The transport and its dialer for one directory connection. */
-export function createDirectoryRtc(directory: DirectoryPort, acceptLink: (raw: Duplex) => void = (raw) => void acceptRawChannel(raw)): DirectoryRtc {
+export function createDirectoryRtc(
+  directory: DirectoryPort,
+  acceptLink: (raw: Duplex) => void = (raw) => void acceptRawChannel(raw),
+  relay: RelayHooks | null = null,
+): DirectoryRtc {
   // Link and approval channels both run the listener's handshake; the preamble picks the mode.
   const transport = new RtcTransport(directorySignalingPort(directory), (raw) => acceptLink(raw));
   // A `peer_offline` answer fails the pending dial at once instead of at the open timeout.
@@ -78,15 +89,21 @@ export function createDirectoryRtc(directory: DirectoryPort, acceptLink: (raw: D
     if (frame.code === 'peer_offline' && frame.session) transport.abortSession(frame.session);
   });
   const dialer: RtcDialer = (url, signal) => {
-    const relay = url.startsWith('rtc+turn://');
-    const environmentId = url.slice(relay ? 'rtc+turn://'.length : 'rtc://'.length);
+    const relayRoute = url.startsWith('rtc+turn://');
+    const environmentId = url.slice(relayRoute ? 'rtc+turn://'.length : 'rtc://'.length);
     if (!directory.isOnline()) {
       return Promise.reject(new ChannelOpenError('unreachable', 'Not connected to the overdeck.ai directory'));
     }
     if (directory.machine(environmentId)?.online !== true) {
       return Promise.reject(new ChannelOpenError('unreachable', 'The other machine is not online in the directory'));
     }
-    return transport.dial(environmentId, { relay, purpose: 'link', signal });
+    if (!relayRoute) return transport.dial(environmentId, { relay: false, purpose: 'link', signal });
+    const refused = relay ? relay.refusal() : 'The relay needs the relay plan';
+    if (refused) return Promise.reject(new ChannelOpenError('unreachable', refused));
+    return transport.dial(environmentId, { relay: true, purpose: 'link', signal }).then((raw) => {
+      relay?.track(raw as MeteredTransport);
+      return raw;
+    });
   };
   return {
     transport,
@@ -101,9 +118,9 @@ export function createDirectoryRtc(directory: DirectoryPort, acceptLink: (raw: D
 let running: DirectoryRtc | null = null;
 
 /** Boot: register the dialer for `rtc://` routes and accept incoming data channels. */
-export function startDirectoryRtc(directory: DirectoryPort): DirectoryRtc {
+export function startDirectoryRtc(directory: DirectoryPort, relay: RelayHooks | null = null): DirectoryRtc {
   stopDirectoryRtc();
-  running = createDirectoryRtc(directory);
+  running = createDirectoryRtc(directory, (raw) => void acceptRawChannel(raw), relay);
   setRtcDialer(running.dialer);
   return running;
 }

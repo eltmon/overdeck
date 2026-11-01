@@ -154,6 +154,11 @@ export class DirectoryClient {
     return this.state === 'online' && this.relayAllowed;
   }
 
+  /** The directory's last relay status (from `welcome` or `relay-status`). */
+  relayStatus(): RelayStatus | null {
+    return this.relay;
+  }
+
   inboxEntitled(): boolean {
     return this.state === 'online' && this.inboxAllowed;
   }

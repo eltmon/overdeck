@@ -21,6 +21,7 @@ import { defaultApprovalDeps, DirectoryApprovalService, setApprovalService } fro
 import { DirectoryClient, defaultOpenSocket, setDirectoryClient } from './directory-client.js';
 import { directoryRoutesFor } from './directory-routes.js';
 import { startDirectoryRtc, stopDirectoryRtc } from './directory-rtc.js';
+import { RelayClient, setRelayClient } from './relay-client.js';
 import { setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
 
@@ -28,6 +29,7 @@ let supervisor: LinkSupervisor | null = null;
 let advertiser: EndpointAdvertiser | null = null;
 let directory: DirectoryClient | null = null;
 let approvals: DirectoryApprovalService | null = null;
+let relay: RelayClient | null = null;
 let reconcileTimer: NodeJS.Timeout | null = null;
 
 /** The port this dashboard listens on, by the same rule as ServerConfig. */
@@ -70,7 +72,11 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   await directory.start();
   // WI-11: `rtc://` and `rtc+turn://` routes dial through the directory; incoming data channels
   // run the same secure-channel handshake as TCP.
-  startDirectoryRtc(directory);
+  // WI-17: relay dials are refused once the plan or the month's allowance says so, and metered.
+  relay = new RelayClient(directory);
+  relay.start();
+  setRelayClient(relay);
+  startDirectoryRtc(directory, relay);
   // WI-14: two-screen approvals; their views ride in GET /api/directory.
   approvals = new DirectoryApprovalService(defaultApprovalDeps(directory, () => advertiser?.current() ?? []));
   setApprovalService(approvals);
@@ -80,8 +86,13 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   supervisor = new LinkSupervisor({
     ...defaultLinkSupervisorDeps(serverVersion),
     // WI-12: direct, relay and directory-reported routes, offered while the directory lists the peer.
-    dynamicRoutes: (link) => directoryRoutesFor(link, directory),
-    relayEntitled: () => directory?.relayEntitled() ?? false,
+    dynamicRoutes: (link) =>
+      directoryRoutesFor(link, directory && {
+        isOnline: () => directory?.isOnline() ?? false,
+        machine: (environmentId) => directory?.machine(environmentId) ?? null,
+        relayEntitled: () => relay?.relayEntitled() ?? false,
+      }),
+    relayEntitled: () => relay?.relayEntitled() ?? false,
   });
   supervisor.start();
   setLinkStatusSource(supervisor);
@@ -109,6 +120,9 @@ export function stopAnywhere(): void {
   approvals = null;
   setApprovalService(null);
   stopDirectoryRtc();
+  relay?.stop();
+  relay = null;
+  setRelayClient(null);
   directory?.setApprovalViews(null);
   directory?.stop();
   directory = null;
