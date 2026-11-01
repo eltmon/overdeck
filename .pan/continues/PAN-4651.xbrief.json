@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T19:45:40.064Z",
+  "updated": "2026-11-01T19:48:29.390Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,9 +94,10 @@
       "doneAt": "2026-11-01T19:45:35.681Z"
     },
     "wi15-lane-cli-machine": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4651",
-      "claimedAt": "2026-11-01T19:45:40.063Z"
+      "claimedAt": "2026-11-01T19:45:40.063Z",
+      "doneAt": "2026-11-01T19:48:29.390Z"
     }
   }
 }
