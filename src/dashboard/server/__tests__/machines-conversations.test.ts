@@ -23,7 +23,7 @@ import { readAnywhereSettings, writeAnywhereSettings } from '../../../lib/anywhe
 import type { ProjectConfig } from '../../../lib/projects.js';
 import type { DashboardCredential } from '../routes/dashboard-auth.js';
 import { handleSharedConversations } from '../routes/machines-peer.js';
-import { setHeartbeatConversationsHashSource, startHeartbeatSource } from '../services/link-heartbeat.js';
+import { HEARTBEAT_HASH_WAIT_MS, setHeartbeatConversationsHashSource, startHeartbeatSource } from '../services/link-heartbeat.js';
 
 const MACHINE: DashboardCredential = {
   kind: 'machine', tokenId: 'tok-1', environmentId: 'env-laptop', scopes: ['read:conversations'], actor: 'operator', access: 'operator',
@@ -81,6 +81,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   invalidateSharedConversations();
   setHeartbeatConversationsHashSource(null);
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
@@ -174,5 +175,30 @@ describe('GET /api/machines/conversations (PAN-4650 WI-2)', () => {
     const payload = JSON.parse(chunk.split('data: ')[1]!) as { conversationsHash?: string; seq: number };
     expect(payload).toMatchObject({ seq: 1, conversationsHash: json.hash });
     expect(listRows).toHaveBeenCalledTimes(1);
+  });
+
+  it('never holds a beat back more than the hash wait; a late build reaches the next beat', async () => {
+    vi.useFakeTimers();
+    const pending: Array<(hash: string) => void> = [];
+    setHeartbeatConversationsHashSource(() => new Promise<string>((resolve) => { pending.push(resolve); }));
+    const beats: Array<{ seq: number; conversationsHash?: string }> = [];
+    let tick: () => void = () => undefined;
+    const source = startHeartbeatSource('0.73.0', (data) => beats.push(JSON.parse(data.split('data: ')[1]!)), {
+      setInterval: ((fn: () => void) => { tick = fn; return {}; }) as unknown as typeof setInterval,
+      clearInterval: () => undefined,
+      onStall: () => () => undefined,
+    });
+
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_HASH_WAIT_MS - 1);
+    expect(beats).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(beats).toHaveLength(1);
+    expect(beats[0]).not.toHaveProperty('conversationsHash');
+
+    pending[0]!('aaaa000011112222');
+    tick();
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_HASH_WAIT_MS);
+    expect(beats[1]).toMatchObject({ seq: 2, conversationsHash: 'aaaa000011112222' });
+    source.stop();
   });
 });

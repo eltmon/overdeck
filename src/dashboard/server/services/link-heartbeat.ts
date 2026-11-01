@@ -31,6 +31,13 @@ export interface HeartbeatPayload {
 
 let endpointsHashSource: () => string = () => '';
 let conversationsHashSource: (() => Promise<string>) | null = null;
+let lastConversationsHash: string | undefined;
+/**
+ * Longest a heartbeat waits for the conversation list hash. The peer flags a
+ * beat later than 17.5 s as a network stall, so a slow list build must never
+ * hold one back: past this wait the beat carries the last known hash.
+ */
+export const HEARTBEAT_HASH_WAIT_MS = 1_000;
 
 /** WI-19 registers the endpoint advertiser's hash here. */
 export function setHeartbeatEndpointsHashSource(source: (() => string) | null): void {
@@ -40,6 +47,23 @@ export function setHeartbeatEndpointsHashSource(source: (() => string) | null): 
 /** PAN-4650 registers the shared conversation list's hash here; null leaves it out. */
 export function setHeartbeatConversationsHashSource(source: (() => Promise<string>) | null): void {
   conversationsHashSource = source;
+  lastConversationsHash = undefined;
+}
+
+/** The conversations hash for one beat: fresh within `HEARTBEAT_HASH_WAIT_MS`, else the last known one. */
+function conversationsHashForBeat(source: () => Promise<string>): Promise<string | undefined> {
+  const fresh = source().then(
+    (hash) => {
+      lastConversationsHash = hash;
+      return hash;
+    },
+    () => lastConversationsHash,
+  );
+  let timer: NodeJS.Timeout | undefined;
+  const fallback = new Promise<string | undefined>((resolve) => {
+    timer = setTimeout(() => resolve(lastConversationsHash), HEARTBEAT_HASH_WAIT_MS);
+  });
+  return Promise.race([fresh, fallback]).finally(() => clearTimeout(timer));
 }
 
 /** One heartbeat payload. Pure apart from the stall record and hash sources. */
@@ -70,12 +94,11 @@ export function startHeartbeatSource(
       emit(encodeHeartbeatEvent(payload));
       return;
     }
-    // A failed list build still sends the heartbeat, just without the hash.
-    void hashSource()
-      .then((conversationsHash): HeartbeatPayload => ({ ...payload, conversationsHash }), () => payload)
-      .then((full) => {
-        if (!stopped) emit(encodeHeartbeatEvent(full));
-      });
+    // A slow or failed list build still sends the beat, with the last known hash or none.
+    void conversationsHashForBeat(hashSource).then((conversationsHash) => {
+      if (stopped) return;
+      emit(encodeHeartbeatEvent(conversationsHash === undefined ? payload : { ...payload, conversationsHash }));
+    });
   };
   send();
   const schedule = deps.setInterval ?? setInterval;
