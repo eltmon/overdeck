@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T08:36:00.584Z",
+  "updated": "2026-11-01T08:37:36.228Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
       "claimedBy": "agent-pan-4645",
       "claimedAt": "2026-11-01T08:01:35.605Z",
       "doneAt": "2026-11-01T08:36:00.583Z"
+    },
+    "wi6-ws-rpc-scoped.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:37:36.228Z"
     }
   }
 }
