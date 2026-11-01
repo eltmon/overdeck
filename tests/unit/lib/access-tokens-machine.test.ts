@@ -56,8 +56,10 @@ describe('machine access tokens (PAN-4645 WI-4)', () => {
     const { token, record } = await machineToken();
     expect(record).toMatchObject({ kind: 'machine', machineKey: KEY_A, environmentId: 'env-desk', access: 'operator' });
     expect(record).not.toHaveProperty('tokenHash');
-    expect(record.scopes).toEqual(['read:events', 'read:state', 'read:conversations', 'read:costs', 'read:settings', 'tell', 'operate', 'forward']);
+    // Operator-level links answer the other machine's prompts (`approve`, PAN-4649) and forward; fenced links do neither.
+    expect(record.scopes).toEqual(['read:events', 'read:state', 'read:conversations', 'read:costs', 'read:settings', 'tell', 'operate', 'approve', 'forward']);
     expect(registry.MACHINE_TOKEN_SCOPES('agent-fenced')).not.toContain('forward');
+    expect(registry.MACHINE_TOKEN_SCOPES('agent-fenced')).not.toContain('approve');
     expect(registry.MACHINE_TOKEN_SCOPES('agent-fenced')).not.toContain('admin');
 
     const verified = registry.verifyAccessToken(token);
