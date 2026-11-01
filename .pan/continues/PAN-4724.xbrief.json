@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4724",
   "created": "2026-11-01T16:06:34.998Z",
-  "updated": "2026-11-01T16:15:12.661Z",
+  "updated": "2026-11-01T16:15:17.472Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4724",
       "claimedAt": "2026-11-01T16:12:49.547Z",
       "doneAt": "2026-11-01T16:15:12.661Z"
+    },
+    "rollup-bench": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4724",
+      "claimedAt": "2026-11-01T16:15:17.472Z"
     }
   }
 }
