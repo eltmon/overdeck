@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4296",
+  "created": "2026-11-01T21:43:56.125Z",
+  "updated": "2026-11-01T21:43:56.126Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-image-codex": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4296",
+      "claimedAt": "2026-11-01T21:43:56.125Z"
+    }
+  }
+}
