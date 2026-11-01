@@ -13,6 +13,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { type AdvertisedEndpoint, ROUTE_KINDS } from '@overdeck/contracts';
 
 import { MACHINE_ACCESS_LEVELS, type MachineAccess } from '../../../lib/access-tokens.js';
+import { sharedConversations, type SharedConversationsDeps } from '../../../lib/anywhere/shared-conversations.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
 import { endStreamOnDeviceRevocation } from '../device-connections.js';
@@ -20,7 +21,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { currentApprovalService } from '../services/directory-approval.js';
 import { startHeartbeatSource } from '../services/link-heartbeat.js';
 import { grantMachineLink, GrantMachineLinkError } from '../services/machine-link-grant.js';
-import { resolveRequestCredential } from './dashboard-auth.js';
+import { type DashboardCredential, resolveRequestCredential } from './dashboard-auth.js';
 import { buildEnvironmentDescriptor } from './environment.js';
 import { getOverdeckVersion } from './misc/shared.js';
 
@@ -183,4 +184,33 @@ const heartbeatRoute = HttpRouter.add(
   }),
 );
 
-export const machinesPeerRouteLayer = Layer.mergeAll(exchangeRoute, approvalExchangeRoute, heartbeatRoute);
+/**
+ * `GET /api/machines/conversations` (PAN-4650 WI-2, FR-1): this machine's shared
+ * conversation list, for a linked machine's cache. Exactly a machine credential
+ * may read it; the answer is empty with `sharing: false` when sharing is off.
+ */
+export async function handleSharedConversations(
+  credential: DashboardCredential | null,
+  deps: Partial<SharedConversationsDeps> = {},
+): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'machine') {
+    return jsonResponse({ error: 'the shared conversation list is for linked machines only' }, { status: 403 });
+  }
+  try {
+    return jsonResponse(await sharedConversations(deps));
+  } catch (error) {
+    console.error('[machines] shared conversation list failed:', error instanceof Error ? error.message : String(error));
+    return jsonResponse({ error: 'the shared conversation list could not be built' }, { status: 500 });
+  }
+}
+
+const sharedConversationsRoute = HttpRouter.add(
+  'GET',
+  '/api/machines/conversations',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.promise(() => handleSharedConversations(resolveRequestCredential(request)));
+  }),
+);
+
+export const machinesPeerRouteLayer = Layer.mergeAll(exchangeRoute, approvalExchangeRoute, heartbeatRoute, sharedConversationsRoute);

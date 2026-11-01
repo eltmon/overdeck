@@ -103,6 +103,8 @@ export const MachineLinkView = Schema.Struct({
   incident: Schema.NullOr(LinkIncident),
   peerVersion: Schema.NullOr(Schema.String),
   createdAt: Schema.String,
+  /** PAN-4650: Hide this machine — its conversations are left out of the conversation list. */
+  hidden: Schema.optional(Schema.Boolean),
   /** Present only on links this server set up over SSH. */
   ssh: Schema.optional(SshLinkInfo),
 })
@@ -125,6 +127,8 @@ export const MachinesResponse = Schema.Struct({
     environmentId: Schema.String,
     label: Schema.String,
     fingerprint: Schema.String,
+    /** PAN-4650 D-4: linked machines list this machine's conversations (anywhere.json, default on). */
+    shareConversations: Schema.Boolean,
   }),
   links: Schema.Array(MachineLinkView),
   inbound: Schema.Array(InboundMachineView),

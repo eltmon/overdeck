@@ -1,0 +1,2101 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T14:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4650: Conversations across machines: shared list, remote control, Pull here, machine-aware UI",
+    "updated": "2026-11-01T13:30:07.136Z"
+  },
+  "plan": {
+    "id": "pan-4650",
+    "title": "Conversations across machines: shared list, remote control, Pull here, machine-aware UI",
+    "status": "running",
+    "uid": "5201f656-1dac-4ae0-8b01-bdead74c5e77",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T14:30:00Z",
+    "updated": "2026-11-01T13:30:07.136Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4650",
+        "label": "PAN-4650",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2350",
+        "label": "PAN-2350 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4645",
+        "label": "PAN-4645 (foundation, merged)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4646",
+        "label": "PAN-4646 (approved mockup)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "machine-links",
+      "conversations",
+      "remote-control",
+      "pull-here",
+      "dashboard",
+      "cli"
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4650.md",
+      "sizeJustification": "The operator decomposed epic PAN-2350 into sibling issues and assigned W-CONV2, W-CONV3, W-CONV4, W-CONV5, W-CONV7, W-CONV8 and W-CONV9 to this issue as one unit; they share the linked-conversation cache, the proxy prefix and the title-bar states, so the 23 items here are already the vertical slices of that unit.",
+      "canonicalFilename": "2026-11-01-PAN-4650-conversations-across-machines-shared-list-remote-control-pull-here-machine-aware-ui.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-4645 links two machines' dashboards over an encrypted channel, but nothing uses the link for conversations: the laptop cannot list, open, control, message or take over a conversation that runs on the desktop, cannot preview its dev server, and cannot open its checkout.",
+      "Proposal": "Add a linked_conversations cache synced from each owner on connect and on heartbeat hash change, merged into GET /api/conversations with one row per native session; remote control through a /api/conversations/@<machine>/* proxy and /ws/linked/<env>/rpc|terminal byte pipes; Pull here as owner release (409 conversation-released afterwards) plus a transfer-vault adopt through the existing Continue here code, with undo on failure and a vault fallback when offline; the approved machine-aware UI (five title-bar states, chips, banner, Hide this machine, Pull dialog, Preview, remote editor picker); pan tell @<label>/<conv>; owner /ws/forward with the D-22 denylist and viewer forwards on 127.0.0.1; remote-SSH Open in editor. Full design: .pan/drafts/PAN-4650.md.",
+      "NonGoals": "- Starting conversations, workers or lanes on another machine, --machine, delegation, and widening the agent fence for link-started conversations (#4651)\n- The project-header 'origin · N machines' line (FR-12, #4651)\n- ssh route kind and SSH machines (#4404); directory, direct and relay routes (#2356); Tailscale setup (#1254)\n- Running one conversation on two machines at once, or any timer-based automatic undo of a release\n- Marking released_to on an old owner after an offline vault Continue here (existing vault continuity badge covers it)\n- A per-conversation privacy flag\n- Streaming a remote simulator or browser view; previews through anything but a TCP port forward\n- Cursor and Windsurf remote-SSH launches\n- Linked rows in `pan conv list`\n- Raising any file-size allowlist cap"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep all seven work items (W-CONV2/3/4/5/7/8/9) in this one issue and set sizeJustification instead of filing new sibling issues.",
+        "rationale": "The operator already decomposed the PAN-2350 epic into sibling issues and assigned exactly these items to PAN-4650; re-splitting would contradict the issue's stated scope."
+      },
+      {
+        "summary": "Remote control over HTTP is a path-prefix proxy (/api/conversations/@<machine>/<name>/*) and over WebSocket a raw byte pipe (/ws/linked/<env>/rpc|terminal).",
+        "rationale": "Existing frontend call sites keep building /api/conversations/${name}/… unchanged, and the owner's PAN-4645 scope tables stay the single authority; a byte pipe avoids re-serializing Effect RPC."
+      },
+      {
+        "summary": "Change detection is a conversations hash in the heartbeat, with a full shared-list refetch only when it changes.",
+        "rationale": "Satisfies NFR-5 (no list polling) without a delta protocol; trimmed rows keep a full refetch near 150 KB for 500 conversations."
+      },
+      {
+        "summary": "Online pulls move the conversation through a one-time transfer vault store inside the secure channel and adopt with the existing continueHere code.",
+        "rationale": "Reuses settle, WIP capture, adopt, materialize and resume as shipped and tested; FR-8 requires no vault backend when both machines are online."
+      },
+      {
+        "summary": "No automatic undo of a release; recovery is `pan conv reclaim` with a liveness check on the target.",
+        "rationale": "NFR-4 (one runner) outranks availability: an automatic undo after a lost 'complete' call could start a second runner."
+      },
+      {
+        "summary": "Agent actors on a link are refused all conversation writes, terminal and forward on the owner (403 agent-fenced) in this issue.",
+        "rationale": "FR-4 limits agents to conversations the link started, and no conversation is link-started until #4651; reads stay allowed."
+      },
+      {
+        "summary": "Senders the local prompt guard treats as operator (no OVERDECK_AGENT_ID, conv-operator-<pid>, operator conversations) map to the operator actor for pan tell @.",
+        "rationale": "FR-28 asks the owner to apply the same role and id checks as a local pan tell, so the existing isOperatorConversation rule is reused unchanged."
+      },
+      {
+        "summary": "The sharing switch lives in ${OVERDECK_HOME}/anywhere.json and Hide this machine is a hidden flag on the link record.",
+        "rationale": "The Settings whole-document save is lossy (concerns.md), and hiding is a per-link property next to the rest of the link."
+      },
+      {
+        "summary": "Remote editor supports VS Code, VS Code Insiders and VSCodium only; Cursor and Windsurf are shown disabled with a tooltip.",
+        "rationale": "The FR-30 checkpoint could not be verified: Windsurf's --help lists no --remote flag and Cursor's CLI launches its GUI; the PRD's own fallback and the approved mockup both disable them."
+      },
+      {
+        "summary": "Mockup open questions 2-6 take the mockup's choices: saved copy on demand, Pull here hidden while offline (banner Continue here instead), narrow-width fold into the ⋮ menu, Hide this machine in the row menu with a Show footer, Stop it now neutral.",
+        "rationale": "The operator approved the mockup as built; only question 1 (the --surface-remote recipe) was answered explicitly, and it was answered in the mockup's favor."
+      },
+      {
+        "summary": "Linked rows are included in GET /api/conversations by default; ?linked=0 opts out and the status bar and God View use it.",
+        "rationale": "W-CONV2's done-when says the list includes the desktop's rows; the two consumers that count this machine's runtime must not count another machine's."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-linked-cache",
+        "title": "Add the linked_conversations cache table, its door and the shared-row contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/paths.ts",
+            "src/lib/overdeck/linked-conversations.ts",
+            "packages/contracts/src/linked-conversations.ts",
+            "packages/contracts/src/index.ts",
+            "tests/unit/lib/overdeck/linked-conversations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/linked-conversations.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "linked-conversations.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "wi2-share-endpoint",
+            "wi3-viewer-sync",
+            "wi4-merged-list",
+            "wi8-remote-frontend",
+            "wi20-remote-editor"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4650.md). Add `linked_conversations` (exact DDL in the PRD) to drizzle/overdeck/0000_overdeck_init.sql and as a CREATE TABLE IF NOT EXISTS top-up after the PAN-4641 top-up in src/lib/overdeck/infra.ts (~:129-130); bump OVERDECK_TABLE_COUNT in src/lib/overdeck/paths.ts by one. New door src/lib/overdeck/linked-conversations.ts exports replaceLinkedConversations(environmentId, rows, hash) (single transaction: upsert all rows in the answer, delete that environment's rows absent from it), listLinkedConversations(), getLinkedConversation(environmentId, name), deleteLinkedConversationsFor(environmentId), cachedListHash(environmentId). New packages/contracts/src/linked-conversations.ts with SharedConversationRow, SharedConversationsResponse, LinkedConversationFields, linkedConversationName, parseLinkedConversationName (types + name helpers; the hash function lives in src/lib/anywhere/shared-conversations.ts in WI-2 because contracts cannot use node:crypto). Export from packages/contracts/src/index.ts. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi1-linked-cache.ac1",
+            "title": "Given rows A,B cached for env E, when replaceLinkedConversations(E, [B', C], h) runs, then listLinkedConversations returns exactly B' and C for E and cachedListHash(E) returns h",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-linked-cache.ac2",
+            "title": "Given rows cached for env E1 and E2, when replaceLinkedConversations(E1, [], h) runs, then E2's rows persist unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-linked-cache.ac3",
+            "title": "Given a fresh overdeck.db, when the schema initializes, then the linked_conversations table exists and the existing table-count assertion passes with the bumped OVERDECK_TABLE_COUNT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-linked-cache.ac4",
+            "title": "parseLinkedConversationName('@desk/conv-x') returns { target: 'desk', name: 'conv-x' } and returns null for 'conv-x'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-share-endpoint",
+        "title": "Owner serves its shared conversation list and heartbeat hash",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/anywhere-settings.ts",
+            "src/lib/anywhere/shared-conversations.ts",
+            "src/lib/vault/resumable.ts",
+            "src/dashboard/server/services/vault-continue.ts",
+            "src/dashboard/server/routes/machines-peer.ts",
+            "src/dashboard/server/services/link-heartbeat.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/machines-conversations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/machines-conversations.test.ts src/dashboard/server/services/__tests__/link-heartbeat.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machines-conversations.test.ts and link-heartbeat.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. anywhere-settings.ts: readAnywhereSettings()/writeAnywhereSettings(patch) for ${OVERDECK_HOME}/anywhere.json ({v:1, shareConversations}, 0600, default true when absent; D-4650-15). shared-conversations.ts: buildSharedConversations() maps getEnrichedConversationList() rows with origin==='local' and archivedAt===null to SharedConversationRow (pullable = isResumableHarness(harness): move vault-continue.ts's isResumable unchanged into new src/lib/vault/resumable.ts as isResumableHarness and import it back in vault-continue.ts, because src/lib must not import dashboard server code; gitOrigin from the project's github_repo/gitlab_repo in projects.yaml as 'github.com/<slug>'), plus sharedConversationsHash(rows) = first 16 hex of SHA-256 of JSON of rows sorted by name, 'sharing-off' when sharing is off. Add GET /api/machines/conversations to routes/machines-peer.ts (credential.kind must be 'machine', else 403) with ROUTE_SCOPES row read:conversations and a no-loss-matrix row. HeartbeatPayload (services/link-heartbeat.ts:22) gains optional conversationsHash, cached for 5 s. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi2-share-endpoint.ac1",
+            "title": "Given a machine credential over a channel, when it calls GET /api/machines/conversations, then the response returns sharing: true and rows carrying name, title, nativeSessionId, harness, model, status, sessionAlive, isWorking, lastActivityAt, projectKey, gitOrigin, cwd, issueId, tmuxSession, releasedTo, createdAt and pullable (isResumable of the harness)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-share-endpoint.ac2",
+            "title": "Given anywhere.json has shareConversations false, when the endpoint is called, then it returns sharing: false, rows [] and hash 'sharing-off'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-share-endpoint.ac3",
+            "title": "The endpoint returns no archived conversations and no vault browse rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-share-endpoint.ac4",
+            "title": "A non-machine credential calling GET /api/machines/conversations receives 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-share-endpoint.ac5",
+            "title": "The heartbeat payload carries a conversationsHash that matches the hash the endpoint returns for the same list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-viewer-sync",
+        "title": "Viewer syncs linked machines' lists on connect and on hash change",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/linked-conversations-sync.ts",
+            "src/dashboard/server/services/link-supervisor.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/services/__tests__/linked-conversations-sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/linked-conversations-sync.test.ts src/dashboard/server/services/__tests__/link-supervisor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "linked-conversations-sync.test.ts and link-supervisor.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Touches only the sync service, the supervisor deps hook and anywhere-boot wiring; no other item edits those files."
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D-4650-1/2. LinkSupervisorDeps (link-supervisor.ts:49) gains onHeartbeat?(link, payload), called after each decoded heartbeat. New createLinkedConversationsSync({fetch = linkFetch, door}) with onConnect(link) (full GET /api/machines/conversations), onHeartbeat(link, payload) (fetch only when payload.conversationsHash is defined and differs from cachedListHash), prune(activeEnvironmentIds). Write through replaceLinkedConversations only when response.environmentId === link.environmentId. One in-flight fetch per environment; a trigger during a fetch sets an 'again' flag. anywhere-boot.ts wires onDescriptor -> onConnect and onHeartbeat into the supervisor deps and calls prune from its existing 5 s reconcile interval with the environment ids of non-revoked links. No timer polls the list. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi3-viewer-sync.ac1",
+            "title": "Given a link connects, when onDescriptor fires, then the sync fetches the shared list exactly once and persists its rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-viewer-sync.ac2",
+            "title": "Given a heartbeat whose conversationsHash equals the cached hash, then no fetch happens; given a different hash, then exactly one fetch happens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-viewer-sync.ac3",
+            "title": "The sync rejects a response whose environmentId differs from the link's environment id and persists no rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-viewer-sync.ac4",
+            "title": "Given a response with sharing false, then that environment's cached rows are removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-viewer-sync.ac5",
+            "title": "Given an environment that no longer has an active link, when prune runs on the reconcile interval (fake timers), then its cached rows are removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-merged-list",
+        "title": "Merge linked rows into GET /api/conversations with one row per session",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/linked-conversations-merge.ts",
+            "src/dashboard/server/services/conversation-list-merged.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/lib/anywhere/link-store.ts",
+            "tests/unit/lib/overdeck/linked-conversations-merge.test.ts",
+            "src/dashboard/frontend/src/components/CloisterStatusBar.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/linked-conversations-merge.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "linked-conversations-merge.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passes (routes/conversations.ts does not grow)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and D-4650-3/22. Pure mergeConversationRows({local, vaultCopies, linked, links, selfEnvironmentId}): drop linked rows whose native session id equals any local row's; drop a vault copy matching a remaining linked row's session id and set that row's savedCopyName; drop linked rows of environments with no active link or with link.hidden === true; drop linked rows with releasedTo === selfEnvironmentId. Linked rows get name '@<env>/<ownerName>', id = -(linked_conversations rowid), origin 'linked', environmentId, remoteName, machineLabel, machineState from currentLinkSupervisor()?.status(link.id) ('offline' when absent), machineLastSeenAt, savedCopyName, releasedTo. getMergedConversationList(limit, offset, {linked}) wraps getConversationListWithVaultCopies and appends merged linked rows on page 1 unless linked === false. Swap the one call at routes/conversations.ts:220 (net 0 lines) and read ?linked=0. Add `hidden?: boolean` to MachineLink in link-store.ts (type only; WI-13 adds the writer). Also make CloisterStatusBar.tsx (fetch at ~:79) and GodView/confluence/useConfluenceData.ts (~:791) request /api/conversations?linked=0, because they count this machine's runtime. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi4-merged-list.ac1",
+            "title": "Given a local row, a linked row and a vault copy sharing one native session id, when the list is merged, then exactly one row (the local one) is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-merged-list.ac2",
+            "title": "Given a linked row and a vault copy sharing a session id, then one linked row is returned with savedCopyName set to the vault row's name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-merged-list.ac3",
+            "title": "The merged list returns no rows of a hidden or revoked link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-merged-list.ac4",
+            "title": "The merged list returns linked rows with negative ids and names starting with '@<environmentId>/'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-merged-list.ac5",
+            "title": "GET /api/conversations?linked=0 returns no rows with origin 'linked'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-released-guard",
+        "title": "Refuse new turns on a released conversation with 409 conversation-released",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-release.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/conversation-message.ts",
+            "src/lib/overdeck/conversation-delivery.ts",
+            "src/lib/overdeck/conversation-kickoff.ts",
+            "tests/unit/lib/overdeck/conversation-release.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-release.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "conversation-release.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passes (conversation-runtime.ts does not grow)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and D-4650-8. New src/lib/overdeck/conversation-release.ts: markConversationReleased(name, toEnvironmentId), clearConversationRelease(name), conversationWriteRefusal(conv) (returns the existing vault-browse 409, or 409 {error: 'Continued on <label>; this copy is read-only', code: 'conversation-released', releasedTo} when conv.releasedTo is set, else null; label = getLink(releasedTo)?.label ?? releasedTo.slice(0, 8)). Replace the vault check at conversation-runtime.ts:1082 with the one-line `const refusal = conversationWriteRefusal(conv); if (refusal) return refusal;` and add the same one-liner right after the conversation lookup in handleConversationMessage (conversation-message.ts:407), handleConversationSwitchModel (conversation-runtime.ts:354), the compact (conversation-delivery.ts:452) and plan-action (conversation-delivery.ts:236) doors, and at the top of startHeldKickoff (conversation-kickoff.ts:36, mapped to its StartKickoffResult error shape with code conversation-released). Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi5-released-guard.ac1",
+            "title": "Given a conversation with released_to set, when message, resume, switch-model, compact or plan-action is called, then each returns 409 with code 'conversation-released' and the terminal backend mock receives no call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-released-guard.ac2",
+            "title": "Given released_to set, when startHeldKickoff runs, then it returns an error with code 'conversation-released' and delivers nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-released-guard.ac3",
+            "title": "Given clearConversationRelease ran, when resume is called, then it proceeds past the guard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-released-guard.ac4",
+            "title": "A vault browse row still returns 409 with code 'vault-browse-copy'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-http-proxy-fence",
+        "title": "Forward /api/conversations/@<machine>/* through the link and fence agent actors on the owner",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/anywhere/link-client.ts",
+            "src/dashboard/server/linked-conversation-proxy.ts",
+            "src/dashboard/server/link-fence.ts",
+            "src/dashboard/server/remote-request-gate.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/linked-conversation-proxy.test.ts",
+            "src/dashboard/server/__tests__/link-fence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/linked-conversation-proxy.test.ts src/dashboard/server/__tests__/link-fence.test.ts src/dashboard/server/__tests__/route-scopes-machine.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "NFR-1",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "wi8-remote-frontend",
+            "wi10-viewer-pull",
+            "wi16-tell-remote",
+            "wi17-forward-owner",
+            "wi19-preview-ui"
+          ],
+          "parallelSafeReason": "New modules plus one gate call; shared files are append-only rows (D-5 in continue.json)."
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and D-4650-4/6/7. Add linkForward(environmentId, {method, path, headers, body?: Buffer, actor, signal, timeoutMs}) -> {status, headers, body: Buffer} to link-client.ts over the pooled LinkAgent with the link token and linkActorHeaders (bodies > 32 MiB refused). New global middleware linked-conversation-proxy.ts: match the DECODED pathname ^/api/conversations/@(<envOrLabel>)/(<ownerName>)(/.*)?$, resolve with getLink, forward METHOD /api/conversations/<ownerName><rest>?<query>; pass status, content-type and body back; LinkUnavailableError -> 503 {error, code}. Actor: browser -> operator; header x-overdeck-sender absent / conv-operator-<pid> / isOperatorConversation -> operator, else {agentId: sender}. Mount after the remote request gate in server.ts. link-fence.ts: linkActorFence(credential, method, pathname) returns 403 {code: 'agent-fenced'} for a machine credential whose actor is an agent on any non-GET /api/conversations/* route, /ws/terminal and /ws/forward; call it from remote-request-gate.ts right after a machine credential resolves. No-loss row for '/api/conversations/@<machine>/*' (RELOCATE). Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi6-http-proxy-fence.ac1",
+            "title": "Given a link to env E labelled desk, when POST /api/conversations/@desk/conv-x/message arrives, then linkForward receives POST /api/conversations/conv-x/message with actor operator and the response status and body are returned unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-http-proxy-fence.ac2",
+            "title": "The percent-encoded form /api/conversations/%40<E>%2Fconv-x/messages resolves to the same owner path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-http-proxy-fence.ac3",
+            "title": "Given the link is offline, when a proxied request arrives, then the proxy returns 503 with code 'machine-offline'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-http-proxy-fence.ac4",
+            "title": "Given a machine credential arriving over a channel, when it requests /api/conversations/@x/y/message, then the gate rejects it with 403 (no chained hops)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-http-proxy-fence.ac5",
+            "title": "On the owner, a machine credential with an agent actor receives 403 'agent-fenced' for POST /api/conversations/x/message and 200 for GET /api/conversations/x/messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-ws-pipes",
+        "title": "Pipe /ws/linked/<env>/rpc and /ws/linked/<env>/terminal to the owner",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-linked.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/__tests__/ws-linked.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-linked.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ws-linked.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "New ws-linked.ts plus one append-only mount line in server.ts."
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and D-4650-5. New setupLinkedWebSocket(nodeServer, deps = {openLinkSocket, routeFor}) installed next to setupTerminalWebSocket(nodeServer) (server.ts:148), wrapping server.on('upgrade') for ^/ws/linked/([^/]+)/(rpc|terminal)$. Authorize the browser with authorizeDashboardUpgrade(headers, 'GET', 'admin', channelOfIncoming(req)); refuse channel callers 403; open a channel with openLinkSocket; write the upgrade request for /ws/rpc or /ws/terminal?<query> with Authorization: Bearer <link token>, x-overdeck-link-actor: operator and no Origin header; wait for the owner's 101; relay that response head; pipe bytes both ways; close both sides together. Failures answer 401/403 (local auth), 503 (link unavailable) or the owner's non-101 status. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi7-ws-pipes.ac1",
+            "title": "Given a ws client on /ws/linked/<E>/rpc, when it connects, then the owner's upgrade request carries 'authorization: Bearer <token>', 'x-overdeck-link-actor: operator' and no 'origin' header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-ws-pipes.ac2",
+            "title": "The owner receives the frames the client sends, and the client receives the frames the owner sends",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-ws-pipes.ac3",
+            "title": "When the owner side closes, the client socket closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-ws-pipes.ac4",
+            "title": "The pipe rejects an upgrade to /ws/linked/* that arrives over a secure channel with 403, and rejects an upgrade for an offline link with 503",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-remote-frontend",
+        "title": "Frontend remote control: linked transport, /conv/@env/name URLs and name-based API paths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/wsTransport.ts",
+            "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+            "src/dashboard/frontend/src/App/routes.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/XTerminal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationTerminal.tsx",
+            "src/dashboard/frontend/src/lib/paneChoice.ts",
+            "src/dashboard/frontend/src/lib/pendingInputAnswer.ts",
+            "src/dashboard/frontend/src/lib/linkedConversation.ts",
+            "src/dashboard/frontend/src/lib/__tests__/linkedConversation.test.ts",
+            "src/dashboard/frontend/src/App/routes.linked.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run test:frontend-subset",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "linkedConversation.test.ts and routes.linked.test.ts pass in the frontend subset",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Owns the transport, routing and API-path helpers; later UI items build on it through edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-8. New lib/linkedConversation.ts: isLinkedConversation(conv), conversationApiName(conv) (linked name for linked rows, conv.name otherwise), transportForConversation(name) -> {transport, subscribeName} (cached WsTransport per environment on /ws/linked/<env>/rpc with subscribeName = owner name; else getTransport() and the name). useConversationMessagesStream.ts uses it at the two getTransport().subscribe calls (~:184, ~:221). routes.ts: getConvIdFromPath also matches /^\\/conv\\/(@[^/]+\\/[^/]+)$/ and buildConversationUrl emits /conv/@<env>/<name> for linked rows; CommandDeck/index.tsx (~:581) matches linked rows by name. Conversation interface (ConversationList.tsx:20) gains optional LinkedConversationFields and origin 'linked'. XTerminal.tsx gets optional wsPath prop; ConversationTerminal passes /ws/linked/<env>/terminal for linked rows. Switch codex-approval (pendingInputAnswer.ts) and pane-choice (paneChoice.ts) URL builders from conv.id to conversationApiName(conv). Add new test files to scripts/frontend-test-subset.txt in sorted position. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi8-remote-frontend.ac1",
+            "title": "transportForConversation('@E/conv-x') returns a transport on /ws/linked/E/rpc with subscribeName 'conv-x', and transportForConversation('conv-y') returns the default transport",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-remote-frontend.ac2",
+            "title": "getConvIdFromPath('/conv/@E/conv-x') returns '@E/conv-x' and buildConversationUrl round-trips it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-remote-frontend.ac3",
+            "title": "For a linked row, each codex-approval and pane-choice request URL contains the linked name and never the negative id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-remote-frontend.ac4",
+            "title": "For a linked row, XTerminal opens its WebSocket on /ws/linked/<E>/terminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-owner-release",
+        "title": "Owner release, transfer pack, undo and complete routes for Pull here",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/vault/transfer-pack.ts",
+            "src/dashboard/server/services/conversation-release-service.ts",
+            "src/dashboard/server/routes/conversation-pull.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/lib/vault/transfer-pack.test.ts",
+            "src/dashboard/server/services/__tests__/conversation-release-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/transfer-pack.test.ts tests/unit/lib/vault/import-graph.test.ts src/dashboard/server/services/__tests__/conversation-release-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "wi10-viewer-pull",
+            "wi11-cli-pull",
+            "wi14-pull-ui"
+          ],
+          "parallelSafeReason": "New owner-side service, route file and vault pack module; shared tables are append-only."
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and D-4650-9/10/11. transfer-pack.ts (Node built-ins only): packDirectory(dir) -> Buffer (repeated uint32be pathLength, UTF-8 relative path, uint32be dataLength, data) and unpackDirectory(buf, dir) rejecting '..' and absolute paths. conversation-release-service.ts + routes/conversation-pull.ts (mounted in server.ts), scope operate, machine credential with operator actor and credential.environmentId equal to the `to`/releasedTo it names: POST /api/conversations/:name/release {to, whenTurnRunning} (409 already released; 400 not-pullable unless harness is claude-code or codex; 'stop' -> handleConversationAbort first; 'wait' polls isWorking every 2 s up to 30 min then 409 turn-still-running; markConversationReleased; settle() into a fresh dir: store under ${OVERDECK_HOME}/pull-transfers/<transferId>/store with createVaultKey() and wip 'force'; pack; handleConversationStop(name, {}); answer {transferId, vaultId, keyHex, ownerEnvironmentId, harness, nativeSessionId, bytes}; any failure after marking -> clearConversationRelease + 500 release-failed), GET .../release/transfer/:transferId (octet-stream), POST .../release/undo (clear, delete transfer, handleConversationResume if it was alive), POST .../release/complete (delete transfer; released_to stays). Unref'd 60 s sweep deletes transfer dirs older than 15 min. No-loss and route-scopes rows. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi9-owner-release.ac1",
+            "title": "packDirectory then unpackDirectory reproduces a nested directory byte for byte, and unpack rejects entries named '../x' or '/abs'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-owner-release.ac2",
+            "title": "Given an idle claude-code conversation, when release is posted by the machine credential of env T with to=T, then released_to becomes T, settle receives wip 'force', the harness stop is called, and the response returns a transferId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-owner-release.ac3",
+            "title": "Given whenTurnRunning 'wait' and isWorking true past 30 minutes (fake timers), then release returns 409 'turn-still-running' and released_to stays null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-owner-release.ac4",
+            "title": "Given settle throws after marking, then released_to is cleared and the response is 500 'release-failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-owner-release.ac5",
+            "title": "The owner rejects with 403 a release whose `to` differs from the calling credential's environment id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-viewer-pull",
+        "title": "Viewer pull job with transfer adopt, undo on failure and offline vault fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-pull.ts",
+            "src/dashboard/server/routes/conversation-pull.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/services/__tests__/conversation-pull.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-pull.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-pull.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "New viewer-side service; the shared route file is ordered after wi9 by an edge."
+        },
+        "narrative": {
+          "Action": "PRD WI-10 and D-4650-12/13/14. startPull({conversation: '@env/name', whenTurnRunning}) job in memory (1 h): step release (linkForward POST release, 31-minute timeout), step transfer (GET pack, unpack into ${OVERDECK_HOME}/pull-transfers/<transferId>/store), step adopt (archive a local row whose native session id matches and whose released_to is set; then continueHere(vaultId, {expectedOwnerToken: ownerToken(ownerEnvironmentId), onDrift: 'note'}, {openVaultContext: async () => ({status: 'open', vault: {config, keys: deriveSubkeys(key), store: await storeForBackend('dir:<path>'), rotatedAt: null}}), removeVaultBrowseRow: async () => {}})), step finish (POST release/complete). Adopt failure -> POST release/undo and job failed. Owner link not online -> previewContinue + continueHere on the row's savedCopyName vault id; no saved copy -> failed 'owner-offline-no-saved-copy'. Routes POST /api/linked-conversations/pull (202 {pullId}) and GET /api/linked-conversations/pull/:pullId ({step, state, error?, conversation?}); admin by default; no-loss rows. Never delete a transcript file. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi10-viewer-pull.ac1",
+            "title": "Given fakes for linkForward and continueHere, when a pull runs, then the job reports release, transfer, adopt and finish in order and ends 'done' with the new conversation id and name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-viewer-pull.ac2",
+            "title": "Given continueHere fails, then the job posts release/undo to the owner and ends 'failed' with the adopt error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-viewer-pull.ac3",
+            "title": "Given the owner link is offline and the row has a saved copy, then the job calls continueHere with the saved copy's vault id; without one it ends 'failed' with 'owner-offline-no-saved-copy'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-viewer-pull.ac4",
+            "title": "Given a local released row with the same native session id (push back), then that row is archived before adopt and its transcript file still exists afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-cli-pull",
+        "title": "pan conv pull and pan conv reclaim",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/conversations/pull.ts",
+            "src/cli/commands/conversations/index.ts",
+            "src/dashboard/server/routes/conversation-pull.ts",
+            "sync-sources/skills/pan-conversations/SKILL.md",
+            "src/cli/commands/conversations/__tests__/pull.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/conversations/__tests__/pull.test.ts",
+            "bash scripts/lint-skills.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pull.test.ts passes",
+            "lint-skills reports no drift",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 and D-4650-10. `pan conv pull <@label/conv> [--stop-turn] [--json]` posts /api/linked-conversations/pull (whenTurnRunning 'stop' with --stop-turn, else 'wait') via callDashboard, polls every 1 s, prints each step (release, transfer, adopt, finish) then 'Pulled: /conv/<id>'; exits 1 with the job error. `pan conv reclaim <conv> [--force]` calls the new local-operator route POST /api/conversations/:name/reclaim (admin; added to routes/conversation-pull.ts): it asks the releasedTo machine over the link whether it lists a live, unreleased conversation with the same native session id (refuse 409 'still-running-there'); target offline -> 409 'target-offline' unless force; otherwise clearConversationRelease. Update sync-sources/skills/pan-conversations/SKILL.md in the same commit. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi11-cli-pull.ac1",
+            "title": "Given a fake dashboard whose job reaches done, when `pan conv pull @desk/conv-x` runs, then it prints release, transfer, adopt, finish and 'Pulled: /conv/<id>' and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-cli-pull.ac2",
+            "title": "Given a failed job, when the command runs, then it prints the job error and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-cli-pull.ac3",
+            "title": "Given the target lists the session as live, when `pan conv reclaim` runs, then it exits 1 with 'still-running-there' and released_to stays set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-cli-pull.ac4",
+            "title": "Given the target is offline, when `pan conv reclaim` runs without --force, then it exits 1 with 'target-offline'; with --force it clears released_to",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-title-bar-states",
+        "title": "Title bar states, --surface-remote token, offline/released banner and read-only composer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/index.css",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/src/components/chat/ConversationMachineBanner.tsx",
+            "src/dashboard/frontend/src/components/chat/conversationMachineState.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/PanOpenInPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/conversationMachineState.test.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationMachineBanner.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run test:frontend-subset",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "grep -c -- '--surface-remote: color-mix(in srgb, var(--card), var(--foreground) 5%)' src/dashboard/frontend/src/index.css"
+          ],
+          "expected_outputs": [
+            "conversationMachineState.test.ts and ConversationMachineBanner.test.tsx pass",
+            "typecheck completes without errors",
+            "file-size guard passes (ConversationPanel.tsx does not grow)",
+            "grep prints 4"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-6"
+          ],
+          "parallelSafeReason": "Owns the title bar, token and banner; later banner edits are ordered by edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-12, D-6, D-4650-19/20. Load the pan-style-guide skill first; build from .tmp/pan-4646-mockup/index.html (states 1-5). Add `--surface-remote: color-mix(in srgb, var(--card), var(--foreground) 5%);` to the four theme scopes in index.css (:396, :426, :455, :484). conversationMachineState(conv, selfEnvironmentId) -> 'local'|'remote'|'offline-saved'|'offline-none'|'released'. .conversationHeaderShell[data-machine-state] uses var(--surface-remote) for all but local and muted title for the three non-live states. Header chip 'on <label>' (MonitorSmartphone, --font-mono-ui, reuse conversationBranchChip). ConversationMachineBanner renders exactly the mockup texts and actions: offline-saved '<label> is offline (last seen <relative>)' with Read saved copy + Continue here; offline-none same text with Reconnect (existing reconnect machine API); released 'Continued on <label> · this copy is read-only' with Open there (navigate /conv/@<releasedTo>/<name>). Non-live states: read-only composer notice, no rename pencil, no Conversation/Terminal toggle, hollow status dot labelled offline/released. ConversationPanel.tsx gets a data-machine-state attribute and one banner mount, offset by moving its vault-origin checks (:915, :1040, :1473) into conversationMachineState helpers. PanOpenInPicker uses bg-transparent instead of bg-card. Status colors: no green; the live dot stays --state-live. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi12-title-bar-states.ac1",
+            "title": "conversationMachineState returns each of local, remote, offline-saved, offline-none and released for its matching input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-title-bar-states.ac2",
+            "title": "ConversationMachineBanner renders Read saved copy and Continue here for offline-saved, only Reconnect for offline-none, and only Open there for released",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-title-bar-states.ac3",
+            "title": "grep -c of the --surface-remote declaration in src/dashboard/frontend/src/index.css prints 4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-title-bar-states.ac4",
+            "title": "In the three non-live states the composer renders the read-only notice instead of the input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-rows-hide-machine",
+        "title": "Machine chips and offline styling on list rows, plus Hide this machine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/machinesApi.ts",
+            "src/lib/anywhere/link-store.ts",
+            "packages/contracts/src/machines.ts",
+            "src/dashboard/server/routes/machines.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.linked.test.tsx",
+            "src/dashboard/server/routes/__tests__/machines-hidden.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run test:frontend-subset",
+            "npx vitest run src/dashboard/server/routes/__tests__/machines-hidden.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationRow.linked.test.tsx passes in the frontend subset",
+            "machines-hidden.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "parallelSafeReason": "Owns row rendering and the hidden flag writer; machines.ts overlap with wi15/wi18 is ordered by edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-13 and D-4650-15/20 (mockup flows a, b, l). setLinkHidden(id, hidden) in link-store.ts; MachineLinkView.hidden (contracts machines.ts); PATCH /api/machines/:id {hidden} (admin default) in routes/machines.ts plus no-loss row; machinesApi.setMachineHidden. Linked rows: machine chip (tinted fill online, hairline outline offline), muted title, hollow dot, 'offline · saved HH:MM' / 'offline · no saved copy' in place of cost/model when offline. Row ⋮ menu: Hide this machine for linked rows (PATCH then invalidate ['conversations'] and MACHINES_QUERY_KEY); hide rename/archive/move/share for linked rows. List footer: '<label> conversations hidden · Show' per hidden link from fetchMachines; Show un-hides. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi13-rows-hide-machine.ac1",
+            "title": "A linked online row renders the chip text of its machine label; an offline row without saved copy renders 'offline · no saved copy'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-rows-hide-machine.ac2",
+            "title": "The ⋮ menu of a linked row shows Hide this machine and no Archive item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-rows-hide-machine.ac3",
+            "title": "PATCH /api/machines/:id {hidden: true} persists hidden in machine-links.json and GET /api/machines returns hidden: true; {hidden: false} clears it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-rows-hide-machine.ac4",
+            "title": "With a hidden link, the list footer renders '<label> conversations hidden' with a Show action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-pull-ui",
+        "title": "Pull here dialog with Wait/Stop, progress steps, Continue here and Read saved copy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/PullHereDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/pullApi.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationMachineBanner.tsx",
+            "src/dashboard/frontend/src/main.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/PullHereDialog.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run test:frontend-subset",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "PullHereDialog.test.tsx passes in the frontend subset",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ],
+          "parallelSafeReason": "New dialog files plus a banner mount ordered after wi12."
+        },
+        "narrative": {
+          "Action": "PRD WI-14 (mockup flows c, d, e, k, m). Dialog via a zustand store plus a host mounted in main.tsx (existing LinkPullRequestDialogHost pattern). Pull here (header button in remote state; ⋮ fallback at narrow widths via container query) opens it: when isWorking, offer Wait for this turn (primary) and Stop it now (neutral); otherwise one Pull here button. Submit posts /api/linked-conversations/pull, polls GET every 1 s, renders the four steps with the current one live; on done navigate to /conv/<id>; on failed show the error and 'the conversation is still running on <label>'. Banner Continue here starts the same job (offline path). Read saved copy navigates to the saved copy row's /conv/<id>. Hide Pull here when the row's pullable flag is false (no harness-name comparisons in the frontend). Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi14-pull-ui.ac1",
+            "title": "Given isWorking true, the dialog renders Wait for this turn and Stop it now; given false it renders a single Pull here button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-pull-ui.ac2",
+            "title": "Clicking Stop it now sends whenTurnRunning 'stop' in the pull request body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-pull-ui.ac3",
+            "title": "With polled job states (fake timers), the dialog renders the four steps and navigates to /conv/<id> on done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-pull-ui.ac4",
+            "title": "The header renders no Pull here button for a linked row whose pullable flag is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi15-share-toggle",
+        "title": "Share my conversations switch in Settings → Anywhere → Machines",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/MachinesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/machinesApi.ts",
+            "packages/contracts/src/machines.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run test:frontend-subset",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MachinesPanel.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15 and D-4. MachinesResponse.self gains shareConversations: boolean (from readAnywhereSettings). PUT /api/machines/sharing {conversations} (admin) writes anywhere.json via writeAnywhereSettings and answers the new value; no-loss row. MachinesPanel shows a Share my conversations toggle (Settings/Shared/Toggle.tsx) under this machine's label with hint 'Linked machines list this machine's conversations. Turn off to hide them on the next sync.' Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi15-share-toggle.ac1",
+            "title": "The toggle renders checked when GET /api/machines returns self.shareConversations true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-share-toggle.ac2",
+            "title": "Toggling it off sends PUT /api/machines/sharing with conversations: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-share-toggle.ac3",
+            "title": "After the PUT, anywhere.json persists shareConversations false and buildSharedConversations returns sharing: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi16-tell-remote",
+        "title": "pan tell @<label>/<conv> through the link with --message-id",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/tell.ts",
+            "src/cli/commands/tell-register.ts",
+            "src/cli/index.ts",
+            "src/lib/agents/messaging.ts",
+            "sync-sources/skills/pan-tell/SKILL.md",
+            "src/cli/commands/__tests__/tell-remote.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/tell-remote.test.ts",
+            "bash scripts/lint-skills.sh",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tell-remote.test.ts passes",
+            "lint-skills reports no drift",
+            "file-size guard passes (src/cli/index.ts shrinks)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16 and D-4650-21. Move the tell registration from src/cli/index.ts:351-356 into registerTellCommand(program) in src/cli/commands/tell-register.ts (keep lazyAction) and add --message-id <id>. In tellCommand, a target starting with '@' posts POST /api/conversations/@<label>/<conv>/message {message, clientMessageId: messageId ?? randomUUID without dashes, deliverAs: 'steer' when --steer} via callDashboard with header x-overdeck-sender: senderFromEnv().id; prints 'Delivered to <conv> on <label>' on 200, else the owner's error and exit 1. Only conv-… names after '@<label>/' (else exit 1 'pan tell @<label>/… targets conversations only'); --when-limit-resets and --force exit 1 for remote targets. Local targets pass --message-id through messageAgent to deliverAgentMessage's existing opts.messageId (add the pass-through in src/lib/agents/messaging.ts if missing). Update sync-sources/skills/pan-tell/SKILL.md in the same commit. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi16-tell-remote.ac1",
+            "title": "`pan tell @desk/conv-x hi --message-id m1` sends POST /api/conversations/@desk/conv-x/message with clientMessageId 'm1' and the x-overdeck-sender header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-tell-remote.ac2",
+            "title": "`pan tell @desk/agent-pan-1 hi` exits 1 with 'targets conversations only'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-tell-remote.ac3",
+            "title": "`pan tell @desk/conv-x hi --when-limit-resets` exits 1 without posting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-tell-remote.ac4",
+            "title": "The file-size guard passes and src/cli/index.ts contains fewer lines than on origin/main after the registration moves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi17-forward-owner",
+        "title": "Owner /ws/forward endpoint with the D-22 port denylist, and preview ports",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/ws-forward.ts",
+            "src/dashboard/server/forward-ports.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/routes/conversation-preview-ports.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/ws-forward.test.ts",
+            "src/dashboard/server/__tests__/forward-ports.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-forward.test.ts src/dashboard/server/__tests__/forward-ports.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ws-forward.test.ts and forward-ports.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "wi18-forward-viewer",
+            "wi19-preview-ui"
+          ],
+          "parallelSafeReason": "New ws-forward.ts, forward-ports.ts and preview-ports route; shared tables are append-only."
+        },
+        "narrative": {
+          "Action": "PRD WI-17 and D-4650-16/17. forward-ports.ts: isForwardablePort(port) refuses ports outside 1024-65535, readPlatformConfig() dashboardApiPort and dashboardPort, getSupervisorPort(), 80, 443 and traefik.dashboard_port. ws-forward.ts: setupForwardWebSocket(nodeServer) for /ws/forward?port=<n>: authorizeDashboardUpgrade(headers, 'GET', 'forward', channelOfIncoming(req)); a channel is required; linkActorFence; refused port -> HTTP 403 {code: 'port-refused'} before upgrade; net.connect({host: '127.0.0.1', port}); pipe via ws createWebSocketStream. routes/conversation-preview-ports.ts: GET /api/conversations/:name/preview-ports (read:conversations) -> {ports: [{port, label}]} from the project's assignPort files (<projectRoot>/.<name>-ports line for the conversation's workspace folder) and ServiceConfig.port values. Mount both in server.ts; route-scopes and no-loss rows. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi17-forward-owner.ac1",
+            "title": "The owner rejects /ws/forward upgrades for ports 3011, 3012, 80, 443, 8080 and 80000 with 403 'port-refused'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-forward-owner.ac2",
+            "title": "For an allowed port, the owner opens a connection to 127.0.0.1 and the client receives the echo server's reply bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-forward-owner.ac3",
+            "title": "The owner rejects a machine credential with an agent actor with 'agent-fenced', and rejects an agent-fenced link (no forward scope) with 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-forward-owner.ac4",
+            "title": "The owner rejects a /ws/forward caller that is not on a secure channel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-forward-owner.ac5",
+            "title": "GET /api/conversations/:name/preview-ports returns the port assigned to the conversation's workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi18-forward-viewer",
+        "title": "Viewer port forwards on 127.0.0.1 and pan machines forward",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/port-forwards.ts",
+            "src/dashboard/server/routes/machines.ts",
+            "src/cli/commands/machines.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/services/__tests__/port-forwards.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/port-forwards.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "port-forwards.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "New port-forwards service; machines.ts overlap is ordered by edges after wi15."
+        },
+        "narrative": {
+          "Action": "PRD WI-18 and D-4650-16. port-forwards.ts: startForward(environmentId, port) first probes the owner's /ws/forward upgrade over openLinkSocket (403 port-refused surfaces as an error and no listener opens), then listens on 127.0.0.1:0; each accepted TCP connection opens its own channel + /ws/forward WebSocket and pipes; listForwards(); stopForward(id); 30-minute idle close (no open connection) and close on unlink. Routes in routes/machines.ts (admin default): POST /api/machines/:id/forwards {port} -> {id, localPort, url: 'http://127.0.0.1:<localPort>'}, GET /api/machines/forwards, DELETE /api/machines/forwards/:forwardId; no-loss rows. CLI in src/cli/commands/machines.ts: `pan machines forward <label> <port> [--json]` prints the URL; `--list`; `--stop <id>`. (No pan-machines skill exists, so no skill lockstep.) Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi18-forward-viewer.ac1",
+            "title": "A local GET to the forward returns the owner's HTTP response through a fake link, and the listener accepts connections on 127.0.0.1 only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-forward-viewer.ac2",
+            "title": "POST /api/machines/:id/forwards for a refused port returns 403 'port-refused' and opens no listener",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-forward-viewer.ac3",
+            "title": "With fake timers, a forward with no connection for 30 minutes closes its listener",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-forward-viewer.ac4",
+            "title": "`pan machines forward desk 5173` prints http://127.0.0.1:<port>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi19-preview-ui",
+        "title": "Open preview popover on a remote conversation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/OpenPreviewPopover.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationMachineBanner.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/OpenPreviewPopover.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run test:frontend-subset",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "OpenPreviewPopover.test.tsx passes in the frontend subset",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-19 (mockup flows f, g, h). Preview button (remote state only, with the other machine header actions) opens a popover listing GET /api/conversations/@env/name/preview-ports (through the WI-6 proxy) plus a port field. Choosing posts POST /api/machines/:envId/forwards; success shows 'Forwarding <label>:<port> → 127.0.0.1:<local>' with Open (new tab) and Stop (DELETE); 403 port-refused shows '<label> refuses port <n>: it is an Overdeck port'. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi19-preview-ui.ac1",
+            "title": "The popover renders the ports returned by preview-ports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-preview-ui.ac2",
+            "title": "A port-refused answer renders the refusal text naming the port",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-preview-ui.ac3",
+            "title": "A started forward renders an Open link to the returned 127.0.0.1 URL and a Stop action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi20-remote-editor",
+        "title": "Open in editor in remote-SSH mode for linked conversations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/open-remote.ts",
+            "src/dashboard/server/routes/linked-open.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/frontend/src/components/PanOpenInPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/server/services/__tests__/open-remote.test.ts",
+            "src/dashboard/frontend/src/components/__tests__/PanOpenInPicker.remote.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/open-remote.test.ts",
+            "npm run test:frontend-subset",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "open-remote.test.ts passes",
+            "PanOpenInPicker.remote.test.tsx passes in the frontend subset",
+            "typecheck completes without errors",
+            "file-size guard passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-20 and D-4650-18 (mockup flows i, j). resolveRemoteEditorLaunch({editor, link, cwd}) -> {command, args: ['--remote', 'ssh-remote+' + host, cwd]} or {error: 'no-ssh-host' | 'editor-unsupported'}; host order: route kind ssh, then the tailnet route whose URL is wss://<name>/ws/link (hostname), then any tailnet route host. Editors vscode, code-insiders, codium only. POST /api/linked-conversations/open-in-editor {conversation, editor} (admin; no-loss row) reads cwd from getLinkedConversation (never from the body) and spawns detached via an injectable spawn (no shell). PanOpenInPicker gets remote?: {conversation}: lists VS Code, Insiders, VSCodium enabled, Cursor and Windsurf disabled with tooltip 'Remote SSH works with VS Code, VS Code Insiders and VSCodium', shows the command line under the list, posts the new route. ConversationPanel passes the prop for linked rows (net <= 0 lines). Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi20-remote-editor.ac1",
+            "title": "Given a tailnet route wss://desk.tail1234.ts.net/ws/link and cwd /home/u/proj, resolveRemoteEditorLaunch returns command 'code' with args ['--remote', 'ssh-remote+desk.tail1234.ts.net', '/home/u/proj']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-remote-editor.ac2",
+            "title": "A link with only lan routes returns 'no-ssh-host' and editor 'cursor' returns 'editor-unsupported'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-remote-editor.ac3",
+            "title": "The route spawns with the cwd from the cache row even when the request body carries a different path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-remote-editor.ac4",
+            "title": "In remote mode the picker renders Cursor and Windsurf disabled with the tooltip text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi21-title-bar-e2e",
+        "title": "Playwright check of the five title-bar states in all four theme scopes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/e2e/linked-conversation-title-bar.spec.ts",
+            "tests/e2e/fixtures/linked-conversations.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "npm run test:e2e -- linked-conversation-title-bar"
+          ],
+          "expected_outputs": [
+            "the spec passes and writes 20 PNGs under test-results/linked-title-bar/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-21. Follow tests/e2e/styleguide-conformance.spec.ts (Vitest + chromium from playwright, `npm run test:e2e`). Use an isolated browser context (own profile; never another agent's browser). Route-mock /api/conversations and /api/machines with one row per state. For Broadsheet and Ledger, light and dark: open each state, assert the header's computed background-color equals --card for local and the D-4650-19 value (#f4f4f5, #171b23, #e8e7e5, #353535) for the other four, assert chip/banner text and buttons from the mockup, and save test-results/linked-title-bar/<theme>-<mode>-<n>-<state>.png for comparison with .tmp/pan-4646-mockup/shots/. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi21-title-bar-e2e.ac1",
+            "title": "For each of the four theme scopes, the local header renders with a computed background-color equal to that scope's --card",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-title-bar-e2e.ac2",
+            "title": "For each scope, each of the remote, offline-saved, offline-none and released headers renders with a computed background-color equal to that scope's D-4650-19 value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-title-bar-e2e.ac3",
+            "title": "Each state renders the mockup's chip, banner text and buttons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-title-bar-e2e.ac4",
+            "title": "The run saves 20 PNG files named <theme>-<mode>-<n>-<state>.png",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi22-two-machine-smoke",
+        "title": "Extend the two-machine smoke with list, budget, tell, 409, forward and live pull steps",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/anywhere/two-machine-smoke.mjs"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "node scripts/anywhere/two-machine-smoke.mjs",
+            "node scripts/anywhere/two-machine-smoke.mjs --live-claude"
+          ],
+          "expected_outputs": [
+            "both runs exit 0 and print every step name with no FAILED line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Edits only scripts/anywhere/two-machine-smoke.mjs and runs after the features it checks."
+        },
+        "narrative": {
+          "Action": "PRD WI-22 and D-4650-23. After the existing 'online' step, seed B's overdeck.db (project SQLite driver) with one local conversation row (environment_id = B, claude_session_id, a conversation_files locator) and a >2 MiB Claude JSONL fixture with an image attachment. Steps: list (A's GET /api/conversations contains @<B>/<name> within 15 s; a seeded vault-style duplicate on A still yields one row), open-budget (B->A bytes in the proxy capture during GET /api/conversations/@<B>/<name>/messages <= 1,114,112), image (attachment bytes via A equal B's file), tell-once (pan tell @b/<name> hi --message-id smoke1 twice; B delivers once), released-409 (set released_to on B's row; POST message via A returns 409 conversation-released), forward (a loopback HTTP server on B fetched through pan machines forward; B's dashboard port refused port-refused). --live-claude adds remote-reply (real Claude conversation on B, message from A, assistant reply seen on A) and pull (uncommitted change in its cwd, pan conv pull on A, change present in A's checkout, B answers 409 conversation-released). Paste both outputs into the PR description. Not a CI job. Repo rules: no execSync; fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait or poll; god files (routes/conversations.ts, ws-rpc.ts, lib/overdeck/conversations.ts, conversation-runtime.ts, cli/index.ts, ConversationPanel.tsx) end with net line change <= 0 — extract a helper into this item's new module instead of growing them; new HTTP routes need a no-loss-matrix row (and a route-scopes row unless admin-only)."
+        },
+        "items": [
+          {
+            "id": "wi22-two-machine-smoke.ac1",
+            "title": "The smoke exits 0 and prints the steps list, open-budget, image, tell-once, released-409 and forward",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi22-two-machine-smoke.ac2",
+            "title": "The open-budget step prints a byte count of at most 1,114,112 from B to A for the bounded open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi22-two-machine-smoke.ac3",
+            "title": "The tell-once step shows the second send with the same message id replayed, not delivered again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi22-two-machine-smoke.ac4",
+            "title": "With --live-claude, the pull step shows the uncommitted change applied on A and B returning 409 conversation-released",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi23-docs",
+        "title": "Document sharing, title-bar states, remote control, Pull here, previews, remote editor, pan tell @ and the architecture decisions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T14:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4650",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/linked-machines.mdx",
+            "cli/machines.mdx",
+            "cli/agent-commands.mdx",
+            "features/conversations.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## forward' cli/machines.mdx",
+            "grep -n 'Pull here' configuration/linked-machines.mdx",
+            "grep -n 'conversation-released' docs/ANYWHERE-ARCHITECTURE.md",
+            "grep -n 'pan tell @' cli/agent-commands.mdx",
+            "grep -n 'pan conv pull' features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-23. configuration/linked-machines.mdx: new sections Sharing conversations, Title-bar states (table of five states and banner actions), Remote control (/conv/@<id>/<name>), Pull here (five steps, Wait/Stop, offline Continue here, push back, pan conv reclaim), Open preview (refused ports) and Open in editor (host order, supported editors, Cursor/Windsurf note). cli/machines.mdx: ## forward (pan machines forward <label> <port>, --list, --stop, refused ports). cli/agent-commands.mdx: pan tell @<label>/<conv> and --message-id. features/conversations.mdx: pan conv pull and pan conv reclaim. docs/ANYWHERE-ARCHITECTURE.md: replace the '#4650: D-5, D-8, D-22' placeholder with sections for D-5 (cache + hash sync), D-8 (release-before-adopt, transfer store, undo, reclaim), D-22 (forward protocol and denylist), the proxy prefix and WebSocket pipes, and the agent fence. .overdeck/context/codebase/architecture.md: one paragraph naming the new modules; keep exactly one <!-- last-verified: --> line at the end with today's date. Write in the existing pages' plain style."
+        },
+        "items": [
+          {
+            "id": "wi23-docs.ac1",
+            "title": "cli/machines.mdx contains a '## forward' section that lists the refused ports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi23-docs.ac2",
+            "title": "configuration/linked-machines.mdx contains a Pull here section describing Wait for this turn, Stop it now and the offline Continue here fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi23-docs.ac3",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md contains sections for D-5, D-8 and D-22 and the refusal code 'conversation-released' where the '#4650: D-5, D-8, D-22' line was",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi23-docs.ac4",
+            "title": "cli/agent-commands.mdx shows `pan tell @<label>/<conv>` with --message-id, and features/conversations.mdx shows `pan conv pull`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-linked-cache",
+        "to": "wi2-share-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-linked-cache",
+        "to": "wi3-viewer-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-share-endpoint",
+        "to": "wi3-viewer-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-linked-cache",
+        "to": "wi4-merged-list",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-merged-list",
+        "to": "wi8-remote-frontend",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-http-proxy-fence",
+        "to": "wi8-remote-frontend",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-ws-pipes",
+        "to": "wi8-remote-frontend",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-released-guard",
+        "to": "wi9-owner-release",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-share-endpoint",
+        "to": "wi9-owner-release",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-owner-release",
+        "to": "wi10-viewer-pull",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-http-proxy-fence",
+        "to": "wi10-viewer-pull",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-linked-cache",
+        "to": "wi10-viewer-pull",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-viewer-pull",
+        "to": "wi11-cli-pull",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-remote-frontend",
+        "to": "wi12-title-bar-states",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-merged-list",
+        "to": "wi13-rows-hide-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-remote-frontend",
+        "to": "wi13-rows-hide-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-viewer-pull",
+        "to": "wi14-pull-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-title-bar-states",
+        "to": "wi14-pull-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-share-endpoint",
+        "to": "wi15-share-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-rows-hide-machine",
+        "to": "wi15-share-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-http-proxy-fence",
+        "to": "wi16-tell-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-http-proxy-fence",
+        "to": "wi17-forward-owner",
+        "type": "blocks"
+      },
+      {
+        "from": "wi17-forward-owner",
+        "to": "wi18-forward-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "wi15-share-toggle",
+        "to": "wi18-forward-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "wi18-forward-viewer",
+        "to": "wi19-preview-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-pull-ui",
+        "to": "wi19-preview-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-linked-cache",
+        "to": "wi20-remote-editor",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-title-bar-states",
+        "to": "wi20-remote-editor",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-title-bar-states",
+        "to": "wi21-title-bar-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-viewer-sync",
+        "to": "wi22-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-merged-list",
+        "to": "wi22-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-released-guard",
+        "to": "wi22-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-cli-pull",
+        "to": "wi22-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-tell-remote",
+        "to": "wi22-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi18-forward-viewer",
+        "to": "wi22-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-cli-pull",
+        "to": "wi23-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-pull-ui",
+        "to": "wi23-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-tell-remote",
+        "to": "wi23-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi18-forward-viewer",
+        "to": "wi23-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi20-remote-editor",
+        "to": "wi23-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

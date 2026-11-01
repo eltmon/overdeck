@@ -132,6 +132,9 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // PAN-4641: operator messages held until a usage limit resets. Mirrors the init migration.
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_scheduled_messages` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` text NOT NULL, `text` text NOT NULL, `status` text NOT NULL, `not_before` integer NOT NULL, `reset_source` text, `limit_window` text, `attempts` integer DEFAULT 0 NOT NULL, `last_error` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, `sent_at` integer, `delivered_at` integer, FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_scheduled_messages_status` ON `conversation_scheduled_messages` (`status`, `not_before`)');
+  // PAN-4650 D-4650-1: linked machines' shared conversation lists. Mirrors the init migration.
+  runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `linked_conversations` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `environment_id` text NOT NULL, `name` text NOT NULL, `row_json` text NOT NULL, `native_session_id` text, `cached_at` text NOT NULL, `list_hash` text NOT NULL, UNIQUE(`environment_id`, `name`))');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `linked_conversations_session_idx` ON `linked_conversations` (`native_session_id`)');
   // PAN-4640: recurring scheduled prompts on conversations. Mirrors the init migration.
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_schedules` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` text NOT NULL, `prompt` text NOT NULL, `cron` text NOT NULL, `time_zone` text NOT NULL, `enabled` integer NOT NULL DEFAULT 1, `next_run_at` integer, `last_run_at` integer, `last_run_status` text, `last_run_error` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_schedules_due` ON `conversation_schedules` (`enabled`, `next_run_at`)');
@@ -154,6 +157,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // are backfilled at boot by `bootConversationEnvironment`.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `environment_id` text');
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `released_to` text');
+  // PAN-4650 D-4650-14: where a pulled conversation came from (JSON), so a push back archives the old copy.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `pulled_from` text');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `conversations_environment_idx` ON `conversations` (`environment_id`)');
   // PAN-4639: operator triage state (settle / snooze) for the conversation list.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `settled_at` integer');

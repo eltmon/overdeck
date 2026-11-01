@@ -33,6 +33,8 @@ import { WorkspaceServiceLive } from './services/workspace-service.js';
 import { OpenRouterServiceLive } from './services/openrouter-service.js';
 import { PanOpenLive } from './services/open.js';
 import { setupTerminalWebSocket } from './ws-terminal.js';
+import { setupLinkedWebSocket } from './ws-linked.js';
+import { setupForwardWebSocket } from './ws-forward.js';
 import { knowledgeViewerRouteLayer, setupKnowledgeViewerProxy } from './routes/knowledge-viewer.js';
 import { setupVoiceWebSocket } from './ws-voice.js';
 import { setupAutoPresoWebSocket } from './ws-autopreso.js';
@@ -78,6 +80,7 @@ import { tailscaleRouteLayer } from './routes/tailscale.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { mcpRouteLayer } from './routes/mcp.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
+import { linkedConversationProxyLayer } from './linked-conversation-proxy.js';
 import { settingsRouteLayer } from './routes/settings.js'
 import { modelPresetsRouteLayer } from './routes/model-presets.js'
 import { jevRouteLayer } from './routes/jev.js'
@@ -90,6 +93,9 @@ import { miscRouteLayer } from './routes/misc.js';
 import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { conversationKickoffRouteLayer } from './routes/conversation-kickoff.js';
+import { conversationPullRouteLayer } from './routes/conversation-pull.js';
+import { conversationPreviewPortsRouteLayer } from './routes/conversation-preview-ports.js';
+import { linkedOpenRouteLayer } from './routes/linked-open.js';
 import { conversationBookmarksRouteLayer } from './routes/conversation-bookmarks.js';
 import { conversationTriageRouteLayer } from './routes/conversation-triage.js';
 import { conversationScheduledMessagesRouteLayer } from './routes/conversation-scheduled-messages.js';
@@ -152,6 +158,8 @@ const HttpServerLive = Layer.unwrap(
       const nodeServer = NodeHttp.createServer();
       holdRequestsUntilServed(nodeServer);
       setupTerminalWebSocket(nodeServer);
+      setupLinkedWebSocket(nodeServer);
+      setupForwardWebSocket(nodeServer);
       setupKnowledgeViewerProxy(nodeServer);
       setupVoiceWebSocket(nodeServer);
       setupAutoPresoWebSocket(nodeServer);
@@ -330,6 +338,8 @@ const staticRouteLayer = HttpRouter.add(
 export const makeRoutesLayer = Layer.mergeAll(
   // PAN-3762: global middleware; requires a credential for non-local /api and /events requests.
   remoteRequestGateLayer,
+  // PAN-4650 D-4650-4: /api/conversations/@<machine>/… forwards to the owner (admitted requests only).
+  linkedConversationProxyLayer,
   healthRouteLayer,
   dashboardSessionPreflightRouteLayer,
   dashboardSessionRouteLayer,
@@ -364,6 +374,9 @@ export const makeRoutesLayer = Layer.mergeAll(
   paletteRouteLayer,
   conversationsRouteLayer,
   conversationKickoffRouteLayer,
+  conversationPullRouteLayer,
+  conversationPreviewPortsRouteLayer,
+  linkedOpenRouteLayer,
   conversationBookmarksRouteLayer,
   conversationTriageRouteLayer,
   conversationScheduledMessagesRouteLayer,

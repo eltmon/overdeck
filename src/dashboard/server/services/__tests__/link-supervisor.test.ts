@@ -321,6 +321,19 @@ describe('link supervisor (PAN-4645 WI-18)', () => {
     expect(h.channels.every((channel) => channel.destroyed)).toBe(true);
   });
 
+  it('PAN-4650: hands each heartbeat on the current channel and the connect descriptor to the hooks', async () => {
+    h = harness();
+    const onHeartbeat = vi.fn();
+    const onDescriptor = vi.fn();
+    h.deps.onHeartbeat = onHeartbeat;
+    h.deps.onDescriptor = onDescriptor;
+    h.supervisor.start();
+    await settle(50);
+    expect(onDescriptor).toHaveBeenCalledWith(expect.objectContaining({ environmentId: 'env-peer' }), expect.objectContaining({ environmentId: 'env-peer' }));
+    h.beat({ conversationsHash: 'abcd' });
+    expect(onHeartbeat).toHaveBeenCalledWith(expect.objectContaining({ environmentId: 'env-peer' }), expect.objectContaining({ conversationsHash: 'abcd' }));
+  });
+
   it('diagnoseGap: froze only for a stall of at least 2 s that ended inside a late gap', () => {
     const at = Date.parse('2026-11-01T12:00:20.000Z');
     expect(diagnoseGap(15_000, { durationMs: 5000, endedAgoMs: 0 }, at)).toBeNull();

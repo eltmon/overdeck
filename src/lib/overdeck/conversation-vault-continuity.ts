@@ -15,6 +15,8 @@ import { roundTripStates, type RoundTripState } from '../vault/round-trip.js';
 
 export interface VaultContinuityLookup {
   states: Map<string, RoundTripState>;
+  /** nativePath -> the vault id this machine settles it into (PAN-4650: shared rows carry it). */
+  vaultIdByPath: Map<string, string>;
   claudeByBasename: Map<string, string[]>;
   codexByTmuxSession: Map<string, string[]>;
 }
@@ -54,7 +56,8 @@ export function buildVaultContinuityLookup(index: Pick<LocalIndex, 'owned' | 'li
     }
   }
 
-  return { states: roundTripStates(index), claudeByBasename, codexByTmuxSession };
+  const vaultIdByPath = new Map(paths.map(([nativePath, entry]) => [nativePath, entry.vaultId]));
+  return { states: roundTripStates(index), vaultIdByPath, claudeByBasename, codexByTmuxSession };
 }
 
 /** Reads the machine-local vault index and builds the lookup. A read failure warns once per message and falls back to an empty index. */
@@ -73,8 +76,8 @@ export async function loadVaultContinuityLookup(overdeckHome: string = getOverde
   return buildVaultContinuityLookup(index, overdeckHome);
 }
 
-/** The round-trip state for a conversation row, or null for a vault browse row, an unsupported harness, or no native-file match. */
-export function vaultContinuityFor(conv: ConversationContinuityInput, lookup: VaultContinuityLookup): RoundTripState | null {
+/** The owned native path a conversation row matches (the newest when several do), or null. */
+function ownedNativePath(conv: ConversationContinuityInput, lookup: VaultContinuityLookup): string | null {
   if (conv.origin === 'vault') return null;
   let candidates: string[] | undefined;
   if (conv.harness === 'claude-code' || conv.harness === null || conv.harness === undefined) {
@@ -85,6 +88,17 @@ export function vaultContinuityFor(conv: ConversationContinuityInput, lookup: Va
   } else {
     return null;
   }
-  if (!candidates || candidates.length === 0) return null;
-  return lookup.states.get(candidates[candidates.length - 1]!) ?? null;
+  return candidates?.[candidates.length - 1] ?? null;
+}
+
+/** The round-trip state for a conversation row, or null for a vault browse row, an unsupported harness, or no native-file match. */
+export function vaultContinuityFor(conv: ConversationContinuityInput, lookup: VaultContinuityLookup): RoundTripState | null {
+  const path = ownedNativePath(conv, lookup);
+  return path === null ? null : lookup.states.get(path) ?? null;
+}
+
+/** PAN-4650: the vault id this machine settles a conversation row into, or null when it has none. */
+export function vaultIdForConversation(conv: ConversationContinuityInput, lookup: VaultContinuityLookup): string | null {
+  const path = ownedNativePath(conv, lookup);
+  return path === null ? null : lookup.vaultIdByPath.get(path) ?? null;
 }

@@ -38,7 +38,7 @@ import type { AgentPaneRef, TerminalBackend, TerminalBackendName } from '../term
 import { normalizeHarnessName, type AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
 import { validateCwdContainment } from './cwd-containment.js';
-import { isVaultBrowseConversation, vaultBrowseReadOnlyMessage } from './conversation-vault-rows.js';
+import { conversationWriteRefusal } from './conversation-release.js';
 import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, waitForConversationSession } from './conversation-liveness.js';
 import { isSupersededConversation, resolveClearChainHead } from './conversation-clear-chain.js';
 import {
@@ -356,9 +356,8 @@ export async function handleConversationSwitchModel(
   body: Record<string, unknown>,
 ): Promise<ReturnType<typeof jsonResponse>> {
   const conv = getConversationByName(name);
-  if (!conv) {
-    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-  }
+  if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  const refusal = conversationWriteRefusal(conv); if (refusal) return refusal;
   const model = typeof body['model'] === 'string' && body['model'].trim()
     ? body['model'].trim()
     : (conv.model ?? undefined);
@@ -1079,7 +1078,7 @@ export async function handleConversationResume(
   try {
     let conv = getConversationByName(name);
     if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-    if (isVaultBrowseConversation(conv)) return jsonResponse({ error: vaultBrowseReadOnlyMessage(conv), code: 'vault-browse-copy' }, { status: 409 });
+    const refusal = conversationWriteRefusal(conv); if (refusal) return refusal;
     // PAN-4485: never respawn a superseded /clear row into the shared session — resume its chain head.
     const requestedName = name;
     if (isSupersededConversation(conv)) {

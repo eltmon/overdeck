@@ -46,6 +46,8 @@ export interface MachineLink {
   routes: LinkRoute[];
   createdAt: string;
   revokedAt: string | null;
+  /** PAN-4650 D-4650-15: **Hide this machine** — its conversations leave the merged list; the link stays. */
+  hidden?: boolean;
 }
 
 export interface UpsertLinkInput {
@@ -291,6 +293,19 @@ export async function setLinkRoutes(id: string, routes: LinkRoute[]): Promise<Ma
     const index = links.findIndex((link) => link.id === id);
     if (index === -1) return { links, result: null };
     const updated = { ...links[index]!, routes: routes.map((route) => ({ ...route })) };
+    const next = links.slice();
+    next[index] = updated;
+    return { links: next, result: updated };
+  });
+}
+
+/** PAN-4650 D-4650-15: Hide this machine (its conversations leave the merged list; the link stays). */
+export async function setLinkHidden(id: string, hidden: boolean): Promise<MachineLink | null> {
+  return mutate((links) => {
+    const index = links.findIndex((link) => link.id === id);
+    if (index === -1) return { links, result: null };
+    const { hidden: _previous, ...rest } = links[index]!;
+    const updated: MachineLink = hidden ? { ...rest, hidden: true } : rest;
     const next = links.slice();
     next[index] = updated;
     return { links: next, result: updated };

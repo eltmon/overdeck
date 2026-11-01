@@ -31,6 +31,7 @@ import { buildTmuxArgs, capturePane, getWindowDimensions, listSessionNames, resi
 import { consumeReauthTerminalToken } from './routes/codex-auth.js';
 import { WS_TERMINAL_SCOPE } from './route-scopes.js';
 import { authorizeDashboardUpgrade, channelOfIncoming, rejectUpgrade, trackDeviceSocket } from './ws-auth.js';
+import { AGENT_FENCED_MESSAGE, linkActorFence } from './link-fence.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 import { isRespawnPending, waitForSessionRespawn } from './services/pending-respawn.js';
 import { HerdrTerminalProcess, resolveHerdrTerminalId, resolveTerminalAttachTarget } from './services/terminal-service.js';
@@ -265,6 +266,8 @@ export function setupTerminalWebSocket(server: http.Server): void {
         rejectUpgrade(socket, auth.status, auth.message);
         return;
       }
+      // PAN-4650 D-4650-7: an agent on a linked machine never drives this machine's terminals.
+      if (linkActorFence(auth.credential, 'GET', '/ws/terminal')) return rejectUpgrade(socket, 403, AGENT_FENCED_MESSAGE);
       wss.handleUpgrade(request, socket, head, (ws) => {
         trackDeviceSocket(auth.credential, ws);
         wss.emit('connection', ws, request);

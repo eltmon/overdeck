@@ -37,6 +37,13 @@ function resolveRpcUrl(url?: string): string {
   return `${proto}://${window.location.host}/ws/rpc`
 }
 
+/** The RPC URL of the dashboard with another WebSocket path (PAN-4650: `/ws/linked/<env>/rpc`). */
+export function rpcUrlWithPath(path: string): string {
+  const url = new URL(resolveRpcUrl())
+  url.pathname = path
+  return url.toString()
+}
+
 function dashboardSessionUrl(url?: string): string {
   const rpcUrl = new URL(resolveRpcUrl(url))
   rpcUrl.protocol = rpcUrl.protocol === 'wss:' ? 'https:' : 'http:'
@@ -207,13 +214,23 @@ function formatError(error: unknown): string {
   return String(error)
 }
 
+/**
+ * Where a subscription finds the live transport and replaces a failed one.
+ * The default is the dashboard singleton; a linked machine's transports
+ * (PAN-4650) keep their own pool so a reconnect never lands on `/ws/rpc`.
+ */
+export interface TransportPool {
+  current(): WsTransport
+  reset(failed: WsTransport): void
+}
+
 export class WsTransport {
   private readonly runtime: ManagedRuntime.ManagedRuntime<RpcClient.Protocol, never>
   private readonly clientScope: Scope.Closeable
   private readonly clientPromise: Promise<PanRpcProtocolClient>
   private disposed = false
 
-  constructor(url?: string) {
+  constructor(url?: string, private readonly pool: TransportPool = defaultPool) {
     this.runtime = ManagedRuntime.make(createPanRpcProtocolLayer(url))
     this.clientScope = this.runtime.runSync(Scope.make())
     this.clientPromise = ensureDashboardSession(url).then(() =>
@@ -270,7 +287,7 @@ export class WsTransport {
 
     const run = () => {
       if (!active) return
-      const transport = getTransport()
+      const transport = this.pool.current()
 
       currentCancel = transport.runtime.runCallback(
         Effect.promise(() => transport.clientPromise).pipe(
@@ -319,7 +336,7 @@ export class WsTransport {
               reconnectAttempts += 1
               try { onRetry?.(reconnectAttempts) } catch { /* non-fatal */ }
               console.warn('[WsTransport] subscription exited, reconnecting with fresh transport')
-              resetTransport(transport)
+              this.pool.reset(transport)
               setTimeout(run, reconnectBackoffDelayMs(reconnectAttempts))
             }
           },
@@ -355,6 +372,8 @@ export function getTransport(): WsTransport {
   }
   return _transport
 }
+
+const defaultPool: TransportPool = { current: getTransport, reset: resetTransport }
 
 export function resetTransport(failed?: WsTransport): void {
   if (!_transport) return

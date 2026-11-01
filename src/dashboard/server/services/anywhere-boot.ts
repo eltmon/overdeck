@@ -16,6 +16,7 @@ import { defaultDiscoverDeps, EndpointAdvertiser, setAdvertisedEndpointsSource }
 import { setLinkRouteSource, linkFetch, closeLinkAgent } from '../../../lib/anywhere/link-client.js';
 import { linksSnapshot, MACHINE_LINKS_REFRESH_MS, startLinkStoreRefresh, stopLinkStoreRefresh } from '../../../lib/anywhere/link-store.js';
 import { ensureMachineKey } from '../../../lib/anywhere/machine-key.js';
+import { sharedConversationsHashForHeartbeat } from '../../../lib/anywhere/shared-conversations.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { setDirectoryStatusSource, setRelayStatusSource } from '../../../lib/remote-access/anywhere-status.js';
 import { setLinkStatusSource, setPeerUnlinkNotifier } from '../routes/machines.js';
@@ -28,8 +29,12 @@ import { InboxDedupe } from '../../../lib/triggers/inbox.js';
 import { triggerDeliveryDependencies } from '../routes/trigger-hooks.js';
 import { InboxClient } from './inbox-client.js';
 import { RelayClient, setRelayClient } from './relay-client.js';
-import { setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
+import { setHeartbeatConversationsHashSource, setHeartbeatEndpointsHashSource } from './link-heartbeat.js';
+import { startTransferSweep } from './conversation-release-service.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
+import { setLinkPresenceSource } from './conversation-list-merged.js';
+import { createLinkedConversationsSync } from './linked-conversations-sync.js';
+import { stopForwardsWithoutLink } from './port-forwards.js';
 import { defaultSshForwardSupervisorDeps, SshForwardSupervisor } from './ssh-forward-supervisor.js';
 import { setSshForwardSupervisor } from './ssh-machine-service.js';
 
@@ -41,6 +46,7 @@ let approvals: DirectoryApprovalService | null = null;
 let relay: RelayClient | null = null;
 let inbox: InboxClient | null = null;
 let reconcileTimer: NodeJS.Timeout | null = null;
+let stopTransferSweep: (() => void) | null = null;
 
 /** The port this dashboard listens on, by the same rule as ServerConfig. */
 function dashboardPort(): number {
@@ -62,6 +68,7 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   advertiser = new EndpointAdvertiser(defaultDiscoverDeps(dashboardPort(), environmentId));
   setAdvertisedEndpointsSource(() => advertiser?.current() ?? []);
   setHeartbeatEndpointsHashSource(() => advertiser?.hash() ?? '');
+  setHeartbeatConversationsHashSource(sharedConversationsHashForHeartbeat);
   await advertiser.start();
 
   // WI-9: the overdeck.ai directory socket; a signed-out machine opens none (FR-2356-2).
@@ -110,6 +117,8 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   const approvalViews = approvals;
   directory.setApprovalViews(() => approvalViews.views());
 
+  // PAN-4650 WI-3: linked machines' conversation lists, fetched on connect and on a changed hash.
+  const linkedConversations = createLinkedConversationsSync();
   supervisor = new LinkSupervisor({
     ...defaultLinkSupervisorDeps(serverVersion),
     // WI-12: direct, relay and directory-reported routes, offered while the directory lists the peer.
@@ -120,9 +129,12 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
         relayEntitled: () => relay?.relayEntitled() ?? false,
       }),
     relayEntitled: () => relay?.relayEntitled() ?? false,
+    onDescriptor: (link) => linkedConversations.onConnect(link),
+    onHeartbeat: (link, payload) => linkedConversations.onHeartbeat(link, payload),
   });
   supervisor.start();
   setLinkStatusSource(supervisor);
+  setLinkPresenceSource(supervisor);
   setLinkRouteSource(supervisor);
   setPeerUnlinkNotifier(async (link) => {
     try {
@@ -134,8 +146,16 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   });
   // Links created or removed by the routes (or another process) are picked up
   // on the same cadence as the store snapshot.
-  reconcileTimer = setInterval(() => supervisor?.reconcile(), MACHINE_LINKS_REFRESH_MS);
+  reconcileTimer = setInterval(() => {
+    supervisor?.reconcile();
+    const active = linksSnapshot().filter((link) => link.revokedAt === null).map((link) => link.environmentId);
+    linkedConversations.prune(active);
+    // PAN-4650 WI-18: a forward closes when its link goes away.
+    stopForwardsWithoutLink(active);
+  }, MACHINE_LINKS_REFRESH_MS);
   reconcileTimer.unref?.();
+  // PAN-4650 WI-9: Pull here transfer directories live at most 15 minutes.
+  stopTransferSweep = startTransferSweep();
 
   sshForwards = new SshForwardSupervisor(defaultSshForwardSupervisorDeps((linkId, routes) => supervisor?.updateRoutes(linkId, routes)));
   setSshForwardSupervisor(sshForwards);
@@ -145,9 +165,12 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
 export function stopAnywhere(): void {
   if (reconcileTimer) clearInterval(reconcileTimer);
   reconcileTimer = null;
+  stopTransferSweep?.();
+  stopTransferSweep = null;
   sshForwards?.stop();
   sshForwards = null;
   setSshForwardSupervisor(null);
+  setLinkPresenceSource(null);
   supervisor?.stop();
   supervisor = null;
   inbox?.stop();
@@ -169,6 +192,7 @@ export function stopAnywhere(): void {
   advertiser = null;
   setAdvertisedEndpointsSource(null);
   setHeartbeatEndpointsHashSource(null);
+  setHeartbeatConversationsHashSource(null);
   setLinkStatusSource(null);
   setLinkRouteSource(null);
   setPeerUnlinkNotifier(null);

@@ -53,7 +53,7 @@ function mockFetch({ ttsEnabled, health, emergencyStop }: {
     if (url === '/api/specialists') {
       return new Response(JSON.stringify({ projects: [] }), { status: 200 });
     }
-    if (url === '/api/conversations') {
+    if (url === '/api/conversations?linked=0') {
       return new Response(JSON.stringify([]), { status: 200 });
     }
     if (url === '/api/settings') {

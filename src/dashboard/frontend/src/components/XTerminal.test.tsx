@@ -313,6 +313,16 @@ describe('XTerminal', () => {
     expect(localStorageMock.getItem).not.toHaveBeenCalledWith('overdeck.terminal.autoCopyOnSelect');
   });
 
+  it('opens a linked conversation terminal on its /ws/linked path (PAN-4650)', async () => {
+    render(<XTerminal sessionName="conv-x" wsPath="/ws/linked/env-desk/terminal" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(new URL(MockWebSocket.instances[0].url).pathname).toBe('/ws/linked/env-desk/terminal');
+      expect(new URL(MockWebSocket.instances[0].url).searchParams.get('session')).toBe('conv-x');
+    });
+  });
+
   it('sends attach with measured dimensions on connect', async () => {
     render(<XTerminal sessionName="test-session" />);
 

@@ -48,6 +48,7 @@ import { scopeSatisfies, type AccessTokenScope } from '../../lib/access-tokens.j
 import { readRemoteAccessConfig } from '../../lib/remote-access/config.js';
 import { type ChannelMarker, channelOfRequest } from './channel-peer.js';
 import { jsonResponse } from './http-helpers.js';
+import { AGENT_FENCED_MESSAGE, linkActorFence } from './link-fence.js';
 import { gatePathname, requiredScopeFor } from './route-scopes.js';
 import {
   credentialScopes,
@@ -93,7 +94,11 @@ export function isTrustedLocalRequest(request: HttpServerRequest.HttpServerReque
   return !(readRemoteAccessConfig().requireTokenMint && hasProxyForwardingHeader(headers));
 }
 
-export type RemoteGateRejection = { status: 401 } | { status: 403; missingScope: AccessTokenScope } | { status: 404 };
+export type RemoteGateRejection =
+  | { status: 401 }
+  | { status: 403; missingScope: AccessTokenScope }
+  | { status: 403; code: 'agent-fenced' }
+  | { status: 404 };
 
 /** `METHOD path` pairs a pairing-mode channel may reach without a credential (PAN-4645). */
 export const PAIRING_CHANNEL_ALLOWLIST: ReadonlySet<string> = new Set(['GET /api/environment', 'POST /api/machines/exchange']);
@@ -121,6 +126,8 @@ export function remoteGateRejection(
   const headers = request.headers as HeaderMap;
   const credential = resolveDashboardCredential(headers, channel);
   if (credential !== null) {
+    // PAN-4650 D-4650-7: an agent on a linked machine reads conversations but never changes them.
+    if (linkActorFence(credential, request.method, pathname)) return { status: 403, code: 'agent-fenced' };
     // PAN-2351 D-7: a registry credential is judged by its scopes, never by the peer.
     const required = requiredScopeFor(request.method, pathname);
     return scopeSatisfies(credentialScopes(credential), required) ? null : { status: 403, missingScope: required };
@@ -137,6 +144,9 @@ export const remoteRequestGateLayer = HttpRouter.middleware(
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
       const rejection = remoteGateRejection(request);
+      if (rejection?.status === 403 && 'code' in rejection) {
+        return jsonResponse({ error: AGENT_FENCED_MESSAGE, code: rejection.code }, { status: 403 });
+      }
       if (rejection?.status === 403) {
         return jsonResponse({ error: 'insufficient_scope', missingScope: rejection.missingScope }, { status: 403 });
       }
