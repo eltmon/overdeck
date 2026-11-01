@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T17:05:40.151Z",
+  "updated": "2026-11-01T17:05:59.290Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -508,6 +508,10 @@
     "wi22-two-machine-smoke.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T17:05:40.150Z"
+    },
+    "wi22-two-machine-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:05:59.290Z"
     }
   },
   "agentModel": "claude-opus-5-5"
