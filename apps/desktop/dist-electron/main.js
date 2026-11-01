@@ -1742,11 +1742,14 @@ function guardRemoteNavigation(win) {
 	const active = getActiveDashboard();
 	if (active.kind !== "remote") return;
 	const base = active.baseUrl;
-	win.webContents.on("will-navigate", (event) => {
+	const keepOnMachine = (event) => {
 		if (isSameOrigin(event.url, base)) return;
 		event.preventDefault();
 		openExternalSafe(event.url);
-	});
+	};
+	win.webContents.on("will-navigate", keepOnMachine);
+	win.webContents.on("will-redirect", keepOnMachine);
+	win.webContents.on("did-create-window", (child) => guardRemoteNavigation(child));
 	win.webContents.setWindowOpenHandler(({ url }) => {
 		if (isSameOrigin(url, base)) return { action: "allow" };
 		openExternalSafe(url);
@@ -1840,6 +1843,7 @@ function switchToLocal(options) {
 		refreshModeUi();
 		return { ok: true };
 	}
+	openConnectWindow();
 	destroyDashboardWindows();
 	serverUrl = "";
 	setLocalDashboard("");

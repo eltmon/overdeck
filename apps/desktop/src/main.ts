@@ -339,11 +339,14 @@ function guardRemoteNavigation(win: BrowserWindow): void {
   const active = getActiveDashboard();
   if (active.kind !== "remote") return;
   const base = active.baseUrl;
-  win.webContents.on("will-navigate", (event) => {
+  const keepOnMachine = (event: { url: string; preventDefault(): void }) => {
     if (isSameOrigin(event.url, base)) return;
     event.preventDefault();
     void openExternalSafe(event.url);
-  });
+  };
+  win.webContents.on("will-navigate", keepOnMachine);
+  win.webContents.on("will-redirect", keepOnMachine);
+  win.webContents.on("did-create-window", (child) => guardRemoteNavigation(child));
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (isSameOrigin(url, base)) return { action: "allow" };
     void openExternalSafe(url);
@@ -447,6 +450,10 @@ function switchToLocal(options: { closeConnectWindow: boolean }): ConnectActionR
     refreshModeUi();
     return { ok: true };
   }
+  // The connect window is the one window that survives the switch. From the
+  // menu or tray no window would be left, and window-all-closed quits the app
+  // on Linux and Windows; the window closes again once the local window opens.
+  openConnectWindow();
   destroyDashboardWindows();
   serverUrl = "";
   setLocalDashboard("");
