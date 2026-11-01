@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4330",
   "created": "2026-11-01T04:59:32.820Z",
-  "updated": "2026-11-01T07:42:45.609Z",
+  "updated": "2026-11-01T07:43:04.549Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,10 @@
     "account-cli-wiring.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T07:42:45.608Z"
+    },
+    "account-import-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:04.548Z"
     }
   }
 }
