@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4651",
   "created": "2026-11-01T18:35:52.116Z",
-  "updated": "2026-11-01T19:14:14.812Z",
+  "updated": "2026-11-01T19:16:57.519Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-01T19:14:05.854Z"
     },
     "wi8-placement-service": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4651",
-      "claimedAt": "2026-11-01T19:14:14.812Z"
+      "claimedAt": "2026-11-01T19:14:14.812Z",
+      "doneAt": "2026-11-01T19:16:57.519Z"
     }
   }
 }
