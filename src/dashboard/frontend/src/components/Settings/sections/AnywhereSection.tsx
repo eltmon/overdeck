@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { requestSettingsSection } from '../../../lib/settingsSection';
 import { SettingsSection } from '../primitives/SettingsSection';
+import { AccessTokensPanel } from '../anywhere/AccessTokensPanel';
 import { AnywhereStatusCard } from '../anywhere/AnywhereStatusCard';
 import type { AnywhereAction } from '../anywhere/anywhereApi';
 import { DevicesPanel } from '../anywhere/DevicesPanel';
@@ -55,6 +56,7 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
       <div className="space-y-4">
         <AnywhereStatusCard onAction={handleAction} />
         <DevicesPanel />
+        <AccessTokensPanel />
       </div>
       <PairDeviceDialog open={open} onClose={() => setOpen(false)} />
       <McpUrlDialog open={mcpOpen} onClose={() => setMcpOpen(false)} />
