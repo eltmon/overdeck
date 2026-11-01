@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4404",
   "created": "2026-11-01T13:29:30.411Z",
-  "updated": "2026-11-01T13:31:39.126Z",
+  "updated": "2026-11-01T13:35:49.004Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-01T13:31:26.725Z"
     },
     "wi2-ssh-target": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4404",
-      "claimedAt": "2026-11-01T13:31:39.126Z"
+      "claimedAt": "2026-11-01T13:31:39.126Z",
+      "doneAt": "2026-11-01T13:35:49.004Z"
     }
   }
 }
