@@ -36,6 +36,7 @@ import { generateEphemeralWatchdogScript, REMOTE_HOST_HEARTBEAT_PATH, writeRemot
 import { REMOTE_PAN_DIR, shellQuote } from '../../remote/remote-tmux.js';
 
 export type FlyMachineErrorCode =
+  | 'bad-request'
   | 'remote-disabled'
   | 'no-fly-token'
   | 'cap-reached'
@@ -49,6 +50,7 @@ export type FlyMachineErrorCode =
 
 /** HTTP status of each Fly machine error. */
 export const FLY_MACHINE_ERROR_STATUS: Record<FlyMachineErrorCode, number> = {
+  'bad-request': 400,
   'remote-disabled': 409,
   'no-fly-token': 424,
   'cap-reached': 429,
@@ -120,7 +122,7 @@ export interface FlyProvisionResult {
   environmentId: string;
   docker: boolean;
   pairingCode: string;
-  routeUrl: string;
+  routeUrl: `wss://${string}`;
 }
 
 async function readHomeVersion(): Promise<string> {
@@ -289,7 +291,7 @@ async function prepareMachine(
   }
 
   // 11. Route.
-  const routeUrl = `wss://${appName}.fly.dev/ws/link?${FLY_INSTANCE_PARAM}=${machineId}`;
+  const routeUrl = `wss://${appName}.fly.dev/ws/link?${FLY_INSTANCE_PARAM}=${machineId}` as const;
   return { machineId, machineName, appName, region: vm.region, label, environmentId, docker, pairingCode, routeUrl };
 }
 

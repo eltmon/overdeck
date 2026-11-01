@@ -22,6 +22,10 @@ describe('route model (PAN-4645 WI-11)', () => {
     expect(parseRouteUrl('tcp://192.168.1.20:3011')).toEqual({ transport: 'tcp', host: '192.168.1.20', port: 3011, url: 'tcp://192.168.1.20:3011' });
     expect(parseRouteUrl('wss://desk.tail1234.ts.net/ws/link')).toEqual({ transport: 'wss', host: 'desk.tail1234.ts.net', port: 443, url: 'wss://desk.tail1234.ts.net/ws/link' });
     expect(parseRouteUrl('wss://desk.example:8443')).toMatchObject({ port: 8443, url: 'wss://desk.example:8443/ws/link' });
+    // PAN-4652 D-3: the fly-instance pin survives; any other query does not.
+    expect(parseRouteUrl('wss://overdeck-ws.fly.dev/ws/link?fly-instance=148e21ea7e1689&x=1').url)
+      .toBe('wss://overdeck-ws.fly.dev/ws/link?fly-instance=148e21ea7e1689');
+    expect(parseRouteUrl('wss://desk.example/ws/link?x=1').url).toBe('wss://desk.example/ws/link');
     expect(parseRouteUrl('tcp://[fd7a:115c:a1e0::1]:3011')).toMatchObject({ host: 'fd7a:115c:a1e0::1', url: 'tcp://[fd7a:115c:a1e0::1]:3011' });
     expect(() => parseRouteUrl('tcp://host')).toThrow(/needs a port/);
     expect(() => parseRouteUrl('http://host:3011')).toThrow(/Unsupported route scheme/);
