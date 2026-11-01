@@ -14,6 +14,7 @@ import {
   _resetDashboardSessionTokenForTests,
   dashboardCsrfToken,
   dashboardSessionCookieHeader,
+  forwardedClientIsLocal,
   hasDashboardAuthHeaders,
   peerIsHostLocalDockerBridge,
   peerIsLocalContainerNetwork,
@@ -194,6 +195,39 @@ describe('peerIsHostLocalDockerBridge — host-local Traefik trust', () => {
       'br-rogue': [ipv4('8.8.0.1', '255.255.0.0')],
     };
     expect(peerIsHostLocalDockerBridge('8.8.0.2', publicBridge)).toBe(false);
+  });
+});
+
+describe('forwardedClientIsLocal — PAN-4299', () => {
+  const interfaces: NodeJS.Dict<NetworkInterfaceInfo[]> = {
+    lo: [ipv4('127.0.0.1', '255.0.0.0')],
+    eth0: [ipv4('192.168.1.10', '255.255.255.0')],
+    'br-849257118e6e': [ipv4('172.18.0.1', '255.255.0.0')],
+  };
+  const xff = (value: string) => ({ 'x-forwarded-for': value });
+
+  it('trusts a request with no X-Forwarded-For (host-local container calling directly)', () => {
+    expect(forwardedClientIsLocal({}, interfaces)).toBe(true);
+  });
+
+  it('trusts a loopback or host Docker-bridge forwarded client', () => {
+    expect(forwardedClientIsLocal(xff('172.18.0.1'), interfaces)).toBe(true);
+    expect(forwardedClientIsLocal(xff('127.0.0.1'), interfaces)).toBe(true);
+    expect(forwardedClientIsLocal(xff('::1'), interfaces)).toBe(true);
+    expect(forwardedClientIsLocal(xff('::ffff:172.18.0.1'), interfaces)).toBe(true);
+  });
+
+  it('rejects a LAN forwarded client', () => {
+    expect(forwardedClientIsLocal(xff('192.168.1.50'), interfaces)).toBe(false);
+  });
+
+  it('reads only the rightmost entry, so a spoofed prefix cannot launder a LAN client', () => {
+    expect(forwardedClientIsLocal(xff('127.0.0.1, 192.168.1.50'), interfaces)).toBe(false);
+    expect(forwardedClientIsLocal(xff('192.168.1.50, 172.18.0.1'), interfaces)).toBe(true);
+  });
+
+  it('rejects a malformed forwarded client', () => {
+    expect(forwardedClientIsLocal(xff('garbage'), interfaces)).toBe(false);
   });
 });
 

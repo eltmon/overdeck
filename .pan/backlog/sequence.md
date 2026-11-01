@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T05:43:33Z · model: claude-opus-5-5 · open: 862_
+_Last sequenced: 2026-11-01T05:56:04Z · model: claude-opus-5-5 · open: 863_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -12,6 +12,7 @@ _Last sequenced: 2026-11-01T05:43:33Z · model: claude-opus-5-5 · open: 862_
 | 5 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
+| 8 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
@@ -652,7 +653,7 @@ _Last sequenced: 2026-11-01T05:43:33Z · model: claude-opus-5-5 · open: 862_
 | 658 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 659 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 660 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 662 | PAN-2355 | M | low | needs-refinement |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
+| 662 | PAN-2355 | M | low | ok |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
 | 663 | PAN-4661 | S | low | ok |  | PAN-2355 | Phone PWA third tab: read-only phase-grouped pipeline list at /m/pipeline; waits on the PAN-2355 /m shell |
 | 664 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 665 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
@@ -897,6 +898,10 @@ New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup fa
 ### PAN-4554 (rank 7)
 
 New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.
+
+### PAN-4666 (rank 8)
+
+New substrate bug in the Flywheel's own status read model: a second liveness rule in derive-status.ts hides live agents, so the loop or operator may respawn running work; small fix with clear ACs, ranked beside PAN-4636 as critical but labeled needs-handoff (TENET-10), so it goes through a supervised pan handoff.
 
 ### PAN-4547 (rank 11)
 
@@ -1186,10 +1191,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
 
 npm run build regenerates the committed record-cost-event.js bundle, dirtying every workspace tree and blocking clean-workspace gates.
 
-### PAN-2957 (rank 92)
-
-npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1197,10 +1198,10 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T05:43:33Z",
+  "generatedAt": "2026-11-01T05:56:04Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 862,
+  "openCount": 863,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -9310,7 +9311,7 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "size": "M",
       "importance": "low",
       "score": 26,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
       "why": "Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push)",
       "rationale": "Triage: verify the PRD is retrievable under .pan/drafts before starting P2. Epic child; rank held.",
@@ -11993,6 +11994,19 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "rationale": "New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4666",
+      "rank": 8,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff.",
+      "rationale": "New substrate bug in the Flywheel's own status read model: a second liveness rule in derive-status.ts hides live agents, so the loop or operator may respawn running work; small fix with clear ACs, ranked beside PAN-4636 as critical but labeled needs-handoff (TENET-10), so it goes through a supervised pan handoff.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13661,6 +13675,20 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-2354",
+      "to": "PAN-2355",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-1254",
+      "to": "PAN-2355",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }

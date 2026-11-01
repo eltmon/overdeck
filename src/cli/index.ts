@@ -721,26 +721,13 @@ defineUpCommand(program)
       const traefikDir = join(process.env.HOME || '', '.overdeck', 'traefik');
       if (existsSync(traefikDir)) {
         try {
-          // Ensure network is marked as external (migration for older installs)
-          const composeFile = join(traefikDir, 'docker-compose.yml');
-          if (existsSync(composeFile)) {
-            const content = readFileSync(composeFile, 'utf-8');
-            if (!content.includes('external: true') && content.includes('overdeck:')) {
-              const patched = content.replace(
-                /networks:\s*\n\s*overdeck:\s*\n\s*name: overdeck\s*\n\s*driver: bridge/,
-                'networks:\n  overdeck:\n    name: overdeck\n    external: true  # Network created by \'pan install\''
-              );
-              const { writeFileSync } = await import('fs');
-              writeFileSync(composeFile, patched);
-              console.log(chalk.dim('  (migrated network config)'));
-            }
-          }
-
+          // PAN-4299: external network + ports on the configured bind address; a changed file needs `up -d` to recreate.
+          const migrated = (await import('../lib/traefik.js')).migrateTraefikCompose(join(traefikDir, 'docker-compose.yml'));
           console.log(chalk.dim('Starting Traefik...'));
           const { stdout } = await execAsync(
             'docker ps --filter "name=overdeck-traefik" --format "{{.Names}}" 2>/dev/null',
           );
-          if (stdout.trim().includes('overdeck-traefik')) {
+          if (stdout.trim().includes('overdeck-traefik') && !migrated) {
             console.log(chalk.dim('Traefik already running'));
           } else {
             execSync('docker compose up -d', {

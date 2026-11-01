@@ -324,3 +324,24 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   `overdeck-feature-pan-*_default` networks (32 → 21). Distinct from PAN-3900
   (orphaned networks from removed worktrees). Check `docker network ls | wc -l`
   against ~31 whenever a stack rebuild fails.
+- 2026-11-01 06:05 UTC: Anywhere epic (#2350, plan `.pan/drafts/pan-2350.md`
+  rev 5) handed to the Flywheel by conv 20261029-6880 with operator approval.
+  Ignore order book 2026-08-08-overdeck-anywhere (draft reference only).
+  Start-when-prereqs-merged map: PAN-4650 (4645, 4646 mockup approved),
+  PAN-2356 (4645, 4330, 4648), PAN-4404 (4645), PAN-4654 (4645), PAN-4656
+  (4645, 4628), PAN-4651 (4650, 4649), PAN-4652 (4645, 4295, 4650), PAN-4296
+  (4652), PAN-4638 (4651, 4652). PAN-4646 is a mockup only (no PR): surface,
+  never merge or close. Operator authorized acknowledging agent-count
+  guardrails for these launches, never memory or CPU.
+- Guardrail acknowledgement has no CLI flag. Recipe: POST
+  `/api/agents` with header `x-overdeck-internal-token: $(cat
+  ~/.overdeck/internal-token)`, `origin: http://127.0.0.1:3011`, body
+  `{"issueId":..,"role":"work","startedBy":"flywheel:conv-flywheel",
+  "guardrailAcknowledgedWarnings":["agent_count_high","agent_count_ceiling"]}`.
+  Any other `startedBy` is refused ("Invalid internal startedBy provenance").
+- Until PAN-4663 merges, every new Overdeck stack recreates an empty
+  `_default` network; remove empty `overdeck-feature-pan-*_default` networks
+  each tick (32 → 26 at 06:00).
+- PAN-4666 (needs-handoff): flywheel status drops agents whose Herdr pane says
+  `done` (turn finished, process alive). Confirm liveness with
+  `pan show <id> --health`, never the status list, before any respawn.
