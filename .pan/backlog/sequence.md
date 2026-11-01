@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T06:33:30Z · model: claude-opus-5-5 · open: 868_
+_Last sequenced: 2026-11-01T06:34:28Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -23,6 +23,7 @@ _Last sequenced: 2026-11-01T06:33:30Z · model: claude-opus-5-5 · open: 868_
 | 16 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
 | 17 | PAN-4674 | S | high | ok |  |  | Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist |
 | 18 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
+| 19 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 22 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
@@ -948,6 +949,10 @@ New operator-reported substrate bug: tiered-execution crew removal and model cha
 
 New operator-reported settings UI bug (substrate-improvement label sets a high floor): truncated model names make the operator misread which model is routed. Cause and fix are already identified in WorkhorsePanel.tsx, so it is a small, self-contained change; ranked just below the crew-removal bug because it misleads but does not block configuration.
 
+### PAN-4675 (rank 19)
+
+New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network timeout becomes a defect that skips pausing agents and stopping the stack, and the merge door then refuses re-runs with Already merged. PAN-4299 is stuck half-closed right now, and pan close refuses on DoD row 5. Substrate bug with clear AC, so it slots into the free rank 19 beside the other merge and close-out fixes; it overlaps PAN-3557 (label retry), and fixing either should consult the other.
+
 ### PAN-4572 (rank 21)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
@@ -1192,10 +1197,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 
 Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
 
-### PAN-3043 (rank 85)
-
-Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1203,10 +1204,10 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T06:33:30Z",
+  "generatedAt": "2026-11-01T06:34:28Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 868,
+  "openCount": 869,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -12077,6 +12078,19 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4675",
+      "rank": 19,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close.",
+      "rationale": "New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network timeout becomes a defect that skips pausing agents and stopping the stack, and the merge door then refuses re-runs with Already merged. PAN-4299 is stuck half-closed right now, and pan close refuses on DoD row 5. Substrate bug with clear AC, so it slots into the free rank 19 beside the other merge and close-out fixes; it overlaps PAN-3557 (label retry), and fixing either should consult the other.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13759,6 +13773,20 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4675",
+      "to": "PAN-3557",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4675",
+      "to": "PAN-4547",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
