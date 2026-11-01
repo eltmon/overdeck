@@ -4,6 +4,9 @@ import MobileApp, { readMobileRoute } from '../MobileApp';
 import { useConnectionState } from '../../../lib/connectionState';
 
 vi.mock('../../EventRouter', () => ({ EventRouter: () => null }));
+// The shell is under test here; the screens have their own suites.
+vi.mock('../MobileNeedsYou', () => ({ MobileNeedsYou: () => <h2>Needs you</h2> }));
+vi.mock('../MobileConversations', () => ({ MobileConversations: () => <h2>Conversations</h2> }));
 
 describe('readMobileRoute', () => {
   it('reads each D-3 deep link', () => {
