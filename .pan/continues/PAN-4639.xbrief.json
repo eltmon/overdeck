@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4639",
   "created": "2026-11-01T04:47:42.017Z",
-  "updated": "2026-11-01T06:27:45.475Z",
+  "updated": "2026-11-01T06:27:57.274Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4639",
       "claimedAt": "2026-11-01T05:59:42.075Z",
       "doneAt": "2026-11-01T06:27:45.475Z"
+    },
+    "triage-mutation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4639",
+      "claimedAt": "2026-11-01T06:27:57.274Z"
     }
   }
 }
