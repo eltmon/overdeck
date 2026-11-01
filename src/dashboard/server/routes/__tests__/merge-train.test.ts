@@ -6,9 +6,12 @@
  * run's activePipeline would fail here.
  */
 
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 
 const projectsMocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),
@@ -190,6 +193,7 @@ beforeEach(() => {
   process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
   process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = 'test-session-token';
   process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
   projectsMocks.listProjectsSync.mockReturnValue([

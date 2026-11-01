@@ -16,7 +16,7 @@
  * credential itself, whatever the peer.
  */
 
-import { mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect, type WebSocket as PageWebSocket } from '@playwright/test';
 import { startIsolatedDashboard, type IsolatedDashboard } from './fixtures/isolated-dashboard.js';
@@ -33,8 +33,9 @@ test.setTimeout(120_000);
 
 test.beforeEach(async () => {
   dashboard = await startIsolatedDashboard();
-  // The fixture inherits this process's env; the server prefers that variable over the file.
-  internalToken = process.env.OVERDECK_INTERNAL_TOKEN || readFileSync(join(dashboard.home, 'internal-token'), 'utf8').trim();
+  // The server reads the token file first; the env value only seeds a missing file (PAN-4628).
+  const tokenPath = join(dashboard.home, 'internal-token');
+  internalToken = existsSync(tokenPath) ? readFileSync(tokenPath, 'utf8').trim() : (process.env.OVERDECK_INTERNAL_TOKEN ?? '');
 });
 
 test.afterEach(async () => {
