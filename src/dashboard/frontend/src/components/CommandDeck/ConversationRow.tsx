@@ -98,6 +98,11 @@ interface ConversationRowProps {
   conv: Conversation;
   isSelected: boolean;
   onSelect: (name: string) => void;
+  /** PAN-4639 D14: when present, the row's click goes here instead of onSelect
+   *  (multi-select handling by the list); nested rows and other callers keep onSelect. */
+  onRowClick?: (event: React.MouseEvent, name: string) => void;
+  /** PAN-4639 D14: part of the current multi-selection (top-level rows only). */
+  isMultiSelected?: boolean;
   mutations: ConversationMutations;
   variant?: 'flat' | 'nested';
   /** Registered projects for the Move submenu (PAN-1577). Fetched once by the
@@ -167,6 +172,8 @@ export function ConversationRow({
   conv,
   isSelected,
   onSelect,
+  onRowClick,
+  isMultiSelected = false,
   mutations,
   variant = 'flat',
   registeredProjects = [],
@@ -323,7 +330,7 @@ export function ConversationRow({
 
   const itemClass = isNested
     ? `${styles.projectConvItem} ${isSelected ? styles.projectConvItemSelected : ''}`
-    : `${styles.conversationItem} ${isSelected ? styles.conversationItemSelected : ''}`;
+    : `${styles.conversationItem} ${isSelected || isMultiSelected ? styles.conversationItemSelected : ''}`;
 
   // Fork / spawn status badges — shared by both row variants.
   const ownerLabel = conv.vaultOwnerLabel ?? 'another machine';
@@ -436,7 +443,7 @@ export function ConversationRow({
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('application/json', JSON.stringify({ name: conv.name, projectKey: conv.projectKey ?? null, cwd: conv.cwd }));
       }}
-      onClick={() => onSelect(conv.name)}
+      onClick={(e) => { if (onRowClick) onRowClick(e, conv.name); else onSelect(conv.name); }}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -450,6 +457,7 @@ export function ConversationRow({
       }}
       title={conv.name}
       aria-busy={archivePending || undefined}
+      aria-selected={isMultiSelected || undefined}
     >
       {/* Stop button */}
       {conv.sessionAlive && (

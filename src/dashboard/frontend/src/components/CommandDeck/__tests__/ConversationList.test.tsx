@@ -808,3 +808,95 @@ describe('Cmd/Ctrl+Z undo (PAN-4639 WI-9)', () => {
     expect(triageRequestBodies(fetchMock)).toHaveLength(0);
   });
 });
+
+describe('Multi-select and bulk bar (PAN-4639 WI-10)', () => {
+  function selectConv(id: number, name: string) {
+    return {
+      ...mockConversation,
+      id,
+      name,
+      tmuxSession: `conv-${name}`,
+      title: name,
+      lastAttachedAt: `2026-10-05T00:0${id}:00.000Z`,
+      endedAt: '2026-10-05T09:00:00.000Z',
+    };
+  }
+
+  function renderThree() {
+    const client = makeClient();
+    client.setQueryData(['conversations'], [selectConv(1, 'a'), selectConv(2, 'b'), selectConv(3, 'c')]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('bulk-select.ac1: Ctrl-click, Ctrl-click, then Shift-click select all three rows', () => {
+    renderThree();
+    fireEvent.click(screen.getByTitle('a'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('b'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('c'), { shiftKey: true });
+
+    expect(screen.getByText('3 selected')).toBeInTheDocument();
+    expect(screen.getByTitle('a')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTitle('b')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTitle('c')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('bulk-select.ac2: clicking the bulk bar Settle sends one request with three updates and closes the bar', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/conversations/triage') {
+        return new Response(JSON.stringify({ conversations: [], notFound: [], rejected: [] }), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderThree();
+
+    fireEvent.click(screen.getByTitle('a'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('b'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('c'), { ctrlKey: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Settle' }));
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.filter(([url]: [string]) => url === '/api/conversations/triage');
+      expect(calls).toHaveLength(1);
+    });
+    const [, init] = fetchMock.mock.calls.find(([url]: [string]) => url === '/api/conversations/triage') as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      updates: [
+        { name: 'a', settled: true },
+        { name: 'b', settled: true },
+        { name: 'c', settled: true },
+      ],
+    });
+    expect(screen.queryByText('3 selected')).not.toBeInTheDocument();
+  });
+
+  it('bulk-select.ac3: a plain click clears the selection', () => {
+    renderThree();
+    fireEvent.click(screen.getByTitle('a'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('b'), { ctrlKey: true });
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle('c'));
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+  });
+
+  it('bulk-select.ac3: Escape clears the selection', () => {
+    renderThree();
+    fireEvent.click(screen.getByTitle('a'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('b'), { ctrlKey: true });
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByTitle('a'), { key: 'Escape' });
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+  });
+});
