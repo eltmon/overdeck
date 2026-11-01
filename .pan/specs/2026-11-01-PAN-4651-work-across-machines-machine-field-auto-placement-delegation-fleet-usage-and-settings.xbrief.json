@@ -4,17 +4,17 @@
     "created": "2026-11-01T19:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4651: Work across machines: Machine field, Auto placement, delegation, fleet usage and settings",
-    "updated": "2026-11-01T18:34:46.887Z"
+    "updated": "2026-11-01T18:35:45.317Z"
   },
   "plan": {
     "id": "pan-4651",
     "title": "Work across machines: Machine field, Auto placement, delegation, fleet usage and settings",
-    "status": "proposed",
+    "status": "running",
     "uid": "25f7d986-d219-4f58-b72a-d484db4e8646",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T19:30:00Z",
-    "updated": "2026-11-01T18:34:46.887Z",
+    "updated": "2026-11-01T18:35:45.317Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4651",
@@ -2699,5 +2699,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
