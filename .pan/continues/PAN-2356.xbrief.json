@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:21:51.594Z",
+  "updated": "2026-11-01T14:23:54.854Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,11 @@
     "wi11-rtc-routes.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:21:51.594Z"
+    },
+    "wi12-supervisor-phases": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:23:54.854Z"
     }
   }
 }
