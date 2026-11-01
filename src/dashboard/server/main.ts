@@ -68,6 +68,7 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 import { startConflictRepairPatrol, stopConflictRepairPatrol } from './services/conflict-repair-patrol.js';
 import { startBlockerWakePatrol, stopBlockerWakePatrol } from './services/blocker-wake-patrol.js';
+import { startScheduledMessagePatrol, stopScheduledMessagePatrol } from './services/scheduled-message-patrol.js';
 import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backend-health.js';
 import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
@@ -779,6 +780,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopAutoMergeExecutor();
   stopConflictRepairPatrol();
   stopBlockerWakePatrol();
+  stopScheduledMessagePatrol();
   stopEventLoopMonitor();
   stopTranscriptPoller();
   stopCostReconcileService();
@@ -937,6 +939,15 @@ if (startBlockerWakePatrol()) {
   console.log('[overdeck] Blocker-wake patrol SKIPPED — peer dashboard spawns nothing');
 } else {
   console.log('[overdeck] Blocker-wake patrol SKIPPED (OVERDECK_DISABLE_BLOCKER_WAKE=1)');
+}
+
+// PAN-4641: delivers operator messages queued until a usage limit resets.
+if (startScheduledMessagePatrol()) {
+  console.log('[overdeck] Scheduled-message patrol started');
+} else if (isPeerDashboard) {
+  console.log('[overdeck] Scheduled-message patrol SKIPPED — peer dashboard spawns nothing');
+} else {
+  console.log('[overdeck] Scheduled-message patrol SKIPPED (OVERDECK_DISABLE_SCHEDULED_MESSAGES=1)');
 }
 
 // PAN-3917: boot used to reset verification runs left `running` by a worker

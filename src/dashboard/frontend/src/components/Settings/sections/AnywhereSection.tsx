@@ -1,14 +1,17 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { requestSettingsSection } from '../../../lib/settingsSection';
 import { SettingsSection } from '../primitives/SettingsSection';
 import { AnywhereStatusCard } from '../anywhere/AnywhereStatusCard';
-import type { AnywhereAction } from '../anywhere/anywhereApi';
+import { ANYWHERE_STATUS_QUERY_KEY, loadAnywhereStatus, type AnywhereAction } from '../anywhere/anywhereApi';
 import { DevicesPanel } from '../anywhere/DevicesPanel';
 import { PairDeviceDialog } from '../anywhere/PairDeviceDialog';
 import { TriggersPanel } from '../anywhere/TriggersPanel';
 import { SetUpPhoneDialog } from '../anywhere/SetUpPhoneDialog';
 import { PushPanel } from '../anywhere/PushPanel';
+import { TailscalePeersPanel } from '../anywhere/TailscalePeersPanel';
+import { TailscaleSetupDialog } from '../anywhere/TailscaleSetupDialog';
 
 interface AnywhereSectionProps {
   /** Controlled open state for the pair dialog, so the status card can open it. */
@@ -25,9 +28,14 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
     setLocalOpen(next);
     onPairDialogChange?.(next);
   };
+  const [tailscaleOpen, setTailscaleOpen] = useState(false);
+  // Only this machine's browser may change Tailscale (PAN-1254 D-4); a paired device's POSTs get 403.
+  const { data: status } = useQuery({ queryKey: ANYWHERE_STATUS_QUERY_KEY, queryFn: loadAnywhereStatus });
+  const canSetUpTailscale = status?.viewer.kind === 'root-session';
   const handleAction = (action: AnywhereAction) => {
     if (action.kind === 'pair-dialog') setOpen(true);
     else if (action.kind === 'settings-section') requestSettingsSection(action.section);
+    else if (action.kind === 'tailscale-setup') setTailscaleOpen(true);
   };
 
   return (
@@ -37,6 +45,15 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
       description="Reach this machine from your other devices"
       actions={(
         <div className="flex items-center gap-2">
+          {canSetUpTailscale && (
+            <button
+              type="button"
+              onClick={() => setTailscaleOpen(true)}
+              className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-muted/50 transition-colors"
+            >
+              Set up Tailscale
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setPhoneOpen(true)}
@@ -57,10 +74,19 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
       <div className="space-y-4">
         <AnywhereStatusCard onAction={handleAction} />
         <DevicesPanel />
+        {status?.tailscale?.nextStep === 'ready' && <TailscalePeersPanel />}
         <TriggersPanel />
         <PushPanel />
       </div>
       <PairDeviceDialog open={open} onClose={() => setOpen(false)} />
+      <TailscaleSetupDialog
+        open={tailscaleOpen}
+        onClose={() => setTailscaleOpen(false)}
+        onPair={() => {
+          setTailscaleOpen(false);
+          setOpen(true);
+        }}
+      />
       <SetUpPhoneDialog open={phoneOpen} onClose={() => setPhoneOpen(false)} />
     </SettingsSection>
   );

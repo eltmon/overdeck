@@ -41,6 +41,10 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/conversations/:name/kickoff', scope: 'read:conversations' },
   { method: 'POST', path: '/api/conversations/:name/kickoff', scope: 'tell' },
   { method: 'GET', path: '/api/conversations/:name/bookmarks', scope: 'read:conversations' },
+  { method: 'GET', path: '/api/conversations/:name/scheduled-messages', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/conversations/:name/scheduled-messages', scope: 'tell' },
+  { method: 'PATCH', path: '/api/conversations/:name/scheduled-messages/:id', scope: 'tell' },
+  { method: 'DELETE', path: '/api/conversations/:name/scheduled-messages/:id', scope: 'tell' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

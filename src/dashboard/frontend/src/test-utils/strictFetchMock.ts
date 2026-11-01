@@ -45,7 +45,8 @@ export function installStrictFetchMock(handler: FetchHandler) {
  * PAN-4255: ComposerFooter asks `GET /api/effort/default` for a live session
  * with no stored effort (its effort chip). PAN-4499: it also polls
  * `GET /api/conversations/:name/kickoff` on every mount to show the held-kickoff
- * notice. Answers only those two requests.
+ * notice. PAN-4641: and `GET /api/conversations/:name/scheduled-messages` for
+ * the usage-limit notice. Answers only those three requests.
  */
 export function installEffortDefaultFetchMock() {
   return installStrictFetchMock(({ method, url }) => {
@@ -54,6 +55,9 @@ export function installEffortDefaultFetchMock() {
     }
     if (method === 'GET' && /\/api\/conversations\/[^/]+\/kickoff$/.test(url)) {
       return Response.json({ held: false });
+    }
+    if (method === 'GET' && /\/api\/conversations\/[^/]+\/scheduled-messages$/.test(url)) {
+      return Response.json({ supported: false, limit: null, messages: [] });
     }
     return undefined;
   });

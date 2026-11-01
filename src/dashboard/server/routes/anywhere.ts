@@ -13,8 +13,9 @@
  * - `GET /api/anywhere/status` returns the Anywhere status card's data
  *   (`lib/remote-access/anywhere-status.ts`): machine identity, trusted
  *   addresses, the active paired-device count, the vault state, the
- *   problems with their fix actions, and the caller's credential kind
- *   (PAN-4455 D-3). Any dashboard credential may read it.
+ *   problems with their fix actions, a Tailscale summary (PAN-1254 FR-9), and
+ *   the caller's credential kind (PAN-4455 D-3). Any dashboard credential may
+ *   read it.
  *
  * No response is cacheable.
  */
@@ -30,8 +31,10 @@ import {
   type AnywhereStatus,
   type AnywhereViewerKind,
 } from '../../../lib/remote-access/anywhere-status.js';
+import { readRemoteAccessConfig } from '../../../lib/remote-access/config.js';
 import { isLoopbackOrigin } from '../../../lib/remote-access/loopback.js';
 import { addSavedTrustedOrigin } from '../../../lib/remote-access/trusted-origins.js';
+import { readTailscaleState } from '../../../lib/tailscale/state.js';
 import { jsonResponse } from '../http-helpers.js';
 import {
   rejectUnauthorizedDashboardRequest,
@@ -108,13 +111,26 @@ async function buildAnywhereStatus(viewerKind: AnywhereViewerKind | null): Promi
   const records = await listAccessTokens();
   // A record with no kind is a device (PAN-2351 FR-10).
   const active = records.filter((record) => (record.kind ?? 'device') === 'device' && !record.revokedAt).length;
-  const vault = await readAnywhereVaultState();
+  const [vault, tailscale] = await Promise.all([readAnywhereVaultState(), readTailscaleState()]);
+  // Read fresh: the Tailscale state is memoized and may predate a settings save.
+  const requireTokenMint = readRemoteAccessConfig().requireTokenMint;
   return {
     machine,
     addresses,
     devices: { active },
     vault,
-    problems: computeAnywhereProblems({ identityError, addresses, vault }),
+    problems: computeAnywhereProblems({
+      identityError,
+      addresses,
+      vault,
+      tailscaleServeOn: tailscale.serve.proxiesDashboard,
+      requireTokenMint,
+    }),
+    tailscale: {
+      nextStep: tailscale.installed ? tailscale.nextStep : 'not-installed',
+      serveUrl: tailscale.serveUrl,
+      magicDnsName: tailscale.magicDnsName,
+    },
     viewer: { kind: viewerKind },
   };
 }
