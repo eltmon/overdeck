@@ -70,6 +70,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'DELETE', path: '/api/machines/self', scope: 'read:state' },
   // PAN-4645 WI-18: the heartbeat stream a linked machine holds open.
   { method: 'GET', path: '/api/machines/heartbeat', scope: 'read:state' },
+  // PAN-4654: a linked machine reads this machine's version report for the fleet table.
+  { method: 'GET', path: '/api/versions/self', scope: 'read:state' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

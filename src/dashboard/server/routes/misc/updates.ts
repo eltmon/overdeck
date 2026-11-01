@@ -1,9 +1,16 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
+import type { FleetInstallMode } from '@overdeck/contracts';
 
 import { UpdateManager } from '../../../../lib/update-manager.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { overdeckDevMode, readPackageVersion } from './shared.js';
+
+/** How Overdeck is installed on this machine (PAN-4654): the desktop app's embedded server, a repository checkout, or a global npm install. */
+export function currentInstallMode(): FleetInstallMode {
+  if (process.env.OVERDECK_MODE === 'desktop') return 'desktop';
+  return overdeckDevMode ? 'development' : 'npm-global';
+}
 
 let managerPromise: Promise<UpdateManager> | null = null;
 
