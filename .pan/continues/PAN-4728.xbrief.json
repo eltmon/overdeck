@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4728",
   "created": "2026-11-01T17:45:22.507Z",
-  "updated": "2026-11-01T18:53:35.370Z",
+  "updated": "2026-11-01T18:53:51.576Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "mount-extras.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T18:53:35.370Z"
+    },
+    "mount-extras.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:53:51.576Z"
     }
   }
 }
