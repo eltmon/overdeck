@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2355",
   "created": "2026-11-01T05:47:25.756Z",
-  "updated": "2026-11-01T07:49:04.212Z",
+  "updated": "2026-11-01T07:49:22.064Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,6 +214,10 @@
     "mobile-uat-spec.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T07:49:04.212Z"
+    },
+    "ci-test-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:49:22.062Z"
     }
   }
 }
