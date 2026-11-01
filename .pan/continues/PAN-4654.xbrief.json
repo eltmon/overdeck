@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4654",
   "created": "2026-11-01T13:26:56.845Z",
-  "updated": "2026-11-01T13:45:54.217Z",
+  "updated": "2026-11-01T13:48:52.324Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-01T13:45:52.693Z"
     },
     "fleet-routes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4654",
-      "claimedAt": "2026-11-01T13:45:54.217Z"
+      "claimedAt": "2026-11-01T13:45:54.217Z",
+      "doneAt": "2026-11-01T13:48:52.323Z"
     }
   }
 }
