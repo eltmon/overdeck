@@ -78,10 +78,18 @@ export function parseConfig(env: Env): ConfigResult {
  * so the Durable Object trusts the headers below and never reads the public `Authorization` header.
  *
  * - `GET /socket` (upgrade) with `HDR_IDENTITY`: a machine's directory socket.
+ * - `POST /inbox` with `HDR_INBOX_SECRET_HASH` and `HDR_INBOX_HEADERS`, body = the raw event (≤ 256 KiB):
+ *   a webhook event for one of the account's inboxes. The answer is the public answer.
  */
 export const INTERNAL = {
   socket: '/socket',
+  inbox: '/inbox',
 } as const;
+
+/** SHA-256 hex of the inbox secret from the URL; the secret itself never reaches the Durable Object. */
+export const HDR_INBOX_SECRET_HASH = 'X-Connect-Inbox-Secret-Hash';
+/** JSON object of the kept webhook headers (inbox.ts KEPT_HEADERS), lower-cased. */
+export const HDR_INBOX_HEADERS = 'X-Connect-Inbox-Headers';
 
 /** JSON `ConnectIdentity` of the verified device (D-2356-2). */
 export const HDR_IDENTITY = 'X-Connect-Identity';

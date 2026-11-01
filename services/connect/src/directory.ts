@@ -13,9 +13,11 @@ import type { ConnectPlan, DirectoryEndpoint, DirectoryToMachineFrame } from '..
 import { EMPTY_DIRECTORY, reduce } from './directory-state.ts';
 import type { ApprovalRow, DirectoryEffect, DirectoryEvent, DirectoryState, MachineRow, Target } from './directory-state.ts';
 import type { ConnectIdentity, Deps, Env } from './env.ts';
-import { HDR_IDENTITY, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
+import { HDR_IDENTITY, HDR_INBOX_HEADERS, HDR_INBOX_SECRET_HASH, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
 import { keyFingerprint } from './fingerprint.ts';
-import { isWebSocketUpgrade } from './http.ts';
+import { isWebSocketUpgrade, json } from './http.ts';
+import { bytesToBase64, InboxStore, NOT_FOUND } from './inbox.ts';
+import type { PendingEvent } from './inbox.ts';
 import { logFrame } from './log.ts';
 import { decodeMachineFrame } from './protocol.ts';
 import { relayCapBytes } from './relay-meter.ts';
@@ -113,8 +115,26 @@ function attachmentOf(ws: WebSocket): Attachment | null {
   return (ws.deserializeAttachment() as Attachment | null) ?? null;
 }
 
+function inboxEventFrame(event: PendingEvent): DirectoryToMachineFrame {
+  return { type: 'inbox-event', eventId: event.eventId, inboxId: event.inboxId, receivedAt: event.receivedAt, sealed: bytesToBase64(event.sealed) };
+}
+
+function parseHeaders(raw: string | null): Record<string, string> {
+  if (!raw) return {};
+  try {
+    const value = JSON.parse(raw) as unknown;
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+    const out: Record<string, string> = {};
+    for (const [key, v] of Object.entries(value)) if (typeof v === 'string') out[key] = v;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 export class DirectoryHost {
   private state: DirectoryState = EMPTY_DIRECTORY;
+  private inbox!: InboxStore;
 
   constructor(
     private readonly ctx: DurableObjectState,
@@ -125,6 +145,7 @@ export class DirectoryHost {
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
     void ctx.blockConcurrencyWhile(async () => {
       for (const statement of SCHEMA) ctx.storage.sql.exec(statement);
+      this.inbox = new InboxStore(ctx.storage.sql, { ...deps, randomUUID: () => crypto.randomUUID() });
       this.state = this.load();
     });
   }
@@ -164,6 +185,7 @@ export class DirectoryHost {
 
   async fetch(req: Request): Promise<Response> {
     const { pathname } = new URL(req.url);
+    if (pathname === INTERNAL.inbox && req.method === 'POST') return this.intake(req);
     if (pathname !== INTERNAL.socket || !isWebSocketUpgrade(req)) return new Response(null, { status: 404 });
     const identity = parseIdentity(req.headers.get(HDR_IDENTITY));
     if (!identity) return new Response(null, { status: 400 });
@@ -193,6 +215,8 @@ export class DirectoryHost {
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
+    // Answer the client's close frame so its close completes now, not at the runtime's timeout.
+    safeClose(ws, 1000, 'closed');
     await this.onSocketGone(ws);
   }
 
@@ -200,8 +224,54 @@ export class DirectoryHost {
     await this.onSocketGone(ws);
   }
 
+  /** D-2356-18 expiry and nack re-sends. Due events for an offline machine wait for its welcome. */
   async alarm(): Promise<void> {
-    // Filled by the inbox (WI-8).
+    const now = this.deps.now();
+    this.inbox.expire(now);
+    const due = this.inbox.dueRetries(now);
+    this.sendEvents(due);
+    this.inbox.markSent(due.map((e) => e.eventId));
+    await this.rearm();
+  }
+
+  /** A webhook event for one of this account's inboxes (the Worker already capped the body). */
+  private async intake(req: Request): Promise<Response> {
+    const result = this.inbox.intake({
+      secretHash: req.headers.get(HDR_INBOX_SECRET_HASH) ?? '',
+      headers: parseHeaders(req.headers.get(HDR_INBOX_HEADERS)),
+      body: new Uint8Array(await req.arrayBuffer()),
+      plan: this.state.plan,
+      publicKeyHexOf: (env) => this.state.machines.find((m) => m.environmentId === env)?.publicKeyHex ?? null,
+    });
+    if (result.status === 202) {
+      const sent = this.sendEvents([result.event]);
+      if (sent.length > 0) this.inbox.markSent(sent);
+      await this.rearm();
+      logFrame('inbox-event', result.event.environmentId, sent.length > 0 ? 'delivered' : 'held');
+      return json(result.body, 202);
+    }
+    logFrame('inbox-event', null, String(result.status));
+    if (result.status === 404) return json(NOT_FOUND, 404);
+    if (result.status === 429) return json(result.body, 429, { 'Retry-After': String(result.retryAfter) });
+    return json(result.body, result.status);
+  }
+
+  /** Sends each event to its machine's open sockets; returns the ids that reached a socket. */
+  private sendEvents(events: readonly PendingEvent[]): string[] {
+    const sockets = this.registered();
+    const sent: string[] = [];
+    for (const event of events) {
+      const targets = sockets.filter((r) => r.environmentId === event.environmentId);
+      for (const { ws } of targets) safeSend(ws, inboxEventFrame(event));
+      if (targets.length > 0) sent.push(event.eventId);
+    }
+    return sent;
+  }
+
+  private async rearm(): Promise<void> {
+    const at = this.inbox.nextAlarm();
+    if (at === null) await this.ctx.storage.deleteAlarm();
+    else await this.ctx.storage.setAlarm(at);
   }
 
   /** Open sockets bound to a machine, optionally excluding one. */
@@ -255,14 +325,23 @@ export class DirectoryHost {
       'put-approval': 0,
       'delete-approval': 0,
       'put-relay-usage': 0,
+      'inbox-delete': 0,
+      'inbox-ack': 0,
+      'inbox-nack': 0,
+      'inbox-forget': 0,
       register: 1,
       send: 2,
       'fetch-turn': 2,
+      'inbox-create': 2,
+      'inbox-deliver': 2,
       close: 3,
       log: 4,
     };
     const sorted = effects.map((e, i) => ({ e, i })).sort((a, b) => order[a.e.kind] - order[b.e.kind] || a.i - b.i);
     const sql = this.ctx.storage.sql;
+    // Read lazily: a `register` effect earlier in this run binds the socket to its machine.
+    const selfEnv = (): string | null => attachmentOf(self)?.environmentId ?? null;
+    let inboxChanged = false;
     for (const { e } of sorted) {
       switch (e.kind) {
         case 'put-plan':
@@ -301,6 +380,48 @@ export class DirectoryHost {
             e.usage.month, e.usage.bytes,
           );
           break;
+        case 'inbox-create': {
+          const self$ = selfEnv();
+          if (!self$) break;
+          const config = parseConfig(this.env);
+          if (!config.ok) {
+            safeSend(self, { type: 'error', code: 'unsupported', message: 'the inbox is not configured', requestId: e.requestId });
+            break;
+          }
+          const { inboxId, secret } = await this.inbox.create(self$);
+          const url = `${config.config.publicBaseUrl}/h/${this.ctx.id.toString()}.${secret}`;
+          safeSend(self, { type: 'inbox-created', requestId: e.requestId, inboxId, url });
+          break;
+        }
+        case 'inbox-delete': {
+          const self$ = selfEnv();
+          if (self$) inboxChanged = this.inbox.delete(e.inboxId, self$) || inboxChanged;
+          break;
+        }
+        case 'inbox-ack': {
+          const self$ = selfEnv();
+          if (self$) this.inbox.ack(e.eventId, self$);
+          inboxChanged = true;
+          break;
+        }
+        case 'inbox-nack': {
+          const self$ = selfEnv();
+          if (self$) this.inbox.nack(e.eventId, self$, e.retryAfterSeconds);
+          inboxChanged = true;
+          break;
+        }
+        case 'inbox-forget':
+          this.inbox.deleteForMachine(e.environmentId);
+          inboxChanged = true;
+          break;
+        case 'inbox-deliver': {
+          const self$ = selfEnv();
+          if (!self$) break;
+          const pending = this.inbox.pendingFor(self$);
+          for (const event of pending) safeSend(self, inboxEventFrame(event));
+          this.inbox.markSent(pending.map((p) => p.eventId));
+          break;
+        }
         case 'fetch-turn': {
           const result = await fetchIceServers(parseTurnConfig(this.env), this.deps);
           safeSend(
@@ -327,5 +448,6 @@ export class DirectoryHost {
           break;
       }
     }
+    if (inboxChanged) await this.rearm();
   }
 }

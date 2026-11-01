@@ -6,12 +6,13 @@
  * exactly as production binds the account Worker. Copies the share service's recipe.
  */
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { openSealed } from '../../../../src/lib/anywhere/sealed-box.ts';
 
 const execFileAsync = promisify(execFile);
 const ROOT = resolve(import.meta.dirname, '../../../..');
@@ -24,6 +25,11 @@ const { Miniflare } = serviceRequire('miniflare') as MiniflareModule;
 type Miniflare = InstanceType<MiniflareModule['Miniflare']>;
 
 const BASE = 'https://connect.test';
+
+interface Sodium {
+  crypto_box_seed_keypair(pk: Buffer, sk: Buffer, seed: Buffer): void;
+}
+const sodium = createRequire(import.meta.url)('sodium-native') as Sodium;
 const SLOW = 60_000;
 
 /** Device tokens: `odd_` + 64 hex. Free-plan devices 1-9 share one account; 'e…' is a tester account. */
@@ -76,6 +82,8 @@ beforeAll(async () => {
   });
   const bundle = await readFile(join(tmp, 'index.js'), 'utf8');
   mf = new Miniflare({
+    // On disk, so the inbox test can scan every byte the Durable Object stored.
+    resourcePersistencePath: join(tmp, 'state'),
     handleStructuredLogs: (log) => logs.push(log.message),
     workers: [
       {
@@ -198,21 +206,21 @@ async function openSocket(token: string): Promise<Peer> {
 
 const isType = (type: string) => (f: Frame) => f['type'] === type;
 const envId = (n: number) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
-const hello = (n: number, label = `machine-${n}`): Frame => ({
+const hello = (n: number, label = `machine-${n}`, publicKeyHex = n.toString(16).padStart(2, '0').repeat(32)): Frame => ({
   type: 'hello',
   protocol: 1,
   environmentId: envId(n),
   label,
-  publicKeyHex: n.toString(16).padStart(2, '0').repeat(32),
+  publicKeyHex,
   serverVersion: '0.72.0',
   linkProtocol: 1,
   endpoints: [],
 });
 
 /** Registers machine `n` on a fresh socket and waits for its welcome. */
-async function register(token: string, n: number, label?: string): Promise<Peer> {
+async function register(token: string, n: number, label?: string, publicKeyHex?: string): Promise<Peer> {
   const peer = await openSocket(token);
-  peer.send(hello(n, label));
+  peer.send(hello(n, label, publicKeyHex));
   await peer.waitFor(isType('welcome'));
   return peer;
 }
@@ -311,6 +319,52 @@ describe('connect service on real workerd (PAN-2356 WI-3)', () => {
     expect(unexpectedOutbound).toEqual([]);
     a.close();
     b.close();
+  }, SLOW);
+
+  it('holds an event sealed while the machine is offline and delivers it on reconnect (WI-8)', async () => {
+    const keys = { publicKey: Buffer.alloc(32), secretKey: Buffer.alloc(32) };
+    sodium.crypto_box_seed_keypair(keys.publicKey, keys.secretKey, Buffer.alloc(32, 42));
+    const keyHex = keys.publicKey.toString('hex');
+
+    const machine = await register(TESTER_TOKEN, 31, 'inbox-machine', keyHex);
+    machine.send({ type: 'inbox-create', requestId: 'ib-1' });
+    const created = (await machine.waitFor(isType('inbox-created'))) as { inboxId: string; url: string };
+    expect(created.url).toMatch(new RegExp(`^${BASE}/h/[0-9a-f]{64}\\.[0-9a-f]{32}$`));
+    machine.close();
+    await machine.waitClose();
+
+    const marker = 'PLAINTEXT-MARKER-2356';
+    const body = JSON.stringify({ action: 'opened', marker });
+    const res = await mf.dispatchFetch(created.url, {
+      method: 'POST',
+      body,
+      headers: { 'Content-Type': 'application/json', 'X-GitHub-Event': 'issues' },
+    } as never);
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ queued: true });
+
+    // Every file the Durable Object wrote, read as raw bytes: the marker must not be in any of them.
+    const files = (await readdir(join(tmp, 'state'), { recursive: true, withFileTypes: true })).filter((d) => d.isFile());
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) {
+      const bytes = await readFile(join(file.parentPath, file.name));
+      expect(bytes.includes(Buffer.from(marker)), file.name).toBe(false);
+    }
+
+    const back = await openSocket(TESTER_TOKEN);
+    back.send(hello(31, 'inbox-machine', keyHex));
+    const event = (await back.waitFor(isType('inbox-event'))) as { eventId: string; inboxId: string; sealed: string };
+    expect(event.inboxId).toBe(created.inboxId);
+    const opened = openSealed(Buffer.from(event.sealed, 'base64'), keys);
+    const plain = JSON.parse(opened!.toString('utf8')) as { eventId: string; headers: Record<string, string>; body: string };
+    expect(plain.eventId).toBe(event.eventId);
+    expect(plain.headers['x-github-event']).toBe('issues');
+    expect(Buffer.from(plain.body, 'base64').toString('utf8')).toBe(body);
+
+    back.send({ type: 'inbox-ack', eventId: event.eventId });
+    const wrong = await mf.dispatchFetch(created.url.replace(/\.[0-9a-f]{32}$/, '.' + '0'.repeat(32)), { method: 'POST', body: 'x' } as never);
+    expect(wrong.status).toBe(404);
+    back.close();
   }, SLOW);
 
   it('logs only frame types, ids and outcomes, never the label (WI-5)', async () => {

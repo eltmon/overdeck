@@ -8,6 +8,7 @@ import { verifyIdentity } from './account.ts';
 import type { Config, Deps, Env } from './env.ts';
 import { HDR_IDENTITY, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
 import { isWebSocketUpgrade, json, matchPattern, withSecurityHeaders } from './http.ts';
+import { inboxIntake } from './inbox-intake.ts';
 
 /** Per-request context handed to every handler. */
 export interface RequestContext {
@@ -58,6 +59,7 @@ const directorySocket: Handler = async (req, rc) => {
 const ROUTES: Route[] = [
   { method: 'GET', pattern: '/healthz', handler: async (_req, rc) => healthz(rc.env) },
   { method: 'GET', pattern: '/v1/directory', handler: directorySocket },
+  { method: 'POST', pattern: '/h/:id', handler: inboxIntake },
 ];
 
 function methodNotAllowed(allow: string[]): Response {

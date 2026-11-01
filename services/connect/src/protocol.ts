@@ -26,6 +26,9 @@ const KEY_HEX_RE = /^[0-9a-f]{64}$/;
 export const ID_HEX_RE = /^[0-9a-f]{32}$/;
 /** A machine-chosen correlation id for `ice-servers` and `inbox-create`. */
 const REQUEST_ID_RE = /^[0-9A-Za-z_-]{1,64}$/;
+const INBOX_ID_RE = /^ib_[0-9a-f]{16}$/;
+/** Inbox event ids are `crypto.randomUUID()` values. */
+const EVENT_ID_RE = UUID_RE;
 const ENDPOINT_URL_RE = /^(tcp|wss):\/\/[^\s]+$/;
 /** C0 and C1 control characters, plus DEL. */
 const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/;
@@ -159,6 +162,18 @@ function build(obj: Obj): MachineToDirectoryFrame {
     }
     case 'approval-cancel':
       return { type, requestId: str(obj, 'requestId', 32, ID_HEX_RE) };
+    case 'inbox-create':
+      return { type, requestId: str(obj, 'requestId', 64, REQUEST_ID_RE) };
+    case 'inbox-delete':
+      return { type, inboxId: str(obj, 'inboxId', 19, INBOX_ID_RE) };
+    case 'inbox-ack':
+      return { type, eventId: str(obj, 'eventId', 36, EVENT_ID_RE) };
+    case 'inbox-nack': {
+      const retryAfterSeconds = obj['retryAfterSeconds'];
+      if (typeof retryAfterSeconds !== 'number' || !Number.isSafeInteger(retryAfterSeconds)) fail();
+      if (retryAfterSeconds < 60 || retryAfterSeconds > 3600) fail();
+      return { type, eventId: str(obj, 'eventId', 36, EVENT_ID_RE), retryAfterSeconds };
+    }
     case 'relay-usage': {
       const bytes = obj['bytes'];
       if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes < 0 || bytes > MAX_RELAY_USAGE_BYTES) fail();

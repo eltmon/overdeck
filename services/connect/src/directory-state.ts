@@ -112,6 +112,14 @@ export type DirectoryEffect =
   | { readonly kind: 'put-relay-usage'; readonly usage: RelayUsage }
   /** Mint TURN credentials and answer the event's socket with `ice-servers` or `turn_unavailable`. */
   | { readonly kind: 'fetch-turn'; readonly requestId: string }
+  /** Inbox operations (inbox.ts) for the event's machine; the glue re-arms the alarm after them. */
+  | { readonly kind: 'inbox-create'; readonly requestId: string }
+  | { readonly kind: 'inbox-delete'; readonly inboxId: string }
+  | { readonly kind: 'inbox-ack'; readonly eventId: string }
+  | { readonly kind: 'inbox-nack'; readonly eventId: string; readonly retryAfterSeconds: number }
+  /** Send every held event for the event's machine to its socket (after `welcome`). */
+  | { readonly kind: 'inbox-deliver' }
+  | { readonly kind: 'inbox-forget'; readonly environmentId: string }
   | { readonly kind: 'register'; readonly environmentId: string }
   | { readonly kind: 'send'; readonly to: Target; readonly frame: DirectoryToMachineFrame }
   | { readonly kind: 'close'; readonly to: Target; readonly code: number; readonly reason: string }
@@ -253,6 +261,7 @@ function hello(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'he
     const pending = approvalFrame(approval, next.machines);
     if (pending) effects.push({ kind: 'send', to: 'self', frame: pending });
   }
+  effects.push({ kind: 'inbox-deliver' });
   effects.push({ kind: 'log', type: 'hello', environmentId: env, outcome: existing ? 'updated' : 'registered' });
   return { state: next, effects };
 }
@@ -302,6 +311,7 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
         effects: [
           { kind: 'delete-machine', environmentId: target },
           ...dropped.map((r) => ({ kind: 'delete-approval', requestId: r.requestId }) as const),
+          { kind: 'inbox-forget', environmentId: target },
           { kind: 'send', to: 'others', frame: { type: 'directory', machines: toDirectoryMachines(next.machines, online) } },
           ...(self === target
             ? []
@@ -370,6 +380,29 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
         ],
       };
     }
+    case 'inbox-create':
+      if (state.plan !== 'tester') {
+        return {
+          state,
+          effects: [
+            { kind: 'send', to: 'self', frame: errorFrame('plan_required', 'the inbox needs the Anywhere plan', { requestId: f.requestId }) },
+            { kind: 'log', type: f.type, environmentId: self, outcome: 'plan_required' },
+          ],
+        };
+      }
+      return { state, effects: [{ kind: 'inbox-create', requestId: f.requestId }, { kind: 'log', type: f.type, environmentId: self, outcome: 'ok' }] };
+    case 'inbox-delete':
+      return { state, effects: [{ kind: 'inbox-delete', inboxId: f.inboxId }, { kind: 'log', type: f.type, environmentId: self, outcome: 'ok' }] };
+    case 'inbox-ack':
+      return { state, effects: [{ kind: 'inbox-ack', eventId: f.eventId }, { kind: 'log', type: f.type, environmentId: self, outcome: 'ok' }] };
+    case 'inbox-nack':
+      return {
+        state,
+        effects: [
+          { kind: 'inbox-nack', eventId: f.eventId, retryAfterSeconds: f.retryAfterSeconds },
+          { kind: 'log', type: f.type, environmentId: self, outcome: 'ok' },
+        ],
+      };
     case 'relay-usage': {
       const { usage, reachedCap } = addUsage(state.relay, f.bytes, ctx.now, ctx.relayCapBytes);
       const next: DirectoryState = { ...state, relay: usage };
@@ -431,14 +464,6 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
         ],
       };
     }
-    default:
-      return {
-        state,
-        effects: [
-          { kind: 'send', to: 'self', frame: errorFrame('unsupported', 'frame type not supported') },
-          { kind: 'log', type: f.type, environmentId: self, outcome: 'unsupported' },
-        ],
-      };
   }
 }
 
