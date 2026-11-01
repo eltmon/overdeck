@@ -4,17 +4,17 @@
     "created": "2026-11-01T05:06:28Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4649: Overdeck MCP server: pan mcp serve, /mcp endpoint and Copy MCP URL",
-    "updated": "2026-11-01T05:10:23.360Z"
+    "updated": "2026-11-01T05:49:32.624Z"
   },
   "plan": {
     "id": "pan-4649",
     "title": "Overdeck MCP server: pan mcp serve, /mcp endpoint and Copy MCP URL",
-    "status": "proposed",
+    "status": "running",
     "uid": "ed239f2f-0419-49d1-8a0d-7f87ca74cdab",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-01T05:06:28Z",
-    "updated": "2026-11-01T05:10:23.360Z",
+    "updated": "2026-11-01T05:49:32.624Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4649",
@@ -1139,5 +1139,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
