@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4697",
   "created": "2026-11-01T09:15:31.379Z",
-  "updated": "2026-11-01T09:35:52.554Z",
+  "updated": "2026-11-01T09:36:07.434Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "union-merge-rule.ac3": {
       "status": "completed",
       "doneAt": "2026-11-01T09:35:52.554Z"
+    },
+    "union-merge-rule.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:36:07.434Z"
     }
   }
 }
