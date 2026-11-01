@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { MachineLink } from '../../../lib/anywhere/link-store.js';
-import { type FleetWorkerDeps, handleFleetWorker } from '../routes/fleet-work.js';
+import { type FleetWorkerDeps, handleFleetWorker, handleFleetWorkerStop } from '../routes/fleet-work.js';
 import { readJsonResponse } from '../routes/machines-work.js';
 import type { FleetTarget } from '../services/fleet-target.js';
 
@@ -60,5 +60,19 @@ describe('POST /api/fleet/workers (D-4651-5)', () => {
     expect(d.dropStandIn).toHaveBeenCalledWith('agent-pan-9-worker-2');
     expect(d.writeStandIn).not.toHaveBeenCalled();
     expect(d.follow).not.toHaveBeenCalled();
+  });
+
+  it('stops a stand-in through its owner and marks it stopped; a local id answers 404', async () => {
+    const standIn = {
+      v: 1 as const, environmentId: 'env-desk', label: 'desk', remoteId: 'agent-pan-9-worker-4', parentId: null, issueId: 'PAN-9', createdAt: 'x',
+      state: 'running' as const, lastSeq: 1, lastSeenAt: null, lastAssistantMessage: null, idleAgeMs: null, unreachableSince: null,
+    };
+    const write = vi.fn(async () => undefined);
+    const fetchPeer = vi.fn(async () => ({ status: 200, json: { stopped: true } }));
+    const answer = readJsonResponse(await handleFleetWorkerStop('agent-pan-9-worker-2', { actor: 'operator' }, { read: async () => standIn, write, fetchPeer }));
+    expect(answer).toEqual({ status: 200, body: { stopped: true } });
+    expect(fetchPeer).toHaveBeenCalledWith('env-desk', '/api/workers/agent-pan-9-worker-4/stop', expect.objectContaining({ method: 'POST', actor: 'operator' }));
+    expect(write).toHaveBeenCalledWith('agent-pan-9-worker-2', { ...standIn, state: 'stopped' });
+    expect(readJsonResponse(await handleFleetWorkerStop('agent-pan-9-worker-1', { actor: 'operator' }, { read: async () => null, write, fetchPeer })).status).toBe(404);
   });
 });

@@ -18,6 +18,9 @@
  *   a local id, the owner's worker work door, then `remote.json` and the
  *   follower. Answers `{ id, machine, reason, remote }`.
  *
+ * - `POST /api/fleet/workers/:id/stop` → stops the worker a stand-in stands
+ *   for on its owner, then marks the stand-in `stopped`.
+ *
  * The actor a forwarded call carries: `operator` for the browser and operator
  * CLIs, `{ agentId }` for an agent sender (`x-overdeck-sender`), and for an
  * `odk_` token credential `operator` with a ceiling of the token's scopes
@@ -28,7 +31,7 @@ import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/u
 
 import type { AccessTokenScope } from '../../../lib/access-tokens.js';
 import { agentsRoot, allocateWorkerId, workerDir } from '../../../lib/agents/worker/ids.js';
-import { type RemoteStandIn, writeRemoteStandIn } from '../../../lib/agents/worker/remote-standin.js';
+import { readRemoteStandIn, type RemoteStandIn, writeRemoteStandIn } from '../../../lib/agents/worker/remote-standin.js';
 import { PARENT_ID_RE, startWorker, type StartWorkerOptions } from '../../../lib/agents/worker/start.js';
 import { removeAgentStateDir } from '../../../lib/agents/state-dir-removal.js';
 import { type LinkActorInit, linkFetch } from '../../../lib/anywhere/link-client.js';
@@ -279,6 +282,31 @@ export async function handleFleetWorker(raw: unknown, caller: FleetCaller, deps:
   return jsonResponse({ id: localId, machine: machineOf(target), reason: target.reason, remote: true });
 }
 
+export interface FleetWorkerStopDeps {
+  read: (localId: string) => Promise<RemoteStandIn | null>;
+  write: (localId: string, standIn: RemoteStandIn) => Promise<void>;
+  fetchPeer: FleetSpawnDeps['fetchPeer'];
+}
+
+const defaultFleetWorkerStopDeps = (): FleetWorkerStopDeps => ({
+  read: readRemoteStandIn,
+  write: writeRemoteStandIn,
+  fetchPeer: (environmentId, path, init) => linkFetch(environmentId, path, init),
+});
+
+/** `POST /api/fleet/workers/:id/stop`. */
+export async function handleFleetWorkerStop(localId: string, caller: FleetCaller, deps: FleetWorkerStopDeps = defaultFleetWorkerStopDeps()): Promise<HttpServerResponse.HttpServerResponse> {
+  const standIn = await deps.read(localId);
+  if (!standIn) return jsonResponse({ code: 'unknown-stand-in', error: `${localId} is not a worker on another machine; stop it with POST /api/workers/${localId}/stop` }, { status: 404 });
+  const link = { environmentId: standIn.environmentId, label: standIn.label } as MachineLink;
+  const answer = await postWorkDoor({ fetchPeer: deps.fetchPeer }, link, `/api/workers/${encodeURIComponent(standIn.remoteId)}/stop`, {}, caller);
+  if (answer.status !== 200 && !(answer.status === 404 && (answer.json as { code?: unknown } | null)?.code === 'unknown-worker')) {
+    return jsonResponse(answer.json, { status: answer.status });
+  }
+  await deps.write(localId, { ...standIn, state: 'stopped' });
+  return jsonResponse({ stopped: true });
+}
+
 export const readFleetBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
@@ -339,4 +367,17 @@ const workersRoute = HttpRouter.add(
   }),
 );
 
-export const fleetWorkRouteLayer = Layer.mergeAll(placementRoute, conversationsRoute, workersRoute);
+const workerStopRoute = HttpRouter.add(
+  'POST',
+  '/api/fleet/workers/:id/stop',
+  Effect.gen(function* () {
+    const refused = yield* fleetWriteGate;
+    if (refused) return refused;
+    const caller = yield* fleetCallerOf;
+    if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
+    const params = yield* HttpRouter.params;
+    return yield* Effect.promise(() => handleFleetWorkerStop(params['id'] ?? '', caller));
+  }),
+);
+
+export const fleetWorkRouteLayer = Layer.mergeAll(placementRoute, conversationsRoute, workersRoute, workerStopRoute);

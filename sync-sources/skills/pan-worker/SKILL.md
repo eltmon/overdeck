@@ -52,6 +52,8 @@ pan worker run --issue PAN-123 --brief brief.md --model gpt-5.5 --harness codex 
 pan worker run --issue PAN-123 --prompt "Fix the flaky test." --cwd packages/core --parent conv-orchestrator
 pan worker run --issue PAN-123 --brief brief.md --detach
 pan worker run --issue PAN-123 --brief brief.md --timeout 540 --stop-after-report
+pan worker run --issue PAN-123 --brief brief.md --machine desk
+pan worker run --issue PAN-123 --brief brief.md --machine auto --needs docker --push-first
 pan worker wait agent-pan-123-worker-1 --timeout 540
 pan worker wait agent-pan-123-worker-1 --after 1
 pan worker report agent-pan-123-worker-1 --file report.md --status blocked
@@ -62,7 +64,8 @@ pan worker list --parent conv-orchestrator --json
 
 `pan worker run` flags: `--issue` (required), exactly one of `--prompt` or `--brief`, and optionally
 `--model`, `--harness`, `--effort <level>` (default: `roles.worker.effort`), `--read-only`, `--cwd` (must be inside the issue workspace), `--parent`,
-`--name`, `--detach`, `--timeout <seconds>`, `--stop-after-report`.
+`--name`, `--detach`, `--timeout <seconds>`, `--stop-after-report`, `--machine <label|auto>`,
+`--needs <tags>`, `--push-first`, `--ignore-unpushed`.
 
 - **Primary checkout refusal.** A read-write worker's `--cwd` that resolves (symlinks followed) to a
   project's primary checkout is refused with `--cwd <path> is the primary checkout of <project>; use a
@@ -76,6 +79,14 @@ pan worker list --parent conv-orchestrator --json
   restrict file or network writes.
 - **Parent.** `--parent`, else `$OVERDECK_AGENT_ID`, else `$OVERDECK_CONVERSATION`. Called from an agent
   with none of these, the command fails and asks for `--parent`.
+- **Another machine (`--machine`).** `--machine <label>` runs the worker on a linked machine;
+  `--machine auto` lets Auto placement pick by load (`--needs docker,gpu` restricts it to machines with
+  those tags). The other machine needs a project with the same repository; if it has none, the error
+  names `pan machines add-project … --to <machine>`. It starts from its view of `origin`, so unpushed
+  commits here refuse the run unless you pass `--push-first` or `--ignore-unpushed`. You get a local
+  stand-in id (`agent-<issue>-worker-<n>`): `pan worker wait` on it mirrors the remote worker's reports,
+  keeps waiting while the other machine is asleep, and stopping your parent stops the remote worker.
+  `--cwd` cannot be combined with `--machine`.
 
 ## Exit codes (run and wait)
 

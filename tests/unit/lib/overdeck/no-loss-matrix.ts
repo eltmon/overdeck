@@ -456,6 +456,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/fleet/placement',                  kind: 'http', disposition: 'AGGREGATE',   door: 'fleet-target.placeAuto -> anywhere/placement.choosePlacement (self sample + link heartbeats) (PAN-4651)' },
   { surface: 'POST /api/fleet/conversations',              kind: 'http', disposition: 'WRITE',       door: 'conversation-runtime.handleConversationCreate, or linkFetch POST /api/machines/work/conversations on the target (PAN-4651)' },
   { surface: 'POST /api/fleet/workers',                    kind: 'http', disposition: 'WRITE',       door: 'agents/worker/start.startWorker, or the target worker work door + agents/worker/remote-standin (remote.json) + remote-worker-follower (PAN-4651)' },
+  { surface: 'POST /api/fleet/workers/:id/stop',           kind: 'http', disposition: 'WRITE',       door: 'linkFetch POST /api/workers/:id/stop on the owner + remote-standin.writeRemoteStandIn (stopped) (PAN-4651)' },
   { surface: 'GET /api/workers/:id/status',                kind: 'http', disposition: 'READ',        door: 'agents/liveness.isAlive + agents/worker/report.listWorkerReports (PAN-4651)' },
   { surface: 'POST /api/workers/:id/stop',                 kind: 'http', disposition: 'WRITE',       door: 'agents/termination.stopAgent (operator) (PAN-4651)' },
   { surface: '* /api/conversations/@<machine>/*',          kind: 'http', disposition: 'RELOCATE',    door: "linked-conversation-proxy -> owner's /api/conversations/* over the machine link (PAN-4650)" },
