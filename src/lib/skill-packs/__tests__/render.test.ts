@@ -189,6 +189,24 @@ describe('gcPackRenders', () => {
     expect(existsSync(mounts)).toBe(true);
   });
 
+  it('removes an old unregistered id\'s browser runtime dir with its render and state (PAN-4730)', async () => {
+    const { packsHome, make, orphan } = home();
+    const dirsOf = orphan('gstack', 30);
+    make('gstack/browser/playwright', 30);
+    const browser = make('gstack/browser', 30);
+    const result = await gcPackRenders({ ...base, packsHome, registered: new Map() });
+    expect(result).toEqual({ removedRenders: [dirsOf.render], removedStates: [dirsOf.state, browser] });
+    expect(existsSync(browser)).toBe(false);
+  });
+
+  it('keeps an unregistered id whose browser dir is young', async () => {
+    const { packsHome, make, orphan } = home();
+    const dirsOf = orphan('gstack', 30);
+    const browser = make('gstack/browser', 0);
+    expect(await gcPackRenders({ ...base, packsHome, registered: new Map() })).toEqual({ removedRenders: [], removedStates: [] });
+    expect([existsSync(dirsOf.render), existsSync(browser)]).toEqual([true, true]);
+  });
+
   it('keeps an unregistered id whose render or state is young, as an add still rendering has', async () => {
     const { packsHome, orphan } = home();
     const dirsOf = orphan('gstack', 0);

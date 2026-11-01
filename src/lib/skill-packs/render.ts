@@ -128,9 +128,10 @@ async function isDir(path: string): Promise<boolean> {
  * `<id>/render/<commit>` dirs that are not the trusted commit, not in `keep`
  * (renders a linked mount still calls into), and older than `maxAgeMs`; building
  * or reusing a mount touches its render, so a render ages like its mount. Also
- * remove `render/` and `state/` of ids that are not registered (left by an
- * interrupted remove) once both are older than `maxAgeMs`, so an `add` that is
- * still rendering keeps them.
+ * remove `render/`, `state/` and `browser/` (PAN-4730: bun cache and Chromium,
+ * about 1 GB) of ids that are not registered (left by an interrupted remove)
+ * once all are older than `maxAgeMs`, so an `add` that is still rendering keeps
+ * them. A removed `browser/` is counted in `removedStates`.
  *
  * `registered` maps every registered id to its trusted commit, or null when the
  * entry is malformed (then nothing of that id is touched). When
@@ -152,16 +153,18 @@ export async function gcPackRenders(opts: {
     if (id === 'mounts') continue;
     const renderRoot = join(opts.packsHome, id, 'render');
     const stateDir = join(opts.packsHome, id, 'state');
+    const browserDir = join(opts.packsHome, id, 'browser');
     if (!opts.registered.has(id)) {
       if (!opts.registryReadable) continue;
-      if (await newerThan([renderRoot, stateDir], now - opts.maxAgeMs)) continue;
+      if (await newerThan([renderRoot, stateDir, browserDir], now - opts.maxAgeMs)) continue;
       if (await isDir(renderRoot)) {
         await rm(renderRoot, { recursive: true, force: true });
         removedRenders.push(renderRoot);
       }
-      if (await isDir(stateDir)) {
-        await rm(stateDir, { recursive: true, force: true });
-        removedStates.push(stateDir);
+      for (const dir of [stateDir, browserDir]) {
+        if (!(await isDir(dir))) continue;
+        await rm(dir, { recursive: true, force: true });
+        removedStates.push(dir);
       }
       continue;
     }

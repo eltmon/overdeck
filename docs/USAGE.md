@@ -388,8 +388,10 @@ pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]
 pan skills set <pack>/<skill> on|off|inherit [--project <key> | --issue <id>]
 
 # Register, update, inspect, and cache skill packs pinned to a commit
-pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly|gstack-runtime] [--yes]
+pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly|gstack-runtime] [--browser] [--yes]
 pan skills pack add gstack https://github.com/eltmon/gstack --ref main   # gstack runtime pack (needs bun)
+pan skills pack add gstack https://github.com/eltmon/gstack --ref main --browser   # plus the browser runtime (asks twice)
+pan skills pack browser <id> [on|off] [--yes]   # build or remove gstack's browser, design and PDF runtime
 pan skills pack update <id> [--ref <ref>] [--yes]
 pan skills pack list [--json] [--offline]
 pan skills pack remove <id>
