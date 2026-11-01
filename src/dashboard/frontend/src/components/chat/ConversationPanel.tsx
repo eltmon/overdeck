@@ -1470,6 +1470,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           targetMessageNonce={targetMessageNonce}
           onTargetMessageHandled={onTargetMessageHandled}
           bookmarksEnabled
+          citationsEnabled={!hideComposer}
           history={olderHistory}
           onLoadOlder={olderHistory.loadOlder}
           onLoadOlderUntil={olderHistory.loadOlderUntil}

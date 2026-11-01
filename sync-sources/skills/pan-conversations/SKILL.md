@@ -1,6 +1,6 @@
 ---
 name: pan-conversations
-description: "pan conversations scan/search/list/show/current/cost/enrich/embed/move/link-pr — discover, index, search, reassign, and link PRs to Claude Code session history"
+description: "pan conversations scan/search/list/show/current/cost/enrich/embed/move/link-pr/schedule — discover, index, search, reassign, link PRs to, and schedule prompts in Claude Code session history"
 triggers:
   - pan conversations
   - pan conv
@@ -8,6 +8,7 @@ triggers:
   - conversations search
   - conversations move
   - conv link-pr
+  - conv schedule
 allowed-tools:
   - Bash
   - Read
@@ -33,6 +34,11 @@ pan conversations link-pr <query> <url|#42|owner/repo#42> [--source agent|manual
 pan conversations unlink-pr <query> <url|#42|owner/repo#42>
 pan conversations prs <query> [--json]
 pan conversations auto-archive-on-merge [on|off]
+pan conversations schedule add <conv> (--cron <expr> | --hourly | --daily <HH:MM> | --weekdays <HH:MM> | --weekly "<day> HH:MM") (--prompt <text> | --prompt-file <path>) [--tz <zone>] [--paused] [--json]
+pan conversations schedule list [conv] [--json]
+pan conversations schedule pause <id>
+pan conversations schedule resume <id>
+pan conversations schedule rm <id>
 pan conversations current [--json]
 pan conversations cost [--since <time>] [--workspace <path>] [--by <field>] [--json]
 pan conversations embed [ids...] [--regenerate] [--status] [--provider <name>] [--model <name>] [--max-parallel <n>]
@@ -82,6 +88,16 @@ pan conversations enrich [ids...] [--tier <n>] [--deep] [--full] [--upgrade] [--
   `auto-archive-on-merge` (default off) archives an operator conversation once
   all its linked PRs are merged or closed; never agent conversations, never a
   live session.
+- **`schedule`** (PAN-4640) runs a prompt in a conversation on a recurring
+  schedule. `<conv>` accepts `self` (also `.`, `current`, `me`) for the
+  conversation you are running in, a conversation number, a name, or a unique
+  title match. Presets (`--hourly`, `--daily`, `--weekdays`, `--weekly "mon 09:00"`)
+  compile to a 5-field cron; `--prompt-file` reads a long prompt from disk. The
+  time zone defaults to this machine's zone, and runs must be at least 15
+  minutes apart. The dashboard fires it, so it survives harness and dashboard
+  restarts: a stopped session is resumed first, missed runs collapse into one,
+  and a failed run is recorded, not retried. Agent conversations and vault
+  copies cannot be scheduled. Writes work with the dashboard down.
 - **`enrich`**/**`embed`** call out to an LLM/embedding provider and cost money;
   `enrich` prompts for confirmation unless `--yes` is passed. `--tier 3`
   (`--deep`) and `--full` are the expensive, most-thorough options.

@@ -1,0 +1,848 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T04:43:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4642: Cite selected reply text with a comment and send it with the next prompt",
+    "updated": "2026-11-01T04:49:39.972Z"
+  },
+  "plan": {
+    "id": "pan-4642",
+    "title": "Cite selected reply text with a comment and send it with the next prompt",
+    "status": "running",
+    "uid": "40147394-3535-41f2-b356-7abe3ede2fa9",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T04:43:40Z",
+    "updated": "2026-11-01T04:49:39.972Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4642",
+        "label": "PAN-4642",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4658",
+        "label": "PAN-4658 (EditorPane follow-up)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2685",
+        "label": "PAN-2685 (live preview annotation)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "composer",
+      "conversation",
+      "citations"
+    ],
+    "narratives": {
+      "Problem": "To push back on part of an agent reply, the operator copies the text by hand and pastes it into the composer. There is no way to select a span, attach a comment, and send it with the next prompt.",
+      "Proposal": "Add a Cite action for selected text in conversation messages. A floating Cite button (or the C key) opens a comment box; saved citations persist per conversation in localStorage and show as editable chips above the composer, with the quoted span highlighted via the CSS Custom Highlight API. On send, the client prepends an exactly-specified `Notes on your previous reply:` block to the prompt, so every harness receives identical text, and failed sends carry the citations into the outbox for Retry. No server change. See .pan/drafts/PAN-4642.md.",
+      "NonGoals": "- Citing inside the Stage BrowserPane (sandboxed iframe without allow-same-origin; belongs to #2685)\n- Citing in the EditorPane markdown preview (no target conversation; follow-up #4658)\n- Citing tool output, plan cards, choice cards, or streaming assistant text\n- Any message pointer or link in the delivered text, or any use of the message-locator route\n- Any server, @overdeck/contracts, or delivery-path change\n- Changing composerStore echo reconciliation or attachment behavior when no citations are pending\n- Cross-window live sync of pending citations (last write wins, like drafts)\n- Disambiguating repeated text in the highlight (first occurrence is painted)\n- Making attachments reload-durable (#1592)\n- Raising any scripts/file-size-allowlist.txt row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Serialize citations client-side into the message text (no server change).",
+        "rationale": "The outbox stores and Retry re-sends the composed text verbatim, so failed-send and Retry behavior come for free, and every harness receives identical bytes (issue AC)."
+      },
+      {
+        "summary": "Pin the exact block format: literal header `Notes on your previous reply:`, `n. > ` quote lines, continuation and comment lines indented to the prefix width, blank line before the prompt.",
+        "rationale": "The issue gives a sketch; a pinned byte format makes tests and harness-equality checkable. The header string is the issue's own."
+      },
+      {
+        "summary": "Attachments stay first, joined by a single newline as today; the citation block follows, then the prompt.",
+        "rationale": "Keeps attachment sends byte-identical when there are no citations."
+      },
+      {
+        "summary": "Clear the chips once, right after the conversation-switch abort check, whenever citations were included.",
+        "rationale": "From that point the composed text always lands in a bubble, hold, offline hold, or the outbox, so the citations travel with that message; leaving chips pending after a failure would double-send them."
+      },
+      {
+        "summary": "Slash-prefixed prompts (`/pan`, `/compact`, …) neither include nor consume citations; citations-only sends are allowed.",
+        "rationale": "Prepending text would break a slash command; mirrors the attachments-only send rule."
+      },
+      {
+        "summary": "Do not put a message pointer in the delivered text; keep source.messageId client-side for the highlight.",
+        "rationale": "Answers the issue's open question: the agent cannot use a dashboard id, and the issue's format has none."
+      },
+      {
+        "summary": "Only settled user and completed assistant message prose is citable; tool output is not.",
+        "rationale": "Answers the issue's open question with the smaller scope; tool rows have no stable text element and are not mentioned in the ACs."
+      },
+      {
+        "summary": "Persist pending citations in localStorage key `conv-citations:<name>` (last write wins), hydrated synchronously.",
+        "rationale": "The issue asks for draft-like persistence; drafts use the same mechanism."
+      },
+      {
+        "summary": "Highlight with the CSS Custom Highlight API from inside each row, first occurrence, best-effort.",
+        "rationale": "Paints without mutating React-owned DOM and survives virtualized row remounts; TypeScript 5.9 already types it."
+      },
+      {
+        "summary": "Defer BrowserPane citing to #2685 and EditorPane preview citing to follow-up #4658; make PendingCitation.source a discriminated union so #2685 shares the list.",
+        "rationale": "The BrowserPane iframe has no allow-same-origin, so selection is unreadable; the EditorPane has no target conversation. Neither is in the issue's ACs."
+      },
+      {
+        "summary": "Extract the attachment strip from ComposerFooter.tsx first.",
+        "rationale": "ComposerFooter.tsx is 982 lines against a 1000-line ceiling that agents may not raise."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-attachment-strip",
+        "title": "Extract the composer attachment strip into ComposerAttachmentStrip.tsx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:43:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4642",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerAttachmentStrip.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ComposerFooter.test.tsx passes with no test edits",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/dashboard/frontend/src/components/chat/ComposerAttachmentStrip.tsx exporting ComposerAttachmentStrip({ attachments, onOpenImage, onRemove }). Move the JSX block from ComposerFooter.tsx lines ~704-757 (search `{pendingAttachments.length > 0 && (`, including the outer composerImageStrip div) and the formatFileSize helper (lines ~110-116) into it unchanged; return null for an empty list. In ComposerFooter.tsx render <ComposerAttachmentStrip attachments={pendingAttachments} onOpenImage={(attachment) => { lightboxOwnerRef.current = { id: attachment.id, src: attachment.previewUrl! }; openImageLightbox(attachment.previewUrl!, attachment.file.name); }} onRemove={removePendingAttachment} /> in the same place. Keep the lightbox-owner effect in ComposerFooter. Remove imports that become unused. Class names, titles and text stay identical: this is a pure move so later items (chips, send) fit under the 1000-line ceiling."
+        },
+        "items": [
+          {
+            "id": "extract-attachment-strip.ac1",
+            "title": "Given the refactor, when `wc -l src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` runs, then it reports 940 lines or fewer and `bash scripts/lint-file-size.sh` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-attachment-strip.ac2",
+            "title": "Given a conversation with one uploading image and one uploaded text file, when ComposerFooter renders, then the strip renders the same card classes, titles (`View <name>`, `Remove <name>`) and status labels (`Uploading…`, `Uploaded`) as before, and the existing ComposerFooter.test.tsx passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-attachment-strip.ac3",
+            "title": "Given a pending image, when its thumbnail is clicked and the attachment is then removed, then the lightbox opens and later closes exactly as before the extraction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "citation-format",
+        "title": "Add the PendingCitation type and the exact citation-block serializer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:43:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4642",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/citationFormat.ts",
+            "src/dashboard/frontend/src/lib/__tests__/citationFormat.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/citationFormat.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "citationFormat.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-7"
+          ],
+          "foundationFor": [
+            "citation-store",
+            "citation-send",
+            "citation-highlight"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/frontend/src/lib/citationFormat.ts exporting CitationSource = { kind: 'message'; messageId: string; role: 'assistant' | 'user' } (a discriminated union so #2685 can add kinds), PendingCitation { id, source, quotedText, comment, createdAt }, CITATION_BLOCK_HEADER = 'Notes on your previous reply:', formatCitationBlock(citations) and composePromptWithCitations(prompt, citations). Implement the exact rules in PRD WI-2: header line; per citation n, prefix `${n}. ` and indent of the same width; quote lines `> ` (first line after the prefix, later lines after the indent, empty line as `<indent>>`), trailing whitespace stripped; comment lines indented, omitted when the trimmed comment is empty; join with \\n, no trailing newline; empty list returns '' / the prompt unchanged; prompt-less compose returns the block alone; otherwise `${block}\\n\\n${prompt}`. The test must contain the PRD fixture verbatim."
+        },
+        "items": [
+          {
+            "id": "citation-format.ac1",
+            "title": "Given two citations (quote `First line\\nsecond line` with comment `I don't agree`, and quote `Use X` with no comment) and prompt `Please revise.`, when composePromptWithCitations runs, then it returns exactly the PRD WI-2 fixture string, asserted with toBe in citationFormat.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-format.ac2",
+            "title": "Given an empty citation list, when composePromptWithCitations(prompt, []) runs, then it returns prompt unchanged; and given citations with an empty prompt, it returns the block with no trailing blank lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-format.ac3",
+            "title": "Given ten citations, when formatCitationBlock runs, then the tenth entry starts with `10. > ` and its continuation and comment lines are indented four spaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "citation-store",
+        "title": "Add the per-conversation pending-citation store persisted in localStorage",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:43:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4642",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerCitations.ts",
+            "src/dashboard/frontend/src/lib/__tests__/composerCitations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/composerCitations.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "composerCitations.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "cite-toolbar",
+            "citation-chips",
+            "citation-send",
+            "citation-highlight"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/dashboard/frontend/src/lib/composerCitations.ts: a zustand store { byConversation: Record<string, PendingCitation[]> } plus useConversationCitations(name), getConversationCitations(name), addCitation(name, { source, quotedText, comment }) (returns null for an empty trimmed quote; stores trimmed quote and comment, id = crypto.randomUUID(), createdAt = now ISO), updateCitationComment(name, id, comment), removeCitation(name, id), consumeCitations(name) (clears and removes the storage key), resetCitationStore() (test-only, rebuilds memory from localStorage). Every test file that touches the citation store runs `localStorage.clear(); resetCitationStore();` in beforeEach, because the reset now reloads from storage and happy-dom storage persists within a file. Storage key `conv-citations:<name>`, value JSON { v: 1, citations }; empty list removes the key. Hydrate once at store creation by iterating localStorage keys with prefix `conv-citations:` (never inside a selector or render, which would setState during render); resetCitationStore() re-runs that load to simulate a reload. Accept only v === 1 and well-formed entries with source.kind === 'message'; any parse/storage error reads as empty. Every storage call is wrapped in try/catch. Use a stable empty array for missing slices."
+        },
+        "items": [
+          {
+            "id": "citation-store.ac1",
+            "title": "Given a saved citation for conversation `a`, when resetCitationStore() runs (reload simulation) and getConversationCitations('a') is read, then it returns the saved citation from localStorage key `conv-citations:a` with the same id, quote and comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-store.ac2",
+            "title": "Given citations added to conversations `a` and `b`, when each list is read, then each returns only its own citations in add order, and consumeCitations('a') empties `a`, removes key `conv-citations:a`, and leaves `b` unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-store.ac3",
+            "title": "Given localStorage.setItem throws, when addCitation runs, then it does not throw and the citation is still present in memory; and given corrupt JSON or `v: 2` in storage, when the list is read, then it returns an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-store.ac4",
+            "title": "Given an added citation, when updateCitationComment and removeCitation run, then the comment changes in memory and storage, and the removed citation is absent from both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cite-row-gate",
+        "title": "Mark citable message rows and resolve a selection to a citation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:43:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4642",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx",
+            "src/dashboard/frontend/src/components/chat/citations/resolveSelectionCitation.ts",
+            "src/dashboard/frontend/src/components/chat/citations/__tests__/resolveSelectionCitation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/citations/__tests__/resolveSelectionCitation.test.ts src/components/chat/messagesTimeline/messageRows.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "resolveSelectionCitation.test.ts and messageRows.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add prop citeConversationName?: string to TimelineRowRenderer and pass it to UserMessageRow and AssistantMessageRow. UserMessageRow normal path only (not slash/fork/review/subagent/held branches): when citeConversationName is set and the message is not pending/optimistic, add data-cite-message-id={message.id} and data-cite-role=\"user\" to the userMessageText div. AssistantMessageRow: when citeConversationName is set and the row is not streaming-incomplete, wrap TurnBody in <div data-cite-message-id={message.id} data-cite-role=\"assistant\">; changed-files card and metadata stay outside. Create components/chat/citations/resolveSelectionCitation.ts exporting resolveSelectionCitation(selection) per PRD WI-4: null for null/collapsed/whitespace-only; anchor and focus (text node -> parentElement) must share the same closest('[data-cite-message-id]') element; return { messageId, role, quotedText: toString().trim() }. Test with fake Selection-shaped objects over a happy-dom fixture."
+        },
+        "items": [
+          {
+            "id": "cite-row-gate.ac1",
+            "title": "Given a selection whose anchor and focus are text nodes inside one `[data-cite-message-id=\"m1\"][data-cite-role=\"assistant\"]` element, when resolveSelectionCitation runs, then it returns { messageId: 'm1', role: 'assistant', quotedText } with the trimmed selection text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cite-row-gate.ac2",
+            "title": "Given a selection spanning two different cite elements, or with one end outside any cite element, or collapsed, or whitespace-only, when resolveSelectionCitation runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cite-row-gate.ac3",
+            "title": "Given citeConversationName is set, when a completed AssistantMessageRow and a settled UserMessageRow render, then each renders exactly one `[data-cite-message-id]` element; and a streaming assistant row, an optimistic user row, and any row rendered without citeConversationName render none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cite-toolbar",
+        "title": "Show the floating Cite button and comment box over a timeline selection",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:43:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4642",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/citations/CiteSelectionToolbar.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/citations/__tests__/CiteSelectionToolbar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/citations/__tests__/CiteSelectionToolbar.test.tsx src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "CiteSelectionToolbar.test.tsx and ConversationPanel.test.tsx pass",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. types.ts: add citationsEnabled?: boolean next to bookmarksEnabled. MessagesTimeline.tsx: destructure citationsEnabled = false, pass citeConversationName={citationsEnabled ? conversationName : undefined} to both TimelineRowRenderer mounts, and render <CiteSelectionLayer conversationName rootRef={scrollContainerRef} /> once when enabled. ConversationPanel.tsx: add exactly one line `citationsEnabled={!hideComposer}` after `bookmarksEnabled` (file is at 1520 of a 1531 cap). One file components/chat/citations/CiteSelectionToolbar.tsx exports useCiteSelection, the presentational CiteSelectionToolbar({ conversationName, snapshot, onDone }) and CiteSelectionLayer({ conversationName, rootRef }) that joins them. useCiteSelection(rootRef): listen to document selectionchange + mouseup, resolve with resolveSelectionCitation, require the cite element inside rootRef.current, snapshot { messageId, role, quotedText, rect } (rect from getRangeAt(0).getBoundingClientRect()), clear on null or root scroll. CiteSelectionToolbar: portal to document.body; fixed `Cite` button at top = max(8, rect.top - 36), left clamped to [8, innerWidth - 64]; onMouseDown preventDefault; click or `c`/`C` (no Ctrl/Meta/Alt, activeElement not input/textarea/select/[contenteditable], listener only while button is visible) opens the box with a frozen snapshot: quote excerpt (160 chars + …), textarea aria-label `Citation comment` autofocus, Save and Cancel. Enter saves, Shift+Enter newline, Escape cancels. Save calls addCitation with source { kind: 'message', messageId, role }, then removeAllRanges and closes. Conversation change closes the box."
+        },
+        "items": [
+          {
+            "id": "cite-toolbar.ac1",
+            "title": "Given a hand-built snapshot prop, when the presentational CiteSelectionToolbar renders, then a button labeled `Cite` renders; and when it is clicked, `I don't agree` is typed and Save is clicked, then the citation store for that conversation holds exactly one citation with that quote, comment and source messageId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cite-toolbar.ac2",
+            "title": "Given the comment box is open, when Save is clicked with an empty comment, then one quote-only citation (comment '') is added; and when Cancel is clicked or Escape is pressed instead, then no citation is added",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cite-toolbar.ac3",
+            "title": "Given the Cite button is visible, when `c` is pressed with document.body focused, then the comment box opens; and when `c` is pressed while a textarea is focused, then the box does not open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cite-toolbar.ac4",
+            "title": "Given the change, when `wc -l` runs on ConversationPanel.tsx, then it reports exactly one more line than on origin/main, and the `citationsEnabled` prop is passed only from ConversationPanel's main timeline mount",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "citation-chips",
+        "title": "Render pending citations as chips above the composer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:43:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4642",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/citations/CitationChips.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/citations/__tests__/CitationChips.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/citations/__tests__/CitationChips.test.tsx src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "CitationChips.test.tsx and ComposerFooter.test.tsx pass",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Create components/chat/citations/CitationChips.tsx: CitationChips({ conversationName }) reads useConversationCitations and returns null when empty; otherwise a strip data-testid=\"composer-citation-chips\" with one chip per citation in add order (data-testid=\"composer-citation-chip\"): lucide Quote icon size 14, quote excerpt (80 chars + …), muted comment excerpt (60 chars) when present, an expand toggle (aria-label `Expand citation` / `Collapse citation`) and a remove button (aria-label `Remove citation`, lucide X size 14) calling removeCitation. Expanded: full quote in a blockquote, a textarea aria-label `Edit citation comment` seeded with the comment, and Save calling updateCitationComment. Reuse composerImageStrip/composerImageCard/composerImageMeta/composerImageName/composerImageStatus/composerImageRemoveButton classes; style the expanded body with existing Tailwind utilities (border-border, text-muted-foreground, bg-muted/30) and add no CSS-module classes or colors (pan-style-guide: no pill badges, no decorative color). In ComposerFooter.tsx render <CitationChips conversationName={conversation.name} /> inside composerBox directly above <ComposerAttachmentStrip …/>."
+        },
+        "items": [
+          {
+            "id": "citation-chips.ac1",
+            "title": "Given two pending citations, when ComposerFooter renders, then `composer-citation-chips` contains two `composer-citation-chip` elements in add order, above the attachment strip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-chips.ac2",
+            "title": "Given two chips, when `Remove citation` is clicked on the first, then only the second citation remains in the store and in the DOM",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-chips.ac3",
+            "title": "Given a chip, when it is expanded, the comment textarea is edited to `Changed` and Save is clicked, then the store's comment for that citation is `Changed`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-chips.ac4",
+            "title": "Given saved citations for conversation `a`, when resetCitationStore() runs and CitationChips renders for `a`, then the chips render on the first render; and CitationChips for conversation `b` renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "citation-send",
+        "title": "Prepend citations to the sent prompt and clear chips on handoff",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:43:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4642",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.citations.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ComposerFooter.citations.test.tsx src/components/chat/__tests__/ComposerFooter.test.tsx src/components/chat/__tests__/composerHeldMessages.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ComposerFooter.citations.test.tsx, ComposerFooter.test.tsx and composerHeldMessages.test.tsx pass",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-9",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In ComposerFooter.tsx handleSubmit: after uploadedAttachments, compute `const citations = messageText.startsWith('/') ? [] : getConversationCitations(submitConversationName);`, change the early return to `if (!messageText && uploadedAttachments.length === 0 && citations.length === 0) return;`, and compose `const composedMessage = [attachmentPrefix, composePromptWithCitations(messageText, citations)].filter(Boolean).join('\\n');`. Immediately after the conversation-switch abort check and before `if (isServerWriteBlocked())`, add `if (citations.length > 0) consumeCitations(submitConversationName);` (D6: the composed text carries the citations into the bubble, hold, offline hold or outbox; this intentionally differs from attachments, which stay pending on failure). Add `const citationCount = useConversationCitations(conversation.name).length;` and append `&& citationCount === 0` inside both Send-button disabled expressions (Send to main, main Send). No server or composerStore change. Tests mock fetch like ComposerFooter.test.tsx."
+        },
+        "items": [
+          {
+            "id": "citation-send.ac1",
+            "title": "Given two citations (one without a comment) and typed `Please revise.`, when Send is clicked, then exactly one POST is made whose JSON `message` equals the PRD WI-2 fixture string, and the conversation's citation store is empty afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-send.ac2",
+            "title": "Given the same citations and prompt, when ComposerFooter renders with conversation.harness `claude-code`, `codex` and `ohmypi` in turn, then the three POSTed `message` strings are identical; and a citation removed before Send is absent from the POSTed message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-send.ac3",
+            "title": "Given a pending citation and a 500 response, when Send is clicked, then onSendFailed receives text containing `Notes on your previous reply:`, the citation store is empty, and composerStore.retryFailed on that outbox entry POSTs the same text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-send.ac4",
+            "title": "Given a pending citation and typed `/compact`, when Send is clicked, then the POSTed message is exactly `/compact` and the citation is still pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-send.ac5",
+            "title": "Given a pending citation and an empty editor, when the composer renders, then the Send button is enabled, and clicking it POSTs the bare citation block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "citation-highlight",
+        "title": "Highlight pending quotes in their timeline rows with the Custom Highlight API",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:43:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4642",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/citations/citationHighlight.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/index.css",
+            "src/dashboard/frontend/src/components/chat/citations/__tests__/citationHighlight.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/citations/__tests__/citationHighlight.test.ts src/components/chat/messagesTimeline/messageRows.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "citationHighlight.test.ts and messageRows.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Create components/chat/citations/citationHighlight.ts (helpers, registry and hook in one file) with findQuoteRange(root, quote): TreeWalker over text nodes, compact string of non-whitespace chars with a parallel (node, offset) array, whitespace-stripped quote, first-occurrence indexOf mapped back to a Range, null when empty/not found; and a registry Map keyed `${conversationName}:${messageId}` with setRowCitationRanges(key, ranges) / clearRowCitationRanges(key) that, only when CSS.highlights and Highlight exist, sets `CSS.highlights.set('overdeck-citation', new Highlight(...allRanges))` or deletes the entry when no ranges remain. In the same file, useCitationHighlight(ref, conversationName, messageId): reads useConversationCitations, filters source.kind === 'message' && messageId match, computes ranges in useLayoutEffect (deps: filtered list, message text), clears on cleanup, returns whether the row has a pending citation. In messageRows.tsx put the hook in a small CitableText wrapper component used by the two cite wrappers from cite-row-gate (no conditional hooks) and set data-cited=\"true\" when it returns true. index.css: `::highlight(overdeck-citation) { background-color: color-mix(in srgb, var(--primary) 22%, transparent); }`. TypeScript 5.9 lib.dom already types CSS.highlights; no ambient declaration."
+        },
+        "items": [
+          {
+            "id": "citation-highlight.ac1",
+            "title": "Given `<p>Hello <strong>wide</strong> world</p>` and quote `Hello wide\\nworld`, when findQuoteRange runs, then it returns a Range whose toString() is `Hello wide world`; and given a quote not in the element, it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-highlight.ac2",
+            "title": "Given stubbed globals (CSS.highlights as a Map, Highlight as a recording class), when setRowCitationRanges adds ranges and clearRowCitationRanges removes the last row, then `overdeck-citation` is set with those ranges and then deleted; and with no CSS.highlights, neither call throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-highlight.ac3",
+            "title": "Given citeConversationName and a pending citation whose source.messageId matches an assistant row, when the row renders, then its cite wrapper has data-cited=\"true\"; and after consumeCitations for that conversation, the attribute is gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "citation-ci-subset",
+        "title": "Register the citation tests in the CI frontend test subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:43:40Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4642",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const s=require('./package.json').scripts['test:frontend-subset'];for(const f of ['citationFormat.test.ts','composerCitations.test.ts','resolveSelectionCitation.test.ts','CiteSelectionToolbar.test.tsx','CitationChips.test.tsx','ComposerFooter.citations.test.tsx','citationHighlight.test.ts']){if(!s.includes(f)){console.error('missing',f);process.exit(1)}}console.log('ok')\""
+          ],
+          "expected_outputs": [
+            "prints ok"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Append to the root package.json `test:frontend-subset` argument list (paths relative to src/dashboard/frontend/): src/lib/__tests__/citationFormat.test.ts, src/lib/__tests__/composerCitations.test.ts, src/components/chat/citations/__tests__/resolveSelectionCitation.test.ts, src/components/chat/citations/__tests__/CiteSelectionToolbar.test.tsx, src/components/chat/citations/__tests__/CitationChips.test.tsx, src/components/chat/__tests__/ComposerFooter.citations.test.tsx, src/components/chat/citations/__tests__/citationHighlight.test.ts. CI runs only listed frontend files, so this is what makes the issue's test AC hold in CI."
+        },
+        "items": [
+          {
+            "id": "citation-ci-subset.ac1",
+            "title": "Given the change, when the verify command reads package.json scripts.test:frontend-subset, then it prints `ok` because all seven citation test file paths are listed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-ci-subset.ac2",
+            "title": "Given the listed paths, when `npm --prefix ./src/dashboard/frontend run test -- <the seven paths>` runs, then every listed file exists and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "citation-docs",
+        "title": "Document citations in the conversations guide and the dashboard architecture doc",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:43:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4642",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Citations' features/conversations.mdx",
+            "grep -n 'Composer citations (PAN-4642)' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "the Citations heading is found",
+            "the PAN-4642 bullet is found"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. features/conversations.mdx: add a **Citations** row to the conversation-surface table near the **Bookmarks** row, and a `## Citations` section between `## Attachments` and `## Bookmarks` explaining: select text in a reply or your own message and click Cite (or press C); optional comment; chips above the composer can be expanded, edited or removed; the quote stays highlighted until sent; citations survive conversation switches and reloads; on send they are prepended as a `Notes on your previous reply:` block (include the PRD WI-2 fixture as an example); a failed send keeps them in the outbox for Retry; slash commands leave them pending; tool output cannot be cited. docs/DASHBOARD-ARCHITECTURE.md: after the `- Composer attachments (PAN-4493)` bullet add a `Composer citations (PAN-4642)` bullet naming lib/citationFormat.ts (exact client-side format, identical for every harness), lib/composerCitations.ts (`conv-citations:<name>` storage; source union shared with #2685), components/chat/citations/ (toolbar, chips, highlight), the data-cite-message-id row gate, the consume-on-handoff rule, and that no server route changed."
+        },
+        "items": [
+          {
+            "id": "citation-docs.ac1",
+            "title": "Given the change, when features/conversations.mdx is read, then it contains a `## Citations` section between `## Attachments` and `## Bookmarks` that shows the `Notes on your previous reply:` example block and states that slash commands leave citations pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "citation-docs.ac2",
+            "title": "Given the change, when docs/DASHBOARD-ARCHITECTURE.md is read, then a `Composer citations (PAN-4642)` bullet follows the PAN-4493 attachments bullet and names lib/citationFormat.ts, lib/composerCitations.ts and the `conv-citations:<name>` storage key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "citation-format",
+        "to": "citation-store",
+        "type": "blocks"
+      },
+      {
+        "from": "citation-format",
+        "to": "citation-send",
+        "type": "blocks"
+      },
+      {
+        "from": "citation-store",
+        "to": "cite-toolbar",
+        "type": "blocks"
+      },
+      {
+        "from": "citation-store",
+        "to": "citation-chips",
+        "type": "blocks"
+      },
+      {
+        "from": "citation-store",
+        "to": "citation-send",
+        "type": "blocks"
+      },
+      {
+        "from": "citation-store",
+        "to": "citation-highlight",
+        "type": "blocks"
+      },
+      {
+        "from": "cite-row-gate",
+        "to": "cite-toolbar",
+        "type": "blocks"
+      },
+      {
+        "from": "cite-row-gate",
+        "to": "citation-highlight",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-attachment-strip",
+        "to": "citation-chips",
+        "type": "blocks"
+      },
+      {
+        "from": "citation-chips",
+        "to": "citation-send",
+        "type": "blocks"
+      },
+      {
+        "from": "citation-format",
+        "to": "citation-ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "citation-store",
+        "to": "citation-ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "cite-row-gate",
+        "to": "citation-ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "cite-toolbar",
+        "to": "citation-ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "citation-chips",
+        "to": "citation-ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "citation-send",
+        "to": "citation-ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "citation-highlight",
+        "to": "citation-ci-subset",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-01-PAN-4642-cite-selected-reply-text-with-a-comment-and-send-it-with-the-next-prompt.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

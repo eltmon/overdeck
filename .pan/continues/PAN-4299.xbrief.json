@@ -1,0 +1,177 @@
+{
+  "version": "1",
+  "issueId": "PAN-4299",
+  "created": "2026-11-01T05:05:33.847Z",
+  "updated": "2026-11-01T05:38:41.192Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "template-loopback-ports": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4299",
+      "claimedAt": "2026-11-01T05:05:33.847Z",
+      "doneAt": "2026-11-01T05:06:05.927Z"
+    },
+    "compose-migration-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4299",
+      "claimedAt": "2026-11-01T05:06:25.242Z",
+      "doneAt": "2026-11-01T05:12:12.221Z"
+    },
+    "wire-install-sync": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4299",
+      "claimedAt": "2026-11-01T05:12:18.273Z",
+      "doneAt": "2026-11-01T05:13:05.612Z"
+    },
+    "wire-up-dev": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4299",
+      "claimedAt": "2026-11-01T05:13:07.639Z",
+      "doneAt": "2026-11-01T05:13:47.852Z"
+    },
+    "wire-lifecycle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4299",
+      "claimedAt": "2026-11-01T05:13:49.691Z",
+      "doneAt": "2026-11-01T05:14:55.342Z"
+    },
+    "forwarded-client-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4299",
+      "claimedAt": "2026-11-01T05:14:57.100Z",
+      "doneAt": "2026-11-01T05:16:23.080Z"
+    },
+    "doctor-traefik-binding": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4299",
+      "claimedAt": "2026-11-01T05:16:24.761Z",
+      "doneAt": "2026-11-01T05:17:29.311Z"
+    },
+    "docs-traefik-loopback": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4299",
+      "claimedAt": "2026-11-01T05:17:31.495Z",
+      "doneAt": "2026-11-01T05:18:20.394Z"
+    },
+    "template-loopback-ports.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:30:11.315Z"
+    },
+    "template-loopback-ports.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:31:05.913Z"
+    },
+    "template-loopback-ports.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:31:21.324Z"
+    },
+    "compose-migration-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:31:36.938Z"
+    },
+    "compose-migration-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:31:51.297Z"
+    },
+    "compose-migration-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:32:07.048Z"
+    },
+    "compose-migration-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:32:24.801Z"
+    },
+    "compose-migration-helper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:32:39.429Z"
+    },
+    "wire-install-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:32:54.934Z"
+    },
+    "wire-install-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:33:11.382Z"
+    },
+    "wire-install-sync.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:33:26.839Z"
+    },
+    "wire-up-dev.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:33:45.583Z"
+    },
+    "wire-up-dev.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:34:02.402Z"
+    },
+    "wire-up-dev.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:34:20.088Z"
+    },
+    "wire-lifecycle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:34:36.412Z"
+    },
+    "wire-lifecycle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:34:51.434Z"
+    },
+    "forwarded-client-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:35:06.963Z"
+    },
+    "forwarded-client-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:35:24.002Z"
+    },
+    "forwarded-client-check.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:35:44.620Z"
+    },
+    "forwarded-client-check.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:36:02.044Z"
+    },
+    "forwarded-client-check.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:36:19.844Z"
+    },
+    "doctor-traefik-binding.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:36:37.984Z"
+    },
+    "doctor-traefik-binding.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:36:56.617Z"
+    },
+    "doctor-traefik-binding.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:37:17.181Z"
+    },
+    "doctor-traefik-binding.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:37:33.111Z"
+    },
+    "docs-traefik-loopback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:37:49.909Z"
+    },
+    "docs-traefik-loopback.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:38:07.384Z"
+    },
+    "docs-traefik-loopback.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:38:23.152Z"
+    },
+    "docs-traefik-loopback.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:38:41.192Z"
+    }
+  }
+}

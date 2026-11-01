@@ -39,7 +39,7 @@ Traefik reverse proxy for local development with HTTPS.
 
 ### Docker Compose
 - Runs Traefik v3.0 in a container
-- Exposes ports 80, 443, 8080
+- Publishes ports 80, 443, 8080 on 127.0.0.1 only (set [traefik] bind = "all" to publish on every interface)
 - Mounts configuration files and certificates
 - Uses `overdeck` network for container communication
 

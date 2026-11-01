@@ -50,6 +50,19 @@ Overdeck manages Traefik configuration in `~/.overdeck/traefik/`:
     └── localhost-key.pem
 ```
 
+### Port Binding
+
+Traefik publishes ports 80, 443 and 8080 on `127.0.0.1` only, so other machines on your network cannot reach the dashboard or the Traefik API through it. To publish on every interface, opt in through `~/.overdeck/config.toml`:
+
+```toml
+[traefik]
+bind = "all"   # default: "loopback" (127.0.0.1)
+```
+
+With `bind = "all"`, anyone who can reach this machine can connect to Traefik and to every workspace it routes. The dashboard still answers **401** to a forwarded LAN client that has no credential, but IPv6 LAN clients look like local traffic, so loopback binding is the only full defense. Unset or unknown values mean loopback.
+
+`pan install`, `pan sync`, `pan up`, `pan dev` and `pan restart --traefik` (or `--full`) rewrite the port lines of an existing `~/.overdeck/traefik/docker-compose.yml` to the configured address. `pan sync` only rewrites the file, so run `pan restart --traefik` afterward to recreate the container. `pan doctor` reports **Traefik port binding** as an error when the running container still publishes on `0.0.0.0` or `[::]`.
+
 ### Static Configuration
 
 The main Traefik config (`~/.overdeck/traefik/traefik.yml`):

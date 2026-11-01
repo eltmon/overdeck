@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { execFileSync, execSync } from 'child_process';
-import { existsSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import {
@@ -23,7 +23,7 @@ import { ensureSemgrepInstalled, formatSemgrepInstallOutcome, SEMGREP_VERSION } 
 import { Effect } from 'effect';
 import { detectPlatform } from '../../lib/platform.js';
 import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
-import { generateOverdeckTraefikConfig, cleanupTemplateFiles, ensureProjectCerts, generateTlsConfig } from '../../lib/traefik.js';
+import { generateOverdeckTraefikConfig, cleanupTemplateFiles, ensureProjectCerts, generateTlsConfig, migrateTraefikCompose } from '../../lib/traefik.js';
 import { refreshCache, syncStatusline } from '../../lib/sync.js';
 import { ensureGlobalLayer } from '../../lib/context-layers/index.js';
 import { setupHooksCommand } from './setup/hooks.js';
@@ -532,19 +532,8 @@ async function installCommand(options: InstallOptions): Promise<void> {
         spinner.succeed('TLS config generated (tls.yml)');
       }
 
-      // Check if existing docker-compose.yml needs migration (for upgrades)
-      const existingCompose = join(TRAEFIK_DIR, 'docker-compose.yml');
-      if (existsSync(existingCompose)) {
-        const content = readFileSync(existingCompose, 'utf-8');
-        if (content.includes('overdeck:') && !content.includes('external: true')) {
-          // Patch the file to add external: true
-          const patched = content.replace(
-            /networks:\s*\n\s*overdeck:\s*\n\s*name: overdeck\s*\n\s*driver: bridge/,
-            'networks:\n  overdeck:\n    name: overdeck\n    external: true  # Network created by \'pan install\''
-          );
-          writeFileSync(existingCompose, patched);
-          spinner.info('Migrated Traefik config (added external: true to network)');
-        }
+      if (migrateTraefikCompose()) {
+        spinner.info('Migrated Traefik compose file (external network, ports on the configured bind address)');
       }
     } catch (error) {
       spinner.fail(`Failed to set up Traefik configuration: ${error}`);

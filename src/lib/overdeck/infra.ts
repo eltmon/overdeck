@@ -129,6 +129,10 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // PAN-4641: operator messages held until a usage limit resets. Mirrors the init migration.
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_scheduled_messages` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` text NOT NULL, `text` text NOT NULL, `status` text NOT NULL, `not_before` integer NOT NULL, `reset_source` text, `limit_window` text, `attempts` integer DEFAULT 0 NOT NULL, `last_error` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, `sent_at` integer, `delivered_at` integer, FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_scheduled_messages_status` ON `conversation_scheduled_messages` (`status`, `not_before`)');
+  // PAN-4640: recurring scheduled prompts on conversations. Mirrors the init migration.
+  runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_schedules` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` text NOT NULL, `prompt` text NOT NULL, `cron` text NOT NULL, `time_zone` text NOT NULL, `enabled` integer NOT NULL DEFAULT 1, `next_run_at` integer, `last_run_at` integer, `last_run_status` text, `last_run_error` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_schedules_due` ON `conversation_schedules` (`enabled`, `next_run_at`)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_schedules_conversation` ON `conversation_schedules` (`conversation_id`)');
   // Gauntlet lanes: launch-time facts written once by the lane door (.pan/drafts/pan-4223.md).
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `parent_conversation_id` text REFERENCES `conversations`(`id`)');
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `gauntlet_run` text');
