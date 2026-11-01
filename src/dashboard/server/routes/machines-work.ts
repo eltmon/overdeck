@@ -23,6 +23,11 @@
  *   the same gates and spawn as the dashboard's Start button
  *   (`POST /api/agents`). Answers `{ issueId, agentId }`; a refusal from those
  *   gates passes through unchanged.
+ * - `POST /api/machines/work/projects { gitOrigin, cloneUrl, name, issuePrefix, files: [{ path, contentBase64 }] }`
+ *   (Add this project there, D-4651-14) → clone + register + write the files
+ *   through `startAddProject`; 202 `{ jobId }`, followed with
+ *   `GET /api/machines/work/projects/:jobId`. Project files cross only an
+ *   operator-level link for the operator actor (403 `project-files-forbidden`).
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
@@ -35,9 +40,11 @@ import { generateAiTitle } from '../../../lib/overdeck/conversation-reads.js';
 import { handleConversationCreate } from '../../../lib/overdeck/conversation-runtime.js';
 import { listProjectsAsync, type ProjectConfig, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { jsonResponse } from '../http-helpers.js';
+import { type AddProjectRequest, getAddProjectJob, startAddProject, type StartAddProjectResult } from '../services/fleet-add-project.js';
 import { spawnIssueAgentForRoute } from './agents/spawn-issue.js';
 import { conversationReadDependencies } from './conversations.js';
 import { type DashboardCredential, resolveRequestCredential } from './dashboard-auth.js';
+import { projectFilesRefusal } from './machines-projects.js';
 import { parseStartWorkerBody } from './workers.js';
 
 export type MachineCredential = Extract<DashboardCredential, { kind: 'machine' }>;
@@ -236,6 +243,50 @@ export function handleWorkIssueStart<R>(
   });
 }
 
+export interface ProjectDoorDeps {
+  start: (request: AddProjectRequest) => Promise<StartAddProjectResult>;
+}
+
+/** A relative path without `..` (the writer re-checks symlinks and escapes). */
+function isRelativeFilePath(path: string): boolean {
+  if (!path || path.startsWith('/') || path.includes('\0') || /^[a-zA-Z]:/.test(path)) return false;
+  return !path.split(/[\\/]+/).includes('..');
+}
+
+/** `POST /api/machines/work/projects`. */
+export async function handleWorkProject(
+  credential: DashboardCredential | null,
+  raw: unknown,
+  deps: ProjectDoorDeps = { start: (request) => startAddProject(request) },
+): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'machine') return machineOnly();
+  const refused = projectFilesRefusal(credential);
+  if (refused) return refused;
+  const body = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+  if (!body || typeof body['cloneUrl'] !== 'string' || typeof body['name'] !== 'string' || typeof body['gitOrigin'] !== 'string') {
+    return jsonResponse({ error: 'body must be { gitOrigin, cloneUrl, name, issuePrefix, files }' }, { status: 400 });
+  }
+  const rawFiles = body['files'] ?? [];
+  if (!Array.isArray(rawFiles)) return jsonResponse({ error: 'files must be a list' }, { status: 400 });
+  const files: AddProjectRequest['files'] = [];
+  for (const file of rawFiles as Array<{ path?: unknown; contentBase64?: unknown }>) {
+    if (typeof file?.path !== 'string' || !isRelativeFilePath(file.path) || typeof file.contentBase64 !== 'string') {
+      return jsonResponse({ code: 'bad-path', error: `files[].path must be a relative path without ..; got ${JSON.stringify(file?.path)}` }, { status: 400 });
+    }
+    files.push({ path: file.path, contents: Buffer.from(file.contentBase64, 'base64') });
+  }
+  const issuePrefix = typeof body['issuePrefix'] === 'string' ? body['issuePrefix'] : null;
+  const started = await deps.start({ cloneUrl: body['cloneUrl'], name: body['name'], issuePrefix, files });
+  return started.ok ? jsonResponse({ jobId: started.jobId }, { status: 202 }) : jsonResponse(started.body, { status: started.status });
+}
+
+/** `GET /api/machines/work/projects/:jobId`: the add job a linked machine started here. */
+export function handleWorkProjectJob(credential: DashboardCredential | null, jobId: string): HttpServerResponse.HttpServerResponse {
+  if (credential?.kind !== 'machine') return machineOnly();
+  const job = getAddProjectJob(jobId);
+  return job ? jsonResponse(job) : jsonResponse({ code: 'unknown-job', error: 'Unknown add job' }, { status: 404 });
+}
+
 export const readWorkDoorBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
@@ -277,4 +328,23 @@ const workIssueStartRoute = HttpRouter.add(
   }),
 );
 
-export const machinesWorkRouteLayer = Layer.mergeAll(workConversationRoute, workWorkerRoute, workIssueStartRoute);
+const workProjectRoute = HttpRouter.add(
+  'POST',
+  '/api/machines/work/projects',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const body = yield* readWorkDoorBody;
+    return yield* Effect.promise(() => handleWorkProject(resolveRequestCredential(request), body));
+  }),
+);
+
+const workProjectJobRoute = HttpRouter.add(
+  'GET',
+  '/api/machines/work/projects/:jobId',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return handleWorkProjectJob(resolveRequestCredential(request), (yield* HttpRouter.params)['jobId'] ?? '');
+  }),
+);
+
+export const machinesWorkRouteLayer = Layer.mergeAll(workConversationRoute, workWorkerRoute, workIssueStartRoute, workProjectRoute, workProjectJobRoute);

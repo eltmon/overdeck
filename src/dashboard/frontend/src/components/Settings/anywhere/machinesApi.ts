@@ -140,6 +140,22 @@ export async function loadOwnerProjectSource(machine: string, projectKey: string
   return result.body;
 }
 
+/** This machine's source facts for one of its projects (Add there). */
+export async function loadLocalProjectSource(projectKey: string): Promise<OwnerProjectSource> {
+  const result = await readResult<OwnerProjectSource>(await fetch(`/api/fleet/projects/local-source?projectKey=${encodeURIComponent(projectKey)}`));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body;
+}
+
+/** Add there: clone one of this machine's projects on a linked machine and copy `files`. */
+export async function addProjectThere(input: { machine: string; projectKey: string; files: string[] }): Promise<ApiResult<{ jobId: string; machine: string }>> {
+  return readResult(await fetch('/api/fleet/projects/add-there', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(input),
+  }));
+}
+
 /** Add here: clone the linked machine's project to this machine and copy `files`. */
 export async function addProjectHere(input: { machine: string; projectKey: string; files: string[] }): Promise<ApiResult<{ jobId: string }>> {
   return readResult(await fetch('/api/fleet/projects/add-here', {
@@ -149,8 +165,10 @@ export async function addProjectHere(input: { machine: string; projectKey: strin
   }));
 }
 
-export async function loadAddProjectJob(jobId: string): Promise<AddProjectJob> {
-  const result = await readResult<AddProjectJob>(await fetch(`/api/fleet/projects/add-jobs/${encodeURIComponent(jobId)}`));
+/** An add job here, or (with `machine`) one running on that linked machine. */
+export async function loadAddProjectJob(jobId: string, machine?: string): Promise<AddProjectJob> {
+  const query = machine ? `?machine=${encodeURIComponent(machine)}` : '';
+  const result = await readResult<AddProjectJob>(await fetch(`/api/fleet/projects/add-jobs/${encodeURIComponent(jobId)}${query}`));
   if (!isOk(result)) throw new Error(apiError(result));
   return result.body;
 }

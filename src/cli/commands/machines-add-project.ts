@@ -4,7 +4,9 @@
  * Copies a project between linked machines through the project-creation core:
  * clone from the repository's origin on the target, register it, then write
  * the chosen git-ignored files (0600, never overwriting). By default the
- * source machine is `<machine>` and the target is this machine; `.env`,
+ * source machine is `<machine>` and the target is this machine; with
+ * `--to <target>` the project is one of this machine's and goes to `<target>`
+ * (`pan machines add-project <this label> <key> --to desk`); `.env`,
  * `.envrc` and `.dev.vars` are included unless `--no-env`, and `--file <path>`
  * adds more. The verb waits for the add job and prints each file's result.
  */
@@ -14,6 +16,7 @@ import { callDashboard, errorText, isDashboardUnreachable } from './dashboard-ca
 import { NOT_RUNNING } from './machines-call.js';
 
 export interface AddProjectOptions {
+  to?: string;
   file?: string[];
   env?: boolean;
   parentDir?: string;
@@ -49,16 +52,17 @@ const errorOf = (json: unknown, status: number): string => {
 
 /** Returns the exit code. */
 export async function runMachinesAddProject(machine: string, projectKey: string, options: AddProjectOptions, deps: AddProjectCliDeps = defaultDeps()): Promise<number> {
+  const there = Boolean(options.to);
   const body = {
-    machine,
+    machine: there ? options.to : machine,
     projectKey,
     files: options.file ?? [],
     includePreselected: options.env !== false,
-    ...(options.parentDir ? { parentDir: options.parentDir } : {}),
+    ...(!there && options.parentDir ? { parentDir: options.parentDir } : {}),
   };
   let started: { status: number; json: unknown };
   try {
-    started = await deps.call('/api/fleet/projects/add-here', { method: 'POST', body });
+    started = await deps.call(there ? '/api/fleet/projects/add-there' : '/api/fleet/projects/add-here', { method: 'POST', body });
   } catch (error) {
     deps.stderr(isDashboardUnreachable(error) ? NOT_RUNNING : (error as Error).message);
     return 1;
@@ -68,9 +72,11 @@ export async function runMachinesAddProject(machine: string, projectKey: string,
     deps.stderr(`pan machines add-project failed: ${errorOf(started.json, started.status)}`);
     return 1;
   }
-  deps.stderr(`Cloning ${projectKey} from ${machine}…`);
+  const owner = (started.json as { machine?: unknown } | null)?.machine;
+  const jobPath = `/api/fleet/projects/add-jobs/${encodeURIComponent(jobId)}${there && typeof owner === 'string' ? `?machine=${encodeURIComponent(owner)}` : ''}`;
+  deps.stderr(there ? `Cloning ${projectKey} on ${options.to}…` : `Cloning ${projectKey} from ${machine}…`);
   for (;;) {
-    const answer = await deps.call(`/api/fleet/projects/add-jobs/${encodeURIComponent(jobId)}`, { method: 'GET' });
+    const answer = await deps.call(jobPath, { method: 'GET' });
     const job = answer.json as AddJob | null;
     if (answer.status !== 200 || !job) {
       deps.stderr(`pan machines add-project lost its job: ${errorOf(answer.json, answer.status)}`);
@@ -83,7 +89,7 @@ export async function runMachinesAddProject(machine: string, projectKey: string,
     if (job.step === 'done') {
       if (options.json) deps.stdout(JSON.stringify(job));
       else {
-        deps.stdout(`Added ${job.projectKey ?? projectKey} to this machine.`);
+        deps.stdout(`Added ${job.projectKey ?? projectKey} to ${there ? options.to : 'this machine'}.`);
         for (const file of job.files ?? []) deps.stdout(`  ${file.path}: ${file.result}`);
       }
       return 0;
@@ -95,7 +101,8 @@ export async function runMachinesAddProject(machine: string, projectKey: string,
 export function registerMachinesAddProjectCommand(machines: Command): void {
   machines
     .command('add-project <machine> <project-key>')
-    .description('Clone a linked machine\'s project here and copy its .env-style files (0600, never overwriting)')
+    .description('Clone a linked machine\'s project here (or, with --to, this machine\'s project there) and copy its .env-style files (0600, never overwriting)')
+    .option('--to <machine>', 'Add this machine\'s project <project-key> to <machine> instead')
     .option('--file <path>', 'Also copy this git-ignored file; repeat for more', (path: string, paths: string[] = []) => [...paths, path])
     .option('--no-env', 'Do not copy .env, .envrc and .dev.vars')
     .option('--parent-dir <dir>', 'Clone under this directory (default: the projects folder)')

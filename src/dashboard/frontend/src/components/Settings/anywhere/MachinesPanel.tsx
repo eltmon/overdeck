@@ -38,6 +38,7 @@ import {
 } from './machinesApi';
 import { RemoveSshMachineDialog } from './RemoveSshMachineDialog';
 import { SharingSwitches } from './SharingSwitches';
+import { AddProjectToMachineDialog } from '../../sidebar/AddProjectToMachineDialog';
 import { unlinkMachineKeepingServer } from './sshMachinesApi';
 
 const STATE_LABEL: Record<LinkState, string> = {
@@ -105,8 +106,9 @@ function MachineLoadText({ view }: { view: Pick<MachineLinkView, 'load' | 'tags'
   return text ? <span data-testid="machine-load">{' · '}{text}</span> : null;
 }
 
-function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged: () => Promise<void> }) {
+function MachineLinkRow({ link, onChanged, thisLabel }: { link: MachineLinkView; onChanged: () => Promise<void>; thisLabel: string }) {
   const confirm = useConfirm();
+  const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [routesOpen, setRoutesOpen] = useState(false);
   const [routeUrl, setRouteUrl] = useState('');
@@ -201,6 +203,11 @@ function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged:
               Reconnect
             </button>
           )}
+          {link.state === 'online' && link.access === 'operator' && (
+            <button type="button" onClick={() => setAddProjectOpen(true)} className={buttonClass}>
+              Add a project
+            </button>
+          )}
           <button type="button" disabled={busy} onClick={() => void handleUnlink()} className={destructiveButtonClass}>
             {ssh ? 'Remove' : 'Unlink'}
           </button>
@@ -242,6 +249,9 @@ function MachineLinkRow({ link, onChanged }: { link: MachineLinkView; onChanged:
       )}
       {removeOpen && ssh && (
         <RemoveSshMachineDialog link={{ ...link, ssh }} onCancel={() => setRemoveOpen(false)} onConfirm={(keepServer) => void handleRemoveSsh(keepServer)} />
+      )}
+      {addProjectOpen && (
+        <AddProjectToMachineDialog target={{ direction: 'there', machine: link.environmentId, machineLabel: link.label, thisLabel }} onClose={() => setAddProjectOpen(false)} />
       )}
     </li>
   );
@@ -334,7 +344,7 @@ export function MachinesPanel() {
         <p className="text-xs text-muted-foreground px-4 py-3">No machines are linked yet. Pair another Overdeck machine and paste its pairing link here.</p>
       ) : (
         <ul className="space-y-1">
-          {data.links.map((link) => <MachineLinkRow key={link.id} link={link} onChanged={refresh} />)}
+          {data.links.map((link) => <MachineLinkRow key={link.id} link={link} onChanged={refresh} thisLabel={data.self.label} />)}
         </ul>
       )}
 

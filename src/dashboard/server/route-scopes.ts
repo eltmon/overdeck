@@ -88,6 +88,9 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // PAN-4651 WI-17: a linked machine's operator reads a project's source facts and ignored files (operator-level link only, checked by the routes).
   { method: 'GET', path: '/api/machines/projects/:key/source', scope: 'read:state' },
   { method: 'GET', path: '/api/machines/projects/:key/file', scope: 'read:state' },
+  // PAN-4651 WI-19: Add this project there (operator actor on an operator-level link only, checked by the route).
+  { method: 'POST', path: '/api/machines/work/projects', scope: 'operate' },
+  { method: 'GET', path: '/api/machines/work/projects/:jobId', scope: 'read:state' },
   // PAN-4651 WI-5: a linked machine follows (and stops) a worker it delegated here.
   { method: 'GET', path: '/api/workers/:id/status', scope: 'read:state' },
   { method: 'POST', path: '/api/workers/:id/stop', scope: 'operate' },

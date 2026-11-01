@@ -47,17 +47,25 @@ const defaultDeps: MachineProjectsDeps = {
 
 const unknownProject = (key: string) => jsonResponse({ code: 'unknown-project', error: `No project ${key} on this machine` }, { status: 404 });
 
-export async function handleProjectSource(credential: DashboardCredential | null, key: string, deps: MachineProjectsDeps = defaultDeps): Promise<HttpServerResponse.HttpServerResponse> {
-  const refused = projectFilesRefusal(credential);
-  if (refused) return refused;
+/** This machine's source facts for a project; null when there is no such project. */
+export async function projectSourceFacts(key: string, deps: MachineProjectsDeps = defaultDeps) {
   const project = deps.project(key);
-  if (!project?.path) return unknownProject(key);
+  if (!project?.path) return null;
   const gitOrigin = gitOriginOf(project);
   const [cloneUrl, ignoredFiles] = await Promise.all([
     deps.cloneUrl(project.path, gitOrigin),
     deps.ignoredFiles(project.path).catch(() => []),
   ]);
-  return jsonResponse({ key, name: project.name || key, issuePrefix: getIssuePrefix(project) ?? null, gitOrigin, cloneUrl, ignoredFiles });
+  return { key, name: project.name || key, issuePrefix: getIssuePrefix(project) ?? null, gitOrigin, cloneUrl, ignoredFiles, root: project.path };
+}
+
+export async function handleProjectSource(credential: DashboardCredential | null, key: string, deps: MachineProjectsDeps = defaultDeps): Promise<HttpServerResponse.HttpServerResponse> {
+  const refused = projectFilesRefusal(credential);
+  if (refused) return refused;
+  const facts = await projectSourceFacts(key, deps);
+  if (!facts) return unknownProject(key);
+  const { root: _root, ...source } = facts;
+  return jsonResponse(source);
 }
 
 export async function handleProjectFile(credential: DashboardCredential | null, key: string, path: string, deps: MachineProjectsDeps = defaultDeps): Promise<HttpServerResponse.HttpServerResponse> {

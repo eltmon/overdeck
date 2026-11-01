@@ -12,15 +12,17 @@
  * selected files from the owner through the link (operator actor), then runs
  * `startAddProject` on this machine. The owner direction (`POST
  * /api/machines/work/projects`, WI-19) calls `startAddProject` with the files
- * it received.
+ * it received. `addProjectThere` is the other way round: it reads this
+ * machine's project facts and files and posts them to the owner's door.
  */
 import { randomUUID } from 'node:crypto';
 
 import type { ProjectCreateInput, ResolvedProjectIntent } from '../../../lib/projects/create.js';
 import { resolveProjectCreateIntent } from '../../../lib/projects/create.js';
-import { MAX_PROJECT_FILE_BYTES, writeProjectFileExclusive } from '../../../lib/projects/ignored-files.js';
+import { MAX_PROJECT_FILE_BYTES, readProjectFile, writeProjectFileExclusive } from '../../../lib/projects/ignored-files.js';
 import { linkFetch, linkForward } from '../../../lib/anywhere/link-client.js';
 import type { MachineLink } from '../../../lib/anywhere/link-store.js';
+import { projectSourceFacts } from '../routes/machines-projects.js';
 import {
   getProjectCreateJob,
   type ProjectCreateJob,
@@ -172,10 +174,8 @@ export async function addProjectHere(
   if (!read.ok) return read;
   const { source } = read;
   if (!source.cloneUrl) return { ok: false, status: 409, body: { code: 'no-clone-url', error: `${source.name} on ${input.link.label} has no origin remote to clone` } };
-  const offered = new Set(source.ignoredFiles.map((file) => file.path));
-  const wanted = new Set([...input.files, ...(input.includePreselected ? source.ignoredFiles.filter((file) => file.preselected).map((file) => file.path) : [])]);
-  const unknown = [...wanted].filter((path) => !offered.has(path));
-  if (unknown.length > 0) return { ok: false, status: 400, body: { code: 'unknown-file', error: `${input.link.label} offers no ignored file ${unknown.join(', ')}` } };
+  const wanted = chooseFiles(source.ignoredFiles, input.files, input.includePreselected, input.link.label);
+  if (!Array.isArray(wanted)) return wanted;
   const files: AddProjectRequest['files'] = [];
   for (const path of wanted) {
     const file = await deps.fetchFile(input.link.environmentId, input.projectKey, path);
@@ -183,4 +183,43 @@ export async function addProjectHere(
     files.push({ path, contents: file.body });
   }
   return deps.start({ cloneUrl: source.cloneUrl, name: source.name, issuePrefix: source.issuePrefix, ...(input.parentDir ? { parentDir: input.parentDir } : {}), files });
+}
+
+function chooseFiles(offered: OwnerSource['ignoredFiles'], files: readonly string[], includePreselected: boolean, where: string): string[] | { ok: false; status: number; body: Record<string, unknown> } {
+  const paths = new Set(offered.map((file) => file.path));
+  const wanted = [...new Set([...files, ...(includePreselected ? offered.filter((file) => file.preselected).map((file) => file.path) : [])])];
+  const unknown = wanted.filter((path) => !paths.has(path));
+  return unknown.length > 0 ? { ok: false, status: 400, body: { code: 'unknown-file', error: `${where} offers no ignored file ${unknown.join(', ')}` } } : wanted;
+}
+
+export interface AddThereDeps {
+  source: (projectKey: string) => Promise<(OwnerSource & { root: string }) | null>;
+  readFile: (root: string, path: string) => Promise<Buffer>;
+  post: (environmentId: string, body: unknown) => Promise<{ status: number; json: unknown }>;
+}
+
+export const defaultAddThereDeps: AddThereDeps = {
+  source: (projectKey) => projectSourceFacts(projectKey),
+  readFile: readProjectFile,
+  post: (environmentId, body) => linkFetch(environmentId, '/api/machines/work/projects', { method: 'POST', body, actor: 'operator' }),
+};
+
+/** `POST /api/fleet/projects/add-there`: add one of this machine's projects (and the chosen files) to a linked machine. */
+export async function addProjectThere(
+  input: { link: MachineLink; projectKey: string; files: readonly string[]; includePreselected: boolean },
+  deps: AddThereDeps = defaultAddThereDeps,
+): Promise<StartAddProjectResult> {
+  const source = await deps.source(input.projectKey);
+  if (!source) return { ok: false, status: 404, body: { code: 'unknown-project', error: `No project ${input.projectKey} on this machine` } };
+  if (!source.gitOrigin || !source.cloneUrl) {
+    return { ok: false, status: 409, body: { code: 'project-has-no-origin', error: `${source.name} has no origin remote, so ${input.link.label} cannot clone it` } };
+  }
+  const chosen = chooseFiles(source.ignoredFiles, input.files, input.includePreselected, 'This machine');
+  if (!Array.isArray(chosen)) return chosen;
+  const files = await Promise.all(chosen.map(async (path) => ({ path, contentBase64: (await deps.readFile(source.root, path)).toString('base64') })));
+  const answer = await deps.post(input.link.environmentId, { gitOrigin: source.gitOrigin, cloneUrl: source.cloneUrl, name: source.name, issuePrefix: source.issuePrefix, files });
+  const jobId = (answer.json as { jobId?: unknown } | null)?.jobId;
+  if (answer.status === 202 && typeof jobId === 'string') return { ok: true, jobId };
+  const body = (answer.json ?? {}) as Record<string, unknown>;
+  return { ok: false, status: answer.status, body: { ...body, error: typeof body.error === 'string' ? body.error : `${input.link.label} answered ${answer.status}` } };
 }
