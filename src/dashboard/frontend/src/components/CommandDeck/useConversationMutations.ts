@@ -7,6 +7,8 @@ import { closeConversationPanes } from '../../lib/panesStore';
 
 // Shared across hook instances so every view sees a pending archive (PAN-4584).
 const ARCHIVE_MUTATION_KEY = ['conversation-archive'] as const;
+// Shared across hook instances so every view sees a pending stop (PAN-4626).
+const STOP_MUTATION_KEY = ['conversation-stop'] as const;
 
 async function archiveConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/archive`, { method: 'POST' });
@@ -16,7 +18,8 @@ async function archiveConversation(name: string): Promise<void> {
 
 async function stopConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/stop`, { method: 'POST' });
-  if (!res.ok) throw new Error('Failed to stop conversation');
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || 'Failed to stop conversation');
 }
 
 async function retitleConversation(name: string): Promise<{ title: string }> {
@@ -106,6 +109,7 @@ export interface ConversationMutations {
   archive: (name: string, options?: { onSuccess?: () => void }) => void;
   isArchivePending: (name: string) => boolean;
   stop: (name: string) => void;
+  isStopPending: (name: string) => boolean;
   rename: (opts: { name: string; title: string }) => void;
   retitle: (name: string) => void;
   isRetitlePending: (name: string) => boolean;
@@ -140,8 +144,10 @@ export function useConversationMutations(
         ?.find((c) => c.name === name)?.title ?? name;
       return { title };
     },
-    onSuccess: (_data, name, ctx) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    onSuccess: async (_data, name, ctx) => {
+      // Awaited so the mutation stays pending (row dimmed) until the
+      // refetched list drops the row (PAN-4626).
+      await queryClient.invalidateQueries({ queryKey: ['conversations'] });
       // An archived conversation leaves the list — close its deck tab(s) too.
       closeConversationPanes(name);
       if (selectedConversation === name) {
@@ -160,13 +166,24 @@ export function useConversationMutations(
   });
 
   const stopMutation = useMutation({
+    mutationKey: STOP_MUTATION_KEY,
     mutationFn: stopConversation,
-    onSuccess: (_data, name) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    onSuccess: async (_data, name) => {
+      // Awaited so the mutation stays pending (row dimmed) until the
+      // refetched list reflects the stopped session (PAN-4626).
+      await queryClient.invalidateQueries({ queryKey: ['conversations'] });
       if (selectedConversation === name) {
         onSelectConversation(null);
       }
     },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 6000 });
+    },
+  });
+
+  const pendingStopNames = useMutationState({
+    filters: { mutationKey: STOP_MUTATION_KEY, status: 'pending' },
+    select: (m) => m.state.variables as string,
   });
 
   const renameMutation = useMutation({
@@ -331,11 +348,10 @@ export function useConversationMutations(
   // PAN-4560: one object per meaningful change, so the memoized conversation
   // list items do not all re-render on every list render. TanStack keeps each
   // `.mutate` stable; retitleVersion is a dependency so isRetitlePending
-  // re-evaluates after pending changes, and pendingArchiveNames is a
-  // dependency so isArchivePending does too.
+  // re-evaluates after pending changes, and pendingArchiveNames /
+  // pendingStopNames are dependencies so isArchivePending / isStopPending do too.
   const archiveMutate = archiveMutation.mutate;
   const stopMutate = stopMutation.mutate;
-  const stopIsPending = stopMutation.isPending;
   const renameMutate = renameMutation.mutate;
   const retitleMutate = retitleMutation.mutate;
   const favoriteMutate = favoriteMutation.mutate;
@@ -349,7 +365,11 @@ export function useConversationMutations(
       archiveMutate(name, options?.onSuccess ? { onSuccess: () => options.onSuccess?.() } : undefined);
     },
     isArchivePending: (name) => pendingArchiveNames.includes(name),
-    stop: (name) => { if (!stopIsPending) stopMutate(name); },
+    stop: (name) => {
+      if (queryClient.isMutating({ mutationKey: STOP_MUTATION_KEY, predicate: (m) => m.state.variables === name }) > 0) return;
+      stopMutate(name);
+    },
+    isStopPending: (name) => pendingStopNames.includes(name),
     rename: (opts) => renameMutate(opts),
     retitle: (name) => {
       if (pendingRetitleNamesRef.current.has(name)) return;
@@ -370,5 +390,5 @@ export function useConversationMutations(
     forkTargetFocus,
     closeForkModal: () => { setForkTarget(null); setForkTargetMode(undefined); setForkTargetFocus(undefined); },
     isForkPending,
-  }), [archiveMutate, pendingArchiveNames, queryClient, stopMutate, stopIsPending, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, retitleVersion]);
+  }), [archiveMutate, pendingArchiveNames, queryClient, stopMutate, pendingStopNames, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, retitleVersion]);
 }
