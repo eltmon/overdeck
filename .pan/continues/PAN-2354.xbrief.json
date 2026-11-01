@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2354",
   "created": "2026-11-01T05:46:47.920Z",
-  "updated": "2026-11-01T07:35:15.131Z",
+  "updated": "2026-11-01T07:35:35.816Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -284,6 +284,10 @@
     "hook-wake.ac2": {
       "status": "completed",
       "doneAt": "2026-11-01T07:35:15.130Z"
+    },
+    "routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:35:35.815Z"
     }
   }
 }
