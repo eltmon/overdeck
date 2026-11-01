@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4652",
   "created": "2026-11-01T18:40:05.145Z",
-  "updated": "2026-11-01T20:34:11.719Z",
+  "updated": "2026-11-01T20:34:25.184Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,10 @@
     "wi5-public-link-only-gate.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T20:34:11.719Z"
+    },
+    "wi6-fly-machine-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:34:25.184Z"
     }
   }
 }
