@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2356",
   "created": "2026-11-01T13:35:50.720Z",
-  "updated": "2026-11-01T14:05:11.364Z",
+  "updated": "2026-11-01T14:10:05.651Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,11 @@
     "wi8-do-inbox.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:05:11.364Z"
+    },
+    "wi9-directory-client": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:10:05.651Z"
     }
   }
 }
