@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4645",
   "created": "2026-11-01T05:45:18.271Z",
-  "updated": "2026-11-01T10:11:51.294Z",
+  "updated": "2026-11-01T10:26:02.325Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -382,9 +382,10 @@
       "doneAt": "2026-11-01T10:11:35.341Z"
     },
     "wi18-link-supervisor": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4645",
-      "claimedAt": "2026-11-01T10:11:51.294Z"
+      "claimedAt": "2026-11-01T10:11:51.294Z",
+      "doneAt": "2026-11-01T10:26:02.324Z"
     }
   }
 }
