@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4654",
   "created": "2026-11-01T13:26:56.845Z",
-  "updated": "2026-11-01T14:17:28.118Z",
+  "updated": "2026-11-01T14:17:42.705Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "harness-update-capabilities.ac4": {
       "status": "completed",
       "doneAt": "2026-11-01T14:17:28.118Z"
+    },
+    "versions-self-report.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:17:42.705Z"
     }
   }
 }
