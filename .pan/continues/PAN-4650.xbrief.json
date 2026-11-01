@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T13:37:53.715Z",
+  "updated": "2026-11-01T13:45:55.151Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4650",
       "claimedAt": "2026-11-01T13:36:45.001Z",
       "doneAt": "2026-11-01T13:37:53.714Z"
+    },
+    "wi2-share-endpoint": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T13:45:55.151Z"
     }
   }
 }
