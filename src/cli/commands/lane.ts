@@ -27,6 +27,7 @@ import type { LaneReportInput } from '../../lib/lanes/report.js';
 import type { LaneView } from '../../lib/lanes/views.js';
 import type { LaneSetFilter, LaneSetOptions, LaneSetOutcome } from '../../lib/lanes/wait.js';
 import { WORKER_EXIT } from './worker.js';
+import { defaultRemoteWorkerCliDeps, parseNeedsFlag, resolveMachineFlag, type RemoteWorkerCliDeps } from './worker-remote.js';
 
 const START_POLL_MS = 2_000;
 const START_WAIT_MS = 180_000;
@@ -55,6 +56,8 @@ export interface LaneCliDeps {
   sleep: (ms: number) => Promise<void>;
   stdout: (text: string) => void;
   stderr: (text: string) => void;
+  /** PAN-4651: the dashboard calls behind `--machine`; absent ⇒ the defaults. */
+  remote?: Pick<RemoteWorkerCliDeps, 'call'>;
 }
 
 async function readAllStdin(): Promise<string> {
@@ -148,6 +151,9 @@ export interface LaneStartOptions {
   replace?: boolean;
   /** PAN-4311: launch even while the host is CPU-saturated. */
   force?: boolean;
+  /** PAN-4651 D-4651-22: a linked machine's label, or `auto`; only this machine runs lanes until PAN-4638. */
+  machine?: string;
+  needs?: string;
   wait?: boolean;
   json?: boolean;
 }
@@ -157,6 +163,26 @@ export function resolveLaneParent(explicit: string | undefined, env: NodeJS.Proc
   const candidate = explicit?.trim() || env.OVERDECK_CONVERSATION?.trim();
   if (!candidate) return null;
   return candidate.startsWith('conv-') ? candidate.slice('conv-'.length) : candidate;
+}
+
+async function projectOriginOf(projectKey: string | undefined): Promise<string | null> {
+  if (!projectKey) return null;
+  const [{ getProjectSync }, { gitOriginOf }] = await Promise.all([import('../../lib/projects.js'), import('../../lib/anywhere/project-origin.js')]);
+  return gitOriginOf(getProjectSync(projectKey) ?? undefined);
+}
+
+/**
+ * PAN-4651 D-4651-22: `--machine` resolves the target with Auto placement (or
+ * the machine list for a label). This machine launches as today; another
+ * machine is refused until PAN-4638 runs lanes there. Null means launch here.
+ */
+export async function laneMachineRefusal(options: LaneStartOptions, deps: LaneCliDeps): Promise<string | null> {
+  const remote = deps.remote ?? defaultRemoteWorkerCliDeps();
+  const target = await resolveMachineFlag(options.machine!, parseNeedsFlag(options.needs), await projectOriginOf(options.project), remote);
+  if (target.kind === 'error') return target.message;
+  if (target.kind === 'remote') return `Lanes on other machines arrive with PAN-4638 (chosen: ${target.label})`;
+  if (target.reason) deps.stderr(target.reason);
+  return null;
 }
 
 export async function laneStartCommand(options: LaneStartOptions, deps: LaneCliDeps): Promise<number> {
@@ -172,6 +198,13 @@ export async function laneStartCommand(options: LaneStartOptions, deps: LaneCliD
   if (Boolean(options.brief) === Boolean(options.prompt)) {
     deps.stderr('Pass exactly one of --brief <file> or --prompt <text>.');
     return WORKER_EXIT.usage;
+  }
+  if (options.machine) {
+    const refusal = await laneMachineRefusal(options, deps).catch((error: Error) => `Could not place the lane: ${error.message}`);
+    if (refusal) {
+      deps.stderr(refusal);
+      return WORKER_EXIT.usage;
+    }
   }
   let brief = options.prompt ?? '';
   if (options.brief) {
@@ -583,6 +616,8 @@ export function registerLaneCommands(program: Command, deps: () => LaneCliDeps =
     .option('--reuse', 'Continue in the directory of the latest earlier lane with the same run, key and role')
     .option('--replace', 'Stop the live lane with the same run, key and role first')
     .option('--force', 'Launch even while the host is CPU-saturated')
+    .option('--machine <label|auto>', 'Where to run: this machine\'s label or auto (lanes on other machines arrive with PAN-4638)')
+    .option('--needs <tags>', 'With --machine auto: comma-separated capability tags the machine must have')
     .option('--no-wait', 'Return without waiting for the lane to start')
     .option('--json', 'Print the launch result as JSON')
     .action(async (options: LaneStartOptions) => exitCli(await laneStartCommand(options, deps())));

@@ -69,6 +69,11 @@ pan lane reap conv-<name> --keep                        # leaves the conversatio
 With no `--model`, the role's model comes from `projects.<key>.gauntlet.roles.<role>.model`; with
 none there, the launch is refused. `--effort` takes `low`, `medium` or `high`.
 
+`--machine <label|auto>` (with `--needs <tags>` for auto) picks where the lane runs: Auto placement
+by load, or a machine label. When it picks this machine the lane launches as usual; another machine
+is refused with `Lanes on other machines arrive with PAN-4638 (chosen: <label>)` until PAN-4638 runs
+lanes there. With nothing that fits, the command prints `No machine fits: …` and exits 1.
+
 ## Rules the door enforces
 
 - One working directory per lane, under the project's lanes root (never `/tmp`, never the primary
