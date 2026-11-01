@@ -24,7 +24,8 @@ export interface AnywhereProblem {
   action: AnywhereAction;
 }
 
-export type AnywhereViewerKind = 'root-session' | 'device' | 'token' | 'internal-token';
+/** PAN-4645: `machine` is a linked machine reading the status over its secure channel. */
+export type AnywhereViewerKind = 'root-session' | 'device' | 'token' | 'internal-token' | 'machine';
 
 export interface AnywhereStatus {
   machine: { environmentId: string; label: string } | null;

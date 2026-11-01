@@ -40,7 +40,7 @@ export interface AnywhereStatus {
   tokenMint?: { effective: boolean; configured: boolean; autoReasons: string[] };
   problems: AnywhereProblem[];
   /** Who is asking (PAN-4455 D-3); null when no credential resolves. */
-  viewer: { kind: 'root-session' | 'device' | 'token' | 'internal-token' | null };
+  viewer: { kind: 'root-session' | 'device' | 'token' | 'internal-token' | 'machine' | null };
 }
 
 export interface PairingLinkBody {

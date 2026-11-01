@@ -321,7 +321,7 @@ counts unrevoked device records. `problems` are computed on the server, each
 with an `action` (`pair-dialog`, `settings-section`, or `none` with an optional
 `docsUrl`) that the UI maps to a button. `viewer.kind` is the caller's
 credential kind from `resolveDashboardCredential()` (`root-session`, `device`,
-`token`, `internal-token`, or `null`); the Continue on another device dialog
+`token`, `internal-token`, `machine` for a linked machine over its channel, or `null`); the Continue on another device dialog
 offers **Also pair the device** only to the `root-session` (PAN-4455 D-3).
 
 **`POST /api/vault/sessions/by-conversation/:name/settle`** (PAN-4455, Hand off
