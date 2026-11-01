@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T06:05:20Z · model: claude-opus-5-5 · open: 863_
+_Last sequenced: 2026-11-01T06:07:00Z · model: claude-opus-5-5 · open: 864_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,11 +9,12 @@ _Last sequenced: 2026-11-01T06:05:20Z · model: claude-opus-5-5 · open: 863_
 | 2 | PAN-4639 | L | medium | ok |  |  | In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions. |
 | 3 | PAN-4640 | L | medium | ok |  | PAN-4639 | In pipeline: Overdeck-owned conversation schedules fired by a deacon-lite tick; resurfaces settled/snoozed rows (needs #4639). |
 | 4 | PAN-4663 | XS | critical | ok |  |  | In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts |
-| 5 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
-| 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
-| 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
-| 8 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
-| 9 | PAN-4669 | S | critical | ok |  |  | Herdr hosts: idle-stack reaper checks tmux only, so it stops server/frontend containers of every live agent after 10m; needs-handoff |
+| 5 | PAN-4670 | S | high | ok |  |  | In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs. |
+| 6 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
+| 7 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
+| 8 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
+| 9 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
+| 10 | PAN-4669 | S | critical | ok |  |  | Herdr hosts: idle-stack reaper checks tmux only, so it stops server/frontend containers of every live agent after 10m; needs-handoff |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
@@ -887,23 +888,27 @@ New in-pipeline issue with a live workspace, pinned just below PAN-4639 because 
 
 New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.
 
-### PAN-4636 (rank 5)
+### PAN-4670 (rank 5)
+
+New in-pipeline substrate bug (live workspace) with a decided two-part fix and clear tests, so it is pinned with the other in-pipeline items at the top; ranks 5-9 shift down one into the former gap at 10.
+
+### PAN-4636 (rank 6)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
-### PAN-4553 (rank 6)
+### PAN-4553 (rank 7)
 
 New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup failures fatal, the unconditional root npm install in workspace-manager/create.ts aborts every polyrepo workspace creation, so pan start fails for all MYN issues and the CLI misreports it as an unresponsive dashboard. The fix is small (skip the root install when the workspace root has no package.json, surface the real error) and it supersedes the non-fatal PAN-4390 report of the same root cause.
 
-### PAN-4554 (rank 7)
+### PAN-4554 (rank 8)
 
 New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.
 
-### PAN-4666 (rank 8)
+### PAN-4666 (rank 9)
 
 New substrate bug in the Flywheel's own status read model: a second liveness rule in derive-status.ts hides live agents, so the loop or operator may respawn running work; small fix with clear ACs, ranked beside PAN-4636 as critical but labeled needs-handoff (TENET-10), so it goes through a supervised pan handoff.
 
-### PAN-4669 (rank 9)
+### PAN-4669 (rank 10)
 
 New since the prior run: on the default Herdr backend the idle-stack reaper decides liveness from the tmux session list, so it stops the dev server and UI containers of every running workspace 10 minutes after start, breaking agents' dev servers and preview URLs fleet-wide. The fix is small and well specified (route through liveness.ts or the backend list()), with clear acceptance criteria, so it ranks in the critical substrate tier next to PAN-4666, the same bypass-liveness.ts class. It carries needs-handoff (TENET-10), so pickup is a supervised pan handoff, not autonomous.
 
@@ -1187,10 +1192,6 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
 
 Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
 
-### PAN-2422 (rank 90)
-
-Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1198,10 +1199,10 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T06:05:20Z",
+  "generatedAt": "2026-11-01T06:07:00Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 863,
+  "openCount": 864,
   "nodes": [
     {
       "issue": "PAN-4626",
@@ -1245,8 +1246,34 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "planning": "auto"
     },
     {
-      "issue": "PAN-4636",
+      "issue": "PAN-4663",
+      "rank": 4,
+      "size": "XS",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts",
+      "rationale": "New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4670",
       "rank": 5,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs.",
+      "rationale": "New in-pipeline substrate bug (live workspace) with a decided two-part fix and clear tests, so it is pinned with the other in-pipeline items at the top; ranks 5-9 shift down one into the former gap at 10.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4636",
+      "rank": 6,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1259,7 +1286,7 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
     },
     {
       "issue": "PAN-4553",
-      "rank": 6,
+      "rank": 7,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1272,7 +1299,7 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
     },
     {
       "issue": "PAN-4554",
-      "rank": 7,
+      "rank": 8,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -1280,6 +1307,32 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "dependsOn": [],
       "why": "pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues",
       "rationale": "New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4666",
+      "rank": 9,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff.",
+      "rationale": "New substrate bug in the Flywheel's own status read model: a second liveness rule in derive-status.ts hides live agents, so the loop or operator may respawn running work; small fix with clear ACs, ranked beside PAN-4636 as critical but labeled needs-handoff (TENET-10), so it goes through a supervised pan handoff.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4669",
+      "rank": 10,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Herdr hosts: idle-stack reaper checks tmux only, so it stops server/frontend containers of every live agent after 10m; needs-handoff",
+      "rationale": "New since the prior run: on the default Herdr backend the idle-stack reaper decides liveness from the tmux session list, so it stops the dev server and UI containers of every running workspace 10 minutes after start, breaking agents' dev servers and preview URLs fleet-wide. The fix is small and well specified (route through liveness.ts or the backend list()), with clear acceptance criteria, so it ranks in the critical substrate tier next to PAN-4666, the same bypass-liveness.ts class. It carries needs-handoff (TENET-10), so pickup is a supervised pan handoff, not autonomous.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9306,6 +9359,21 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "planning": "skip"
     },
     {
+      "issue": "PAN-4661",
+      "rank": 663,
+      "size": "S",
+      "importance": "low",
+      "score": 22,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2355"
+      ],
+      "why": "Phone PWA third tab: read-only phase-grouped pipeline list at /m/pipeline; waits on the PAN-2355 /m shell",
+      "rationale": "New since the prior run: split out of PAN-2355 to keep that plan within size limits, so it ranks directly after its parent shell.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2353",
       "rank": 664,
       "size": "M",
@@ -9359,22 +9427,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "planning": "auto"
     },
     {
-      "issue": "PAN-4638",
-      "rank": 670,
-      "size": "L",
-      "importance": "medium",
-      "score": 38,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4651",
-        "PAN-4652"
-      ],
-      "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
-      "rationale": "Rank 668->670: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4643",
       "rank": 668,
       "size": "M",
@@ -9397,6 +9449,22 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "dependsOn": [],
       "why": "Server-held 'send when limits reset' composer message; needs a parsed reset time; usage-window data would come from #2065.",
       "rationale": "New issue: useful for rate-limited operators but depends on reset-time parsing that does not exist yet, so it sits below the self-contained features.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4638",
+      "rank": 670,
+      "size": "L",
+      "importance": "medium",
+      "score": 38,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4651",
+        "PAN-4652"
+      ],
+      "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
+      "rationale": "Rank 668->670: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11287,19 +11355,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "planning": "auto"
     },
     {
-      "issue": "PAN-37",
-      "rank": 826,
-      "size": "M",
-      "importance": "medium",
-      "score": 30,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "Support external PR selection for merge-agent",
-      "rationale": "Rank 825->826: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4642",
       "rank": 825,
       "size": "M",
@@ -11309,6 +11364,19 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "dependsOn": [],
       "why": "Cite selected reply text with a comment as composer chips sent with the next prompt; share pending list with #2685 annotations.",
       "rationale": "New issue: a self-contained composer convenience with clear acceptance criteria and no blocking dependencies.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-37",
+      "rank": 826,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "stale",
+      "dependsOn": [],
+      "why": "Support external PR selection for merge-agent",
+      "rationale": "Rank 825->826: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11326,19 +11394,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "planning": "auto"
     },
     {
-      "issue": "PAN-3244",
-      "rank": 829,
-      "size": "S",
-      "importance": "low",
-      "score": 20,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close",
-      "rationale": "Rank 828->829: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4644",
       "rank": 828,
       "size": "L",
@@ -11348,6 +11403,19 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "dependsOn": [],
       "why": "Import VS Code themes and custom color themes for UI tokens, terminal palette and syntax highlighting; cosmetic, large surface.",
       "rationale": "New issue: cosmetic appearance work touching many theme surfaces, so it ranks low.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3244",
+      "rank": 829,
+      "size": "S",
+      "importance": "low",
+      "score": 20,
+      "condition": "stale",
+      "dependsOn": [],
+      "why": "Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close",
+      "rationale": "Rank 828->829: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11951,60 +12019,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       ],
       "why": "Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work.",
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4661",
-      "rank": 663,
-      "size": "S",
-      "importance": "low",
-      "score": 22,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-2355"
-      ],
-      "why": "Phone PWA third tab: read-only phase-grouped pipeline list at /m/pipeline; waits on the PAN-2355 /m shell",
-      "rationale": "New since the prior run: split out of PAN-2355 to keep that plan within size limits, so it ranks directly after its parent shell.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4663",
-      "rank": 4,
-      "size": "XS",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts",
-      "rationale": "New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4666",
-      "rank": 8,
-      "size": "S",
-      "importance": "critical",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff.",
-      "rationale": "New substrate bug in the Flywheel's own status read model: a second liveness rule in derive-status.ts hides live agents, so the loop or operator may respawn running work; small fix with clear ACs, ranked beside PAN-4636 as critical but labeled needs-handoff (TENET-10), so it goes through a supervised pan handoff.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4669",
-      "rank": 9,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Herdr hosts: idle-stack reaper checks tmux only, so it stops server/frontend containers of every live agent after 10m; needs-handoff",
-      "rationale": "New since the prior run: on the default Herdr backend the idle-stack reaper decides liveness from the tmux session list, so it stops the dev server and UI containers of every running workspace 10 minutes after start, breaking agents' dev servers and preview URLs fleet-wide. The fix is small and well specified (route through liveness.ts or the backend list()), with clear acceptance criteria, so it ranks in the critical substrate tier next to PAN-4666, the same bypass-liveness.ts class. It carries needs-handoff (TENET-10), so pickup is a supervised pan handoff, not autonomous.",
       "gate": "auto",
       "planning": "auto"
     }
