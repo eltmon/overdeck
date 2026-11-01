@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4650",
+  "created": "2026-11-01T13:36:45.001Z",
+  "updated": "2026-11-01T13:36:45.002Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-linked-cache": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T13:36:45.001Z"
+    }
+  }
+}
