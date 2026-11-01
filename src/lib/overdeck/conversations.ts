@@ -26,6 +26,7 @@ import { vacateConversationName } from './conversation-replace.js';
 import { resolveWorkspaceForCwd } from '../workspaces/resolver.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
+import { localEnvironmentId } from './conversation-environment.js';
 import { readLatestIndexedSessionId } from '../session-history.js';
 
 // ── Local Drizzle table definitions ──────────────────────────────────────────
@@ -295,6 +296,10 @@ export interface LegacyConversation {
   origin: 'local' | 'vault';
   /** PAN-4436: the owning machine's label for a browse copy; null otherwise. */
   vaultOwnerLabel: string | null;
+  /** PAN-4645: environment id of the machine that owns this row; null only for rows not yet stamped. */
+  environmentId: string | null;
+  /** PAN-4645: environment id the row was released to (#4650), else null. */
+  releasedTo: string | null;
 }
 
 export type LegacyFavoriteType = 'conversation';
@@ -345,6 +350,8 @@ interface LegacyConversationRow {
   critic_of_name: string | null;
   origin: string | null;
   vault_owner_label: string | null;
+  environment_id: string | null;
+  released_to: string | null;
 }
 
 const LEGACY_CONVERSATION_SELECT = `
@@ -393,6 +400,8 @@ const LEGACY_CONVERSATION_SELECT = `
     b.name AS critic_of_name,
     c.origin,
     c.vault_owner_label,
+    c.environment_id,
+    c.released_to,
     (
       SELECT cf.locator
       FROM conversation_files cf
@@ -520,6 +529,8 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
     criticOfConversationName: row.critic_of_name ?? null,
     origin: row.origin === 'vault' ? 'vault' : 'local',
     vaultOwnerLabel: row.vault_owner_label ?? null,
+    environmentId: row.environment_id ?? null,
+    releasedTo: row.released_to ?? null,
   };
 }
 
@@ -726,8 +737,9 @@ export function createConversation(opts: {
       INSERT INTO conversations
         (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at,
          tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id, project_key,
-         bare_context, skip_claude_md, skill_overrides, parent_conversation_id, gauntlet_run, lane_key, lane_role, critic_of_conversation_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         bare_context, skip_claude_md, skill_overrides, parent_conversation_id, gauntlet_run, lane_key, lane_role, critic_of_conversation_id,
+         environment_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       opts.name,
@@ -753,6 +765,7 @@ export function createConversation(opts: {
       opts.lane?.key ?? null,
       opts.lane?.role ?? null,
       criticOfId,
+      localEnvironmentId(),
     );
     if (opts.claudeSessionId) {
       db.prepare(`

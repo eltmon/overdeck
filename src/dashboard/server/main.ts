@@ -94,6 +94,7 @@ import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { startProjectCiRefillAfterProjectionReady } from './services/project-ci-refill-startup.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive, dropPipelineStateMirrorTables, dropDeadIssuesForeignKeys } from '../../lib/overdeck/infra.js';
+import { bootConversationEnvironment } from '../../lib/overdeck/conversation-environment.js';
 import { startServerBootTelemetry } from './telemetry.js';
 import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { isSmeeConfigured, startSmeeProcess } from '../../lib/smee.js';
@@ -197,6 +198,15 @@ try {
   }
 } catch (err) {
   console.warn('[overdeck] Dead-issues-FK rebuild failed (non-fatal):', err);
+}
+
+// PAN-4645 D-4645-19: this machine's environment id on local conversation rows
+// (set for inserts on every dashboard; existing rows backfilled on the primary).
+try {
+  const owner = await bootConversationEnvironment();
+  if (owner.backfilled > 0) console.log(`[overdeck] Stamped ${owner.backfilled} local conversation(s) with environment ${owner.environmentId}`);
+} catch (err) {
+  console.warn('[overdeck] Conversation owner column boot failed (non-fatal):', err);
 }
 
 // Bind the HTTP socket before starting any background service or the Deacon.

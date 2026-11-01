@@ -133,6 +133,8 @@ CREATE TABLE `conversations` (
 	`critic_of_conversation_id` text,
 	`origin` text NOT NULL DEFAULT 'local',
 	`vault_owner_label` text,
+	`environment_id` text,
+	`released_to` text,
 	FOREIGN KEY (`handoff_target_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`cleared_to_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`parent_conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
