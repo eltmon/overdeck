@@ -61,7 +61,9 @@ async function start(listenerDeps: ChannelListenerDeps): Promise<void> {
   seen = [];
   server = http.createServer((req, res) => {
     seen.push({ method: req.method ?? '', url: req.url ?? '', remoteAddress: req.socket.remoteAddress, channel: channelOfIncoming(req), socket: req.socket });
-    res.end(`ok ${req.url}`);
+    let bytes = 0;
+    req.on('data', (chunk: Buffer) => { bytes += chunk.length; });
+    req.on('end', () => res.end(req.method === 'POST' ? `ok ${req.url} ${bytes}` : `ok ${req.url}`));
   });
   installChannelListener(server, listenerDeps);
   // Effect registers its upgrade handler after the factory ran; mirror that order.
@@ -85,6 +87,18 @@ function get(path: string, agent?: http.Agent): Promise<{ status: number; text: 
   });
 }
 
+function post(path: string, body: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port, path, method: 'POST', headers: { 'content-length': String(body.length) } }, (res) => {
+      let text = '';
+      res.on('data', (chunk: Buffer) => { text += chunk.toString(); });
+      res.on('end', () => resolve(text));
+    });
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
 function requestOverChannel(channel: ChannelSocket, path: string): Promise<string> {
   return new Promise((resolve, reject) => {
     http.get({ host: 'link.invalid', path, createConnection: () => channel as unknown as Socket }, (res) => {
@@ -105,11 +119,13 @@ afterEach(async () => {
 });
 
 describe('channel listener (PAN-4645 WI-3)', () => {
-  it('leaves a plain HTTP GET, a keep-alive pair and a WebSocket upgrade untouched', async () => {
+  it('leaves a plain HTTP GET, a keep-alive pair, a 200 KB POST and a WebSocket upgrade untouched', async () => {
     await start(deps());
 
     const single = await get('/plain');
     expect(single).toEqual({ status: 200, text: 'ok /plain' });
+    expect(await post('/upload', Buffer.alloc(200 * 1024, 0x78))).toBe(`ok /upload ${200 * 1024}`);
+    seen.length = 0;
 
     const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
     cleanups.push(() => agent.destroy());
@@ -117,8 +133,8 @@ describe('channel listener (PAN-4645 WI-3)', () => {
     const second = await get('/keep-2', agent);
     expect(first.text).toBe('ok /keep-1');
     expect(second.text).toBe('ok /keep-2');
-    expect(seen).toHaveLength(3);
-    expect(seen[1]!.socket).toBe(seen[2]!.socket);
+    expect(seen).toHaveLength(2);
+    expect(seen[0]!.socket).toBe(seen[1]!.socket);
     for (const entry of seen) {
       expect(entry.remoteAddress).toBe('127.0.0.1');
       expect(entry.channel).toBeNull();
