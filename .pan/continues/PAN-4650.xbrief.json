@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4650",
   "created": "2026-11-01T13:36:45.001Z",
-  "updated": "2026-11-01T15:21:36.981Z",
+  "updated": "2026-11-01T15:45:19.135Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T15:41:55.380Z"
+    }
+  ],
   "items": {
     "wi1-linked-cache": {
       "status": "completed",
@@ -106,9 +112,11 @@
       "doneAt": "2026-11-01T15:21:29.308Z"
     },
     "wi17-forward-owner": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4650",
-      "claimedAt": "2026-11-01T15:21:36.980Z"
+      "claimedAt": "2026-11-01T15:21:36.980Z",
+      "doneAt": "2026-11-01T15:45:19.134Z"
     }
-  }
+  },
+  "agentModel": "claude-opus-5-5"
 }
