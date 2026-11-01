@@ -383,3 +383,12 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   (`run-gh.test.ts`, ledger appends race: PAN-4680, started). Re-ran failed
   jobs (run 41283191295 attempt 2). `gh run list` timed out on the workflow
   listing; `gh api repos/eltmon/overdeck/actions/runs?branch=main` works.
+- 2026-11-01 07:55 UTC: PAN-4690 (needs-handoff). Review dispatch
+  (`review-agent.ts` ~457, `clearFeedbackFiles` → `clearFeedbackForIssue`)
+  rewrites the tracked `.pan/continues/<ID>.xbrief.json` without committing,
+  so the dirty-tree gate blocks the review it was dispatching. Symptom:
+  `verification.passed` then no reviewer, and dashboard.log "could not
+  re-request the undispatched review — Workspace has uncommitted changes".
+  Recovery: confirm the only dirty file is the continue file, commit it as
+  bookkeeping on the feature branch, push, `pan review request <id>` (re-runs
+  verification). Hit PAN-4643 and PAN-4626.
