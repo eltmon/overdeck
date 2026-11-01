@@ -44,6 +44,7 @@ import { telemetryEnvironmentForcesOff } from './telemetry/config.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
 import { ensureOperatorHash } from './telemetry/operator-hash.js';
 import { invalidateRemoteAccessConfig, readRemoteAccessConfig } from './remote-access/config.js';
+import { keepTokenMintWhileServing } from './tailscale/token-mint-guard.js';
 
 export type ApiTtsConfig = Omit<TtsDaemonConfig, 'daemonPort' | 'daemonHost'>;
 
@@ -910,7 +911,7 @@ export function runSettingsWriteSerialized<T>(fn: () => Promise<T>): Promise<T> 
 
 /** Persist API settings through the serialized settings write queue. */
 export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void> {
-  return runSettingsWriteSerialized(() => saveSettingsApiPromiseUnlocked(settings));
+  return runSettingsWriteSerialized(async () => saveSettingsApiPromiseUnlocked(await keepTokenMintWhileServing(settings)));
 }
 
 /**
