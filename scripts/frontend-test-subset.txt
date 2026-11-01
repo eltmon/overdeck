@@ -89,6 +89,7 @@ src/components/chat/continueOnDevice/__tests__/continueOnDeviceStore.test.ts
 src/components/chat/messagesTimeline/__tests__/UserMessageAttachments.test.tsx
 src/components/chat/messagesTimeline/__tests__/attachmentRefs.test.ts
 src/components/chat/messagesTimeline/__tests__/workLogRows.test.tsx
+src/components/chat/messagesTimeline/messageRows.test.tsx
 src/components/home/__tests__/HomeComposer.test.tsx
 src/components/home/__tests__/HomeComposerProjectChip.test.tsx
 src/components/home/__tests__/homeComposerIntents.test.ts
