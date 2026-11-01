@@ -5,6 +5,7 @@
  */
 import type { DirectoryResponse } from '@overdeck/contracts';
 
+import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import { apiError, type ApiResult, isOk } from './anywhereApi';
 
 export type { DirectoryApprovalView, DirectoryJoinView, DirectoryMachineView, DirectoryResponse } from '@overdeck/contracts';
@@ -30,4 +31,44 @@ export async function loadDirectory(): Promise<DirectoryResponse> {
 /** The directory inbox needs a connected directory and the Anywhere plan. */
 export function inboxAvailable(directory: DirectoryResponse | undefined): boolean {
   return directory?.state === 'online' && directory.plan === 'tester';
+}
+
+async function post<T>(path: string, body?: unknown): Promise<ApiResult<T>> {
+  return readResult(await fetch(path, {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }));
+}
+
+const enc = encodeURIComponent;
+
+/** Ask one machine (or every machine of the account) to approve this one. */
+export function joinDirectory(to: string | null): Promise<ApiResult<{ requestId: string }>> {
+  return post('/api/directory/join', to ? { to } : {});
+}
+
+export function acceptJoin(requestId: string): Promise<ApiResult<{ ok: true }>> {
+  return post(`/api/directory/joins/${enc(requestId)}/accept`);
+}
+
+export function rejectJoin(requestId: string): Promise<ApiResult<{ ok: true }>> {
+  return post(`/api/directory/joins/${enc(requestId)}/reject`);
+}
+
+/** Open the approval channel; answers the code both screens must show. */
+export function openApproval(requestId: string): Promise<ApiResult<{ sas: string; fingerprint: string }>> {
+  return post(`/api/directory/approvals/${enc(requestId)}/open`);
+}
+
+export function approveApproval(requestId: string): Promise<ApiResult<{ approving: true }>> {
+  return post(`/api/directory/approvals/${enc(requestId)}/approve`);
+}
+
+export function rejectApproval(requestId: string): Promise<ApiResult<{ ok: true }>> {
+  return post(`/api/directory/approvals/${enc(requestId)}/reject`);
+}
+
+export function forgetDirectoryMachine(environmentId: string): Promise<ApiResult<{ ok: true }>> {
+  return post('/api/directory/forget', { environmentId });
 }
