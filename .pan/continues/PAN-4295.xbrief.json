@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4295",
   "created": "2026-11-01T05:48:47.966Z",
-  "updated": "2026-11-01T08:17:34.295Z",
+  "updated": "2026-11-01T08:17:55.982Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "reap-requests-review.ac1": {
       "status": "completed",
       "doneAt": "2026-11-01T08:17:34.294Z"
+    },
+    "reap-requests-review.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:17:55.981Z"
     }
   }
 }
