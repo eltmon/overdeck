@@ -31,6 +31,10 @@ node_child_process = __toESM(node_child_process);
 let node_crypto = require("node:crypto");
 node_crypto = __toESM(node_crypto);
 let electron_updater = require("electron-updater");
+let node_os = require("node:os");
+node_os = __toESM(node_os);
+let node_dns = require("node:dns");
+let node_net = require("node:net");
 //#region src/settings.ts
 /**
 * Desktop-specific settings, persisted to userData/desktop-settings.json.
@@ -110,6 +114,75 @@ function updateDesktopSetting(key, value) {
 	return true;
 }
 //#endregion
+//#region src/connection.ts
+/**
+* The dashboard the desktop app currently shows: the embedded local server or
+* the one chosen machine (PAN-4402 W-4).
+*
+* This is the one piece of runtime state main, menu and tray share. In remote
+* mode main-process calls carry the device token as a bearer (D-10), and the
+* remote windows authenticate with the device cookie set in an in-memory
+* partition, so the cookie never reaches disk (D-3).
+*/
+/** baseUrl is '' until the embedded server is ready. */
+let active = {
+	kind: "local",
+	baseUrl: ""
+};
+function getActiveDashboard() {
+	return active;
+}
+function setLocalDashboard(baseUrl) {
+	active = {
+		kind: "local",
+		baseUrl
+	};
+}
+/** No `persist:` prefix, so the partition's cookies and storage stay in memory. */
+function remotePartitionName(environmentId) {
+	return `remote-${environmentId}`;
+}
+function setRemoteDashboard(record, token) {
+	active = {
+		kind: "remote",
+		baseUrl: record.baseUrl,
+		partition: remotePartitionName(record.environmentId),
+		label: record.label,
+		token
+	};
+}
+function dashboardFetch(path, init = {}) {
+	const current = active;
+	if (!current.baseUrl) return Promise.reject(/* @__PURE__ */ new Error("The dashboard server is not ready yet."));
+	if (current.kind === "local") return fetch(`${current.baseUrl}${path}`, init);
+	const headers = new Headers(init.headers);
+	headers.set("Authorization", `Bearer ${current.token}`);
+	return fetch(`${current.baseUrl}${path}`, {
+		...init,
+		headers
+	});
+}
+async function prepareRemoteSession(remote) {
+	if (remote.partition.startsWith("persist:")) throw new Error(`Refusing to store a machine credential in the persistent partition ${remote.partition}.`);
+	const ses = electron.session.fromPartition(remote.partition);
+	await ses.cookies.set({
+		url: remote.baseUrl,
+		name: "overdeck_device",
+		value: remote.token,
+		httpOnly: true,
+		sameSite: "strict",
+		secure: remote.baseUrl.startsWith("https:")
+	});
+	return ses;
+}
+function isSameOrigin(url, baseUrl) {
+	try {
+		return new URL(url).origin === new URL(baseUrl).origin;
+	} catch {
+		return false;
+	}
+}
+//#endregion
 //#region src/tray.ts
 let tray = null;
 let pollTimer = null;
@@ -128,18 +201,30 @@ function createTrayIcon(status) {
 	return electron.nativeImage.createFromBuffer(Buffer.from(svg));
 }
 function buildTooltip(agentCount, attentionCount, lastActivity) {
-	if (getDesktopSettings().tray.tooltipDetail === "minimal") return `Overdeck — ${agentCount} agent${agentCount !== 1 ? "s" : ""}`;
-	const lines = ["Overdeck"];
+	const settings = getDesktopSettings();
+	const active = getActiveDashboard();
+	const title = active.kind === "remote" ? `Overdeck — ${active.label}` : "Overdeck";
+	if (settings.tray.tooltipDetail === "minimal") return `${title} — ${agentCount} agent${agentCount !== 1 ? "s" : ""}`;
+	const lines = [title];
 	lines.push(`${agentCount} agent${agentCount !== 1 ? "s" : ""} running`);
 	if (attentionCount > 0) lines.push(`⚠ ${attentionCount} need${attentionCount !== 1 ? "" : "s"} attention`);
 	if (lastActivity) lines.push(`Last: ${lastActivity}`);
 	return lines.join("\n");
 }
 function buildContextMenu() {
-	return electron.Menu.buildFromTemplate([
+	const template = [
 		{
 			label: "Show Dashboard",
 			click: () => showOrCreateWindow()
+		},
+		{
+			label: "Connect to a Machine…",
+			click: () => openConnectWindowFromMenu()
+		},
+		{
+			label: "Use This Computer",
+			enabled: getActiveDashboard().kind === "remote",
+			click: () => useThisComputer()
 		},
 		{ type: "separator" },
 		{
@@ -169,14 +254,14 @@ function buildContextMenu() {
 				electron.app.quit();
 			}
 		}
-	]);
+	];
+	return electron.Menu.buildFromTemplate(template);
 }
 async function refreshTrayStatus() {
 	if (!tray || isQuitting) return;
-	const url = serverUrl;
-	if (!url) return;
+	if (!getActiveDashboard().baseUrl) return;
 	try {
-		const resp = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(3e3) });
+		const resp = await dashboardFetch("/api/health", { signal: AbortSignal.timeout(3e3) });
 		if (!resp.ok) return;
 		const data = await resp.json();
 		const agentCount = data.agentCount ?? 0;
@@ -196,6 +281,14 @@ function createTray() {
 	tray.setContextMenu(buildContextMenu());
 	tray.on("click", () => showOrCreateWindow());
 	pollTimer = setInterval(() => void refreshTrayStatus(), 5e3);
+	refreshTrayStatus();
+}
+/** Rebuild the context menu and tooltip after a switch between this computer and the chosen machine. */
+function refreshTrayMode() {
+	if (!tray) return;
+	const active = getActiveDashboard();
+	tray.setToolTip(active.kind === "remote" ? `Overdeck — ${active.label}` : "Overdeck");
+	tray.setContextMenu(buildContextMenu());
 	refreshTrayStatus();
 }
 function destroyTray() {
@@ -546,9 +639,8 @@ function getUpdateStatus() {
 * Linux/Windows: Settings in File menu.
 */
 async function fetchActiveWorkspaces() {
-	if (!serverUrl) return [];
 	try {
-		const resp = await fetch(`${serverUrl}/api/workspaces`, { signal: AbortSignal.timeout(2e3) });
+		const resp = await dashboardFetch("/api/workspaces", { signal: AbortSignal.timeout(2e3) });
 		if (!resp.ok) return [];
 		return (await resp.json()).workspaces?.slice(0, 10) ?? [];
 	} catch {
@@ -622,9 +714,14 @@ function buildMenuTemplate() {
 		]
 	});
 	template.push({ role: "windowMenu" });
+	const active = getActiveDashboard();
 	template.push({
 		label: "Overdeck",
 		submenu: [
+			...active.kind === "remote" ? [{
+				label: `Showing ${active.label}`,
+				enabled: false
+			}, { type: "separator" }] : [],
 			{
 				label: "Start Cloister",
 				click: () => callServerApi("/api/cloister/start", "POST")
@@ -636,6 +733,16 @@ function buildMenuTemplate() {
 			{
 				label: "Emergency Stop All Agents",
 				click: () => callServerApi("/api/agents/emergency-stop", "POST")
+			},
+			{ type: "separator" },
+			{
+				label: "Connect to a Machine…",
+				click: () => openConnectWindowFromMenu()
+			},
+			{
+				label: "Use This Computer",
+				enabled: active.kind === "remote",
+				click: () => useThisComputer()
 			},
 			{ type: "separator" },
 			{
@@ -692,6 +799,10 @@ function buildMenuTemplate() {
 		});
 	}
 	return template;
+}
+/** Rebuild after a switch between this computer and the chosen machine. */
+function refreshApplicationMenu() {
+	rebuildMenu();
 }
 function configureApplicationMenu() {
 	const menu = electron.Menu.buildFromTemplate(buildMenuTemplate());
@@ -873,6 +984,554 @@ function registerDesktopProtocol() {
 	console.log(`[desktop/protocol] registered ${DESKTOP_SCHEME}:// serving from ${staticRoot}`);
 }
 //#endregion
+//#region src/boot.ts
+/** Local when there is no record, the record is inactive, or the Vite dev server is in use. */
+function planBoot(record, isDevelopment) {
+	if (!record || !record.active || isDevelopment) return { kind: "local" };
+	return {
+		kind: "remote",
+		record
+	};
+}
+//#endregion
+//#region src/machine-store.ts
+/**
+* The chosen machine's record, persisted to userData/remote-machine.json.
+*
+* Holds at most one machine (PAN-4402 D-1). The device token is stored only as
+* safeStorage ciphertext; the plaintext never reaches disk, a renderer or a log.
+* Saving refuses when the OS has no real secret store (D-4).
+*/
+const NO_SECRET_STORE_ERROR = "This computer has no secure credential store (GNOME Keyring, KWallet, Keychain or Windows credential protection), so Overdeck will not save a machine credential.";
+function recordPath() {
+	return node_path.join(electron.app.getPath("userData"), "remote-machine.json");
+}
+function writeRecord(record) {
+	const final = recordPath();
+	const tmp = `${final}.tmp`;
+	node_fs.mkdirSync(node_path.dirname(final), { recursive: true });
+	node_fs.rmSync(tmp, { force: true });
+	node_fs.writeFileSync(tmp, JSON.stringify(record, null, 2), { mode: 384 });
+	node_fs.renameSync(tmp, final);
+}
+function isMachineRecord(value) {
+	if (typeof value !== "object" || value === null) return false;
+	const r = value;
+	return r.version === 1 && typeof r.active === "boolean" && typeof r.baseUrl === "string" && typeof r.environmentId === "string" && typeof r.label === "string" && typeof r.deviceId === "string" && typeof r.pairedAt === "string" && typeof r.tokenCiphertext === "string";
+}
+function credentialStoreStatus() {
+	if (!electron.safeStorage.isEncryptionAvailable()) return {
+		ok: false,
+		error: NO_SECRET_STORE_ERROR
+	};
+	if (process.platform === "linux") {
+		const backend = electron.safeStorage.getSelectedStorageBackend();
+		if (backend === "basic_text" || backend === "unknown") return {
+			ok: false,
+			error: NO_SECRET_STORE_ERROR
+		};
+	}
+	return { ok: true };
+}
+function loadMachineRecord() {
+	let raw;
+	try {
+		raw = node_fs.readFileSync(recordPath(), "utf8");
+	} catch {
+		return null;
+	}
+	try {
+		const parsed = JSON.parse(raw);
+		if (isMachineRecord(parsed)) return parsed;
+	} catch {}
+	console.error("[desktop] ignoring malformed remote-machine.json");
+	return null;
+}
+function saveMachineRecord(input, token) {
+	const status = credentialStoreStatus();
+	if (!status.ok) throw new Error(status.error);
+	const tokenCiphertext = electron.safeStorage.encryptString(token).toString("base64");
+	writeRecord({
+		version: 1,
+		active: input.active,
+		baseUrl: input.baseUrl,
+		environmentId: input.environmentId,
+		label: input.label,
+		deviceId: input.deviceId,
+		pairedAt: input.pairedAt,
+		tokenCiphertext
+	});
+}
+function setMachineActive(active) {
+	const record = loadMachineRecord();
+	if (!record || record.active === active) return;
+	writeRecord({
+		...record,
+		active
+	});
+}
+function readMachineToken(record) {
+	return electron.safeStorage.decryptString(Buffer.from(record.tokenCiphertext, "base64"));
+}
+function deleteMachineRecord() {
+	node_fs.rmSync(recordPath(), { force: true });
+}
+//#endregion
+//#region src/machine-url.ts
+/**
+* Pairing-link parsing and the transport policy for a chosen machine.
+*
+* Pure: no Electron import. The DNS lookup is injected so the policy can be
+* tested without network; production passes `dns.promises.lookup(host, { all: true })`.
+*
+* Transport policy (PAN-4402 D-5): the device token travels only over HTTPS,
+* this computer's loopback, or a Tailscale address (WireGuard encrypts the tailnet).
+*/
+const BARE_CREDENTIAL_ERROR = "Paste the whole pairing link, including the address.";
+const NOT_A_LINK_ERROR = "That is not an Overdeck pairing link.";
+const TRANSPORT_REFUSED_ERROR = "Overdeck sends this computer's credential only over HTTPS, Tailscale or this computer's loopback. Use the machine's Tailscale address or an HTTPS address.";
+const tailnet = new node_net.BlockList();
+tailnet.addSubnet("100.64.0.0", 10, "ipv4");
+tailnet.addSubnet("fd7a:115c:a1e0::", 48, "ipv6");
+const loopback = new node_net.BlockList();
+loopback.addSubnet("127.0.0.0", 8, "ipv4");
+loopback.addAddress("::1", "ipv6");
+function inList(list, ip) {
+	const family = (0, node_net.isIP)(ip);
+	if (family === 4) return list.check(ip, "ipv4");
+	if (family === 6) return list.check(ip, "ipv6");
+	return false;
+}
+/** True for 100.64.0.0/10 and fd7a:115c:a1e0::/48. */
+function isTailnetAddress(ip) {
+	return inList(tailnet, ip);
+}
+/** True for 127.0.0.0/8 and ::1. */
+function isLoopbackAddress(ip) {
+	return inList(loopback, ip);
+}
+function parsePairingLink(input) {
+	const text = input.trim();
+	if (text.startsWith("odp_")) return {
+		ok: false,
+		error: BARE_CREDENTIAL_ERROR
+	};
+	let url;
+	try {
+		url = new URL(text);
+	} catch {
+		return {
+			ok: false,
+			error: NOT_A_LINK_ERROR
+		};
+	}
+	if (url.protocol !== "http:" && url.protocol !== "https:") return {
+		ok: false,
+		error: NOT_A_LINK_ERROR
+	};
+	const credential = new URLSearchParams(url.hash.slice(1)).get("pair");
+	if (!credential || !credential.startsWith("odp_")) return {
+		ok: false,
+		error: NOT_A_LINK_ERROR
+	};
+	return {
+		ok: true,
+		link: {
+			baseUrl: url.origin,
+			credential
+		}
+	};
+}
+async function assessMachineTransport(baseUrl, lookupAll) {
+	const refused = {
+		ok: false,
+		error: TRANSPORT_REFUSED_ERROR
+	};
+	let url;
+	try {
+		url = new URL(baseUrl);
+	} catch {
+		return refused;
+	}
+	if (url.protocol === "https:") return {
+		ok: true,
+		kind: "https"
+	};
+	if (url.protocol !== "http:") return refused;
+	const host = url.hostname.replace(/^\[(.*)\]$/, "$1");
+	if (host === "localhost" || isLoopbackAddress(host)) return {
+		ok: true,
+		kind: "loopback"
+	};
+	if (isTailnetAddress(host) || host.endsWith(".ts.net")) return {
+		ok: true,
+		kind: "tailnet"
+	};
+	if ((0, node_net.isIP)(host) !== 0) return refused;
+	let addresses;
+	try {
+		addresses = await lookupAll(host);
+	} catch {
+		return refused;
+	}
+	if (addresses.length === 0) return refused;
+	if (addresses.every(isTailnetAddress)) return {
+		ok: true,
+		kind: "tailnet"
+	};
+	if (addresses.every(isLoopbackAddress)) return {
+		ok: true,
+		kind: "loopback"
+	};
+	return refused;
+}
+const REQUEST_TIMEOUT_MS = 5e3;
+function unreachableMessage(origin, label) {
+	return `Can't reach ${label ? `${label} at ${origin}` : origin}. Check that its Overdeck is running and that this computer is on the same tailnet.`;
+}
+function wrongMachineMessage(origin, newLabel) {
+	return `${origin} is now a different Overdeck machine (${newLabel}). Pair again.`;
+}
+function revokedMessage(label) {
+	return `${label} no longer accepts this computer's credential. Pair again with a new link.`;
+}
+function protocolMessage(label, version) {
+	return `${label} speaks Overdeck protocol ${version}; this app supports 1. Update the older side.`;
+}
+const STORE_DECRYPT_ERROR = "This computer's credential store could not decrypt the saved credential. Pair again.";
+/** Production DNS lookup for the transport policy. */
+async function lookupAllAddresses(host) {
+	return (await node_dns.promises.lookup(host, { all: true })).map((result) => result.address);
+}
+function deviceLabel() {
+	return `Overdeck desktop on ${node_os.hostname()}`.slice(0, 200);
+}
+async function readJson(response) {
+	try {
+		const body = await response.json();
+		return typeof body === "object" && body !== null ? body : null;
+	} catch {
+		return null;
+	}
+}
+function mintSession(baseUrl, token, deps) {
+	return deps.fetchImpl(`${baseUrl}/api/dashboard/session`, {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${token}`,
+			Origin: baseUrl
+		},
+		signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+	});
+}
+async function fetchMachineDescriptor(baseUrl, deps) {
+	let body;
+	try {
+		const response = await deps.fetchImpl(`${baseUrl}/api/environment`, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+		if (!response.ok) return {
+			ok: false,
+			error: unreachableMessage(baseUrl)
+		};
+		body = await readJson(response);
+	} catch {
+		return {
+			ok: false,
+			error: unreachableMessage(baseUrl)
+		};
+	}
+	if (!body || body.descriptorVersion !== 1 || typeof body.environmentId !== "string" || typeof body.label !== "string" || typeof body.protocolVersion !== "number") return {
+		ok: false,
+		error: `${baseUrl} did not answer as an Overdeck machine.`
+	};
+	const capabilities = body.capabilities;
+	return {
+		ok: true,
+		descriptor: {
+			environmentId: body.environmentId,
+			label: body.label,
+			protocolVersion: body.protocolVersion,
+			pairing: capabilities?.pairing === true
+		}
+	};
+}
+async function pairWithMachine(linkText, deps) {
+	const parsed = parsePairingLink(linkText);
+	if (!parsed.ok) return parsed;
+	const { baseUrl, credential } = parsed.link;
+	const store = credentialStoreStatus();
+	if (!store.ok) return store;
+	const transport = await assessMachineTransport(baseUrl, deps.lookupAll);
+	if (!transport.ok) return transport;
+	const described = await fetchMachineDescriptor(baseUrl, deps);
+	if (!described.ok) return described;
+	const { descriptor } = described;
+	if (descriptor.protocolVersion !== 1) return {
+		ok: false,
+		error: protocolMessage(descriptor.label, descriptor.protocolVersion)
+	};
+	if (!descriptor.pairing) return {
+		ok: false,
+		error: `${descriptor.label} does not accept pairing.`
+	};
+	let response;
+	try {
+		response = await deps.fetchImpl(`${baseUrl}/api/pairing/exchange`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Origin: baseUrl
+			},
+			body: JSON.stringify({
+				credential,
+				label: deviceLabel(),
+				delivery: "bearer"
+			}),
+			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+		});
+	} catch {
+		return {
+			ok: false,
+			error: unreachableMessage(baseUrl, descriptor.label)
+		};
+	}
+	const body = await readJson(response);
+	if (!response.ok) {
+		const serverError = typeof body?.error === "string" ? body.error : `HTTP ${response.status}`;
+		return {
+			ok: false,
+			error: `Pairing failed: ${serverError}${serverError === "Invalid origin" ? ` Add ${baseUrl} under Settings → Anywhere → trusted addresses on that machine.` : ""}`
+		};
+	}
+	const token = body?.token;
+	const deviceId = body?.deviceId;
+	if (typeof token !== "string" || !token.startsWith("odk_") || typeof deviceId !== "string") return {
+		ok: false,
+		error: "Pairing failed: the machine did not return a device credential."
+	};
+	if (body?.environmentId !== descriptor.environmentId) return {
+		ok: false,
+		error: wrongMachineMessage(baseUrl, descriptor.label)
+	};
+	const previous = loadMachineRecord();
+	if (previous) try {
+		await revokeOwnDevice(previous, readMachineToken(previous), deps);
+	} catch {}
+	saveMachineRecord({
+		active: true,
+		baseUrl,
+		environmentId: descriptor.environmentId,
+		label: descriptor.label,
+		deviceId,
+		pairedAt: (/* @__PURE__ */ new Date()).toISOString()
+	}, token);
+	const record = loadMachineRecord();
+	if (!record) return {
+		ok: false,
+		error: "Pairing failed: the machine record could not be saved."
+	};
+	return {
+		ok: true,
+		record
+	};
+}
+async function preflightMachine(record, deps) {
+	const { baseUrl, label } = record;
+	const transport = await assessMachineTransport(baseUrl, deps.lookupAll);
+	if (!transport.ok) return {
+		ok: false,
+		reason: "transport",
+		error: transport.error
+	};
+	const described = await fetchMachineDescriptor(baseUrl, deps);
+	if (!described.ok) return {
+		ok: false,
+		reason: "unreachable",
+		error: unreachableMessage(baseUrl, label)
+	};
+	const { descriptor } = described;
+	if (descriptor.environmentId !== record.environmentId) return {
+		ok: false,
+		reason: "wrong-machine",
+		error: wrongMachineMessage(baseUrl, descriptor.label)
+	};
+	if (descriptor.protocolVersion !== 1) return {
+		ok: false,
+		reason: "protocol",
+		error: protocolMessage(label, descriptor.protocolVersion)
+	};
+	let token;
+	try {
+		token = readMachineToken(record);
+	} catch {
+		return {
+			ok: false,
+			reason: "store",
+			error: STORE_DECRYPT_ERROR
+		};
+	}
+	let response;
+	try {
+		response = await mintSession(baseUrl, token, deps);
+	} catch {
+		return {
+			ok: false,
+			reason: "unreachable",
+			error: unreachableMessage(baseUrl, label)
+		};
+	}
+	if (response.status === 200) return {
+		ok: true,
+		token
+	};
+	if (response.status === 401 || response.status === 403) return {
+		ok: false,
+		reason: "revoked",
+		error: revokedMessage(label)
+	};
+	return {
+		ok: false,
+		reason: "unreachable",
+		error: unreachableMessage(baseUrl, label)
+	};
+}
+async function revokeOwnDevice(record, token, deps) {
+	try {
+		const mint = await mintSession(record.baseUrl, token, deps);
+		if (!mint.ok) return false;
+		const csrfToken = (await readJson(mint))?.csrfToken;
+		if (typeof csrfToken !== "string") return false;
+		return (await deps.fetchImpl(`${record.baseUrl}/api/devices/${encodeURIComponent(record.deviceId)}`, {
+			method: "DELETE",
+			headers: {
+				Authorization: `Bearer ${token}`,
+				"Content-Type": "application/json",
+				Origin: record.baseUrl,
+				"x-overdeck-csrf-token": csrfToken
+			},
+			body: "{}",
+			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+		})).ok;
+	} catch {
+		return false;
+	}
+}
+//#endregion
+//#region src/connect-window.ts
+/**
+* The connect window: a small local page that takes a pairing link and shows
+* the chosen machine's state and errors (PAN-4402 W-5).
+*
+* It works with no server running anywhere. Its IPC handlers answer only the
+* connect window's own webContents, so a dashboard page — local or remote —
+* cannot pair, switch or forget (D-8). getState never carries the token.
+*/
+const CONNECT_IPC = {
+	GET_STATE: "pan:connect-get-state",
+	PAIR: "pan:connect-pair",
+	OPEN_MACHINE: "pan:connect-open-machine",
+	USE_LOCAL: "pan:connect-use-local",
+	FORGET: "pan:connect-forget",
+	STATE_CHANGED: "pan:connect-state-changed"
+};
+const NOT_ALLOWED = {
+	ok: false,
+	error: "not allowed"
+};
+let connectWindow = null;
+let lastError = null;
+function fromConnectWindow(event) {
+	return connectWindow !== null && !connectWindow.isDestroyed() && event.sender === connectWindow.webContents;
+}
+function notifyStateChanged() {
+	if (connectWindow && !connectWindow.isDestroyed()) connectWindow.webContents.send(CONNECT_IPC.STATE_CHANGED);
+}
+async function runAction(action) {
+	try {
+		const result = await action();
+		lastError = result.ok ? null : result.error;
+		return result;
+	} catch (err) {
+		const error = err instanceof Error ? err.message : String(err);
+		lastError = error;
+		return {
+			ok: false,
+			error
+		};
+	}
+}
+/** Opens the one connect window, or focuses it and shows the new error. */
+function openConnectWindow(error) {
+	if (error !== void 0) lastError = error;
+	if (connectWindow && !connectWindow.isDestroyed()) {
+		notifyStateChanged();
+		if (connectWindow.isMinimized()) connectWindow.restore();
+		connectWindow.show();
+		connectWindow.focus();
+		return connectWindow;
+	}
+	const win = new electron.BrowserWindow({
+		width: 520,
+		height: 560,
+		title: "Open another machine",
+		autoHideMenuBar: true,
+		webPreferences: {
+			preload: node_path.join(__dirname, "connect-preload.js"),
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: true
+		},
+		show: false
+	});
+	connectWindow = win;
+	win.once("ready-to-show", () => win.show());
+	win.on("closed", () => {
+		if (connectWindow === win) connectWindow = null;
+	});
+	const page = resolveResourcePath("connect.html");
+	if (page) win.loadFile(page);
+	else console.error("[desktop] connect.html not found");
+	return win;
+}
+function closeConnectWindow() {
+	if (connectWindow && !connectWindow.isDestroyed()) connectWindow.close();
+	connectWindow = null;
+}
+function registerConnectIpc(handlers) {
+	electron.ipcMain.handle(CONNECT_IPC.GET_STATE, (event) => {
+		if (!fromConnectWindow(event)) return NOT_ALLOWED;
+		const { mode, machine, canUseThisComputer } = handlers.getState();
+		return {
+			mode,
+			machine: machine ? {
+				label: machine.label,
+				baseUrl: machine.baseUrl
+			} : null,
+			canUseThisComputer,
+			error: lastError
+		};
+	});
+	electron.ipcMain.handle(CONNECT_IPC.PAIR, (event, link) => {
+		if (!fromConnectWindow(event)) return NOT_ALLOWED;
+		if (typeof link !== "string") return {
+			ok: false,
+			error: "That is not an Overdeck pairing link."
+		};
+		return runAction(() => handlers.pair(link));
+	});
+	electron.ipcMain.handle(CONNECT_IPC.OPEN_MACHINE, (event) => {
+		if (!fromConnectWindow(event)) return NOT_ALLOWED;
+		return runAction(() => handlers.openMachine());
+	});
+	electron.ipcMain.handle(CONNECT_IPC.USE_LOCAL, (event) => {
+		if (!fromConnectWindow(event)) return NOT_ALLOWED;
+		return runAction(() => handlers.useLocal());
+	});
+	electron.ipcMain.handle(CONNECT_IPC.FORGET, (event) => {
+		if (!fromConnectWindow(event)) return NOT_ALLOWED;
+		return runAction(() => handlers.forget());
+	});
+}
+//#endregion
 //#region src/main.ts
 const ROOT_DIR = node_path.resolve(__dirname, "../../..");
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -903,6 +1562,14 @@ let serverUrl = "";
 let serverWsUrl = "";
 let isQuitting = false;
 const terminalWindows = /* @__PURE__ */ new Map();
+let localServerStarted = false;
+let autoStartNagHandled = false;
+/** Set by Use This Computer: close the connect window once the local window opens. */
+let closeConnectWhenLocalReady = false;
+const machineClientDeps = {
+	fetchImpl: (input, init) => fetch(input, init),
+	lookupAll: lookupAllAddresses
+};
 if (!electron.app.requestSingleInstanceLock()) electron.app.exit(0);
 electron.app.on("second-instance", () => showOrCreateWindow());
 function resolveResourcePath(fileName) {
@@ -932,6 +1599,8 @@ function resolveServerStaticDir() {
 }
 function resolveWindowUrl() {
 	if (isDevelopment) return process.env.VITE_DEV_SERVER_URL;
+	const active = getActiveDashboard();
+	if (active.kind === "remote") return active.baseUrl;
 	if (serverUrl) return serverUrl;
 	return `${DESKTOP_SCHEME}://app/index.html`;
 }
@@ -944,10 +1613,12 @@ function createTerminalWindow(sessionName, title) {
 			preload: node_path.join(__dirname, "preload.js"),
 			contextIsolation: true,
 			nodeIntegration: false,
-			sandbox: false
+			sandbox: false,
+			...remotePartitionPreference()
 		},
 		show: false
 	});
+	guardRemoteNavigation(win);
 	win.once("ready-to-show", () => win.show());
 	win.loadURL(`${resolveWindowUrl()}?terminal=${encodeURIComponent(sessionName)}&title=${encodeURIComponent(title)}`);
 	return win;
@@ -966,14 +1637,7 @@ function registerIpcHandlers() {
 	});
 	electron.ipcMain.handle(IPC.OPEN_EXTERNAL, async (_event, url) => {
 		if (typeof url !== "string") return;
-		let parsed;
-		try {
-			parsed = new URL(url);
-		} catch {
-			return;
-		}
-		if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return;
-		await electron.shell.openExternal(parsed.toString());
+		await openExternalSafe(url);
 	});
 	electron.ipcMain.handle(IPC.GET_DESKTOP_SETTINGS, () => getDesktopSettings());
 	electron.ipcMain.on(IPC.OPEN_TERMINAL_WINDOW, (_event, sessionName, title) => {
@@ -1017,6 +1681,8 @@ function registerIpcHandlers() {
 		quitAndInstall();
 	});
 	electron.ipcMain.handle(IPC.RESTART_DASHBOARD, async () => {
+		const active = getActiveDashboard();
+		if (active.kind === "remote") throw new Error(`This window shows ${active.label}. Restart its dashboard on that machine.`);
 		console.log("[main] manual dashboard restart requested");
 		stopServer();
 		await new Promise((resolve) => setTimeout(resolve, 500));
@@ -1024,9 +1690,191 @@ function registerIpcHandlers() {
 			serverPort = port;
 			serverUrl = `http://127.0.0.1:${port}`;
 			serverWsUrl = wsUrl;
+			setLocalDashboard(serverUrl);
 			console.log(`[main] dashboard restarted on ${serverUrl}`);
 		});
 	});
+	registerConnectIpc({
+		getState: () => {
+			const record = loadMachineRecord();
+			return {
+				mode: getActiveDashboard().kind,
+				machine: record ? {
+					label: record.label,
+					baseUrl: record.baseUrl
+				} : null,
+				canUseThisComputer: getActiveDashboard().kind === "remote" || !localServerStarted
+			};
+		},
+		pair: async (link) => {
+			const result = await pairWithMachine(link, machineClientDeps);
+			if (!result.ok) return result;
+			return openRemoteDashboard(result.record);
+		},
+		openMachine: async () => {
+			const record = loadMachineRecord();
+			if (!record) return {
+				ok: false,
+				error: "No machine is paired with this computer."
+			};
+			return openRemoteDashboard(record);
+		},
+		useLocal: async () => switchToLocal({ closeConnectWindow: true }),
+		forget: async () => forgetMachine()
+	});
+}
+async function openExternalSafe(url) {
+	let parsed;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return;
+	}
+	if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return;
+	await electron.shell.openExternal(parsed.toString());
+}
+function remotePartitionPreference() {
+	const active = getActiveDashboard();
+	return active.kind === "remote" ? { partition: active.partition } : {};
+}
+/** D-9: a remote window stays on the chosen machine; other origins open in the browser. */
+function guardRemoteNavigation(win) {
+	const active = getActiveDashboard();
+	if (active.kind !== "remote") return;
+	const base = active.baseUrl;
+	const keepOnMachine = (event) => {
+		if (isSameOrigin(event.url, base)) return;
+		event.preventDefault();
+		openExternalSafe(event.url);
+	};
+	win.webContents.on("will-navigate", keepOnMachine);
+	win.webContents.on("will-redirect", keepOnMachine);
+	win.webContents.on("did-create-window", (child) => guardRemoteNavigation(child));
+	win.webContents.setWindowOpenHandler(({ url }) => {
+		if (isSameOrigin(url, base)) return { action: "allow" };
+		openExternalSafe(url);
+		return { action: "deny" };
+	});
+}
+/** A window's partition cannot change, so a mode switch recreates every dashboard window (H-4). */
+function destroyDashboardWindows() {
+	if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy();
+	mainWindow = null;
+	for (const win of terminalWindows.values()) if (!win.isDestroyed()) win.destroy();
+	terminalWindows.clear();
+}
+function refreshModeUi() {
+	refreshApplicationMenu();
+	refreshTrayMode();
+}
+function startLocalServer() {
+	localServerStarted = true;
+	startServer(onLocalServerReady);
+}
+function stopLocalServer() {
+	localServerStarted = false;
+	stopServer();
+}
+function handleAutoStartNagOnce() {
+	if (autoStartNagHandled) return;
+	autoStartNagHandled = true;
+	handleAutoStartNag();
+}
+function onLocalServerReady(port, wsUrl) {
+	serverPort = port;
+	serverUrl = `http://127.0.0.1:${port}`;
+	serverWsUrl = wsUrl;
+	if (getActiveDashboard().kind === "remote") return;
+	setLocalDashboard(serverUrl);
+	if (mainWindow && !mainWindow.isDestroyed()) {
+		mainWindow.loadURL(resolveWindowUrl());
+		return;
+	}
+	mainWindow = createWindow();
+	handleAutoStartNagOnce();
+	if (closeConnectWhenLocalReady) {
+		closeConnectWhenLocalReady = false;
+		closeConnectWindow();
+	}
+}
+/** D-6: preflight first; only a 200 session mint stops the local server and opens the machine. */
+async function openRemoteDashboard(record) {
+	const result = await preflightMachine(record, machineClientDeps);
+	if (!result.ok) {
+		openConnectWindow(result.error);
+		return {
+			ok: false,
+			error: result.error
+		};
+	}
+	const previous = getActiveDashboard();
+	setRemoteDashboard(record, result.token);
+	const active = getActiveDashboard();
+	try {
+		if (active.kind === "remote") await prepareRemoteSession(active);
+	} catch (err) {
+		if (previous.kind === "local") setLocalDashboard(previous.baseUrl);
+		const error = err instanceof Error ? err.message : String(err);
+		openConnectWindow(error);
+		return {
+			ok: false,
+			error
+		};
+	}
+	stopLocalServer();
+	setMachineActive(true);
+	closeConnectWhenLocalReady = false;
+	destroyDashboardWindows();
+	mainWindow = createWindow();
+	handleAutoStartNagOnce();
+	closeConnectWindow();
+	refreshModeUi();
+	return { ok: true };
+}
+/**
+* Use This Computer: mark the record inactive and run the embedded server.
+* The connect window stays open until the local window exists, so closing it
+* never leaves the app with no window (window-all-closed would quit).
+*/
+function switchToLocal(options) {
+	setMachineActive(false);
+	if (getActiveDashboard().kind === "local" && localServerStarted) {
+		if (options.closeConnectWindow) closeConnectWindow();
+		refreshModeUi();
+		return { ok: true };
+	}
+	openConnectWindow();
+	destroyDashboardWindows();
+	serverUrl = "";
+	setLocalDashboard("");
+	closeConnectWhenLocalReady = options.closeConnectWindow;
+	startLocalServer();
+	refreshModeUi();
+	return { ok: true };
+}
+/** FR-9: best-effort self-revoke, then delete the record whatever the result. */
+async function forgetMachine() {
+	const record = loadMachineRecord();
+	if (!record) return switchToLocal({ closeConnectWindow: false });
+	let revoked = false;
+	try {
+		revoked = await revokeOwnDevice(record, readMachineToken(record), machineClientDeps);
+	} catch {
+		revoked = false;
+	}
+	deleteMachineRecord();
+	switchToLocal({ closeConnectWindow: false });
+	if (revoked) return { ok: true };
+	return {
+		ok: true,
+		message: `Removed from this computer. ${record.label} could not be reached; revoke "${deviceLabel()}" in its Settings → Anywhere → Devices.`
+	};
+}
+function openConnectWindowFromMenu() {
+	openConnectWindow();
+}
+function useThisComputer() {
+	switchToLocal({ closeConnectWindow: true });
 }
 function createWindow() {
 	const win = new electron.BrowserWindow({
@@ -1039,10 +1887,12 @@ function createWindow() {
 			preload: node_path.join(__dirname, "preload.js"),
 			contextIsolation: true,
 			nodeIntegration: false,
-			sandbox: false
+			sandbox: false,
+			...remotePartitionPreference()
 		},
 		show: false
 	});
+	guardRemoteNavigation(win);
 	win.once("ready-to-show", () => win.show());
 	win.on("close", (event) => {
 		if (!isQuitting && process.platform === "darwin") {
@@ -1079,8 +1929,8 @@ function dispatchMenuAction(action) {
 	else send();
 }
 function callServerApi(path, method) {
-	if (!serverUrl) return;
-	fetch(`${serverUrl}${path}`, { method }).catch((err) => {
+	if (!getActiveDashboard().baseUrl) return;
+	dashboardFetch(path, { method }).catch((err) => {
 		console.error("[desktop] server API call failed:", err);
 	});
 }
@@ -1108,17 +1958,9 @@ electron.app.on("ready", () => {
 		if (iconPath) electron.app.dock.setIcon(iconPath);
 	}
 	createTray();
-	startServer((port, wsUrl) => {
-		serverPort = port;
-		serverUrl = `http://127.0.0.1:${port}`;
-		serverWsUrl = wsUrl;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.loadURL(resolveWindowUrl());
-			return;
-		}
-		mainWindow = createWindow();
-		handleAutoStartNag();
-	});
+	const plan = planBoot(loadMachineRecord(), isDevelopment);
+	if (plan.kind === "remote") openRemoteDashboard(plan.record);
+	else startLocalServer();
 });
 electron.app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") {
@@ -1144,6 +1986,7 @@ Object.defineProperty(exports, "isQuitting", {
 		return isQuitting;
 	}
 });
+exports.openConnectWindowFromMenu = openConnectWindowFromMenu;
 exports.resolveResourcePath = resolveResourcePath;
 exports.resolveServerEntry = resolveServerEntry;
 exports.resolveServerStaticDir = resolveServerStaticDir;
@@ -1167,5 +2010,6 @@ Object.defineProperty(exports, "serverWsUrl", {
 	}
 });
 exports.showOrCreateWindow = showOrCreateWindow;
+exports.useThisComputer = useThisComputer;
 
 //# sourceMappingURL=main.js.map
