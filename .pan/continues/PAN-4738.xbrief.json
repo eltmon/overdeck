@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4738",
+  "created": "2026-11-02T05:12:04.950Z",
+  "updated": "2026-11-02T05:12:04.950Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fly-preanswer-auto-default-nudge": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4738",
+      "claimedAt": "2026-11-02T05:12:04.950Z"
+    }
+  }
+}
