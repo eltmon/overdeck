@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4825",
   "created": "2026-11-02T16:35:14.732Z",
-  "updated": "2026-11-02T17:29:35.841Z",
+  "updated": "2026-11-02T17:29:53.958Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "mimo-v26.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T17:29:35.840Z"
+    },
+    "mimo-v26.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:29:53.958Z"
     }
   }
 }
