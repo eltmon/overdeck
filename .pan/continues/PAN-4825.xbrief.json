@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4825",
   "created": "2026-11-02T16:35:14.732Z",
-  "updated": "2026-11-02T16:52:10.076Z",
+  "updated": "2026-11-02T16:52:11.378Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4825",
       "claimedAt": "2026-11-02T16:48:44.556Z",
       "doneAt": "2026-11-02T16:52:10.075Z"
+    },
+    "mistral-large-4": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T16:52:11.378Z"
     }
   }
 }
