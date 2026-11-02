@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4659",
   "created": "2026-11-02T05:46:59.538Z",
-  "updated": "2026-11-02T06:22:50.600Z",
+  "updated": "2026-11-02T06:23:07.989Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "vsix-import.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T06:22:50.600Z"
+    },
+    "vsix-import.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:23:07.988Z"
     }
   }
 }
