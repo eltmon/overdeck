@@ -8,7 +8,7 @@
       "binding": "DB",
       "database_name": "overdeck-account",
       // Placeholder: the operator replaces it with the id printed when creating the D1 database (docs/ACCOUNT-SERVICE.md "Deploy"). `--local` ignores it.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "25137ba7-bb02-44ae-9658-6f855adc49f4",
       "migrations_dir": "migrations"
     }
   ],
