@@ -37,4 +37,19 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   // Z.AI deprecated
   'glm-4.7': 'glm-5.1',
   'glm-4.7-flash': 'glm-5.1',
+  // MiMo — retired by Xiaomi 2026-10-21 (mimo.mi.com/docs/en-US/price/pay-as-you-go)
+  'mimo-v2.5-pro': 'mimo-v2.6-pro',
+  'mimo-v2.5': 'mimo-v2.6-flash',
+  // Groq — shut down (console.groq.com/docs/deprecations). Groq named qwen/qwen3-32b for
+  // QwQ and the now-dead llama-3.1-8b-instant for Gemma; both remap to live gpt-oss ids.
+  'llama-3.3-70b-versatile': 'openai/gpt-oss-120b',
+  'qwen-qwq-32b': 'openai/gpt-oss-120b',
+  'llama-3.1-8b-instant': 'openai/gpt-oss-20b',
+  'gemma2-9b-it': 'openai/gpt-oss-20b',
+  // Cerebras — deprecated (inference-docs.cerebras.ai/support/deprecation). llama-3.3-70b is
+  // Cerebras's real id; Overdeck carried llama3.3-70b.
+  'llama3.3-70b': 'gpt-oss-120b',
+  'llama-3.3-70b': 'gpt-oss-120b',
+  'llama3.1-70b': 'gpt-oss-120b',
+  'llama3.1-8b': 'gpt-oss-120b',
 };

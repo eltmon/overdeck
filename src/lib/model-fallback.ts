@@ -91,6 +91,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'minimax-m2.7': 'minimax',
   'minimax-m2.7-highspeed': 'minimax',
   'MiniMax-M3': 'minimax',
+  'MiniMax-M3.1-Flash': 'minimax',
 
   // Z.AI models
   'glm-5.3': 'zai',
@@ -100,6 +101,9 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'glm-4.7-flash': 'zai',
 
   // MiMo models
+  'mimo-v2.6-pro': 'mimo',
+  'mimo-v2.6-flash': 'mimo',
+  'mimo-v2.6-pro-ultraspeed': 'mimo',
   'mimo-v2.5-pro': 'mimo',
   'mimo-v2.5': 'mimo',
 
@@ -117,6 +121,18 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // xAI models
   'grok-build-0.1': 'xai',
+  'grok-4.7': 'xai',
+  'grok-4.3': 'xai',
+
+  // Groq models
+  'openai/gpt-oss-120b': 'groq',
+  'openai/gpt-oss-20b': 'groq',
+
+  // Cerebras models
+  'gpt-oss-120b': 'cerebras',
+
+  // Mistral models
+  'mistral-large-4-0': 'mistral',
 
   // QuantumLlama models (synthetic benchmark provider, PAN-3252)
   'ql-reason-70b': 'quantumllama',
@@ -187,6 +203,7 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'minimax-m2.7': 'claude-sonnet-5-5', // Near-Opus performance → Sonnet
   'minimax-m2.7-highspeed': 'claude-sonnet-5-5', // Same quality, faster → Sonnet
   'MiniMax-M3': 'claude-sonnet-5-5', // Top-tier coding → Sonnet
+  'MiniMax-M3.1-Flash': 'claude-sonnet-5-5',
 
   // Z.AI → Anthropic
   'glm-5.2': 'claude-sonnet-5-5', // Current GLM flagship → Sonnet
@@ -200,6 +217,9 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // MiMo → Anthropic
   'mimo-v2.5-pro': 'claude-sonnet-5-5', // Flagship reasoning → Sonnet
   'mimo-v2.5': 'claude-sonnet-5-5', // Multimodal → Sonnet
+  'mimo-v2.6-pro': 'claude-sonnet-5-5',
+  'mimo-v2.6-flash': 'claude-sonnet-5-5',
+  'mimo-v2.6-pro-ultraspeed': 'claude-sonnet-5-5',
 
   // Nous Portal → Anthropic
   'qwen/qwen3.6-plus': 'claude-sonnet-5-5',
@@ -213,6 +233,18 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // xAI → Anthropic
   'grok-build-0.1': 'claude-sonnet-5-5', // Coding flagship → Sonnet
+  'grok-4.7': 'claude-sonnet-5-5',
+  'grok-4.3': 'claude-sonnet-5-5',
+
+  // Groq → Anthropic
+  'openai/gpt-oss-120b': 'claude-sonnet-5-5',
+  'openai/gpt-oss-20b': 'claude-haiku-4-5',
+
+  // Cerebras → Anthropic
+  'gpt-oss-120b': 'claude-sonnet-5-5',
+
+  // Mistral → Anthropic
+  'mistral-large-4-0': 'claude-sonnet-5-5',
 
   // QuantumLlama → Anthropic (synthetic benchmark provider, PAN-3252)
   'ql-reason-70b': 'claude-sonnet-5-5', // Flagship reasoning → Sonnet
@@ -263,8 +295,11 @@ const TIER_RANK: Record<SubscriptionPlan, number> = {
  * OpenRouter model IDs use the format "organization/model-name" (e.g., "qwen/qwen3.6-plus:free").
  * This is distinct from all other providers which use simple identifiers without slashes.
  */
+/** Groq-native ids that carry an `openai/` vendor prefix (console.groq.com/docs/models). */
+const GROQ_SLASH_MODEL_IDS = new Set(['openai/gpt-oss-120b', 'openai/gpt-oss-20b']);
+
 export function isOpenRouterModel(modelId: string): boolean {
-  return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus' && !modelId.startsWith('opencode/') && !modelId.startsWith('opencode-go/');
+  return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus' && !GROQ_SLASH_MODEL_IDS.has(modelId) && !modelId.startsWith('opencode/') && !modelId.startsWith('opencode-go/');
 }
 
 /**

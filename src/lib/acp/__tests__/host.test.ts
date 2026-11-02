@@ -431,7 +431,7 @@ describe("AcpHost", () => {
       agentId: "agent-k27",
       provider: "kimi",
       workspace: process.cwd(),
-      model: "kimi-code/kimi-for-coding",
+      model: "kimi-code/kimi-for-coding-highspeed",
       effort: "high",
       overdeckHome,
       runtime: stub.runtime,
@@ -504,7 +504,7 @@ describe("AcpHost", () => {
     const stub = await makeStubRuntime();
     const host = new AcpHost({
       agentId: "agent-fixed-effort", provider: "kimi", workspace: process.cwd(),
-      model: "kimi-code/kimi-for-coding", overdeckHome, runtime: stub.runtime,
+      model: "kimi-code/kimi-for-coding-highspeed", overdeckHome, runtime: stub.runtime,
     });
     hosts.push(host);
     await host.start();

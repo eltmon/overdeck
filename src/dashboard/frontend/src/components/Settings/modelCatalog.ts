@@ -17,7 +17,7 @@ export interface ModelDef {
    * attachments); `true`/`undefined` = allow. Distinct from the `'vision'`
    * capability tag above, which is incomplete/unreliable today (e.g. multimodal
    * models missing the tag) — only `supportsImages` gates the attach guard.
-   * Scoped to the two MiMo models for now; full audit in PAN-1685.
+   * Set only for audited models (e.g. glm-5.3); full audit in PAN-1685.
    */
   supportsImages?: boolean;
 }
@@ -98,7 +98,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'k3.1-pro-highspeed' as ModelId, name: 'Kimi K3.1 Pro Highspeed (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 12, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'K3.1 Pro at 2-3x inference speed and 2x price. Needs a Kimi Code Allegretto (Pro) plan or higher.' },
       { id: 'k3' as ModelId, name: 'Kimi K3 (256K context)', icon: Gem, tier: 'premium', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi flagship coding model (July 2026). Always-thinking 2.8T MoE, 256K context.' },
       { id: 'k3[1m]' as ModelId, name: 'Kimi K3 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi K3 coding endpoint with the full 1,048,576-token context window.' },
-      { id: 'kimi-k2.7-code' as ModelId, name: 'Kimi K2.7 Code (256K context)', icon: Layers, tier: 'premium', costPer1MTokens: 2.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding-first flagship (June 2026). 1T MoE, multimodal, 262K context.' },
+      { id: 'kimi-k2.7-code' as ModelId, name: 'Kimi K2.7 Code (256K context)', icon: Layers, tier: 'premium', costPer1MTokens: 2.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding-first flagship (June 2026). 1T MoE, multimodal, 262K context. On a coding-subscription key the wire id kimi-for-coding now serves K2.8 Preview.' },
       { id: 'kimi-k2.6' as ModelId, name: 'Kimi K2.6 (256K context)', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi smartest model (April 2026). Native multimodal, superior agentic coding.' },
       { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5 (256K context)', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },
       { id: 'K2.6-code-preview' as ModelId, name: 'K2.6-code-preview (256K context)', icon: FlaskConical, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding preview model.' },
@@ -116,6 +116,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
     name: 'MiniMax',
     models: [
       { id: 'MiniMax-M3' as ModelId, name: 'M3 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'MSA architecture, 1M context, top-tier coding, native multimodal' },
+      { id: 'MiniMax-M3.1-Flash' as ModelId, name: 'M3.1 Flash (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.375, capabilities: ['code', 'agentic', 'fast', 'large-context'], description: 'Multimodal coding model with tunable thinking depth. 1M context, $0.15/M in, $0.60/M out.' },
       { id: 'minimax-m2.7-highspeed' as ModelId, name: 'M2.7 Highspeed (204.8K context)', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 100 tps, 204K context, $0.06/M blended' },
       { id: 'minimax-m2.7' as ModelId, name: 'M2.7 (204.8K context)', icon: Layers, tier: 'balanced', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 10B active params, 204K context' },
     ],
@@ -123,8 +124,9 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   mimo: {
     name: 'Xiaomi MiMo',
     models: [
-      { id: 'mimo-v2.5-pro' as ModelId, name: 'MiMo V2.5 Pro (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 2, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], supportsImages: false, description: 'Flagship reasoning model, 1M context, enhanced agent efficiency. Text-only on Token-Plan endpoints.' },
-      { id: 'mimo-v2.5' as ModelId, name: 'MiMo V2.5 (1M context)', icon: Zap, tier: 'balanced', costPer1MTokens: 1, capabilities: ['code', 'agentic', 'fast', 'vision'], supportsImages: true, description: 'Multimodal model, 1M context, strong agentic coding' },
+      { id: 'mimo-v2.6-pro' as ModelId, name: 'MiMo V2.6 Pro (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 0.6525, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Flagship reasoning model, 1M context, 128K output. $0.435/M in, $0.87/M out.' },
+      { id: 'mimo-v2.6-flash' as ModelId, name: 'MiMo V2.6 Flash (1M context)', icon: Zap, tier: 'balanced', costPer1MTokens: 0.21, capabilities: ['code', 'agentic', 'fast', 'large-context'], description: 'Fast multimodal model, 1M context, 128K output. $0.14/M in, $0.28/M out.' },
+      { id: 'mimo-v2.6-pro-ultraspeed' as ModelId, name: 'MiMo V2.6 Pro UltraSpeed (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 6.525, capabilities: ['reasoning', 'code', 'agentic', 'fast', 'large-context'], description: 'High-speed V2.6 Pro serving, 1M context. $4.35/M in, $8.70/M out.' },
     ],
   },
   nous: {
@@ -149,6 +151,27 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
     name: 'xAI (Grok)',
     models: [
       { id: 'grok-build-0.1' as ModelId, name: 'Grok Build 0.1 (256K context)', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'vision'], description: 'xAI\'s agentic coding model (May 2026). 256K context, reasoning always active.' },
+      { id: 'grok-4.7' as ModelId, name: 'Grok 4.7 (500K context)', icon: Layers, tier: 'premium', costPer1MTokens: 4, capabilities: ['reasoning', 'code', 'large-context'], description: 'xAI flagship. 500K context, $2/M in, $6/M out; a prompt of 200K+ tokens bills the whole request at double.' },
+      { id: 'grok-4.3' as ModelId, name: 'Grok 4.3 (1M context)', icon: Zap, tier: 'balanced', costPer1MTokens: 1.875, capabilities: ['reasoning', 'code', 'large-context'], description: '1M context, $1.25/M in, $2.50/M out; a prompt of 200K+ tokens bills the whole request at double.' },
+    ],
+  },
+  groq: {
+    name: 'Groq',
+    models: [
+      { id: 'openai/gpt-oss-120b' as ModelId, name: 'GPT OSS 120B (131K context)', icon: Zap, tier: 'balanced', costPer1MTokens: 0.375, capabilities: ['reasoning', 'code', 'fast'], description: 'OpenAI open-weight model on Groq. 131K context, $0.15/M in, $0.60/M out.' },
+      { id: 'openai/gpt-oss-20b' as ModelId, name: 'GPT OSS 20B (131K context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.1875, capabilities: ['code', 'fast', 'cost-efficient'], description: 'Small OpenAI open-weight model on Groq. 131K context, $0.075/M in, $0.30/M out.' },
+    ],
+  },
+  cerebras: {
+    name: 'Cerebras',
+    models: [
+      { id: 'gpt-oss-120b' as ModelId, name: 'GPT OSS 120B (131K context)', icon: Zap, tier: 'balanced', costPer1MTokens: 0.55, capabilities: ['reasoning', 'code', 'fast'], description: 'OpenAI open-weight model on Cerebras. 131K context and 40K output on the paid tier, $0.35/M in, $0.75/M out.' },
+    ],
+  },
+  mistral: {
+    name: 'Mistral AI',
+    models: [
+      { id: 'mistral-large-4-0' as ModelId, name: 'Mistral Large 4 (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 1.4, capabilities: ['reasoning', 'code', 'large-context'], description: 'Public Preview (2026-10-06). 1M context, $0.70/M in, $0.07/M cached, $2.10/M out.' },
     ],
   },
   quantumllama: {
@@ -173,7 +196,7 @@ export function findModelDef(modelId: string): ModelDef | undefined {
 /**
  * Whether image attachments may be sent to a model. Permissive: returns `false`
  * ONLY for models flagged `supportsImages: false` (proven text-only, e.g.
- * mimo-v2.5-pro); every other model — including unflagged ones — is allowed, so
+ * glm-5.3); every other model — including unflagged ones — is allowed, so
  * the provider stays the final authority. Mirrors `modelSupportsImages` in
  * src/lib/model-capabilities.ts. PAN-1685.
  */

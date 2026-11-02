@@ -47,7 +47,7 @@ describe('September model catalog no-loss audit', () => {
     ['glm-5.3', 'zai', 1000000],
     ['qwen3.7-plus', 'dashscope', 1000000],
     ['qwen3.8-flash', 'dashscope', 1000000],
-    ['mimo-v2.5', 'mimo', 1048576],
+    ['mimo-v2.6-pro', 'mimo', 1048576],
   ] as const)('registers %s with the intended context and provider', (id, provider, contextWindow) => {
     expect(MODEL_CAPABILITIES[id].contextWindow).toBe(contextWindow);
     expect(getProviderForModel(id).name).toBe(provider);
@@ -60,7 +60,7 @@ describe('September model catalog no-loss audit', () => {
   it('preserves K3 context tier across launch translation and hides unsupported K2.7 effort', () => {
     expect(apiLaunchModelId('k3')).toBe('k3-256k');
     expect(apiLaunchModelId('k3[1m]')).toBe('k3[1m]');
-    expect(MODEL_CAPABILITIES['kimi-code/kimi-for-coding'].effortLevels).toEqual([]);
+    expect(MODEL_CAPABILITIES['kimi-code/kimi-for-coding'].effortLevels).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
     expect(MODEL_CAPABILITIES['kimi-code/kimi-for-coding-highspeed'].effortLevels).toEqual([]);
     // Generic role effort remains valid; the native launcher omits unsupported controls.
     expect(modelSupportsEffortSync('kimi-code/kimi-for-coding', 'high')).toBe(true);

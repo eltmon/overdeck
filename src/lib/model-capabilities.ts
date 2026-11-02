@@ -820,7 +820,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 75, // MoE: 1T total params, 32B active
       'context-length': 98, // 262K context
     },
-    notes: 'Moonshot/Kimi\'s coding-first open-weight model (June 2026). 1T MoE / 32B active, multimodal, extended thinking modes. API id `kimi-k2.7-code`. Source: https://platform.moonshot.ai/docs/pricing/chat',
+    notes: 'Moonshot/Kimi\'s coding-first open-weight model (June 2026). 1T MoE / 32B active, multimodal, extended thinking modes. API id `kimi-k2.7-code`. On a coding-subscription key the wire id `kimi-for-coding` now serves K2.8 Preview (Kimi CLI, 2026-11-02); this route keeps its 262144 window and no adjustable effort until verified. Source: https://platform.moonshot.ai/docs/pricing/chat',
   },
 
   'kimi-k2.6': {
@@ -895,8 +895,8 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   // namespaced `kimi-code/<alias>`, verified via `kimi provider list --json`.
   'kimi-code/k3': { model: 'kimi-code/k3', provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Native kimi-code harness alias for K3 at its full 1M context (maxContextSize=1048576 per `kimi provider list --json`). Launched via `kimi -m kimi-code/k3 --yolo`. Canonical effort levels; src/lib/kimi-effort.ts translates to native low/high/max.' },
   'kimi-code/k3-256k': { model: 'kimi-code/k3-256k', provider: 'kimi', displayName: 'Kimi K3 (256K)', costPer1MTokens: 9, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 98 }, notes: 'Native kimi-code harness alias for K3 at the smaller 256K context tier (maxContextSize=262144 per `kimi provider list --json`). Same per-token pricing as kimi-code/k3.' },
-  'kimi-code/kimi-for-coding': { model: 'kimi-code/kimi-for-coding', provider: 'kimi', displayName: 'Kimi K2.7 Coding', costPer1MTokens: 2.5, effortLevels: [], contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 75, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Coding" per `kimi provider list --json` — the CLI-native successor to the claude-code-routed kimi-k2.7-code id.' },
-  'kimi-code/kimi-for-coding-highspeed': { model: 'kimi-code/kimi-for-coding-highspeed', provider: 'kimi', displayName: 'Kimi K2.7 Coding Highspeed', costPer1MTokens: 2.5, effortLevels: [], contextWindow: 262144, skills: { 'code-generation': 93, 'code-review': 91, debugging: 91, planning: 88, documentation: 88, testing: 88, security: 83, performance: 90, synthesis: 92, speed: 88, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Coding Highspeed" per `kimi provider list --json` — a faster-inference variant of kimi-code/kimi-for-coding. No published pricing yet; reuses that alias\'s rate as a placeholder.' },
+  'kimi-code/kimi-for-coding': { model: 'kimi-code/kimi-for-coding', provider: 'kimi', displayName: 'Kimi K2.8 Preview', costPer1MTokens: 2.5, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 75, 'context-length': 100 }, notes: 'Native kimi-code harness alias; `kimi provider list --json` (kimi 2.0.2, 2026-11-02) reports displayName "K2.8 Preview", maxContextSize 1048576, supportEfforts low/high/max (default max). Canonical effort levels; src/lib/kimi-effort.ts translates to native low/high/max. Pricing unpublished; reuses the K2.7 rate.' },
+  'kimi-code/kimi-for-coding-highspeed': { model: 'kimi-code/kimi-for-coding-highspeed', provider: 'kimi', displayName: 'Kimi K2.7 Code Highspeed', costPer1MTokens: 2.5, effortLevels: [], contextWindow: 262144, skills: { 'code-generation': 93, 'code-review': 91, debugging: 91, planning: 88, documentation: 88, testing: 88, security: 83, performance: 90, synthesis: 92, speed: 88, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Code Highspeed" per `kimi provider list --json` — a faster-inference variant of kimi-code/kimi-for-coding. No published pricing yet; reuses that alias\'s rate as a placeholder.' },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // MINIMAX MODELS
@@ -950,7 +950,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'MiniMax-M3',
     provider: 'minimax',
     displayName: 'MiniMax M3',
-    costPer1MTokens: 1.5, // Same $0.30/M in / $1.20/M out blended as M2.7; confirm at launch
+    costPer1MTokens: 1.5, // $0.30/M in / $1.20/M out / $0.06/M cache read at ≤512K input (Standard)
     contextWindow: 1000000, // 1M context via MSA architecture
     skills: {
       'code-generation': 93, // Top-tier coding; MSA architecture for scalable context
@@ -965,7 +965,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 80,
       'context-length': 100, // 1M context
     },
-    notes: 'MSA (MiniMax Sparse Attention), 1M context, native multimodal, top-tier coding/agentic. Same pricing as M2.7.',
+    notes: 'MSA (MiniMax Sparse Attention), 1M context, native multimodal, top-tier coding/agentic. Above 512K input tokens: $0.60/M in, $2.40/M out, $0.12/M cache read (platform.minimax.io/docs/guides/pricing).',
   },
 
   // Z.AI models

@@ -176,6 +176,9 @@ model picker. All three use a 1,048,576-token context window:
 | `muse-spark-1.3` | &#36;1.25 | &#36;0.15 | &#36;4.25 |
 | `muse-spark-1.3-contributor` | &#36;0.10 | &#36;0.002 | &#36;0.20 |
 
+Muse Wonder and Muse Spark 1.3 accept `max` effort and Contributor stops at
+`xhigh`; Overdeck still sends at most `xhigh` (see the effort table).
+
 Muse Wonder (`muse-wonder-1.0`) is Meta's frontier model, released on
 2026-10-12. Muse Wonder Full is not in the picker yet: Meta offers it only on
 the Muse Code Power Usage and Maximum Usage plans and has not published its
@@ -450,6 +453,10 @@ alias. A role pinned to `kimi-k2.7-code`, `kimi-k2.6`, `kimi-k2.5`, `kimi-k2`,
 or `K2.6-code-preview` has no native equivalent and fails loudly at spawn with
 the list of valid native aliases, rather than silently launching the wrong
 model.
+
+`kimi-code/kimi-for-coding` is K2.8 Preview (1,048,576-token context, effort
+low/high/max); `kimi-code/kimi-for-coding-highspeed` is K2.7 Code Highspeed
+(262,144 tokens, no adjustable effort).
 
 To opt back out to `claude-code` or `acp`, override the provider's harness in
 `~/.overdeck/config.yaml`:
@@ -1151,7 +1158,7 @@ Model pickers show the configured session context beside each model. This budget
 
 Astra and GPT 5.6 Sol, Terra, and Luna default to **272K**. The explicit GPT 5.6 **372K** variants opt into a larger budget. Managed Codex sessions pass this budget and default to **High** reasoning effort. A dashboard effort change on Codex app-server or Kimi ACP applies after the runtime accepts it, starting with subsequent turns. Terminal-only routes use their launch setting and native terminal controls.
 
-Fable 5.1 supports **1M** context and requires **Claude Code 2.1.255 or newer**. Model availability and extended-context access still depend on your provider and subscription. Kimi K3 offers separate **256K** and **1M** choices; K2.7 Code uses **256K** and does not offer adjustable reasoning effort.
+Fable 5.1 supports **1M** context and requires **Claude Code 2.1.255 or newer**. Model availability and extended-context access still depend on your provider and subscription. Kimi K3 offers separate **256K** and **1M** choices; K2.7 Code uses **256K** and does not offer adjustable reasoning effort; K2.8 Preview (`kimi-code/kimi-for-coding`) uses **1M** and offers low/high/max.
 
 Subscription usage allowances are not API token prices. A larger window can consume more of your allowance, but API long-input multipliers should not be read as subscription-credit multipliers.
 
@@ -1163,8 +1170,8 @@ Subscription usage allowances are not API token prices. A larger window can cons
 | Codex (TUI) | `model_reasoning_effort` in the agent's `CODEX_HOME/config.toml` | low | medium | high | xhigh | max on models that advertise it |
 | Codex (app-server) | host `--effort` at launch, per-turn `effort`, live `set-effort` | same as Codex TUI | | | | |
 | OpenCode | ACP `setConfigOption("effort", …)`; model variants pass through | low | medium | high | xhigh | max (only levels/variants the model exposes) |
-| Kimi K3 / K3.1 (ACP) | ACP `thinking` option | low | high | high | max | max |
-| Kimi K3 / K3.1 (native) | `KIMI_MODEL_THINKING_EFFORT` env per process | low | high | high | max | max |
+| Kimi K3 / K3.1 / K2.8 Preview (ACP) | ACP `thinking` option | low | high | high | max | max |
+| Kimi K3 / K3.1 / K2.8 Preview (native) | `KIMI_MODEL_THINKING_EFFORT` env per process | low | high | high | max | max |
 | Pi (`omp`) | `--thinking <level>`; live `set_thinking_level` | low | medium | high | xhigh | xhigh |
 | Muse Code | `--reasoning-effort <level>` | low | medium | high | xhigh | xhigh |
 | Prime Agent | `--thinking <level>` (1:1) | low | medium | high | xhigh | max |
