@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T21:36:26.165Z",
+  "updated": "2026-11-02T21:36:27.153Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-4774",
       "claimedAt": "2026-11-02T21:33:25.273Z",
       "doneAt": "2026-11-02T21:36:26.165Z"
+    },
+    "ac13-open-preview-ui": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T21:36:27.153Z"
     }
   }
 }
