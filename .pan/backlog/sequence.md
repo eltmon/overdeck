@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T01:10:33.908132Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-02T01:11:38.643086Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -610,6 +610,7 @@ _Last sequenced: 2026-11-02T01:10:33.908132Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
+| 603 | PAN-4762 | S | medium | ok |  |  | In-pipeline: file-link right-click menu gains Open in browser and per-installed-browser items for html/svg/pdf/image files. |
 | 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -1205,10 +1206,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T01:10:33.908132Z",
+  "generatedAt": "2026-11-02T01:11:38.643086Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 871,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12050,6 +12051,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       ],
       "why": "Live 3-machine gauntlet check moved out of PAN-4638; needs its release, pan reload, a linked laptop rig and Fly setup by the operator.",
       "rationale": "New follow-up to PAN-4638 holding the live check that could not run before merge. It ranks just after PAN-4638 because it needs that PR released and reloaded plus operator setup of the rig and Fly, so it cannot be picked up autonomously yet.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4762",
+      "rank": 603,
+      "size": "S",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: file-link right-click menu gains Open in browser and per-installed-browser items for html/svg/pdf/image files.",
+      "rationale": "New in-pipeline issue with a fully specified body and ACs; pinned in the free rank 603 beside comparable dashboard UX features so no existing node moves.",
       "gate": "auto",
       "planning": "auto"
     }
