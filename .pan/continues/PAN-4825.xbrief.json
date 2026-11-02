@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4825",
   "created": "2026-11-02T16:35:14.732Z",
-  "updated": "2026-11-02T17:33:31.148Z",
+  "updated": "2026-11-02T17:33:48.790Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "xai-grok-47-43.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T17:33:31.147Z"
+    },
+    "minimax-m31-flash.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:33:48.790Z"
     }
   }
 }
