@@ -14,6 +14,8 @@ import {
 } from '../../../../lib/agents/agent-state.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { evaluateIssueMergeGate } from '../../../../lib/cloister/merge-gate.js';
+import { raiseDeftDriftDecision } from '../../../../lib/deft/merge-guard.js';
+import { getIssueWorkspacePath } from '../../../../lib/overdeck/issue-projects.js';
 import type { MergeReadiness } from '../../../../lib/cloister/pr-facts.js';
 import type { VerificationRunnerOptions } from '../../../../lib/cloister/verification-types.js';
 import type { DerivedIssueState } from '@overdeck/contracts';
@@ -182,6 +184,8 @@ export interface MergeQueueAdvanceDeps {
 /** What `evaluateIssueMergeGate` answers, narrowed to what the merge doors read. */
 export interface MergeGateVerdict extends MergeReadiness {
   facts?: { headBranch: string | null; headSha?: string | null; url?: string | null };
+  /** PAN-4820: Deft-hidden files edited outside any commit. */
+  deftDrift?: string[];
 }
 
 /**
@@ -257,8 +261,20 @@ export async function forgeMergeGate(
     preferBranch: expectedBranch,
     ...(requiresHeadApproval(request) ? {} : { requireApprovalAtHead: false }),
   });
+  if (verdict.deftDrift?.length) raiseDriftDecision(issueId, verdict.deftDrift);
   const refusal = mergeGateRefusal(verdict, expectedBranch, automaticMergeHead(request) ?? undefined);
   return refusal ? { refusal } : { refusal: null, facts: verdict.facts };
+}
+
+/** PAN-4820 (AD-18): surface Deft drift in Needs-you. A journal failure never blocks the gate's answer. */
+function raiseDriftDecision(issueId: string, paths: string[]): void {
+  const workspacePath = getIssueWorkspacePath(issueId);
+  if (!workspacePath) return;
+  try {
+    raiseDeftDriftDecision(workspacePath, issueId, paths);
+  } catch (err) {
+    console.warn(`[merge] Could not raise the Deft drift decision for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 /** {@link forgeMergeGate}'s refusal alone, for the doors that do not merge. */
