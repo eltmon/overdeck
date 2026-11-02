@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4754",
   "created": "2026-11-02T00:55:26.468Z",
-  "updated": "2026-11-02T01:47:07.394Z",
+  "updated": "2026-11-02T01:47:21.714Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "work-md-guidance.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T01:47:07.394Z"
+    },
+    "work-md-guidance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:47:21.714Z"
     }
   }
 }
