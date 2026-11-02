@@ -165,6 +165,29 @@ export const AUDITED_MODEL_ADDITIONS = {
     notes: 'Stable Google model. 1,048,576 input tokens and 65,536 maximum output tokens; verified September 2026.',
   },
 
+  'gemini-3.6-flash': {
+    model: 'gemini-3.6-flash',
+    provider: 'google',
+    displayName: 'Gemini 3.6 Flash',
+    costPer1MTokens: 2.25, // $0.75 in / $3.75 out through 2026-12-31; $1.50/$7.50 from 2027-01-01
+    contextWindow: 1048576,
+    maxOutputTokens: 65536,
+    skills: {
+      'code-generation': 80,
+      'code-review': 75,
+      debugging: 72,
+      planning: 68,
+      documentation: 76,
+      testing: 72,
+      security: 60,
+      performance: 70,
+      synthesis: 75,
+      speed: 96, // Very fast
+      'context-length': 100,
+    },
+    notes: 'Stable Google model (latest update July 2026). 1,048,576 input tokens, 65,536 output. $0.75/M input, $3.75/M output, $0.075/M cached until 2026-12-31; from 2027-01-01 $1.50/M, $7.50/M and $0.15/M. Google names it the replacement for gemini-3-flash-preview. Skill scores inherit Gemini 3 Flash until benchmarked. Verified 2026-11-02.',
+  },
+
   'gemini-3.1-flash-lite': {
     model: 'gemini-3.1-flash-lite',
     provider: 'google',

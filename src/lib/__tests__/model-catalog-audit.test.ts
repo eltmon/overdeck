@@ -3,6 +3,7 @@ import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS, getModelEffortLevels, resolveMo
 import { getProviderForModel, PROVIDERS } from '../providers.js';
 import { apiLaunchModelId } from '../model-context-windows.js';
 import { getClaudeCodeContextPolicyForModel } from '../agents/provider-env.js';
+import { getPricing } from '../cost.js';
 import type { EffortLevel } from '../model-capability-types.js';
 import { ModelId } from '../settings.js';
 
@@ -49,6 +50,7 @@ describe('September model catalog no-loss audit', () => {
     ['qwen3.8-flash', 'dashscope', 1000000],
     ['mimo-v2.5', 'mimo', 1048576],
     ['gemini-3.1-flash-lite', 'google', 1048576],
+    ['gemini-3.6-flash', 'google', 1048576],
   ] as const)('registers %s with the intended context and provider', (id, provider, contextWindow) => {
     expect(MODEL_CAPABILITIES[id].contextWindow).toBe(contextWindow);
     expect(getProviderForModel(id).name).toBe(provider);
@@ -93,5 +95,9 @@ describe('November 2026 Gemini, Qwen and GLM refresh (PAN-4827)', () => {
     expect(PROVIDERS.google.models).not.toContain(id);
     expect(Object.hasOwn(MODEL_CAPABILITIES, id)).toBe(true);
     expect(PROVIDERS.google.tierModels.haiku).toBe(target);
+  });
+
+  it('registers gemini-3.6-flash with its official price', () => {
+    expect(getPricing('google', 'gemini-3.6-flash')).toMatchObject({ inputPer1k: 0.00075, outputPer1k: 0.00375 });
   });
 });

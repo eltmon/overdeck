@@ -154,10 +154,11 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3-flash-preview');
       expect(models).toContain('gemini-3.1-flash-lite-preview');
       expect(models).toContain('gemini-3.1-flash-lite');
+      expect(models).toContain('gemini-3.6-flash');
       expect(models).toContain('gemini-3-pro-preview'); // legacy
       expect(models).toContain('gemini-2.5-pro'); // legacy
       expect(models).toContain('gemini-2.5-flash'); // legacy
-      expect(models).toHaveLength(10);
+      expect(models).toHaveLength(11);
     });
 
     it('should return all Nous Portal models', () => {
@@ -395,7 +396,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(40); // 12 Anthropic + 11 OpenAI + 6 Google + 11 Kimi
+      expect(models.length).toBe(41); // 12 Anthropic + 11 OpenAI + 7 Google + 11 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -424,11 +425,12 @@ describe('model-fallback', () => {
 
       expect(models).toContain('gemini-3.1-pro-preview');
       expect(models).toContain('gemini-3-flash-preview');
+      expect(models).toContain('gemini-3.6-flash');
       expect(models).not.toContain('gemini-3.1-flash-lite-preview');
       expect(models).toContain('gemini-3.1-flash-lite');
       expect(models).not.toContain('gemini-2.5-pro');
       expect(models).not.toContain('gemini-2.5-flash');
-      expect(models.length).toBe(18); // 12 Anthropic + 6 current Google
+      expect(models.length).toBe(19); // 12 Anthropic + 7 current Google
     });
   });
 

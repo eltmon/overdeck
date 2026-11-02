@@ -150,6 +150,7 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // Google — Gemini 4 Argon introductory rates through 2026-11-30; from 2026-12-01 $4/$20/$0.20 per MTok
   { provider: 'google', model: 'gemini-4-argon', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0001, currency: 'USD' },
   { provider: 'google', model: 'gemini-3.8-flash', inputPer1k: 0.0015, outputPer1k: 0.009, cacheReadPer1k: 0.00015, currency: 'USD' },
+  { provider: 'google', model: 'gemini-3.6-flash', inputPer1k: 0.00075, outputPer1k: 0.00375, cacheReadPer1k: 0.000075, currency: 'USD' },
   { provider: 'google', model: 'gemini-3.5-flash-lite', inputPer1k: 0.0003, outputPer1k: 0.0025, cacheReadPer1k: 0.00003, currency: 'USD' },
   { provider: 'google', model: 'gemini-3.1-pro-preview', inputPer1k: 0.002, outputPer1k: 0.012, currency: 'USD' },
   { provider: 'google', model: 'gemini-3-flash-preview', inputPer1k: 0.00015, outputPer1k: 0.0006, currency: 'USD' },
