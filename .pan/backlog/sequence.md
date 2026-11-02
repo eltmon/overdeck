@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T15:46:00.515870Z · model: claude-opus-5-5 · open: 855_
+_Last sequenced: 2026-11-02T15:55:03.092237Z · model: claude-opus-5-5 · open: 855_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,7 +8,7 @@ _Last sequenced: 2026-11-02T15:46:00.515870Z · model: claude-opus-5-5 · open: 
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
-| 6 | PAN-4803 | M | high | ok |  |  | PAN-4801 landed; now carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews. |
+| 6 | PAN-4821 | S | high | ok |  |  | Close-out says no PR found when the forge read fails transiently; dod-gate maps every lookup error to null and caches it. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -875,9 +875,9 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 
 Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
 
-### PAN-4803 (rank 6)
+### PAN-4821 (rank 6)
 
-Rank held at 6; its only dependency, PAN-4801 (wire the merge-train reconcile hook), closed since the prior run, so it is now unblocked and next in the merge-path tier. Needs-handoff (TENET-10) because it touches merge-gate trust.
+New in-pipeline substrate bug: pan close --force failed three times on 2026-11-02 for merged PRs because readPullRequest in dod-gate.ts turns any forge lookup error into "no PR" and fetchIssuePullRequest caches the error. The fix is small and well-specified (typed read-failure row, one retry, no error caching, log the cause). It takes rank 6, freed when PAN-4803 closed, so no other node moves.
 
 ### PAN-4733 (rank 7)
 
@@ -1190,7 +1190,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T15:46:00.515870Z",
+  "generatedAt": "2026-11-02T15:55:03.092237Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 855,
@@ -1231,19 +1231,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails.",
       "rationale": "Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4803",
-      "rank": 6,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "PAN-4801 landed; now carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews.",
-      "rationale": "Rank held at 6; its only dependency, PAN-4801 (wire the merge-train reconcile hook), closed since the prior run, so it is now unblocked and next in the merge-path tier. Needs-handoff (TENET-10) because it touches merge-gate trust.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11846,6 +11833,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "New issue filed 2026-11-02 as the WI-14 live checkpoint for PAN-4734 (pan start --remote on Fly). It carries no product value and is closed unmerged once the check is recorded, so it takes the free bottom rank and no other node moves.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4821",
+      "rank": 6,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Close-out says no PR found when the forge read fails transiently; dod-gate maps every lookup error to null and caches it.",
+      "rationale": "New in-pipeline substrate bug: pan close --force failed three times on 2026-11-02 for merged PRs because readPullRequest in dod-gate.ts turns any forge lookup error into \"no PR\" and fetchIssuePullRequest caches the error. The fix is small and well-specified (typed read-failure row, one retry, no error caching, log the cause). It takes rank 6, freed when PAN-4803 closed, so no other node moves.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13033,13 +13033,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 0.6
     },
     {
-      "from": "PAN-4702",
-      "to": "PAN-4803",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-4743",
       "to": "PAN-4811",
       "type": "unblocks",
@@ -13077,6 +13070,13 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     {
       "from": "PAN-4426",
       "to": "PAN-4820",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4821",
+      "to": "PAN-4547",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
