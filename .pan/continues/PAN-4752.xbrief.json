@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4752",
   "created": "2026-11-02T00:18:49.972Z",
-  "updated": "2026-11-02T00:20:43.315Z",
+  "updated": "2026-11-02T00:20:51.248Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4752",
       "claimedAt": "2026-11-02T00:18:49.972Z",
       "doneAt": "2026-11-02T00:20:43.315Z"
+    },
+    "fold-strike-workspaces": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4752",
+      "claimedAt": "2026-11-02T00:20:51.248Z"
     }
   }
 }
