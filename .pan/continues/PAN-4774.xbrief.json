@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T23:47:33.744Z",
+  "updated": "2026-11-02T23:47:50.398Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -244,6 +244,10 @@
     "run-local-smoke.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T23:47:33.744Z"
+    },
+    "run-live-claude-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:47:50.398Z"
     }
   }
 }
