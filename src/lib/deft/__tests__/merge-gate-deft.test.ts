@@ -28,9 +28,13 @@ function unapprovedFacts(): PrFacts {
   };
 }
 
-function deps(deft: boolean, guard: MergeGateDeps['deftGuard'] = async () => ({ ok: true, drifted: [] })): MergeGateDeps {
+function deps(
+  deft: boolean,
+  guard: MergeGateDeps['deftGuard'] = async () => ({ ok: true, drifted: [] }),
+  facts: PrFacts = unapprovedFacts(),
+): MergeGateDeps {
   return {
-    getFacts: async () => unapprovedFacts(),
+    getFacts: async () => facts,
     readReviews: async () => ({ headRefOid: HEAD, reviews: [] }),
     overdeckLogins: async () => ['overdeck-agent[bot]'],
     ciTestsRequired: () => true,
@@ -68,6 +72,15 @@ describe('evaluateIssueMergeGate for a Deft issue', () => {
     );
 
     expect(result).toMatchObject({ ready: false, deftDrift: ['package.json'] });
+  });
+
+  it('refuses when the forge reports no PR head, and never runs the guard', async () => {
+    const guard = vi.fn(async () => ({ ok: true as const, drifted: [] }));
+
+    const result = await evaluateIssueMergeGate('PAN-1', deps(true, guard, { ...unapprovedFacts(), forge: 'gitlab', headSha: null }));
+
+    expect(result).toMatchObject({ ready: false, reason: 'the Deft merge guard needs the PR head, and the forge reported none' });
+    expect(guard).not.toHaveBeenCalled();
   });
 
   it('keeps an explicit approval requirement', async () => {

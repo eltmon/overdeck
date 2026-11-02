@@ -159,8 +159,12 @@ export async function evaluateIssueMergeGate(
   const readiness = evaluateMergeReadiness(facts, {
     ciTestsRequired, uatRequired, requireApprovalAtHead, requireApproval: requireApprovalAtHead,
   });
-  // Without a head the PR cannot be ready, and the guard would only repeat the forge read.
-  if (deft && facts.headSha) {
+  if (deft) {
+    // The guard judges the PR's diff at a head; with no head (a GitLab read can
+    // lack one) there is nothing to judge, so a Deft PR is refused, not waved through.
+    if (!facts.headSha) {
+      return { ...readiness, ready: false, reason: 'the Deft merge guard needs the PR head, and the forge reported none', facts };
+    }
     const verdict = await (deps.deftGuard ?? deftMergeGuardForIssue)(issueId, facts.headSha);
     if (!verdict.ok) return { ...readiness, ready: false, reason: verdict.reason, facts, deftDrift: verdict.drifted };
   }
