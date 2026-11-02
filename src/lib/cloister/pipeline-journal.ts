@@ -36,6 +36,7 @@ export type PipelineJournalEntryType =
   | 'review.verdict-refused' | 'review.aborted' | 'review.synthesis-gave-up'
   | 'review.verdict-deferred' | 'review.verdict-replay-gave-up'
   | 'review.stalled' | 'review.stall-escalated' | 'review.dispatch-failed'
+  | 'review.approval-carried'
   | 'uat.verdict' | 'feedback.delivered' | 'feedback.skipped'
   | 'merge.attempted' | 'merge.completed' | 'merge.failed'
   | 'strike.landed'

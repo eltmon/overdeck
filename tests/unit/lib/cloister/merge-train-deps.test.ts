@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildRealReconcileDeps, type TrainIo } from '../../../../src/lib/cloister/merge-train-deps.js';
+import { reconcileStaleSiblings } from '../../../../src/lib/cloister/merge-train-reconciler.js';
 import type { MergeGateResult } from '../../../../src/lib/cloister/merge-gate.js';
 import type { PrFacts } from '../../../../src/lib/cloister/pr-facts.js';
 
@@ -19,9 +20,14 @@ function gate(ready: boolean, overrides: Partial<PrFacts> = {}): MergeGateResult
   return { ready, ...(ready ? {} : { reason: 'not ready' }), facts: facts(overrides) } as MergeGateResult;
 }
 
+const NEW_HEAD = 'd'.repeat(40);
+const MAIN = 'e'.repeat(40);
+const FORK_POINT = 'f'.repeat(40);
+
 /** A git double answering the rebase path; `answers` overrides by subcommand. */
 function gitDouble(answers: Record<string, string | Error> = {}) {
   const calls: string[] = [];
+  let rebased = false;
   const git = vi.fn(async (_cwd: string, args: string[]) => {
     const line = args.join(' ');
     calls.push(line);
@@ -33,16 +39,26 @@ function gitDouble(answers: Record<string, string | Error> = {}) {
     }
     if (line === 'branch --show-current') return 'feature/pan-2\n';
     if (line.startsWith('status')) return '';
+    if (line === 'rev-parse HEAD') return `${rebased ? NEW_HEAD : PR_HEAD}\n`;
+    if (line === 'rev-parse origin/main') return `${MAIN}\n`;
     if (line.startsWith('rev-parse')) return `${PR_HEAD}\n`;
+    if (line.startsWith('merge-base')) return `${FORK_POINT}\n`;
     if (line.startsWith('rev-list')) return '3\n';
+    if (line === 'rebase origin/main') rebased = true;
     return '';
   });
   return { git, calls };
 }
 
+/** Patch-ids by base: the PR diff before the rebase, and after it. */
+function patchIds(before: string, after: string) {
+  return vi.fn(async (_cwd: string, base: string) => (base === FORK_POINT ? before : after));
+}
+
 function io(overrides: Partial<TrainIo> = {}): Partial<TrainIo> {
   return {
     workspacePathFor: () => WS,
+    patchId: patchIds('p1', 'p2'),
     log: () => undefined,
     ...overrides,
   };
@@ -105,10 +121,33 @@ describe('merge-train real deps: rebaseSibling (PAN-4801)', () => {
       'rev-parse HEAD',
       'rev-parse refs/remotes/origin/feature/pan-2',
       'rev-list --count HEAD..origin/main',
+      'rev-parse origin/main',
+      'merge-base HEAD origin/main',
       'rebase origin/main',
-      `push --force-with-lease=refs/heads/feature/pan-2:${PR_HEAD} origin HEAD:refs/heads/feature/pan-2`,
+      'rev-parse HEAD',
+      `push --force-with-lease=refs/heads/feature/pan-2:${PR_HEAD} origin ${NEW_HEAD}:refs/heads/feature/pan-2`,
     ]);
     expect(git.mock.calls.every(([cwd]) => cwd === WS)).toBe(true);
+  });
+
+  it('offers to carry the approval when the PR patch-id is the same before and after the rebase', async () => {
+    const { git } = gitDouble();
+    const patchId = patchIds('same', 'same');
+    const deps = buildRealReconcileDeps(io({ git, patchId }));
+
+    expect(await deps.rebaseSibling('PAN-2')).toEqual({
+      status: 'clean',
+      carry: { from: PR_HEAD, to: NEW_HEAD, patchId: 'same' },
+    });
+    expect(patchId).toHaveBeenCalledWith(WS, FORK_POINT, PR_HEAD);
+    expect(patchId).toHaveBeenCalledWith(WS, MAIN, NEW_HEAD);
+  });
+
+  it('offers no carry when either patch-id is empty', async () => {
+    const { git } = gitDouble();
+    const deps = buildRealReconcileDeps(io({ git, patchId: patchIds('', '') }));
+
+    expect(await deps.rebaseSibling('PAN-2')).toEqual({ status: 'clean' });
   });
 
   it('reports up-to-date without rebasing when main has nothing new', async () => {
@@ -210,5 +249,108 @@ describe('merge-train real deps: follow-up (PAN-4801)', () => {
     expect(log).toHaveBeenCalledWith(
       '[merge-train] PAN-2 conflicts with main after PAN-1; the conflict-repair patrol routes it to the work agent',
     );
+  });
+});
+
+describe('merge-train real deps: approval carry (PAN-4801)', () => {
+  const carry = { from: PR_HEAD, to: NEW_HEAD, patchId: 'same' };
+  const posted = { posted: true as const, forge: 'github' as const, url: null, verdict: 'approve' as const, via: 'review' as const };
+
+  function carryIo(overrides: Partial<TrainIo> = {}) {
+    const postApproval = vi.fn(async () => posted);
+    const journal = vi.fn();
+    const log = vi.fn();
+    return {
+      postApproval,
+      journal,
+      log,
+      io: io({
+        readFacts: async () => facts({ headSha: NEW_HEAD, approvedAtHead: undefined }),
+        postApproval,
+        journal,
+        log,
+        ...overrides,
+      }),
+    };
+  }
+
+  it('posts an approval pinned to the new head and journals both heads', async () => {
+    const { io: train, postApproval, journal } = carryIo();
+    const deps = buildRealReconcileDeps(train);
+
+    expect(await deps.carryApproval!('PAN-2', carry)).toBe(true);
+    expect(postApproval).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-2',
+      verdict: 'approve',
+      reviewedHead: NEW_HEAD,
+      pinHead: NEW_HEAD,
+      body: expect.stringContaining(`patch-id same`),
+    }));
+    expect(journal).toHaveBeenCalledWith(WS, {
+      type: 'review.approval-carried',
+      issueId: 'PAN-2',
+      source: 'merge-train',
+      data: { from: PR_HEAD, to: NEW_HEAD, patchId: 'same', via: 'review' },
+    });
+  });
+
+  it('does not carry when the PR head moved past the rebased head', async () => {
+    const { io: train, postApproval } = carryIo({ readFacts: async () => facts({ headSha: 'c'.repeat(40) }) });
+
+    expect(await buildRealReconcileDeps(train).carryApproval!('PAN-2', carry)).toBe(false);
+    expect(postApproval).not.toHaveBeenCalled();
+  });
+
+  it('does not carry on a non-GitHub forge', async () => {
+    const { io: train, postApproval } = carryIo({ readFacts: async () => facts({ forge: 'gitlab', headSha: NEW_HEAD }) });
+
+    expect(await buildRealReconcileDeps(train).carryApproval!('PAN-2', carry)).toBe(false);
+    expect(postApproval).not.toHaveBeenCalled();
+  });
+
+  it('does not carry, and logs why, when the forge refuses the approval', async () => {
+    const { io: train, journal, log } = carryIo({
+      postApproval: vi.fn(async () => ({ posted: false as const, reason: 'gh api failed' })),
+    });
+
+    expect(await buildRealReconcileDeps(train).carryApproval!('PAN-2', carry)).toBe(false);
+    expect(journal).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(`[merge-train] PAN-2: approval not carried to ${NEW_HEAD.slice(0, 12)}: gh api failed`);
+  });
+
+  it('end to end: an unchanged patch-id carries the approval and skips the re-review', async () => {
+    const { git } = gitDouble();
+    const requester = vi.fn(async () => ({ kind: 'started' as const, autoRequeueCount: 1 }));
+    const { io: train, postApproval } = carryIo({
+      git,
+      patchId: patchIds('same', 'same'),
+      listProjectIssuesWithPr: async () => ['PAN-2'],
+      evaluateGate: async () => gate(true),
+      reviewRequester: () => requester,
+    });
+
+    expect(await reconcileStaleSiblings('PAN-1', buildRealReconcileDeps(train))).toEqual([
+      { issueId: 'PAN-2', result: 'approval-carried' },
+    ]);
+    expect(postApproval).toHaveBeenCalledOnce();
+    expect(requester).not.toHaveBeenCalled();
+  });
+
+  it('end to end: a changed patch-id re-reviews and carries nothing', async () => {
+    const { git } = gitDouble();
+    const requester = vi.fn(async () => ({ kind: 'started' as const, autoRequeueCount: 1 }));
+    const { io: train, postApproval } = carryIo({
+      git,
+      patchId: patchIds('before', 'after'),
+      listProjectIssuesWithPr: async () => ['PAN-2'],
+      evaluateGate: async () => gate(true),
+      reviewRequester: () => requester,
+    });
+
+    expect(await reconcileStaleSiblings('PAN-1', buildRealReconcileDeps(train))).toEqual([
+      { issueId: 'PAN-2', result: 'rebased' },
+    ]);
+    expect(postApproval).not.toHaveBeenCalled();
+    expect(requester).toHaveBeenCalledWith('PAN-2', expect.objectContaining({ source: 'merge-train' }));
   });
 });

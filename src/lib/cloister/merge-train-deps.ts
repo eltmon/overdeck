@@ -11,22 +11,31 @@
  * - A rebase runs only on a clean workspace on the feature branch whose HEAD
  *   is the PR head, and the push is leased on that head. A workspace in any
  *   other state, or a failed push, is an `error` outcome, never a `conflict`.
- * - A rebased sibling is re-reviewed through the guarded review door (its
- *   breaker and in-flight check), not a direct review spawn.
+ * - A clean rebase that leaves the PR's own patch unchanged (`git patch-id
+ *   --stable` of merge-base..head, before and after) carries the approval:
+ *   an approval pinned to the new head is posted and journaled as
+ *   `review.approval-carried`. CI still re-runs on the new head.
+ * - Any other rebased sibling is re-reviewed through the guarded review door
+ *   (its breaker and in-flight check), not a direct review spawn.
  * - A real conflict is left to the conflict-repair patrol (PAN-4384), which
  *   messages the issue's work agent once per conflicting head. Starting a
  *   second agent here would double that.
  */
-import { execFile } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { promisify } from 'util';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import type { MergeGateResult } from './merge-gate.js';
-import type { ReconcileDeps, RebaseStatus } from './merge-train-reconciler.js';
+import type { ApprovalCarry, ReconcileDeps, RebaseStatus } from './merge-train-reconciler.js';
+import { appendPipelineEntry, type PipelineJournalEntry } from './pipeline-journal.js';
+import type { PrFacts } from './pr-facts.js';
+import type { PostReviewVerdictInput, PostReviewVerdictResult } from './pr-review-verdict.js';
 import { getGuardedReviewRequester, type GuardedReviewRequester } from './request-review-pipeline.js';
 
 const execFileAsync = promisify(execFile);
+const execAsync = promisify(exec);
+const SHA_RE = /^[0-9a-f]{40}$/i;
 
 export interface TrainIo {
   /** Run git in `cwd`; resolves stdout, rejects on a non-zero exit. */
@@ -37,6 +46,12 @@ export interface TrainIo {
   listProjectIssuesWithPr: (mergedIssueId: string) => Promise<string[]>;
   evaluateGate: (issueId: string) => Promise<MergeGateResult>;
   reviewRequester: () => GuardedReviewRequester | null;
+  /** `git patch-id --stable` of `git diff base head`; empty when the diff is. */
+  patchId: (cwd: string, base: string, head: string) => Promise<string>;
+  /** The PR's facts, read fresh (no cache). */
+  readFacts: (issueId: string) => Promise<PrFacts>;
+  postApproval: (input: PostReviewVerdictInput) => Promise<PostReviewVerdictResult>;
+  journal: (workspacePath: string, entry: Omit<PipelineJournalEntry, 'at'>) => void;
   log: (line: string) => void;
 }
 
@@ -61,6 +76,24 @@ const defaultIo: TrainIo = {
   },
   evaluateGate: async (issueId) => (await import('./merge-gate.js')).evaluateIssueMergeGate(issueId),
   reviewRequester: getGuardedReviewRequester,
+  patchId: async (cwd, base, head) => {
+    if (!SHA_RE.test(base) || !SHA_RE.test(head)) throw new Error(`patch-id needs full shas, got ${base}..${head}`);
+    const { stdout } = await execAsync(`git diff ${base} ${head} | git patch-id --stable`, {
+      cwd,
+      encoding: 'utf-8',
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    return stdout.trim().split(/\s+/)[0] ?? '';
+  },
+  readFacts: async (issueId) => (await import('./pr-facts.js')).getPrFacts(
+    issueId,
+    {},
+    { preferBranch: `feature/${issueId.toLowerCase()}`, fresh: true },
+  ),
+  postApproval: async (input) => (await import('./pr-review-verdict.js')).postReviewVerdict(input),
+  journal: (workspacePath, entry) => {
+    appendPipelineEntry(workspacePath, entry);
+  },
   log: (line) => console.log(line),
 };
 
@@ -96,7 +129,7 @@ export function buildRealReconcileDeps(overrides: Partial<TrainIo> = {}): Reconc
       return siblings;
     },
 
-    rebaseSibling: async (issueId): Promise<{ status: RebaseStatus }> => {
+    rebaseSibling: async (issueId): Promise<{ status: RebaseStatus; carry?: ApprovalCarry }> => {
       const ws = io.workspacePathFor(issueId);
       if (!ws) throw new Error(`no workspace for ${issueId}`);
       const git = (...args: string[]) => io.git(ws, args).then((out) => out.trim());
@@ -114,6 +147,9 @@ export function buildRealReconcileDeps(overrides: Partial<TrainIo> = {}): Reconc
         throw new Error(`workspace HEAD ${head.slice(0, 12)} is not the PR head ${prHead.slice(0, 12)}`);
       }
       if (await git('rev-list', '--count', 'HEAD..origin/main') === '0') return { status: 'up-to-date' };
+      const main = await git('rev-parse', 'origin/main');
+      const forkPoint = await git('merge-base', 'HEAD', 'origin/main');
+      const patchBefore = await io.patchId(ws, forkPoint, prHead);
 
       try {
         await git('rebase', 'origin/main');
@@ -121,8 +157,9 @@ export function buildRealReconcileDeps(overrides: Partial<TrainIo> = {}): Reconc
         await git('rebase', '--abort').catch(() => {});
         return { status: 'conflict' };
       }
+      const newHead = await git('rev-parse', 'HEAD');
       try {
-        await git('push', `--force-with-lease=refs/heads/${branch}:${prHead}`, 'origin', `HEAD:refs/heads/${branch}`);
+        await git('push', `--force-with-lease=refs/heads/${branch}:${prHead}`, 'origin', `${newHead}:refs/heads/${branch}`);
       } catch (err) {
         // Put the workspace back on the PR head it had, so the agent's next
         // push is not a surprise rebase.
@@ -130,7 +167,42 @@ export function buildRealReconcileDeps(overrides: Partial<TrainIo> = {}): Reconc
         const message = err instanceof Error ? err.message : String(err);
         throw new Error(`push of the rebased ${branch} failed: ${message}`);
       }
-      return { status: 'clean' };
+      const patchAfter = await io.patchId(ws, main, newHead);
+      return patchBefore && patchBefore === patchAfter
+        ? { status: 'clean', carry: { from: prHead, to: newHead, patchId: patchAfter } }
+        : { status: 'clean' };
+    },
+
+    carryApproval: async (issueId, carry: ApprovalCarry) => {
+      const facts = await io.readFacts(issueId);
+      if (facts.forge !== 'github') return false;
+      if (facts.headSha?.toLowerCase() !== carry.to.toLowerCase()) return false;
+      const result = await io.postApproval({
+        issueId,
+        verdict: 'approve',
+        facts,
+        reviewedHead: carry.to,
+        pinHead: carry.to,
+        body: [
+          `Approval carried forward by the merge train (PAN-4801). Rebasing onto main moved the head from`,
+          `${carry.from} to ${carry.to}, and this PR's own patch is unchanged (patch-id ${carry.patchId}).`,
+          'CI re-runs on the new head.',
+        ].join(' '),
+      });
+      if (!result.posted) {
+        io.log(`[merge-train] ${issueId}: approval not carried to ${carry.to.slice(0, 12)}: ${result.reason}`);
+        return false;
+      }
+      const ws = io.workspacePathFor(issueId);
+      if (ws) {
+        io.journal(ws, {
+          type: 'review.approval-carried',
+          issueId,
+          source: 'merge-train',
+          data: { from: carry.from, to: carry.to, patchId: carry.patchId, ...(result.via ? { via: result.via } : {}) },
+        });
+      }
+      return true;
     },
 
     reDispatchVerification: async (issueId) => {

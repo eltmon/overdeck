@@ -354,15 +354,24 @@ through the merged issue's own project only:
    new commits, the branch is rebased onto `origin/main` and pushed with a lease
    on the PR head. A workspace in any other state, or a failed push, is an
    `error` outcome; a failed push also restores the workspace to the PR head.
-3. **Re-review.** A rebased sibling's approval no longer stands at its new
-   head, so the reconcile asks the guarded review door (source `merge-train`)
-   to review it again. With N approved siblings, each merge re-reviews all N.
+3. **Approval carry or re-review.** A rebase moves the head, so the old
+   approval no longer stands at it. When the rebase was clean and the PR's own
+   patch is unchanged (`git patch-id --stable` of the merge-base..head diff is
+   the same before and after), the approval is carried: an approving review
+   pinned to the new head (the reviews API's `commit_id`, or a
+   `<!-- overdeck-verdict: APPROVED sha=<new head> -->` marker when GitHub
+   refuses a self-review) is posted, and the workspace journal records
+   `review.approval-carried` with both heads. The merge gate accepts it at the
+   new head; CI still re-runs there, so checks stay authoritative. A changed
+   patch-id, a head that moved again, a non-GitHub forge or a refused post
+   falls back to a re-review through the guarded review door (source
+   `merge-train`).
 4. **Conflicts.** A rebase that conflicts is aborted and left to the
    conflict-repair patrol ([PIPELINE-GATES.md](PIPELINE-GATES.md), "Conflict
    repair"), which messages the issue's work agent once per conflicting head.
 
 Each run logs `[merge-train] reconciled N sibling(s) after <ISSUE>` with one
-`<ISSUE>=unaffected|rebased|conflict|error` entry per sibling, including runs
+`<ISSUE>=unaffected|approval-carried|rebased|conflict|error` entry per sibling, including runs
 with no siblings.
 
 ## Stash Discipline
