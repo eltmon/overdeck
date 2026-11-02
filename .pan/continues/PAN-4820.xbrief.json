@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T17:42:27.381Z",
+  "updated": "2026-11-02T17:42:44.660Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -81,6 +81,10 @@
     "uninstall-restore.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T17:42:27.381Z"
+    },
+    "uninstall-restore.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:42:44.660Z"
     }
   }
 }
