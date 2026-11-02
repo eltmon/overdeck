@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4653",
   "created": "2026-11-02T03:31:51.838Z",
-  "updated": "2026-11-02T04:29:06.779Z",
+  "updated": "2026-11-02T04:29:25.135Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "menu-override.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T04:29:06.778Z"
+    },
+    "menu-override.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:29:25.134Z"
     }
   }
 }
