@@ -87,4 +87,49 @@ describe('formatCitationBlock', () => {
     const citations: PendingCitation[] = [makeCitation({ quotedText: 'Use X', comment: '   ' })];
     expect(formatCitationBlock(citations)).toBe(`${CITATION_BLOCK_HEADER}\n1. > Use X`);
   });
+
+  it('groups file citations by path, after the message block, in first-appearance order', () => {
+    const citations: PendingCitation[] = [
+      makeCitation({
+        source: { kind: 'file', path: '/repo/docs/guide.md' },
+        quotedText: 'Step two\nis wrong',
+        comment: 'Swap the order',
+      }),
+      makeCitation({ quotedText: 'Use X' }),
+      makeCitation({ source: { kind: 'file', path: '/repo/docs/guide.md' }, quotedText: 'Done.' }),
+      makeCitation({
+        source: { kind: 'file', path: '/repo/README.md' },
+        quotedText: 'Install',
+        comment: 'Mention bun',
+      }),
+    ];
+
+    const result = composePromptWithCitations('Please fix.', citations);
+
+    expect(result).toBe(
+      [
+        'Notes on your previous reply:',
+        '1. > Use X',
+        '',
+        'Notes on `/repo/docs/guide.md`:',
+        '1. > Step two',
+        '   > is wrong',
+        '   Swap the order',
+        '2. > Done.',
+        '',
+        'Notes on `/repo/README.md`:',
+        '1. > Install',
+        '   Mention bun',
+        '',
+        'Please fix.',
+      ].join('\n'),
+    );
+  });
+
+  it('produces no "Notes on your previous reply:" line for a file-only list', () => {
+    const citations: PendingCitation[] = [
+      makeCitation({ source: { kind: 'file', path: '/repo/docs/guide.md' }, quotedText: 'Use X' }),
+    ];
+    expect(formatCitationBlock(citations)).not.toContain(CITATION_BLOCK_HEADER);
+  });
 });
