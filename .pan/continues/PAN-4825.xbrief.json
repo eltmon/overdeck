@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4825",
   "created": "2026-11-02T16:35:14.732Z",
-  "updated": "2026-11-02T17:29:53.958Z",
+  "updated": "2026-11-02T17:30:13.765Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "mimo-v26.ac5": {
       "status": "completed",
       "doneAt": "2026-11-02T17:29:53.958Z"
+    },
+    "groq-gpt-oss.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:30:13.764Z"
     }
   }
 }
