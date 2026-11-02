@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T16:14:26.999957Z · model: claude-opus-5-5 · open: 858_
+_Last sequenced: 2026-11-02T16:17:00.193771Z · model: claude-opus-5-5 · open: 859_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -183,6 +183,7 @@ _Last sequenced: 2026-11-02T16:14:26.999957Z · model: claude-opus-5-5 · open: 
 | 174 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 175 | PAN-4827 | M | high | ok |  | PAN-4825 | Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices |
 | 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
+| 177 | PAN-4819 | XS | low | ok |  |  | Throwaway in-pipeline issue for PAN-4734 live Fly checkpoint (WI-14); closed without merging once the check is recorded. |
 | 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
 | 180 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
 | 181 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
@@ -1193,10 +1194,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T16:14:26.999957Z",
+  "generatedAt": "2026-11-02T16:17:00.193771Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 858,
+  "openCount": 859,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11890,6 +11891,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "New issue from the 2026-11-02 catalog audit. Nothing is broken today: claude-sonnet-4-5 already migrates through MODEL_DEPRECATIONS, so the 2026-11-30 retirement only needs it hidden from new selections, and the rest is price accuracy, a new opt-in model and two context windows. It takes the free rank 224, after PAN-4364 (GPT-6 OpenAI catalog alignment, rank 208), which edits the same OpenAI rows and should land first to avoid conflicts.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4819",
+      "rank": 177,
+      "size": "XS",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Throwaway in-pipeline issue for PAN-4734 live Fly checkpoint (WI-14); closed without merging once the check is recorded.",
+      "rationale": "New in-pipeline throwaway: placed in the free rank 177 near its parent PAN-4734 (rank 147) so no pinned rank shifts.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13138,6 +13152,13 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4819",
+      "to": "PAN-4734",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.9
     }
   ]
 }
