@@ -51,7 +51,7 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-import { FlyProvider, createFlyProvider } from '../../../src/lib/remote/fly-provider.js';
+import { FlyProvider, createFlyProvider, defaultFlyImage } from '../../../src/lib/remote/fly-provider.js';
 
 describe('FlyProvider', () => {
   let provider: FlyProvider;
@@ -83,7 +83,7 @@ describe('FlyProvider', () => {
 
       expect(mockApi.ensureApp).toHaveBeenCalledWith('test-app', 'test-org');
       expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
-        image: expect.any(String),
+        image: 'registry.fly.io/test-app:latest',
       }));
       expect(result.machineId).toBe('new-machine');
       expect(result.name).toBe('ws-123');
@@ -173,6 +173,41 @@ describe('FlyProvider', () => {
       expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
         mounts: [{ volume: 'vol-1', path: '/workspace' }],
       }));
+    });
+
+    it('defaults the image to registry.fly.io/pan-workspaces:latest when app and image are unset', async () => {
+      const defaulted = createFlyProvider({});
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([]);
+      mockApi.createMachine.mockResolvedValue({ id: 'new-machine', name: 'ws-123', state: 'started', region: 'iad' });
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      await run(defaulted.createVm('ws-123'));
+
+      expect(mockApi.ensureApp).toHaveBeenCalledWith('pan-workspaces', 'personal');
+      expect(mockApi.createMachine).toHaveBeenCalledWith('pan-workspaces', 'ws-123', expect.objectContaining({
+        image: 'registry.fly.io/pan-workspaces:latest',
+      }));
+    });
+
+    it('uses an explicit image over the app-derived default', async () => {
+      const explicit = createFlyProvider({ app: 'test-app', image: 'registry.fly.io/custom:v1' });
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([]);
+      mockApi.createMachine.mockResolvedValue({ id: 'new-machine', name: 'ws-123', state: 'started', region: 'iad' });
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      await run(explicit.createVm('ws-123'));
+
+      expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
+        image: 'registry.fly.io/custom:v1',
+      }));
+    });
+  });
+
+  describe('defaultFlyImage', () => {
+    it("returns 'registry.fly.io/my-app:latest' for 'my-app'", () => {
+      expect(defaultFlyImage('my-app')).toBe('registry.fly.io/my-app:latest');
     });
   });
 

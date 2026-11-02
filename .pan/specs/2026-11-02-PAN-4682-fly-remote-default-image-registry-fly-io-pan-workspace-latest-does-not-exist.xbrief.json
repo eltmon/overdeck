@@ -1,0 +1,393 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T03:15:46Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4682: Fly remote: default image registry.fly.io/pan-workspace:latest does not exist",
+    "updated": "2026-11-02T03:19:48.784Z"
+  },
+  "plan": {
+    "id": "pan-4682",
+    "title": "Fly remote: default image registry.fly.io/pan-workspace:latest does not exist",
+    "status": "running",
+    "uid": "bc1ccf46-6e72-4d16-b7a9-5939bc41e06d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T03:15:46Z",
+    "updated": "2026-11-02T03:19:48.784Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4682",
+        "label": "PAN-4682",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4778",
+        "label": "PAN-4778 (sibling: CI image-build workflow)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4682.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "fly",
+      "remote",
+      "bug",
+      "config-defaults"
+    ],
+    "narratives": {
+      "Problem": "Both code paths that create Fly Machines (FlyProvider for pan start --remote, provisionFlyMachine for pan machines add-fly) default the image to registry.fly.io/pan-workspace:latest. The Fly registry is app-scoped and no app named pan-workspace exists, so that repository answers NAME_UNKNOWN and every machine create with no [remote.fly] image points at a missing image. pan remote setup also writes the dead literal into the operator's config.toml, and the add-fly help text, composer manifest and docs repeat it.",
+      "Proposal": "Export DEFAULT_FLY_APP and defaultFlyImage(app) => `registry.fly.io/${app}:latest` from src/lib/remote/fly-provider.ts. FlyProvider's constructor and provisionFlyMachine both fall back to defaultFlyImage(resolved app) after an explicit --image and [remote.fly] image. pan remote setup stops seeding an image key. The add-fly --image help text, the regenerated composer manifest, cli/machines.mdx and docs/fly-provider.md name the derived default and push to registry.fly.io/pan-workspaces:latest. See .pan/drafts/PAN-4682.md.",
+      "NonGoals": "- Do not edit .github/workflows/build-workspace-image.yml (wrong APP_NAME, fly not on PATH, no FLY_API_TOKEN secret); that is PAN-4778.\n- Do not add GitHub Actions secrets or push any image.\n- Do not rewrite operators' existing config.toml files or treat the old literal registry.fly.io/pan-workspace:latest as unset in code.\n- Do not make live Fly API calls.\n- Do not rename the docker/pan-workspace/ folder or the default Fly app pan-workspaces.\n- Do not edit historical PRDs (docs/prds/active/PAN-340-plan.md) or the PAN-4652/PAN-4296 live-verification sections of docs/fly-provider.md.\n- Do not change the registry.fly.io/pan-workspace:latest fixture strings in tests/lib/remote/fly-api.test.ts.\n- Do not change the explicit-override precedence: --image, then [remote.fly] image, then the default."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Default image is registry.fly.io/<resolved app>:latest, computed by one exported helper defaultFlyImage() in fly-provider.ts and used by both FlyProvider and provisionFlyMachine.",
+        "rationale": "The issue body names this fix; the Fly registry is app-scoped; provision.ts already duplicated FlyProvider's defaults, which is how the two could drift."
+      },
+      {
+        "summary": "pan remote setup omits the image key from the [remote.fly] block it seeds instead of writing the new derived value.",
+        "rationale": "Writing any literal pins it; the setup output tells operators to edit app, and only an omitted image follows that edit."
+      },
+      {
+        "summary": "The broken CI image-build workflow is split into sibling issue PAN-4778 and not touched here.",
+        "rationale": "Fixing APP_NAME alone does not make it pass (fly not on PATH, no FLY_API_TOKEN secret needs an operator), and workflow-file pushes need a credential with workflow scope, which would put this branch's push at risk."
+      },
+      {
+        "summary": "No migration of configs that already hold registry.fly.io/pan-workspace:latest; the troubleshooting doc tells operators to delete that line.",
+        "rationale": "Silently treating a configured value as unset hides config from the operator; a documented one-line fix is explicit and reversible."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Small bug fix: 5 items, about 10 files, 3 subsystems (remote provider, anywhere/fly provisioning, CLI + docs).",
+      "canonicalFilename": "2026-11-02-PAN-4682-fly-remote-default-image-registry-fly-io-pan-workspace-latest-does-not-exist.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "provider-default-image",
+        "title": "FlyProvider derives its default image from the resolved Fly app",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:15:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4682",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote/fly-provider.ts",
+            "tests/lib/remote/fly-provider.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/remote/fly-provider.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/remote/fly-provider.test.ts passes including the new default-image cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/remote/fly-provider.ts, below DURABLE_MAX_RETRIES add `export const DEFAULT_FLY_APP = 'pan-workspaces';` and `export function defaultFlyImage(app: string): string { return `registry.fly.io/${app}:latest`; }` with the JSDoc from the PRD. In the FlyProvider constructor compute `const app = config.app ?? DEFAULT_FLY_APP;` first, set `app,` and `image: config.image ?? defaultFlyImage(app),`. Update the FlyProviderConfig.image JSDoc to name the default. In tests/lib/remote/fly-provider.test.ts: tighten the `image: expect.any(String)` assertion in 'calls ensureApp then createMachine' to 'registry.fly.io/test-app:latest'; add a case for createFlyProvider({}) → app pan-workspaces and image registry.fly.io/pan-workspaces:latest; add a case where an explicit image registry.fly.io/custom:v1 passes through; add a defaultFlyImage('my-app') unit case."
+        },
+        "items": [
+          {
+            "id": "provider-default-image.ac1",
+            "title": "Given createFlyProvider({}) with no app or image, when createVm runs, then createMachine receives app 'pan-workspaces' and image 'registry.fly.io/pan-workspaces:latest'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-default-image.ac2",
+            "title": "Given createFlyProvider({ app: 'test-app' }), when createVm runs, then createMachine receives image 'registry.fly.io/test-app:latest'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-default-image.ac3",
+            "title": "Given createFlyProvider({ app: 'test-app', image: 'registry.fly.io/custom:v1' }), when createVm runs, then createMachine receives image 'registry.fly.io/custom:v1' unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-default-image.ac4",
+            "title": "fly-provider.ts exports defaultFlyImage, which returns 'registry.fly.io/my-app:latest' for 'my-app', and `git grep -n \"pan-workspace:latest\" -- src/lib/remote` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provision-default-image",
+        "title": "provisionFlyMachine defaults the image through defaultFlyImage(appName)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:15:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4682",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/fly/provision.ts",
+            "src/lib/anywhere/fly/__tests__/provision.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/fly/__tests__/provision.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "provision.test.ts passes including the default-image and precedence cases",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/anywhere/fly/provision.ts change `import type { FlyProvider } from '../../remote/fly-provider.js';` to `import { DEFAULT_FLY_APP, defaultFlyImage, type FlyProvider } from '../../remote/fly-provider.js';`, set `const DEFAULT_APP = DEFAULT_FLY_APP;`, delete `const DEFAULT_IMAGE = 'registry.fly.io/pan-workspace:latest';`, and change the createMachine image to `input.image ?? cfg.image ?? defaultFlyImage(appName)` using the existing `appName` variable (the one passed to ensureApp), never cfg.app. Keep vi.useFakeTimers() in the test file. Add tests: default image is 'registry.fly.io/overdeck-ws:latest' for the harness's flyConfig.app; input.image wins; with h.deps.flyConfig.image = 'registry.fly.io/y:2' and no input image the config image wins."
+        },
+        "items": [
+          {
+            "id": "provision-default-image.ac1",
+            "title": "Given flyConfig { app: 'overdeck-ws' } with no image and no --image, when provisionFlyMachine runs, then createMachine receives image 'registry.fly.io/overdeck-ws:latest'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provision-default-image.ac2",
+            "title": "Given input { image: 'registry.fly.io/x:1' }, when provisionFlyMachine runs, then createMachine receives 'registry.fly.io/x:1'; given flyConfig.image 'registry.fly.io/y:2' and no input image, then it receives 'registry.fly.io/y:2'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provision-default-image.ac3",
+            "title": "`git grep -n \"pan-workspace:latest\" -- src/lib/anywhere` prints nothing and provision.ts no longer declares DEFAULT_IMAGE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remote-setup-omit-image",
+        "title": "pan remote setup stops seeding the dead image literal into config.toml",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:15:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4682",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/remote/setup.ts",
+            "tests/unit/cli/remote-setup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/remote-setup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "remote-setup.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/cli/commands/remote/setup.ts delete the `image: 'registry.fly.io/pan-workspace:latest',` line from the seeded remote.fly block, and change the closing hint `Make sure your Fly app exists and the pan-workspace image is built.` to `Make sure your Fly app exists and its image is pushed to registry.fly.io/<app>:latest.` Add tests/unit/cli/remote-setup.test.ts that mocks ../../../src/lib/config.js (loadConfigSync → {}, saveConfig spy), ../../../src/lib/remote/index.js (createFlyProvider → { isAuthenticated: () => Effect.succeed(true) }), child_process exec (callback with { stdout: '' }) and ora (spinner with start/succeed/warn no-ops), silences console.log, calls setupCommand(), and asserts the saved config."
+        },
+        "items": [
+          {
+            "id": "remote-setup-omit-image.ac1",
+            "title": "Given loadConfigSync returns {} and Fly auth succeeds, when setupCommand() runs, then saveConfig is called once with remote.fly.app === 'pan-workspaces' and remote.fly has no 'image' key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-setup-omit-image.ac2",
+            "title": "`git grep -n \"pan-workspace:latest\" -- src/cli/commands/remote/setup.ts` prints nothing, and the setup output prints a hint naming registry.fly.io/<app>:latest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-fly-image-help",
+        "title": "add-fly --image help text names the app-derived default, with the regenerated manifest and cli/machines.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:15:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4682",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/machines-fly.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "cli/machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:cli",
+            "npm run generate:slash-commands",
+            "npm run lint:slash-commands",
+            "npx vitest run src/cli/commands/__tests__/machines-fly.test.ts"
+          ],
+          "expected_outputs": [
+            "lint:slash-commands prints '✓ composer-command manifest matches the CLI registry'",
+            "machines-fly.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Change the --image option description in src/cli/commands/machines-fly.ts (line 123) to 'Image (default: remote.fly.image, else registry.fly.io/<app>:latest)'. Run `npm run build:cli && npm run generate:slash-commands` (never against a stale dist) and commit the regenerated packages/contracts/src/composer-commands.generated.ts in the same commit. In cli/machines.mdx change the --image table row (line 126) to: Image. Default: `[remote.fly] image`, else `registry.fly.io/<app>:latest` (the Fly registry is app-scoped)."
+        },
+        "items": [
+          {
+            "id": "add-fly-image-help.ac1",
+            "title": "`node dist/cli/index.js machines add-fly --help` prints 'else registry.fly.io/<app>:latest' for --image",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-fly-image-help.ac2",
+            "title": "`npm run lint:slash-commands` exits 0 and prints '✓ composer-command manifest matches the CLI registry'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-fly-image-help.ac3",
+            "title": "`git grep -n \"pan-workspace:latest\" -- packages cli src/cli` prints nothing, and cli/machines.mdx's --image row renders the default as registry.fly.io/<app>:latest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fly-provider-docs",
+        "title": "docs/fly-provider.md names the app-derived default image and pushes to pan-workspaces",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:15:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4682",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n \"registry.fly.io/pan-workspace:\" -- docs/fly-provider.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the only match is the troubleshooting line that names the old literal",
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, steps 1-7, editing docs/fly-provider.md only: prerequisite bullet (line 32) names registry.fly.io/<app>:latest and keeps the #building-the-pan-workspace-image anchor; the example [remote.fly] block comments out the image line and says the default is registry.fly.io/<app>:latest because the registry is app-scoped; the config table's remote.fly.image default becomes registry.fly.io/<app>:latest; the Build and push block uses registry.fly.io/pan-workspaces:latest in docker build -t and docker push plus a sentence to substitute a custom app; the 'image tag must match' sentence describes the effective image; troubleshooting 'Image not found' gains a step telling operators who have registry.fly.io/pan-workspace:latest (seeded by pan remote setup before PAN-4682) to delete that line; the PAN-4295 live-run sentence (lines 488-490) says the default was fixed by PAN-4682. Do not edit the PAN-4652/PAN-4296 live-verification sections."
+        },
+        "items": [
+          {
+            "id": "fly-provider-docs.ac1",
+            "title": "Given docs/fly-provider.md, when an operator follows the Build and push block, then it builds and pushes `registry.fly.io/pan-workspaces:latest` (both the `docker build -t` and the `docker push` lines name that reference)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-provider-docs.ac2",
+            "title": "The config field reference row for remote.fly.image shows the default `registry.fly.io/<app>:latest`, and the example [remote.fly] block has the image line commented out with that default explained",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-provider-docs.ac3",
+            "title": "`git grep -n \"registry.fly.io/pan-workspace:\" -- docs/fly-provider.md` returns exactly one line, the troubleshooting step that tells operators to delete that config line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "provider-default-image",
+        "to": "provision-default-image",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
