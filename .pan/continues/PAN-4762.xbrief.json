@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4762",
   "created": "2026-11-02T01:21:42.220Z",
-  "updated": "2026-11-02T01:48:04.210Z",
+  "updated": "2026-11-02T01:48:18.031Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "server-launch-browser.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T01:48:04.210Z"
+    },
+    "rpc-browser-methods.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:48:18.031Z"
     }
   }
 }
