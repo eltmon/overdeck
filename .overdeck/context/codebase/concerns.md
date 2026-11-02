@@ -1,6 +1,7 @@
 # Concerns / hazards
 
 Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bullets 2026-11-02, feature-branch-push bullets 2026-11-01).
+Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, linked-machine pooling and feature-branch-push bullets 2026-11-01/02).
 
 - **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
   ohmypi/prime-agent + Anthropic + subscription auth (plus the model/harness pairing
@@ -148,6 +149,15 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   the retry as `FlyMachineError('fly-token-rejected')` instead of counting it as "not
   finished"; the heartbeat/sweep/Codex-sync loop lines, `pan machines unlink`/rollback,
   and `pan doctor`'s `Fly token` row all report it as `Fly token rejected`.
+- **A pooled channel agent must set `timeout`, or Node ignores the peer's keep-alive hint** —
+  `http.Agent.keepSocketAlive` applies `Keep-Alive: timeout=N` only when it is below a nonzero
+  agent `timeout`; with none, a free socket never expires. The other dashboard's stock HTTP
+  server closes idle channels after 5 s, and behind the Fly WebSocket proxy home may not see
+  that close, so `LinkAgent` (`src/lib/anywhere/link-client.ts`) reused a dead channel and the
+  first `linkFetch` after idle failed with `socket hang up` (PAN-4740). `ChannelSocket`'s idle
+  timer was one-shot, unlike `net.Socket`, which also defeats pool expiry after one mid-request
+  timeout. Any new pooled agent over channels needs both an explicit `timeout` and re-arming
+  socket timeouts.
 - **A workspace's `feature/<id>` branch tracks `origin/main`** (`branch.<b>.merge =
   refs/heads/main`), so a bare `git push` from a workspace fails ("upstream branch
   does not match") and `pushPlanArtifacts` (`overdeck/plan-artifact-commit.ts`)
