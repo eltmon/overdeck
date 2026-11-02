@@ -722,7 +722,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             <span className={styles.featureItemCaretPlaceholder} />
           )}
           {expanded && <IssueViewFullscreenButton className={styles.featureItemCaret} onClick={() => openIssue(feature.issueId)} />}
-          <OrderBookIssueChip issueId={feature.issueId} />
+          <OrderBookIssueChip issueId={feature.issueId} compact />
           <ContextMenuTrigger asChild>
             <button
               className={`${styles.featureItem} ${isSelected ? styles.featureItemSelected : ''}`}
