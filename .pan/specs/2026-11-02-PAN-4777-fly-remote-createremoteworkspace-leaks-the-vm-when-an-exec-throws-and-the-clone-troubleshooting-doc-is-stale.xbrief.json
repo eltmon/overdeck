@@ -4,17 +4,17 @@
     "created": "2026-11-02T04:08:06Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4777: Fly remote: createRemoteWorkspace leaks the VM when an exec throws, and the clone troubleshooting doc is stale",
-    "updated": "2026-11-02T04:10:18.130Z"
+    "updated": "2026-11-02T04:11:30.156Z"
   },
   "plan": {
     "id": "pan-4777",
     "title": "Fly remote: createRemoteWorkspace leaks the VM when an exec throws, and the clone troubleshooting doc is stale",
-    "status": "proposed",
+    "status": "running",
     "uid": "42afafc5-1040-4c10-9e88-cc98d8943a24",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T04:08:06Z",
-    "updated": "2026-11-02T04:10:18.130Z",
+    "updated": "2026-11-02T04:11:30.156Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4777",
@@ -200,5 +200,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
