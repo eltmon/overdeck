@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4738",
   "created": "2026-11-02T05:12:04.950Z",
-  "updated": "2026-11-02T05:34:04.774Z",
+  "updated": "2026-11-02T05:34:24.004Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "docs-fly-and-readiness.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T05:34:04.773Z"
+    },
+    "docs-fly-and-readiness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:34:24.004Z"
     }
   }
 }
