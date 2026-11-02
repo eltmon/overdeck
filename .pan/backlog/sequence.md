@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T16:05:38.784543Z · model: claude-opus-5-5 · open: 855_
+_Last sequenced: 2026-11-02T16:08:45.634143Z · model: claude-opus-5-5 · open: 855_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -653,6 +653,7 @@ _Last sequenced: 2026-11-02T16:05:38.784543Z · model: claude-opus-5-5 · open: 
 | 657 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 658 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 659 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
+| 660 | PAN-4823 | XL | medium | needs-refinement |  | PAN-4774 | Native iOS/Android Anywhere client without Tailscale; PRD still being written, children unfiled; sequenced after PAN-4774 acceptance run. |
 | 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
@@ -859,7 +860,6 @@ _Last sequenced: 2026-11-02T16:05:38.784543Z · model: claude-opus-5-5 · open: 
 | 871 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 874 | PAN-4819 | XS | low | ok |  | PAN-4734 | Operator-run throwaway for the PAN-4734 live Fly check; closed without merging. Not Flywheel work, so it sits at the bottom. |
 
 ## Rationale detail
 
@@ -1190,7 +1190,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T16:05:38.784543Z",
+  "generatedAt": "2026-11-02T16:08:45.634143Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 855,
@@ -1231,6 +1231,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails.",
       "rationale": "Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4821",
+      "rank": 6,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Close-out says no PR found when the forge read fails transiently; dod-gate maps every lookup error to null and caches it.",
+      "rationale": "New in-pipeline substrate bug: pan close --force failed three times on 2026-11-02 for merged PRs because readPullRequest in dod-gate.ts turns any forge lookup error into \"no PR\" and fetchIssuePullRequest caches the error. The fix is small and well-specified (typed read-failure row, one retry, no error caching, log the cause). It takes rank 6, freed when PAN-4803 closed, so no other node moves.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9275,6 +9288,21 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
+      "issue": "PAN-4823",
+      "rank": 660,
+      "size": "XL",
+      "importance": "medium",
+      "score": 30,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4774"
+      ],
+      "why": "Native iOS/Android Anywhere client without Tailscale; PRD still being written, children unfiled; sequenced after PAN-4774 acceptance run.",
+      "rationale": "New issue filed 2026-11-02. It is a large new product surface (React Native app, QR pairing, encrypted push, Live Activities) whose PRD is not yet written and whose child issues are not filed, so it is needs-refinement. Its body sequences it after the Anywhere release acceptance run (PAN-4774), so it takes the free rank 660 beside the other deferred Anywhere follow-ups and no other node moves.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2353",
       "rank": 661,
       "size": "M",
@@ -11818,34 +11846,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4819",
-      "rank": 874,
-      "size": "XS",
-      "importance": "low",
-      "score": 5,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4734"
-      ],
-      "why": "Operator-run throwaway for the PAN-4734 live Fly check; closed without merging. Not Flywheel work, so it sits at the bottom.",
-      "rationale": "New issue filed 2026-11-02 as the WI-14 live checkpoint for PAN-4734 (pan start --remote on Fly). It carries no product value and is closed unmerged once the check is recorded, so it takes the free bottom rank and no other node moves.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4821",
-      "rank": 6,
-      "size": "S",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Close-out says no PR found when the forge read fails transiently; dod-gate maps every lookup error to null and caches it.",
-      "rationale": "New in-pipeline substrate bug: pan close --force failed three times on 2026-11-02 for merged PRs because readPullRequest in dod-gate.ts turns any forge lookup error into \"no PR\" and fetchIssuePullRequest caches the error. The fix is small and well-specified (typed read-failure row, one retry, no error caching, log the cause). It takes rank 6, freed when PAN-4803 closed, so no other node moves.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13061,13 +13061,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 0.6
     },
     {
-      "from": "PAN-4734",
-      "to": "PAN-4819",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-4426",
       "to": "PAN-4820",
       "type": "informs",
@@ -13080,6 +13073,13 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4823",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
