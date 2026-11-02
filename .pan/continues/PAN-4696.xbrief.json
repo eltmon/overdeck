@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4696",
   "created": "2026-11-02T16:17:12.298Z",
-  "updated": "2026-11-02T16:48:51.753Z",
+  "updated": "2026-11-02T16:49:08.438Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "auto-reap-check.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T16:48:51.753Z"
+    },
+    "auto-reap-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:49:08.437Z"
     }
   }
 }
