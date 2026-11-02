@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4752",
   "created": "2026-11-02T00:18:49.972Z",
-  "updated": "2026-11-02T01:10:12.119Z",
+  "updated": "2026-11-02T01:10:44.105Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "strike-pr-overlay.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T01:10:12.118Z"
+    },
+    "strike-pr-overlay.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:10:44.104Z"
     }
   }
 }
