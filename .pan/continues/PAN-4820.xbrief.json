@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T18:32:00.862Z",
+  "updated": "2026-11-02T18:34:46.568Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -276,9 +276,10 @@
       "doneAt": "2026-11-02T18:31:56.047Z"
     },
     "switch-use-back": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4820",
-      "claimedAt": "2026-11-02T18:32:00.862Z"
+      "claimedAt": "2026-11-02T18:32:00.862Z",
+      "doneAt": "2026-11-02T18:34:46.567Z"
     }
   }
 }
