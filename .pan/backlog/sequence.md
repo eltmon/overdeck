@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T00:33:57.522889Z · model: claude-opus-5-5 · open: 863_
+_Last sequenced: 2026-11-02T00:41:15.552296Z · model: claude-opus-5-5 · open: 866_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -10,6 +10,7 @@ _Last sequenced: 2026-11-02T00:33:57.522889Z · model: claude-opus-5-5 · open: 
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4751 | S | medium | ok |  |  | In-pipeline: make the Flywheel NEEDS YOU banner reopen the pending AskUserQuestion dialog or jump to the conversation. |
 | 5 | PAN-4750 | M | critical | ok |  |  | Strike merge door requires head approval strikes never get; 5 green strike PRs unmergeable. needs-handoff (TENET-10). |
+| 6 | PAN-4755 | M | medium | ok |  |  | In-pipeline: overlay tokens + shared Modal primitive; rebuild New conversation dialog to the approved mockup. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
@@ -87,6 +88,7 @@ _Last sequenced: 2026-11-02T00:33:57.522889Z · model: claude-opus-5-5 · open: 
 | 80 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
 | 81 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
 | 82 | PAN-4213 | M | high | ok |  |  | Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
+| 82 | PAN-4753 | XL | high | needs-refinement | ✓ | PAN-4750 | Epic: restore merge trains (MergeTrain component, strike fast lane); needs PAN-4750; PRD being written, no children yet; handoff. |
 | 83 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
 | 84 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
 | 85 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
@@ -205,6 +207,7 @@ _Last sequenced: 2026-11-02T00:33:57.522889Z · model: claude-opus-5-5 · open: 
 | 198 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
 | 199 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
 | 200 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
+| 200 | PAN-4754 | S | medium | ok |  |  | pan ask decisions render as one run-on paragraph: markdown in AskUserQuestionDialog, separate context block, tighter work.md guidance. |
 | 201 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
 | 202 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
 | 203 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
@@ -891,6 +894,10 @@ New in-pipeline issue pinned near the top per the never-re-rank rule. It is a co
 
 New substrate issue that blocks every strike PR from merging through Overdeck since #4066: the strike door reuses the feature merge gate with requireApprovalAtHead, and the operator cannot approve their own PR. Five green strike PRs are stuck today, so it ranks critical near the top; it is labeled needs-handoff, so pickup must be a supervised handoff rather than autonomous.
 
+### PAN-4755 (rank 6)
+
+New this pass and already in the pipeline, so it is pinned in the free rank 6 slot rather than ranked by impact. The issue is a fully specified UI fix (overlay tokens, a shared Modal primitive, and the New conversation dialog rebuilt to an approved mockup), so its condition is ok.
+
 ### PAN-4733 (rank 7)
 
 Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.
@@ -1187,10 +1194,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
-### PAN-3106 (rank 80)
-
-New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1198,10 +1201,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T00:33:57.522889Z",
+  "generatedAt": "2026-11-02T00:41:15.552296Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 863,
+  "openCount": 866,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11947,6 +11950,48 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "New issue filed 2026-11-02 and already in the pipeline, so it is pinned at the free rank 2 without moving any other node. The substrate-improvement label sets a high-importance floor; the fix is a small, well-specified change in src/lib/flywheel/derive-status.ts with a named unit test, so the condition is ok.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4755",
+      "rank": 6,
+      "size": "M",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: overlay tokens + shared Modal primitive; rebuild New conversation dialog to the approved mockup.",
+      "rationale": "New this pass and already in the pipeline, so it is pinned in the free rank 6 slot rather than ranked by impact. The issue is a fully specified UI fix (overlay tokens, a shared Modal primitive, and the New conversation dialog rebuilt to an approved mockup), so its condition is ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4753",
+      "rank": 82,
+      "size": "XL",
+      "importance": "high",
+      "score": 78,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4750"
+      ],
+      "why": "Epic: restore merge trains (MergeTrain component, strike fast lane); needs PAN-4750; PRD being written, no children yet; handoff.",
+      "rationale": "New epic that restores the pre-Cut merge-train surfaces the operator approved on 2026-11-02. It is ranked beside the PAN-4213 merge-train follow-ups because voided UAT batches and invisible trains hit every hold-for-UAT project. Its strike lane depends on PAN-4750, and PAN-3657 must fix the polyrepo queue first. It stays needs-refinement because the PRD is still being written and no child issues exist yet.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": true
+    },
+    {
+      "issue": "PAN-4754",
+      "rank": 200,
+      "size": "S",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan ask decisions render as one run-on paragraph: markdown in AskUserQuestionDialog, separate context block, tighter work.md guidance.",
+      "rationale": "New, well-specified operator-UX fix with exact files and acceptance criteria; ranked with other medium operator-surface fixes.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13195,6 +13240,27 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4750",
+      "to": "PAN-4753",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3657",
+      "to": "PAN-4753",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4213",
+      "to": "PAN-4753",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
