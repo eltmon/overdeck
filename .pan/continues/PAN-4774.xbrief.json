@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T23:57:24.628Z",
+  "updated": "2026-11-02T23:57:43.540Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -392,6 +392,10 @@
     "ac08-wdoc.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T23:57:24.628Z"
+    },
+    "release-checklist-doc.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:57:43.540Z"
     }
   }
 }
