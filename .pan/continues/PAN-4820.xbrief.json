@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T17:39:36.281Z",
+  "updated": "2026-11-02T17:39:44.111Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,11 @@
     "install-and-hide.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T17:39:36.280Z"
+    },
+    "uninstall-restore": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T17:39:44.111Z"
     }
   }
 }
