@@ -1,0 +1,58 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T15:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4819: throwaway PAN-4734 live Fly check",
+    "updated": "2026-11-02T15:30:00Z"
+  },
+  "plan": {
+    "id": "pan-4819",
+    "title": "Throwaway: PAN-4734 live Fly check",
+    "status": "approved",
+    "uid": "bb77b5a2-4d0a-4e49-bb59-94614d90ac13",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 1,
+    "created": "2026-11-02T15:30:00Z",
+    "updated": "2026-11-02T15:30:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4819",
+        "type": "x-overdeck/issue",
+        "title": "PAN-4819"
+      }
+    ],
+    "narratives": {
+      "Overview": "Throwaway issue for the PAN-4734 live checkpoint. One trivial item."
+    },
+    "items": [
+      {
+        "id": "wi1-scratch-line",
+        "title": "Append the live-check line to the scratch file",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-02T15:30:00Z",
+        "metadata": {
+          "issueLabel": "pan-4819",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "chore",
+          "files_scope": [
+            ".tmp-pan4734-live-check.txt"
+          ],
+          "verify_commands": [
+            "cat .tmp-pan4734-live-check.txt"
+          ],
+          "expected_outputs": [
+            "the file contains the line PAN-4734 live check"
+          ]
+        },
+        "narrative": {
+          "Action": "Create .tmp-pan4734-live-check.txt at the repository root containing the single line `PAN-4734 live check`. Commit it with the body line `Item: wi1-scratch-line`, push, and complete the item."
+        }
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}
