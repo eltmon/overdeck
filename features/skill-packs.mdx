@@ -514,6 +514,27 @@ When the `sageox` pack is registered, `pan doctor` adds a **SageOx (ox)** row. I
 
 ## Where state lives and when changes apply
 
+### Where pack state is stored
+
+| What | Stored in |
+|------|-----------|
+| Registry (url, ref, trusted commit) | `~/.overdeck/config.yaml`, under `skills.packs.<id>` |
+| Global pack toggle | `~/.overdeck/config.yaml`, under `skills.pack_overrides.<id>: true` |
+| Project pack toggle | `~/.overdeck/projects.yaml`, under `projects.<key>.skill_pack_overrides.<id>` |
+| Issue pack toggle | The issue's skill override file, under `packs.<id>` |
+| Single pack skills | The same `skills.overrides`, `skill_overrides`, and issue `skills:` maps, with `pack/skill` keys |
+| gstack runtime and state | `~/.overdeck/packs/gstack/render/<commit>/` and `~/.overdeck/packs/gstack/state/` |
+| gstack browser runtime | `~/.overdeck/packs/gstack/browser/` (bun cache, Chromium, Chromium's fontconfig and GPU caches), and `node_modules` plus binaries inside the render |
+| gstack browser consent | `~/.overdeck/config.yaml`, under `skills.packs.gstack.browser: true` |
+
+The cache lives in `~/.overdeck/packs/` and can be rebuilt at any time, except the gstack `state/` dir, which holds gstack's own config, sessions and learnings: `pan skills pack sync [id]` re-fetches the cache, and `pan skills pack gc [--max-age-days <n>]` removes mounts no launch uses. `pan skills pack remove <id>` unregisters a pack, clears its global toggle and global skill values, and deletes its cache; project and issue values stay but do nothing until the pack is added again.
+
+### When pack changes apply
+
+Packs apply to Overdeck-managed **Claude Code** and **Codex** sessions at their next launch, like other skill changes. Claude Code receives the pack as `--plugin-dir`; Codex gets a local `overdeck-packs` plugin marketplace in the agent's own `$CODEX_HOME`. Remote (Fly) launches and other harnesses get no packs. A launch never touches the network: if the trusted commit is not cached, the launch skips that pack and prints `run pan skills pack sync <id>`. If Claude Code also has the same upstream plugin installed, the dashboard warns that its skills will appear twice.
+
+In the dashboard, packs appear above the skill list on the Skills page, in project settings, and in the issue view. The dashboard can turn packs on and off but not add them; it shows the `pan skills pack add` command instead.
+
 ## Troubleshooting
 
 ## Terminology: skill packs and skill bundles
