@@ -4,17 +4,17 @@
     "created": "2026-11-02T03:40:08Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4657: Add the dashboard schedule dialog, next-run badge and inbox resurfacing for scheduled conversations",
-    "updated": "2026-11-02T03:47:14.752Z"
+    "updated": "2026-11-02T03:48:17.933Z"
   },
   "plan": {
     "id": "pan-4657",
     "title": "Add the dashboard schedule dialog, next-run badge and inbox resurfacing for scheduled conversations",
-    "status": "proposed",
+    "status": "running",
     "uid": "c2899cf9-f053-43e2-b598-b93119067021",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T03:40:08Z",
-    "updated": "2026-11-02T03:47:14.752Z",
+    "updated": "2026-11-02T03:48:17.933Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4657",
@@ -758,5 +758,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
