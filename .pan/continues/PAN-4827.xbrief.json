@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4827",
   "created": "2026-11-02T16:36:08.290Z",
-  "updated": "2026-11-02T18:01:39.145Z",
+  "updated": "2026-11-02T18:11:47.413Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-02T18:01:35.217Z"
     },
     "zai-tiers": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4827",
-      "claimedAt": "2026-11-02T18:01:39.145Z"
+      "claimedAt": "2026-11-02T18:01:39.145Z",
+      "doneAt": "2026-11-02T18:11:47.413Z"
     }
   }
 }
