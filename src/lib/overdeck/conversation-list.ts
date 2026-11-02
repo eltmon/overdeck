@@ -24,6 +24,7 @@ import { codexConversationPendingInput } from './conversation-delivery.js';
 import { readConversationInputTarget } from './conversation-input-target.js';
 import { readConversationProviderError } from './conversation-provider-error.js';
 import { listPullRequestLinksForConversations } from './conversation-pull-requests.js';
+import { EMPTY_SCHEDULE_SUMMARY, listScheduleSummariesForConversations } from './conversation-schedules.js';
 import { EMPTY_CONVERSATION_TRIAGE, listConversationTriage } from './conversation-triage-store.js';
 import { loadVaultContinuityLookup, vaultContinuityFor, type ConversationContinuityInput } from './conversation-vault-continuity.js';
 import {
@@ -188,6 +189,7 @@ export async function getConversationListWithVaultCopies(limit: number, offset: 
     pullRequest: null, pullRequestCount: 0, pendingInputCount: 0, pendingInputKinds: [],
     transcriptMissing: false, needsTerminal: false, providerError: null, vaultContinuity: null,
     ...EMPTY_CONVERSATION_TRIAGE,
+    ...EMPTY_SCHEDULE_SUMMARY,
   }));
   return [...enriched, ...copies];
 }
@@ -203,6 +205,8 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
   const pullRequestLinks = listPullRequestLinksForConversations(conversations.map((conv) => conv.name));
   // PAN-4639: one query for the whole page's triage state, never one per row.
   const triage = listConversationTriage(conversations.map((conv) => conv.name));
+  // PAN-4657: one query for the whole page's schedule summaries, never one per row.
+  const schedules = listScheduleSummariesForConversations(conversations.map((conv) => conv.name));
   const lanes = await laneEnrichment(conversations);
   return withConcurrencyLimit(
     conversations.map((conv) => async () => {
@@ -333,6 +337,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         transcriptMissing: conversationTranscriptMissing(row, sessionAlive, convSf),
         needsTerminal: await conversationNeedsTerminal(row, sessionAlive, convSf),
         ...(triage.get(row.name) ?? EMPTY_CONVERSATION_TRIAGE),
+        ...(schedules.get(row.name) ?? EMPTY_SCHEDULE_SUMMARY),
         ...(lanes.get(row.name) ?? {}),
         providerError,
       };

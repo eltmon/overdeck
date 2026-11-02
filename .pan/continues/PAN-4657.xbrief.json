@@ -1,0 +1,225 @@
+{
+  "version": "1",
+  "issueId": "PAN-4657",
+  "created": "2026-11-02T03:48:30.667Z",
+  "updated": "2026-11-02T05:59:28.391Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-02T05:52Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-02T05:52:51.543Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-02T05:57:48.128Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-02T05:59Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-02T05:59:28.391Z"
+    }
+  ],
+  "items": {
+    "contracts-presets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4657",
+      "claimedAt": "2026-11-02T03:48:30.667Z",
+      "doneAt": "2026-11-02T03:53:59.302Z"
+    },
+    "schedules-event": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4657",
+      "claimedAt": "2026-11-02T03:54:10.708Z",
+      "doneAt": "2026-11-02T04:01:35.935Z"
+    },
+    "badge-enrichment": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4657",
+      "claimedAt": "2026-11-02T04:01:44.606Z",
+      "doneAt": "2026-11-02T04:20:52.887Z"
+    },
+    "routes-notify": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4657",
+      "claimedAt": "2026-11-02T04:21:01.328Z",
+      "doneAt": "2026-11-02T04:29:33.129Z"
+    },
+    "sweep-resurface": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4657",
+      "claimedAt": "2026-11-02T04:29:40.849Z",
+      "doneAt": "2026-11-02T04:44:25.146Z"
+    },
+    "badge-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4657",
+      "claimedAt": "2026-11-02T04:44:53.139Z",
+      "doneAt": "2026-11-02T04:51:16.509Z"
+    },
+    "schedule-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4657",
+      "claimedAt": "2026-11-02T04:51:23.894Z",
+      "doneAt": "2026-11-02T05:12:42.835Z"
+    },
+    "menu-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4657",
+      "claimedAt": "2026-11-02T05:12:51.780Z",
+      "doneAt": "2026-11-02T05:26:40.917Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4657",
+      "claimedAt": "2026-11-02T05:26:52.131Z",
+      "doneAt": "2026-11-02T05:28:45.127Z"
+    },
+    "contracts-presets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:32:38.773Z"
+    },
+    "contracts-presets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:32:58.096Z"
+    },
+    "contracts-presets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:33:18.687Z"
+    },
+    "schedules-event.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:33:37.343Z"
+    },
+    "schedules-event.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:33:57.590Z"
+    },
+    "schedules-event.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:34:16.754Z"
+    },
+    "schedules-event.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:34:36.222Z"
+    },
+    "badge-enrichment.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:34:54.243Z"
+    },
+    "badge-enrichment.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:35:21.776Z"
+    },
+    "badge-enrichment.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:35:41.699Z"
+    },
+    "badge-enrichment.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:36:02.943Z"
+    },
+    "routes-notify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:36:22.053Z"
+    },
+    "routes-notify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:36:40.654Z"
+    },
+    "routes-notify.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:36:59.653Z"
+    },
+    "sweep-resurface.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:37:18.049Z"
+    },
+    "sweep-resurface.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:37:36.647Z"
+    },
+    "sweep-resurface.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:37:55.633Z"
+    },
+    "sweep-resurface.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:38:15.113Z"
+    },
+    "badge-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:38:34.422Z"
+    },
+    "badge-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:38:53.757Z"
+    },
+    "badge-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:39:13.106Z"
+    },
+    "badge-row.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:39:36.706Z"
+    },
+    "schedule-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:40:00.585Z"
+    },
+    "schedule-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:40:20.176Z"
+    },
+    "schedule-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:40:43.956Z"
+    },
+    "schedule-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:41:04.162Z"
+    },
+    "schedule-dialog.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:41:23.651Z"
+    },
+    "menu-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:41:42.377Z"
+    },
+    "menu-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:42:03.424Z"
+    },
+    "menu-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:42:23.333Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:42:41.680Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:43:01.229Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:43:21.577Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-02T05:59:28Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4657\n\n# Review — PAN-4657\n## Verdict: CHANGES REQUESTED — the schedule dialog has no Time zone field, and Edit silently rewrites a schedule's stored time zone to the browser's zone\n\n## Context\n- Run ID: agent-pan-4657-review-3456efe8\n- Manifest: .pan/review/agent-pan-4657-review-3456efe8/context.json\n- Branch / workspace: feature/pan-4657 / workspaces/feature-pan-4657\n- PR: https://github.com/eltmon/overdeck/pull/4800\n- HEAD reviewed: 3456efe8ebaece68266939d6abddb9dc91bf8ac4\n- Base / prior cycle SHA: merge base with main babf86c1b928; prior unsignalled review pass at d6288d57 (no verdict was recorded for it). Since d6288d57 the only PR-scoped change is 08d1a6f9c12 (list-costs fixture); the rest is a main merge (PAN-4791).\n- Spec: .pan/drafts/PAN-4657.md (D1–D18, FR-1…FR-11, NFR-1…NFR-5, AC-1…AC-9)\n\n## Prior-cycle item verified\n- **Fixed:** `src/lib/overdeck/__tests__/conversation-list-costs.test.ts` failed on CI at d6288d57 (test-shard 4/4) because every enriched row gained `nextScheduledRunAt`/`scheduleCount`. Commit 08d1a6f9c12 adds both fields to the expected row. The test passes locally at this HEAD.\n\n## Blocking Findings\n\n### [requirements/correctness] Dialog has no Time zone field; Edit overwrites the stored zone with the browser zone — `src/dashboard/frontend/src/components/chat/ConversationScheduleDialog.tsx:172`\n- Severity: ! (MUST)\n- Classification / requirement scope: implementation defect; in_pr_scope (FR-9, D10, D11).\n- Trigger and changed-code connection: `submit()` builds `body = { prompt, cron, timeZone: browserTimeZone() }` (line 172) and sends it for both create (POST) and edit (PATCH). `ScheduleFormState` (lines 112–118) has no `timeZone` field, and the form renders no Time zone input. `startEdit` (lines 187–192) copies the prompt and cron but drops `schedule.timeZone`.\n- Spec: D10 says the form has \"`Time zone` text input, default `Intl.DateTimeFormat().resolvedOptions().timeZone`\". D11 says edit sets \"the prompt and the zone to the stored values\". The non-goal \"no time-zone picker beyond a text input\" also assumes the text input exists.\n- Expected / observed / impact: A schedule created with `pan conv schedule … --tz America/New_York` (the CLI flag at `src/cli/commands/conversations/schedule.ts:187`), or one created on a dashboard reached from another zone, is edited only to fix a typo in its prompt. The PATCH also sends the browser zone. `updateConversationSchedule` stores it and recomputes `next_run_at` in the new zone (`conversation-schedules.ts:271`). So the schedule starts firing at a different wall-clock hour, and nothing on screen warns the operator. There is also no way to create a schedule in any zone except the browser's.\n- Evidence: static trace above. The dialog test codifies the bug: `ConversationScheduleDialog.test.tsx` lines 158–178 seed a schedule with `timeZone: 'UTC'` and assert the PATCH body carries `timeZone: BROWSER_ZONE`.\n- Fix: add `timeZone` to `ScheduleFormState`, default it to `browserTimeZone()` in create mode, set it to `schedule.timeZone` in `startEdit`, render a `Time zone` text input, and send `form.timeZone.trim()`. Change the edit test to assert the stored zone (`'UTC'`) round-trips, and add a create test that types a zone.\n\n## Non-blocking Findings\n\n### [requirements/UX] Dialog list omits next run, time zone and last outcome — `ConversationScheduleDialog.tsx:301-304`\n- Severity: ~ (SHOULD); implementation gap against D12 / WI-6 step 5; in_pr_scope. AC-6 does not list these fields, so this is not a failed AC.\n- Each row shows only the prompt, the raw cron and `active`/`paused`. D12 asks for `<cron> · <timeZone>`, `next <when>` (via `formatLocalWhen`) or `paused`, and `last <status>` with `lastRunError` in `title`. Failed runs do not resurface (D7), so without `last failed` in the dialog the dashboard gives no sign that a schedule keeps failing; the operator must use `pan conv schedule list`. Fix it in the same change as the blocker, because the zone belongs on this line.\n\n### [performance] Revision effect runs after every render and refetches the whole conversation list — `ConversationScheduleDialog.tsx:124,144-149`\n- Severity: ~ (SHOULD).\n- `queryKey` is a new array literal on each render and is in the effect's dependency list, so the effect runs after every render. After any list event `conversationsListRevision > 0`, so each keystroke in the prompt textarea (and each `busy` toggle) invalidates the dialog query and the global `['conversations']` query. That forces `GET /api/conversations` (the enrichment endpoint) once per keystroke while the dialog is open. `ConversationList.tsx` already invalidates `['conversations']` when the revision changes, so the dialog's invalidation of it is redundant. Fix: depend on `[conversationsListRevision, conversationName, queryClient]` (or `useMemo` the key) and invalidate only `['conversation-schedules', conversationName]` in that effect. React Query v5 tracked props keep this from becoming an infinite loop; the cost is bounded by typing speed.\n- Evidence: static React dependency semantics; not measured.\n\n### [docs] New docs claim answering a question clears settle/snooze — `features/conversations.mdx:386` and `:893`\n- Severity: ~ (SHOULD); FR-11 accuracy.\n- The new text says a delivered run clears settle or snooze \"the same way answering a pending question does\" and \"the same as an answered question\". No question-answer path calls `unsettleConversation`, `unsnoozeConversation` or `clearConversationTriage` (only the triage store's own undo path and the sweep do), and the same page at line 841 says the group \"returns to Snoozed or Settled once the question is answered.\" Remove the comparison.\n- The docs also say editing pre-fills the cron \"so the raw cron is never lost on save.\" After the blocker fix, add one sentence that the time zone defaults to the browser's and edit keeps the stored zone.\n\n### Advisory notes (?)\n- `clearConversationTriage` also sets `idle_reset_at` (`conversation-triage-store.ts:118`), which D8 did not specify. It matches `unsettleConversation`/`unsnoozeConversation` (PAN-4655 D3), and a delivered prompt is activity, so this is a reasonable spec deviation, not a defect.\n- Naming differs from WI-6: the default time is `21:00` (D10 says `09:00`), the textarea label is `Prompt` (spec: `Schedule prompt`), and the row buttons are labeled `Edit`/`Pause`/`Resume`/`Delete` with no schedule id. With several schedules, a screen reader announces identical buttons; WI-6 asked for `Edit schedule ${id}` etc.\n- The stub-UI flag at line 129 (`busy`) is a false positive: `run()` sets it to true and back to false.\n- `ScheduleMenuItem` still shows for agent conversations if one appears in the list; the API refuses them with 409 and the dialog would show that error. Minor.\n- Badge uses `conv.scheduleCount ?? 1` where the spec says `?? 0`. The server always sends the field, so this has no visible effect.\n\n## Coverage\n\n### Changed-file ledger (32 files)\n| File | Status |\n| --- | --- |\n| src/dashboard/server/routes/conversation-schedules.ts | Reviewed: notify only on 201/200 success paths; 400/403/404/409 do not notify (FR-5). |\n| src/dashboard/server/services/conversation-schedule-service.ts | Reviewed: `FireOutcome` carries the delivered-to name; `changedNames` set; `clearTriage` only on delivered, wrapped in try/catch; `onChanged` once per name after the loop (FR-6, FR-7). |\n| src/lib/overdeck/conversation-schedules.ts | Reviewed: one grouped `IN (…)` query over enabled schedules; emitter in try/catch; no `conversation-list` import (NFR-1, NFR-2). |\n| src/lib/overdeck/conversation-list.ts | Reviewed: summary spread into rows and vault copies (FR-2). |\n| src/lib/overdeck/conversation-triage-store.ts | Reviewed: single-statement clear (+ `idle_reset_at`, advisory). |\n| src/lib/overdeck/conversation-schedule-recurrence.ts | Reviewed: re-exports from contracts; CLI import unchanged (FR-1). |\n| packages/contracts/src/conversation-schedule-presets.ts | Reviewed: byte-identical logic and error text. |\n| packages/contracts/src/events.ts, event-reducers.ts, index.ts | Reviewed: event in union; reducer bumps only the revision (FR-3). |\n| src/dashboard/frontend/src/components/chat/ConversationScheduleDialog.tsx | Reviewed: blocker + 2 SHOULD findings above. |\n| src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx | Reviewed: badge in both variants after the PR badge; menu item after PR items; 889 lines (NFR-4). |\n| src/dashboard/frontend/src/components/CommandDeck/ConversationActionMenu.tsx | Reviewed: menu item after PR items (FR-8). |\n| src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx | Reviewed: type fields. |\n| src/dashboard/frontend/src/components/CommandDeck/conversation-triage.ts | Reviewed: `formatLocalWhen` extraction; `formatSnoozeWake` output unchanged. |\n| src/dashboard/frontend/src/main.tsx | Reviewed: host mounted after `LinkPullRequestDialogHost`. |\n| scripts/frontend-test-subset.txt | Reviewed: dialog test listed in sorted position (NFR-5). |\n| features/conversations.mdx | Reviewed: docs finding above. |\n| docs/DASHBOARD-ARCHITECTURE.md | Reviewed: accurate. |\n| packages/contracts/src/__tests__/conversation-schedule-presets.test.ts, conversation-schedules-changed.test.ts | Reviewed. |\n| src/lib/overdeck/__tests__/conversation-list-schedules.test.ts, conversation-schedules.test.ts, conversation-triage-store.test.ts, conversation-list-costs.test.ts | Reviewed. |\n| src/dashboard/server/routes/__tests__/conversation-schedules-route.test.ts | Reviewed. |\n| src/dashboard/server/services/__tests__/conversation-schedule-service.test.ts | Reviewed: covers delivered, chain head, failed, skipped, lost claim, clearTriage throwing. |\n| src/dashboard/frontend/src/components/chat/__tests__/ConversationScheduleDialog.test.tsx | Reviewed: the edit test asserts the zone overwrite (blocker). |\n| src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx | Reviewed. |\n| .pan/continues/PAN-4657.xbrief.json, .pan/drafts/PAN-4657.md, .pan/specs/…xbrief.json | Not applicable: planning artifacts; the PRD was read as the spec. |\n\n### Dimensions\n- **Correctness:** sweep, routes, enrichment, triage clear and reducer are correct. The dialog's edit path has the zone-overwrite blocker.\n- **Security:** no new routes; the existing `validateOrigin` guards still apply; names pass through `encodeURIComponent`; prompts render as text. The door imports `event-store.js` the same way `conversation-pull-requests.ts` does. No findings.\n- **Performance:** the enrichment adds one grouped query per page (NFR-1). The sweep emits nothing on an idle pass. The dialog effect finding is above.\n- **Requirements/UX:** see the AC matrix below.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 (presets in contracts) | Met | contracts preset test passes; recurrence test unchanged and passes; `function presetToCron` is gone from the recurrence module. |\n| AC-2 (event + emitter) | Met | reducer test and door emitter tests pass. |\n| AC-3 (enrichment) | Met | `conversation-list-schedules.test.ts` passes (two enabled, paused-only, none, vault); no `conversation-list` import in the door. |\n| AC-4 (routes emit) | Met | route test: POST/PATCH/DELETE emit once; 400 POST and 404 DELETE emit nothing. |\n| AC-5 (sweep resurface) | Met | service tests cover chain head, failed/skipped, lost claim, and `clearTriage` throwing; triage store test passes. |\n| AC-6 (dialog requests) | Partially met | The POST/PATCH/DELETE requests and `role=\"alert\"` work, and the test is listed. But the documented PATCH body `{ prompt, cron, timeZone }` sends the wrong zone on edit, and the Time zone input from D10 is missing (blocker). |\n| AC-7 (badge) | Met (static) | Row test asserts the badge text and the singular/plural title; `formatSnoozeWake` delegates unchanged. Frontend run not verified locally (see Verification). |\n| AC-8 (menus) | Met (static) | Both menus render `ScheduleMenuItem` after the PR items; the row test covers local and vault rows. |\n| AC-9 (docs) | Met with a defect | The \"arrive with #4657\" text is gone; the architecture doc names the event, `nextScheduledRunAt` and `clearConversationTriage`; the user doc contains a false comparison (SHOULD finding). |\n\n## Verification\n- `npx vitest run` on 9 touched root/contracts test files (list-costs, list-schedules, schedules, triage-store, recurrence, schedule-service, schedules-route, presets, schedules-changed): **9 files, 112 tests passed** at 3456efe8.\n- CI at 3456efe8: not started when checked (only CodeRabbit \"pass\" (rate limited) and a skipped Mintlify check). **Unverified.** At the prior HEAD d6288d57, only test-shard 4/4 failed (the list-costs fixture, now fixed); build, lint-group (core/state/effect/skills), test-e2e, test-shard 1/4 and 3/4 passed.\n- `npm run lint:effect-diagnostics`: covered by `lint-group (effect)` passing at d6288d57. The code under review is identical at 3456efe8; the only code since then is a test fixture and a merge of main.\n- Frontend tests (dialog, row, triage): local run failed to start. The workspace frontend `node_modules` raised a symlink `EEXIST` while Vite loaded its config, which is an environment issue, not a test failure. Not fixed (review never edits). **Unverified locally**; CI runs them because they are in `scripts/frontend-test-subset.txt`.\n- Full test suite: not run (by role rule).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4657/.pan/review/agent-pan-4657-review-3456efe8/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4657 -m \"Fixed review issues\"`"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

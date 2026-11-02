@@ -59,7 +59,7 @@ import {
 } from '../../../lib/anywhere/fly/provision.js';
 import { loadConfig, type RemoteConfig } from '../../../lib/config.js';
 import { getProviderForModel, UnknownModelError } from '../../../lib/providers.js';
-import { createFlyApiClient } from '../../../lib/remote/fly-api.js';
+import { createFlyApiClient, flyTokenRejectedMessage, isFlyAuthError } from '../../../lib/remote/fly-api.js';
 import { checkRemoteSpendCap } from '../../../lib/remote/remote-agents.js';
 import { createMachineLink, MachineLinkError } from './machine-link-service.js';
 
@@ -333,7 +333,7 @@ export async function startFlyConversation(
 async function rollback(deps: FlyMachineServiceDeps, vm: Pick<FlyCreatedMachine, 'appName' | 'machineId'>, recordId: string, linkId: string | null): Promise<void> {
   const attempt = async (what: string, step: () => Promise<unknown>): Promise<boolean> =>
     step().then(() => true, (error: unknown) => {
-      deps.log(`Rollback could not ${what}: ${(error as Error).message}`);
+      deps.log(`Rollback could not ${what}: ${isFlyAuthError(error) ? flyTokenRejectedMessage(error) : (error as Error).message}`);
       return false;
     });
   const destroyed = await attempt(`destroy Fly machine ${vm.machineId}`, () => deps.destroy(vm.appName, vm.machineId));
@@ -362,6 +362,9 @@ export async function removeFlyMachineForLink(
     try {
       await deps.destroy(record.appName, record.machineId);
     } catch (error) {
+      if (isFlyAuthError(error)) {
+        throw new FlyMachineError('fly-token-rejected', `Could not destroy Fly machine ${record.machineId}: ${flyTokenRejectedMessage(error)}`, { machineId: record.machineId });
+      }
       throw new FlyMachineError('unreachable', `Could not destroy Fly machine ${record.machineId}: ${(error as Error).message}`, { machineId: record.machineId });
     }
   }

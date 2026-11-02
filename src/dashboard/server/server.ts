@@ -120,6 +120,7 @@ import { eventsRouteLayer } from './routes/events.js';
 import { projectsRouteLayer } from './routes/projects.js';
 import { projectsMergeTrainRouteLayer } from './routes/projects-merge-train.js';
 import { mergeTrainRouteLayer } from './routes/merge-train.js';
+import { mergeTrainLanesRouteLayer } from './routes/merge-train-lanes.js';
 import { flywheelRouteLayer } from './routes/flywheel.js';
 import { contextRouteLayer } from './routes/context.js';
 import { commandsRouteLayer } from './routes/commands.js';
@@ -401,6 +402,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   projectsRouteLayer,
   projectsMergeTrainRouteLayer,
   mergeTrainRouteLayer,
+  mergeTrainLanesRouteLayer,
   flywheelRouteLayer,
   contextRouteLayer,
   commandsRouteLayer,

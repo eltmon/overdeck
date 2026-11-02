@@ -15,9 +15,10 @@
  *   - `OVERDECK_DISABLE_DEACON=1`, so no second Deacon races the host's — two
  *     deacons sharing one home is a known way to make agents thrash
  *     (`single-deacon-invariant`);
- *   - a port that is never 3011. `shouldRefuseHostDashboardPort` only refuses
- *     when the port equals the host's configured `api_port`, so a high port is
- *     allowed by design and cannot collide with the live dashboard.
+ *   - an OS-assigned port, probed free at the moment of the call and never
+ *     3011 (the operator's host dashboard port); health is accepted only from
+ *     the spawned child's own PID, and a boot that loses the port race is
+ *     retried once on a fresh port with the same home.
  *
  * The built server is used deliberately: `dist/dashboard/server.js` under Node,
  * never Bun and never tsx, for the reasons in the dashboard-node22-only rule.
@@ -29,8 +30,9 @@
  * is called out here: build first, then run this spec.
  */
 
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,30 +59,76 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../../../..');
 const BOOT_TIMEOUT_MS = 120_000;
 
-/** A high port, chosen per run so two suites can never collide. */
-function pickPort(): number {
-  return 39_000 + Math.floor(Math.random() * 900);
+/** The operator's live dashboard port; an isolated fixture must never bind it. */
+const HOST_DASHBOARD_PORT = 3011;
+const MAX_PORT_PROBES = 5;
+
+/** One OS-assigned port: listen on 0, read the port, release it. */
+function probeFreePort(): Promise<number> {
+  return new Promise((resolvePort, reject) => {
+    const probe = createServer();
+    probe.once('error', reject);
+    probe.listen(0, () => {
+      const address = probe.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      probe.close(() => resolvePort(port));
+    });
+  });
 }
 
-async function waitForHealth(baseUrl: string, child: ChildProcess, logPath: string): Promise<void> {
-  const deadline = Date.now() + BOOT_TIMEOUT_MS;
+/**
+ * A port the OS reports free right now, never the host dashboard's 3011.
+ * The port is released before the child binds it, so a tiny race remains;
+ * `startIsolatedDashboard` covers it with one retry on EADDRINUSE.
+ */
+export interface PickPortOptions {
+  /** Test seam: where candidate ports come from. */
+  probe?: () => Promise<number>;
+  /** Ports to skip, e.g. the one a failed first boot just lost. */
+  exclude?: readonly number[];
+}
+
+export async function pickPort({ probe = probeFreePort, exclude = [] }: PickPortOptions = {}): Promise<number> {
+  for (let attempt = 0; attempt < MAX_PORT_PROBES; attempt += 1) {
+    const port = await probe();
+    if (port > 0 && port !== HOST_DASHBOARD_PORT && !exclude.includes(port)) return port;
+  }
+  throw new Error(`pickPort: no usable free port after ${MAX_PORT_PROBES} probes`);
+}
+
+export interface HealthWaitChild {
+  readonly pid?: number;
+  readonly exitCode: number | null;
+}
+
+export async function waitForHealth(
+  baseUrl: string,
+  child: HealthWaitChild,
+  opts: { logPath?: string; timeoutMs?: number; pollMs?: number } = {},
+): Promise<void> {
+  const { logPath, timeoutMs = BOOT_TIMEOUT_MS, pollMs = 500 } = opts;
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
       throw new Error(
-        `Fixture dashboard exited early (code ${child.exitCode}).\n${readLog(logPath)}`,
+        `Fixture dashboard exited early (code ${child.exitCode}).\n${logPath ? readLog(logPath) : ''}`,
       );
     }
     try {
       const response = await fetch(`${baseUrl}/api/health`, {
         signal: AbortSignal.timeout(2_000),
       });
-      if (response.ok) return;
+      if (response.ok) {
+        const body = (await response.json()) as { pid?: unknown };
+        // Another process may hold this port (the probe released it before spawn).
+        if (body.pid === child.pid) return;
+      }
     } catch {
-      // Not listening yet.
+      // Not listening yet, or not JSON.
     }
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, pollMs));
   }
-  throw new Error(`Fixture dashboard did not become healthy.\n${readLog(logPath)}`);
+  throw new Error(`Fixture dashboard did not become healthy.\n${logPath ? readLog(logPath) : ''}`);
 }
 
 function readLog(logPath: string): string {
@@ -92,12 +140,26 @@ function readLog(logPath: string): string {
 }
 
 /**
- * Boot a dashboard nothing else shares. Always `await stop()` in teardown —
- * a leaked server holds its port and its temp home for the life of the machine.
+ * True when the child's captured output holds the fatal bind error. The
+ * server's transient `HTTP bind failed with EADDRINUSE; retry N/3` warnings
+ * do not match: a child can log one and still bind.
  */
-export async function startIsolatedDashboard(opts: IsolatedDashboardOptions = {}): Promise<IsolatedDashboard> {
-  const home = opts.home ?? mkdtempSync(join(tmpdir(), 'overdeck-e2e-home-'));
-  const port = opts.port ?? pickPort();
+export function isAddressInUseOutput(output: string): boolean {
+  return /listen EADDRINUSE: address already in use/.test(output);
+}
+
+class FixtureBootError extends Error {
+  constructor(message: string, readonly output: string, readonly exited: boolean) {
+    super(message);
+  }
+}
+
+/** Boot one child on `port`, failing with a `FixtureBootError` (home kept) on any boot problem. */
+async function bootOnce(
+  home: string,
+  port: number,
+  env: Record<string, string> | undefined,
+): Promise<IsolatedDashboard> {
   const baseUrl = `http://127.0.0.1:${port}`;
   const logPath = join(home, 'server.log');
 
@@ -112,10 +174,12 @@ export async function startIsolatedDashboard(opts: IsolatedDashboardOptions = {}
       OVERDECK_DISABLE_AUTO_MERGE: '1',
       // fix10: never let a UAT host reach a Herdr session.
       OVERDECK_TERMINAL_BACKEND: 'tmux',
-      ...opts.env,
+      ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+
+  const closed = new Promise<void>((done) => child.once('close', () => done()));
 
   const chunks: string[] = [];
   child.stdout?.on('data', (c: Buffer) => chunks.push(c.toString()));
@@ -139,14 +203,45 @@ export async function startIsolatedDashboard(opts: IsolatedDashboardOptions = {}
   };
 
   try {
-    await waitForHealth(baseUrl, child, logPath);
+    await waitForHealth(baseUrl, child, { logPath });
   } catch (err) {
-    // Surface the server's own output; a boot failure is otherwise mute.
-    // eslint-disable-next-line no-console
-    console.error(chunks.join('').split('\n').slice(-40).join('\n'));
-    await stop();
-    throw err;
+    // Wait for stdio to drain so the captured output is complete before we
+    // read it; `exit` (which sets exitCode) can fire before the last chunk.
+    await Promise.race([closed, new Promise((r) => setTimeout(r, 2_000))]);
+    await stop({ keepHome: true });
+    const exited = child.exitCode !== null || child.signalCode !== null;
+    throw new FixtureBootError(err instanceof Error ? err.message : String(err), chunks.join(''), exited);
   }
 
   return { baseUrl, port, home, stop };
+}
+
+/**
+ * Boot a dashboard nothing else shares. Always `await stop()` in teardown —
+ * a leaked server holds its port and its temp home for the life of the machine.
+ */
+export async function startIsolatedDashboard(opts: IsolatedDashboardOptions = {}): Promise<IsolatedDashboard> {
+  const home = opts.home ?? mkdtempSync(join(tmpdir(), 'overdeck-e2e-home-'));
+  const explicitPort = opts.port !== undefined;
+  const firstPort = opts.port ?? (await pickPort());
+  try {
+    try {
+      return await bootOnce(home, firstPort, opts.env);
+    } catch (err) {
+      // A fresh port only when we chose the first one: an explicit port is a
+      // restart the open page depends on (pan-4279-degraded-mode.spec.ts).
+      const lostPort =
+        err instanceof FixtureBootError && err.exited && isAddressInUseOutput(err.output);
+      if (explicitPort || !lostPort) throw err;
+      return await bootOnce(home, await pickPort({ exclude: [firstPort] }), opts.env);
+    }
+  } catch (err) {
+    if (err instanceof FixtureBootError) {
+      // Surface the server's own output; a boot failure is otherwise mute.
+      // eslint-disable-next-line no-console
+      console.error(err.output.split('\n').slice(-40).join('\n'));
+    }
+    rmSync(home, { recursive: true, force: true });
+    throw err;
+  }
 }

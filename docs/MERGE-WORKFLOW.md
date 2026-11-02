@@ -35,6 +35,13 @@ The Flywheel page's UAT BATCHES card (`MergeTrainView`) is the merge control.
    lands exactly the tree you tested. The small "Merge one feature to main…"
    escape hatch stays below the rows for the rare case where one feature must
    go first.
+
+   The checklist is each member's xBRIEF acceptance criteria. Because a
+   member's spec is committed on its feature branch and reaches `main` only
+   when its PR merges, the lookup tries the batch worktree first (every
+   member merged in), then the member's own feature workspace, then the
+   project root, so an already-merged member still resolves there (PAN-4799).
+   A member with no spec anywhere shows "Plan not found for \<ID>".
 2. **No tested batch exists.** This covers a batch that is still assembling,
    a lone feature in a project that does not hold for UAT, and a failed
    assembly. Each ready row then shows its own **Merge** button. It posts

@@ -1,0 +1,141 @@
+{
+  "version": "1",
+  "issueId": "PAN-4659",
+  "created": "2026-11-02T05:46:59.538Z",
+  "updated": "2026-11-02T06:34:55.011Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "zip-reader": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4659",
+      "claimedAt": "2026-11-02T05:46:59.538Z",
+      "doneAt": "2026-11-02T05:49:53.115Z"
+    },
+    "mapper-split": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4659",
+      "claimedAt": "2026-11-02T05:50:00.372Z",
+      "doneAt": "2026-11-02T05:51:23.104Z"
+    },
+    "vsix-import": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4659",
+      "claimedAt": "2026-11-02T05:51:48.785Z",
+      "doneAt": "2026-11-02T05:54:19.176Z"
+    },
+    "route-vsix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4659",
+      "claimedAt": "2026-11-02T05:54:24.346Z",
+      "doneAt": "2026-11-02T05:56:04.603Z"
+    },
+    "ui-accept-vsix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4659",
+      "claimedAt": "2026-11-02T05:56:10.911Z",
+      "doneAt": "2026-11-02T05:58:44.624Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4659",
+      "claimedAt": "2026-11-02T05:58:50.635Z",
+      "doneAt": "2026-11-02T05:59:34.661Z"
+    },
+    "mapper-split.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:18:57.848Z"
+    },
+    "mapper-split.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:19:43.511Z"
+    },
+    "mapper-split.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:20:00.356Z"
+    },
+    "mapper-split.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:20:18.093Z"
+    },
+    "vsix-import.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:22:00.040Z"
+    },
+    "vsix-import.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:22:17.618Z"
+    },
+    "vsix-import.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:22:33.472Z"
+    },
+    "vsix-import.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:22:50.600Z"
+    },
+    "vsix-import.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:23:07.988Z"
+    },
+    "zip-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:23:48.781Z"
+    },
+    "zip-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:24:06.157Z"
+    },
+    "zip-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:24:22.973Z"
+    },
+    "zip-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:24:38.865Z"
+    },
+    "route-vsix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:24:54.629Z"
+    },
+    "route-vsix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:25:11.215Z"
+    },
+    "route-vsix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:25:27.843Z"
+    },
+    "ui-accept-vsix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:25:45.003Z"
+    },
+    "ui-accept-vsix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:26:03.430Z"
+    },
+    "ui-accept-vsix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:26:21.456Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:26:38.619Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:26:56.081Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:27:15.261Z"
+    },
+    "ui-accept-vsix.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:34:55.011Z"
+    }
+  }
+}

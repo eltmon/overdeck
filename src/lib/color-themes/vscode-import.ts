@@ -2,7 +2,8 @@
  * Maps a VS Code theme JSON(C) file to a color theme (PAN-4644). Never
  * fills fallback colors into the result — fallbacks apply at use time
  * (`effectiveTerminalPalette`), so a built-in palette change reaches
- * imported themes.
+ * imported themes. The parse and map halves are split so the .vsix import
+ * (PAN-4659, `vsix-import.ts`) can map an already-merged include chain.
  */
 import { parse, type ParseError } from 'jsonc-parser';
 import { normalizeColorTheme, toOpaqueHex, type ColorTheme, type ColorThemeType } from '@overdeck/contracts';
@@ -24,7 +25,7 @@ const TERMINAL_ANSI_KEYS = [
   ['terminal.ansiBrightCyan', 'brightCyan'], ['terminal.ansiBrightWhite', 'brightWhite'],
 ] as const;
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -58,17 +59,22 @@ function resolveType(raw: Record<string, unknown>, colors: Record<string, unknow
   return 'dark';
 }
 
-/** Parses a VS Code theme JSON(C) file and maps it to a `ColorThemeFile`-shaped raw object plus warnings. */
-export function mapVsCodeTheme(text: string, fileName: string): { theme: ColorTheme; warnings: string[] } {
+/** Parses VS Code theme JSON(C) text into a plain object; throws ColorThemeImportError. */
+export function parseVsCodeThemeText(text: string): Record<string, unknown> {
   const errors: ParseError[] = [];
-  const parsed = parse(text, errors, { allowTrailingComma: true, disallowComments: false });
+  // jsonc-parser reports a leading UTF-8 BOM as a parse error at offset 0; Windows-authored themes often carry one.
+  const parsed = parse(text.replace(/^\uFEFF/, ''), errors, { allowTrailingComma: true, disallowComments: false });
   if (errors.length > 0) {
     throw new ColorThemeImportError(`invalid JSON at offset ${errors[0]!.offset}`);
   }
   if (!isPlainObject(parsed)) {
     throw new ColorThemeImportError('theme file must contain a JSON object');
   }
+  return parsed;
+}
 
+/** Maps a parsed VS Code theme object to a color theme plus warnings. */
+export function mapVsCodeThemeObject(parsed: Record<string, unknown>, fileName: string): { theme: ColorTheme; warnings: string[] } {
   const warnings: string[] = [];
   const colors = isPlainObject(parsed.colors) ? parsed.colors : {};
 
@@ -141,4 +147,9 @@ export function mapVsCodeTheme(text: string, fileName: string): { theme: ColorTh
     throw new ColorThemeImportError(result.errors.join('; '));
   }
   return { theme: result.theme, warnings: [...warnings, ...result.warnings] };
+}
+
+/** Parses a VS Code theme JSON(C) file and maps it to a color theme plus warnings. */
+export function mapVsCodeTheme(text: string, fileName: string): { theme: ColorTheme; warnings: string[] } {
+  return mapVsCodeThemeObject(parseVsCodeThemeText(text), fileName);
 }

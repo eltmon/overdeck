@@ -15,6 +15,7 @@ import type { MachineLinkView } from '@overdeck/contracts';
 import { _resetFlyMachineStoreForTests, _settleFlyMachineWritesForTests, listFlyMachines, upsertFlyMachine } from '../../../../lib/anywhere/fly/machine-store.js';
 import { type FlyCreatedMachine, FlyMachineError, type FlyProvisionResult } from '../../../../lib/anywhere/fly/provision.js';
 import type { MachineLink } from '../../../../lib/anywhere/link-store.js';
+import { FlyApiError, flyTokenRejectedMessage } from '../../../../lib/remote/fly-api.js';
 import { _resetFlyMachineServiceForTests, addFlyMachine, type FlyMachineServiceDeps, removeFlyMachineForLink, startFlyConversation } from '../fly-machine-service.js';
 import { MachineLinkError } from '../machine-link-service.js';
 
@@ -261,6 +262,16 @@ describe('project and conversation on the Fly machine (PAN-4652 WI-9)', () => {
     expect(deps.removeLink).toHaveBeenCalledWith('link-1');
     expect(await listFlyMachines()).toEqual([]);
   });
+
+  it('rollback logs Fly token rejected when the destroy gets 403 (PAN-4748)', async () => {
+    const error = new FlyApiError('Fly API error 403', 403, '{"error":"unauthorized"}');
+    const log = vi.fn();
+    const deps = fakes({ linkFetch: vi.fn(async () => ({ status: 500, json: { error: 'boom' } })), destroy: vi.fn(async () => { throw error; }), log });
+    await expect(addFlyMachine({ projectKey: 'overdeck', message: 'hi' }, deps)).rejects.toMatchObject({ code: 'conversation-failed' });
+
+    expect(log).toHaveBeenCalledWith(expect.stringContaining(flyTokenRejectedMessage(error)));
+    expect(await listFlyMachines()).toHaveLength(1);
+  });
 });
 
 describe('removeFlyMachineForLink (PAN-4652 WI-8)', () => {
@@ -295,6 +306,14 @@ describe('removeFlyMachineForLink (PAN-4652 WI-8)', () => {
   it('keeps the record when the destroy fails, so the unlink can be retried', async () => {
     const destroy = vi.fn(async () => { throw new Error('Fly API error 500'); });
     await expect(removeFlyMachineForLink({ id: 'link-1' }, { keepServer: false }, { destroy })).rejects.toMatchObject({ code: 'unreachable' });
+    expect(await listFlyMachines()).toHaveLength(1);
+  });
+
+  it('unlink of a Fly machine whose destroy gets 403 throws fly-token-rejected and keeps the record (PAN-4748)', async () => {
+    const error = new FlyApiError('Fly API error 403', 403, '{"error":"unauthorized"}');
+    const destroy = vi.fn(async () => { throw error; });
+    await expect(removeFlyMachineForLink({ id: 'link-1' }, { keepServer: false }, { destroy }))
+      .rejects.toMatchObject({ code: 'fly-token-rejected', message: expect.stringContaining(flyTokenRejectedMessage(error)) });
     expect(await listFlyMachines()).toHaveLength(1);
   });
 });

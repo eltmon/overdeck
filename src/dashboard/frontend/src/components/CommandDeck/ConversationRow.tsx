@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getRuntimeBehavior, normalizeHarnessName } from '@overdeck/contracts';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone, CheckSquare, Square } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone, CheckSquare, Square, CalendarClock } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { continueTargetOf, openContinueOnDevice } from '../chat/continueOnDevice/continueOnDeviceStore';
@@ -19,8 +19,9 @@ import { fallbackBadgeTone } from './fallbackBadge';
 import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import { isOfflineLinked, LinkedMachineChip, LinkedOfflineMeta, LinkedRowMenuItems } from './LinkedConversationRow';
 import { PullRequestMenuItems } from './PullRequestMenuItems';
+import { ScheduleMenuItem } from '../chat/ConversationScheduleDialog';
 import { TriageMenuItems } from './TriageMenuItems';
-import { formatSnoozeWake, isSnoozed } from './conversation-triage';
+import { formatLocalWhen, formatSnoozeWake, isSnoozed } from './conversation-triage';
 import { PullRequestBadge } from '../primitives/PullRequestBadge';
 import styles from './styles/command-deck.module.css';
 
@@ -380,6 +381,21 @@ export function ConversationRow({
       extraCount={Math.max(0, (conv.pullRequestCount ?? 1) - 1)}
     />
   ) : null;
+  const scheduleCount = conv.scheduleCount ?? 0;
+  const scheduleBadgeLabel = conv.nextScheduledRunAt
+    ? `${scheduleCount} active schedule${scheduleCount === 1 ? '' : 's'} · next run ${new Date(conv.nextScheduledRunAt).toLocaleString()}`
+    : '';
+  const scheduleBadge = conv.nextScheduledRunAt ? (
+    <span
+      className={styles.conversationBranchChip}
+      title={scheduleBadgeLabel}
+      aria-label={scheduleBadgeLabel}
+      data-testid="schedule-badge"
+    >
+      <CalendarClock size={10} />
+      <span className={styles.conversationBranchChipText}>{formatLocalWhen(conv.nextScheduledRunAt, now)}</span>
+    </span>
+  ) : null;
 
   const forkBadges = (
     <>
@@ -618,6 +634,7 @@ export function ConversationRow({
           )}
           {ownerBadge}
           {pullRequestBadge}
+          {scheduleBadge}
           {forkBadges}
         </>
       ) : (
@@ -640,6 +657,7 @@ export function ConversationRow({
                 )}
                 {ownerBadge}
                 {pullRequestBadge}
+                {scheduleBadge}
                 {conv.lastAttachedAt && (
                   <>
                     {conv.branch && <span className={styles.conversationMetaSep} aria-hidden>·</span>}
@@ -805,6 +823,7 @@ export function ConversationRow({
           )}
           {!isNested && <TriageMenuItems conversation={conv} mutations={mutations} onClose={() => setMenuOpen(false)} />}
           <PullRequestMenuItems conversation={conv} mutations={mutations} onClose={() => setMenuOpen(false)} />
+          <ScheduleMenuItem conversation={conv} onClose={() => setMenuOpen(false)} />
           {conv.claudeSessionId && !conv.forkStatus && (
             <MenuItemButton
               onClick={() => { mutations.openForkModal(conv, { mode: 'handoff' }); setMenuOpen(false); }}

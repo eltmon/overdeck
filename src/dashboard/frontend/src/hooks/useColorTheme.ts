@@ -2,12 +2,13 @@ import { create } from 'zustand';
 import {
   BUILTIN_COLOR_THEMES,
   effectiveTerminalPalette,
-  readableForeground,
   type ColorTheme,
+  type ColorThemeFile,
   type ColorThemeType,
   type TerminalPalette,
 } from '@overdeck/contracts';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport.js';
+import { ALL_UI_PROPS, uiTokenStyles } from '../lib/uiTokenStyles.js';
 import { useTheme } from './useTheme.js';
 
 const STORAGE_KEY = 'overdeck.ui.colorThemes.active';
@@ -43,71 +44,11 @@ function storeActive(active: ActiveThemes): void {
   }
 }
 
-// The documented UI token subset (PRD "UI token table"). Signal/state tokens
-// (--destructive*, --info*, --success*, --warning*, --signal-*, --state-*)
-// are never in this list and are never touched here.
-const ALL_UI_PROPS = [
-  '--background', '--muted', '--secondary', '--accent',
-  '--card', '--popover',
-  '--border', '--input',
-  '--foreground', '--card-foreground', '--popover-foreground', '--secondary-foreground', '--accent-foreground',
-  '--body-foreground', '--faint-foreground',
-  '--muted-foreground',
-  '--primary', '--ring', '--primary-ink', '--primary-foreground',
-  '--surface-overlay', '--surface-overlay-field', '--border-overlay', '--overlay-scrim',
-] as const;
-
 /** Applies (or clears) the active theme's `ui` tokens as inline styles on `<html>`, which beat every stylesheet selector. */
 function applyUiTokens(theme: ColorTheme): void {
   const html = document.documentElement;
   for (const prop of ALL_UI_PROPS) html.style.removeProperty(prop);
-
-  const ui = theme.ui;
-  if (ui === undefined) return;
-
-  const set = (prop: string, value: string) => html.style.setProperty(prop, value);
-
-  if (ui.background !== undefined) {
-    set('--background', ui.background);
-    set('--muted', 'color-mix(in srgb, var(--foreground) 5%, var(--background))');
-    set('--secondary', 'color-mix(in srgb, var(--foreground) 6%, var(--background))');
-    set('--accent', 'color-mix(in srgb, var(--foreground) 8%, var(--background))');
-  }
-  if (ui.surface !== undefined) {
-    set('--card', ui.surface);
-    set('--popover', ui.surface);
-  }
-  if (ui.border !== undefined) {
-    set('--border', ui.border);
-    set('--input', ui.border);
-  }
-  if (ui.foreground !== undefined) {
-    set('--foreground', ui.foreground);
-    set('--card-foreground', ui.foreground);
-    set('--popover-foreground', ui.foreground);
-    set('--secondary-foreground', ui.foreground);
-    set('--accent-foreground', ui.foreground);
-    set('--body-foreground', 'color-mix(in srgb, var(--foreground) 85%, var(--background))');
-    set('--faint-foreground', 'color-mix(in srgb, var(--foreground) 45%, var(--background))');
-  }
-  if (ui.muted !== undefined) {
-    set('--muted-foreground', ui.muted);
-  }
-  if (ui.accent !== undefined) {
-    set('--primary', ui.accent);
-    set('--ring', ui.accent);
-    set('--primary-ink', ui.accent);
-    set('--primary-foreground', readableForeground(ui.accent));
-  }
-  if (ui.overlay !== undefined) {
-    set('--surface-overlay', ui.overlay);
-  } else if (ui.background !== undefined) {
-    set('--surface-overlay', theme.type === 'light'
-      ? 'color-mix(in srgb, var(--background), white 70%)'
-      : 'color-mix(in srgb, var(--background), var(--foreground) 6%)');
-  }
-  if (ui.background !== undefined) set('--surface-overlay-field', 'var(--background)');
-  if (ui.border !== undefined) set('--border-overlay', ui.border);
+  for (const [prop, value] of Object.entries(uiTokenStyles(theme))) html.style.setProperty(prop, value);
 }
 
 // Memoizes effectiveTerminalPalette per theme object reference, so
@@ -120,7 +61,10 @@ const terminalPaletteCache = new WeakMap<ColorTheme, TerminalPalette>();
 async function fileToBase64(file: File): Promise<string> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
+  // 32 KiB chunks keep the spread below the engine's argument-count limit.
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
   return btoa(binary);
 }
 
@@ -134,6 +78,7 @@ interface ColorThemeState {
   select: (mode: ColorThemeType, id: string) => Promise<void>;
   previewImport: (file: File) => Promise<{ themes: ColorTheme[]; warnings: string[] }>;
   saveImported: (theme: unknown) => Promise<void>;
+  updateTheme: (id: string, theme: ColorThemeFile) => Promise<void>;
   activeTheme: (mode: ColorThemeType) => ColorTheme;
   terminalPalette: (mode: ColorThemeType) => TerminalPalette;
 }
@@ -211,6 +156,18 @@ export const useColorTheme = create<ColorThemeState>((set, get) => ({
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error(data?.errors?.join('; ') ?? `Failed to save theme (HTTP ${res.status})`);
+    await get().reconcileFromServer();
+  },
+
+  updateTheme: async (id, theme) => {
+    const headers = await dashboardMutationJsonHeaders();
+    const res = await fetch(`/api/color-themes/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ theme }),
+    });
+    const data = await res.json().catch(() => null) as { error?: string; errors?: string[] } | null;
+    if (!res.ok) throw new Error(data?.error ?? data?.errors?.join('; ') ?? `Failed to save theme (HTTP ${res.status})`);
     await get().reconcileFromServer();
   },
 

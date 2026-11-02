@@ -96,6 +96,10 @@ export interface Conversation extends LinkedRowFields {
   pullRequest?: PullRequestLink | null;
   /** PAN-3822: number of live (non-dismissed) pull-request links. */
   pullRequestCount?: number;
+  /** PAN-4657: the earliest nextRunAt among this conversation's enabled schedules, null if none. */
+  nextScheduledRunAt?: string | null;
+  /** PAN-4657: number of enabled schedules on this conversation. */
+  scheduleCount?: number;
   /** PAN-4639: operator triage state. Null/absent = not settled / not snoozed. */
   settledAt?: string | null;
   settleReason?: 'manual' | 'merge' | 'idle' | null;
