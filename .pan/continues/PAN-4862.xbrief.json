@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4862",
   "created": "2026-11-02T23:48:40.343Z",
-  "updated": "2026-11-02T23:55:09.180Z",
+  "updated": "2026-11-02T23:55:15.962Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4862",
       "claimedAt": "2026-11-02T23:50:37.516Z",
       "doneAt": "2026-11-02T23:55:09.179Z"
+    },
+    "relay-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4862",
+      "claimedAt": "2026-11-02T23:55:15.962Z"
     }
   }
 }
