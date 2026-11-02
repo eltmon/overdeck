@@ -130,11 +130,11 @@ fields each adapter fills in — see their type definitions in `adapters.ts`.
   `resolveLaunchPackSelection` reads the cache only).
 - Mounts are content-addressed and immutable: `mountHash` in `mount.ts`
   names the mount, and building renames it into place.
-- Mount contents are copies, never symlinks; the per-launch link is the only
-  symlink. The render and the browser build write only under
-  `~/.overdeck/packs/<id>/`; skills invoked later may write project
-  `.gstack/`, `/tmp/browse-*` and bun's transpiler cache, as
-  [features/skill-packs.mdx](../features/skill-packs.mdx) says.
+- Mount contents are copies, never symlinks; the per-launch link is the only symlink.
+- The render and the browser build write only under `~/.overdeck/packs/<id>/`;
+  skills invoked later may write project `.gstack/`, `/tmp/browse-*` and bun's
+  transpiler cache, as [features/skill-packs.mdx](../features/skill-packs.mdx)
+  says.
 - No repository can self-register a pack; only `addPack` (`sources.ts`)
   writes the registry.
 - Removal under the agents dir goes through
