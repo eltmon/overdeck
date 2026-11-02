@@ -135,8 +135,10 @@ fields each adapter fills in — see their type definitions in `adapters.ts`.
   skills invoked later may write project `.gstack/`, `/tmp/browse-*` and bun's
   transpiler cache, as [features/skill-packs.mdx](../features/skill-packs.mdx)
   says.
-- No repository can self-register a pack; only `addPack` (`sources.ts`)
-  writes the registry.
+- No repository can self-register a pack; the registry is written only by
+  Overdeck's own pack-management functions in `sources.ts` (`addPack`,
+  `updatePack`, `enablePackBrowser`, `disablePackBrowser`, `removePack`),
+  never by anything a pack's own files can trigger.
 - Removal under the agents dir goes through
   `src/lib/agents/state-dir-removal.ts` (`removeCodexPluginCaches`), enforced
   by `npm run lint:agent-dir-removal` (`scripts/guard-agent-dir-removal.sh`).

@@ -55,8 +55,6 @@ const MARKDOWN_ROOTS = [
 const PROPOSAL_DOCS: Record<string, string> = {
   'reference/template-conversations.mdx':
     'research proposal: sketches `pan bundle` / `pan template` and says they do not exist yet',
-  'features/skill-packs.mdx':
-    'terminology note names the unbuilt `pan bundle` proposal (PAN-1357) to distinguish it from shipped skill packs',
 };
 
 /**

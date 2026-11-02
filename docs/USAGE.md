@@ -372,7 +372,7 @@ The singular `pan project` form is a compatibility alias.
 
 ### Skills Commands
 
-Skill pack internals: [docs/SKILL-PACKS.md](SKILL-PACKS.md). User guide: `features/skill-packs.mdx`.
+Skill pack internals: [docs/SKILL-PACKS.md](SKILL-PACKS.md). User guide: [features/skill-packs.mdx](../features/skill-packs.mdx).
 
 ```bash
 # Sync layered context and bundled skills to Claude Code

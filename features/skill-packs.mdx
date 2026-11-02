@@ -76,7 +76,7 @@ For a pack skill, Overdeck checks the levels from narrowest to widest. At each l
 pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3
 ```
 
-Overdeck fetches the repository, resolves the ref to a commit, reads the pack, and prints a preview before it writes anything:
+Overdeck fetches the repository, resolves the ref to a commit, reads the pack, and prints a preview before it registers or enables anything (the fetch and the commit extraction do write to the pack cache):
 
 ```
 Pack mattpocock
@@ -101,7 +101,7 @@ Runtime packs (gstack) are the exception: their scripts are mounted and run when
 
 ### The trust model
 
-- Adding a pack trusts one commit and turns nothing on. Without a terminal, `--yes` is required, else nothing is written. See [Adding a pack](#adding-a-pack).
+- Adding a pack trusts one commit and turns nothing on. Without a terminal, `--yes` is required, else nothing is registered (the fetch and commit extraction still write to the pack cache before you confirm). See [Adding a pack](#adding-a-pack).
 - Every launch mounts exactly the trusted commit; `update` shows the preview again and moves the commit only after you confirm. See [Pinning, updates and forks](#pinning-updates-and-forks).
 - A repository cannot register itself; only `pan skills pack add` can.
 - Overdeck mounts skill directories only. Hooks, MCP servers, commands, agents, context injection, git hooks and scripts are **Not applied**; scripts inside a skill directory are copied but never run by Overdeck. See [What is not applied](#what-is-not-applied).
@@ -573,4 +573,4 @@ In the dashboard, packs appear above the skill list on the Skills page, in proje
 
 ## Terminology: skill packs and skill bundles
 
-Skill packs are the built feature described on this page. [Template Conversations](/reference/template-conversations) describes a separate, unbuilt proposal (PAN-1357, `pan bundle`) that also uses the words "skill bundle." Per-conversation skill values (PAN-4486), set in the **New conversation with options…** dialog or by `pan handoff --skill/--pack`, already cover part of that proposal: a conversation can turn on pack skills for itself. See [Template Conversations](/reference/template-conversations) and [Conversations](/features/conversations).
+Skill packs are the built feature described on this page. [Template Conversations](/reference/template-conversations) describes a separate, unbuilt proposal (PAN-1357, the proposed `bundle` verb) that also uses the words "skill bundle." Per-conversation skill values (PAN-4486), set in the **New conversation with options…** dialog or by `pan handoff --skill/--pack`, already cover part of that proposal: a conversation can turn on pack skills for itself. See [Template Conversations](/reference/template-conversations) and [Conversations](/features/conversations).

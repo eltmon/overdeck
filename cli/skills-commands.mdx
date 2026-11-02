@@ -24,7 +24,7 @@ skills` alone runs it.
 | --- | --- |
 | `--project <key>` | Resolve for a project |
 | `--issue <id>` | Resolve for an issue |
-| `--json` | Output as JSON |
+| `--json` | Output as JSON (only the skill array; packs and pack skills are not included) |
 
 ```bash
 pan skills list --project myapp
@@ -72,7 +72,7 @@ enables nothing. Known packs (`mattpocock`, `pstack`, `gstack`, `deft`,
 | `--ref <ref>` | Tag, branch or commit to pin (default: the known pack ref) |
 | `--adapter <adapter>` | `plain`, `claude-plugin`, `deft-readonly`, or `gstack-runtime` |
 | `--browser` | Also build the browser runtime (gstack; asks separately) |
-| `--yes` | Trust the resolved commit without asking |
+| `--yes` | Trust the resolved commit without asking; with `--browser`, also accepts the browser runtime's consent |
 
 ```bash
 pan skills pack add mattpocock --ref v1.2.3
@@ -80,7 +80,11 @@ pan skills pack add mattpocock --ref v1.2.3
 
 Exits 1 on an unknown `--adapter` value, a pack with no default url or ref
 when none is given, a pack source error, or when the commit was not
-trusted (declined, or not written without a terminal and `--yes`).
+trusted (declined, or not written without a terminal and `--yes`). With
+`--browser`, the pack is registered as soon as the commit is trusted; a
+declined or failed browser-runtime step then exits 1 with the pack already
+registered. Finish it with `pan skills pack browser <id>` rather than
+retrying `pack add`.
 
 ## pan skills pack update
 
@@ -127,15 +131,18 @@ pan skills pack remove <id>
 ```
 
 Unregisters a pack, clears its global toggles, and deletes its cache,
-every mount that contains it, and dangling launch and Codex plugin
-caches.
+every mount that contains it, and dangling launch links, and Codex
+plugin caches.
 
 ```bash
 pan skills pack remove gstack
 ```
 
 Exits 1 if the pack is not registered, or if removing a mount or cache
-failed (rerun to retry).
+failed (rerun to retry). The unregister step runs before the cache and
+mount sweep, so a retry after a failed sweep still exits 1 with "pack is
+not registered" even when that retry's sweep itself succeeds; that exit
+does not by itself mean the cleanup failed.
 
 ## pan skills pack sync
 
@@ -210,7 +217,7 @@ are enabled.
 pan skills pack sageox status --project myapp
 ```
 
-Exits 1 if `--project` names a project with no recorded sageox state.
+Exits 1 if `--project` names a project Overdeck does not know.
 
 ## pan skills pack sageox upload
 
