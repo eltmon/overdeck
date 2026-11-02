@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T17:38:53.024186Z · model: claude-opus-5-5 · open: 877_
+_Last sequenced: 2026-11-02T17:41:22.831565Z · model: claude-opus-5-5 · open: 877_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1212,7 +1212,7 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T17:38:53.024186Z",
+  "generatedAt": "2026-11-02T17:41:22.831565Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 877,
