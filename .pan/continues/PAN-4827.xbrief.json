@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4827",
   "created": "2026-11-02T16:36:08.290Z",
-  "updated": "2026-11-02T17:08:52.361Z",
+  "updated": "2026-11-02T17:22:42.677Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-02T17:08:44.037Z"
     },
     "google-reprice-flash": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4827",
-      "claimedAt": "2026-11-02T17:08:52.361Z"
+      "claimedAt": "2026-11-02T17:08:52.361Z",
+      "doneAt": "2026-11-02T17:22:42.676Z"
     }
   }
 }
