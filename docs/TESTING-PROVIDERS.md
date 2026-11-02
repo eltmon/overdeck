@@ -80,7 +80,7 @@ export ZAI_API_KEY="YOUR_ZAI_API_KEY"
 
 **Test via Overdeck agent:**
 ```bash
-pan start PAN-998 --model glm-4.7
+pan start PAN-998 --model glm-5.3
 # Verify: ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
 # Verify: API_TIMEOUT_MS=300000
 ```
@@ -194,7 +194,7 @@ pan start PAN-997 --harness pi --model kimi-k2.5
 
 **Test 4: Spawn agent with GLM via Claude Code**
 ```bash
-pan start PAN-996 --model glm-4.7
+pan start PAN-996 --model glm-5.3
 # Verify in agent env:
 # - ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
 # - ANTHROPIC_AUTH_TOKEN=...
