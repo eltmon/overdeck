@@ -18,20 +18,27 @@
  * the skill catalog and reject core skills.
  */
 import { execFile } from 'node:child_process';
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import { isMap, parse as parseYaml, parseDocument, stringify as stringifyYaml, type Document } from 'yaml';
+import { isMap, parseDocument, stringify as stringifyYaml, type Document } from 'yaml';
 import { getGlobalConfigPath } from '../config-yaml/load.js';
 import { commitPlanArtifacts, pushPlanArtifacts } from '../overdeck/plan-artifact-commit.js';
-import { PAN_DIRNAME } from '../pan-dir/types.js';
 import {
-  listProjectsAsync,
-  resolveInfraRepo,
-  resolveProjectFromIssueSync,
-  updateProjectsConfigAsync,
-  type ProjectConfig,
-} from '../projects.js';
+  booleanEntries,
+  findProject,
+  type IssueOverrides,
+  issueSkillOverridesPath,
+  parseYamlOrNull,
+  planHomeFor,
+  type ProjectWithSkillOverrides,
+  projectForIssue,
+  readIssueFile,
+  readIssueOverrides,
+  readTextOrEmpty,
+} from './issue-file.js';
+import { PAN_DIRNAME } from '../pan-dir/types.js';
+import { listProjectsAsync, updateProjectsConfigAsync, type ProjectConfig } from '../projects.js';
 import { runSettingsWriteSerialized } from '../settings-api.js';
 import { KNOWN_PACKS, notAppliedLabels, type PackAdapterId } from '../skill-packs/adapters.js';
 import { listPacks, packUpdateAvailable } from '../skill-packs/sources.js';
@@ -84,47 +91,9 @@ export interface SkillOverrideWriteResult {
   reason?: string;
 }
 
-type ProjectWithSkillOverrides = ProjectConfig & {
-  skill_overrides?: Record<string, boolean>;
-  skill_pack_overrides?: Record<string, boolean>;
-};
-
-interface IssueOverrides {
-  skills: Record<string, boolean>;
-  packs: Record<string, boolean>;
-  /** PAN-4820: absent = Overdeck's pipeline. */
-  pipeline?: 'deft';
-}
-
 const execFileAsync = promisify(execFile);
 
 const ISSUE_FILE_HEADER = '# Overdeck per-issue skill overrides (PAN-3942). true = on, false = off; absent = inherit.\n';
-
-function booleanEntries(value: unknown): Record<string, boolean> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  const out: Record<string, boolean> = {};
-  for (const [name, enabled] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof enabled === 'boolean') out[name] = enabled;
-  }
-  return out;
-}
-
-async function readTextOrEmpty(path: string): Promise<string> {
-  try {
-    return await readFile(path, 'utf8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
-    throw error;
-  }
-}
-
-function parseYamlOrNull(text: string): unknown {
-  try {
-    return parseYaml(text);
-  } catch {
-    return null;
-  }
-}
 
 // ── reads ────────────────────────────────────────────────────────────────
 
@@ -140,11 +109,6 @@ export async function readGlobalPackOverrides(): Promise<Record<string, boolean>
   return booleanEntries(config?.skills?.pack_overrides);
 }
 
-async function findProject(projectKey: string): Promise<ProjectWithSkillOverrides | null> {
-  const match = (await listProjectsAsync()).find(project => project.key === projectKey);
-  return (match?.config as ProjectWithSkillOverrides | undefined) ?? null;
-}
-
 export async function readProjectSkillOverrides(projectKey: string): Promise<Record<string, boolean>> {
   return booleanEntries((await findProject(projectKey))?.skill_overrides);
 }
@@ -153,54 +117,10 @@ export async function readProjectPackOverrides(projectKey: string): Promise<Reco
   return booleanEntries((await findProject(projectKey))?.skill_pack_overrides);
 }
 
-/** `<planHome>/.pan/skill-overrides/<ISSUE>.yaml` */
-export function issueSkillOverridesPath(planHome: string, issueId: string): string {
-  return join(planHome, PAN_DIRNAME, 'skill-overrides', `${issueId.toUpperCase()}.yaml`);
-}
-
-/**
- * The checkout holding a registered project's `.pan/` — what `resolvePlanHome`
- * returns for the project root, computed from the config without re-reading
- * projects.yaml.
- */
-function planHomeFor(project: ProjectConfig): string {
-  try {
-    return resolveInfraRepo(project, resolve(project.path)).repoPath;
-  } catch {
-    return resolve(project.path);
-  }
-}
-
-/** The registered project that owns an issue, with its key. */
-async function projectForIssue(issueId: string): Promise<{ projectKey: string; project: ProjectConfig } | null> {
-  const resolved = resolveProjectFromIssueSync(issueId);
-  if (!resolved) return null;
-  const project = await findProject(resolved.projectKey);
-  return project ? { projectKey: resolved.projectKey, project } : null;
-}
-
-async function readIssueFile(path: string): Promise<IssueOverrides> {
-  const parsed = parseYamlOrNull(await readTextOrEmpty(path)) as { skills?: unknown; packs?: unknown; pipeline?: unknown } | null;
-  return {
-    skills: booleanEntries(parsed?.skills),
-    packs: booleanEntries(parsed?.packs),
-    ...(parsed?.pipeline === 'deft' ? { pipeline: 'deft' as const } : {}),
-  };
-}
-
-async function readIssueOverrides(issueId: string): Promise<IssueOverrides> {
-  const owner = await projectForIssue(issueId);
-  if (!owner) return { skills: {}, packs: {} };
-  return readIssueFile(issueSkillOverridesPath(planHomeFor(owner.project), issueId));
-}
+export { issueSkillOverridesPath };
 
 export async function readIssueSkillOverrides(issueId: string): Promise<Record<string, boolean>> {
   return (await readIssueOverrides(issueId)).skills;
-}
-
-/** The issue file's `pipeline:` key (PAN-4820); undefined = Overdeck's pipeline. */
-export async function readIssuePipelineField(issueId: string): Promise<'deft' | undefined> {
-  return (await readIssueOverrides(issueId)).pipeline;
 }
 
 /**
