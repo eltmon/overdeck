@@ -6,7 +6,7 @@
  * shape as install.test.ts), and an isolated global git config.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -139,9 +139,47 @@ describe('removeDeftInstall', () => {
     expect(existsSync(join(wt, 'AGENTS.md'))).toBe(false);
   });
 
-  it('does nothing without a snapshot', async () => {
+  it('does nothing without a snapshot once the install is gone', async () => {
     await removeDeftInstall(wt);
 
     expect(await removeDeftInstall(wt)).toEqual({ removed: [], restored: [], refused: [] });
+  });
+
+  it('reports a deleted snapshot and makes the install visible instead of guessing', async () => {
+    rmSync(join(wt, '.overdeck'), { recursive: true, force: true });
+
+    const result = await removeDeftInstall(wt);
+
+    expect(result).toMatchObject({ snapshotMissing: true, removed: [], restored: [] });
+    expect(result.unhidden?.sort()).toEqual(['README.md', 'package.json']);
+    expect(git(wt, 'ls-files', '-v').split('\n').filter(line => line.startsWith('S '))).toEqual([]);
+    expect(gitCode(wt, 'config', '--worktree', '--get', 'core.hooksPath')).toBe(1);
+    expect(gitCode(wt, 'config', '--worktree', '--get', 'core.excludesFile')).toBe(1);
+    expect(git(wt, 'status', '--porcelain')).toContain('?? AGENTS.md');
+    expect(git(wt, 'status', '--porcelain')).toContain(' M package.json');
+  });
+
+  it('refuses a created path under a symlinked directory that leads outside the worktree', async () => {
+    write(root, 'outside/keep.txt', 'keep\n');
+    symlinkSync(join(root, 'outside'), join(wt, 'link'));
+    const snapshot = await readDeftSnapshot(wt);
+    if (!snapshot) throw new Error('no snapshot');
+    await writeDeftSnapshot(wt, { ...snapshot, createdPaths: [...snapshot.createdPaths, 'link/keep.txt'] });
+
+    const result = await removeDeftInstall(wt);
+
+    expect(result.refused).toEqual(['link/keep.txt']);
+    expect(readFileSync(join(root, 'outside', 'keep.txt'), 'utf8')).toBe('keep\n');
+  });
+
+  it('never writes a restored file through a planted symlink', async () => {
+    write(root, 'outside/target.txt', 'outside\n');
+    rmSync(join(wt, '.claude', 'settings.json'));
+    symlinkSync(join(root, 'outside', 'target.txt'), join(wt, '.claude', 'settings.json'));
+
+    const result = await removeDeftInstall(wt);
+
+    expect(result.refused).toContain('.claude/settings.json');
+    expect(readFileSync(join(root, 'outside', 'target.txt'), 'utf8')).toBe('outside\n');
   });
 });

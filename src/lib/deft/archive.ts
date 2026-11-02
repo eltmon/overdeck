@@ -15,15 +15,16 @@
  * the merge guard's deposit rules never match the archive. The merge guard
  * refuses a PR whose archive differs from what `save` would write now.
  *
- * A native Directive project (one that tracks its own deposit, AD-14) keeps
- * its state in its own tracked `xbrief/`: nothing is archived there.
+ * A native Directive project (one whose default branch tracks its own
+ * deposit, AD-14) keeps its state in its own tracked `xbrief/`: nothing is
+ * archived there.
  */
 import { execFile } from 'node:child_process';
 import { copyFile, mkdir, readdir, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import { detectDirectiveProject } from './detect.js';
-import { readDeftSnapshot } from './install-snapshot.js';
+import { resolveDefaultBranchForRepo } from '../project-repos.js';
+import { isDirectiveProjectAtRef } from './detect.js';
 
 const execFileAsync = promisify(execFile);
 const MAX_BUFFER = 64 * 1024 * 1024;
@@ -40,13 +41,26 @@ export function deftArchiveDir(issueId: string): string {
 }
 
 /**
- * True for a project that tracks its own Directive deposit. A worktree with a
- * temporary install also looks like a Directive project, so the install
- * snapshot rules it out.
+ * The ref whose committed tree decides whether a project is natively a
+ * Directive project: `origin/<default branch>`, else the local default branch
+ * when the remote ref is absent.
+ */
+export async function directiveBaseRef(worktree: string): Promise<string> {
+  const branch = resolveDefaultBranchForRepo(worktree);
+  return (await gitExitCode(worktree, ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`])) === 0
+    ? `origin/${branch}`
+    : branch;
+}
+
+/**
+ * True for a project that tracks its own Directive deposit on its default
+ * branch. Read from the committed base tree only: a worktree's own files
+ * cannot decide it, because a temporary install leaves the same markers on
+ * disk, and a deleted or corrupt install snapshot must not turn the merge
+ * guard off.
  */
 export async function isNativeDirectiveProject(worktree: string): Promise<boolean> {
-  if (await readDeftSnapshot(worktree)) return false;
-  return (await detectDirectiveProject(worktree)).isDirectiveProject;
+  return isDirectiveProjectAtRef(worktree, await directiveBaseRef(worktree));
 }
 
 async function listNames(dir: string, filter: (name: string, isDir: boolean) => boolean): Promise<string[]> {

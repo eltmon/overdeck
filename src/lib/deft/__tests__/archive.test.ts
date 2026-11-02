@@ -75,11 +75,21 @@ describe('planDeftArchive', () => {
     }
   });
 
-  it('plans nothing for a native Directive project', async () => {
+  it('plans nothing for a native Directive project (deposit tracked on the default branch)', async () => {
     write('.deft/core/VERSION', '0.127.0\n');
+    git('add', '.deft/core/VERSION');
+    git('commit', '-q', '-m', 'deposit');
 
     expect(await planDeftArchive(repo, 'TST-1')).toEqual([]);
     expect(await isDeftArchiveCurrent(repo, 'TST-1', head())).toBe(true);
+  });
+
+  it('does not treat markers that exist only in the worktree as native', async () => {
+    write('.deft/core/VERSION', '0.127.0\n');
+    write('AGENTS.md', '<!-- deft:managed-section v3 -->\n');
+
+    expect(await planDeftArchive(repo, 'TST-1')).toHaveLength(5);
+    expect(await isDeftArchiveCurrent(repo, 'TST-1', head())).toBe(false);
   });
 });
 

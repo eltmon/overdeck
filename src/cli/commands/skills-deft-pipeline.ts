@@ -68,6 +68,14 @@ export async function skillsDeftBackCommand(issue: string, options: JsonOption =
       return;
     }
     console.log(`Overdeck pipeline on for ${issueId}: ${result.removed.length} install paths removed, ${result.restored.length} files restored.`);
+    if (result.snapshotMissing) {
+      console.error(chalk.yellow(
+        `Warning: no readable install snapshot for ${issueId}, so the exact undo was not possible. `
+        + `Cleared the worktree hooks path, the exclude file and ${result.unhidden?.length ?? 0} skip-worktree flags `
+        + `(${result.unhidden?.join(', ') || 'none'}). The install's files are visible to git again: `
+        + 'review git status in the workspace and discard what you do not want.',
+      ));
+    }
     console.log(`Next: pan start ${issueId} (plans first)`);
   } catch (error) {
     refuse(error);

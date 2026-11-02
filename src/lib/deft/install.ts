@@ -23,13 +23,22 @@
  */
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { access, lstat, mkdir, readFile, readlink, writeFile } from 'node:fs/promises';
+import { access, lstat, mkdir, readFile, readlink, realpath, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { installPreRebaseHook } from '../workspace-manager/worktree-ops.js';
-import { detectDirectiveProject } from './detect.js';
-import { type DeftInstallSnapshot, readDeftSnapshot, touchedDeftDir, writeDeftSnapshot } from './install-snapshot.js';
+import { isNativeDirectiveProject } from './archive.js';
+import {
+  type DeftInstallSnapshot,
+  deftExcludeFilePath,
+  readDeftSnapshot,
+  touchedDeftDir,
+  writeDeftSnapshot,
+} from './install-snapshot.js';
+import { undoDeftChanges, type DeftUndoPlan } from './uninstall.js';
+
+export { deftExcludeFilePath } from './install-snapshot.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -38,7 +47,6 @@ export const DEFT_INSTALL_TIMEOUT_MS = 10 * 60 * 1000;
 const GIT_MAX_BUFFER = 64 * 1024 * 1024;
 const RUNTIME_PACKAGE = '@deftai/directive-runtime';
 const HOOKS_PATH = '.githooks';
-const EXCLUDE_FILE_NAME = 'overdeck-deft-exclude';
 /** Overdeck's own runtime files for a Deft worktree; `.overdeck/` is not ignored in every project. */
 const RUNTIME_EXCLUDES = ['/.overdeck/deft-install.json', '/.overdeck/deft-run-summary.jsonl', '/.overdeck/deft-lift/'];
 
@@ -266,12 +274,6 @@ async function effectiveGlobalExcludes(worktree: string): Promise<string> {
   }
 }
 
-/** `<gitdir>/info/overdeck-deft-exclude`; the git dir is per worktree. */
-export async function deftExcludeFilePath(worktree: string): Promise<string> {
-  const gitDir = resolve(worktree, (await gitOut(worktree, ['rev-parse', '--git-dir'])).trim());
-  return join(gitDir, 'info', EXCLUDE_FILE_NAME);
-}
-
 function tail(text: string, lines: number): string {
   return text.trimEnd().split('\n').slice(-lines).join('\n');
 }
@@ -346,6 +348,49 @@ async function computeChanges(worktree: string, before: BeforeState): Promise<In
   return { createdPaths, modifiedTracked, modifiedUntracked, touchedPreexisting };
 }
 
+/** Put the shared `core.hooksPath` back to its pre-install value when an installer changed it. */
+async function restoreSharedHooksPath(worktree: string, before: string | null): Promise<void> {
+  const now = (await git(worktree, ['config', '--local', '--get', 'core.hooksPath'])).stdout.trim() || null;
+  if (now === before) return;
+  if (before === null) await git(worktree, ['config', '--local', '--unset', 'core.hooksPath']);
+  else await gitOut(worktree, ['config', '--local', 'core.hooksPath', before]);
+}
+
+/**
+ * Undo a half-done install that has no snapshot yet: restore the shared
+ * hooks path, unstage, and put back whatever the diff against `before` shows.
+ * Best effort: each step runs even when an earlier one fails.
+ */
+async function rollbackInstall(worktree: string, before: BeforeState, sharedHooksPathBefore: string | null): Promise<void> {
+  await restoreSharedHooksPath(worktree, sharedHooksPathBefore).catch(() => undefined);
+  await git(worktree, ['reset', '-q']).catch(() => undefined);
+  let plan: DeftUndoPlan = { createdPaths: [], modifiedTracked: [], modifiedUntracked: [], touchedPreexisting: [] };
+  try {
+    plan = await computeChanges(worktree, before);
+  } catch {
+    // Nothing more is knowable; the wiring is still cleared below.
+  }
+  await undoDeftChanges(worktree, plan).catch(() => undefined);
+}
+
+/**
+ * The install writes `--worktree` config, so it must run at the root of a
+ * linked worktree: a subdirectory or the primary checkout would wire the
+ * wrong checkout.
+ */
+async function linkedWorktreeRootError(worktree: string): Promise<string | null> {
+  try {
+    const top = (await gitOut(worktree, ['rev-parse', '--show-toplevel'])).trim();
+    const gitDir = resolve(worktree, (await gitOut(worktree, ['rev-parse', '--git-dir'])).trim());
+    const commonDir = resolve(worktree, (await gitOut(worktree, ['rev-parse', '--git-common-dir'])).trim());
+    if ((await realpath(top)) !== (await realpath(worktree))) return `${worktree} is not the root of its git worktree (${top})`;
+    if ((await realpath(gitDir)) === (await realpath(commonDir))) return `${worktree} is a primary checkout, not a linked issue worktree`;
+    return null;
+  } catch (error) {
+    return `${worktree} is not a git worktree: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
 // ── the install ──────────────────────────────────────────────────────────
 
 /**
@@ -363,7 +408,9 @@ export async function installDeftIntoWorktree(
   // 1. Early returns.
   const existing = await readDeftSnapshot(worktree);
   if (existing) return { ok: true, mode: 'installed', snapshot: existing, alreadyInstalled: true };
-  if ((await detectDirectiveProject(worktree)).isDirectiveProject) return { ok: true, mode: 'directive-project' };
+  const notLinked = await linkedWorktreeRootError(worktree);
+  if (notLinked) return { ok: false, error: notLinked };
+  if (await isNativeDirectiveProject(worktree)) return { ok: true, mode: 'directive-project' };
   const staged = await git(worktree, ['diff', '--cached', '--quiet']);
   const unmerged = (await gitOut(worktree, ['ls-files', '-u'])).trim();
   if (staged.exitCode !== 0 || unmerged) {
@@ -375,82 +422,87 @@ export async function installDeftIntoWorktree(
   // the shared config.
   const before = await captureBefore(worktree);
   const sharedHooksPathBefore = (await git(worktree, ['config', '--local', '--get', 'core.hooksPath'])).stdout.trim() || null;
-  await gitOut(worktree, ['config', 'extensions.worktreeConfig', 'true']);
-  await gitOut(worktree, ['config', '--worktree', 'core.hooksPath', HOOKS_PATH]);
+  // Any failure before the snapshot exists is rolled back here: nothing
+  // else could undo it later.
+  let snapshotWritten = false;
+  try {
+    await gitOut(worktree, ['config', 'extensions.worktreeConfig', 'true']);
+    await gitOut(worktree, ['config', '--worktree', 'core.hooksPath', HOOKS_PATH]);
 
-  // 3. Run the install.
-  const installRun = await runInstall(worktree);
+    // 3. Run the install.
+    const installRun = await runInstall(worktree);
 
-  // 4. Restore the shared config (an installer may still write it).
-  const sharedNow = (await git(worktree, ['config', '--local', '--get', 'core.hooksPath'])).stdout.trim() || null;
-  if (sharedNow !== sharedHooksPathBefore) {
-    if (sharedHooksPathBefore === null) await git(worktree, ['config', '--local', '--unset', 'core.hooksPath']);
-    else await gitOut(worktree, ['config', '--local', 'core.hooksPath', sharedHooksPathBefore]);
+    // 4. Restore the shared config (an installer may still write it).
+    await restoreSharedHooksPath(worktree, sharedHooksPathBefore);
+
+    // 5. Unstage what the install added.
+    await gitOut(worktree, ['reset', '-q']);
+
+    // 6. Diff the after state against the before state. A failed install that
+    // changed nothing leaves nothing to hide: drop the worktree hooks path and
+    // stop before the rebase guard writes into `.githooks/`.
+    let changes = await computeChanges(worktree, before);
+    if (installRun.exitCode !== 0 && !hasChanges(changes)) {
+      await git(worktree, ['config', '--worktree', '--unset', 'core.hooksPath']);
+      return { ok: false, error: `directive install failed: ${tail(installRun.stderr || installRun.stdout, 20)}` };
+    }
+    // Re-point the rebase guard at the new hooks path, then diff again so its files are hidden too.
+    await installPreRebaseHook(worktree);
+    changes = await computeChanges(worktree, before);
+    const { createdPaths, modifiedTracked, modifiedUntracked, touchedPreexisting } = changes;
+
+    // 7. Hide.
+    const excludeFile = await deftExcludeFilePath(worktree);
+    const globalExcludes = await effectiveGlobalExcludes(worktree);
+    const excludeText = [
+      ...(globalExcludes ? [globalExcludes.trimEnd()] : []),
+      `# overdeck:deft ${issueId}`,
+      ...RUNTIME_EXCLUDES,
+      ...createdPaths.map(excludeLine),
+      '',
+    ].join('\n');
+    await mkdir(dirname(excludeFile), { recursive: true });
+    await writeFile(excludeFile, excludeText, 'utf8');
+    await gitOut(worktree, ['config', '--worktree', 'core.excludesFile', excludeFile]);
+    if (modifiedTracked.length > 0) {
+      await gitOut(worktree, ['update-index', '--skip-worktree', '--', ...modifiedTracked.map(entry => entry.path)]);
+    }
+
+    // 8. Write the snapshot, then prove the worktree looks as it did before.
+    const snapshot: DeftInstallSnapshot = {
+      version: 1,
+      issueId,
+      installedAt: new Date().toISOString(),
+      runtimeVersion: await readRuntimeVersion(worktree),
+      createdPaths,
+      modifiedTracked,
+      modifiedUntracked,
+      touchedPreexisting,
+      sharedHooksPathBefore,
+      excludeFile,
+    };
+    await writeDeftSnapshot(worktree, snapshot);
+    snapshotWritten = true;
+
+    if (installRun.exitCode !== 0) {
+      return { ok: false, error: `directive install failed: ${tail(installRun.stderr || installRun.stdout, 20)}`, snapshot };
+    }
+
+    const beforeLines = new Set(before.entries.map(entry => `${entry.code} ${entry.path}`));
+    const hidden = [...createdPaths, ...modifiedTracked.map(entry => entry.path)];
+    const extra = (await statusEntries(worktree, false))
+      .filter(entry =>
+        !beforeLines.has(`${entry.code} ${entry.path}`) ||
+        hidden.some(path => entry.path === path || (isDir(path) && entry.path.startsWith(path))))
+      .map(entry => `${entry.code} ${entry.path}`);
+    if (extra.length > 0) {
+      return { ok: false, error: `the Directive install is still visible to git:\n${extra.join('\n')}`, snapshot };
+    }
+    return { ok: true, mode: 'installed', snapshot, alreadyInstalled: false };
+  } catch (error) {
+    if (!snapshotWritten) await rollbackInstall(worktree, before, sharedHooksPathBefore);
+    throw error;
   }
-
-  // 5. Unstage what the install added.
-  await gitOut(worktree, ['reset', '-q']);
-
-  // 6. Diff the after state against the before state. A failed install that
-  // changed nothing leaves nothing to hide: drop the worktree hooks path and
-  // stop before the rebase guard writes into `.githooks/`.
-  let changes = await computeChanges(worktree, before);
-  if (installRun.exitCode !== 0 && !hasChanges(changes)) {
-    await git(worktree, ['config', '--worktree', '--unset', 'core.hooksPath']);
-    return { ok: false, error: `directive install failed: ${tail(installRun.stderr || installRun.stdout, 20)}` };
-  }
-  // Re-point the rebase guard at the new hooks path, then diff again so its files are hidden too.
-  await installPreRebaseHook(worktree);
-  changes = await computeChanges(worktree, before);
-  const { createdPaths, modifiedTracked, modifiedUntracked, touchedPreexisting } = changes;
-
-  // 7. Hide.
-  const excludeFile = await deftExcludeFilePath(worktree);
-  const globalExcludes = await effectiveGlobalExcludes(worktree);
-  const excludeText = [
-    ...(globalExcludes ? [globalExcludes.trimEnd()] : []),
-    `# overdeck:deft ${issueId}`,
-    ...RUNTIME_EXCLUDES,
-    ...createdPaths.map(excludeLine),
-    '',
-  ].join('\n');
-  await mkdir(dirname(excludeFile), { recursive: true });
-  await writeFile(excludeFile, excludeText, 'utf8');
-  await gitOut(worktree, ['config', '--worktree', 'core.excludesFile', excludeFile]);
-  if (modifiedTracked.length > 0) {
-    await gitOut(worktree, ['update-index', '--skip-worktree', '--', ...modifiedTracked.map(entry => entry.path)]);
-  }
-
-  // 8. Write the snapshot, then prove the worktree looks as it did before.
-  const snapshot: DeftInstallSnapshot = {
-    version: 1,
-    issueId,
-    installedAt: new Date().toISOString(),
-    runtimeVersion: await readRuntimeVersion(worktree),
-    createdPaths,
-    modifiedTracked,
-    modifiedUntracked,
-    touchedPreexisting,
-    sharedHooksPathBefore,
-    excludeFile,
-  };
-  await writeDeftSnapshot(worktree, snapshot);
-
-  if (installRun.exitCode !== 0) {
-    return { ok: false, error: `directive install failed: ${tail(installRun.stderr || installRun.stdout, 20)}`, snapshot };
-  }
-
-  const beforeLines = new Set(before.entries.map(entry => `${entry.code} ${entry.path}`));
-  const hidden = [...createdPaths, ...modifiedTracked.map(entry => entry.path)];
-  const extra = (await statusEntries(worktree, false))
-    .filter(entry =>
-      !beforeLines.has(`${entry.code} ${entry.path}`) ||
-      hidden.some(path => entry.path === path || (isDir(path) && entry.path.startsWith(path))))
-    .map(entry => `${entry.code} ${entry.path}`);
-  if (extra.length > 0) {
-    return { ok: false, error: `the Directive install is still visible to git:\n${extra.join('\n')}`, snapshot };
-  }
-  return { ok: true, mode: 'installed', snapshot, alreadyInstalled: false };
 }
 
 async function readRuntimeVersion(worktree: string): Promise<string | null> {

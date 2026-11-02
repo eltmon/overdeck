@@ -2,10 +2,11 @@
  * PAN-4820 WI-5: what the Deft merge guard refuses, rule by rule, and that
  * the per-issue guard fails closed when it cannot read the PR's diff.
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const { workspace } = vi.hoisted(() => ({ workspace: { path: '' } }));
 
@@ -14,6 +15,7 @@ vi.mock('../../overdeck/issue-projects.js', () => ({
   resolveProjectForIssue: vi.fn(() => null),
 }));
 
+import { installDeftIntoWorktree } from '../install.js';
 import type { DeftInstallSnapshot } from '../install-snapshot.js';
 import { type DeftGuardInput, deftMergeGuardForIssue, evaluateDeftMergeGuard } from '../merge-guard.js';
 
@@ -146,5 +148,78 @@ describe('deftMergeGuardForIssue', () => {
     expect(verdict.ok).toBe(false);
     expect(!verdict.ok && verdict.reason).toMatch(/^merge guard could not read the PR's changed files: /);
     expect(verdict.drifted).toEqual([]);
+  });
+});
+
+describe('deftMergeGuardForIssue with a temporary install', () => {
+  const savedEnv = { GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM };
+  let wt: string;
+  const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' });
+  const write = (base: string, path: string, content: string): void => {
+    mkdirSync(join(base, path, '..'), { recursive: true });
+    writeFileSync(join(base, path), content);
+  };
+
+  beforeAll(() => {
+    const globalConfig = join(scratch, 'gitconfig');
+    writeFileSync(globalConfig, '[user]\n\tname = Overdeck Test\n\temail = test@overdeck.local\n[commit]\n\tgpgsign = false\n');
+    process.env.GIT_CONFIG_GLOBAL = globalConfig;
+    process.env.GIT_CONFIG_NOSYSTEM = '1';
+  });
+
+  afterAll(() => {
+    for (const [key, value] of Object.entries(savedEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  async function installed(): Promise<void> {
+    const root = mkdtempSync(join(scratch, 'repo-'));
+    const main = join(root, 'main');
+    wt = join(root, 'wt');
+    mkdirSync(main);
+    git(main, 'init', '-q', '-b', 'main');
+    write(main, 'package.json', '{"name":"probe"}\n');
+    git(main, 'add', '-A');
+    git(main, 'commit', '-q', '-m', 'seed');
+    git(main, 'update-ref', 'refs/remotes/origin/main', 'main');
+    git(main, 'worktree', 'add', '-q', '-b', 'feature/pan-1', wt);
+    const result = await installDeftIntoWorktree(wt, 'PAN-1', {
+      runInstall: async (worktree) => {
+        write(worktree, 'AGENTS.md', '<!-- deft:managed-section v3 -->\n');
+        write(worktree, '.githooks/pre-push', '#!/bin/sh\nexit 0\n');
+        return { exitCode: 0, stdout: '', stderr: '' };
+      },
+    });
+    expect(result).toMatchObject({ ok: true, mode: 'installed' });
+    workspace.path = wt;
+  }
+
+  it('passes a clean PR while the snapshot is in place', async () => {
+    await installed();
+
+    expect(await deftMergeGuardForIssue('PAN-1', git(wt, 'rev-parse', 'HEAD').trim())).toMatchObject({ ok: true });
+  });
+
+  it('refuses when the snapshot was deleted and the deposit was force-added', async () => {
+    await installed();
+    rmSync(join(wt, '.overdeck'), { recursive: true, force: true });
+    git(wt, 'add', '-f', '.githooks/pre-push');
+    git(wt, 'commit', '-q', '-m', 'sneak the hook in');
+
+    const verdict = await deftMergeGuardForIssue('PAN-1', git(wt, 'rev-parse', 'HEAD').trim());
+
+    expect(verdict.ok).toBe(false);
+    expect(!verdict.ok && verdict.reason).toContain('Deft install snapshot for PAN-1 (.overdeck/deft-install.json) is missing or unreadable');
+  });
+
+  it('refuses when the snapshot is corrupt', async () => {
+    await installed();
+    writeFileSync(join(wt, '.overdeck', 'deft-install.json'), '{ not json');
+
+    const verdict = await deftMergeGuardForIssue('PAN-1', git(wt, 'rev-parse', 'HEAD').trim());
+
+    expect(!verdict.ok && verdict.reason).toContain('is missing or unreadable');
   });
 });

@@ -10,7 +10,10 @@
  *
  * `evaluateDeftMergeGuard` is pure apart from the injected head-file reader.
  * `deftMergeGuardForIssue` composes the git reads and fails closed: when the
- * head or the diff cannot be read, the PR is not mergeable.
+ * head or the diff cannot be read, or a temporary install's snapshot is
+ * missing or unreadable, the PR is not mergeable. Whether the project is a
+ * native Directive project is read from its default branch, never from the
+ * worktree.
  */
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -190,8 +193,18 @@ export async function deftMergeGuardForIssue(
   }
 
   const snapshot = await readDeftSnapshot(worktree);
-  const [directiveProject, drifted, archiveCurrent] = await Promise.all([
-    isNativeDirectiveProject(worktree),
+  const directiveProject = await isNativeDirectiveProject(worktree);
+  // A temporary install is only verifiable through its snapshot. Missing or
+  // unreadable (deleted, cleaned, corrupt), the guard cannot vouch for the PR.
+  if (!directiveProject && !snapshot) {
+    return {
+      ok: false,
+      reason: `the Deft install snapshot for ${issueId.toUpperCase()} (.overdeck/deft-install.json) is missing or unreadable, so the merge guard cannot vouch for this PR; run pan skills deft show ${issueId.toUpperCase()}, then switch back to Overdeck or ask the operator`,
+      paths: [],
+      drifted: [],
+    };
+  }
+  const [drifted, archiveCurrent] = await Promise.all([
     detectDrift(worktree, snapshot),
     isDeftArchiveCurrent(worktree, issueId, head),
   ]);

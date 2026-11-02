@@ -79,6 +79,20 @@ describe('pan skills deft back', () => {
   });
 });
 
+describe('pan skills deft back without a snapshot', () => {
+  it('warns that the exact undo was impossible and names the unhidden files', async () => {
+    mocks.backToOverdeck.mockResolvedValue({
+      removed: [], restored: [], archiveSha: null, next: 'pan start PAN-7', snapshotMissing: true, unhidden: ['package.json'],
+    });
+
+    await run('back', 'PAN-7');
+
+    expect(err.join('\n')).toContain('no readable install snapshot for PAN-7');
+    expect(err.join('\n')).toContain('(package.json)');
+    expect(out).toContain('Next: pan start PAN-7 (plans first)');
+  });
+});
+
 describe('pan skills deft save', () => {
   it('saves the archive in the issue workspace', async () => {
     mocks.saveDeftState.mockResolvedValue({ committed: true, sha: '0123456789abcdef', files: 3 });

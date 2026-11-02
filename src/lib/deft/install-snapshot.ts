@@ -7,8 +7,12 @@
  * and deletes it last. Its presence means "this worktree carries a hidden
  * Directive install".
  */
+import { execFile } from 'node:child_process';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 export interface DeftInstallSnapshot {
   version: 1;
@@ -45,6 +49,12 @@ export function touchedDeftDir(entry: string): string {
   return entry === 'node_modules/' || entry.endsWith('/node_modules/')
     ? join(entry, '@deftai')
     : join(entry, 'node_modules', '@deftai');
+}
+
+/** `<gitdir>/info/overdeck-deft-exclude`; the git dir is per worktree. */
+export async function deftExcludeFilePath(worktree: string): Promise<string> {
+  const { stdout } = await execFileAsync('git', ['rev-parse', '--git-dir'], { cwd: worktree });
+  return join(resolve(worktree, stdout.trim()), 'info', 'overdeck-deft-exclude');
 }
 
 export function deftSnapshotPath(worktree: string): string {

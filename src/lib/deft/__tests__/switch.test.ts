@@ -141,6 +141,15 @@ describe('backToOverdeck', () => {
     expect(result).toEqual({ removed: ['AGENTS.md'], restored: ['package.json'], archiveSha: 'abc123', next: 'pan start TST-1' });
   });
 
+  it('reports a missing snapshot from the undo', async () => {
+    const { deps } = recorder({
+      findPlanPath: async () => null,
+      remove: async () => ({ removed: [], restored: [], refused: [], snapshotMissing: true, unhidden: ['package.json'] }),
+    });
+
+    expect(await backToOverdeck('TST-1', deps)).toMatchObject({ snapshotMissing: true, unhidden: ['package.json'], next: 'pan start TST-1' });
+  });
+
   it('skips the save for a native Directive project', async () => {
     const { calls, deps } = recorder({ nativeDirective: async () => true, findPlanPath: async () => null });
 

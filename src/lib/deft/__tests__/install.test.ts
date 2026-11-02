@@ -188,11 +188,52 @@ describe('installDeftIntoWorktree', () => {
     expect(existsSync(join(wt, 'AGENTS.md'))).toBe(false);
   });
 
-  it('returns directive-project for a project that already holds a Directive deposit', async () => {
-    write(wt, 'AGENTS.md', '<!-- deft:managed-section v3 -->\n');
+  it('returns directive-project when the default branch tracks a Directive deposit', async () => {
+    write(main, 'AGENTS.md', '<!-- deft:managed-section v3 -->\n');
+    git(main, 'add', 'AGENTS.md');
+    git(main, 'commit', '-q', '-m', 'deposit');
 
     const result = await installDeftIntoWorktree(wt, 'TST-1', { runInstall: fakeInstall });
 
     expect(result).toEqual({ ok: true, mode: 'directive-project' });
+  });
+
+  it('installs when the Directive markers exist only in the worktree, not on the default branch', async () => {
+    write(wt, 'AGENTS.md', '<!-- deft:managed-section v3 -->\n');
+    write(wt, '.deft/core/VERSION', '0.127.0\n');
+
+    const result = await installDeftIntoWorktree(wt, 'TST-1', { runInstall: async () => ({ exitCode: 0, stdout: '', stderr: '' }) });
+
+    expect(result).toMatchObject({ ok: true, mode: 'installed' });
+  });
+
+  it('refuses a directory that is not the root of a linked worktree', async () => {
+    mkdirSync(join(wt, 'sub'));
+
+    expect(await installDeftIntoWorktree(join(wt, 'sub'), 'TST-1', { runInstall: fakeInstall }))
+      .toMatchObject({ ok: false, error: expect.stringContaining('is not the root of its git worktree') });
+    expect(await installDeftIntoWorktree(main, 'TST-1', { runInstall: fakeInstall }))
+      .toMatchObject({ ok: false, error: expect.stringContaining('is a primary checkout') });
+    expect(gitTry(main, 'config', '--worktree', '--get', 'core.hooksPath').code).not.toBe(0);
+  });
+
+  it('rolls back everything when the installer throws before the snapshot exists', async () => {
+    const before = git(wt, 'status', '--porcelain', '--ignored=matching');
+
+    await expect(installDeftIntoWorktree(wt, 'TST-1', {
+      runInstall: async (worktree) => {
+        await fakeInstall(worktree);
+        throw new Error('installer crashed');
+      },
+    })).rejects.toThrow('installer crashed');
+
+    expect(git(wt, 'status', '--porcelain', '--ignored=matching')).toBe(before);
+    expect(readFileSync(join(wt, 'package.json'), 'utf8')).toBe('{"name":"probe"}\n');
+    expect(readFileSync(join(wt, '.claude', 'settings.json'), 'utf8')).toBe('{}\n');
+    expect(existsSync(join(wt, 'node_modules', '@deftai'))).toBe(false);
+    expect(gitTry(wt, 'config', '--worktree', '--get', 'core.hooksPath').code).toBe(1);
+    expect(gitTry(wt, 'config', '--local', '--get', 'core.hooksPath').code).toBe(1);
+    expect(git(wt, 'ls-files', '-v').split('\n').filter(line => line.startsWith('S '))).toEqual([]);
+    expect(await readDeftSnapshot(wt)).toBeNull();
   });
 });

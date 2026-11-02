@@ -29,7 +29,7 @@ import { findPlan } from '../xbrief/io.js';
 import { isNativeDirectiveProject, saveDeftState } from './archive.js';
 import { type DeftInstallResult, installDeftIntoWorktree } from './install.js';
 import { readDeftSnapshot } from './install-snapshot.js';
-import { removeDeftInstall } from './uninstall.js';
+import { type DeftRemoveResult, removeDeftInstall } from './uninstall.js';
 
 const execFileAsync = promisify(execFile);
 const WORKSPACE_CREATE_TIMEOUT_MS = 5 * 60 * 1000;
@@ -51,7 +51,7 @@ export interface DeftSwitchDeps {
   workspaceExists?: (workspace: string) => Promise<boolean>;
   createWorkspace?: (issueId: string) => Promise<void>;
   install?: (workspace: string, issueId: string) => Promise<DeftInstallResult>;
-  remove?: (workspace: string) => Promise<{ removed: string[]; restored: string[]; refused: string[] }>;
+  remove?: (workspace: string) => Promise<DeftRemoveResult>;
   save?: (workspace: string, issueId: string) => Promise<{ committed: boolean; sha?: string; files: number }>;
   nativeDirective?: (workspace: string) => Promise<boolean>;
   hasSnapshot?: (workspace: string) => Promise<boolean>;
@@ -72,6 +72,10 @@ export interface BackToOverdeckResult {
   restored: string[];
   archiveSha: string | null;
   next: string;
+  /** No readable install snapshot: the exact undo was impossible, and the install's files are visible to git again. */
+  snapshotMissing?: boolean;
+  /** Tracked files unhidden by the recovery path, still holding the install's content. */
+  unhidden?: string[];
 }
 
 function defaultResolveProject(issueId: string): { projectKey: string; projectPath: string; polyrepo: boolean } | null {
@@ -190,10 +194,16 @@ export async function backToOverdeck(issueId: string, deps: DeftSwitchDeps = {})
     const saved = await d.save(workspace, issue);
     archiveSha = saved.sha ?? null;
   }
-  const { removed, restored } = await d.remove(workspace);
+  const { removed, restored, snapshotMissing, unhidden } = await d.remove(workspace);
   await d.setPipeline(issue, 'overdeck');
 
   const planPath = await d.findPlanPath(workspace);
   if (planPath && (await readPlanMetadata(planPath))?.deftPlaceholder === true) await rm(planPath, { force: true });
-  return { removed, restored, archiveSha, next: `pan start ${issue}` };
+  return {
+    removed,
+    restored,
+    archiveSha,
+    next: `pan start ${issue}`,
+    ...(snapshotMissing ? { snapshotMissing: true, unhidden: unhidden ?? [] } : {}),
+  };
 }
