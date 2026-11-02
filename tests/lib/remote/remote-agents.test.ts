@@ -22,6 +22,22 @@ const { execFileMock } = vi.hoisted(() => ({
   ),
 }));
 
+const { flySshCommands } = vi.hoisted(() => ({ flySshCommands: [] as string[] }));
+
+vi.mock('../../../src/lib/remote/fly-provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/remote/fly-provider.js')>();
+  const { Effect: E } = await import('effect');
+  return {
+    ...actual,
+    createFlyProvider: () => ({
+      ssh: (_vm: string, command: string) => {
+        flySshCommands.push(command);
+        return E.succeed({ stdout: '', stderr: '', exitCode: 0 });
+      },
+    }),
+  };
+});
+
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
   return { ...actual, execFile: execFileMock };
@@ -35,7 +51,14 @@ import {
   refreshHostHeartbeatForEphemeralVms,
   checkRemoteSpendCap,
   checkRemoteDurabilityPreflight,
+  getRemoteAgentOutput,
+  sendToRemoteAgent,
+  killRemoteAgent,
+  saveRemoteAgentState,
+  loadRemoteAgentState,
+  type RemoteAgentState,
 } from '../../../src/lib/remote/remote-agents.js';
+import { getManagedTmuxSocketName } from '../../../src/lib/tmux.js';
 
 describe('generatePushDaemonScript', () => {
   it('includes the issue branch and wip(remote) prefix', () => {
@@ -426,5 +449,100 @@ describe('refreshHostHeartbeatForEphemeralVms', () => {
     });
     expect(actions).toEqual(['Host heartbeat failed for PAN-1845 on vm-eph (exit 1): machine not started']);
     expect(actions[0]).not.toContain('refreshed');
+  });
+});
+
+describe('remote tmux target (PAN-4734)', () => {
+  const VM = 'overdeck-machine-1a2b3c4d';
+  const CONFIG = `'-f' '/workspace/.pan/tmux/overdeck.tmux.conf'`;
+
+  function seedState(id: string, extra: Partial<RemoteAgentState> = {}): void {
+    saveRemoteAgentState({
+      id,
+      issueId: 'PAN-4734',
+      vmName: VM,
+      model: 'claude-opus-5-5',
+      status: 'running',
+      startedAt: '2026-11-02T00:00:00.000Z',
+      location: 'remote',
+      startedBy: 'operator',
+      ...extra,
+    });
+  }
+
+  const tmuxCommands = (): string[] => flySshCommands.filter((command) => command.startsWith(`'tmux'`));
+
+  beforeEach(() => {
+    flySshCommands.length = 0;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe('linked work agent', () => {
+    const AGENT = 'agent-pan-4734-linked';
+
+    beforeEach(() => {
+      seedState(AGENT, {
+        linked: true,
+        environmentId: 'env-1',
+        tmuxSession: 'conv-20261102-1234',
+        tmuxSocket: 'overdeck',
+      });
+    });
+
+    it('captures output from the conversation session on the VM socket', async () => {
+      await getRemoteAgentOutput(AGENT, VM);
+      expect(tmuxCommands()).toEqual([
+        `'tmux' '-L' 'overdeck' ${CONFIG} 'capture-pane' '-t' 'conv-20261102-1234' '-p' '-S' '-100'`,
+      ]);
+    });
+
+    it('pastes into the conversation session and keeps the agent id for the buffer', async () => {
+      vi.useFakeTimers();
+      const pending = sendToRemoteAgent(AGENT, VM, 'hello');
+      await vi.advanceTimersByTimeAsync(300);
+      expect(await pending).toEqual({ ok: true });
+      expect(tmuxCommands()).toEqual([
+        `'tmux' '-L' 'overdeck' ${CONFIG} 'load-buffer' '-b' '${AGENT}' '/workspace/.pan/prompts/${AGENT}-message.txt'`,
+        `'tmux' '-L' 'overdeck' ${CONFIG} 'paste-buffer' '-b' '${AGENT}' '-t' 'conv-20261102-1234' '-d'`,
+        `'tmux' '-L' 'overdeck' ${CONFIG} 'send-keys' '-t' 'conv-20261102-1234' 'C-m'`,
+      ]);
+    });
+
+    it('kills the conversation session and records stopped on the agent id', async () => {
+      await killRemoteAgent(AGENT, VM);
+      expect(tmuxCommands()).toEqual([
+        `'tmux' '-L' 'overdeck' ${CONFIG} 'kill-session' '-t' 'conv-20261102-1234' 2>/dev/null || true`,
+      ]);
+      expect(loadRemoteAgentState(AGENT)?.status).toBe('stopped');
+    });
+  });
+
+  describe('legacy remote agent', () => {
+    const AGENT = 'agent-pan-4734-legacy';
+
+    beforeEach(() => {
+      seedState(AGENT);
+    });
+
+    it('produces the unchanged output, send and kill commands', async () => {
+      vi.useFakeTimers();
+      const socket = getManagedTmuxSocketName();
+      await getRemoteAgentOutput(AGENT, VM);
+      const pending = sendToRemoteAgent(AGENT, VM, 'hello');
+      await vi.advanceTimersByTimeAsync(300);
+      await pending;
+      await killRemoteAgent(AGENT, VM);
+      expect(tmuxCommands()).toEqual([
+        `'tmux' '-L' '${socket}' ${CONFIG} 'capture-pane' '-t' '${AGENT}' '-p' '-S' '-100'`,
+        `'tmux' '-L' '${socket}' ${CONFIG} 'load-buffer' '-b' '${AGENT}' '/workspace/.pan/prompts/${AGENT}-message.txt'`,
+        `'tmux' '-L' '${socket}' ${CONFIG} 'paste-buffer' '-b' '${AGENT}' '-t' '${AGENT}' '-d'`,
+        `'tmux' '-L' '${socket}' ${CONFIG} 'send-keys' '-t' '${AGENT}' 'C-m'`,
+        `'tmux' '-L' '${socket}' ${CONFIG} 'kill-session' '-t' '${AGENT}' 2>/dev/null || true`,
+      ]);
+      expect(loadRemoteAgentState(AGENT)?.status).toBe('stopped');
+    });
   });
 });

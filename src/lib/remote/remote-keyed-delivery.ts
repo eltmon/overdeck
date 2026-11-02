@@ -31,20 +31,29 @@ import {
   runSsh,
   shellQuote,
 } from './remote-tmux.js';
+import type { RemoteTmuxTarget } from './remote-tmux.js';
 
 export type RemoteKeyedDeliveryOutcome = 'delivered' | 'deduplicated';
 
 /** Injectable command runner for tests — resolves with the command's stdout. */
 export type RemoteKeyedExec = (command: string) => Promise<string>;
 
-export async function sendToRemoteAgentKeyed(
+/**
+ * Keyed delivery into `target` (PAN-4734: a linked work agent's `conv-<name>`
+ * session on the VM's `overdeck` socket; legacy: the agent id on home's
+ * socket). `agentId` names the prompt file and every error.
+ */
+export async function deliverRemoteKeyed(
   agentId: string,
+  target: RemoteTmuxTarget,
   vmName: string,
   message: string,
   dedupKey: string,
   exec?: RemoteKeyedExec,
 ): Promise<RemoteKeyedDeliveryOutcome> {
   assertValidDedupKey(dedupKey);
+  const { session, socket } = target;
+  const tmuxCommand = (args: string[]): string => buildRemoteTmuxCommand(args, socket);
 
   let run: RemoteKeyedExec;
   if (exec) {
@@ -78,15 +87,15 @@ export async function sendToRemoteAgentKeyed(
   // Inner marker reads must target the managed remote server explicitly —
   // the if-shell condition cannot rely on a TMUX env the remote server may
   // not have inherited.
-  const innerTmux = ['tmux', ...getRemoteTmuxBaseArgs()].map(shellQuote).join(' ');
+  const innerTmux = ['tmux', ...getRemoteTmuxBaseArgs(socket)].map(shellQuote).join(' ');
 
   const cleanup = async (): Promise<void> => {
-    await run(buildRemoteTmuxCommand(['delete-buffer', '-b', bufferName])).catch(() => '');
+    await run(tmuxCommand(['delete-buffer', '-b', bufferName])).catch(() => '');
     await run(`rm -f ${shellQuote(promptFile)}`).catch(() => '');
   };
 
   const readMarker = async (option: string): Promise<string> =>
-    run(buildRemoteTmuxCommand(['show-option', '-qv', '-t', agentId, option]))
+    run(tmuxCommand(['show-option', '-qv', '-t', session, option]))
       .then(stdout => stdout.trim(), () => '');
 
   // Fail-CLOSED marker read (cycle 12/13): `-q` makes an unset user option a
@@ -95,7 +104,7 @@ export async function sendToRemoteAgentKeyed(
   // this way — interpreting a failed read as "absent" could honor a false
   // terminal marker or bypass a rollback-required state.
   const readMarkerStrict = async (option: string): Promise<string> =>
-    run(buildRemoteTmuxCommand(['show-option', '-qv', '-t', agentId, option]))
+    run(tmuxCommand(['show-option', '-qv', '-t', session, option]))
       .then(stdout => stdout.trim());
 
   // Clear the poison breadcrumb and VERIFY it is gone with a strict read.
@@ -105,7 +114,7 @@ export async function sendToRemoteAgentKeyed(
   // so the wake outbox must stay pending, never terminal 'failed'.
   const clearPoisonVerified = async (context: string): Promise<void> => {
     try {
-      await run(buildRemoteTmuxCommand(['set-option', '-u', '-t', agentId, poisonOption]));
+      await run(tmuxCommand(['set-option', '-u', '-t', session, poisonOption]));
     } catch (error) {
       throw new KeyedMarkerVerificationError(agentId, `poison clear command failed (${context})`, { cause: error });
     }
@@ -121,7 +130,7 @@ export async function sendToRemoteAgentKeyed(
   };
 
   const readPaneTarget = async (): Promise<{ pid: string; dead: boolean }> =>
-    run(buildRemoteTmuxCommand(['display-message', '-p', '-t', agentId, '#{pane_pid} #{pane_dead}']))
+    run(tmuxCommand(['display-message', '-p', '-t', session, '#{pane_pid} #{pane_dead}']))
       .then(stdout => {
         const [pid = '', dead = ''] = stdout.trim().split(/\s+/);
         return { pid, dead: dead === '1' };
@@ -151,10 +160,10 @@ export async function sendToRemoteAgentKeyed(
       // always roll back to pending and let normal recovery re-drive. STRICT
       // verification reads (cycle 13): a failed read aborts with the
       // breadcrumb authoritative, never converted to empty state.
-      await run(buildRemoteTmuxCommand([
-        'set-option', '-u', '-t', agentId, terminalOption,
+      await run(tmuxCommand([
+        'set-option', '-u', '-t', session, terminalOption,
         ';',
-        'set-option', '-t', agentId, pendingOption, sendId,
+        'set-option', '-t', session, pendingOption, sendId,
       ]));
       let repairedTerminal: string;
       let repairedPending: string;
@@ -179,7 +188,7 @@ export async function sendToRemoteAgentKeyed(
     await run(
       `mkdir -p ${shellQuote(`${REMOTE_PAN_DIR}/prompts`)} && echo ${shellQuote(messageBase64)} | base64 -d > ${shellQuote(promptFile)}`,
     );
-    await run(buildRemoteTmuxCommand(['load-buffer', '-b', bufferName, promptFile]));
+    await run(tmuxCommand(['load-buffer', '-b', bufferName, promptFile]));
 
     let pendingMarker: string;
     if (repaired) {
@@ -189,13 +198,13 @@ export async function sendToRemoteAgentKeyed(
       // record OUR sendId in the pending option AND the receiving pane's pid
       // in the target option in the same breath (cycle 13).
       const condition =
-        `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})" && ` +
-        `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})"`;
+        `test -z "$(${innerTmux} show-option -qv -t ${session} ${pendingOption})" && ` +
+        `test -z "$(${innerTmux} show-option -qv -t ${session} ${terminalOption})"`;
       const onTrue =
-        `paste-buffer -b ${bufferName} -p -t ${agentId} \; ` +
-        `set-option -t ${agentId} ${pendingOption} ${sendId} \; ` +
-        `set-option -F -t ${agentId} ${targetOption} '#{pane_pid}'`;
-      await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, condition, onTrue]));
+        `paste-buffer -b ${bufferName} -p -t ${session} \; ` +
+        `set-option -t ${session} ${pendingOption} ${sendId} \; ` +
+        `set-option -F -t ${session} ${targetOption} '#{pane_pid}'`;
+      await run(tmuxCommand(['if-shell', '-t', session, condition, onTrue]));
 
       const terminalMarker = await readMarker(terminalOption);
       pendingMarker = await readMarker(pendingOption);
@@ -216,14 +225,14 @@ export async function sendToRemoteAgentKeyed(
       // stands, no terminal exists, and the recorded target does NOT match
       // the current pane — and record the NEW target in the same breath.
       const repasteCondition =
-        `test -n "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})" && ` +
-        `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})" && ` +
-        `! test "$(${innerTmux} display-message -p -t ${agentId} '#{pane_pid}')" = "$(${innerTmux} show-option -qv -t ${agentId} ${targetOption})"`;
+        `test -n "$(${innerTmux} show-option -qv -t ${session} ${pendingOption})" && ` +
+        `test -z "$(${innerTmux} show-option -qv -t ${session} ${terminalOption})" && ` +
+        `! test "$(${innerTmux} display-message -p -t ${session} '#{pane_pid}')" = "$(${innerTmux} show-option -qv -t ${session} ${targetOption})"`;
       const repasteOnTrue =
-        `paste-buffer -b ${bufferName} -p -t ${agentId} \; ` +
-        `set-option -t ${agentId} ${pendingOption} ${sendId} \; ` +
-        `set-option -F -t ${agentId} ${targetOption} '#{pane_pid}'`;
-      await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, repasteCondition, repasteOnTrue]));
+        `paste-buffer -b ${bufferName} -p -t ${session} \; ` +
+        `set-option -t ${session} ${pendingOption} ${sendId} \; ` +
+        `set-option -F -t ${session} ${targetOption} '#{pane_pid}'`;
+      await run(tmuxCommand(['if-shell', '-t', session, repasteCondition, repasteOnTrue]));
       const [repastedPending, repastedTerminal] = await Promise.all([
         readMarker(pendingOption),
         readMarker(terminalOption),
@@ -251,16 +260,16 @@ export async function sendToRemoteAgentKeyed(
     // poison+terminal together — recovery can never find an
     // honorable-but-unverified terminal.
     const submitCondition =
-      `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})" && ` +
-      `test -n "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})" && ` +
-      `test "$(${innerTmux} display-message -p -t ${agentId} '#{pane_dead}')" = "0" && ` +
-      `test "$(${innerTmux} display-message -p -t ${agentId} '#{pane_pid}')" = "$(${innerTmux} show-option -qv -t ${agentId} ${targetOption})"`;
+      `test -z "$(${innerTmux} show-option -qv -t ${session} ${terminalOption})" && ` +
+      `test -n "$(${innerTmux} show-option -qv -t ${session} ${pendingOption})" && ` +
+      `test "$(${innerTmux} display-message -p -t ${session} '#{pane_dead}')" = "0" && ` +
+      `test "$(${innerTmux} display-message -p -t ${session} '#{pane_pid}')" = "$(${innerTmux} show-option -qv -t ${session} ${targetOption})"`;
     const submitOnTrue =
-      `send-keys -t ${agentId} C-m \; ` +
-      `set-option -t ${agentId} ${poisonOption} 1 \; ` +
-      `set-option -t ${agentId} ${terminalOption} 1 \; ` +
-      `set-option -u -t ${agentId} ${pendingOption}`;
-    await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, submitCondition, submitOnTrue]));
+      `send-keys -t ${session} C-m \; ` +
+      `set-option -t ${session} ${poisonOption} 1 \; ` +
+      `set-option -t ${session} ${terminalOption} 1 \; ` +
+      `set-option -u -t ${session} ${pendingOption}`;
+    await run(tmuxCommand(['if-shell', '-t', session, submitCondition, submitOnTrue]));
 
     const [terminalAfter, pendingAfter, postTarget, recordedTargetAfter] = await Promise.all([
       readMarker(terminalOption),
@@ -295,9 +304,9 @@ export async function sendToRemoteAgentKeyed(
       // provisional, so a failed rollback can never leave it honorable.
       if (terminalAfter !== '') {
         const rollbackArgs = pendingBefore === ''
-          ? ['set-option', '-u', '-t', agentId, terminalOption, ';', 'set-option', '-u', '-t', agentId, pendingOption]
-          : ['set-option', '-u', '-t', agentId, terminalOption, ';', 'set-option', '-t', agentId, pendingOption, pendingBefore];
-        await run(buildRemoteTmuxCommand(rollbackArgs)).catch(() => '');
+          ? ['set-option', '-u', '-t', session, terminalOption, ';', 'set-option', '-u', '-t', session, pendingOption]
+          : ['set-option', '-u', '-t', session, terminalOption, ';', 'set-option', '-t', session, pendingOption, pendingBefore];
+        await run(tmuxCommand(rollbackArgs)).catch(() => '');
         let rolledTerminal: string;
         let restoredPending: string;
         try {
