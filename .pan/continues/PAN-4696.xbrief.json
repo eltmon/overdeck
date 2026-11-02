@@ -2,9 +2,15 @@
   "version": "1",
   "issueId": "PAN-4696",
   "created": "2026-11-02T16:17:12.298Z",
-  "updated": "2026-11-02T16:51:52.463Z",
+  "updated": "2026-11-02T16:52:30.668Z",
   "gitState": {},
-  "decisions": [],
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: NFR-1 forbids src/ changes in this branch (operational verification + docs only, PRD .pan/drafts/PAN-4696.md); no code changed to test. Existing coverage for the reap/heartbeat loops themselves is in src/lib/cloister/__tests__/deacon-lite-boot-deferred-handoff.test.ts and src/lib/remote/__tests__/remote-completion.test.ts @82fd85f895e.",
+      "recordedAt": "2026-11-02T16:52:30.668Z"
+    }
+  ],
   "hazards": [],
   "resumePoint": null,
   "sessionHistory": [],
