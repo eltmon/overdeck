@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4825",
   "created": "2026-11-02T16:35:14.732Z",
-  "updated": "2026-11-02T17:31:40.996Z",
+  "updated": "2026-11-02T17:31:57.499Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "cerebras-gpt-oss.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T17:31:40.996Z"
+    },
+    "cerebras-gpt-oss.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:57.499Z"
     }
   }
 }
