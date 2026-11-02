@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4740",
   "created": "2026-11-02T12:44:07.052Z",
-  "updated": "2026-11-02T12:44:07.052Z",
+  "updated": "2026-11-02T13:22:24.228Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "pool-idle-expiry": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4740",
-      "claimedAt": "2026-11-02T12:44:07.052Z"
+      "claimedAt": "2026-11-02T12:44:07.052Z",
+      "doneAt": "2026-11-02T13:22:24.228Z"
     }
   }
 }
