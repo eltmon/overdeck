@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4762",
   "created": "2026-11-02T01:21:42.220Z",
-  "updated": "2026-11-02T01:44:00.482Z",
+  "updated": "2026-11-02T01:45:55.977Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
       "claimedBy": "agent-pan-4762",
       "claimedAt": "2026-11-02T01:43:15.127Z",
       "doneAt": "2026-11-02T01:44:00.481Z"
+    },
+    "browsers-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:45:55.977Z"
     }
   }
 }
