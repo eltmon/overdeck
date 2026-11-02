@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4826",
   "created": "2026-11-02T16:31:08.878Z",
-  "updated": "2026-11-02T17:33:19.651Z",
+  "updated": "2026-11-02T17:33:37.328Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "picker-rows-friendly-names.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T17:33:19.651Z"
+    },
+    "picker-rows-friendly-names.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:33:37.328Z"
     }
   }
 }
