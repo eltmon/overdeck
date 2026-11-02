@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T14:34:14.740Z",
+  "updated": "2026-11-02T14:34:23.489Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4734",
       "claimedAt": "2026-11-02T14:32:33.776Z",
       "doneAt": "2026-11-02T14:34:14.740Z"
+    },
+    "wi5-remote-prompt-workspace-path": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:34:23.489Z"
     }
   }
 }
