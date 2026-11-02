@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4658",
   "created": "2026-11-02T04:25:38.183Z",
-  "updated": "2026-11-02T05:20:45.858Z",
+  "updated": "2026-11-02T05:21:04.516Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "file-citation-highlight.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T05:20:45.858Z"
+    },
+    "chips-file-label.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:21:04.516Z"
     }
   }
 }
