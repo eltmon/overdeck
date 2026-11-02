@@ -29,4 +29,20 @@ describe('REMOTE work prompt workspace path', () => {
     expect(text).toContain('`/workspace/.overdeck/continue.json`');
     expect(text).toContain('touch /workspace/.pan/REMOTE_DONE');
   });
+
+  it('tells a remote agent to signal REMOTE_DONE and never to run pan done (PAN-4734 live check)', async () => {
+    const text = await remotePrompt('/workspace/overdeck/workspaces/feature-pan-1');
+
+    expect(text).toContain('Never run `pan done`, `pan review request` or `/rebase-and-submit`.');
+    expect(text).toContain('NEVER stop working without creating `/workspace/.pan/REMOTE_DONE`');
+    expect(text).not.toContain('you MUST call `pan done PAN-1 -c "summary"` as your final action');
+    expect(text).not.toContain('pan done PAN-1 -c "Work already complete from previous session"');
+  });
+
+  it('keeps the pan done mandate for a local agent', async () => {
+    const text = await buildWorkAgentPrompt({ issueId: 'PAN-1', env: 'LOCAL', workspacePath: '/tmp/ws', skipDynamicContext: true });
+
+    expect(text).toContain('you MUST call `pan done PAN-1 -c "summary"` as your final action');
+    expect(text).not.toContain('NEVER stop working without creating `/workspace/.pan/REMOTE_DONE`');
+  });
 });
