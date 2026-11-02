@@ -67,7 +67,9 @@ async function cloneDetached(
 /**
  * Delete a VM whose creation failed, then return the error to throw
  * (PAN-4777). Before metadata is saved nothing points at the VM, so a VM
- * left running here bills with no record of it.
+ * left running here bills with no record of it. On the durable tier the
+ * message also names the `<vmName>-workspace` volume, because a failed
+ * delete never reached `deleteVm`'s volume step.
  */
 async function rollBackVm(
   fly: FlyProvider,
@@ -82,9 +84,13 @@ async function rollBackVm(
     const reason = error instanceof Error ? error.message : String(error);
     const deleteReason = deleteError instanceof Error ? deleteError.message : String(deleteError);
     const appName = fly.getAppName();
+    const volumeStep = fly.getResiliencyTier() === 'durable'
+      ? `. Then destroy its volume: fly volumes list -a ${appName}, find ${vmName}-workspace, ` +
+        `and run fly volumes destroy <volume-id> -a ${appName} --yes`
+      : '';
     return new Error(
       `${reason}. The VM ${vmName} (machine ${machineId}, app ${appName}) could not be deleted: ${deleteReason}. ` +
-        `Destroy it by hand: fly machines destroy ${machineId} -a ${appName} --force`,
+        `Destroy it by hand: fly machines destroy ${machineId} -a ${appName} --force${volumeStep}`,
       { cause: error },
     );
   }
