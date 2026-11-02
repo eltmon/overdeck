@@ -4,17 +4,17 @@
     "created": "2026-11-02T03:20:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4661: Phone PWA: read-only pipeline board tab at /m/pipeline",
-    "updated": "2026-11-02T03:24:18.240Z"
+    "updated": "2026-11-02T03:25:19.140Z"
   },
   "plan": {
     "id": "pan-4661",
     "title": "Phone PWA: read-only pipeline board tab at /m/pipeline",
-    "status": "proposed",
+    "status": "running",
     "uid": "49bd21c2-0e0d-40aa-8565-ca55b71c3362",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T03:20:12Z",
-    "updated": "2026-11-02T03:24:18.240Z",
+    "updated": "2026-11-02T03:25:19.140Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4661",
@@ -533,5 +533,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
