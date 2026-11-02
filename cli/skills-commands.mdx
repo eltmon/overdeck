@@ -1,0 +1,292 @@
+---
+title: Skills Commands
+description: List skills, set on/off overrides, and manage skill packs
+---
+
+# Skills Commands
+
+`pan skills` lists skills and sets per-level on/off overrides for native
+skills and skill packs. See [Skills](/features/skills) for the on/off
+levels and [Skill Packs](/features/skill-packs) for what a pack is, the
+pack catalog, and the trust model.
+
+## pan skills list
+
+```bash
+pan skills list [--project <key>] [--issue <id>] [--json]
+```
+
+Lists skills with their effective on/off state and the level that decided
+it, then skill packs and their skills. This is the default command: `pan
+skills` alone runs it.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Resolve for a project |
+| `--issue <id>` | Resolve for an issue |
+| `--json` | Output as JSON |
+
+```bash
+pan skills list --project myapp
+```
+
+Exits 1 if the override files cannot be read.
+
+## pan skills set
+
+```bash
+pan skills set <skill> <state>
+pan skills set --pack <id> <state>
+```
+
+Sets a native skill, a pack skill (`<pack>/<skill>`), or a whole pack to
+`on`, `off`, or `inherit`, at the global, project, or issue level.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Project override |
+| `--issue <id>` | Issue override |
+| `--pack <id>` | Set a whole skill pack instead of one skill |
+
+```bash
+pan skills set mattpocock/grilling on --project myapp
+```
+
+Takes exactly one positional (the state) with `--pack`, two (the skill and
+the state) without it. Exits 1 on the wrong positional count, a state that
+is not `on`, `off`, or `inherit`, passing `--project` and `--issue`
+together, or an unreadable override file.
+
+## pan skills pack add
+
+```bash
+pan skills pack add <id> [url] [--ref <ref>] [--adapter <adapter>] [--browser] [--yes]
+```
+
+Registers a git skill pack at the commit a ref resolves to and trusts it;
+enables nothing. Known packs (`mattpocock`, `pstack`, `gstack`, `deft`,
+`sageox`) default the url and, for `pstack`, the ref.
+
+| Flag | Effect |
+| --- | --- |
+| `--ref <ref>` | Tag, branch or commit to pin (default: the known pack ref) |
+| `--adapter <adapter>` | `plain`, `claude-plugin`, `deft-readonly`, or `gstack-runtime` |
+| `--browser` | Also build the browser runtime (gstack; asks separately) |
+| `--yes` | Trust the resolved commit without asking |
+
+```bash
+pan skills pack add mattpocock --ref v1.2.3
+```
+
+Exits 1 on an unknown `--adapter` value, a pack with no default url or ref
+when none is given, a pack source error, or when the commit was not
+trusted (declined, or not written without a terminal and `--yes`).
+
+## pan skills pack update
+
+```bash
+pan skills pack update <id> [--ref <ref>] [--yes]
+```
+
+Moves a pack to the commit its ref (or `--ref`) now resolves to, after
+showing the preview again.
+
+| Flag | Effect |
+| --- | --- |
+| `--ref <ref>` | Switch to a different tag or branch |
+| `--yes` | Trust the new commit without asking |
+
+```bash
+pan skills pack update mattpocock --ref v1.3.0
+```
+
+Exits 1 on a pack source error, or when the new commit was not trusted.
+
+## pan skills pack list
+
+```bash
+pan skills pack list [--json] [--offline]
+```
+
+Lists registered skill packs with their source, cache state, license,
+skill count, and what is not applied.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Output as JSON |
+| `--offline` | Skip the update check (no network) |
+
+```bash
+pan skills pack list
+```
+
+## pan skills pack remove
+
+```bash
+pan skills pack remove <id>
+```
+
+Unregisters a pack, clears its global toggles, and deletes its cache,
+every mount that contains it, and dangling launch and Codex plugin
+caches.
+
+```bash
+pan skills pack remove gstack
+```
+
+Exits 1 if the pack is not registered, or if removing a mount or cache
+failed (rerun to retry).
+
+## pan skills pack sync
+
+```bash
+pan skills pack sync [id]
+```
+
+Re-fetches a pack and extracts its trusted commit, or every registered
+pack when `id` is omitted.
+
+```bash
+pan skills pack sync gstack
+```
+
+Exits 1 if any pack fails to sync.
+
+## pan skills pack gc
+
+```bash
+pan skills pack gc [--max-age-days <n>]
+```
+
+Removes unused skill pack mounts, dangling launch links, stale renders,
+and orphaned pack state for packs that are no longer registered.
+
+| Flag | Effect |
+| --- | --- |
+| `--max-age-days <n>` | Keep unused mounts younger than this (default: `7`) |
+
+```bash
+pan skills pack gc --max-age-days 14
+```
+
+Exits 1 if `--max-age-days` is not a number of days of 0 or more, or if
+the global config cannot be read or parsed (gc then removes nothing).
+
+## pan skills pack browser
+
+```bash
+pan skills pack browser <id> [state] [--yes]
+```
+
+Turns a runtime pack's browser runtime on or off (gstack only). `state`
+defaults to `on`.
+
+| Flag | Effect |
+| --- | --- |
+| `--yes` | Trust without asking |
+
+```bash
+pan skills pack browser gstack on
+```
+
+Exits 1 if `state` is not `on` or `off`, on a pack source error, or when
+the browser runtime was not trusted.
+
+## pan skills pack sageox status
+
+```bash
+pan skills pack sageox status [--project <key>] [--json]
+```
+
+Shows, per project, whether the `sageox` pack is on and whether uploads
+are enabled.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Only this project |
+| `--json` | Output as JSON |
+
+```bash
+pan skills pack sageox status --project myapp
+```
+
+Exits 1 if `--project` names a project with no recorded sageox state.
+
+## pan skills pack sageox upload
+
+```bash
+pan skills pack sageox upload <state> --project <key>
+```
+
+Turns SageOx uploads on or off for a project. Uploads are off by default.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Project key (required) |
+
+```bash
+pan skills pack sageox upload on --project myapp
+```
+
+Exits 1 if `state` is not `on` or `off`, or on a SageOx config error.
+
+## pan skills deft status
+
+```bash
+pan skills deft status [--project <key>] [--json]
+```
+
+Shows Directive detection, the `deft` pack, the skill map, managed mode,
+and the ownership report for a project (the current repository when
+`--project` is omitted).
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Registered project (default: the current repo) |
+| `--json` | Output as JSON |
+
+```bash
+pan skills deft status --project myapp
+```
+
+Exits 1 if `--project` names a project Overdeck does not know.
+
+## pan skills deft enable
+
+```bash
+pan skills deft enable --project <key> [--yes]
+```
+
+Prints the ownership plan for a Directive project and, once accepted,
+stores the decision to enable managed mode.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Registered project (required) |
+| `--yes` | Accept the printed plan without asking |
+
+```bash
+pan skills deft enable --project myapp --yes
+```
+
+Exits 1 if `--project` names an unknown project, the project is not a
+Directive project, or the plan was not accepted.
+
+## pan skills deft disable
+
+```bash
+pan skills deft disable --project <key>
+```
+
+Removes the managed-mode decision for a project. Project files are
+untouched.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Registered project (required) |
+
+```bash
+pan skills deft disable --project myapp
+```
+
+Exits 1 if `--project` names a project Overdeck does not know.
