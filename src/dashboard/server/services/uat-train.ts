@@ -11,6 +11,7 @@
  * no flywheel run and no review-status record at all. Assemblies run minutes;
  * the reconciler is single-flight per project, so ticks never pile up.
  */
+import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Effect } from 'effect';
@@ -67,6 +68,8 @@ import {
 import { getDashboardIdentity } from '../identity.js';
 import { issueHoldsForUat } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { isFlywheelRequireUatBeforeMerge } from '../../../lib/overdeck/control-settings.js';
+import { memberSpecRoots } from './uat-member-spec-roots.js';
+import { getWorkspaceInfoForIssue } from '../routes/workspaces.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
 const CHAIN_PAYLOAD_LIMIT = 10;
@@ -89,6 +92,7 @@ interface AcceptanceCriteriaCacheEntry {
   path: string;
   mtimeMs: number;
   criteria: AcceptanceCriteriaSummary;
+  rootsKey: string;
 }
 
 const acceptanceCriteriaByIssue = new Map<string, AcceptanceCriteriaCacheEntry>();
@@ -607,24 +611,26 @@ async function mapBounded<T>(items: readonly T[], concurrency: number, worker: (
 }
 
 /**
- * PAN-1696: `root` is the project the issues belong to, NOT the dashboard's own
- * repo. Once the generations payload started serving every tracked project, a
- * dashboard-rooted xBRIEF lookup silently returned no acceptance criteria for
- * every non-PAN generation, so those batches showed an empty "What to UAT" list.
- * Issue ids are prefix-distinct across projects, so the module-level mtime cache
- * stays safe to key by issue id alone.
+ * PAN-4799: a batch member's xBRIEF spec is committed on its feature branch
+ * and reaches main only when its PR merges, so a batch's own worktree (every
+ * member merged in) and each member's feature workspace both hold specs the
+ * project root never will. `rootsByIssue` carries each issue's ordered
+ * candidate roots (`memberSpecRoots`: batch worktree, then feature workspace,
+ * then project root) and the first root with a resolvable spec wins.
+ * Issue ids are prefix-distinct across projects, so the module-level mtime
+ * cache stays safe to key by issue id alone.
  */
 async function loadAcceptanceCriteriaCache(
-  issueIds: ReadonlySet<string>,
-  root: string,
+  rootsByIssue: ReadonlyMap<string, readonly string[]>,
 ): Promise<Map<string, AcceptanceCriteriaLookup>> {
   const cache = new Map<string, AcceptanceCriteriaLookup>();
-  if (issueIds.size === 0) return cache;
+  if (rootsByIssue.size === 0) return cache;
 
-  await mapBounded([...issueIds], ACCEPTANCE_CRITERIA_READ_CONCURRENCY, async (issueId) => {
+  await mapBounded([...rootsByIssue.entries()], ACCEPTANCE_CRITERIA_READ_CONCURRENCY, async ([issueId, roots]) => {
     const upperIssueId = issueId.toUpperCase();
+    const rootsKey = roots.join('\0');
     const existing = acceptanceCriteriaByIssue.get(upperIssueId);
-    if (existing) {
+    if (existing && existing.rootsKey === rootsKey) {
       try {
         const { mtimeMs } = await stat(existing.path);
         if (existing.mtimeMs === mtimeMs) {
@@ -637,18 +643,19 @@ async function loadAcceptanceCriteriaCache(
     }
 
     try {
-      const found = await Effect.runPromise(findXBriefByIssue(root, upperIssueId));
-      if (!found) {
-        acceptanceCriteriaByIssue.delete(upperIssueId);
-        console.warn(`[uat-train] no xBRIEF spec resolved for ${upperIssueId} under ${root} — UAT checklist unavailable`);
-        cache.set(upperIssueId, { planResolved: false, criteria: [] });
+      for (const root of roots) {
+        const found = await Effect.runPromise(findXBriefByIssue(root, upperIssueId));
+        if (!found) continue;
+        const { mtimeMs } = await stat(found.path);
+        const document = await Effect.runPromise(readXBriefDocument(found.path));
+        const criteria = extractACFromDocument(document).map((ac) => ({ title: ac.title, status: ac.status }));
+        acceptanceCriteriaByIssue.set(upperIssueId, { path: found.path, mtimeMs, criteria, rootsKey });
+        cache.set(upperIssueId, { planResolved: true, criteria });
         return;
       }
-      const { mtimeMs } = await stat(found.path);
-      const document = await Effect.runPromise(readXBriefDocument(found.path));
-      const criteria = extractACFromDocument(document).map((ac) => ({ title: ac.title, status: ac.status }));
-      acceptanceCriteriaByIssue.set(upperIssueId, { path: found.path, mtimeMs, criteria });
-      cache.set(upperIssueId, { planResolved: true, criteria });
+      acceptanceCriteriaByIssue.delete(upperIssueId);
+      console.warn(`[uat-train] no xBRIEF spec resolved for ${upperIssueId} under ${roots.join(', ')} — UAT checklist unavailable`);
+      cache.set(upperIssueId, { planResolved: false, criteria: [] });
     } catch (err) {
       console.warn(
         `[uat-train] failed to read xBRIEF spec for ${upperIssueId}:`,
@@ -671,8 +678,17 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
   const chain = listUatGenerations({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
-  // Resolve each member's xBRIEF in ITS OWN project, not the dashboard's repo.
-  const acCache = await loadAcceptanceCriteriaCache(memberIssueIds, root);
+  // Resolve each member's xBRIEF in ITS OWN project, not the dashboard's repo,
+  // and in the batch worktree / feature workspace before the project root —
+  // PAN-4799: an unmerged member's spec is never on the project root.
+  const featureWorkspacePath = (issueId: string): string | null => {
+    const info = getWorkspaceInfoForIssue(issueId);
+    return info.exists && !info.isRemote && info.localPath ? info.localPath : null;
+  };
+  const rootsByIssue = new Map([...memberIssueIds].map((id) => [
+    id, memberSpecRoots(id, chain, root, { exists: existsSync, featureWorkspacePath }),
+  ]));
+  const acCache = await loadAcceptanceCriteriaCache(rootsByIssue);
   const payload: UatGenerationPayload[] = [];
   for (const gen of chain) {
     const probe = await probeUatStack(gen);

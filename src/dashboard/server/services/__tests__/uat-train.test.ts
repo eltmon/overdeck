@@ -29,6 +29,8 @@ const mocks = vi.hoisted(() => ({
   getUatGeneration: vi.fn(),
   findXBriefByIssue: vi.fn(),
   readXBriefDocument: vi.fn(),
+  invalidateXBriefIndex: vi.fn(),
+  getWorkspaceInfoForIssue: vi.fn(),
   reviewRecordEligibility: vi.fn(),
   isMergeTrainEnabledForProject: vi.fn(),
   listReadyIssuesForProject: vi.fn(),
@@ -152,7 +154,16 @@ vi.mock('../../../../lib/cloister/uat-generation-deps.js', async (importOriginal
 vi.mock('../../../../lib/xbrief/xbrief-index.js', () => ({
   findXBriefByIssue: mocks.findXBriefByIssue,
   readXBriefDocument: mocks.readXBriefDocument,
+  invalidateXBriefIndex: mocks.invalidateXBriefIndex,
 }));
+
+vi.mock('../../routes/workspaces.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../routes/workspaces.js')>();
+  return {
+    ...original,
+    getWorkspaceInfoForIssue: mocks.getWorkspaceInfoForIssue,
+  };
+});
 
 function gen(members: UatGeneration['members']): UatGeneration {
   return {
@@ -201,6 +212,7 @@ describe('getUatGenerationsPayload', () => {
     mocks.findProjectByPath.mockReturnValue(null);
     mocks.getDashboardIdentity.mockReturnValue({ repoRoot: process.cwd(), mode: 'primary' });
     mocks.probeUatStack.mockResolvedValue({ status: 'absent', frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost' });
+    mocks.getWorkspaceInfoForIssue.mockReturnValue({ exists: false, isRemote: false });
   });
 
   afterEach(async () => {
@@ -374,6 +386,70 @@ describe('getUatGenerationsPayload', () => {
     expect(maxActiveReads).toBeLessThanOrEqual(4);
     expect(mocks.findXBriefByIssue).toHaveBeenCalledTimes(8);
     expect(mocks.readXBriefDocument).toHaveBeenCalledTimes(8);
+  });
+
+  // PAN-4799: a batch member's spec is committed on its feature branch and
+  // reaches the project root only once its PR merges, so the batch worktree
+  // (every member merged in) is tried before the project root.
+  it("reads a member's spec from the batch worktree when it exists", async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'pan-uat-train-'));
+    const specPath = join(tmp, 'PAN-9000.xbrief.json');
+    await writeFile(specPath, '{}');
+    const batchGen = { ...gen([{ issueId: 'PAN-9000', title: 'Batch', branch: 'feature/pan-9000', headSha: 'h1', mergeOrder: 1 }]), worktreePath: tmp };
+    mocks.listUatGenerations.mockReturnValue([batchGen]);
+    mocks.findXBriefByIssue.mockImplementation((root: string) => Effect.succeed(root === tmp
+      ? { path: specPath, lifecycleDir: 'proposed', issueId: 'PAN-9000', slug: 'batch', date: '2026-11-02', filename: 'PAN-9000.xbrief.json' }
+      : null));
+    mocks.readXBriefDocument.mockReturnValue(Effect.succeed(doc('From the batch worktree') as never));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(mocks.findXBriefByIssue).toHaveBeenNthCalledWith(1, tmp, 'PAN-9000');
+    expect(payload[0]!.members[0]!.planResolved).toBe(true);
+    expect(payload[0]!.members[0]!.acceptanceCriteria).toEqual([{ title: 'From the batch worktree', status: 'pending' }]);
+  });
+
+  it('falls back to the member\'s feature workspace when no batch worktree exists', async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'pan-uat-train-'));
+    const specPath = join(tmp, 'PAN-9001.xbrief.json');
+    await writeFile(specPath, '{}');
+    mocks.listUatGenerations.mockReturnValue([
+      gen([{ issueId: 'PAN-9001', title: 'Workspace', branch: 'feature/pan-9001', headSha: 'h1', mergeOrder: 1 }]),
+    ]);
+    mocks.getWorkspaceInfoForIssue.mockReturnValue({ exists: true, isRemote: false, localPath: tmp });
+    mocks.findXBriefByIssue.mockImplementation((root: string) => Effect.succeed(root === tmp
+      ? { path: specPath, lifecycleDir: 'proposed', issueId: 'PAN-9001', slug: 'workspace', date: '2026-11-02', filename: 'PAN-9001.xbrief.json' }
+      : null));
+    mocks.readXBriefDocument.mockReturnValue(Effect.succeed(doc('From the feature workspace') as never));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(mocks.findXBriefByIssue).toHaveBeenCalledWith(tmp, 'PAN-9001');
+    expect(payload[0]!.members[0]!.planResolved).toBe(true);
+  });
+
+  it('falls back to the project root for an already-merged member', async () => {
+    mocks.listUatGenerations.mockReturnValue([
+      gen([{ issueId: 'PAN-9002', title: 'Merged', branch: 'feature/pan-9002', headSha: 'h1', mergeOrder: 1 }]),
+    ]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
+
+    await getUatGenerationsPayload('/repos/myn');
+
+    expect(mocks.findXBriefByIssue).toHaveBeenCalledTimes(1);
+    expect(mocks.findXBriefByIssue).toHaveBeenCalledWith('/repos/myn', 'PAN-9002');
+  });
+
+  it('keeps planResolved false when no root has the spec', async () => {
+    mocks.listUatGenerations.mockReturnValue([
+      gen([{ issueId: 'PAN-9003', title: 'Missing', branch: 'feature/pan-9003', headSha: 'h1', mergeOrder: 1 }]),
+    ]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(payload[0]!.members[0]!.planResolved).toBe(false);
+    expect(payload[0]!.members[0]!.acceptanceCriteria).toEqual([]);
   });
 });
 
