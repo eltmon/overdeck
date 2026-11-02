@@ -595,6 +595,23 @@ Recorded, not fixed here:
 - A test that pulls a conversation must not register the workspace being tested as the
   project's checkout: **Pull here** restores the conversation's code into that checkout.
 
+**Reproduction (PAN-4739).** Cause found and fixed in `src/lib/tmux.ts` (the decision
+rule's first branch). Run 1's image (`registry.fly.io/pan-workspaces:pan-4652`, pan
+0.72.0, tmux 3.4) ran in a local container with `pan serve` started as provisioning
+starts it (`HOME=/`, `setsid nohup`, `OVERDECK_TERMINAL_BACKEND=tmux IS_SANDBOX=1`).
+The server process had no `LANG` or `LC_*` variable, and without a UTF-8 locale tmux
+prints every tab in `-F` output as `_`: the census's `list-panes -a` returned
+`conv-20261102-2889_565_0_` where it should return tab-separated fields. The parser
+read no pane id from that line and dropped it, so the census held no session, and the
+patrol logged `Session conv-20261102-2889 gone — marking ended` 30 s after the spawn
+while `tmux ls` listed the session. `list-sessions -F '#{session_name}'` has no tab,
+so the list route still saw the session and set the row back to `active` on the next
+`GET /api/conversations`. The pane readers that parse tab-separated records
+(`listAllPaneRecords`, `listPaneValues`, `listPaneValuesSync`) now pass `-u`, which
+makes tmux write UTF-8 output whatever the locale. With that change patched into the
+same container, a row marked ended under a live harness was set back to `active` by
+the patrol's own census on the next tick, and no `gone` line appeared.
+
 
 ## Live verification (PAN-4296)
 
