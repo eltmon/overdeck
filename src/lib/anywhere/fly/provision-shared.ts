@@ -21,6 +21,7 @@ export type FlyMachineErrorCode =
   | 'pairing-failed'
   | 'unreachable'
   | 'project-failed'
+  | 'workspace-failed'
   | 'conversation-failed';
 
 /** HTTP status of each Fly machine error. */
@@ -37,6 +38,7 @@ export const FLY_MACHINE_ERROR_STATUS: Record<FlyMachineErrorCode, number> = {
   'pairing-failed': 502,
   'unreachable': 502,
   'project-failed': 502,
+  'workspace-failed': 502,
   'conversation-failed': 502,
 };
 

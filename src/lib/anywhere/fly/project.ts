@@ -8,6 +8,11 @@
  * GitHub projects qualify: the image has no `glab` and GitHub credentials are
  * the ones `syncAllCredentials` copied.
  *
+ * `ensureFlyWorkspace()` (PAN-4734 D-3) adds the issue's git worktree under
+ * that clone, `workspaces/feature-<issue>`, where `pan task` on the VM looks
+ * for the plan. It uses `git worktree add`, not `pan workspace create`: the
+ * latter refuses below a 10 GiB free-disk floor and installs dependencies.
+ *
  * Every value that reaches the remote shell is validated against a fixed
  * grammar first, so the command needs no quoting.
  */
@@ -25,6 +30,9 @@ const CLONE_POLL = { intervalMs: 5_000, limitMs: 20 * 60_000 };
 const GITHUB_REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const PROJECT_KEY_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const ISSUE_PREFIX_RE = /^[A-Za-z][A-Za-z0-9]*$/;
+const ISSUE_ID_RE = /^[A-Za-z][A-Za-z0-9]*-\d+$/;
+/** The git identity of a remote work agent (`remote-workspace.ts`). */
+const AGENT_GIT_IDENTITY = 'git config user.email "panopticon-agent[bot]@users.noreply.github.com" && git config user.name "panopticon-agent[bot]"';
 
 export interface FlyProjectDeps {
   api: Pick<FlyApiClient, 'execCommand'>;
@@ -89,4 +97,40 @@ export async function ensureFlyProject(
     // Not JSON: no projects are registered.
   }
   if (!keys.includes(projectKey)) fail(`Fly machine ${machine.machineId} does not list project ${projectKey} after the clone.`, { projectKey });
+}
+
+/**
+ * Create the issue's worktree, `/workspace/<projectKey>/workspaces/feature-<issue>`,
+ * on its pushed feature branch, and return its path. Fails with
+ * `workspace-failed` and the remote stderr.
+ */
+export async function ensureFlyWorkspace(
+  machine: { appName: string; machineId: string },
+  projectKey: string,
+  issueId: string,
+  overrides: Partial<FlyProjectDeps> = {},
+): Promise<string> {
+  const failWorkspace = (message: string): never => {
+    throw new FlyMachineError('workspace-failed', message, { projectKey, issueId });
+  };
+  if (!PROJECT_KEY_RE.test(projectKey)) failWorkspace(`Project key ${projectKey} cannot be used as a directory name on the Fly machine.`);
+  if (!ISSUE_ID_RE.test(issueId)) failWorkspace(`${issueId} is not an issue id.`);
+  const deps = await resolveDeps(overrides);
+  const exec = (command: string): Promise<FlyExecResult> =>
+    deps.api.execCommand(machine.appName, machine.machineId, ['/bin/sh', '-c', command], EXEC_TIMEOUT_SECONDS);
+
+  const issue = issueId.toLowerCase();
+  const branch = `feature/${issue}`;
+  const relative = `workspaces/feature-${issue}`;
+  const projectDir = `/workspace/${projectKey}`;
+  const worktree = `${projectDir}/${relative}`;
+  const created = await exec(
+    `cd ${projectDir} && ${AGENT_GIT_IDENTITY} && git fetch origin ${branch} && git worktree add -b ${branch} ${relative} origin/${branch}`,
+  );
+  if (created.exit_code !== 0) {
+    failWorkspace(`Could not create the ${branch} worktree on Fly machine ${machine.machineId} (exit ${created.exit_code}): ${created.stderr.trim()}`);
+  }
+  const current = (await exec(`git -C ${worktree} branch --show-current`)).stdout.trim();
+  if (current !== branch) failWorkspace(`The worktree on Fly machine ${machine.machineId} is on ${current || 'no branch'}, not ${branch}.`);
+  return worktree;
 }
