@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4740",
   "created": "2026-11-02T12:44:07.052Z",
-  "updated": "2026-11-02T13:39:29.247Z",
+  "updated": "2026-11-02T13:39:44.287Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
     "channel-timer-rearm.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T13:39:29.247Z"
+    },
+    "channel-timer-rearm.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:39:44.287Z"
     }
   }
 }
