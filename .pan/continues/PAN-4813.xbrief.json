@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4813",
   "created": "2026-11-02T13:36:08.209Z",
-  "updated": "2026-11-02T14:18:32.931Z",
+  "updated": "2026-11-02T14:18:49.521Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "catalog-registry.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T14:18:32.931Z"
+    },
+    "fallback-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:18:49.520Z"
     }
   }
 }
