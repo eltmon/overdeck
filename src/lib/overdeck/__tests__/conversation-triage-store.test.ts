@@ -110,6 +110,23 @@ describe('conversation triage store', () => {
     expect(getConversationTriage('conv-f')?.snoozedUntil).toBeNull();
   });
 
+  it('clearConversationTriage nulls settle and snooze together, and returns false for an unknown name', async () => {
+    const { createConversation } = await import('../conversations.js');
+    const { settleConversation, snoozeConversation, clearConversationTriage, getConversationTriage } = await import('../conversation-triage-store.js');
+    createConversation({ name: 'conv-settled', tmuxSession: 'conv-settled', cwd: testHome, harness: 'claude-code' });
+    createConversation({ name: 'conv-snoozed', tmuxSession: 'conv-snoozed', cwd: testHome, harness: 'claude-code' });
+    settleConversation('conv-settled');
+    snoozeConversation('conv-snoozed', Date.now() + 1_000);
+
+    expect(clearConversationTriage('conv-settled')).toBe(true);
+    expect(getConversationTriage('conv-settled')).toEqual({ settledAt: null, settleReason: null, snoozedUntil: null });
+
+    expect(clearConversationTriage('conv-snoozed')).toBe(true);
+    expect(getConversationTriage('conv-snoozed')).toEqual({ settledAt: null, settleReason: null, snoozedUntil: null });
+
+    expect(clearConversationTriage('does-not-exist')).toBe(false);
+  });
+
   it('listConversationTriage returns one entry per existing name from a single statement', async () => {
     const { createConversation } = await import('../conversations.js');
     const { settleConversation, snoozeConversation, listConversationTriage } = await import('../conversation-triage-store.js');

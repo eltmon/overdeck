@@ -94,6 +94,14 @@ export function unsnoozeConversation(name: string): boolean {
   return result.changes > 0;
 }
 
+/** PAN-4657: clears settle and snooze together, so a schedule delivering a prompt resurfaces the conversation. */
+export function clearConversationTriage(name: string): boolean {
+  const result = getOverdeckDatabase()
+    .prepare('UPDATE conversations SET settled_at = NULL, settle_reason = NULL, snoozed_until = NULL WHERE name = ?')
+    .run(name);
+  return result.changes > 0;
+}
+
 /** Parse and validate a request body per the PRD API contract. */
 export function parseTriageUpdates(body: unknown): { ok: true; updates: TriageUpdate[] } | { ok: false; error: string } {
   if (typeof body !== 'object' || body === null || !('updates' in body)) {
