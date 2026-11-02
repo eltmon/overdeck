@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T15:43:18.520612Z · model: claude-opus-5-5 · open: 859_
+_Last sequenced: 2026-11-02T15:44:28.892563Z · model: claude-opus-5-5 · open: 858_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -496,7 +496,6 @@ _Last sequenced: 2026-11-02T15:43:18.520612Z · model: claude-opus-5-5 · open: 
 | 493 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
 | 494 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
 | 495 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 496 | PAN-4741 | S | low | ok |  |  | Fly machine advertises unreachable private 172.19.x lan routes ranked before its public route; every reconnect probes dead routes first. |
 | 497 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
 | 498 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
 | 499 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
@@ -1194,10 +1193,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T15:43:18.520612Z",
+  "generatedAt": "2026-11-02T15:44:28.892563Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 859,
+  "openCount": 858,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -7384,18 +7383,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-4741",
-      "rank": 496,
-      "size": "S",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fly machine advertises unreachable private 172.19.x lan routes ranked before its public route; every reconnect probes dead routes first.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-863",
       "rank": 497,
       "size": "M",
@@ -13081,13 +13068,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4741",
-      "to": "PAN-4760",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.7
     },
     {
       "from": "PAN-4671",
