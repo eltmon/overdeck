@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4682",
   "created": "2026-11-02T03:20:08.527Z",
-  "updated": "2026-11-02T03:26:57.456Z",
+  "updated": "2026-11-02T03:31:57.763Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-02T03:26:52.314Z"
     },
     "fly-provider-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4682",
-      "claimedAt": "2026-11-02T03:26:57.456Z"
+      "claimedAt": "2026-11-02T03:26:57.456Z",
+      "doneAt": "2026-11-02T03:31:57.762Z"
     }
   }
 }
