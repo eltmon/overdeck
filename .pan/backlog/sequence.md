@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T12:25:56.758998Z · model: claude-opus-5-5 · open: 865_
+_Last sequenced: 2026-11-02T12:26:46.542866Z · model: claude-opus-5-5 · open: 863_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,7 +9,6 @@ _Last sequenced: 2026-11-02T12:25:56.758998Z · model: claude-opus-5-5 · open: 
 | 2 | PAN-4801 | M | critical | ok |  |  | Merge train never rebases approved siblings after a merge (reconcile hook unwired), so each merge strands siblings conflicting. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
-| 5 | PAN-4750 | M | high | ok |  |  | Strike merge door requires head approval strikes never get; 5 green strike PRs unmergeable. needs-handoff (TENET-10). |
 | 6 | PAN-4803 | M | high | ok |  | PAN-4801 | After PAN-4801, carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
@@ -186,7 +185,6 @@ _Last sequenced: 2026-11-02T12:25:56.758998Z · model: claude-opus-5-5 · open: 
 | 174 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 179 | PAN-4657 | M | low | ok |  |  | Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; #4640 merged, waits on in-pipeline #4639. |
 | 180 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
 | 181 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
 | 182 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
@@ -889,10 +887,6 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 
 Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
 
-### PAN-4750 (rank 5)
-
-New substrate issue that blocks every strike PR from merging through Overdeck since #4066: the strike door reuses the feature merge gate with requireApprovalAtHead, and the operator cannot approve their own PR. Five green strike PRs are stuck today, so it ranks critical near the top; it is labeled needs-handoff, so pickup must be a supervised handoff rather than autonomous.
-
 ### PAN-4803 (rank 6)
 
 New substrate follow-up to PAN-4801: once siblings are rebased after each merge, PAN-4772 re-requests review for every one, so review load grows quadratically. Carrying the approval when git patch-id is unchanged removes that cost. It takes the free rank 6, after its PAN-4801 dependency; needs-handoff (TENET-10) because it touches merge-gate trust.
@@ -1193,6 +1187,10 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 
 New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.
 
+### PAN-3234 (rank 77)
+
+Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1200,10 +1198,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T12:25:56.758998Z",
+  "generatedAt": "2026-11-02T12:26:46.542866Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 865,
+  "openCount": 863,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11879,19 +11877,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "planning": "auto"
     },
     {
-      "issue": "PAN-4750",
-      "rank": 5,
-      "size": "M",
-      "importance": "high",
-      "score": 5,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Strike merge door requires head approval strikes never get; 5 green strike PRs unmergeable. needs-handoff (TENET-10).",
-      "rationale": "New substrate issue that blocks every strike PR from merging through Overdeck since #4066: the strike door reuses the feature merge gate with requireApprovalAtHead, and the operator cannot approve their own PR. Five green strike PRs are stuck today, so it ranks critical near the top; it is labeled needs-handoff, so pickup must be a supervised handoff rather than autonomous.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4739",
       "rank": 272,
       "size": "M",
@@ -11914,19 +11899,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "dependsOn": [],
       "why": "First message to a Fly-machine conversation is pasted into Claude Code's auto-mode dialog and lost; pre-answer it in configureClaudeCode.",
       "rationale": "New bug from the PAN-4652 live check with a located fix site (FlyProvider.configureClaudeCode); every conversation started with --message loses its opening turn, so it sits just behind PAN-4739.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4657",
-      "rank": 179,
-      "size": "M",
-      "importance": "low",
-      "score": 5,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; #4640 merged, waits on in-pipeline #4639.",
-      "rationale": "Rank held: dependency PAN-4639 closed as completed on 2026-11-01, so it no longer gates this issue; remaining order is unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13161,13 +13133,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "confidence": 0.5
     },
     {
-      "from": "PAN-4750",
-      "to": "PAN-4753",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3657",
       "to": "PAN-4753",
       "type": "informs",
@@ -13264,13 +13229,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4750",
-      "to": "PAN-4785",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.6
     },
     {
       "from": "PAN-4772",
