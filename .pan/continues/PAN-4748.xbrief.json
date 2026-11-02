@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4748",
   "created": "2026-11-02T03:23:38.611Z",
-  "updated": "2026-11-02T05:19:00.380Z",
+  "updated": "2026-11-02T05:19:16.572Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
     "fly-token-source.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T05:19:00.380Z"
+    },
+    "fly-token-source.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:19:16.571Z"
     }
   }
 }
