@@ -42,7 +42,7 @@ import { ensurePRExists } from './ensure-pr.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 import { freshMergeArtifact } from './merge-artifact.js';
 import { postInternalPipelineNotifyRoute } from './internal-pipeline-notify.js';
-import { activeStrikeMerge, advanceMergeQueue, automaticMergeHead, automaticMergeStartRefusal, forgeMergeGate, manualMergeHeadMoved, mergeHeadPin, mergeTargetRefusal, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
+import { activeStrikeMerge, advanceMergeQueue, automaticMergeHead, automaticMergeStartRefusal, busyMergeRefusal, forgeMergeGate, manualMergeHeadMoved, mergeHeadPin, mergeTargetRefusal, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
@@ -305,11 +305,8 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   const normalizedId = issueId.toUpperCase();
   const currentlyMerging = getCurrentMerge(projectKey);
   if (request.kind === 'strike' && currentlyMerging === normalizedId) return { success: true, statusCode: 200, message: 'Strike merge already in progress', outcome: 'merging' };
-  // #4066 review: an automatic merge never waits on the queue, which would start it
-  // with none of its pin or policy checks; the executor retries with every check.
-  if (currentlyMerging && currentlyMerging !== normalizedId && approvedHead) {
-    return { success: false, statusCode: 409, error: `Another merge (${currentlyMerging}) is in progress; the automatic merge retries on the executor's next tick`, deferred: true, outcome: 'queued' };
-  }
+  const busy = busyMergeRefusal(request, currentlyMerging, normalizedId);
+  if (busy) return busy;
   if (currentlyMerging && currentlyMerging !== normalizedId) {
     // Another merge is in progress — queue this one
     const position = enqueueMerge(projectKey, normalizedId);

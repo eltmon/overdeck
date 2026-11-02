@@ -9,6 +9,7 @@ import { useDesignLanguage } from './hooks/useDesignLanguage';
 import { useColorTheme } from './hooks/useColorTheme';
 import { installQueryRecovery } from './lib/queryRecovery';
 import { LinkPullRequestDialogHost } from './components/chat/LinkPullRequestDialog';
+import { ConversationScheduleDialogHost } from './components/chat/ConversationScheduleDialog';
 import { PullHereDialogHost } from './components/chat/PullHereDialog';
 import { ContinueOnDeviceDialogHost } from './components/chat/continueOnDevice/ContinueOnDeviceDialog';
 import { NewConversationDialogHost } from './components/newConversation/NewConversationDialog';
@@ -77,6 +78,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <DialogProvider>
           <App />
           <LinkPullRequestDialogHost />
+          <ConversationScheduleDialogHost />
           <PullHereDialogHost />
           <ContinueOnDeviceDialogHost />
           <NewConversationDialogHost />

@@ -4,6 +4,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import {
   createConversationSchedule,
+  emitConversationSchedulesChanged,
   listConversationSchedules,
   MAX_SCHEDULES_PER_CONVERSATION,
   removeConversationSchedule,
@@ -13,7 +14,14 @@ import {
   validateSchedulePatch,
 } from '../../../lib/overdeck/conversation-schedules.js';
 import { getConversationByName } from '../../../lib/overdeck/conversations.js';
+import { invalidateConversationListEnrichmentCache } from '../../../lib/overdeck/conversation-list.js';
 import { validateOrigin } from './origin-validation.js';
+
+/** Invalidate the list cache and tell connected clients so the next-run badge refreshes. */
+function notifySchedulesChanged(name: string): void {
+  invalidateConversationListEnrichmentCache();
+  emitConversationSchedulesChanged(name);
+}
 
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -59,6 +67,7 @@ const postConversationScheduleRoute = HttpRouter.add(
     const result = createConversationSchedule(name, validated.value, now);
     switch (result.status) {
       case 'created':
+        notifySchedulesChanged(name);
         return jsonResponse({ schedule: result.schedule }, { status: 201 });
       case 'not-found':
         return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
@@ -89,6 +98,7 @@ const patchConversationScheduleRoute = HttpRouter.add(
     try {
       const schedule = updateConversationSchedule(name, id, validated.value, now);
       if (!schedule) return jsonResponse({ error: 'Schedule not found' }, { status: 404 });
+      notifySchedulesChanged(name);
       return jsonResponse({ schedule });
     } catch (err) {
       if (err instanceof ScheduleValidationError) return jsonResponse({ error: err.message }, { status: 400 });
@@ -109,6 +119,7 @@ const deleteConversationScheduleRoute = HttpRouter.add(
     const id = parseScheduleId(params['id']);
     if (id === null) return jsonResponse({ error: 'Invalid schedule id' }, { status: 400 });
     if (!removeConversationSchedule(name, id)) return jsonResponse({ error: 'Schedule not found' }, { status: 404 });
+    notifySchedulesChanged(name);
     return jsonResponse({ removed: true });
   }),
 );

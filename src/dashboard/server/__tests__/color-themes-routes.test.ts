@@ -22,6 +22,7 @@ process.env.OVERDECK_HOME = home;
 const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
 const { _resetDashboardSessionTokenForTests } = await import('../routes/dashboard-auth.js');
 const { colorThemesRouteLayer } = await import('../routes/color-themes.js');
+const { buildVsix } = await import('../../../lib/color-themes/__tests__/zip-fixture.js');
 
 const INTERNAL_TOKEN = 'color-themes-internal-token-0123456789';
 const asInternal = { [INTERNAL_TOKEN_HEADER]: INTERNAL_TOKEN };
@@ -88,13 +89,13 @@ describe('POST /api/color-themes/import/preview (PAN-4644 ac1, ac4)', () => {
     await expect(readdir(join(home, 'themes')).catch(() => [])).resolves.toEqual([]);
   });
 
-  it('rejects a .vsix file name with 400 naming #4659', async () => {
+  it('rejects a file name that is neither .json nor .vsix with 400', async () => {
     const res = await call('POST', '/api/color-themes/import/preview', asInternal, {
-      fileName: 'theme.vsix',
+      fileName: 'theme.txt',
       contentBase64: Buffer.from('{}', 'utf8').toString('base64'),
     });
     expect(res.status).toBe(400);
-    expect(res.json.error).toContain('#4659');
+    expect(res.json.error).toContain('.vsix');
   });
 
   it('rejects a payload over the 2 MB import limit with 413', async () => {
@@ -104,6 +105,81 @@ describe('POST /api/color-themes/import/preview (PAN-4644 ac1, ac4)', () => {
       contentBase64: big,
     });
     expect(res.status).toBe(413);
+  });
+});
+
+describe('POST /api/color-themes/import/preview with a .vsix (PAN-4659)', () => {
+  function twoThemeVsix(): Buffer {
+    return buildVsix({
+      'extension/package.json': JSON.stringify({
+        name: 'route-pack',
+        contributes: {
+          themes: [
+            { label: 'Route Light', uiTheme: 'vs', path: './themes/light.json' },
+            { label: 'Route Dark', uiTheme: 'vs-dark', path: './themes/dark.json' },
+          ],
+        },
+      }),
+      'extension/themes/light.json': JSON.stringify({ colors: { 'editor.background': '#fafafa' }, tokenColors: [] }),
+      'extension/themes/dark.json': JSON.stringify({ include: './base.json', colors: { 'editor.background': '#1e1e1e' } }),
+      'extension/themes/base.json': JSON.stringify({ colors: { 'terminal.ansiRed': '#ff5555' }, tokenColors: [] }),
+    });
+  }
+
+  async function previewVsix(fileName: string, archive: Buffer) {
+    return call('POST', '/api/color-themes/import/preview', asInternal, {
+      fileName,
+      contentBase64: archive.toString('base64'),
+    });
+  }
+
+  async function themeFiles(): Promise<string[]> {
+    return readdir(join(home, 'themes')).catch(() => []);
+  }
+
+  it('previews both themes without writing, and saving them lists one light and one dark theme', async () => {
+    const res = await previewVsix('route-pack-1.0.0.vsix', twoThemeVsix());
+
+    expect(res.status).toBe(200);
+    expect(res.json.themes.map((t: { id: string; type: string }) => [t.id, t.type])).toEqual([
+      ['route-light', 'light'],
+      ['route-dark', 'dark'],
+    ]);
+    expect(res.json.themes[1].terminal.red).toBe('#ff5555');
+    await expect(themeFiles()).resolves.toEqual([]);
+
+    for (const theme of res.json.themes) {
+      const saved = await call('POST', '/api/color-themes', asInternal, { theme });
+      expect(saved.status).toBe(200);
+    }
+    const list = await call('GET', '/api/color-themes', {});
+    const imported = list.json.themes.filter((t: { builtin: boolean }) => !t.builtin);
+    expect(imported.map((t: { name: string; type: string }) => [t.name, t.type])).toEqual(
+      expect.arrayContaining([['Route Light', 'light'], ['Route Dark', 'dark']]),
+    );
+    expect(imported).toHaveLength(2);
+  });
+
+  it('rejects an archive over 10 MB with 400 and writes nothing', async () => {
+    const res = await previewVsix('big.vsix', Buffer.alloc(10 * 1024 * 1024 + 1));
+    expect(res.status).toBe(400);
+    expect(res.json.error).toContain('10 MB');
+    await expect(themeFiles()).resolves.toEqual([]);
+  });
+
+  it('rejects a ZIP64 archive with 400 and writes nothing', async () => {
+    const res = await previewVsix('zip64.vsix', buildVsix({ 'extension/package.json': '{}' }, { zip64: true }));
+    expect(res.status).toBe(400);
+    expect(res.json.error).toContain('ZIP64');
+    await expect(themeFiles()).resolves.toEqual([]);
+  });
+
+  it('rejects an archive with a .. entry path with 400 and writes nothing', async () => {
+    const archive = buildVsix({ 'extension/package.json': '{}', 'extension/../evil.json': '{}' });
+    const res = await previewVsix('evil.vsix', archive);
+    expect(res.status).toBe(400);
+    expect(res.json.error).toContain('..');
+    await expect(themeFiles()).resolves.toEqual([]);
   });
 });
 

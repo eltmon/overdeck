@@ -94,6 +94,16 @@ export async function defaultUatRequired(issueId: string, deps: UatRequiredDeps 
 }
 
 /**
+ * PAN-4750: `requireApprovalAtHead` defaults to true. Only an operator-started
+ * strike merge passes `false`, which waives approval entirely: a strike PR is
+ * authored as the operator, who cannot approve their own PR. Every other check
+ * (draft, changes requested, checks, CI test job, UAT, mergeability) still applies.
+ */
+export interface MergeGateOptions extends PrFactsOptions {
+  requireApprovalAtHead?: boolean;
+}
+
+/**
  * Is this issue's PR ready to merge right now? Never throws: a failed forge
  * read comes back not-ready with the lookup error as the reason.
  *
@@ -109,15 +119,16 @@ export async function defaultUatRequired(issueId: string, deps: UatRequiredDeps 
 export async function evaluateIssueMergeGate(
   issueId: string,
   deps: MergeGateDeps = {},
-  options: PrFactsOptions = {},
+  options: MergeGateOptions = {},
 ): Promise<MergeGateResult> {
+  const { requireApprovalAtHead = true, ...readOptions } = options;
   const getFacts = (readOptions: PrFactsOptions) => deps.getFacts
     ? deps.getFacts(issueId, readOptions)
     : getPrFacts(issueId, {}, readOptions);
-  let read = await getFacts(options);
+  let read = await getFacts(readOptions);
   if (mergeabilityPending(read)) {
     await new Promise<void>((resolve) => setTimeout(resolve, MERGEABILITY_REREAD_MS));
-    read = await getFacts({ ...options, fresh: true });
+    read = await getFacts({ ...readOptions, fresh: true });
   }
   const facts = await withForgeApprovalAtHead(read, deps.readReviews, deps.overdeckLogins);
   // #4066 review: the board's derived `ready` reads this answer (no forge read).
@@ -133,7 +144,9 @@ export async function evaluateIssueMergeGate(
     }
   }
   return {
-    ...evaluateMergeReadiness(facts, { ciTestsRequired, uatRequired, requireApprovalAtHead: true }),
+    ...evaluateMergeReadiness(facts, {
+      ciTestsRequired, uatRequired, requireApprovalAtHead, requireApproval: requireApprovalAtHead,
+    }),
     facts,
   };
 }

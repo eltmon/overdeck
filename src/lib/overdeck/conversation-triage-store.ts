@@ -112,6 +112,14 @@ export function unsnoozeConversation(name: string, nowMs: number = Date.now()): 
   return result.changes > 0;
 }
 
+/** PAN-4657: clears settle and snooze together and restarts the idle clock (PAN-4655 D3), so a schedule delivering a prompt resurfaces the conversation. */
+export function clearConversationTriage(name: string, nowMs: number = Date.now()): boolean {
+  const result = getOverdeckDatabase()
+    .prepare('UPDATE conversations SET settled_at = NULL, settle_reason = NULL, snoozed_until = NULL, idle_reset_at = ? WHERE name = ?')
+    .run(nowMs, name);
+  return result.changes > 0;
+}
+
 export interface IdleClock {
   settledAtMs: number | null;
   snoozedUntilMs: number | null;

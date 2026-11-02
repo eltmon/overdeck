@@ -1,0 +1,762 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T03:40:08Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4657: Add the dashboard schedule dialog, next-run badge and inbox resurfacing for scheduled conversations",
+    "updated": "2026-11-02T03:48:17.933Z"
+  },
+  "plan": {
+    "id": "pan-4657",
+    "title": "Add the dashboard schedule dialog, next-run badge and inbox resurfacing for scheduled conversations",
+    "status": "running",
+    "uid": "c2899cf9-f053-43e2-b598-b93119067021",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T03:40:08Z",
+    "updated": "2026-11-02T03:48:17.933Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4657",
+        "label": "PAN-4657",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4640",
+        "label": "PAN-4640 (schedules backend, merged)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4639",
+        "label": "PAN-4639 (snooze and settle, merged)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4657.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "conversations",
+      "schedules",
+      "triage",
+      "frontend"
+    ],
+    "metadata": {
+      "sizeJustification": "28 files across 6 subsystems, of which 11 are tests, the frontend CI test list and two docs. This issue is already the dashboard slice split out of PAN-4640; its four parts (dialog, badge, list refresh event, resurfacing) share one operator flow and the PRD keeps each work item at 8 files or fewer with explicit edges, so a further split would add coordination without independent value.",
+      "canonicalFilename": "2026-11-02-PAN-4657-add-the-dashboard-schedule-dialog-next-run-badge-and-inbox-resurfacing-for-scheduled-conversations.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-4640 shipped conversation schedules as a backend, sweep and CLI only. The dashboard cannot create, see, pause or delete a schedule; rows do not show that a conversation is scheduled; schedule changes do not refresh the list; and a settled or snoozed conversation stays hidden after its schedule delivers a prompt.",
+      "Proposal": "Move presetToCron into @overdeck/contracts so the dialog and CLI share it. Add an in-memory conversation.schedules_changed event (reducer bumps conversationsListRevision) emitted by the schedule door's new emitter from the routes (successful writes) and the sweep (once per changed conversation per pass), with list-cache invalidation at both call sites. The list enrichment returns nextScheduledRunAt and scheduleCount from one grouped query per page over enabled schedules. The sweep clears settle and snooze on the conversation a prompt was delivered to. The frontend adds a schedule dialog (host pattern, mounted in main.tsx) opened from a Schedule… item in the row overflow menu and the tab menu, and a muted CalendarClock badge on rows with an active schedule. Docs updated in features/conversations.mdx and docs/DASHBOARD-ARCHITECTURE.md. Full detail: .pan/drafts/PAN-4657.md.",
+      "NonGoals": "- No schedule surface for linked (other-machine) conversations or Session Vault browse copies\n- No per-schedule model or effort, and no new conversation per run\n- No cron-to-preset decoding in the edit form, no natural-language recurrence, no time-zone picker beyond a text input\n- No change to sweep firing semantics (claim, at-most-once, no retries, archived skip) beyond resurfacing and notification\n- No resurfacing on failed or skipped runs, and none from ordinary agent activity\n- No new HTTP route, config key or database schema change\n- No change to pan conv schedule CLI output or flags\n- The row badge has no click action of its own\n- No edits to src/lib/overdeck/conversations.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Share presetToCron through @overdeck/contracts; the recurrence module re-exports it.",
+        "rationale": "The frontend cannot import the croner-based recurrence module; one implementation keeps the dialog and CLI identical."
+      },
+      {
+        "summary": "Badge counts enabled schedules only (MIN next_run_at, COUNT) via one grouped query per page.",
+        "rationale": "The issue says a paused-only conversation renders no badge and forbids per-row queries."
+      },
+      {
+        "summary": "'Emitted on each sweep run' = once per changed conversation per sweep pass; a pass that claims nothing emits nothing.",
+        "rationale": "Avoids a list refetch every 60 s for every client while still refreshing after every claimed run."
+      },
+      {
+        "summary": "Resurface only on delivered runs, on the conversation the prompt was delivered to (clear-chain head).",
+        "rationale": "The issue says 'when the sweep delivers'; failed or skipped runs put nothing new in the conversation."
+      },
+      {
+        "summary": "Edit pre-fills the raw cron (Repeat = Custom cron); no cron-to-preset decoding.",
+        "rationale": "Smallest unambiguous edit flow; presets still overwrite it."
+      },
+      {
+        "summary": "Delete has no confirmation step.",
+        "rationale": "Matches the Pull requests dialog's Unlink precedent inside an explicit dialog."
+      },
+      {
+        "summary": "Schedule… item hidden for vault browse copies and linked rows, shown on nested rows.",
+        "rationale": "The API refuses vault copies with 409 and linked rows belong to another machine; lanes and successors are ordinary conversations."
+      },
+      {
+        "summary": "Badge text uses formatLocalWhen (extracted from formatSnoozeWake); tooltip 'N active schedule(s) · next run <locale string>'.",
+        "rationale": "Reuses the PAN-4639 D13 date wording; the issue asks the tooltip to name the schedule count."
+      },
+      {
+        "summary": "Open dialog refetches its own list when conversationsListRevision changes.",
+        "rationale": "A sweep run then updates next/last run in place without extra polling."
+      },
+      {
+        "summary": "Set plan.metadata.sizeJustification instead of splitting further.",
+        "rationale": "This issue is already the split-out dashboard slice of PAN-4640; each work item stays at 8 files or fewer."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-presets",
+        "title": "Move the schedule preset compiler into @overdeck/contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:40:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4657",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/conversation-schedule-presets.ts",
+            "packages/contracts/src/index.ts",
+            "src/lib/overdeck/conversation-schedule-recurrence.ts",
+            "packages/contracts/src/__tests__/conversation-schedule-presets.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/conversation-schedule-presets.test.ts src/lib/overdeck/__tests__/conversation-schedule-recurrence.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create packages/contracts/src/conversation-schedule-presets.ts holding SchedulePreset, TIME_PATTERN, DAY_NUMBERS, parseTime and presetToCron moved verbatim (identical error messages) from src/lib/overdeck/conversation-schedule-recurrence.ts lines 12-62, plus SCHEDULE_PRESET_DAYS = ['mon','tue','wed','thu','fri','sat','sun'] as const. Export it from packages/contracts/src/index.ts. In the recurrence module delete the moved code and add `export { presetToCron, type SchedulePreset } from '@overdeck/contracts';` so src/cli/commands/conversations/schedule.ts is untouched. Add the contracts test mirroring recurrence test lines 84-97."
+        },
+        "items": [
+          {
+            "id": "contracts-presets.ac1",
+            "title": "Given presetToCron imported from @overdeck/contracts, when called with hourly, daily 21:00, weekdays 09:05, weekly mon 09:00 and weekly SUN 00:00, then it returns '0 * * * *', '0 21 * * *', '5 9 * * 1-5', '0 9 * * 1' and '0 0 * * 0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-presets.ac2",
+            "title": "presetToCron from @overdeck/contracts throws for time 24:00, day xyz and day monday",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-presets.ac3",
+            "title": "`npx vitest run src/lib/overdeck/__tests__/conversation-schedule-recurrence.test.ts` exits 0 with that test file unmodified, and `grep -n \"function presetToCron\" src/lib/overdeck/conversation-schedule-recurrence.ts` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schedules-event",
+        "title": "Add the conversation.schedules_changed event, reducer case and door emitter",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:40:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4657",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/events.ts",
+            "packages/contracts/src/event-reducers.ts",
+            "packages/contracts/src/__tests__/conversation-schedules-changed.test.ts",
+            "src/lib/overdeck/conversation-schedules.ts",
+            "src/lib/overdeck/__tests__/conversation-schedules.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/conversation-schedules-changed.test.ts src/lib/overdeck/__tests__/conversation-schedules.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "routes-notify",
+            "sweep-resurface"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add ConversationSchedulesChangedEvent (type 'conversation.schedules_changed', payload { conversationName: Schema.String }) after ConversationPullRequestsChangedEvent in events.ts and to the DomainEvent union; add a reducer case that only increments conversationsListRevision. Add emitConversationSchedulesChanged(name) at the end of src/lib/overdeck/conversation-schedules.ts using getEventStore().emitOnly inside try/catch (copy emitConversationPullRequestsChanged in conversation-pull-requests.ts:348). The door must NOT import conversation-list.ts. Tests: reducer bump (model pull-request-links.test.ts:77-88); door test mocks ../../../dashboard/server/event-store.js."
+        },
+        "items": [
+          {
+            "id": "schedules-event.ac1",
+            "title": "Given INITIAL_READ_MODEL_STATE, when a conversation.schedules_changed event with payload { conversationName: 'c' } is applied, then conversationsListRevision increments by exactly 1 and no other top-level state key changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedules-event.ac2",
+            "title": "emitConversationSchedulesChanged('conv-a') emits through emitOnly an event with type 'conversation.schedules_changed' and payload { conversationName: 'conv-a' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedules-event.ac3",
+            "title": "emitConversationSchedulesChanged returns without throwing when getEventStore throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedules-event.ac4",
+            "title": "`grep -n \"conversation-list\" src/lib/overdeck/conversation-schedules.ts` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "badge-enrichment",
+        "title": "Return nextScheduledRunAt and scheduleCount from the conversation list enrichment",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:40:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4657",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-schedules.ts",
+            "src/lib/overdeck/conversation-list.ts",
+            "src/lib/overdeck/__tests__/conversation-list-schedules.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-list-schedules.test.ts src/lib/overdeck/__tests__/conversation-list-triage.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint (including the circular-import check) passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add ConversationScheduleSummary, EMPTY_SCHEDULE_SUMMARY and listScheduleSummariesForConversations(names) to the schedule door: one SELECT ... MIN(s.next_run_at), COUNT(*) ... WHERE s.enabled = 1 AND c.name IN (...) GROUP BY c.name. In conversation-list.ts call it once per page right after listConversationTriage, spread `...(schedules.get(row.name) ?? EMPTY_SCHEDULE_SUMMARY)` after the triage spread, and add `...EMPTY_SCHEDULE_SUMMARY` to vault browse copies in getConversationListWithVaultCopies. New test modelled on conversation-list-triage.test.ts."
+        },
+        "items": [
+          {
+            "id": "badge-enrichment.ac1",
+            "title": "Given a conversation with two enabled schedules, when getEnrichedConversationList runs, then its row returns scheduleCount 2 and nextScheduledRunAt equal to the earlier schedule's nextRunAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "badge-enrichment.ac2",
+            "title": "Given a conversation whose only schedule is paused, the enrichment returns nextScheduledRunAt null and scheduleCount 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "badge-enrichment.ac3",
+            "title": "Given a conversation with no schedule, the enrichment returns nextScheduledRunAt null and scheduleCount 0, and listScheduleSummariesForConversations([]) returns an empty map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "badge-enrichment.ac4",
+            "title": "getConversationListWithVaultCopies returns vault browse copies with nextScheduledRunAt null and scheduleCount 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routes-notify",
+        "title": "Schedule routes invalidate the list cache and emit on successful writes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:40:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4657",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversation-schedules.ts",
+            "src/dashboard/server/routes/__tests__/conversation-schedules-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-schedules-route.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route test file passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add notifySchedulesChanged(name) = invalidateConversationListEnrichmentCache() + emitConversationSchedulesChanged(name) to routes/conversation-schedules.ts and call it only on POST 201, PATCH 200 and DELETE 200. Route test partially mocks the door module (importOriginal) to spy emitConversationSchedulesChanged."
+        },
+        "items": [
+          {
+            "id": "routes-notify.ac1",
+            "title": "A successful POST /api/conversations/conv-a/schedules (201) emits conversation.schedules_changed once for 'conv-a'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-notify.ac2",
+            "title": "A successful PATCH (200) and a successful DELETE (200) each emits conversation.schedules_changed once for the conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-notify.ac3",
+            "title": "A POST that returns 400 and a DELETE of an unknown id that returns 404 each emits nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweep-resurface",
+        "title": "Sweep clears settle and snooze on delivered conversations and notifies once per changed conversation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:40:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4657",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-triage-store.ts",
+            "src/lib/overdeck/__tests__/conversation-triage-store.test.ts",
+            "src/dashboard/server/services/conversation-schedule-service.ts",
+            "src/dashboard/server/services/__tests__/conversation-schedule-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-schedule-service.test.ts src/lib/overdeck/__tests__/conversation-triage-store.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add clearConversationTriage(name) to the triage store (one UPDATE nulling settled_at, settle_reason, snoozed_until). FireOutcome ok becomes { ok: true; conversationName } with conv.name (chain head). ScheduleSweepDeps gains clearTriage and onChanged (defaults: clearConversationTriage; invalidateConversationListEnrichmentCache + emitConversationSchedulesChanged). runScheduleSweepOnce collects claimed schedule names and delivered-to names in a Set, clears triage only on delivered outcomes (try/catch + console.warn), and calls onChanged once per name after the loop. Update the sweep test's mock factories and the three toEqual({ ok: true }) assertions exactly as the PRD lists."
+        },
+        "items": [
+          {
+            "id": "sweep-resurface.ac1",
+            "title": "Given a delivered fire on conv-a, runScheduleSweepOnce calls clearTriage('conv-a') once and onChanged('conv-a') once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-resurface.ac2",
+            "title": "Given a fire delivered to chain head conv-head for a schedule on conv-a, clearTriage receives 'conv-head' and onChanged receives both 'conv-a' and 'conv-head'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-resurface.ac3",
+            "title": "Failed and skipped runs call clearTriage zero times and onChanged once; a lost claim calls onChanged zero times; a throwing clearTriage still records 'delivered'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-resurface.ac4",
+            "title": "clearConversationTriage returns a settled row and a snoozed row to settledAt, settleReason and snoozedUntil all null, and returns false for an unknown name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "badge-row",
+        "title": "Render the next-run schedule badge on conversation rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:40:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4657",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/conversation-triage.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ConversationRow.test.tsx src/components/CommandDeck/__tests__/conversation-triage.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Extract exported formatLocalWhen(iso, now) from formatSnoozeWake in conversation-triage.ts (formatSnoozeWake = 'back ' + formatLocalWhen, output unchanged). Add nextScheduledRunAt?: string | null and scheduleCount?: number to the Conversation interface in ConversationList.tsx. In ConversationRow.tsx build scheduleBadge (conversationBranchChip span, CalendarClock size 10, text formatLocalWhen(nextScheduledRunAt, now), title and aria-label 'N active schedule(s) · next run <toLocaleString>', data-testid schedule-badge) and render it right after {pullRequestBadge} in both row variants, only when nextScheduledRunAt is non-null."
+        },
+        "items": [
+          {
+            "id": "badge-row.ac1",
+            "title": "Given a row with nextScheduledRunAt set and scheduleCount 2, ConversationRow renders data-testid schedule-badge whose title starts with '2 active schedules · next run' and whose text equals formatLocalWhen(nextScheduledRunAt, now)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "badge-row.ac2",
+            "title": "Given scheduleCount 1, the badge title starts with '1 active schedule ·'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "badge-row.ac3",
+            "title": "Given nextScheduledRunAt null and scheduleCount 0, ConversationRow renders no schedule-badge element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "badge-row.ac4",
+            "title": "formatSnoozeWake returns the same strings as before: the frontend run of src/components/CommandDeck/__tests__/conversation-triage.test.ts exits 0 with that test file unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schedule-dialog",
+        "title": "Add the schedule dialog with its host and the ScheduleMenuItem component",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:40:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4657",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationScheduleDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationScheduleDialog.test.tsx",
+            "src/dashboard/frontend/src/main.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ConversationScheduleDialog.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "dialog test file passes",
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. New components/chat/ConversationScheduleDialog.tsx (< 450 lines): useScheduleDialogStore + openScheduleDialog, ConversationScheduleDialogHost, ScheduleMenuItem (null for origin vault/linked; 'Schedule…' with CalendarClock), buildScheduleCron (presetToCron from @overdeck/contracts; cron mode trims; errors as { ok: false, error }), and the dialog: GET list, create POST { prompt, cron, timeZone }, edit PATCH { prompt, cron, timeZone } with raw cron pre-filled (Repeat = Custom cron), pause/resume PATCH { enabled }, DELETE without confirm, API errors in role=alert, invalidate ['conversation-schedules', name] and ['conversations'] after writes and on conversationsListRevision changes. Accessible names exactly as the PRD lists. Mount <ConversationScheduleDialogHost /> in main.tsx after <LinkPullRequestDialogHost />; add the test path to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "schedule-dialog.ac1",
+            "title": "Given Repeat Daily at 21:00 and a prompt, when Create schedule is clicked, then one POST /api/conversations/conv-a/schedules is sent with body { prompt, cron: '0 21 * * *', timeZone: <browser zone> }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-dialog.ac2",
+            "title": "Pause sends PATCH /api/conversations/conv-a/schedules/3 with { enabled: false }, Resume sends { enabled: true }, Delete sends DELETE /api/conversations/conv-a/schedules/3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-dialog.ac3",
+            "title": "Edit pre-fills Cron expression with the stored cron and Save changes sends PATCH with { prompt, cron, timeZone }; a 400 { error } renders that text in role=alert",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-dialog.ac4",
+            "title": "ScheduleMenuItem renders 'Schedule…' and a click opens the dialog store for that conversation; it renders nothing for origin 'vault' or 'linked'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-dialog.ac5",
+            "title": "scripts/frontend-test-subset.txt lists src/components/chat/__tests__/ConversationScheduleDialog.test.tsx and main.tsx renders <ConversationScheduleDialogHost />",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "menu-wiring",
+        "title": "Show Schedule… in the row overflow menu and the tab menu",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:40:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4657",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationActionMenu.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ConversationRow test file passes",
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Import ScheduleMenuItem from ../chat/ConversationScheduleDialog and render it immediately after <PullRequestMenuItems .../> in ConversationRow.tsx's overflow menu (onClose closes the menu) and in ConversationActionMenu.tsx (onClose={onClose}). Add ConversationRow tests for the menu item."
+        },
+        "items": [
+          {
+            "id": "menu-wiring.ac1",
+            "title": "Given a local conversation row, when its overflow menu opens, then a 'Schedule…' item renders and clicking it sets useScheduleDialogStore conversationName to the row's name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-wiring.ac2",
+            "title": "Given a row with origin 'vault', its overflow menu renders no 'Schedule…' item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-wiring.ac3",
+            "title": "`grep -n -A1 \"<PullRequestMenuItems\" src/dashboard/frontend/src/components/CommandDeck/ConversationActionMenu.tsx` prints a following line that contains <ScheduleMenuItem conversation={conversation} onClose={onClose} />",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the schedule dialog, the next-run badge and inbox resurfacing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:40:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4657",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"arrive with \\[#4657\\]\" features/conversations.mdx || true",
+            "grep -n \"conversation.schedules_changed\" docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "the first grep prints nothing",
+            "the second grep prints at least one line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In features/conversations.mdx 'Scheduled runs', replace the 'arrive with #4657' sentence with the dialog paragraph, the badge sentence and the resurfacing sentence the PRD gives; add one sentence to 'Settling and snoozing conversations' linking to #scheduled-runs. Extend the 'Conversation schedules (PAN-4640)' bullet in docs/DASHBOARD-ARCHITECTURE.md with the PAN-4657 enrichment fields, event, notification points, clearConversationTriage and the dialog file."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "features/conversations.mdx no longer contains 'arrive with [#4657]' and its Scheduled runs section names 'Schedule…', the Repeat options Hourly, Daily, Weekdays, Weekly and Custom cron, and states that a delivered run returns a settled or snoozed conversation to Inbox",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "features/conversations.mdx states that a conversation with an active schedule shows a badge with its next run time and that paused-only conversations show none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains the names conversation.schedules_changed, nextScheduledRunAt, listScheduleSummariesForConversations and clearConversationTriage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "schedules-event",
+        "to": "badge-enrichment",
+        "type": "blocks"
+      },
+      {
+        "from": "schedules-event",
+        "to": "routes-notify",
+        "type": "blocks"
+      },
+      {
+        "from": "schedules-event",
+        "to": "sweep-resurface",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-presets",
+        "to": "schedule-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "badge-row",
+        "to": "schedule-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "schedule-dialog",
+        "to": "menu-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "badge-row",
+        "to": "menu-wiring",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

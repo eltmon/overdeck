@@ -1,0 +1,168 @@
+{
+  "version": "1",
+  "issueId": "PAN-4748",
+  "created": "2026-11-02T03:23:38.611Z",
+  "updated": "2026-11-02T05:29:48.737Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fly-token-source": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4748",
+      "claimedAt": "2026-11-02T03:23:38.611Z",
+      "doneAt": "2026-11-02T03:44:24.501Z"
+    },
+    "fly-api-retry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4748",
+      "claimedAt": "2026-11-02T03:44:49.586Z",
+      "doneAt": "2026-11-02T04:01:53.181Z"
+    },
+    "poll-token-hard-fail": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4748",
+      "claimedAt": "2026-11-02T04:02:02.804Z",
+      "doneAt": "2026-11-02T04:19:08.087Z"
+    },
+    "loop-lines-token-rejected": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4748",
+      "claimedAt": "2026-11-02T04:19:13.984Z",
+      "doneAt": "2026-11-02T04:36:53.197Z"
+    },
+    "unlink-rollback-token-rejected": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4748",
+      "claimedAt": "2026-11-02T04:37:00.082Z",
+      "doneAt": "2026-11-02T04:50:10.913Z"
+    },
+    "doctor-fly-token": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4748",
+      "claimedAt": "2026-11-02T04:50:16.089Z",
+      "doneAt": "2026-11-02T05:03:45.663Z"
+    },
+    "docs-fly-token": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4748",
+      "claimedAt": "2026-11-02T05:03:54.307Z",
+      "doneAt": "2026-11-02T05:16:10.055Z"
+    },
+    "fly-token-source.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:18:27.445Z"
+    },
+    "fly-token-source.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:18:43.558Z"
+    },
+    "fly-token-source.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:19:00.380Z"
+    },
+    "fly-token-source.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:19:16.571Z"
+    },
+    "fly-token-source.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:19:32.494Z"
+    },
+    "fly-api-retry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:19:51.815Z"
+    },
+    "fly-api-retry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:20:09.577Z"
+    },
+    "fly-api-retry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:20:27.907Z"
+    },
+    "fly-api-retry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:20:46.179Z"
+    },
+    "fly-api-retry.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:21:04.572Z"
+    },
+    "poll-token-hard-fail.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:21:28.110Z"
+    },
+    "poll-token-hard-fail.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:21:44.727Z"
+    },
+    "poll-token-hard-fail.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:22:01.253Z"
+    },
+    "loop-lines-token-rejected.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:22:22.061Z"
+    },
+    "loop-lines-token-rejected.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:22:40.085Z"
+    },
+    "loop-lines-token-rejected.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:22:57.234Z"
+    },
+    "loop-lines-token-rejected.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:23:13.497Z"
+    },
+    "unlink-rollback-token-rejected.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:23:33.764Z"
+    },
+    "unlink-rollback-token-rejected.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:23:51.564Z"
+    },
+    "unlink-rollback-token-rejected.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:24:08.844Z"
+    },
+    "doctor-fly-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:24:30.394Z"
+    },
+    "doctor-fly-token.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:24:47.615Z"
+    },
+    "doctor-fly-token.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:25:06.370Z"
+    },
+    "doctor-fly-token.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:25:25.402Z"
+    },
+    "doctor-fly-token.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:25:44.261Z"
+    },
+    "docs-fly-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:26:08.488Z"
+    },
+    "docs-fly-token.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:26:26.906Z"
+    },
+    "docs-fly-token.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:26:42.702Z"
+    }
+  },
+  "feedback": []
+}

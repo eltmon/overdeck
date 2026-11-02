@@ -37,8 +37,9 @@ export function ColorThemeSection() {
     <div className="mb-6">
       <span className="text-sm font-medium text-foreground">Color theme</span>
       <p className="text-xs text-muted-foreground mt-0.5 mb-3">
-        Choose the terminal, syntax, and UI colors for each mode. Import a VS Code theme, duplicate and
-        edit any theme below, or hand-edit a file in <code className="text-[11px]">~/.overdeck/themes/</code>.
+        Choose the terminal, syntax, and UI colors for each mode. Import a VS Code theme (.json) or
+        extension package (.vsix), duplicate and edit any theme below, or hand-edit a file in{' '}
+        <code className="text-[11px]">~/.overdeck/themes/</code>.
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="block">
@@ -79,7 +80,7 @@ export function ColorThemeSection() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".json"
+        accept=".json,.vsix"
         data-testid="color-theme-import-input"
         className="hidden"
         onChange={(e) => {

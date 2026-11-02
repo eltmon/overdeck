@@ -75,7 +75,9 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   the feature: `GET /api/color-themes`, `PUT /api/color-themes/selection`,
   `POST /api/color-themes/import/preview`, `POST /api/color-themes`, and
   `PUT /api/color-themes/:id` (in-place overwrite of a user theme; built-ins refused
-  with 403). See
+  with 403). The import preview accepts a single theme `.json` or a `.vsix` package;
+  `.vsix` archives are read in memory by `src/lib/color-themes/zip-reader.ts` (stored
+  and deflated entries only) and mapped by `vsix-import.ts` (PAN-4659). See
   [appearance.mdx](../configuration/appearance.mdx) "Color themes" for the operator-facing
   picture.
 - Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
@@ -490,6 +492,24 @@ door that does not exist; a real record read door would be a separate change.
   deacon child would need two internal HTTP hops and could not pass a resume
   cause), and a scheduled prompt follows the operator-message rule, so the
   deacon pause toggle does not apply.
+  PAN-4657 adds the dashboard surface: `listScheduleSummariesForConversations`
+  (one grouped query per list page) returns `nextScheduledRunAt` (the earliest
+  enabled schedule's next run) and `scheduleCount`, spread into the list
+  enrichment next to triage; the frontend renders them as a next-run badge
+  (`ConversationRow.tsx`). A `conversation.schedules_changed` domain event
+  (payload `{ conversationName }`, reducer bumps `conversationsListRevision`)
+  is emitted by `emitConversationSchedulesChanged` on every successful
+  POST/PATCH/DELETE in `routes/conversation-schedules.ts` and by the sweep
+  after a delivered, failed, or skipped fire, so the list and the schedule
+  dialog refresh without polling. A delivered fire also calls
+  `clearConversationTriage` (nulls `settled_at`, `settle_reason`, and
+  `snoozed_until` together) on the delivered-to conversation — the clear-chain
+  head when the schedule's own conversation was superseded — so the run
+  resurfaces it in Inbox. The dialog itself
+  (`src/dashboard/frontend/src/components/chat/ConversationScheduleDialog.tsx`)
+  is opened via `openScheduleDialog(name)` from the row's overflow menu and the
+  tab menu (`ScheduleMenuItem`, hidden for a vault or linked row) and mounted
+  once at the app root as `ConversationScheduleDialogHost`.
 - Idle auto-settle (PAN-4655). `src/lib/overdeck/conversation-idle-settle.ts` holds
   the sweep: it groups the operator list by display root (the Command Deck D27 rule:
   critic → builder, else parent), keeps only roots that are not settled, not

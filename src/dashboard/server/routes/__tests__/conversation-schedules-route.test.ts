@@ -2,12 +2,20 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 let testHome: string;
 let originalHome: string | undefined;
+
+// PAN-4657 WI-4: spy on the door's emitter without mocking the rest of the
+// module (createConversationSchedule et al. still run for real).
+const emitConversationSchedulesChangedMock = vi.fn();
+vi.mock('../../../../lib/overdeck/conversation-schedules.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/overdeck/conversation-schedules.js')>()),
+  emitConversationSchedulesChanged: emitConversationSchedulesChangedMock,
+}));
 
 function decode(response: { body: unknown }): unknown {
   const payload = response.body as { body: Uint8Array } | null;
@@ -41,6 +49,7 @@ beforeEach(async () => {
   mkdirSync(testHome, { recursive: true });
   const { closeOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
   closeOverdeckDatabase();
+  emitConversationSchedulesChangedMock.mockClear();
 });
 
 afterEach(async () => {
@@ -65,17 +74,20 @@ describe('schedule routes (PAN-4640 WI-3)', () => {
     const created = await request('POST', '/api/conversations/conv-a/schedules', DAILY);
     expect(created.status).toBe(201);
     expect(decode(created)).toMatchObject({ schedule: { conversationName: 'conv-a', cron: '0 21 * * *', enabled: true } });
+    expect(emitConversationSchedulesChangedMock).toHaveBeenCalledTimes(1);
+    expect(emitConversationSchedulesChangedMock).toHaveBeenCalledWith('conv-a');
 
     const listed = await request('GET', '/api/conversations/conv-a/schedules');
     expect(listed.status).toBe(200);
     expect(decode(listed)).toMatchObject({ schedules: [{ prompt: 'Summarize the day', timeZone: 'America/New_York' }] });
   });
 
-  it('POST rejects a too-frequent cron with 400 and the spacing message', async () => {
+  it('POST rejects a too-frequent cron with 400 and the spacing message, and emits nothing', async () => {
     await seedConversation('conv-b');
     const response = await request('POST', '/api/conversations/conv-b/schedules', { ...DAILY, cron: '* * * * *' });
     expect(response.status).toBe(400);
     expect(decode(response)).toEqual({ error: 'Schedules must be at least 15 minutes apart' });
+    expect(emitConversationSchedulesChangedMock).not.toHaveBeenCalled();
   });
 
   it('POST on an agent conversation returns 409 agent-conversation; unknown returns 404', async () => {
@@ -94,9 +106,12 @@ describe('schedule routes (PAN-4640 WI-3)', () => {
     const created = decode(await request('POST', '/api/conversations/conv-c/schedules', DAILY)) as { schedule: { id: number } };
     const id = created.schedule.id;
 
+    emitConversationSchedulesChangedMock.mockClear();
     const paused = await request('PATCH', `/api/conversations/conv-c/schedules/${id}`, { enabled: false });
     expect(paused.status).toBe(200);
     expect(decode(paused)).toMatchObject({ schedule: { id, enabled: false } });
+    expect(emitConversationSchedulesChangedMock).toHaveBeenCalledTimes(1);
+    expect(emitConversationSchedulesChangedMock).toHaveBeenCalledWith('conv-c');
 
     expect((await request('PATCH', '/api/conversations/conv-c/schedules/abc', { enabled: true })).status).toBe(400);
     const invalid = await request('PATCH', `/api/conversations/conv-c/schedules/${id}`, { cron: '*/5 * * * *' });
@@ -107,16 +122,22 @@ describe('schedule routes (PAN-4640 WI-3)', () => {
     expect(decode(missing)).toEqual({ error: 'Schedule not found' });
   });
 
-  it('DELETE returns 200 then 404', async () => {
+  it('DELETE returns 200 then 404, emitting only for the 200', async () => {
     await seedConversation('conv-d');
     const created = decode(await request('POST', '/api/conversations/conv-d/schedules', DAILY)) as { schedule: { id: number } };
     const path = `/api/conversations/conv-d/schedules/${created.schedule.id}`;
 
+    emitConversationSchedulesChangedMock.mockClear();
     const first = await request('DELETE', path);
     expect(first.status).toBe(200);
     expect(decode(first)).toEqual({ removed: true });
+    expect(emitConversationSchedulesChangedMock).toHaveBeenCalledTimes(1);
+    expect(emitConversationSchedulesChangedMock).toHaveBeenCalledWith('conv-d');
+
+    emitConversationSchedulesChangedMock.mockClear();
     const second = await request('DELETE', path);
     expect(second.status).toBe(404);
     expect(decode(second)).toEqual({ error: 'Schedule not found' });
+    expect(emitConversationSchedulesChangedMock).not.toHaveBeenCalled();
   });
 });

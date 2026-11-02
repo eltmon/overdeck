@@ -9,6 +9,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { FlyApiError } from '../../../remote/fly-api.js';
 import {
   type CodexAuthSnapshot,
   decideCodexAuthSync,
@@ -109,6 +110,16 @@ describe('readVmCodexAuth (D-8)', () => {
 
     exec.mockResolvedValueOnce({ stdout: '', stderr: 'boom', exit_code: 1 });
     await expect(readVmCodexAuth(exec, '/.codex/auth.json')).resolves.toEqual({ state: 'indeterminate' });
+
+    exec.mockRejectedValueOnce(new Error('429 Too Many Requests'));
+    await expect(readVmCodexAuth(exec, '/.codex/auth.json')).resolves.toEqual({ state: 'indeterminate' });
+  });
+
+  it('returns tokenRejected for a 403 and plain indeterminate for a network error (PAN-4748)', async () => {
+    const exec = vi.fn<FlyExec>();
+    const authError = new FlyApiError('Fly API error 403', 403, '{"error":"unauthorized"}');
+    exec.mockRejectedValueOnce(authError);
+    await expect(readVmCodexAuth(exec, '/.codex/auth.json')).resolves.toEqual({ state: 'indeterminate', tokenRejected: authError });
 
     exec.mockRejectedValueOnce(new Error('429 Too Many Requests'));
     await expect(readVmCodexAuth(exec, '/.codex/auth.json')).resolves.toEqual({ state: 'indeterminate' });

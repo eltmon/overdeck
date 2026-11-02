@@ -11,6 +11,7 @@
 import { getOverdeckDatabase } from './infra.js';
 import { isAgentConversationName } from './conversations.js';
 import { defaultScheduleTimeZone, nextRunAfter, validateRecurrence } from './conversation-schedule-recurrence.js';
+import { getEventStore } from '../../dashboard/server/event-store.js';
 
 export const MAX_SCHEDULES_PER_CONVERSATION = 20;
 export const MAX_SCHEDULE_PROMPT_LENGTH = 40_000;
@@ -336,4 +337,47 @@ export function recordScheduleRunOutcome(id: number, status: ScheduleRunStatus, 
   getOverdeckDatabase()
     .prepare('UPDATE conversation_schedules SET last_run_status = ?, last_run_error = ? WHERE id = ?')
     .run(status, error === null ? null : error.slice(0, MAX_RUN_ERROR_LENGTH), id);
+}
+
+export interface ConversationScheduleSummary {
+  nextScheduledRunAt: string | null;
+  scheduleCount: number;
+}
+
+export const EMPTY_SCHEDULE_SUMMARY: ConversationScheduleSummary = {
+  nextScheduledRunAt: null,
+  scheduleCount: 0,
+};
+
+/** One query for a page of names (NFR-2). Only enabled schedules count; names with none are absent from the map. */
+export function listScheduleSummariesForConversations(names: readonly string[]): Map<string, ConversationScheduleSummary> {
+  const byName = new Map<string, ConversationScheduleSummary>();
+  if (names.length === 0) return byName;
+  const placeholders = names.map(() => '?').join(', ');
+  const rows = getOverdeckDatabase()
+    .prepare(`
+      SELECT c.name AS conversation_name, MIN(s.next_run_at) AS next_run_at, COUNT(*) AS schedule_count
+      FROM conversation_schedules s
+      JOIN conversations c ON c.id = s.conversation_id
+      WHERE s.enabled = 1 AND c.name IN (${placeholders})
+      GROUP BY c.name
+    `)
+    .all<{ conversation_name: string; next_run_at: number | null; schedule_count: number }>(...names);
+  for (const row of rows) {
+    byName.set(row.conversation_name, { nextScheduledRunAt: iso(row.next_run_at), scheduleCount: row.schedule_count });
+  }
+  return byName;
+}
+
+/** Tell connected clients a conversation's schedules changed. No-op outside the dashboard. */
+export function emitConversationSchedulesChanged(conversationName: string): void {
+  try {
+    getEventStore().emitOnly({
+      type: 'conversation.schedules_changed',
+      timestamp: new Date().toISOString(),
+      payload: { conversationName },
+    });
+  } catch {
+    // Event store is uninitialized in CLI/test contexts; the stored schedule is enough.
+  }
 }
