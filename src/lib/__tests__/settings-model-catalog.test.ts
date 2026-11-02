@@ -27,12 +27,15 @@ const haiku55 = {
   costPer1MTokens: 0.3,
 };
 
-// GPT-6 Sol/Luna (2026-09-22), GPT-6.1 Sol (2026-09-29) and GPT-6.1 Terra (2026-10-26) are additions after the fixture was captured.
+// GPT-6 Sol/Luna (2026-09-22), GPT-6.1 Sol (2026-09-29), GPT-6.1 Terra (2026-10-26), and
+// GPT-6 Rosalind / GPT-6 Astra for Law (2026-11-02) are additions after the fixture was captured.
 const gpt6Additions = [
   { id: 'gpt-6.1-sol', name: 'GPT-6.1 Sol (272K context)', contextWindow: 272000, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], costPer1MTokens: 6 },
   { id: 'gpt-6.1-terra', name: 'GPT-6.1 Terra (272K context)', contextWindow: 272000, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], costPer1MTokens: 3 },
   { id: 'gpt-6-sol', name: 'GPT-6 Sol (272K context)', contextWindow: 272000, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], costPer1MTokens: 6 },
   { id: 'gpt-6-luna', name: 'GPT-6 Luna (272K context)', contextWindow: 272000, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], costPer1MTokens: 0.3 },
+  { id: 'gpt-6-astra-law', name: 'GPT-6 Astra for Law (272K context)', contextWindow: 272000, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], costPer1MTokens: 30 },
+  { id: 'gpt-6-rosalind', name: 'GPT-6 Rosalind (272K context)', contextWindow: 272000, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], costPer1MTokens: 45 },
 ];
 const gpt6AdditionIds = new Set(gpt6Additions.map((model) => model.id));
 // Muse Wonder (2026-10-12) is an addition after the fixture was captured.
