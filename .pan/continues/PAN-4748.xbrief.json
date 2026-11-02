@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4748",
   "created": "2026-11-02T03:23:38.611Z",
-  "updated": "2026-11-02T03:44:49.586Z",
+  "updated": "2026-11-02T04:01:53.182Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-02T03:44:24.501Z"
     },
     "fly-api-retry": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4748",
-      "claimedAt": "2026-11-02T03:44:49.586Z"
+      "claimedAt": "2026-11-02T03:44:49.586Z",
+      "doneAt": "2026-11-02T04:01:53.181Z"
     }
   }
 }
