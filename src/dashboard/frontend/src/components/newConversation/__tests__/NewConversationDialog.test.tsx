@@ -95,7 +95,7 @@ describe('NewConversationDialog', () => {
     renderHost();
     expect(screen.queryByRole('dialog')).toBeNull();
     act(() => openNewConversationDialog({ projectKey: 'Display Name' }));
-    const dialog = await screen.findByRole('dialog', { name: 'New conversation with options' });
+    const dialog = await screen.findByRole('dialog', { name: 'New conversation' });
     await waitFor(() => expect((within(dialog).getByLabelText('Project') as HTMLSelectElement).value).toBe('myapp'));
     expect((screen.getByLabelText('Working directory') as HTMLInputElement).value).toBe('/home/me/Projects/myapp');
   });
@@ -191,11 +191,49 @@ describe('NewConversationDialog', () => {
     expect(screen.getByRole('dialog')).toBeTruthy();
   });
 
+  it('shows the error above the footer', async () => {
+    postResponse = { ok: false, body: { error: 'boom' } };
+    act(() => openNewConversationDialog());
+    renderHost();
+    fireEvent.click(await screen.findByRole('button', { name: 'Create conversation' }));
+    const alert = await screen.findByRole('alert');
+    const panel = screen.getByRole('dialog');
+    expect(panel.contains(alert)).toBe(true);
+
+    // Among the panel's direct children, the one holding the scrolling body
+    // controls (e.g. the Project field) must not be the one holding the
+    // pinned alert — it renders as a sibling region, not inside the body.
+    const projectField = screen.getByLabelText('Project');
+    const bodyChild = Array.from(panel.children).find((child) => child.contains(projectField));
+    expect(bodyChild).toBeTruthy();
+    expect(bodyChild!.contains(alert)).toBe(false);
+  });
+
   it('closes on Escape', async () => {
     act(() => openNewConversationDialog());
     renderHost();
-    await screen.findByRole('dialog');
-    fireEvent.keyDown(window, { key: 'Escape' });
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
     expect(useNewConversationDialogStore.getState().open).toBe(false);
+  });
+
+  it('Escape does nothing while submitting', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST' && url === '/api/conversations') return new Promise<Response>(() => {});
+      if (url === '/api/registered-projects') return { ok: true, status: 200, json: async () => PROJECTS };
+      if (url.startsWith('/api/effort/default')) {
+        return { ok: true, status: 200, json: async () => ({ effort: 'high', source: 'default', requested: 'high', clamped: false }) };
+      }
+      if (url.startsWith('/api/skills/overrides')) {
+        return { ok: true, status: 200, json: async () => ({ skills: [], packs: [] }) };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    }));
+    act(() => openNewConversationDialog());
+    renderHost();
+    fireEvent.click(await screen.findByRole('button', { name: 'Create conversation' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create conversation' })).toBeDisabled());
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(useNewConversationDialogStore.getState().open).toBe(true);
   });
 });

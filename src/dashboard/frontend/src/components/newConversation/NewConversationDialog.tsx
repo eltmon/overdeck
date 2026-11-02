@@ -8,11 +8,11 @@
  * After a create it opens the conversation through its `/conv/<id>` route
  * (D6); the Command Deck's deep-link effect selects it.
  */
-import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
 import { toast } from 'sonner';
 import { EFFORT_LEVELS } from '@overdeck/contracts';
+import { Modal } from '../shared/Modal';
 import { HarnessSelect, ModelSelect, pickerEffortLevels, useAvailableModels, type Harness } from '../shared/ModelPicker';
 import { loadStoredHarness, loadStoredModel, MODEL_EFFORT_SUPPORT } from '../chat/ModelPicker';
 import { fetchRegisteredProjects, type RegisteredProject } from '../CommandDeck/UnknownProjectState';
@@ -44,7 +44,6 @@ export function NewConversationDialogHost() {
 
 export function NewConversationDialog({ presetProject, onClose }: { presetProject?: string; onClose: () => void }) {
   const queryClient = useQueryClient();
-  const titleId = useId();
   const { groups, harnessPolicy } = useAvailableModels();
   const { data: projects, isFetched: projectsFetched } = useQuery({
     queryKey: ['registered-projects'],
@@ -93,14 +92,6 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
     if (effortTouched || !effortDefault) return;
     setEffort(effortDefault.effort);
   }, [effortTouched, effortDefault]);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !submitting) onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, submitting]);
 
   // A picked effort the new model does not support falls back to the default.
   const chooseModel = (next: string) => {
@@ -155,134 +146,120 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
   };
 
   return (
-    <div className={styles.backdrop} onClick={() => { if (!submitting) onClose(); }}>
-      <form
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className={styles.dialog}
-        onClick={(event) => event.stopPropagation()}
-        onSubmit={submit}
-      >
-        <div className={styles.header}>
-          <h2 id={titleId} className={styles.title}>New conversation with options</h2>
-          <button type="button" className={styles.iconButton} aria-label="Close" onClick={onClose} disabled={submitting}>
-            <X size={14} />
-          </button>
-        </div>
+    <Modal
+      title="New conversation"
+      description="These choices apply to this conversation only. Your sidebar defaults stay the same."
+      onClose={onClose}
+      dismissible={!submitting}
+      onSubmit={submit}
+      pinned={error ? <p role="alert" className={styles.error}>{error}</p> : null}
+      footer={<>
+        <button type="button" className={styles.button} onClick={onClose} disabled={submitting}>Cancel</button>
+        <button type="submit" className={styles.primaryButton} aria-label="Create conversation" disabled={submitting}>
+          {submitting ? 'Creating…' : 'Create'}
+        </button>
+      </>}
+    >
+      <label className={styles.row}>
+        <span className={styles.label}>Project</span>
+        <select aria-label="Project" className={styles.control} value={projectKey ?? ''} onChange={(e) => chooseProject(e.target.value)}>
+          <option value="">No project</option>
+          {(projects ?? []).map((p) => (
+            <option key={p.key} value={p.key}>{p.name ?? p.key}</option>
+          ))}
+        </select>
+      </label>
 
-        <div className={styles.body}>
-          <label className={styles.row}>
-            <span className={styles.label}>Project</span>
-            <select aria-label="Project" className={styles.control} value={projectKey ?? ''} onChange={(e) => chooseProject(e.target.value)}>
-              <option value="">No project</option>
-              {(projects ?? []).map((p) => (
-                <option key={p.key} value={p.key}>{p.name ?? p.key}</option>
-              ))}
-            </select>
-          </label>
+      <MachineField value={machine} onChange={setMachine} />
 
-          <MachineField value={machine} onChange={setMachine} />
+      <label className={styles.row}>
+        <span className={styles.label}>Working directory</span>
+        <input
+          aria-label="Working directory"
+          className={styles.control}
+          value={cwd}
+          disabled={!projectKey || machine.machine !== ''}
+          placeholder={projectKey ? '' : 'Default working directory'}
+          onChange={(e) => setCwd(e.target.value)}
+        />
+      </label>
 
-          <label className={styles.row}>
-            <span className={styles.label}>Working directory</span>
-            <input
-              aria-label="Working directory"
+      <ModelSelect label="Model" value={model} onChange={chooseModel} groups={groups} />
+      <HarnessSelect value={harness} onChange={setHarness} modelId={model} harnessPolicy={harnessPolicy} />
+
+      <div className={styles.row}>
+        <span className={styles.label}>Effort</span>
+        {effortSupported ? (
+          <div className={styles.effort}>
+            <select
+              aria-label="Effort"
               className={styles.control}
-              value={cwd}
-              disabled={!projectKey || machine.machine !== ''}
-              placeholder={projectKey ? '' : 'Default working directory'}
-              onChange={(e) => setCwd(e.target.value)}
-            />
-          </label>
-
-          <ModelSelect label="Model" value={model} onChange={chooseModel} groups={groups} />
-          <HarnessSelect value={harness} onChange={setHarness} modelId={model} harnessPolicy={harnessPolicy} />
-
-          <div className={styles.row}>
-            <span className={styles.label}>Effort</span>
-            {effortSupported ? (
-              <div className={styles.effort}>
-                <select
-                  aria-label="Effort"
-                  className={styles.control}
-                  value={effort ?? ''}
-                  onChange={(e) => { setEffort(e.target.value); setEffortTouched(true); }}
-                >
-                  {effort === null && <option value="">…</option>}
-                  {effortLevels.map((level) => <option key={level} value={level}>{level}</option>)}
-                </select>
-                {effortDefault && (
-                  <span className={styles.hint}>
-                    Default: {effortDefault.effort} ({effortDefault.source})
-                    {effortDefault.clamped ? ` · clamped from ${effortDefault.requested}` : ''}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <span className={styles.hint}>Not supported by this model</span>
+              value={effort ?? ''}
+              onChange={(e) => { setEffort(e.target.value); setEffortTouched(true); }}
+            >
+              {effort === null && <option value="">…</option>}
+              {effortLevels.map((level) => <option key={level} value={level}>{level}</option>)}
+            </select>
+            {effortDefault && (
+              <span className={styles.hint}>
+                Default: {effortDefault.effort} ({effortDefault.source})
+                {effortDefault.clamped ? ` · clamped from ${effortDefault.requested}` : ''}
+              </span>
             )}
           </div>
+        ) : (
+          <span className={styles.hint}>Not supported by this model</span>
+        )}
+      </div>
 
-          <fieldset className={styles.group}>
-            <legend className={styles.label}>Context</legend>
+      <fieldset className={styles.group}>
+        <legend className={styles.label}>Context</legend>
+        <label className={styles.check}>
+          <input type="checkbox" checked={bareContext} onChange={(e) => setBareContext(e.target.checked)} />
+          No context
+        </label>
+        <p className={styles.hint}>
+          New conversations start without Overdeck context: no bundled rules, session briefing, memory injection or resume message. Faster to spawn.
+        </p>
+        {harness === 'claude-code' && (
+          <>
             <label className={styles.check}>
-              <input type="checkbox" checked={bareContext} onChange={(e) => setBareContext(e.target.checked)} />
-              No context
+              <input type="checkbox" checked={skipClaudeMd} onChange={(e) => setSkipClaudeMd(e.target.checked)} />
+              Skip CLAUDE.md
             </label>
             <p className={styles.hint}>
-              New conversations start without Overdeck context: no bundled rules, session briefing, memory injection or resume message. Faster to spawn.
+              Claude Code skips ~/.claude/CLAUDE.md, project CLAUDE.md files and auto memory (CLAUDE_CODE_DISABLE_CLAUDE_MDS).
             </p>
-            {harness === 'claude-code' && (
-              <>
-                <label className={styles.check}>
-                  <input type="checkbox" checked={skipClaudeMd} onChange={(e) => setSkipClaudeMd(e.target.checked)} />
-                  Skip CLAUDE.md
-                </label>
-                <p className={styles.hint}>
-                  Claude Code skips ~/.claude/CLAUDE.md, project CLAUDE.md files and auto memory (CLAUDE_CODE_DISABLE_CLAUDE_MDS).
-                </p>
-              </>
-            )}
-          </fieldset>
+          </>
+        )}
+      </fieldset>
 
-          <div className={styles.group}>
-            <span className={styles.label}>Skills</span>
-            <ConversationSkillsField
-              projectKey={projectKey ?? undefined}
-              issueId={issueId ?? undefined}
-              value={skillOverrides}
-              onChange={setSkillOverrides}
-            />
-          </div>
+      <div className={styles.group}>
+        <span className={styles.label}>Skills</span>
+        <ConversationSkillsField
+          projectKey={projectKey ?? undefined}
+          issueId={issueId ?? undefined}
+          value={skillOverrides}
+          onChange={setSkillOverrides}
+        />
+      </div>
 
-          <div className={styles.group}>
-            <span className={styles.label}>Linked issue</span>
-            <IssuePickerField value={issueId} onChange={setIssueId} />
-          </div>
+      <div className={styles.group}>
+        <span className={styles.label}>Linked issue</span>
+        <IssuePickerField value={issueId} onChange={setIssueId} />
+      </div>
 
-          <label className={styles.group}>
-            <span className={styles.label}>First message</span>
-            <textarea
-              aria-label="First message"
-              className={styles.textarea}
-              rows={3}
-              placeholder="Optional"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-            />
-          </label>
-
-          {error && <p role="alert" className={styles.error}>{error}</p>}
-        </div>
-
-        <div className={styles.footer}>
-          <button type="button" className={styles.button} onClick={onClose} disabled={submitting}>Cancel</button>
-          <button type="submit" className={styles.primaryButton} aria-label="Create conversation" disabled={submitting}>
-            {submitting ? 'Creating…' : 'Create'}
-          </button>
-        </div>
-      </form>
-    </div>
+      <label className={styles.group}>
+        <span className={styles.label}>First message</span>
+        <textarea
+          aria-label="First message"
+          className={styles.textarea}
+          rows={3}
+          placeholder="Optional"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+        />
+      </label>
+    </Modal>
   );
 }
