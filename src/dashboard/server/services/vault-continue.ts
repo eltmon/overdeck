@@ -12,6 +12,10 @@
  * The browser never chooses a directory: the target comes only from the
  * record and the registered projects. Every collaborator is injectable
  * through `VaultContinueDeps` so tests run without git, a vault or a DB.
+ *
+ * Smoke hook: `OVERDECK_TEST_ADOPT_SKIP_SAVED_CWD=1` skips the saved-cwd target
+ * so the one-host two-dashboard AC-1 test (PAN-4774) adopts by git origin into
+ * a distinct checkout. It is read here and nowhere else.
  */
 import { createHash } from 'node:crypto';
 import { stat } from 'node:fs/promises';
@@ -91,6 +95,7 @@ export interface VaultContinueDeps {
   removeVaultBrowseRow: typeof removeVaultBrowseRow;
   claudeProjectsRoot: typeof claudeProjectsRoot;
   pathIsDirectory: (path: string) => Promise<boolean>;
+  env: NodeJS.ProcessEnv;
 }
 
 async function readRecordDefault(vaultId: string, vault: OpenVault): Promise<SessionRecord | null> {
@@ -132,6 +137,7 @@ function resolveDeps(overrides: Partial<VaultContinueDeps>): VaultContinueDeps {
     removeVaultBrowseRow,
     claudeProjectsRoot,
     pathIsDirectory: pathIsDirectoryDefault,
+    env: process.env,
     ...overrides,
   };
 }
@@ -154,7 +160,10 @@ interface ResolvedTarget {
 async function resolveTarget(record: SessionRecord, deps: VaultContinueDeps): Promise<ResolvedTarget> {
   const projects = await deps.listProjectsAsync();
   const match = deps.findProjectForGitOrigin(record.gitOrigin, projects);
-  if (record.cwd && (await deps.pathIsDirectory(record.cwd))) {
+  // Smoke hook: OVERDECK_TEST_ADOPT_SKIP_SAVED_CWD=1 adopts by git origin, so a one-host
+  // two-dashboard test (PAN-4774) applies a pulled WIP bundle into a distinct checkout.
+  const skipSavedCwd = deps.env['OVERDECK_TEST_ADOPT_SKIP_SAVED_CWD'] === '1';
+  if (!skipSavedCwd && record.cwd && (await deps.pathIsDirectory(record.cwd))) {
     const containing = projects.find((project) => isPathUnder(record.cwd, project.config.path));
     return { target: { cwd: record.cwd, source: 'saved-cwd', projectKey: containing?.key ?? match?.key ?? null }, noTargetReason: null, clone: null };
   }
