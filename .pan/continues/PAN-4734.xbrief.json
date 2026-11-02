@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T16:52:20.963Z",
+  "updated": "2026-11-02T16:52:37.179Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -137,6 +137,10 @@
     "wi4-sweep-defers-to-reap.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T16:52:20.963Z"
+    },
+    "wi4-sweep-defers-to-reap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:52:37.178Z"
     }
   }
 }
