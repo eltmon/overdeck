@@ -72,6 +72,7 @@ src/components/Stage/HomePane/Launcher.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx
 src/components/Stage/launcherFocusStore.test.ts
 src/components/XTerminal.test.tsx
+src/components/__tests__/AskUserQuestionDialog.test.tsx
 src/components/__tests__/DecisionsPanel.test.tsx
 src/components/__tests__/DegradedModeBanner.test.tsx
 src/components/__tests__/GitHubQuotaPill.test.tsx

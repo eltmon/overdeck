@@ -85,3 +85,48 @@ describe('AskUserQuestionDialog answer state', () => {
     expect(props.onSubmit).toHaveBeenCalledWith(['Yes']);
   });
 });
+
+describe('AskUserQuestionDialog markdown', () => {
+  function renderQuestion(question: { question: string; context?: string }) {
+    return render(
+      <AskUserQuestionDialog
+        subject={{
+          id: 'agent-pan-1',
+          pendingAskUserQuestion: {
+            toolUseId: 'operator-decision:q1',
+            askedAt: '2026-11-01T12:00:00.000Z',
+            questions: [{ ...question, options: [{ label: 'Yes' }, { label: 'No' }] }],
+          },
+        }}
+        isOpen
+        onSubmit={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+  }
+
+  it('renders a markdown list in the question as list items', () => {
+    renderQuestion({ question: 'Pick a path.\n\n- first fact\n- second fact' });
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByText('Pick a path.')).toBeInTheDocument();
+  });
+
+  it('renders the context as a separate block after the options', () => {
+    renderQuestion({ question: 'Pick a path.', context: '- tried A\n- tried B' });
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByText('Pick a path.').closest('div')).not.toHaveTextContent('tried A');
+    const notesLabel = screen.getByText("Agent's notes");
+    expect(notesLabel.parentElement).toHaveTextContent('tried A');
+    const lastOption = screen.getByRole('button', { name: 'No' });
+    expect(lastOption.compareDocumentPosition(notesLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('renders no context block when context is absent', () => {
+    renderQuestion({ question: 'Pick a path.' });
+
+    expect(screen.queryByText("Agent's notes")).toBeNull();
+    expect(screen.queryByText('tried A')).toBeNull();
+  });
+});

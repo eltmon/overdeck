@@ -17,6 +17,7 @@
 import { useState } from 'react'
 import { Loader2, MessageCircleQuestion, Minus } from 'lucide-react'
 import { formatIssueRef } from '../lib/issueLabel'
+import { ChatMarkdown } from './chat/ChatMarkdown'
 import { bucketCount, capture } from '../lib/telemetry'
 
 /**
@@ -39,6 +40,8 @@ export interface AskUserQuestionSubject {
     askedAt: string
     questions: ReadonlyArray<{
       question: string
+      /** Supporting facts from `pan ask --context`, shown apart from the question. */
+      context?: string
       header?: string
       multiSelect?: boolean
       options: ReadonlyArray<{ label: string; description?: string }>
@@ -156,7 +159,9 @@ export function AskUserQuestionDialog({
               {q.header ? (
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{q.header}</p>
               ) : null}
-              <p className="text-sm font-medium text-foreground">{q.question}</p>
+              <div className="text-sm text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                <ChatMarkdown text={q.question} cwd={undefined} />
+              </div>
               <div className="space-y-1">
                 {q.options.map((opt, oIdx) => {
                   const isSelected = selections[qIdx] === opt.label
@@ -187,6 +192,14 @@ export function AskUserQuestionDialog({
                   )
                 })}
               </div>
+              {q.context ? (
+                <div className="space-y-1">
+                  <p className="eyebrow">{"Agent's notes"}</p>
+                  <div className="border-l-2 border-border pl-3 text-sm text-muted-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                    <ChatMarkdown text={q.context} cwd={undefined} />
+                  </div>
+                </div>
+              ) : null}
             </div>
           ))}
 
