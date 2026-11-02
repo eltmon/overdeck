@@ -11,6 +11,9 @@
  * project `skill_pack_overrides`, and the issue file's `packs:` map. Pack
  * skills use the same per-skill maps with `pack/skill` keys.
  *
+ * The issue file also carries `pipeline: deft` (PAN-4820) when the issue runs
+ * on Deft Directive's pipeline; absent means Overdeck's pipeline.
+ *
  * Server-reachable: every config read here is async. Writes validate against
  * the skill catalog and reject core skills.
  */
@@ -89,6 +92,8 @@ type ProjectWithSkillOverrides = ProjectConfig & {
 interface IssueOverrides {
   skills: Record<string, boolean>;
   packs: Record<string, boolean>;
+  /** PAN-4820: absent = Overdeck's pipeline. */
+  pipeline?: 'deft';
 }
 
 const execFileAsync = promisify(execFile);
@@ -175,8 +180,12 @@ async function projectForIssue(issueId: string): Promise<{ projectKey: string; p
 }
 
 async function readIssueFile(path: string): Promise<IssueOverrides> {
-  const parsed = parseYamlOrNull(await readTextOrEmpty(path)) as { skills?: unknown; packs?: unknown } | null;
-  return { skills: booleanEntries(parsed?.skills), packs: booleanEntries(parsed?.packs) };
+  const parsed = parseYamlOrNull(await readTextOrEmpty(path)) as { skills?: unknown; packs?: unknown; pipeline?: unknown } | null;
+  return {
+    skills: booleanEntries(parsed?.skills),
+    packs: booleanEntries(parsed?.packs),
+    ...(parsed?.pipeline === 'deft' ? { pipeline: 'deft' as const } : {}),
+  };
 }
 
 async function readIssueOverrides(issueId: string): Promise<IssueOverrides> {
@@ -187,6 +196,11 @@ async function readIssueOverrides(issueId: string): Promise<IssueOverrides> {
 
 export async function readIssueSkillOverrides(issueId: string): Promise<Record<string, boolean>> {
   return (await readIssueOverrides(issueId)).skills;
+}
+
+/** The issue file's `pipeline:` key (PAN-4820); undefined = Overdeck's pipeline. */
+export async function readIssuePipelineField(issueId: string): Promise<'deft' | undefined> {
+  return (await readIssueOverrides(issueId)).pipeline;
 }
 
 /**
@@ -539,36 +553,46 @@ function sortedEntries(map: Record<string, boolean>): Record<string, boolean> {
   return Object.fromEntries(Object.entries(map).sort(([a], [b]) => a.localeCompare(b)));
 }
 
-function renderIssueFile(issueId: string, skills: Record<string, boolean>, packs: Record<string, boolean>): string {
+function renderIssueFile(
+  issueId: string,
+  skills: Record<string, boolean>,
+  packs: Record<string, boolean>,
+  pipeline?: 'deft',
+): string {
   const body = {
     issue: issueId,
+    ...(pipeline ? { pipeline } : {}),
     ...(Object.keys(skills).length > 0 ? { skills: sortedEntries(skills) } : {}),
     ...(Object.keys(packs).length > 0 ? { packs: sortedEntries(packs) } : {}),
   };
   return ISSUE_FILE_HEADER + stringifyYaml(body, { indent: 2 });
 }
 
-/** Write (or delete, when both maps are empty) the issue file and commit it through the plan-artifact door. */
+/**
+ * Write (or delete, when both maps are empty and no pipeline is set) the issue
+ * file and commit it through the plan-artifact door.
+ */
 async function persistIssueFile(
   planHome: string,
   path: string,
   issue: string,
   overrides: IssueOverrides,
+  message = `chore(workspace): skill overrides for ${issue}`,
 ): Promise<SkillOverrideWriteResult> {
-  if (Object.keys(overrides.skills).length === 0 && Object.keys(overrides.packs).length === 0) {
+  if (
+    Object.keys(overrides.skills).length === 0 &&
+    Object.keys(overrides.packs).length === 0 &&
+    overrides.pipeline === undefined
+  ) {
     await rm(path, { force: true });
     // A file that was never committed leaves nothing to record.
     if (!(await isTracked(planHome, path))) return { committed: false, reason: 'nothing to commit' };
   } else {
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, renderIssueFile(issue, overrides.skills, overrides.packs), 'utf8');
+    await writeFile(path, renderIssueFile(issue, overrides.skills, overrides.packs, overrides.pipeline), 'utf8');
   }
 
-  const commit = await commitPlanArtifacts({
-    cwd: planHome,
-    paths: [path],
-    message: `chore(workspace): skill overrides for ${issue}`,
-  });
+  const commit = await commitPlanArtifacts({ cwd: planHome, paths: [path], message });
   if (!commit.committed) {
     // A clean tree means the same content was already committed.
     if (commit.reason === 'nothing to commit') return { committed: false, reason: commit.reason };
@@ -599,6 +623,28 @@ async function setIssue(issueId: string, skill: string, enabled: boolean | null)
     skills[skill] = enabled;
   }
   return persistIssueFile(planHome, path, issue, overrides);
+}
+
+/**
+ * Choose the pipeline an issue runs on (PAN-4820). `deft` writes
+ * `pipeline: deft` into the issue file; `overdeck` removes the key, and the
+ * file too when nothing else remains.
+ */
+export async function setIssuePipeline(issueId: string, pipeline: 'deft' | 'overdeck'): Promise<SkillOverrideWriteResult> {
+  const issue = issueId.toUpperCase();
+  const owner = await projectForIssue(issue);
+  if (!owner) throw new SkillOverrideError('unknown-issue', `no registered project owns issue ${issue}`);
+  const planHome = planHomeFor(owner.project);
+  const path = issueSkillOverridesPath(planHome, issue);
+  const overrides = await readIssueFile(path);
+  if (pipeline === 'deft') {
+    if (overrides.pipeline === 'deft') return {};
+    overrides.pipeline = 'deft';
+  } else {
+    if (overrides.pipeline === undefined) return {};
+    delete overrides.pipeline;
+  }
+  return persistIssueFile(planHome, path, issue, overrides, `chore(workspace): pipeline for ${issue}`);
 }
 
 async function setPackOverride(update: PackOverrideUpdate): Promise<SkillOverrideWriteResult> {
