@@ -3,6 +3,7 @@ import {
   BUILTIN_COLOR_THEMES,
   effectiveTerminalPalette,
   type ColorTheme,
+  type ColorThemeFile,
   type ColorThemeType,
   type TerminalPalette,
 } from '@overdeck/contracts';
@@ -74,6 +75,7 @@ interface ColorThemeState {
   select: (mode: ColorThemeType, id: string) => Promise<void>;
   previewImport: (file: File) => Promise<{ themes: ColorTheme[]; warnings: string[] }>;
   saveImported: (theme: unknown) => Promise<void>;
+  updateTheme: (id: string, theme: ColorThemeFile) => Promise<void>;
   activeTheme: (mode: ColorThemeType) => ColorTheme;
   terminalPalette: (mode: ColorThemeType) => TerminalPalette;
 }
@@ -151,6 +153,18 @@ export const useColorTheme = create<ColorThemeState>((set, get) => ({
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error(data?.errors?.join('; ') ?? `Failed to save theme (HTTP ${res.status})`);
+    await get().reconcileFromServer();
+  },
+
+  updateTheme: async (id, theme) => {
+    const headers = await dashboardMutationJsonHeaders();
+    const res = await fetch(`/api/color-themes/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ theme }),
+    });
+    const data = await res.json().catch(() => null) as { error?: string; errors?: string[] } | null;
+    if (!res.ok) throw new Error(data?.error ?? data?.errors?.join('; ') ?? `Failed to save theme (HTTP ${res.status})`);
     await get().reconcileFromServer();
   },
 
