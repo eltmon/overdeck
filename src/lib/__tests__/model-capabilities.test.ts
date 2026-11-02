@@ -79,6 +79,15 @@ describe('model capabilities', () => {
     },
   );
 
+  // PAN-4826 D1: contextWindow is the launched window. Claude Code runs bare
+  // claude-opus-4-6 / claude-sonnet-4-6 at 200K; raising it to the 1M API window
+  // would rescore the context meter and Deacon high-water against 1M (PAN-3057).
+  it.each(['claude-opus-4-6', 'claude-sonnet-4-6'] as const)('keeps %s at the 200K Claude Code window', async (model) => {
+    const { getClaudeCodeContextPolicyForModel } = await import('../agents/provider-env.js');
+    expect(MODEL_CAPABILITIES[model].contextWindow).toBe(200_000);
+    expect(getClaudeCodeContextPolicyForModel(model)).toEqual({ autoCompactWindow: 200_000 });
+  });
+
   // PAN-3388: the [372k] suffix is Overdeck-side only — the launch door must
   // hand every harness CLI the base API id.
   it('strips the [372k] suffix at the shell-quote launch door', async () => {

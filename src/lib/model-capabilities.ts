@@ -197,7 +197,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     provider: 'anthropic',
     displayName: 'Claude Opus 4.6',
     costPer1MTokens: 15, // Equal input/output blend of published API prices.
-    contextWindow: 200000, // 1M available via opt-in beta, but we use 200K
+    contextWindow: 200000, // API offers 1M at standard pricing; Claude Code runs the bare id at 200K (1M only via the plan-gated [1m] variant, code.claude.com/docs/en/model-config)
     skills: {
       'code-generation': 96, // 80.9% SWE-bench (first >80%), 89.4% Aider Polyglot
       'code-review': 98,
@@ -212,7 +212,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 95,
     },
     effortLevels: ['low', 'medium', 'high', 'max'],
-    notes: 'Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning.',
+    notes: 'Successor to Opus 4.5. Same pricing, 1M context on the API, but Claude Code runs the bare id at 200K (1M only through the plan-gated [1m] variant). Best for planning, security, complex reasoning.',
   },
 
   'claude-sonnet-5': {
@@ -246,7 +246,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     provider: 'anthropic',
     displayName: 'Claude Sonnet 4.6',
     costPer1MTokens: 9.0, // $3 in / $15 out → avg ~$9
-    contextWindow: 200000,
+    contextWindow: 200000, // API offers 1M at standard pricing; Claude Code runs the bare id at 200K ([1m] needs usage credits on every subscription plan)
     skills: {
       'code-generation': 94,
       'code-review': 94,
@@ -261,7 +261,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 95,
     },
     effortLevels: ['low', 'medium', 'high', 'max'],
-    notes: 'Successor to Sonnet 4.5. Same pricing tier. Improved coding and reasoning.',
+    notes: 'Successor to Sonnet 4.5. Same pricing tier. Improved coding and reasoning. 1M context on the API; Claude Code runs the bare id at 200K ([1m] variant needs usage credits).',
   },
 
   'claude-sonnet-4-5': {
