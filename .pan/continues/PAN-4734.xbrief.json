@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T14:43:33.596Z",
+  "updated": "2026-11-02T14:45:47.164Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-02T14:43:30.053Z"
     },
     "wi10-reap-linked-agents": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4734",
-      "claimedAt": "2026-11-02T14:43:33.596Z"
+      "claimedAt": "2026-11-02T14:43:33.596Z",
+      "doneAt": "2026-11-02T14:45:47.164Z"
     }
   }
 }
