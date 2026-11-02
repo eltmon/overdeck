@@ -123,7 +123,11 @@ describe('importVsixThemes', () => {
 
   function includeChain(includes: number): Record<string, string> {
     const files: Record<string, string> = {
-      'extension/package.json': manifest([{ label: 'Deep', uiTheme: 'vs-dark', path: './t0.json' }]),
+      'extension/package.json': manifest([
+        { label: 'Deep', uiTheme: 'vs-dark', path: './t0.json' },
+        { label: 'Other', uiTheme: 'vs', path: './other.json' },
+      ]),
+      'extension/other.json': LIGHT,
     };
     for (let i = 0; i <= includes; i += 1) {
       files[`extension/t${i}.json`] = themeFile(i < includes ? { include: `./t${i + 1}.json` } : { colors: { 'terminal.ansiRed': '#ff0000' } });
@@ -133,10 +137,12 @@ describe('importVsixThemes', () => {
 
   it('loads a chain of 5 includes and refuses a chain of 6', async () => {
     const five = await importVsixThemes(buildVsix(includeChain(5)), 'five.vsix');
+    expect(five.themes.map((t) => t.name)).toEqual(['Deep', 'Other']);
     expect(five.themes[0]!.terminal?.red).toBe('#ff0000');
 
-    const six = await importError(buildVsix(includeChain(6)), 'six.vsix');
-    expect(six.message).toContain('include depth exceeds 5');
+    const six = await importVsixThemes(buildVsix(includeChain(6)), 'six.vsix');
+    expect(six.themes.map((t) => t.name)).toEqual(['Other']);
+    expect(six.warnings).toEqual([expect.stringMatching(/^"Deep": include depth exceeds 5; skipped$/)]);
   });
 
   it('imports a theme whose tokenColors is a .tmTheme path, with a warning', async () => {
