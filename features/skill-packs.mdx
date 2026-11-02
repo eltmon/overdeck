@@ -560,6 +560,17 @@ In the dashboard, packs appear above the skill list on the Skills page, in proje
 
 ## Troubleshooting
 
+| Symptom | Cause | Fix |
+|---|---|---|
+| Launch prints `[launcher] WARNING: skill pack <id> not cached; run pan skills pack sync <id>` and the pack is missing | The trusted commit is not in the cache; launches never fetch | `pan skills pack sync <id>`, then relaunch |
+| A pack skill is not visible to the agent | The pack or skill is off at the level that decides, the skill is opt-in, the harness is not Claude Code or Codex, or the launch is remote (Fly) | `pan skills list --project <key> --issue <id>`; turn on the pack (`--pack`) or the opt-in skill (`<pack>/<skill>`); packs apply only to Overdeck-managed Claude Code and Codex launches |
+| A running agent did not pick up a change | Packs resolve at launch | Restart or resume the agent; the next launch applies it |
+| The dashboard shows `also installed as a Claude plugin — skills will appear twice` | Claude Code also has the same upstream plugin installed | Uninstall the Claude Code plugin, or keep the pack off |
+| Launch prints `[launcher] WARNING: gstack browser runtime not built; run pan skills pack sync gstack` | Browser consent is recorded but the runtime for the trusted commit is missing | `pan skills pack sync gstack` |
+| `pack gstack needs bun on PATH (https://bun.sh)` | `bun` is not installed or not on `PATH` | Install bun, then repeat the command |
+| An old gstack render stays after `pan skills pack gc` | A linked mount still uses it, or it is younger than `--max-age-days` (using a mount resets its age and its render's age) | Wait until no launch uses it, or run `pan skills pack gc --max-age-days <n>` with a smaller value |
+| Codex launches show no SageOx skills and print `SageOx is on but supports Claude Code launches only; sageox skills and hooks not applied` | SageOx supports Claude Code launches only | Use a Claude Code launch |
+
 ## Terminology: skill packs and skill bundles
 
 Skill packs are the built feature described on this page. [Template Conversations](/reference/template-conversations) describes a separate, unbuilt proposal (PAN-1357, `pan bundle`) that also uses the words "skill bundle." Per-conversation skill values (PAN-4486), set in the **New conversation with options…** dialog or by `pan handoff --skill/--pack`, already cover part of that proposal: a conversation can turn on pack skills for itself. See [Template Conversations](/reference/template-conversations) and [Conversations](/features/conversations).

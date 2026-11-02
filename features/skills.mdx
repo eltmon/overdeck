@@ -279,6 +279,10 @@ Overrides do not apply to other harnesses, to remote (Fly) launches, or to sessi
 
 `pan sync` still installs every skill everywhere; hiding happens per launch, and no skill files are copied, moved, or deleted.
 
+## Skill packs
+
+A **skill pack** is a third-party git repository of skills that Overdeck pins to one commit you trust and mounts into Overdeck-managed Claude Code and Codex launches. Pack skills are off until you turn them on, at the same global, project, issue and conversation levels as other skills. Overdeck never copies them into `~/.claude/skills` or `~/.agents/skills`. See [Skill Packs](/features/skill-packs) for the quickstart, the pack catalog, the trust model and each pack.
+
 ## Subagents
 
 Overdeck includes specialized subagent templates for common development tasks. Subagents are invoked via the Task tool or convoy orchestration for parallel execution.
