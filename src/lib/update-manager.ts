@@ -11,6 +11,8 @@ import {
   type UpdateSnapshot,
 } from '@overdeck/contracts';
 
+import { ensureDurableRuntime } from './anywhere/connect-runtime.js';
+
 const execFileAsync = promisify(execFile);
 const NPM_DIST_TAGS_URL = 'https://registry.npmjs.org/-/package/%40overdeck%2Fcore/dist-tags';
 const GITHUB_RELEASES_URL = 'https://api.github.com/repos/eltmon/overdeck/releases';
@@ -56,13 +58,55 @@ export function isVersionNewer(candidate: string, current: string): boolean {
   return false;
 }
 
+/** The side effects of an Overdeck install; injectable for tests (PAN-4722). */
+export interface UpdateInstallDeps {
+  /** Runs a command; rejects on a non-zero exit. */
+  execFile: (file: string, args: readonly string[]) => Promise<void>;
+  ensureDurableRuntime: (overdeckHome: string, version: string) => Promise<{ root: string; installed: boolean }>;
+}
+
+const defaultInstallDeps: UpdateInstallDeps = {
+  execFile: async (file, args) => {
+    await execFileAsync(file, [...args]);
+  },
+  ensureDurableRuntime: (overdeckHome, version) => ensureDurableRuntime(overdeckHome, version),
+};
+
+/**
+ * Installs @overdeck/core@<version> where the running copy lives: the
+ * `pan connect` runtime under `runtimeHome` (PAN-4722), else the global
+ * npm prefix.
+ */
+export async function installOverdeckPackage(
+  version: string,
+  runtimeHome: string | null,
+  deps: UpdateInstallDeps = defaultInstallDeps,
+): Promise<void> {
+  if (runtimeHome) {
+    await deps.ensureDurableRuntime(runtimeHome, version);
+    return;
+  }
+  await deps.execFile('npm', ['install', '--global', `@overdeck/core@${version}`]);
+}
+
 export class UpdateManager {
   private snapshot: UpdateSnapshot;
   private readonly fetchImpl: typeof fetch;
+  private readonly runtimeHome: string | null;
+  private readonly installDeps: UpdateInstallDeps;
   private installPromise: Promise<void> | null = null;
 
-  constructor(options: { currentVersion: string; installMode: UpdateInstallMode; fetchImpl?: typeof fetch }) {
+  constructor(options: {
+    currentVersion: string;
+    installMode: UpdateInstallMode;
+    fetchImpl?: typeof fetch;
+    /** OVERDECK_HOME whose `pan connect` runtime this process runs from; install() updates that runtime (PAN-4722). */
+    runtimeHome?: string | null;
+    installDeps?: Partial<UpdateInstallDeps>;
+  }) {
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.runtimeHome = options.runtimeHome ?? null;
+    this.installDeps = { ...defaultInstallDeps, ...options.installDeps };
     this.snapshot = {
       phase: 'idle',
       installMode: options.installMode,
@@ -140,7 +184,7 @@ export class UpdateManager {
       this.snapshot = { ...this.snapshot, phase: 'installing', error: null };
       this.installPromise = (async () => {
         try {
-          await execFileAsync('npm', ['install', '--global', `@overdeck/core@${version}`]);
+          await installOverdeckPackage(version, this.runtimeHome, this.installDeps);
           await execFileAsync('pan', ['sync']);
           this.snapshot = { ...this.snapshot, phase: 'ready' };
         } catch (error) {
