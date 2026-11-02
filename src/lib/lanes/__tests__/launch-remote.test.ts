@@ -188,13 +188,17 @@ describe('launchLane on another machine (PAN-4638 WI-4)', () => {
     expect(await readRemoteLane(second!)).not.toBeNull();
   });
 
-  it('ac4: refuses a non-Claude Code harness on a Fly machine before calling it', async () => {
+  it('ac4: refuses a harness that does not run on Fly machines before calling it, and lets Codex through', async () => {
     const { deps, remote } = harness({ isFly: true });
-    deps.resolveHarness.mockResolvedValue('codex' as never);
+    deps.resolveHarness.mockResolvedValue('pi' as never);
     const error = await rejection(launchLane(request(root(), { key: 'b5', machine: 'fly-abc' }), deps));
     expect(error.status).toBe(400);
-    expect(error.message).toBe('Fly machines run Claude Code only; codex on Fly is #4296');
+    expect(error.message).toBe('pi does not run on Fly machines (#4296)');
     expect(remote.launch).not.toHaveBeenCalled();
+
+    deps.resolveHarness.mockResolvedValue('codex' as never);
+    await launchLane(request(root(), { key: 'b5c', machine: 'fly-abc' }), deps);
+    expect(remote.launch).toHaveBeenCalledTimes(1);
   });
 
   it('ac5: a live remote lane answers 409; --replace stops it through the owner first', async () => {
@@ -253,6 +257,27 @@ describe('launchLane on another machine (PAN-4638 WI-4)', () => {
     ));
     expect(elsewhere.status).toBe(400);
     expect(elsewhere.message).toContain('ran on desk');
+  });
+
+  it('a local launch never takes a name a remote lane already holds', async () => {
+    const { deps } = harness();
+    const parent = root();
+    const random = vi.spyOn(Math, 'random');
+    try {
+      random.mockReturnValueOnce(0.5);
+      const remote = await launchLane(request(parent, { run: 'coll', key: 'r1', machine: 'desk' }), deps);
+      // The local launch's first candidate is the remote lane's name; the next one is free.
+      random.mockReturnValueOnce(0.5).mockReturnValueOnce(0.6);
+      const local = harness();
+      const launched = await launchLane(
+        request(parent, { run: 'coll', key: 'l1' }),
+        { ...local.deps, remote: undefined, cpuPressure: vi.fn(async () => ({ ...CPU_SATURATED, saturated: false })) },
+      );
+      expect(launched.conversation.name).not.toBe(remote.conversation.name);
+      expect(getConversationByName(launched.conversation.name)?.laneKey).toBe('l1');
+    } finally {
+      random.mockRestore();
+    }
   });
 
   it('a local critic of a remote builder links it through the sidecar', async () => {

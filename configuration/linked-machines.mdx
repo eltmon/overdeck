@@ -211,7 +211,7 @@ a Fly machine started for Claude Code can also run a Codex conversation later.
 
 A linked Fly machine runs gauntlet lanes like any linked machine: name it with
 `pan lane start --machine fly-<machineId>`, or let `--machine auto --needs docker` choose
-it. It runs Claude Code lanes only. A run with long waits between reports can sit idle
+it. It runs Claude Code and Codex lanes only. A run with long waits between reports can sit idle
 longer than `machine_idle_minutes`, so raise it for that run. See
 [Lanes on other machines](/reference/lanes#lanes-on-other-machines).
 

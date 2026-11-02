@@ -20,6 +20,8 @@ import { mkdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 
+import { getHarnessBehavior } from '@overdeck/contracts';
+
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { workerDir } from '../agents/worker/ids.js';
 import { latestWorkerReport, type WorkerReport } from '../agents/worker/report.js';
@@ -52,6 +54,7 @@ import { listAllLaneRows, type LaneRow } from './lane-rows.js';
 import { pairBuilder, type PairingRow } from './pairing.js';
 import {
   readRemoteLane,
+  remoteLaneNameTaken,
   removeRemoteLane,
   reserveRemoteLane,
   writeCriticLink,
@@ -65,7 +68,12 @@ import { addBranchWorktree, addDetachedWorktree, applySparse, fetchBase, laneDir
 export const RUN_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 export const KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;
 /** opencode takes free-form effort names, as at the conversation door. */
-export const OPENCODE_EFFORT_PATTERN = /^[a-z][a-z0-9_-]*$/;
+const OPENCODE_EFFORT_PATTERN = /^[a-z][a-z0-9_-]*$/;
+
+/** D20: a lane takes low, medium or high; opencode also takes its free-form variant names. */
+export function isValidLaneEffort(effort: string, harness: RuntimeName): boolean {
+  return (harness === 'opencode' ? OPENCODE_EFFORT_PATTERN : SAFE_EFFORT_PATTERN).test(effort);
+}
 /** D10 `starting`: a row not ended, created less than this long ago. */
 export const STARTING_GRACE_MS = 3 * 60_000;
 const REPLACE_POLL_MS = 1_000;
@@ -443,12 +451,12 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
     throw new LaneLaunchError(400, error instanceof Error ? error.message : String(error));
   }
   const effort = request.effort?.trim() || roleConfig.effort;
-  if (effort && !(harness === 'opencode' ? OPENCODE_EFFORT_PATTERN : SAFE_EFFORT_PATTERN).test(effort)) {
+  if (effort && !isValidLaneEffort(effort, harness)) {
     throw new LaneLaunchError(400, 'effort must be low, medium or high');
   }
-  // FR-10: Fly machines run Claude Code only.
-  if (remote?.isFly && harness !== 'claude-code') {
-    throw new LaneLaunchError(400, `Fly machines run Claude Code only; ${harness} on Fly is #4296`);
+  // FR-10: only harnesses that declare runsOnFlyMachine run on a Fly machine (#4296).
+  if (remote?.isFly && !getHarnessBehavior(harness).capabilities.runsOnFlyMachine) {
+    throw new LaneLaunchError(400, `${harness} does not run on Fly machines (#4296)`);
   }
 
   // 6. Serialize the rest per project (NFR-4).
@@ -607,8 +615,11 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
 
     try {
       // 10-11. Name and write-once brief (FR-9, D9).
+      // A name is free when no local row and no remote lane stand-in holds it (D-4638-2).
+      const nameTaken = async (candidate: string): Promise<boolean> =>
+        getConversationByName(candidate) !== null || (await remoteLaneNameTaken(candidate));
       let name = generateConversationName();
-      for (let attempt = 0; attempt < NAME_ATTEMPTS && getConversationByName(name); attempt += 1) name = generateConversationName();
+      for (let attempt = 0; attempt < NAME_ATTEMPTS && (await nameTaken(name)); attempt += 1) name = generateConversationName();
       const tmuxSession = `conv-${name}`;
       const briefPath = await writeBrief(name);
 

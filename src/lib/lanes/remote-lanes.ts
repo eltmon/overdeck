@@ -17,7 +17,7 @@
  *
  * Every file is mode 0600. Rewritable files go through a temp file + rename.
  */
-import { chmod, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import type { LaneActivity } from '@overdeck/contracts';
@@ -204,6 +204,12 @@ export async function reserveRemoteLane(name: string): Promise<boolean> {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
     throw error;
   }
+}
+
+/** Whether `name` is held in the stand-in store (a launched lane or a claim); false for a name the store does not accept. */
+export async function remoteLaneNameTaken(name: string): Promise<boolean> {
+  if (!NAME_PATTERN.test(name)) return false;
+  return stat(laneDir(name)).then(() => true, () => false);
 }
 
 /** Remove a stand-in. Only for a launch the owner refused: a launched lane's stand-in is kept (D7). */

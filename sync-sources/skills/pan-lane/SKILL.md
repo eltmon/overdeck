@@ -78,7 +78,7 @@ exits 1. A remote lane prints `Lane <run>/<key> <role> i<n>: <name> on <label> i
   machine. Orchestrator lanes stay on this machine. `--reuse` continues on the newest lane's machine,
   so it takes no `--machine`.
 - A critic on another machine judges a commit that is on `origin`: the builder must push first.
-- A Fly machine runs Claude Code lanes only.
+- A Fly machine runs Claude Code and Codex lanes only.
 - `pan lane list` and `show` show remote lanes with the conversation name in `ID` and the machine in
   `MACHINE` (`(offline)` while it cannot be reached). `wait`, `stop` and `reap` work on them from
   here; an unreachable machine delays a report and never fails the wait.

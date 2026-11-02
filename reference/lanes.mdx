@@ -125,7 +125,7 @@ What to know:
 - `--reuse` continues on the newest lane's machine, so it takes no `--machine`.
 - Orchestrator lanes run on this machine only.
 - A Fly machine must be linked first with `pan machines add-fly --project <key>`, and
-  runs Claude Code lanes only. It is destroyed after `remote.fly.machine_idle_minutes`
+  runs Claude Code and Codex lanes only. It is destroyed after `remote.fly.machine_idle_minutes`
   (default 30) of idle conversations, so raise that for runs with long waits.
 - The Command Deck nests a remote lane under the orchestrator that launched it, and
   the Awareness rail counts it in the run card.

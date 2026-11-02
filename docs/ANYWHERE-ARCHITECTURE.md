@@ -959,8 +959,8 @@ remote lane is its **owner**.
 launcher standing, run, critic link and default `--at`, iteration, idempotency, model,
 harness and effort. It reads lanes through `listAllLaneRows` (`lanes/lane-rows.ts`), which
 merges local lane conversations with the stand-ins. With a remote target it skips home's
-CPU check, refuses an orchestrator lane, refuses a non-`claude-code` harness on a Fly
-machine (#4296) and refuses `--machine` with `--reuse` (D-4638-8). It allocates a name
+CPU check, refuses an orchestrator lane, refuses on a Fly machine a harness whose
+capabilities lack `runsOnFlyMachine` (Claude Code and Codex have it; #4296) and refuses `--machine` with `--reuse` (D-4638-8). It allocates a name
 free in `conversations` and claimed in the stand-in store (`reserveRemoteLane`, an empty
 directory), and calls the owner with a precomputed `OwnerLaneSpec`: name, iteration,
 branch, base, `at`, brief header, the verdict a builder answers. `name-taken` retries with

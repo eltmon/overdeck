@@ -24,7 +24,7 @@ import { assessCpuPressure } from '../cloister/cpu-pressure.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { conversationHarnessAlive } from '../overdeck/conversation-liveness.js';
 import { markConversationStartedBy } from '../overdeck/conversation-provenance.js';
-import { resolveAllowedHarness, SAFE_EFFORT_PATTERN, startConversationRuntime } from '../overdeck/conversation-runtime.js';
+import { resolveAllowedHarness, startConversationRuntime } from '../overdeck/conversation-runtime.js';
 import {
   createConversation,
   getConversationByName,
@@ -38,10 +38,10 @@ import { resolveLaneConfig } from './config.js';
 import { laneContract } from './contract.js';
 import {
   gitFailure,
+  isValidLaneEffort,
   isWithin,
   KEY_PATTERN,
   laneDir,
-  OPENCODE_EFFORT_PATTERN,
   pathExists,
   prepareLanesRoot,
   RUN_PATTERN,
@@ -131,7 +131,7 @@ export async function launchOwnedLane(spec: OwnerLaneSpec, context: OwnerLaneCon
     throw new LaneLaunchError(400, error instanceof Error ? error.message : String(error));
   }
   const effort = spec.effort?.trim() || undefined;
-  if (effort && !(harness === 'opencode' ? OPENCODE_EFFORT_PATTERN : SAFE_EFFORT_PATTERN).test(effort)) {
+  if (effort && !isValidLaneEffort(effort, harness)) {
     throw new LaneLaunchError(400, 'effort must be low, medium or high');
   }
 
