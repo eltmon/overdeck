@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4775",
   "created": "2026-11-02T03:25:35.744Z",
-  "updated": "2026-11-02T03:37:08.426Z",
+  "updated": "2026-11-02T03:37:25.079Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,10 @@
     "w3-roadmap-steps.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T03:37:08.426Z"
+    },
+    "w4-pricing-reasoning.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:37:25.078Z"
     }
   }
 }
