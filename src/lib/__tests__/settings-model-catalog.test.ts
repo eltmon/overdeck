@@ -45,14 +45,17 @@ const geminiArgon = {
   effortLevels: ['low', 'medium', 'high'],
   costPer1MTokens: 6,
 };
+// Kimi K3.1 Pro / K3.1 Pro Highspeed (2026-10-23) are additions after the fixture was captured.
+const kimiK31AdditionIds = new Set(['k3.1-pro', 'k3.1-pro-highspeed', 'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed']);
 
-function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }> }>(catalog: T): T {
+function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }>; kimi: Array<{ id: string }> }>(catalog: T): T {
   return {
     ...catalog,
     anthropic: catalog.anthropic.filter((model) => ![opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
     openai: catalog.openai.filter((model) => !gpt6AdditionIds.has(model.id)),
     google: catalog.google.filter((model) => model.id !== geminiArgon.id),
     meta: catalog.meta.filter((model) => model.id !== museWonderId),
+    kimi: catalog.kimi.filter((model) => !kimiK31AdditionIds.has(model.id)),
   };
 }
 
@@ -71,6 +74,19 @@ describe('model catalog no-loss audit', () => {
     expect(opencode).toEqual([]);
     expect(go).toEqual([]);
     expect(compatibilityExport).toBe(getAvailableModelsApi);
+  });
+
+  it('registers K3.1 Pro and K3.1 Pro Highspeed under the Claude Code and Kimi Code CLI harnesses', () => {
+    const { kimi } = getAvailableModelsApi();
+    const k31Pro = kimi.find((model) => model.id === 'k3.1-pro');
+    const k31ProHighspeed = kimi.find((model) => model.id === 'k3.1-pro-highspeed');
+    const k31ProNative = kimi.find((model) => model.id === 'kimi-code/k3.1-pro');
+    const k31ProHighspeedNative = kimi.find((model) => model.id === 'kimi-code/k3.1-pro-highspeed');
+    expect(k31Pro?.harness).toBe('claude-code');
+    expect(k31Pro?.baseName).toBe('Kimi K3.1 Pro (1M context)');
+    expect(k31ProHighspeed?.harness).toBe('claude-code');
+    expect(k31ProNative?.harness).toBe('kimi-code');
+    expect(k31ProHighspeedNative?.harness).toBe('kimi-code');
   });
 
   it('adds native Go and Zen rows without changing the previous catalog', () => {
