@@ -455,6 +455,74 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
     expect(status.conversation?.createdAt).toBe('2026-09-23T08:00:00.000Z');
   });
 
+  describe('strike workspaces (PAN-4752)', () => {
+    it('folds a strike-only workspace onto its base id', async () => {
+      const readTrackerIssues = vi.fn(async () => ({}));
+      const loadStates = vi.fn(async () => new Map());
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-4669-STRIKE', workspacePath: '/ws/feature-pan-4669-strike' }],
+          readTrackerIssues,
+          loadStates,
+        }),
+      });
+      expect(status.inFlight.map((row) => row.issueId)).toEqual(['PAN-4669']);
+      expect(status.inFlight[0]?.strike).toBe(true);
+      expect(status.inFlight.some((row) => /-STRIKE$/i.test(row.issueId))).toBe(false);
+      expect(readTrackerIssues).toHaveBeenCalledWith(['PAN-4669']);
+      expect(loadStates).toHaveBeenCalledWith('/repos/overdeck', ['PAN-4669'], { issues: {}, panes: [] });
+    });
+
+    it('folds a strike workspace listed before its base workspace into one row, journal from the base', async () => {
+      const lastJournal = vi.fn(() => null);
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [
+            { issueId: 'PAN-7-STRIKE', workspacePath: '/ws/feature-pan-7-strike' },
+            { issueId: 'PAN-7', workspacePath: '/ws/feature-pan-7' },
+          ],
+          lastJournal,
+        }),
+      });
+      expect(status.inFlight.map((row) => row.issueId)).toEqual(['PAN-7']);
+      expect(status.inFlight[0]?.strike).toBe(true);
+      expect(lastJournal).toHaveBeenCalledWith('/ws/feature-pan-7');
+      expect(lastJournal).not.toHaveBeenCalledWith('/ws/feature-pan-7-strike');
+    });
+
+    it('folds a tick-only strike id onto its base, with inTick true', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          readTranscript: async () => [marker(4, '2026-09-23T09:59:30.000Z', 'pick=PAN-8-STRIKE phase=watch in-flight=PAN-8-STRIKE needs-you=none')],
+          listWorkspaces: () => [],
+        }),
+      });
+      expect(status.inFlight).toEqual([
+        expect.objectContaining({ issueId: 'PAN-8', strike: true, inTick: true, lastJournal: null }),
+      ]);
+    });
+
+    it('counts a live strike pane toward the folded row', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-4669-STRIKE', workspacePath: '/ws/feature-pan-4669-strike' }],
+          listPanes: () => [
+            { id: 'PAN-4669-work', issue: 'PAN-4669', role: 'work', harness: 'claude-code', model: 'claude-opus-5-5', state: 'working' },
+          ],
+        }),
+      });
+      expect(status.inFlight[0]?.liveAgents).toBe(1);
+      expect(status.agents[0]?.issueId).toBe('PAN-4669');
+    });
+
+    it('does not set strike on a plain workspace row', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({ listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }] }),
+      });
+      expect('strike' in status.inFlight[0]!).toBe(false);
+    });
+  });
+
   it('never writes: every dependency it calls is a read', async () => {
     const deps = baseDeps();
     const spies = Object.fromEntries(Object.entries(deps).map(([k, v]) => [k, vi.fn(v as (...a: unknown[]) => unknown)]));

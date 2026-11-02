@@ -88,6 +88,12 @@ export function freshnessFor(atIso: string, nowMs: number): FlywheelFreshness {
   return 'stalled';
 }
 
+/** `PAN-4669-STRIKE` → `PAN-4669`; null for any id that is not a strike id (PAN-4752). */
+export function strikeBaseId(issueId: string): string | null {
+  const match = /^(.+)-STRIKE$/i.exec(issueId);
+  return match?.[1] ? match[1].toUpperCase() : null;
+}
+
 // ─── lazy defaults ───────────────────────────────────────────────────────────
 
 async function defaultGetConversation(name: string): Promise<LegacyConversation | null> {
@@ -263,20 +269,34 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
   // The board is the union of the workspace census and the ids the loop named
   // in its own newest tick: an issue the loop is driving without a workspace
   // of its own is still in flight, and a workspace the loop has not picked up
-  // is still real. Census order first, then the tick-only ids.
-  const candidates: Array<{ issueId: string; workspacePath: string | null; inTick: boolean }> = [];
-  const seen = new Set<string>();
-  const tickIds = new Set((lastTick?.inFlight ?? []).map((id) => id.toUpperCase()));
+  // is still real. Census order first, then the tick-only ids. A `-STRIKE`
+  // workspace or tick id folds onto its base issue row (PAN-4752): the base
+  // workspace's path wins for the journal regardless of arrival order.
+  type Candidate = { issueId: string; workspacePath: string | null; inTick: boolean; strike: boolean };
+  const candidates: Candidate[] = [];
+  const byId = new Map<string, Candidate>();
+  const tickIds = new Set((lastTick?.inFlight ?? []).map((id) => strikeBaseId(id) ?? id.toUpperCase()));
+  const tickStrikeIds = new Set((lastTick?.inFlight ?? []).map(strikeBaseId).filter((id): id is string => id !== null));
   for (const ws of workspaces) {
-    const id = ws.issueId.toUpperCase();
-    if (seen.has(id)) continue;
-    seen.add(id);
-    candidates.push({ issueId: ws.issueId, workspacePath: ws.workspacePath, inTick: tickIds.has(id) });
+    const base = strikeBaseId(ws.issueId);
+    const id = base ?? ws.issueId.toUpperCase();
+    const existing = byId.get(id);
+    if (existing) {
+      // A strike workspace folds onto its base issue; the base workspace's journal wins.
+      if (base) existing.strike = true;
+      else existing.workspacePath = ws.workspacePath;
+      continue;
+    }
+    const candidate: Candidate = { issueId: base ?? ws.issueId, workspacePath: ws.workspacePath, inTick: tickIds.has(id), strike: base !== null };
+    byId.set(id, candidate);
+    candidates.push(candidate);
   }
   for (const id of tickIds) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    candidates.push({ issueId: id, workspacePath: null, inTick: true });
+    const existing = byId.get(id);
+    if (existing) { if (tickStrikeIds.has(id)) existing.strike = true; continue; }
+    const candidate: Candidate = { issueId: id, workspacePath: null, inTick: true, strike: tickStrikeIds.has(id) };
+    byId.set(id, candidate);
+    candidates.push(candidate);
   }
   const issueIds = candidates.map((c) => c.issueId);
   // The tracker read comes first: `loadIssueStatesForProject` treats a missing
@@ -313,6 +333,7 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
       ...(derived?.attention ? { attention: derived.attention } : {}),
       ...(derived?.pr ? { pr: derived.pr } : {}),
       ...(issue ? {} : { trackerUnknown: true as const }),
+      ...(candidate.strike ? { strike: true as const } : {}),
       liveAgents: livePanesByIssue.get(id)?.length ?? 0,
       inTick: candidate.inTick,
       lastJournal: entry ? { at: entry.at, type: entry.type, ...(entry.source ? { source: entry.source } : {}) } : null,
