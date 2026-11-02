@@ -4,17 +4,17 @@
     "created": "2026-11-02T16:29:38Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4827: fix(models): Gemini, Qwen and GLM catalog refresh (dead tier ids, new models, prices)",
-    "updated": "2026-11-02T16:34:39.673Z"
+    "updated": "2026-11-02T16:35:49.640Z"
   },
   "plan": {
     "id": "pan-4827",
     "title": "fix(models): Gemini, Qwen and GLM catalog refresh (dead tier ids, new models, prices)",
-    "status": "proposed",
+    "status": "running",
     "uid": "b9358ea9-3c30-43d3-915c-c4c653fefb95",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T16:29:38Z",
-    "updated": "2026-11-02T16:34:39.673Z",
+    "updated": "2026-11-02T16:35:49.640Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4827",
@@ -969,5 +969,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

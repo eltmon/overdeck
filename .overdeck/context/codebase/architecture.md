@@ -65,6 +65,12 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   (`kimi-claude-routing.ts`, a narrow id set) and `resolveKimiModelForEndpoint` (`providers.ts`,
   coding vs platform endpoint); native `kimi-code/*` aliases need rows in both
   `KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS` and `acp/kimi.ts` `KIMI_ACP_MODEL_IDS` (a lockstep test).
+  Retiring an id: a `MODEL_DEPRECATIONS` row, out of `PROVIDERS.<p>.models`/available lists/pickers, but
+  capability (`(deprecated)` displayName), cost and `getProviderForModel` lookup-list rows stay.
+  `tierModels`/`haikuModel` become Claude Code tier env vars, so they must never name a retired id;
+  `tier-table.ts` validates tiered-execution ids against `provider.models`. `getPricing` prefix-matches
+  in table order, so a longer id's cost row goes above its prefix. Google/DashScope also need
+  `ohmypi-models.ts` registry rows (their default harness is ohmypi).
 - `config-yaml.ts` — `~/.overdeck/*.yaml` settings: `RoleConfig` (model/harness/effort
   per role), `providerHarnesses`, workhorses, normalization + defaults.
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
@@ -309,4 +315,4 @@ Gauntlet lanes across machines (PAN-4638): home keeps the run rules in `src/lib/
 
 Model and built-ins (`overdeck-dark`, `overdeck-light`; read-only, full terminal palette, no `ui`/`syntax`) live in `packages/contracts/src/color-theme.ts` (`normalizeColorTheme`, `effectiveTerminalPalette`, `slugifyThemeId`, `RESERVED_COLOR_THEME_IDS`). User themes are `~/.overdeck/themes/<id>.json` via `src/lib/color-themes/store.ts` (read fresh on every list; `saveColorTheme` is create-only — `claimThemeFile` uses `link()` and suffixes `-2`, never overwrites; `updateColorTheme` is the in-place counterpart — temp file + `rename()`, refuses built-in/reserved ids). Selection is `ui.color_theme.{light,dark}` in `config.yaml` (`selection.ts` read, `selection-write.ts` write door); `terminal-background.ts` feeds the tmux `window-style` stamp for new sessions only. VS Code import: `vscode-import.ts` maps one theme JSON(C); `.vsix` packages (PAN-4659) are read in memory by `zip-reader.ts` and every contributed theme is mapped by `vsix-import.ts`; the preview route returns a `themes[]` array and writes nothing. Routes: `src/dashboard/server/routes/color-themes.ts` (`GET /api/color-themes`, `PUT …/selection`, `POST …/import/preview`, `POST /api/color-themes`, `PUT /api/color-themes/:id`). Frontend: `hooks/useColorTheme.ts` (zustand; `applyUiTokens` writes the `ui` subset as inline styles on `<html>`, never signal/state tokens; `reconcileFromServer` refetches and re-applies; `updateTheme` PUTs then reconciles), `lib/uiTokenStyles.ts` (pure `uiTokenStyles(theme)`, shared by `applyUiTokens` and the editor preview), `lib/colorThemeEditor.ts` (pure draft model: `createDraft`/`setEdit`/`revertEdit`/`draftToFile`/`pickerValue`), `lib/syntaxTheme.ts` (content-hashed Shiki theme names), consumers `XTerminal.tsx`, `chat/ChatMarkdown.tsx`, `chat/MarkdownFileLink.tsx`; UI in `Settings/sections/ColorThemeSection.tsx` (theme list, Duplicate-and-edit/Edit entry points) + `ColorThemeImportPreview.tsx` + `ColorThemeEditor.tsx` + `ColorThemeEditorPreview.tsx`. Docs: `configuration/appearance.mdx` "Color themes".
 
-<!-- last-verified: 2026-11-02 (PAN-4813, PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759, PAN-4682, PAN-4655, PAN-4644, PAN-4659, PAN-4660, PAN-4743) -->
+<!-- last-verified: 2026-11-02 (PAN-4827, PAN-4813, PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759, PAN-4682, PAN-4655, PAN-4644, PAN-4659, PAN-4660, PAN-4743) -->
