@@ -350,6 +350,24 @@
   border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent);
 }
 
+.summary {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-mono-ui);
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 600px) {
+  .summary {
+    display: none;
+  }
+}
+
 .button,
 .primaryButton {
   height: 32px;

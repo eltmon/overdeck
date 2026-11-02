@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { EFFORT_LEVELS } from '@overdeck/contracts';
 import { cn } from '../../lib/utils';
 import { Modal } from '../shared/Modal';
-import { HarnessSelect, ModelSelect, pickerEffortLevels, useAvailableModels, type Harness } from '../shared/ModelPicker';
+import { HARNESS_OPTIONS, HarnessSelect, ModelSelect, pickerEffortLevels, useAvailableModels, type Harness } from '../shared/ModelPicker';
 import { loadStoredHarness, loadStoredModel, MODEL_EFFORT_SUPPORT } from '../chat/ModelPicker';
 import { fetchRegisteredProjects, type RegisteredProject } from '../CommandDeck/UnknownProjectState';
 import { buildConversationUrl } from '../../App/routes';
@@ -169,6 +169,14 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
     }
   };
 
+  const harnessLabel = HARNESS_OPTIONS.find((h) => h.id === harness)?.label ?? harness;
+  const footerSummary = [
+    model,
+    harnessLabel,
+    ...(effortSupported ? [effort ?? effortDefault?.effort ?? '…'] : []),
+    projectKey ?? 'No project',
+  ].join(' · ');
+
   return (
     <Modal
       title="New conversation"
@@ -178,6 +186,7 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
       onSubmit={submit}
       pinned={error ? <p role="alert" className={styles.error}>{error}</p> : null}
       footer={<>
+        <p className={styles.summary} data-component="new-conversation-summary">{footerSummary}</p>
         <button type="button" className={styles.button} onClick={onClose} disabled={submitting}>Cancel</button>
         <button type="submit" className={styles.primaryButton} aria-label="Create conversation" disabled={submitting}>
           {submitting ? 'Creating…' : 'Create'}

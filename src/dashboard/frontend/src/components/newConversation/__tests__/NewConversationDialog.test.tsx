@@ -10,6 +10,10 @@ vi.mock('../../../lib/wsTransport', () => ({
 vi.mock('../../shared/ModelPicker', () => ({
   useAvailableModels: () => ({ groups: [], harnessPolicy: {} }),
   pickerEffortLevels: () => undefined,
+  HARNESS_OPTIONS: [
+    { id: 'claude-code', label: 'Claude Code', description: '' },
+    { id: 'codex', label: 'Codex', description: '' },
+  ],
   ModelSelect: ({ value, onChange }: { value: string; onChange: (id: string) => void }) => (
     <select aria-label="Model" value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="claude-opus-5-5">Opus</option>
@@ -164,6 +168,24 @@ describe('NewConversationDialog', () => {
     fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'claude-sonnet-5' } });
     await waitFor(() => expect(within(group).getByRole('radio', { name: 'high' })).toHaveAttribute('aria-checked', 'true'));
     expect(within(group).queryByRole('radio', { name: 'max' })).toBeNull();
+  });
+
+  it('the footer summary reads model, harness, effort and project and updates live', async () => {
+    act(() => openNewConversationDialog({ projectKey: 'overdeck' }));
+    renderHost();
+    await waitFor(() => expect((screen.getByLabelText('Project') as HTMLSelectElement).value).toBe('overdeck'));
+    await screen.findByText('Default: high (default)');
+    const summary = () => document.querySelector('[data-component="new-conversation-summary"]')?.textContent;
+    await waitFor(() => expect(summary()).toBe('claude-opus-5-5 · Claude Code · high · overdeck'));
+
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Effort' })).getByRole('radio', { name: 'low' }));
+    expect(summary()).toBe('claude-opus-5-5 · Claude Code · low · overdeck');
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: '' } });
+    expect(summary()).toBe('claude-opus-5-5 · Claude Code · low · No project');
+
+    fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'claude-haiku-4-5-20251001' } });
+    expect(summary()).toBe('claude-haiku-4-5-20251001 · Claude Code · No project');
   });
 
   it('POSTs every chosen field', async () => {
