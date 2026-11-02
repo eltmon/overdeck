@@ -522,7 +522,12 @@ state (D-3).
   `UpdateManager` (`check()`, `install()`, poll), then restarts through
   `restartDashboardDetached()`, the same function `POST /api/system/restart-dashboard`
   uses, so it claims the restart gate and never waits on the approval banner. Development
-  and desktop installs skip the Overdeck component.
+  and desktop installs skip the Overdeck component. A machine set up with `pan connect`
+  also reports `npm-global`. `getUpdateManager()` passes `runtimeHome` when
+  `isRuntimePackageRoot(packageRoot, OVERDECK_HOME)`, and `UpdateManager.install()` then
+  installs through `ensureDurableRuntime()` into `<OVERDECK_HOME>/runtime` instead of
+  `npm install --global` (PAN-4722). `pan sync` runs through `panCliInvocation`, and a
+  sync failure after a good install still moves to `ready`, so the restart happens.
 - **Older peers (D-11).** There is no capability flag and no protocol bump: a `404` from
   `GET /api/versions/self` means the peer predates fleet updates, and its row names the
   version and command to install. In practice an older peer answers
@@ -567,6 +572,8 @@ service, lingering, then one pairing link (`.pan/drafts/PAN-4656.md`).
   (`RunAtLoad`, `KeepAlive`) and bootstraps it into `gui/<uid>`, falling back to
   `user/<uid>`; a changed plist is booted out first. The agent starts at login only. `pan up`
   on a Mac with the agent loaded does not start a second supervisor.
+
+Update all, the update dialog and `pan update` reinstall into the same runtime (PAN-4722).
 
 ## Fly machines (PAN-4652)
 
