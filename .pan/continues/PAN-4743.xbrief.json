@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T14:58:32.904Z",
+  "updated": "2026-11-02T14:58:48.674Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "add-fly-button.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T14:58:32.904Z"
+    },
+    "add-fly-button.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:58:48.674Z"
     }
   }
 }
