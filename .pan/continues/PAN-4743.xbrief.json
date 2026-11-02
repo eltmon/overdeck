@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T13:37:38.492Z",
+  "updated": "2026-11-02T13:37:44.477Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4743",
       "claimedAt": "2026-11-02T13:30:55.168Z",
       "doneAt": "2026-11-02T13:37:38.492Z"
+    },
+    "cli-fly-refusal": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:37:44.477Z"
     }
   }
 }
