@@ -123,7 +123,7 @@ lifetime and cost.
 | `--model <id>` | Model for the conversation. Required with `--harness codex`, and it must be an OpenAI model id. |
 | `--effort <level>` | Reasoning effort for the conversation. |
 | `--region <code>` | Fly region. Default: `[remote.fly] region`, else `iad`. |
-| `--image <ref>` | Image. Default: `[remote.fly] image`, else `registry.fly.io/pan-workspace:latest`. |
+| `--image <ref>` | Image. Default: `[remote.fly] image`, else `registry.fly.io/<app>:latest` (the Fly registry is app-scoped). |
 | `--json` | Print `{ link, record, conversation? }` as JSON. `record.codexAuthPath` is the path of the Codex sign-in on the VM, or `null` when Codex was not prepared there. |
 
 ```
