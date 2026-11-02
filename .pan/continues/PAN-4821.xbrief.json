@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4821",
+  "created": "2026-11-02T16:00:29.674Z",
+  "updated": "2026-11-02T16:00:29.674Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-no-error-cache": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4821",
+      "claimedAt": "2026-11-02T16:00:29.674Z"
+    }
+  }
+}
