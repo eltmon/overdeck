@@ -76,6 +76,23 @@ Overdeck mounts skill directories only. If a pack also carries hooks, MCP server
 
 Runtime packs (gstack) are the exception: their scripts are mounted and run when you invoke a skill, after you trusted them at `add`.
 
+### The trust model
+
+- Adding a pack trusts one commit and turns nothing on. Without a terminal, `--yes` is required, else nothing is written. See [Adding a pack](#adding-a-pack).
+- Every launch mounts exactly the trusted commit; `update` shows the preview again and moves the commit only after you confirm. See [Pinning, updates and forks](#pinning-updates-and-forks).
+- A repository cannot register itself; only `pan skills pack add` can.
+- Overdeck mounts skill directories only. Hooks, MCP servers, commands, agents, context injection, git hooks and scripts are **Not applied**; scripts inside a skill directory are copied but never run by Overdeck. See [What is not applied](#what-is-not-applied).
+- Runtime packs are the exception: gstack runs its pack-mode setup once per trusted commit (at add, update or sync) and its scripts when you invoke a skill; the preview lists every script before you trust it. See [gstack](#gstack).
+- The gstack browser runtime is a second, separate consent that lists every download and path it writes.
+- Opt-in skills change files Overdeck owns or reach paid, cloud or push actions; the pack toggle never turns them on. See [How packs turn on and off](#how-packs-turn-on-and-off).
+- A launch never touches the network: it mounts from the cache or skips the pack with a warning.
+- Pack skills never land in `~/.claude/skills` or `~/.agents/skills`, so they cannot reach sessions you start outside Overdeck.
+- Disclosures: the `sageox` and `gstack` pack rows show what leaves the machine.
+  - SageOx: "SageOx records agent sessions on this machine. With uploads off (the default) Overdeck runs `ox` with the network off: nothing is sent. With uploads on for a project, redacted session transcripts and session metadata are uploaded to the SageOx cloud ledger for that repo, and `ox` may fetch team context. Requires the eltmon/ox build; see `pan doctor`."
+  - gstack: "Runs gstack's bash and bun scripts from ~/.overdeck/packs/gstack; telemetry and update checks are off. Opt-in skills can send code to OpenAI (codex) or call paid or cloud APIs. The optional browser runtime downloads npm packages and Chromium into ~/.overdeck/packs/gstack/browser."
+- Deft skills carry a host notice, and outside a Directive project Claude Code launches deny Deft's CLIs. See [Deft Directive](#deft-directive).
+- `pan skills pack remove <id>` deletes the cache, every mount that holds the pack, dangling launch links, and Codex plugin caches.
+
 ## Pinning, updates and forks
 
 ## Packs
