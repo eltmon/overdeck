@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T14:53:11.357Z",
+  "updated": "2026-11-02T14:53:26.197Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "resolver-fly-branch.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T14:53:11.357Z"
+    },
+    "resolver-fly-branch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:53:26.197Z"
     }
   }
 }
