@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T21:49:32.649904Z · model: claude-opus-5-5 · open: 873_
+_Last sequenced: 2026-11-02T21:58:13.211426Z · model: claude-opus-5-5 · open: 873_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 2 | PAN-4825 | M | high | ok |  |  | MiMo, Groq and Cerebras ship only dead ids (tierModels too), so every launch on them fails; also refreshes MiniMax/xAI/Mistral/Kimi |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
@@ -179,7 +178,7 @@ _Last sequenced: 2026-11-02T21:49:32.649904Z · model: claude-opus-5-5 · open: 
 | 172 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 173 | PAN-4634 | M | medium | needs-refinement |  |  | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
 | 174 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 175 | PAN-4827 | M | high | ok |  | PAN-4825 | Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices |
+| 175 | PAN-4827 | M | high | ok |  |  | Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices |
 | 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 177 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
 | 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
@@ -271,6 +270,7 @@ _Last sequenced: 2026-11-02T21:49:32.649904Z · model: claude-opus-5-5 · open: 
 | 266 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 267 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 268 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
+| 269 | PAN-4859 | S | medium | ok |  |  | Open in editor on an SSH-host machine opens ssh-remote+127.0.0.1 (local forward); use the SSH record destination. Blocks AC-15 W-CONV9. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
 | 272 | PAN-4820 | XL | medium | ok |  |  | Run one issue on Deft Directive pipeline (hidden temp install, merge guard, native dashboard view, switch back); decisions made |
@@ -885,10 +885,6 @@ _Last sequenced: 2026-11-02T21:49:32.649904Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
-### PAN-4825 (rank 2)
-
-New in-pipeline issue from the 2026-11-02 model catalog audit. MiMo, Groq and Cerebras currently carry only provider-retired ids, including their tierModels, so every launch on those providers fails today; the issue retires them through MODEL_DEPRECATIONS with official-source decision rules and also refreshes MiniMax, xAI, Mistral, Meta and Kimi entries. As an in-pipeline issue it is pinned in the free rank 2 (no prior rank), so no other node moves. It also unblocks PAN-4827, whose all-provider tierModels test fails while these dead tier ids remain.
-
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1201,6 +1197,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
+### PAN-3100 (rank 81)
+
+New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1208,7 +1208,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T21:49:32.649904Z",
+  "generatedAt": "2026-11-02T21:58:13.211426Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 873,
@@ -1223,19 +1223,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4825",
-      "rank": 2,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "MiMo, Groq and Cerebras ship only dead ids (tierModels too), so every launch on them fails; also refreshes MiniMax/xAI/Mistral/Kimi",
-      "rationale": "New in-pipeline issue from the 2026-11-02 model catalog audit. MiMo, Groq and Cerebras currently carry only provider-retired ids, including their tierModels, so every launch on those providers fails today; the issue retires them through MODEL_DEPRECATIONS with official-source decision rules and also refreshes MiniMax, xAI, Mistral, Meta and Kimi entries. As an in-pipeline issue it is pinned in the free rank 2 (no prior rank), so no other node moves. It also unblocks PAN-4827, whose all-provider tierModels test fails while these dead tier ids remain.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3468,9 +3455,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "high",
       "score": 70,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4825"
-      ],
+      "dependsOn": [],
       "why": "Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices",
       "rationale": "New issue from the 2026-11-02 catalog audit: Google's haiku tier and all three DashScope tiers point at shut-down or never-real ids, so Claude Code subagents on those providers fail, and several Qwen rows carry $0 placeholder prices. It is a well-specified provider bug fix, not substrate, so it takes the free rank 175 among high-importance fixes. Its AC1 test asserts no provider's tierModels is in MODEL_DEPRECATIONS, which cannot pass until PAN-4825 retires the MiMo/Groq/Cerebras tier ids, so it depends on PAN-4825.",
       "gate": "auto",
@@ -12154,6 +12139,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "New issue: dashboard read-only views over SageOx files, explicitly blocked by PAN-4852 part A, so it sits right after part A with lower importance as UI follow-up.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4859",
+      "rank": 269,
+      "size": "S",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Open in editor on an SSH-host machine opens ssh-remote+127.0.0.1 (local forward); use the SSH record destination. Blocks AC-15 W-CONV9.",
+      "rationale": "New bug found by the in-pipeline Anywhere release acceptance run (PAN-4774, AC-15 / W-CONV9): sshHostFor reads the hostname of the SSH route, which is the local port forward, so Open in editor targets the local machine instead of the SSH host. The fix is small and well specified (look up SshMachineRecord.destination by link id, check the Remote-SSH authority form for user and port, add an open-remote unit test). It takes the free rank 269, just ahead of PAN-4774, because the release checklist item cannot pass on an SSH-linked machine until it lands.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13369,13 +13367,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 1
     },
     {
-      "from": "PAN-4825",
-      "to": "PAN-4827",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-4823",
       "to": "PAN-4828",
       "type": "contains",
@@ -13773,6 +13764,13 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4859",
+      "to": "PAN-4774",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
