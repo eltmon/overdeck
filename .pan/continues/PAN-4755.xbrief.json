@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4755",
   "created": "2026-11-02T01:00:42.371Z",
-  "updated": "2026-11-02T02:26:21.144Z",
+  "updated": "2026-11-02T02:26:34.986Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "modal-primitive.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T02:26:21.143Z"
+    },
+    "modal-primitive.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:26:34.986Z"
     }
   }
 }
