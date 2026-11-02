@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4660",
+  "created": "2026-11-02T06:14:17.395Z",
+  "updated": "2026-11-02T06:14:17.395Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-store-update": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4660",
+      "claimedAt": "2026-11-02T06:14:17.395Z"
+    }
+  }
+}
