@@ -451,6 +451,137 @@ describe('getUatGenerationsPayload', () => {
     expect(payload[0]!.members[0]!.planResolved).toBe(false);
     expect(payload[0]!.members[0]!.acceptanceCriteria).toEqual([]);
   });
+
+  // PAN-4799 W2b (D4): a fallback hit is never cached, so a spec that later
+  // shows up in a higher-priority root always wins on the next poll.
+  it('prefers a spec that appears in the batch worktree over a cached fallback', async () => {
+    const batchDir = await mkdtemp(join(tmpdir(), 'pan-uat-train-batch-'));
+    const workspaceDir = await mkdtemp(join(tmpdir(), 'pan-uat-train-ws-'));
+    try {
+      const workspaceSpecPath = join(workspaceDir, 'PAN-9100.xbrief.json');
+      await writeFile(workspaceSpecPath, '{}');
+      const batchSpecPath = join(batchDir, 'PAN-9100.xbrief.json');
+      const batchGen = { ...gen([{ issueId: 'PAN-9100', title: 'Prefer', branch: 'feature/pan-9100', headSha: 'h1', mergeOrder: 1 }]), worktreePath: batchDir };
+      mocks.listUatGenerations.mockReturnValue([batchGen]);
+      mocks.getWorkspaceInfoForIssue.mockReturnValue({ exists: true, isRemote: false, localPath: workspaceDir });
+
+      let batchHasSpec = false;
+      mocks.findXBriefByIssue.mockImplementation((root: string) => {
+        if (root === batchDir) {
+          return Effect.succeed(batchHasSpec
+            ? { path: batchSpecPath, lifecycleDir: 'proposed', issueId: 'PAN-9100', slug: 'prefer', date: '2026-11-02', filename: 'PAN-9100.xbrief.json' }
+            : null);
+        }
+        if (root === workspaceDir) {
+          return Effect.succeed({ path: workspaceSpecPath, lifecycleDir: 'proposed', issueId: 'PAN-9100', slug: 'prefer', date: '2026-11-02', filename: 'PAN-9100.xbrief.json' });
+        }
+        return Effect.succeed(null);
+      });
+      mocks.readXBriefDocument.mockImplementation((path: string) => Effect.succeed(
+        doc(path === batchSpecPath ? 'From the batch worktree' : 'From the workspace fallback') as never,
+      ));
+
+      const poll1 = await getUatGenerationsPayload('/repos/myn');
+      expect(poll1[0]!.members[0]!.acceptanceCriteria).toEqual([{ title: 'From the workspace fallback', status: 'pending' }]);
+
+      await writeFile(batchSpecPath, '{}');
+      batchHasSpec = true;
+      const poll2 = await getUatGenerationsPayload('/repos/myn');
+      expect(poll2[0]!.members[0]!.acceptanceCriteria).toEqual([{ title: 'From the batch worktree', status: 'pending' }]);
+    } finally {
+      await rm(batchDir, { recursive: true, force: true });
+      await rm(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
+  it('falls through to the next root on the same poll once a cached workspace is reaped', async () => {
+    const workspaceDir = await mkdtemp(join(tmpdir(), 'pan-uat-train-ws-'));
+    const projectDir = await mkdtemp(join(tmpdir(), 'pan-uat-train-proj-'));
+    try {
+      const workspaceSpecPath = join(workspaceDir, 'PAN-9101.xbrief.json');
+      await writeFile(workspaceSpecPath, '{}');
+      const projectSpecPath = join(projectDir, 'PAN-9101.xbrief.json');
+      await writeFile(projectSpecPath, '{}');
+      mocks.listUatGenerations.mockReturnValue([
+        gen([{ issueId: 'PAN-9101', title: 'Reaped', branch: 'feature/pan-9101', headSha: 'h1', mergeOrder: 1 }]),
+      ]);
+      mocks.getWorkspaceInfoForIssue.mockReturnValue({ exists: true, isRemote: false, localPath: workspaceDir });
+      mocks.findXBriefByIssue.mockImplementation((root: string) => Effect.succeed(root === workspaceDir
+        ? { path: workspaceSpecPath, lifecycleDir: 'proposed', issueId: 'PAN-9101', slug: 'reaped', date: '2026-11-02', filename: 'PAN-9101.xbrief.json' }
+        : null));
+      mocks.readXBriefDocument.mockReturnValue(Effect.succeed(doc('From the workspace') as never));
+
+      const poll1 = await getUatGenerationsPayload(projectDir);
+      expect(poll1[0]!.members[0]!.planResolved).toBe(true);
+
+      await rm(workspaceDir, { recursive: true, force: true });
+      mocks.findXBriefByIssue.mockImplementation((root: string) => Effect.succeed(root === projectDir
+        ? { path: projectSpecPath, lifecycleDir: 'proposed', issueId: 'PAN-9101', slug: 'reaped', date: '2026-11-02', filename: 'PAN-9101.xbrief.json' }
+        : null));
+      mocks.readXBriefDocument.mockReturnValue(Effect.succeed(doc('From the project root') as never));
+
+      const poll2 = await getUatGenerationsPayload(projectDir);
+      expect(poll2[0]!.members[0]!.planResolved).toBe(true);
+      expect(poll2[0]!.members[0]!.acceptanceCriteria).toEqual([{ title: 'From the project root', status: 'pending' }]);
+    } finally {
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it('recovers from a stale index entry for a deleted spec', async () => {
+    const workspaceDir = await mkdtemp(join(tmpdir(), 'pan-uat-train-ws-'));
+    const projectDir = await mkdtemp(join(tmpdir(), 'pan-uat-train-proj-'));
+    try {
+      // Never written: the index still points at it, but the file is gone.
+      const staleSpecPath = join(workspaceDir, 'PAN-9102.xbrief.json');
+      const realSpecPath = join(projectDir, 'PAN-9102.xbrief.json');
+      await writeFile(realSpecPath, '{}');
+      mocks.listUatGenerations.mockReturnValue([
+        gen([{ issueId: 'PAN-9102', title: 'Stale', branch: 'feature/pan-9102', headSha: 'h1', mergeOrder: 1 }]),
+      ]);
+      mocks.getWorkspaceInfoForIssue.mockReturnValue({ exists: true, isRemote: false, localPath: workspaceDir });
+      mocks.findXBriefByIssue.mockImplementation((root: string) => Effect.succeed(
+        root === workspaceDir
+          ? { path: staleSpecPath, lifecycleDir: 'proposed', issueId: 'PAN-9102', slug: 'stale', date: '2026-11-02', filename: 'PAN-9102.xbrief.json' }
+          : root === projectDir
+            ? { path: realSpecPath, lifecycleDir: 'proposed', issueId: 'PAN-9102', slug: 'stale', date: '2026-11-02', filename: 'PAN-9102.xbrief.json' }
+            : null,
+      ));
+      mocks.readXBriefDocument.mockReturnValue(Effect.succeed(doc('Recovered from the project root') as never));
+
+      const payload = await getUatGenerationsPayload(projectDir);
+
+      expect(mocks.invalidateXBriefIndex).toHaveBeenCalledWith(workspaceDir);
+      expect(payload[0]!.members[0]!.planResolved).toBe(true);
+      expect(payload[0]!.members[0]!.acceptanceCriteria).toEqual([{ title: 'Recovered from the project root', status: 'pending' }]);
+    } finally {
+      await rm(workspaceDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it('stops at a broken spec instead of falling through', async () => {
+    const workspaceDir = await mkdtemp(join(tmpdir(), 'pan-uat-train-ws-'));
+    try {
+      const specPath = join(workspaceDir, 'PAN-9103.xbrief.json');
+      await writeFile(specPath, '{}');
+      mocks.listUatGenerations.mockReturnValue([
+        gen([{ issueId: 'PAN-9103', title: 'Broken', branch: 'feature/pan-9103', headSha: 'h1', mergeOrder: 1 }]),
+      ]);
+      mocks.getWorkspaceInfoForIssue.mockReturnValue({ exists: true, isRemote: false, localPath: workspaceDir });
+      mocks.findXBriefByIssue.mockImplementation((root: string) => Effect.succeed(root === workspaceDir
+        ? { path: specPath, lifecycleDir: 'proposed', issueId: 'PAN-9103', slug: 'broken', date: '2026-11-02', filename: 'PAN-9103.xbrief.json' }
+        : null));
+      mocks.readXBriefDocument.mockReturnValue(Effect.fail(new Error('malformed xBRIEF JSON')) as never);
+
+      const payload = await getUatGenerationsPayload('/repos/myn');
+
+      expect(payload[0]!.members[0]!.planResolved).toBe(false);
+      expect(mocks.findXBriefByIssue).toHaveBeenCalledTimes(1);
+    } finally {
+      await rm(workspaceDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('getUatCandidatePayload', () => {

@@ -58,7 +58,7 @@ import {
 import { getDerivedIssueState, listReadyIssuesForProject } from './derived-issue-state.js';
 import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
-import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
+import { findXBriefByIssue, invalidateXBriefIndex, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPath, listProjectsSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import {
   resolveConfiguredRepos,
@@ -611,6 +611,33 @@ async function mapBounded<T>(items: readonly T[], concurrency: number, worker: (
 }
 
 /**
+ * Resolves one candidate root to a stat'd spec path, recovering once from a
+ * stale index entry (D7): a path the index remembers can be deleted without
+ * the 5s TTL noticing, so an ENOENT on `stat` invalidates that root's index
+ * and retries once before giving up on it.
+ */
+async function resolveInRoot(root: string, issueId: string): Promise<{ path: string; mtimeMs: number } | null> {
+  const found = await Effect.runPromise(findXBriefByIssue(root, issueId));
+  if (!found) return null;
+  try {
+    const { mtimeMs } = await stat(found.path);
+    return { path: found.path, mtimeMs };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') throw err;
+  }
+  invalidateXBriefIndex(root);
+  const retried = await Effect.runPromise(findXBriefByIssue(root, issueId));
+  if (!retried) return null;
+  try {
+    const { mtimeMs } = await stat(retried.path);
+    return { path: retried.path, mtimeMs };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
+/**
  * PAN-4799: a batch member's xBRIEF spec is committed on its feature branch
  * and reaches main only when its PR merges, so a batch's own worktree (every
  * member merged in) and each member's feature workspace both hold specs the
@@ -619,6 +646,11 @@ async function mapBounded<T>(items: readonly T[], concurrency: number, worker: (
  * then project root) and the first root with a resolvable spec wins.
  * Issue ids are prefix-distinct across projects, so the module-level mtime
  * cache stays safe to key by issue id alone.
+ *
+ * D4: only a hit from `roots[0]` is cached. A hit from a later root is a
+ * fallback for this poll only — caching it would keep masking a spec that
+ * later appears in a higher-priority root (e.g. the batch worktree), so every
+ * later poll re-searches the full root list until roots[0] resolves.
  */
 async function loadAcceptanceCriteriaCache(
   rootsByIssue: ReadonlyMap<string, readonly string[]>,
@@ -644,12 +676,15 @@ async function loadAcceptanceCriteriaCache(
 
     try {
       for (const root of roots) {
-        const found = await Effect.runPromise(findXBriefByIssue(root, upperIssueId));
-        if (!found) continue;
-        const { mtimeMs } = await stat(found.path);
-        const document = await Effect.runPromise(readXBriefDocument(found.path));
+        const resolved = await resolveInRoot(root, upperIssueId);
+        if (!resolved) continue;
+        const document = await Effect.runPromise(readXBriefDocument(resolved.path));
         const criteria = extractACFromDocument(document).map((ac) => ({ title: ac.title, status: ac.status }));
-        acceptanceCriteriaByIssue.set(upperIssueId, { path: found.path, mtimeMs, criteria, rootsKey });
+        if (root === roots[0]) {
+          acceptanceCriteriaByIssue.set(upperIssueId, { path: resolved.path, mtimeMs: resolved.mtimeMs, criteria, rootsKey });
+        } else {
+          acceptanceCriteriaByIssue.delete(upperIssueId);
+        }
         cache.set(upperIssueId, { planResolved: true, criteria });
         return;
       }
