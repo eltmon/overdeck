@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T16:23:18.931183Z · model: claude-opus-5-5 · open: 858_
+_Last sequenced: 2026-11-02T16:25:34.692761Z · model: claude-opus-5-5 · open: 862_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -600,6 +600,7 @@ _Last sequenced: 2026-11-02T16:23:18.931183Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
+| 603 | PAN-4828 | S | medium | ok |  | PAN-4774 | Phone app W-CON1: contracts for directory client role and sealed push frames; first in build order, after PAN-4774. |
 | 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -656,16 +657,18 @@ _Last sequenced: 2026-11-02T16:23:18.931183Z · model: claude-opus-5-5 · open: 
 | 657 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 658 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 659 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 660 | PAN-4823 | XL | medium | needs-refinement |  | PAN-4774 | Capacitor 8 phone client for Anywhere without Tailscale; PRD written (15 work items), children unfiled, OD-1 open; after PAN-4774. |
+| 660 | PAN-4823 | XL | medium | needs-refinement | ✓ | PAN-4774 | Epic: Capacitor phone client for Anywhere without Tailscale; 4 of 15 children filed (#4828-4831), OD-1 open; after PAN-4774. |
 | 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
+| 664 | PAN-4831 | S | medium | ok |  | PAN-4774 | Phone app W-ACC1: allow ai.overdeck.app:/oauth/callback PKCE redirect and ios/android platforms in account service; after PAN-4774. |
 | 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 666 | PAN-4638 | L | medium | ok |  |  | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
 | 670 | PAN-4760 | S | low | ok |  | PAN-4638 | Live 3-machine gauntlet check moved out of PAN-4638; needs its release, pan reload, a linked laptop rig and Fly setup by the operator. |
+| 671 | PAN-4829 | M | medium | ok |  | PAN-4774, PAN-4828 | Phone app W-CON2: phones join the directory as clients (cap 5, not counted as machines), bearer subprotocol; needs PAN-4828. |
 | 672 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
 | 673 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
 | 674 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
@@ -680,6 +683,7 @@ _Last sequenced: 2026-11-02T16:23:18.931183Z · model: claude-opus-5-5 · open: 
 | 683 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
 | 684 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 685 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 686 | PAN-4830 | M | medium | ok |  | PAN-4774, PAN-4828 | Phone app W-CON3: directory delivers sealed push to APNs/FCM, placeholder-only bodies, dead-token cleanup; needs PAN-4828. |
 | 687 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 688 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 689 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -1193,10 +1197,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T16:23:18.931183Z",
+  "generatedAt": "2026-11-02T16:25:34.692761Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 858,
+  "openCount": 862,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1208,6 +1212,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4825",
+      "rank": 2,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "MiMo, Groq and Cerebras ship only dead ids (tierModels too), so every launch on them fails; also refreshes MiniMax/xAI/Mistral/Kimi",
+      "rationale": "New in-pipeline issue from the 2026-11-02 model catalog audit. MiMo, Groq and Cerebras currently carry only provider-retired ids, including their tierModels, so every launch on those providers fails today; the issue retires them through MODEL_DEPRECATIONS with official-source decision rules and also refreshes MiniMax, xAI, Mistral, Meta and Kimi entries. As an in-pipeline issue it is pinned in the free rank 2 (no prior rank), so no other node moves. It also unblocks PAN-4827, whose all-provider tierModels test fails while these dead tier ids remain.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3462,6 +3479,21 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "isEpic": true
     },
     {
+      "issue": "PAN-4827",
+      "rank": 175,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4825"
+      ],
+      "why": "Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices",
+      "rationale": "New issue from the 2026-11-02 catalog audit: Google's haiku tier and all three DashScope tiers point at shut-down or never-real ids, so Claude Code subagents on those providers fail, and several Qwen rows carry $0 placeholder prices. It is a well-specified provider bug fix, not substrate, so it takes the free rank 175 among high-importance fixes. Its AC1 test asserts no provider's tierModels is in MODEL_DEPRECATIONS, which cannot pass until PAN-4825 retires the MiMo/Groq/Cerebras tier ids, so it depends on PAN-4825.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1868",
       "rank": 176,
       "size": "XS",
@@ -3473,6 +3505,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "Cost-bleed circuit breaker — progress-aware, always-on guard against runaway spend; the one real guard the epic authorizes. Updated since the prior run (comment/label activity); body substance unchanged, rank held. Note: its costBleedMonitor is described as a deacon patrol — deacon-lite is the new home. Blocker PAN-2466 closed since the prior run; dependsOn pruned.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-4819",
+      "rank": 177,
+      "size": "XS",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Throwaway in-pipeline issue for PAN-4734 live Fly checkpoint (WI-14); closed without merging once the check is recorded.",
+      "rationale": "New in-pipeline throwaway: placed in the free rank 177 near its parent PAN-4734 (rank 147) so no pinned rank shifts.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1042",
@@ -4028,6 +4073,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Kimi ACP cancel is sent with id:\"\" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked.",
       "rationale": "Source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. Its prerequisite PAN-4563 (replay fixture and pinned host-replay test) merged in #4576, so the dependency is cleared; the rank stays at 224 because it already sat in the high tier with peers of equal score and nothing else about the issue changed.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4826",
+      "rank": 224,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "OpenAI/Anthropic catalog: fix 7 wrong prices, add gpt-6-rosalind, hide sonnet-4-5 before 11-30 retirement, raise 4-6 to 1M",
+      "rationale": "New issue from the 2026-11-02 catalog audit. Nothing is broken today: claude-sonnet-4-5 already migrates through MODEL_DEPRECATIONS, so the 2026-11-30 retirement only needs it hidden from new selections, and the rest is price accuracy, a new opt-in model and two context windows. It takes the free rank 224, after PAN-4364 (GPT-6 OpenAI catalog alignment, rank 208), which edits the same OpenAI rows and should land first to avoid conflicts.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8594,6 +8652,21 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
+      "issue": "PAN-4828",
+      "rank": 603,
+      "size": "S",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774"
+      ],
+      "why": "Phone app W-CON1: contracts for directory client role and sealed push frames; first in build order, after PAN-4774.",
+      "rationale": "New child of epic PAN-4823 (work item W-CON1). It is first in the PRD build order: W-CON2 and W-CON3 need its frames, so it takes the free rank 603 ahead of the other children. Its body says not to start before the Anywhere acceptance run (PAN-4774) passes, so it depends on PAN-4774.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-947",
       "rank": 604,
       "size": "M",
@@ -9285,10 +9358,11 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [
         "PAN-4774"
       ],
-      "why": "Capacitor 8 phone client for Anywhere without Tailscale; PRD written (15 work items), children unfiled, OD-1 open; after PAN-4774.",
-      "rationale": "Rank unchanged at 660. The PRD (.pan/drafts/pan-4823.md) is now written: it switches the stack to Capacitor 8, defines 15 work items with a build order, and makes PAN-4823 the epic for per-work-item child issues. Those children are not filed yet and OD-1 (Live Activity content) is still open, so the issue stays needs-refinement and must not be picked as one XL unit; it remains sequenced after the Anywhere acceptance run (PAN-4774). Score rises slightly because the plan is now concrete.",
+      "why": "Epic: Capacitor phone client for Anywhere without Tailscale; 4 of 15 children filed (#4828-4831), OD-1 open; after PAN-4774.",
+      "rationale": "Rank unchanged at 660, now marked as an epic. Its first four children are filed (PAN-4828 contracts, PAN-4829 directory client role, PAN-4830 APNs/FCM sealed push, PAN-4831 native sign-in redirect), each naming #4823 as its epic, so the epic itself must not be picked; the children are. It stays needs-refinement because 11 work items are still unfiled and OD-1 (Live Activity content) is open, and the whole stream waits for the Anywhere acceptance run (PAN-4774).",
       "gate": "auto",
-      "planning": "auto"
+      "planning": "auto",
+      "isEpic": true
     },
     {
       "issue": "PAN-2353",
@@ -9327,6 +9401,21 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "why": "Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice.",
       "gate": "auto",
       "planning": "interactive"
+    },
+    {
+      "issue": "PAN-4831",
+      "rank": 664,
+      "size": "S",
+      "importance": "medium",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774"
+      ],
+      "why": "Phone app W-ACC1: allow ai.overdeck.app:/oauth/callback PKCE redirect and ios/android platforms in account service; after PAN-4774.",
+      "rationale": "New child of epic PAN-4823 (work item W-ACC1). The PRD lists it as independent in the first build step, so it needs no sibling, but its body sequences it after the Anywhere acceptance run (PAN-4774). It takes the free rank 664 just after the epic.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-3011",
@@ -9404,6 +9493,22 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       ],
       "why": "Live 3-machine gauntlet check moved out of PAN-4638; needs its release, pan reload, a linked laptop rig and Fly setup by the operator.",
       "rationale": "New follow-up to PAN-4638 holding the live check that could not run before merge. It ranks just after PAN-4638 because it needs that PR released and reloaded plus operator setup of the rig and Fly, so it cannot be picked up autonomously yet.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4829",
+      "rank": 671,
+      "size": "M",
+      "importance": "medium",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774",
+        "PAN-4828"
+      ],
+      "why": "Phone app W-CON2: phones join the directory as clients (cap 5, not counted as machines), bearer subprotocol; needs PAN-4828.",
+      "rationale": "New child of epic PAN-4823 (work item W-CON2). The PRD build order puts it after W-CON1 (PAN-4828), whose client frames it implements, and its body sequences it after PAN-4774. It takes the free rank 671.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9578,6 +9683,22 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "condition": "ok",
       "dependsOn": [],
       "why": "Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4830",
+      "rank": 686,
+      "size": "M",
+      "importance": "medium",
+      "score": 34,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774",
+        "PAN-4828"
+      ],
+      "why": "Phone app W-CON3: directory delivers sealed push to APNs/FCM, placeholder-only bodies, dead-token cleanup; needs PAN-4828.",
+      "rationale": "New child of epic PAN-4823 (work item W-CON3). The PRD build order puts it after W-CON1 (PAN-4828), which defines the push frames, and its body sequences it after PAN-4774. It needs APNs and FCM credentials only at release time, so it takes the free rank 686.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11834,60 +11955,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4825",
-      "rank": 2,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "MiMo, Groq and Cerebras ship only dead ids (tierModels too), so every launch on them fails; also refreshes MiniMax/xAI/Mistral/Kimi",
-      "rationale": "New in-pipeline issue from the 2026-11-02 model catalog audit. MiMo, Groq and Cerebras currently carry only provider-retired ids, including their tierModels, so every launch on those providers fails today; the issue retires them through MODEL_DEPRECATIONS with official-source decision rules and also refreshes MiniMax, xAI, Mistral, Meta and Kimi entries. As an in-pipeline issue it is pinned in the free rank 2 (no prior rank), so no other node moves. It also unblocks PAN-4827, whose all-provider tierModels test fails while these dead tier ids remain.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4827",
-      "rank": 175,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4825"
-      ],
-      "why": "Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices",
-      "rationale": "New issue from the 2026-11-02 catalog audit: Google's haiku tier and all three DashScope tiers point at shut-down or never-real ids, so Claude Code subagents on those providers fail, and several Qwen rows carry $0 placeholder prices. It is a well-specified provider bug fix, not substrate, so it takes the free rank 175 among high-importance fixes. Its AC1 test asserts no provider's tierModels is in MODEL_DEPRECATIONS, which cannot pass until PAN-4825 retires the MiMo/Groq/Cerebras tier ids, so it depends on PAN-4825.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4826",
-      "rank": 224,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "OpenAI/Anthropic catalog: fix 7 wrong prices, add gpt-6-rosalind, hide sonnet-4-5 before 11-30 retirement, raise 4-6 to 1M",
-      "rationale": "New issue from the 2026-11-02 catalog audit. Nothing is broken today: claude-sonnet-4-5 already migrates through MODEL_DEPRECATIONS, so the 2026-11-30 retirement only needs it hidden from new selections, and the rest is price accuracy, a new opt-in model and two context windows. It takes the free rank 224, after PAN-4364 (GPT-6 OpenAI catalog alignment, rank 208), which edits the same OpenAI rows and should land first to avoid conflicts.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4819",
-      "rank": 177,
-      "size": "XS",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Throwaway in-pipeline issue for PAN-4734 live Fly checkpoint (WI-14); closed without merging once the check is recorded.",
-      "rationale": "New in-pipeline throwaway: placed in the free rank 177 near its parent PAN-4734 (rank 147) so no pinned rank shifts.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13134,6 +13201,76 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "from": "PAN-4819",
       "to": "PAN-4734",
       "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4828",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4828",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4829",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4829",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4830",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4830",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4831",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4831",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4828",
+      "to": "PAN-4829",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4828",
+      "to": "PAN-4830",
+      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.9
     }
