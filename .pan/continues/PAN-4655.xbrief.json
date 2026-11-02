@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4655",
   "created": "2026-11-02T03:52:43.700Z",
-  "updated": "2026-11-02T04:15:32.126Z",
+  "updated": "2026-11-02T04:15:34.385Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4655",
       "claimedAt": "2026-11-02T04:04:17.267Z",
       "doneAt": "2026-11-02T04:15:32.126Z"
+    },
+    "idle-settle-patrol": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4655",
+      "claimedAt": "2026-11-02T04:15:34.384Z"
     }
   }
 }
