@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T12:45:16.493968Z · model: claude-opus-5-5 · open: 857_
+_Last sequenced: 2026-11-02T12:46:09.423890Z · model: claude-opus-5-5 · open: 858_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -280,6 +280,7 @@ _Last sequenced: 2026-11-02T12:45:16.493968Z · model: claude-opus-5-5 · open: 
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
 | 276 | PAN-4743 | M | medium | ok |  |  | Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; PAN-4651 merged, so this is now unblocked. |
+| 277 | PAN-4811 | M | medium | ok |  | PAN-4743 | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; split out of PAN-4743, which must land its Fly target door first. |
 | 278 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
 | 278 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
@@ -1192,10 +1193,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T12:45:16.493968Z",
+  "generatedAt": "2026-11-02T12:46:09.423890Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 857,
+  "openCount": 858,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11869,6 +11870,21 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "rationale": "New since the prior run. Verification syncs main into the workspace without first moving it to origin/<branch>, so any PR whose commits arrive from a handoff worktree, a train sibling rebase or a suggestion commit is verified on a stale tree and silently never dispatched to review; three PRs (PAN-4772, PAN-4785, PAN-4801) stalled five hours on it. It is substrate pipeline machinery with a concrete fix direction, so it ranks in the critical top tier beside the merge-train and adoption fixes it unblocks. Labeled needs-handoff (TENET-10): supervised handoff only.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4811",
+      "rank": 277,
+      "size": "M",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4743"
+      ],
+      "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; split out of PAN-4743, which must land its Fly target door first.",
+      "rationale": "New issue filed 2026-11-02: PAN-4743's plan ships Fly (new VM) for conversations only, so lane provisioning and the per-run VM cap move here. It needs startFlyTarget from in-pipeline PAN-4743, so it takes the free rank 277 directly behind it with no other node moving.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13149,6 +13165,20 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
     {
       "from": "PAN-4810",
       "to": "PAN-4801",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4743",
+      "to": "PAN-4811",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4811",
+      "to": "PAN-4638",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
