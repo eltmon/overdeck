@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4739",
   "created": "2026-11-02T06:14:09.782Z",
-  "updated": "2026-11-02T06:17:05.510Z",
+  "updated": "2026-11-02T06:20:40.574Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-02T06:16:59.667Z"
     },
     "list-repair-door-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4739",
-      "claimedAt": "2026-11-02T06:17:05.510Z"
+      "claimedAt": "2026-11-02T06:17:05.510Z",
+      "doneAt": "2026-11-02T06:20:40.574Z"
     }
   }
 }
