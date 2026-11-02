@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4748",
   "created": "2026-11-02T03:23:38.611Z",
-  "updated": "2026-11-02T05:03:54.307Z",
+  "updated": "2026-11-02T05:16:10.055Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-02T05:03:45.663Z"
     },
     "docs-fly-token": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4748",
-      "claimedAt": "2026-11-02T05:03:54.307Z"
+      "claimedAt": "2026-11-02T05:03:54.307Z",
+      "doneAt": "2026-11-02T05:16:10.055Z"
     }
   }
 }
