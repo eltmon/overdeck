@@ -4,17 +4,17 @@
     "created": "2026-11-02T12:55:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4743: Fly (new VM) in the Machine field and --machine fly: neither PAN-4651 nor PAN-4652 delivers it",
-    "updated": "2026-11-02T12:49:52.948Z"
+    "updated": "2026-11-02T12:51:29.309Z"
   },
   "plan": {
     "id": "pan-4743",
     "title": "Fly (new VM) in the Machine field and --machine fly: neither PAN-4651 nor PAN-4652 delivers it",
-    "status": "proposed",
+    "status": "running",
     "uid": "06f831a8-205d-4f35-9678-466cf8f0e368",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T12:55:00Z",
-    "updated": "2026-11-02T12:49:52.948Z",
+    "updated": "2026-11-02T12:51:29.309Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4743",
@@ -882,5 +882,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
