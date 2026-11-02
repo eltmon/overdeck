@@ -29,15 +29,24 @@
  *     lands during the pass is never overwritten.
  *
  * GitLab projects are skipped with a log line: their MRs are not listed here.
+ *
+ * PAN-4772: when the gate refuses a PR whose approval is stale (approved at an
+ * older head), the pass re-requests review once per head
+ * (`stale-approval-rereview.ts`). Every completed pass's skip reasons are kept
+ * (`auto-merge-skip-reasons.ts`) and served as `notScheduled` on
+ * `GET /api/merge-train/auto-merge/pending`; a reason is logged only when it
+ * changes.
  */
 import { resolve } from 'node:path';
 import type { ProjectConfig } from '../../../lib/projects.js';
 import type { PendingAutoMerge } from '../../../lib/overdeck/merge-sync.js';
 import type { MergeReadiness, PrFacts } from '../../../lib/cloister/pr-facts.js';
 import type { listRepoPullRequests } from './derived-issue-state.js';
+import { recordSchedulerOutcomes } from './auto-merge-skip-reasons.js';
+import type { StaleApprovalFacts } from './stale-approval-rereview.js';
 
 type DoorResult = { status: number; body: unknown };
-type GateAnswer = MergeReadiness & { facts: Pick<PrFacts, 'url' | 'headSha'> };
+type GateAnswer = MergeReadiness & { facts: Pick<PrFacts, 'url' | 'headSha'> & StaleApprovalFacts };
 /** The re-arm rule, asked again with the latest row inside the insert transaction. */
 type CanSchedule = (latest: PendingAutoMerge) => boolean;
 type ListedPr = Awaited<ReturnType<typeof listRepoPullRequests>>[number];
@@ -55,6 +64,14 @@ export interface AutoMergeSchedulerDeps {
   mergeGate?: (issueId: string) => Promise<GateAnswer>;
   /** The schedule door; `postAutoMergeSchedulePayload` with a guarded insert by default. */
   schedule?: (issueId: string, canSchedule: CanSchedule) => Promise<DoorResult>;
+  /**
+   * PAN-4772: asked when the gate refuses. Re-requests review once per head
+   * for a stale approval and answers a clause for the skip reason, or null.
+   * `rereviewStaleApproval` by default.
+   */
+  rereview?: (issueId: string, facts: GateAnswer['facts']) => Promise<string | null>;
+  /** Clock for the recorded skip reasons; `Date.now` by default. */
+  now?: () => number;
   log?: (message: string) => void;
   /** Read for the `OVERDECK_DISABLE_AUTO_MERGE=1` kill switch; `process.env` by default. */
   env?: NodeJS.ProcessEnv;
@@ -72,6 +89,10 @@ export interface AutoMergeScheduleOutcome {
   scheduled: boolean;
   /** Why the issue was not scheduled. */
   reason?: string;
+  /** PAN-4772: the PR head the merge gate read, when the pass got that far. */
+  head?: string;
+  /** Skipped only because a pending or merging row already exists. */
+  alreadyScheduled?: boolean;
 }
 
 function errorMessage(error: unknown): string {
@@ -161,6 +182,11 @@ async function defaultMergeGate(issueId: string): Promise<GateAnswer> {
   return evaluateIssueMergeGate(issueId);
 }
 
+async function defaultRereview(issueId: string, facts: GateAnswer['facts']): Promise<string | null> {
+  const { rereviewStaleApproval } = await import('./stale-approval-rereview.js');
+  return rereviewStaleApproval(issueId, facts);
+}
+
 async function defaultPolicyRefusal(): Promise<(issueId: string) => DoorResult | null> {
   const { autoMergePolicyRefusal } = await import('../routes/merge-train.js');
   return (issueId) => autoMergePolicyRefusal(issueId);
@@ -207,6 +233,7 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
   const policyRefusal = deps.policyRefusal ?? await defaultPolicyRefusal();
   const mergeGate = deps.mergeGate ?? defaultMergeGate;
   const schedule = deps.schedule ?? defaultSchedule;
+  const rereview = deps.rereview ?? defaultRereview;
   const isCurrent = deps.isCurrent ?? (() => true);
 
   const outcomes: AutoMergeScheduleOutcome[] = [];
@@ -233,7 +260,9 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
     for (const rawIssueId of candidates) {
       if (!isCurrent()) return outcomes;
       const issueId = rawIssueId.toUpperCase();
-      const skip = (reason: string) => outcomes.push({ projectKey: key, issueId, scheduled: false, reason });
+      let head: string | undefined;
+      const skip = (reason: string, extra: { alreadyScheduled?: true } = {}) =>
+        outcomes.push({ projectKey: key, issueId, scheduled: false, reason, ...(head ? { head } : {}), ...extra });
       try {
         // Free checks first: a held or already-scheduled issue costs no forge read.
         const refusal = policyRefusal(issueId);
@@ -243,7 +272,7 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
         }
         const latest = latestAutoMerge(issueId);
         if (latest?.status === 'pending' || latest?.status === 'merging') {
-          skip(`auto-merge already ${latest.status}`);
+          skip(`auto-merge already ${latest.status}`, { alreadyScheduled: true });
           continue;
         }
         if (latest?.status === 'cancelled') {
@@ -252,8 +281,18 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
         }
 
         const gate = await mergeGate(issueId);
+        head = gate.facts.headSha ?? undefined;
         if (!gate.ready) {
-          skip(gate.reason ?? 'merge gate says not ready');
+          const reason = gate.reason ?? 'merge gate says not ready';
+          let stale: string | null = null;
+          if (isCurrent()) {
+            try {
+              stale = await rereview(issueId, gate.facts);
+            } catch (error) {
+              stale = `stale-approval re-review failed: ${errorMessage(error)}`;
+            }
+          }
+          skip(stale ? `${reason}; ${stale}` : reason);
           continue;
         }
         if (!latestAutoMergeAllowsSchedule(latest, gate.facts)) {
@@ -322,6 +361,11 @@ export function runAutoMergeSchedulerTick(
     timer.unref?.();
   });
   const pass: Promise<AutoMergeScheduleOutcome[]> = Promise.race([scheduleReadyAutoMerges({ ...deps, isCurrent }), timedOut])
+    .then((outcomes) => {
+      // PAN-4772: only a pass that ran to completion replaces the visible skips.
+      if (isCurrent()) recordSchedulerOutcomes(outcomes, { log, ...(deps.now ? { now: deps.now } : {}) });
+      return outcomes;
+    })
     .finally(() => {
       clearTimeout(timer);
       if (activePass === pass) activePass = null;

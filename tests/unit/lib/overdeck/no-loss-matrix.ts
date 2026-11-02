@@ -601,7 +601,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/merge-train/merge-backend',                  kind: 'http', disposition: 'READ',        door: 'getMergeBackendStatus (github-app.js) — whether an autonomous merge can actually be performed' },
   { surface: 'GET /api/merge-train/config',                         kind: 'http', disposition: 'READ',        door: 'getMergeTrainConfigPayload' },
   { surface: 'POST /api/merge-train/config',                        kind: 'http', disposition: 'WRITE',       door: 'postMergeTrainConfigPayload' },
-  { surface: 'GET /api/merge-train/auto-merge/pending',              kind: 'http', disposition: 'READ',        door: 'getPendingAutoMergePayload — supersedes GET /api/flywheel/auto-merge/pending' },
+  { surface: 'GET /api/merge-train/auto-merge/pending',              kind: 'http', disposition: 'READ',        door: 'getPendingAutoMergePayload — cooldown queue plus the scheduler skip reasons (notScheduled, PAN-4772); supersedes GET /api/flywheel/auto-merge/pending' },
   { surface: 'GET /api/merge-train/auto-merge/problems',             kind: 'http', disposition: 'READ',        door: 'getAutoMergeProblemPayload — supersedes GET /api/flywheel/auto-merge/problems' },
   { surface: 'POST /api/merge-train/auto-merge/schedule',            kind: 'http', disposition: 'WRITE',       door: 'postAutoMergeSchedulePayload — supersedes POST /api/flywheel/auto-merge/schedule' },
   { surface: 'DELETE /api/merge-train/auto-merge/:id',                kind: 'http', disposition: 'WRITE',       door: 'deleteAutoMergePayload — supersedes DELETE /api/flywheel/auto-merge/:id' },

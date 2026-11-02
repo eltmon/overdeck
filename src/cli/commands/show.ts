@@ -171,6 +171,8 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `head=${shortSha(data.head)} sync-main repair to ${data.agentId ?? 'the work agent'}`;
     case 'conflict.repair-escalated':
       return `head=${shortSha(data.head)} needs you — ${data.reason ?? 'unknown'}`;
+    case 'review.stale-approval-rerequested':
+      return `head=${shortSha(data.head)} stale approval, review re-requested (${data.outcome ?? 'unknown'})`;
     case 'blocked.declared':
       return `${data.item ?? 'item'} waits on ${Array.isArray(data.blockers) ? data.blockers.join(', ') : '?'}`;
     case 'blocked.woken':

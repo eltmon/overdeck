@@ -1,7 +1,9 @@
 /**
  * Pending auto-merges (PAN-3964 FR-11; v1 `PendingAutoMergesBanner`). Reads
  * the merge train's cooldown queue and lets the operator cancel an entry
- * before its countdown runs out. Hidden when nothing is pending.
+ * before its countdown runs out. PAN-4772: also lists why the scheduler's last
+ * pass left a candidate unscheduled ("Not scheduled: <reason>"). Hidden when
+ * both lists are empty.
  */
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,12 +20,32 @@ export interface PendingAutoMergeRow {
   status: 'pending' | 'merging' | 'blocked' | 'failed' | 'merged' | 'cancelled';
 }
 
+/** PAN-4772: one candidate the scheduler's last completed pass did not schedule. */
+export interface NotScheduledAutoMergeRow {
+  issueId: string;
+  projectKey: string;
+  reason: string;
+  head?: string;
+  at: string;
+}
+
+export interface PendingAutoMergesPayload {
+  pending: PendingAutoMergeRow[];
+  notScheduled: NotScheduledAutoMergeRow[];
+}
+
 export const PENDING_AUTO_MERGES_QUERY_KEY = ['merge-train', 'auto-merge', 'pending'] as const;
 
-async function fetchPending(): Promise<PendingAutoMergeRow[]> {
+async function fetchPending(): Promise<PendingAutoMergesPayload> {
   const res = await fetch('/api/merge-train/auto-merge/pending');
   if (!res.ok) throw new Error(`GET /api/merge-train/auto-merge/pending → ${res.status}`);
-  return res.json() as Promise<PendingAutoMergeRow[]>;
+  const body = await res.json() as PendingAutoMergesPayload | PendingAutoMergeRow[];
+  // A server from before PAN-4772 answers the bare cooldown queue.
+  if (Array.isArray(body)) return { pending: body, notScheduled: [] };
+  return {
+    pending: Array.isArray(body?.pending) ? body.pending : [],
+    notScheduled: Array.isArray(body?.notScheduled) ? body.notScheduled : [],
+  };
 }
 
 export function formatAutoMergeCountdown(scheduledMergeAt: string, nowMs: number): string {
@@ -53,7 +75,8 @@ export function PendingAutoMergesCard({ onNavigateIssue }: { onNavigateIssue?: (
     onSettled: () => queryClient.invalidateQueries({ queryKey: PENDING_AUTO_MERGES_QUERY_KEY }),
   });
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const pending = Array.isArray(data) ? data.filter((entry) => entry.status === 'pending' || entry.status === 'merging') : [];
+  const pending = (data?.pending ?? []).filter((entry) => entry.status === 'pending' || entry.status === 'merging');
+  const notScheduled = data?.notScheduled ?? [];
 
   useEffect(() => {
     if (pending.length === 0) return;
@@ -61,7 +84,7 @@ export function PendingAutoMergesCard({ onNavigateIssue }: { onNavigateIssue?: (
     return () => window.clearInterval(interval);
   }, [pending.length]);
 
-  if (pending.length === 0) return null;
+  if (pending.length === 0 && notScheduled.length === 0) return null;
 
   return (
     <RailCard label="Pending auto-merges" ariaLabel="Pending auto-merges">
@@ -86,6 +109,14 @@ export function PendingAutoMergesCard({ onNavigateIssue }: { onNavigateIssue?: (
             </li>
           );
         })}
+        {notScheduled.map((entry) => (
+          <li key={`not-scheduled-${entry.issueId}`} className="flex flex-wrap items-baseline gap-2 text-xs" data-testid={`not-scheduled-auto-merge-${entry.issueId}`}>
+            <button type="button" className="font-mono text-foreground hover:underline" onClick={() => onNavigateIssue?.(entry.issueId)}>
+              {entry.issueId}
+            </button>
+            <span className="min-w-0 break-words text-muted-foreground">Not scheduled: {entry.reason}</span>
+          </li>
+        ))}
       </ul>
       {cancel.error && <p className="mt-2 text-xs text-destructive" role="alert">{cancel.error.message}</p>}
     </RailCard>
