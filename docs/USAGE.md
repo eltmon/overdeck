@@ -152,14 +152,13 @@ Overdeck supports multiple AI model providers through direct Anthropic-compatibl
 
 **Anthropic** (via Claude Code / Claude API)
 - `claude-opus-4-6` - Most capable, best for planning and complex tasks
-- `claude-sonnet-4-5` - Balanced performance and cost
+- `claude-sonnet-4-6` - Balanced performance and cost
 - `claude-haiku-4-5` - Fast and cost-effective for simple tasks
 
 **OpenAI**
-- `gpt-5.2-codex` - Agentic coding and research
-- `o3-deep-research` - Deep research capabilities
-- `gpt-4o` - General-purpose model
-- `gpt-4o-mini` - Faster, more cost-effective variant
+- `gpt-5.6-sol` - Default OpenAI model
+- `gpt-6-astra` - Most capable OpenAI model (opt-in)
+- `gpt-5.6-luna` - Fast and cost-effective
 
 **Google (Gemini)**
 - `gemini-3-pro-preview` - Supports `thinking_level: high|low`

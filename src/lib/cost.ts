@@ -129,12 +129,18 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'openai', model: 'gpt-6.1-sol', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0001, currency: 'USD' },
   // gpt-6.1-terra per developers.openai.com/api/docs/models/gpt-6.1-terra (2026-10-26)
   { provider: 'openai', model: 'gpt-6.1-terra', inputPer1k: 0.001, outputPer1k: 0.005, cacheReadPer1k: 0.00005, currency: 'USD' },
+  // gpt-6-rosalind / gpt-6-astra-law per developers.openai.com/api/docs/pricing (checked 2026-11-02).
+  // Rosalind's >272K tier ($30/$3/$112.50) is not modeled, same as the GPT-5.6/6 rows. Astra for Law is promotional through at least 2026-12-31.
+  { provider: 'openai', model: 'gpt-6-rosalind', inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-6-astra-law', inputPer1k: 0.010, outputPer1k: 0.050, cacheReadPer1k: 0.001, currency: 'USD' },
   // gpt-6-sol / gpt-6-luna per developers.openai.com/api/docs/models/gpt-6-sol and /gpt-6-luna (2026-09-22)
   { provider: 'openai', model: 'gpt-6-sol', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0002, currency: 'USD' },
   { provider: 'openai', model: 'gpt-6-luna', inputPer1k: 0.0001, outputPer1k: 0.0005, cacheReadPer1k: 0.00001, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.6-sol', inputPer1k: 0.005, outputPer1k: 0.030, cacheReadPer1k: 0.0005, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.6-terra', inputPer1k: 0.0025, outputPer1k: 0.015, cacheReadPer1k: 0.00025, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.6-luna', inputPer1k: 0.001, outputPer1k: 0.006, cacheReadPer1k: 0.0001, currency: 'USD' },
+  // gpt-5.6-sol/terra/luna per developers.openai.com/api/docs/pricing (checked 2026-11-02). Sol's
+  // $4/$20 is promotional "at least through November 21, 2026"; no post-promo rate is published.
+  { provider: 'openai', model: 'gpt-5.6-sol', inputPer1k: 0.004, outputPer1k: 0.020, cacheReadPer1k: 0.0004, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.6-terra', inputPer1k: 0.002, outputPer1k: 0.012, cacheReadPer1k: 0.0002, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.6-luna', inputPer1k: 0.0002, outputPer1k: 0.0012, cacheReadPer1k: 0.00002, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.5', inputPer1k: 0.005, outputPer1k: 0.030, cacheReadPer1k: 0.0005, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.5-pro', inputPer1k: 0.030, outputPer1k: 0.180, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.4', inputPer1k: 0.0025, outputPer1k: 0.015, cacheReadPer1k: 0.00025, currency: 'USD' },
@@ -144,7 +150,7 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'openai', model: 'gpt-5.3-codex', inputPer1k: 0.00175, outputPer1k: 0.014, cacheReadPer1k: 0.000175, currency: 'USD' },
   { provider: 'openai', model: 'codex-4o', inputPer1k: 0.00175, outputPer1k: 0.014, cacheReadPer1k: 0.000175, currency: 'USD' },
   { provider: 'openai', model: 'codex-4o-mini', inputPer1k: 0.00075, outputPer1k: 0.0045, cacheReadPer1k: 0.000075, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.2', inputPer1k: 0.00125, outputPer1k: 0.010, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.2', inputPer1k: 0.00175, outputPer1k: 0.014, cacheReadPer1k: 0.000175, currency: 'USD' }, // developers.openai.com/api/docs/pricing (2026-11-02)
   { provider: 'openai', model: 'o3', inputPer1k: 0.002, outputPer1k: 0.008, currency: 'USD' },
   { provider: 'openai', model: 'o4-mini', inputPer1k: 0.004, outputPer1k: 0.016, cacheReadPer1k: 0.001, currency: 'USD' },
   // Google — Gemini 4 Argon introductory rates through 2026-11-30; from 2026-12-01 $4/$20/$0.20 per MTok

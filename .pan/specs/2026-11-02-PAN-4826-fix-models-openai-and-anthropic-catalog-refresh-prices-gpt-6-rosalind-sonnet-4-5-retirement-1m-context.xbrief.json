@@ -1,0 +1,771 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T17:30:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4826: fix(models): OpenAI and Anthropic catalog refresh (prices, gpt-6-rosalind, sonnet-4-5 retirement, 1M context)",
+    "updated": "2026-11-02T16:30:53.208Z"
+  },
+  "plan": {
+    "id": "pan-4826",
+    "title": "fix(models): OpenAI and Anthropic catalog refresh (prices, gpt-6-rosalind, sonnet-4-5 retirement, 1M context)",
+    "status": "running",
+    "uid": "8adc8b3e-de30-448e-b616-83cc30e6e9f7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T17:30:00.000Z",
+    "updated": "2026-11-02T16:30:53.208Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4826",
+        "label": "PAN-4826",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4826.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "models",
+      "catalog",
+      "pricing",
+      "openai",
+      "anthropic"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator split the 2026-11 catalog audit into three provider-grouped sibling issues (PAN-4825/4826/4827) so their PRs edit disjoint entries in the same shared catalog files; splitting the OpenAI+Anthropic slice further would put more PRs on those same files and multiply conflicts. Each item is already a small independent slice with its own tests.",
+      "canonicalFilename": "2026-11-02-PAN-4826-fix-models-openai-and-anthropic-catalog-refresh-prices-gpt-6-rosalind-sonnet-4-5-retirement-1m-context.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The OpenAI and Anthropic catalog has drifted from the official pages (checked 2026-11-02). cost.ts still prices gpt-5.6-sol at $5/$30, terra at $2.50/$15, luna at $1/$6 and gpt-5.2 at $1.25/$10. Several capability blends are wrong (gpt-5.5 $3/$18, gpt-5.5-pro $18/$220, gpt-5.4-mini 1.0, gpt-5.2 window 200K vs 400K). gpt-6-rosalind and gpt-6-astra-law are missing. claude-sonnet-4-5 retires on 2026-11-30 but is still in PROVIDERS.anthropic.models.",
+      "Proposal": "Reprice in place from the official pricing page (cost rows, capability blends, picker badges, catalog fixture). Register gpt-6-rosalind and gpt-6-astra-law as opt-in, API-key-only, unranked domain models on the gpt-6.1-terra Codex route (272K pin, no CLIProxy, no Codex floor because they cannot be measured). Remove claude-sonnet-4-5 from PROVIDERS.anthropic.models only, keeping its migration to claude-sonnet-4-6 and its historical rows. Keep Opus 4.6/Sonnet 4.6 at the 200K window Claude Code actually launches them with, and record why. Update harnesses.mdx, MODEL-CONTEXT-AUDIT.md, USAGE.md and TESTING-PROVIDERS.md. Full detail: .pan/drafts/PAN-4826.md.",
+      "NonGoals": "- No [1m] ModelIds for claude-opus-4-6 or claude-sonnet-4-6, and no change to their 200000 contextWindow\n- No change to the claude-sonnet-4-5 MODEL_DEPRECATIONS target (stays claude-sonnet-4-6)\n- No tierModels or haikuModel change for any provider\n- No change to operator-retired MODEL_DEPRECATIONS rows\n- No CODEX_MODEL_MINIMUM_VERSIONS row, no GPT_56_MODELS membership, no CLIProxy route for gpt-6-rosalind or gpt-6-astra-law\n- No edit to src/lib/runtimes/codex.ts\n- No modeling of >272K long-context price tiers in cost.ts\n- No edits to providers other than OpenAI and Anthropic (PAN-4825, PAN-4827 own them)\n- No changelog.mdx edit\n- No new lines in src/lib/model-capabilities.ts or src/dashboard/server/routes/settings.ts, and no file-size allowlist raise\n- No hardcoded model fallback"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep claude-opus-4-6 and claude-sonnet-4-6 at contextWindow 200000 instead of raising to 1M (issue AC #4 not met)",
+        "rationale": "code.claude.com/docs/en/model-config says Opus 4.6 and Sonnet 4.6 reach 1M only through the plan-gated [1m] variant; Overdeck launches the bare ids, and contextWindow drives the context meter and Deacon 85% compaction, so 1M would reproduce PAN-3057. Issue rule 1: the official page wins; the PR body records it."
+      },
+      {
+        "summary": "Keep claude-sonnet-4-5 migrating to claude-sonnet-4-6",
+        "rationale": "Issue AC #3 names this target explicitly, claude-sonnet-4-6 is Active until at least 2027-02-17, and existing tests assert it. Anthropic recommends claude-sonnet-5-5; the PR body notes the difference."
+      },
+      {
+        "summary": "Add gpt-6-astra-law alongside gpt-6-rosalind",
+        "rationale": "The issue says to add it only if it appears on the official pricing page; it does ($10/$1/$50, promotional through 2026-12-31)."
+      },
+      {
+        "summary": "No Codex floor for the new ids",
+        "rationale": "Neither id is in the Codex 0.159.0 ChatGPT-sign-in catalog (codex debug models, 2026-11-02) and access is trusted-access only, so a floor cannot be measured; existing floors are all measured."
+      },
+      {
+        "summary": "gpt-5.6-sol priced at the promotional $4/$20/$0.40 with a dated comment",
+        "rationale": "No post-promo rate is published on the pricing page; the issue says to use $4/$20 with a dated comment in that case."
+      },
+      {
+        "summary": "Domain models get unranked skills (0) and no minTier/maxOutputTokens",
+        "rationale": "No benchmarks or limits are published (model pages 404); the Muse precedent marks unbenchmarked models unranked, and omitted minTier means API-key only, matching trusted-access availability."
+      },
+      {
+        "summary": "gpt-5.2 gains its official cached rate and 400K window; the no-cache-pricing test moves to gpt-5.5-pro",
+        "rationale": "The official page lists $0.175 cached and a 400,000 window; gpt-5.5-pro has no cached rate listed, so it keeps the test meaningful."
+      }
+    ],
+    "items": [
+      {
+        "id": "openai-cost-reprice",
+        "title": "Reprice the stale OpenAI cost.ts rows (gpt-5.6 Sol/Terra/Luna, gpt-5.2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T17:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4826",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "tests/lib/cost.test.ts",
+            "src/lib/costs/__tests__/cost-calculation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cost.test.ts src/lib/costs/__tests__/cost-calculation.test.ts src/lib/cost-parsers/__tests__/codex-parser-gpt56.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4826.md WI-1. In src/lib/cost.ts replace the gpt-5.6-sol/terra/luna rows (search `model: 'gpt-5.6-sol', inputPer1k: 0.005`) with sol 0.004/0.020/cached 0.0004, terra 0.002/0.012/0.0002, luna 0.0002/0.0012/0.00002, plus the dated source comment that says Sol's $4/$20 is promotional through at least 2026-11-21 with no post-promo rate published. Replace the gpt-5.2 row with 0.00175/0.014/cacheReadPer1k 0.000175. Do NOT touch the gpt-5.5, gpt-5.5-pro or gpt-5.4-mini rows (already correct). In tests/lib/cost.test.ts change the terra56 expectations in 'prices gpt-6.1-terra distinctly from gpt-5.6-terra' to 0.002/0.0002/0.012 and add the PRD's it.each ('prices %s at the 2026-11 official OpenAI rate') and the 'prices gpt-5.5-pro at $30/$180 with no cached rate' test. In src/lib/costs/__tests__/cost-calculation.test.ts:309-312 repoint the no-cache-pricing test from gpt-5.2 to gpt-5.5-pro and fix any hard-coded expected cost to gpt-5.5-pro's rates."
+        },
+        "items": [
+          {
+            "id": "openai-cost-reprice.ac1",
+            "title": "Given cost.ts after this item, when getPricing('openai','gpt-5.6-terra') is called, then it returns inputPer1k 0.002, cacheReadPer1k 0.0002 and outputPer1k 0.012, asserted in tests/lib/cost.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-cost-reprice.ac2",
+            "title": "Given cost.ts after this item, when getPricing('openai','gpt-5.5-pro') is called, then it returns inputPer1k 0.030 and outputPer1k 0.180 with cacheReadPer1k undefined, asserted by a new test in tests/lib/cost.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-cost-reprice.ac3",
+            "title": "Given cost.ts after this item, when getPricing is called for gpt-5.6-sol and gpt-5.2, then it returns 0.004/0.0004/0.020 and 0.00175/0.000175/0.014, and the gpt-5.6-sol row carries a comment naming the 2026-11-21 promotional date",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-cost-reprice.ac4",
+            "title": "Given cost-calculation.test.ts, when its no-cache-pricing test runs, then it uses gpt-5.5-pro and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "openai-capability-reprice",
+        "title": "Reprice the OpenAI capability blends, gpt-5.2 window and catalog fixture in place",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T17:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4826",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-capabilities.ts",
+            "src/lib/__tests__/model-capabilities.test.ts",
+            "src/lib/__tests__/fixtures/pre-opencode-model-catalog.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts src/lib/__tests__/settings-model-catalog.test.ts src/lib/__tests__/model-catalog-audit.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "wc -l src/lib/model-capabilities.ts"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "file-size guard passes",
+            "wc prints 1422"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4826.md WI-2. Edit src/lib/model-capabilities.ts IN PLACE only (it is at its 1422-line cap; never add a line): gpt-5.6-sol (line 458) and gpt-5.6-sol[372k] (line 482) costPer1MTokens 17.5 -> 12 with the promo comment; gpt-5.5 (line 602) 10.5 -> 17.5; gpt-5.5-pro (line 625) 119.0 -> 105; gpt-5.2 (line 670) 5.625 -> 7.875 and its contextWindow (line 671) 200000 -> 400000 with the source comment; gpt-5.4-mini (line 342) 1.0 -> 2.625. Use the exact replacement comments in the PRD table. Leave gpt-5.6-terra/luna and their [372k] blends (7, 0.7) unchanged. In src/lib/__tests__/fixtures/pre-opencode-model-catalog.json change costPer1MTokens 17.5 -> 12 for the gpt-5.6-sol and gpt-5.6-sol[372k] objects only. Add the PRD's 'blends %s at %s $/1M' it.each and the 'records gpt-5.2 at its official 400K window' test to model-capabilities.test.ts."
+        },
+        "items": [
+          {
+            "id": "openai-capability-reprice.ac1",
+            "title": "Given model-capabilities.ts after this item, when MODEL_CAPABILITIES is read, then gpt-5.6-sol and gpt-5.6-sol[372k] return costPer1MTokens 12, gpt-5.5 returns 17.5, gpt-5.5-pro returns 105, gpt-5.2 returns 7.875 and gpt-5.4-mini returns 2.625, asserted by a new it.each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-capability-reprice.ac2",
+            "title": "Given model-capabilities.ts after this item, when MODEL_CAPABILITIES['gpt-5.2'].contextWindow is read, then it returns 400000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-capability-reprice.ac3",
+            "title": "Given the edited file, when wc -l src/lib/model-capabilities.ts runs, then it prints 1422 and bash scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-capability-reprice.ac4",
+            "title": "Given the updated fixture, when settings-model-catalog.test.ts runs its no-loss audit, then it passes with gpt-5.6-sol at 12",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "openai-picker-reprice",
+        "title": "Reprice the gpt-5.6-sol rows in both dashboard pickers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T17:30:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-4826",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4826.md WI-3. ModelPicker.tsx:126-127 (gpt-5.6-sol and gpt-5.6-sol[372k]): costDisplay '$17.5/1M' -> '$12/1M' and costPer1MTokens 17.5 -> 12. modelCatalog.ts:76 (gpt-5.6-sol): costPer1MTokens 17.5 -> 12 and description '$5 in / $30 out per 1M.' -> '$4 in / $20 out per 1M (promotional through at least November 21, 2026).'; modelCatalog.ts:77 (gpt-5.6-sol[372k]): costPer1MTokens 17.5 -> 12. Change nothing else."
+        },
+        "items": [
+          {
+            "id": "openai-picker-reprice.ac1",
+            "title": "Given ModelPicker.tsx after this item, when its gpt-5.6-sol and gpt-5.6-sol[372k] rows are read, then each shows costDisplay '$12/1M' and costPer1MTokens 12",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-picker-reprice.ac2",
+            "title": "Given modelCatalog.ts after this item, when the gpt-5.6-sol row is read, then it shows costPer1MTokens 12 and its description contains '$4 in / $20 out per 1M (promotional through at least November 21, 2026)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-picker-reprice.ac3",
+            "title": "Given both files, when grep -n '17.5' runs on them, then no gpt-5.6-sol row matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "register-rosalind-astra-law",
+        "title": "Register gpt-6-rosalind and gpt-6-astra-law as opt-in Codex-route OpenAI models",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T17:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4826",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/providers.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/agents/provider-env.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "src/lib/__tests__/model-capabilities.test.ts",
+            "tests/lib/model-fallback.test.ts",
+            "tests/lib/settings.test.ts",
+            "src/lib/runtimes/__tests__/codex.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/model-catalog-audit.test.ts src/lib/__tests__/model-capabilities.test.ts src/lib/__tests__/model-validation.test.ts tests/lib/model-fallback.test.ts tests/lib/settings.test.ts tests/lib/providers.test.ts src/lib/runtimes/__tests__/codex.test.ts src/lib/__tests__/model-capability-class.test.ts tests/unit/lib/conversations/model-pattern-drift.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all nine test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "settings-catalog-order",
+            "sonnet-4-5-retire"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4826.md WI-4 and decisions D5-D7. Add 'gpt-6-rosalind' and 'gpt-6-astra-law' to: the OpenAIModel union and openaiModels list in src/lib/settings.ts; PROVIDERS.openai.models and the getProviderForModelSync OpenAI array in src/lib/providers.ts (never tierModels); MODEL_CAPABILITIES via src/lib/model-capability-additions.ts right after 'gpt-6.1-terra' using the PRD snippet verbatim (blend 45 / 30, contextWindow CLIPROXY_GPT56_CONTEXT_WINDOW, effortLevels low..max, every skill 0 except 'context-length' 95, NO minTier, NO maxOutputTokens, notes per PRD); class 'frontier' in model-capability-class.ts; MODEL_PROVIDERS 'openai', FALLBACK_MAP 'claude-sonnet-5-5' and MODEL_TIER_RANK 3 in model-fallback.ts. Replace the comment above GPT_56_MODELS in src/lib/agents/provider-env.ts:141 with the PRD text; do NOT add either id to GPT_56_MODELS; do NOT add a Codex floor; do NOT edit src/lib/runtimes/codex.ts or src/lib/cost.ts. Tests per PRD: model-catalog-audit it.each rows (272000), model-capabilities.test new it.each plus the no-[372k] list, model-fallback.test counts 21->23, 40->42, 23->25 (add 2 to whatever value main holds if a sibling PR changed it), settings.test.ts list, codex.test.ts rows ['gpt-6-rosalind','high',272000,'high'] and ['gpt-6-astra-law','high',272000,'high']."
+        },
+        "items": [
+          {
+            "id": "register-rosalind-astra-law.ac1",
+            "title": "Given the registry after this item, when getProviderForModel('gpt-6-rosalind') and getProviderForModel('gpt-6-astra-law') are called, then each returns the openai provider and both ids appear in PROVIDERS.openai.models",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-rosalind-astra-law.ac2",
+            "title": "Given MODEL_CAPABILITIES, when the two entries are read, then they report costPer1MTokens 45 and 30, contextWindow 272000, minTier undefined and code-generation 0, and capabilityClassOf returns 'frontier' for both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-rosalind-astra-law.ac3",
+            "title": "Given initCodexHome is called with each new id, when config.toml is read, then it pins model_context_window = 272000 (codex.test.ts rows pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-rosalind-astra-law.ac4",
+            "title": "Given provider-env.ts, when GPT_56_MODELS is inspected, then neither new id is a member and PROVIDERS.openai.tierModels is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rosalind-astra-law-cost",
+        "title": "Price gpt-6-rosalind and gpt-6-astra-law through exact cost.ts rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T17:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4826",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "tests/lib/cost.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cost.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/cost.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4826.md WI-5. Directly below the gpt-6.1-terra row in src/lib/cost.ts add the two rows with the PRD source comment: gpt-6-rosalind 0.015/0.075/cacheReadPer1k 0.0015 and gpt-6-astra-law 0.010/0.050/cacheReadPer1k 0.001. The exact row is required: without it getPricing's prefix fallback prices gpt-6-astra-law as gpt-6-astra. Add the PRD's 'prices %s through its own exact row' it.each to tests/lib/cost.test.ts."
+        },
+        "items": [
+          {
+            "id": "rosalind-astra-law-cost.ac1",
+            "title": "Given cost.ts after this item, when getPricing('openai','gpt-6-rosalind') is called, then it returns model 'gpt-6-rosalind' with inputPer1k 0.015, cacheReadPer1k 0.0015 and outputPer1k 0.075",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rosalind-astra-law-cost.ac2",
+            "title": "Given cost.ts after this item, when getPricing('openai','gpt-6-astra-law') is called, then it returns model 'gpt-6-astra-law' (not 'gpt-6-astra') with 0.010 / 0.001 / 0.050",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-catalog-order",
+        "title": "Order the new ids in the Settings catalog and map their settings-route API ids",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T17:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4826",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-model-catalog.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts",
+            "src/dashboard/server/routes/settings.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/settings-model-catalog.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "wc -l src/dashboard/server/routes/settings.ts"
+          ],
+          "expected_outputs": [
+            "settings-model-catalog.test.ts passes",
+            "file-size guard passes",
+            "wc prints 1104"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4826.md WI-6. In src/lib/settings-model-catalog.ts openaiOrder add 'gpt-6-astra-law': 8, 'gpt-6-rosalind': 9 on the gpt-5.6 line and extend the order comment. In settings-model-catalog.test.ts update the additions comment and append the two PRD objects (Astra for Law then Rosalind) to gpt6Additions; keep the slice(0, 5) assertion; if the code's order differs, fix the array, not the code. In src/dashboard/server/routes/settings.ts append the two { apiModel } entries to the END of the existing line 109 — add no new line (file is at its 1104-line cap)."
+        },
+        "items": [
+          {
+            "id": "settings-catalog-order.ac1",
+            "title": "Given getAvailableModelsApi() after this item, when the openai list is read, then gpt-6-astra-law and gpt-6-rosalind follow gpt-5.6-luna in that order and the first five ids stay ['gpt-6-astra','gpt-6.1-sol','gpt-6.1-terra','gpt-6-sol','gpt-6-luna']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-catalog-order.ac2",
+            "title": "Given MODEL_API_IDS, when it is read for the two new ids, then each maps to an identical apiModel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-catalog-order.ac3",
+            "title": "Given the edited route file, when wc -l runs, then it prints 1104 and bash scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "picker-rows-friendly-names",
+        "title": "Add the new ids to both dashboard pickers with their own friendly names",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T17:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4826",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/dashboard/frontend/src/lib/dashboard-utils.ts",
+            "src/dashboard/frontend/src/lib/__tests__/dashboard-utils.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/dashboard-utils.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "dashboard-utils.test.ts passes",
+            "typecheck completes without errors",
+            "lint (including lint:effort) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4826.md WI-7. Insert the PRD's two rows (gpt-6-astra-law then gpt-6-rosalind) directly after the gpt-6-luna row in ModelPicker.tsx (effortLevels: EFFORT_LEVELS, never a literal array) and in modelCatalog.ts (icon Gem, tier 'premium', PRD capabilities and descriptions). In dashboard-utils.ts getFriendlyModelName, add the gpt-6-astra-law and gpt-6-rosalind lines as the first two lines of the OpenAI block (before the gpt-6.1-sol line). Add the two expectations to dashboard-utils.test.ts next to the gpt-6.1-terra one."
+        },
+        "items": [
+          {
+            "id": "picker-rows-friendly-names.ac1",
+            "title": "Given getFriendlyModelName, when it is called with 'gpt-6-astra-law' and 'gpt-6-rosalind', then it returns 'GPT-6 Astra for Law' and 'GPT-6 Rosalind'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-rows-friendly-names.ac2",
+            "title": "Given ModelPicker.tsx, when its OpenAI rows are read, then both ids render with costPer1MTokens 30 and 45 and effortLevels: EFFORT_LEVELS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-rows-friendly-names.ac3",
+            "title": "Given modelCatalog.ts, when its OpenAI rows are read, then both ids appear with descriptions that state their prices and the Rosalind trusted-access restriction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sonnet-4-5-retire",
+        "title": "Remove claude-sonnet-4-5 from new selections while it still migrates to claude-sonnet-4-6",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T17:30:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4826",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/providers.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/model-catalog-audit.test.ts tests/lib/model-deprecation.test.ts tests/lib/model-fallback.test.ts tests/lib/providers.test.ts tests/lib/settings.test.ts src/lib/agents/__tests__/tier-fitness-context.test.ts src/lib/__tests__/model-capability-class.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all seven test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4826.md WI-8 and D2/D3. Remove 'claude-sonnet-4-5' from PROVIDERS.anthropic.models (src/lib/providers.ts:98) only. Keep it in the getProviderForModelSync array (line 471), the AnthropicModel union, MODEL_PROVIDERS, capability/class/cost rows and MODEL_DEPRECATIONS (target stays claude-sonnet-4-6 per issue AC #3). Add the PRD's 'retires claude-sonnet-4-5 from new selections…' test to model-catalog-audit.test.ts, adding resolveModelId to the ../model-capabilities.js import and getPricing from ../cost.js."
+        },
+        "items": [
+          {
+            "id": "sonnet-4-5-retire.ac1",
+            "title": "Given PROVIDERS after this item, when PROVIDERS.anthropic.models is read, then it does not contain 'claude-sonnet-4-5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-4-5-retire.ac2",
+            "title": "Given resolveModelId, when it is called with 'claude-sonnet-4-5', then it returns 'claude-sonnet-4-6' and getProviderForModel('claude-sonnet-4-5').name returns 'anthropic'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-4-5-retire.ac3",
+            "title": "Given the historical rows, when MODEL_CAPABILITIES and getPricing('anthropic','claude-sonnet-4-5') are read, then the capability entry exists and inputPer1k is 0.003",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-46-context-lock",
+        "title": "Lock Opus 4.6 and Sonnet 4.6 at the 200K Claude Code window and correct their notes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T17:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4826",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-capabilities.ts",
+            "src/lib/__tests__/model-capabilities.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "wc -l src/lib/model-capabilities.ts"
+          ],
+          "expected_outputs": [
+            "model-capabilities.test.ts passes",
+            "file-size guard passes",
+            "wc prints 1422"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4826.md WI-9 and D1. Do NOT raise contextWindow: Claude Code runs bare claude-opus-4-6/claude-sonnet-4-6 at 200K (1M only via the plan-gated [1m] variant), and contextWindow is the launched window (PAN-3057). Edit IN PLACE in src/lib/model-capabilities.ts (no added lines): the contextWindow comments at lines 200 and 249 and the notes at lines 215 and 264 to the exact PRD text citing the Claude Code [1m] rule. Add the PRD's 'keeps %s at the 200K Claude Code window' it.each to model-capabilities.test.ts asserting contextWindow 200000 and getClaudeCodeContextPolicyForModel(model) equals { autoCompactWindow: 200000 }. Add no minClaudeCodeVersion."
+        },
+        "items": [
+          {
+            "id": "claude-46-context-lock.ac1",
+            "title": "Given MODEL_CAPABILITIES after this item, when getModelCapability('claude-sonnet-4-6').contextWindow and getModelCapability('claude-opus-4-6').contextWindow are read, then each returns 200000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-46-context-lock.ac2",
+            "title": "Given getClaudeCodeContextPolicyForModel, when it is called with each id, then it returns { autoCompactWindow: 200000 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-46-context-lock.ac3",
+            "title": "Given the edited file, when the claude-sonnet-4-6 notes are read, then they state that Claude Code runs the bare id at 200K, and wc -l still prints 1422",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-catalog-refresh",
+        "title": "Document the new OpenAI ids and the Anthropic 4.6/4.5 facts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T17:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4826",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "docs/MODEL-CONTEXT-AUDIT.md",
+            "docs/USAGE.md",
+            "docs/TESTING-PROVIDERS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n 'claude-sonnet-4-5' -- '*.mdx' ':!changelog.mdx'",
+            "git grep -n -E 'gpt-6-rosalind|gpt-6-astra-law' -- configuration/harnesses.mdx docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "expected_outputs": [
+            "first command prints nothing",
+            "second command prints hits in both files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4826.md WI-10. configuration/harnesses.mdx: add Rosalind and Astra for Law to the Codex family list (line 224) and the no-[372k] list (line 110-111); add the PRD's Rosalind/Astra-for-Law sentence after the gpt-6.1-terra sentence (prices with &#36;, trusted-access limit, Codex-only, no Codex floor because they are absent from the 0.159.0 ChatGPT catalog); extend the CLIProxy sentence (line 246) to say neither was probed. docs/MODEL-CONTEXT-AUDIT.md: extend table row 1 and its evidence cell, replace the Opus 4.6/Sonnet 4.6/Haiku 4.5 evidence cell with the PRD text on the [1m] rule, add the two Sources bullets. docs/USAGE.md: replace the claude-sonnet-4-5 line with claude-sonnet-4-6 and the four retired OpenAI lines with gpt-5.6-sol / gpt-6-astra / gpt-5.6-luna per PRD. docs/TESTING-PROVIDERS.md:173: --model claude-sonnet-4-6. Do NOT edit changelog.mdx, docs/CONFIGURATION.md:419, docs/MODEL_ROUTING.md:259 or reference/harness-landscape.mdx."
+        },
+        "items": [
+          {
+            "id": "docs-catalog-refresh.ac1",
+            "title": "Given the docs after this item, when git grep -n 'claude-sonnet-4-5' -- '*.mdx' ':!changelog.mdx' runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-catalog-refresh.ac2",
+            "title": "Given configuration/harnesses.mdx, when the Codex section is read, then it states gpt-6-rosalind costs &#36;15/M input and &#36;75/M output, that its API access is limited to OpenAI's trusted-access program, and that neither new id has a Codex floor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-catalog-refresh.ac3",
+            "title": "Given docs/MODEL-CONTEXT-AUDIT.md, when the Opus 4.6/Sonnet 4.6 row is read, then it says Claude Code runs the bare ids at 200K and 1M needs the plan-gated [1m] variant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-catalog-refresh.ac4",
+            "title": "Given docs/USAGE.md, when its supported-model lists are read, then they name claude-sonnet-4-6, gpt-5.6-sol, gpt-6-astra and gpt-5.6-luna and none of claude-sonnet-4-5, gpt-5.2-codex, o3-deep-research, gpt-4o or gpt-4o-mini",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "openai-cost-reprice",
+        "to": "rosalind-astra-law-cost",
+        "type": "blocks"
+      },
+      {
+        "from": "openai-capability-reprice",
+        "to": "register-rosalind-astra-law",
+        "type": "blocks"
+      },
+      {
+        "from": "register-rosalind-astra-law",
+        "to": "claude-46-context-lock",
+        "type": "blocks"
+      },
+      {
+        "from": "openai-picker-reprice",
+        "to": "picker-rows-friendly-names",
+        "type": "blocks"
+      },
+      {
+        "from": "register-rosalind-astra-law",
+        "to": "settings-catalog-order",
+        "type": "blocks"
+      },
+      {
+        "from": "register-rosalind-astra-law",
+        "to": "sonnet-4-5-retire",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
