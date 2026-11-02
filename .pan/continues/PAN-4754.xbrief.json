@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4754",
   "created": "2026-11-02T00:55:26.468Z",
-  "updated": "2026-11-02T01:44:46.564Z",
+  "updated": "2026-11-02T01:45:03.033Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "context-field.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T01:44:46.564Z"
+    },
+    "dialog-markdown.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:45:03.032Z"
     }
   }
 }
