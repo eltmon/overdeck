@@ -182,6 +182,7 @@ src/lib/__tests__/useDecisions.fleet.test.tsx
 src/lib/__tests__/useDecisions.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts
 src/lib/decisionContext.test.ts
+src/lib/pipeline-state.test.ts
 src/lib/sessionOutcome.test.ts
 src/lib/simple/uiMode.test.ts
 src/lib/simple/useSimpleActions.test.tsx
