@@ -36,7 +36,7 @@ import { parseVersionOutput } from '../ssh/target.js';
 import { loadConfig, type RemoteConfig } from '../../config.js';
 import { packageRoot } from '../../paths.js';
 import { createFlyApiClient, FlyApiError, type FlyApiClient, type FlyExecResult } from '../../remote/fly-api.js';
-import type { FlyProvider } from '../../remote/fly-provider.js';
+import { DEFAULT_FLY_APP, defaultFlyImage, type FlyProvider } from '../../remote/fly-provider.js';
 import { createFlyProviderFromConfig } from '../../remote/index.js';
 import { generateEphemeralWatchdogScript, REMOTE_HOST_HEARTBEAT_PATH, writeRemoteFile } from '../../remote/remote-agents.js';
 import { REMOTE_PAN_DIR, shellQuote } from '../../remote/remote-tmux.js';
@@ -63,11 +63,10 @@ const MIN_MEMORY_MB = 2048;
 const PAIRING_CODE_RE = /^odp_[0-9a-f]{64}$/;
 
 // The same defaults as FlyProvider's constructor.
-const DEFAULT_APP = 'pan-workspaces';
+const DEFAULT_APP = DEFAULT_FLY_APP;
 const DEFAULT_ORG = 'personal';
 const DEFAULT_REGION = 'iad';
 const DEFAULT_SIZE = 'shared-cpu-2x';
-const DEFAULT_IMAGE = 'registry.fly.io/pan-workspace:latest';
 
 const DOCKER_POLL = { intervalMs: 2_000, limitMs: 60_000 };
 const HEALTH_POLL = { intervalMs: 2_000, limitMs: 120_000 };
@@ -181,7 +180,7 @@ export async function provisionFlyMachine(
 
   // 2. Create with the D-3 proxy service and the D-12 memory floor.
   const machine = await deps.api.createMachine(appName, machineName, {
-    image: input.image ?? cfg.image ?? DEFAULT_IMAGE,
+    image: input.image ?? cfg.image ?? defaultFlyImage(appName),
     size: cfg.vm_size ?? DEFAULT_SIZE,
     memory: Math.max(cfg.vm_memory ?? 1024, MIN_MEMORY_MB),
     region: input.region ?? cfg.region ?? DEFAULT_REGION,
