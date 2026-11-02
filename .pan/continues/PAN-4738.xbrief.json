@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4738",
   "created": "2026-11-02T05:12:04.950Z",
-  "updated": "2026-11-02T05:37:33.391Z",
+  "updated": "2026-11-02T05:58:27.659Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-02T05:58:27.658Z"
+    }
+  ],
   "items": {
     "fly-preanswer-auto-default-nudge": {
       "status": "completed",
@@ -60,5 +66,6 @@
       "doneAt": "2026-11-02T05:34:43.139Z"
     }
   },
-  "feedback": []
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
 }
