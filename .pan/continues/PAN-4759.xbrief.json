@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4759",
   "created": "2026-11-02T01:10:45.557Z",
-  "updated": "2026-11-02T01:58:20.077Z",
+  "updated": "2026-11-02T01:58:35.367Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -226,6 +226,10 @@
     "move-mattpocock-pstack.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T01:58:20.077Z"
+    },
+    "move-mattpocock-pstack.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:58:35.366Z"
     }
   }
 }
