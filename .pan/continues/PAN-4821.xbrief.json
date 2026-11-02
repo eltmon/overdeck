@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4821",
   "created": "2026-11-02T16:00:29.674Z",
-  "updated": "2026-11-02T17:03:23.644Z",
+  "updated": "2026-11-02T17:14:15.505Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-02T17:03:17.786Z"
     },
     "wi5-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4821",
-      "claimedAt": "2026-11-02T17:03:23.644Z"
+      "claimedAt": "2026-11-02T17:03:23.644Z",
+      "doneAt": "2026-11-02T17:14:15.505Z"
     }
   }
 }
