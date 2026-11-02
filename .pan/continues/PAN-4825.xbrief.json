@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4825",
   "created": "2026-11-02T16:35:14.732Z",
-  "updated": "2026-11-02T16:43:01.501Z",
+  "updated": "2026-11-02T16:44:36.656Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4825",
       "claimedAt": "2026-11-02T16:35:14.732Z",
       "doneAt": "2026-11-02T16:43:01.501Z"
+    },
+    "groq-gpt-oss": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T16:44:36.656Z"
     }
   }
 }
