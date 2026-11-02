@@ -95,6 +95,17 @@ Runtime packs (gstack) are the exception: their scripts are mounted and run when
 
 ## Pinning, updates and forks
 
+### Pinning and updates
+
+The registry stores the **ref** you asked for (a tag or a branch) and the **trusted commit** you approved. Every launch mounts exactly the trusted commit, even if the tag or branch moves.
+
+```bash
+pan skills pack update mattpocock            # re-resolve the ref
+pan skills pack update mattpocock --ref v1.3.0
+```
+
+`update` prints the preview again with the skills added, removed, and changed since the trusted commit, plus any capabilities that are new. It moves the trusted commit only after you confirm. `pan skills pack list` shows when the ref has moved (`update available`); `--offline` skips that network check.
+
 ## Packs
 
 ## Where state lives and when changes apply

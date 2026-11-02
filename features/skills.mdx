@@ -281,17 +281,6 @@ Overrides do not apply to other harnesses, to remote (Fly) launches, or to sessi
 
 ## Skill packs
 
-### Pinning and updates
-
-The registry stores the **ref** you asked for (a tag or a branch) and the **trusted commit** you approved. Every launch mounts exactly the trusted commit, even if the tag or branch moves.
-
-```bash
-pan skills pack update mattpocock            # re-resolve the ref
-pan skills pack update mattpocock --ref v1.3.0
-```
-
-`update` prints the preview again with the skills added, removed, and changed since the trusted commit, plus any capabilities that are new. It moves the trusted commit only after you confirm. `pan skills pack list` shows when the ref has moved (`update available`); `--offline` skips that network check.
-
 ### Matt Pocock's skills from a fork
 
 Overdeck's default source for the `mattpocock` pack is the operator-controlled fork `eltmon/skills`, pinned to the `v1.2.3` commit. A fork lets the operator decide when upstream changes arrive: sync the fork on GitHub, then run `pan skills pack update mattpocock --ref <tag>` to preview and re-pin. Any url works here; `KNOWN_PACKS` applies the `mattpocock` defaults by pack id, not by url.
