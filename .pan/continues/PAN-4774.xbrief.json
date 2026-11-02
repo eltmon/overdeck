@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T23:41:26.823Z",
+  "updated": "2026-11-02T23:41:40.787Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "adopt-skip-saved-cwd-hook.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T23:41:26.823Z"
+    },
+    "ac1-fake-claude.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:41:40.787Z"
     }
   }
 }
