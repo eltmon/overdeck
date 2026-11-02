@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T04:47:31.528157Z · model: claude-opus-5-5 · open: 875_
+_Last sequenced: 2026-11-02T04:55:01.641922Z · model: claude-opus-5-5 · open: 876_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -291,6 +291,7 @@ _Last sequenced: 2026-11-02T04:47:31.528157Z · model: claude-opus-5-5 · open: 
 | 278 | PAN-4756 | L | medium | ok |  | PAN-4755 | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755; surface/structure only. Waits for PAN-4755 to land. |
 | 278 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
 | 279 | PAN-4777 | S | medium | ok |  |  | Fly createRemoteWorkspace leaks a billing VM when an exec throws before deleteVm; delete on any failure. Plus stale clone doc. |
+| 279 | PAN-4791 | XS | high | ok |  | PAN-4777 | Fix two unanswered CodeRabbit findings from #4789: scope the fly-provider.md cleanup promise; add Fly volume removal to recovery text. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 280 | PAN-4774 | M | medium | ok |  |  | Run Anywhere release AC-1..15 on integrated main: two-server local test, fixes or filed issues, operator hardware checklist doc. |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
@@ -1210,10 +1211,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T04:47:31.528157Z",
+  "generatedAt": "2026-11-02T04:55:01.641922Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 875,
+  "openCount": 876,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1238,6 +1239,19 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "dependsOn": [],
       "why": "Main is red: styleguide-conformance e2e spec times out since the Skills page redesign changed index.css; blocks every merge.",
       "rationale": "New issue filed 2026-11-02 and already in the pipeline with a live workspace, so it is pinned at rank 1 beside PAN-4702 without moving any other node. Main CI fails unit shard 4 twice in a row on tests/e2e/styleguide-conformance.spec.ts after commit a443ff0619a changed the global stylesheet, and a red main empties the merge gate for every approved PR. The substrate-improvement label and the pipeline-blocking effect make it critical; the fix is scoped to one spec and one stylesheet change with a clear acceptance, so the condition is ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4786",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Adopted PRs fail incomplete-plan-items (no xBRIEF); blocks handoff PRs #4780/#4783. Narrower overlap of PAN-4636.",
+      "rationale": "New in-pipeline substrate bug: adoption starts review without skipPlanChecklist, so every adopted PR with no xBRIEF fails verification, and today that stalls the handoff PRs for critical PAN-4750 and PAN-4772. TENET-10 routes merge-machinery fixes through supervised handoffs, so until this lands no handoff PR can be reviewed; it takes the free rank-2 slot. It covers the checklist half of PAN-4636, which keeps the operator-signal half.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1511,6 +1525,19 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "dependsOn": [],
       "why": "quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards.",
       "rationale": "New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4785",
+      "rank": 21,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff.",
+      "rationale": "New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4843,6 +4870,21 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "planning": "auto"
     },
     {
+      "issue": "PAN-4791",
+      "rank": 279,
+      "size": "XS",
+      "importance": "high",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4777"
+      ],
+      "why": "Fix two unanswered CodeRabbit findings from #4789: scope the fly-provider.md cleanup promise; add Fly volume removal to recovery text.",
+      "rationale": "New this pass and already in the pipeline, so it sits beside its parent PAN-4777 at rank 279; the recovery-text fix stops an orphaned Fly volume from billing silently.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2211",
       "rank": 280,
       "size": "M",
@@ -7338,6 +7380,19 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "dependsOn": [],
       "why": "Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver)",
       "rationale": "New this run: medium/50 — Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4779",
+      "rank": 482,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate",
+      "rationale": "New issue: small, well-scoped docs fix with mechanical ACs; placed in a free medium-tier slot beside comparable XS/S doc hygiene work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12086,45 +12141,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4779",
-      "rank": 482,
-      "size": "S",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate",
-      "rationale": "New issue: small, well-scoped docs fix with mechanical ACs; placed in a free medium-tier slot beside comparable XS/S doc hygiene work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4785",
-      "rank": 21,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff.",
-      "rationale": "New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4786",
-      "rank": 2,
-      "size": "S",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Adopted PRs fail incomplete-plan-items (no xBRIEF); blocks handoff PRs #4780/#4783. Narrower overlap of PAN-4636.",
-      "rationale": "New in-pipeline substrate bug: adoption starts review without skipPlanChecklist, so every adopted PR with no xBRIEF fails verification, and today that stalls the handoff PRs for critical PAN-4750 and PAN-4772. TENET-10 routes merge-machinery fixes through supervised handoffs, so until this lands no handoff PR can be reviewed; it takes the free rank-2 slot. It covers the checklist half of PAN-4636, which keeps the operator-signal half.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13478,6 +13494,13 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4777",
+      "to": "PAN-4791",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
