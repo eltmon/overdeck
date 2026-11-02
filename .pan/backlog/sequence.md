@@ -1,12 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T04:27:19.952636Z · model: claude-opus-5-5 · open: 874_
+_Last sequenced: 2026-11-02T04:32:26.323684Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 1 | PAN-4767 | S | critical | ok |  |  | Main is red: styleguide-conformance e2e spec times out since the Skills page redesign changed index.css; blocks every merge. |
+| 2 | PAN-4786 | S | critical | ok |  |  | Adopted PRs fail incomplete-plan-items (no xBRIEF); blocks handoff PRs #4780/#4783. Narrower overlap of PAN-4636. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 5 | PAN-4750 | M | critical | ok |  |  | Strike merge door requires head approval strikes never get; 5 green strike PRs unmergeable. needs-handoff (TENET-10). |
 | 6 | PAN-4755 | M | medium | ok |  |  | In-pipeline: overlay tokens + shared Modal primitive; rebuild New conversation dialog to the approved mockup. |
@@ -890,6 +891,10 @@ New substrate bug in the merge door: on 2026-11-01 it refused three approved, gr
 
 New issue filed 2026-11-02 and already in the pipeline with a live workspace, so it is pinned at rank 1 beside PAN-4702 without moving any other node. Main CI fails unit shard 4 twice in a row on tests/e2e/styleguide-conformance.spec.ts after commit a443ff0619a changed the global stylesheet, and a red main empties the merge gate for every approved PR. The substrate-improvement label and the pipeline-blocking effect make it critical; the fix is scoped to one spec and one stylesheet change with a clear acceptance, so the condition is ok.
 
+### PAN-4786 (rank 2)
+
+New in-pipeline substrate bug: adoption starts review without skipPlanChecklist, so every adopted PR with no xBRIEF fails verification, and today that stalls the handoff PRs for critical PAN-4750 and PAN-4772. TENET-10 routes merge-machinery fixes through supervised handoffs, so until this lands no handoff PR can be reviewed; it takes the free rank-2 slot. It covers the checklist half of PAN-4636, which keeps the operator-signal half.
+
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1198,10 +1203,6 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 
 New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.
 
-### PAN-3234 (rank 77)
-
-Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1209,10 +1210,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T04:27:19.952636Z",
+  "generatedAt": "2026-11-02T04:32:26.323684Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 874,
+  "openCount": 875,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12111,6 +12112,19 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "rationale": "New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4786",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Adopted PRs fail incomplete-plan-items (no xBRIEF); blocks handoff PRs #4780/#4783. Narrower overlap of PAN-4636.",
+      "rationale": "New in-pipeline substrate bug: adoption starts review without skipPlanChecklist, so every adopted PR with no xBRIEF fails verification, and today that stalls the handoff PRs for critical PAN-4750 and PAN-4772. TENET-10 routes merge-machinery fixes through supervised handoffs, so until this lands no handoff PR can be reviewed; it takes the free rank-2 slot. It covers the checklist half of PAN-4636, which keeps the operator-signal half.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13443,6 +13457,27 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4786",
+      "to": "PAN-4750",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4786",
+      "to": "PAN-4772",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4786",
+      "to": "PAN-4636",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.9
     }
   ]
 }
