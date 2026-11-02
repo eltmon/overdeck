@@ -1,0 +1,141 @@
+{
+  "version": "1",
+  "issueId": "PAN-4696",
+  "created": "2026-11-02T16:17:12.298Z",
+  "updated": "2026-11-02T16:52:30.668Z",
+  "gitState": {},
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: NFR-1 forbids src/ changes in this branch (operational verification + docs only, PRD .pan/drafts/PAN-4696.md); no code changed to test. Existing coverage for the reap/heartbeat loops themselves is in src/lib/cloister/__tests__/deacon-lite-boot-deferred-handoff.test.ts and src/lib/remote/__tests__/remote-completion.test.ts @82fd85f895e.",
+      "recordedAt": "2026-11-02T16:52:30.668Z"
+    }
+  ],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "preflight-deployed-build": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4696",
+      "claimedAt": "2026-11-02T16:17:12.298Z",
+      "doneAt": "2026-11-02T16:19:25.626Z"
+    },
+    "smoke-launch-remote": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4696",
+      "claimedAt": "2026-11-02T16:23:21.660Z",
+      "doneAt": "2026-11-02T16:33:01.847Z"
+    },
+    "heartbeat-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4696",
+      "claimedAt": "2026-11-02T16:33:57.068Z",
+      "doneAt": "2026-11-02T16:34:41.054Z"
+    },
+    "auto-reap-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4696",
+      "claimedAt": "2026-11-02T16:34:51.937Z",
+      "doneAt": "2026-11-02T16:38:44.936Z"
+    },
+    "journal-source-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4696",
+      "claimedAt": "2026-11-02T16:38:50.741Z",
+      "doneAt": "2026-11-02T16:39:37.176Z"
+    },
+    "smoke-cleanup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4696",
+      "claimedAt": "2026-11-02T16:39:46.523Z",
+      "doneAt": "2026-11-02T16:41:38.356Z"
+    },
+    "docs-link-result": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4696",
+      "claimedAt": "2026-11-02T16:41:43.701Z",
+      "doneAt": "2026-11-02T16:43:11.053Z"
+    },
+    "preflight-deployed-build.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:45:37.429Z"
+    },
+    "preflight-deployed-build.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:46:22.803Z"
+    },
+    "preflight-deployed-build.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:46:40.510Z"
+    },
+    "smoke-launch-remote.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:47:00.651Z"
+    },
+    "smoke-launch-remote.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:47:18.809Z"
+    },
+    "smoke-launch-remote.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:47:38.461Z"
+    },
+    "heartbeat-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:47:57.440Z"
+    },
+    "heartbeat-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:48:17.092Z"
+    },
+    "heartbeat-check.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:48:34.296Z"
+    },
+    "auto-reap-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:48:51.753Z"
+    },
+    "auto-reap-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:49:08.437Z"
+    },
+    "auto-reap-check.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:49:25.967Z"
+    },
+    "journal-source-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:49:46.163Z"
+    },
+    "journal-source-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:50:03.453Z"
+    },
+    "smoke-cleanup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:50:22.101Z"
+    },
+    "smoke-cleanup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:50:40.202Z"
+    },
+    "smoke-cleanup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:50:58.377Z"
+    },
+    "docs-link-result.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:51:18.932Z"
+    },
+    "docs-link-result.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:51:36.027Z"
+    },
+    "docs-link-result.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:51:52.463Z"
+    }
+  }
+}

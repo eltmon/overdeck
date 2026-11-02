@@ -1,0 +1,534 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T16:11:16Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4696: Verify automatic Fly reap and heartbeat on the deployed build (PAN-4295 follow-up)",
+    "updated": "2026-11-02T16:16:26.947Z"
+  },
+  "plan": {
+    "id": "pan-4696",
+    "title": "Verify automatic Fly reap and heartbeat on the deployed build (PAN-4295 follow-up)",
+    "status": "running",
+    "uid": "ee5853d5-6228-4214-ad50-40916c90c08e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T16:11:16Z",
+    "updated": "2026-11-02T16:16:26.947Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4696",
+        "label": "PAN-4696",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4295",
+        "label": "PAN-4295",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4696.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "fly",
+      "remote",
+      "verification",
+      "deacon-lite",
+      "heartbeat",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "PAN-4295 restored automatic Fly reap and the ephemeral-VM host heartbeat, but its pre-merge smoke test could only drive the reap manually from the feature branch's own dist/ build. The automatic 60 s deacon-lite hand-off, the 'remote-reap' journal source and a fresh /workspace/.pan/host-heartbeat can only be observed on the deployed deacon child, which now runs buildCommit 6563a676 containing PAN-4295, PAN-4682, PAN-4683 and PAN-4748.",
+      "Proposal": "Run one throwaway Fly smoke issue through the deployed, un-worked-around path (pan plan SMOKE --auto, then pan start SMOKE --remote), observe the three behaviors with exact commands (two heartbeat stats >=60 s apart, the '[deacon-lite] Remote reap SMOKE: handed-off' line in ~/.overdeck/logs/dashboard.log with no operator reap, review.requested source remote-reap in the materialized workspace journal), clean up the run, and record each result as a row under a new '### Post-deploy verification (PAN-4696)' heading in docs/fly-provider.md. Failed checks are root-caused and filed, never fixed in this branch.",
+      "NonGoals": "- No source code changes under src/ in this branch; a failed check is filed as a new issue (D-3)\n- No pan reload, pan restart, pan up, or deacon restart from the workspace\n- No pan admin remote reap (including --dry-run) for the smoke issue before the automatic hand-off is observed or the 10-minute timeout expires\n- No deep-wipe or other destructive HTTP request, and no manual rm of the smoke workspace\n- No verification of the credential refresh loop, the VM watchdog self-stop, Fly machines (PAN-4652) or Codex on Fly (PAN-4296)\n- No unfreezing of the deacon and no --force on pan start\n- No [remote.fly] image override, manual branch push or --plan skip unless a PAN-4682/PAN-4683 regression is filed first (D-5)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The issue itself is the operator's consent for Fly spend and the temporary remote.enabled=true flip; no AskUserQuestion checkpoint.",
+        "rationale": "PAN-4295's D-7 asked consent because its smoke was a side task; this issue exists solely to run that smoke, and auto mode forbids questions. The flip is restored in smoke-cleanup even on failure."
+      },
+      {
+        "summary": "Drop the issue body's setup workarounds ([remote.fly] image override, manual push + --plan skip).",
+        "rationale": "PAN-4682 (a7fdf79133e) and PAN-4683 (babf86c1b92) are merged and are ancestors of the deployed buildCommit 6563a676, and the issue scoped those workarounds 'until #4682/#4683 is fixed'. Running the plain path doubles as their live regression check; the workarounds stay as the D-5 fallback."
+      },
+      {
+        "summary": "Start with pan plan SMOKE --auto then pan start SMOKE --remote, not pan start SMOKE --remote --plan auto.",
+        "rationale": "The post-planning auto-start goes through the dashboard spawn route's guardrail gate, which was refusing hand-offs on this host at 11/10 work agents; the direct CLI remote start does not pass that gate, so the run is deterministic."
+      },
+      {
+        "summary": "A failed check is root-caused and filed as a new issue; no code fix lands in this branch.",
+        "rationale": "A fix here could not be observed live until another merge and Flywheel deploy, so it would need its own post-deploy check; the issue's deliverable is the verified record."
+      },
+      {
+        "summary": "The smoke task includes two 'sleep 75' steps.",
+        "rationale": "PAN-4677's agent lived about 80 s, leaving room for one heartbeat write at most; FR-3 needs two readings at least 60 s apart while the agent is WORKING. Two 75 s sleeps stay under Claude Code's 120 s Bash default timeout."
+      },
+      {
+        "summary": "Hand-off timeout is 10 minutes (10 deacon-lite ticks) after REMOTE_DONE; only then may the manual reap run, for cleanup.",
+        "rationale": "Allows for one transient reap failure such as PAN-4677's 'cannot lock ref' while keeping the machine from billing indefinitely."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Single operational run; every item touches docs/fly-provider.md and one live Fly machine, so items are intrinsically sequential.",
+      "canonicalFilename": "2026-11-02-PAN-4696-verify-automatic-fly-reap-and-heartbeat-on-the-deployed-build-pan-4295-follow-up.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "preflight-deployed-build",
+        "title": "Re-check the deployed build and loop preconditions before the smoke run",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:11:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4696",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### Post-deploy verification (PAN-4696)' docs/fly-provider.md",
+            "curl -s localhost:3011/api/health",
+            "sqlite3 -readonly ~/.overdeck/panopticon.db \"select value from app_settings where key='deacon.globally_paused'\""
+          ],
+          "expected_outputs": [
+            "grep prints one line number for the new heading",
+            "health JSON shows a buildCommit that has 74f4da1fb85, a7fdf79133e, babf86c1b92 and 4d5461bfccd as ancestors",
+            "sqlite prints false"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4696.md). Run every command in the PRD 'Verified preconditions' table: buildCommit from curl -s localhost:3011/api/health; git merge-base --is-ancestor for 74f4da1fb85 (PAN-4295), a7fdf79133e (PAN-4682), babf86c1b92 (PAN-4683), 4d5461bfccd (PAN-4748) against it; deacon status (GET /api/deacon/status, pid + deaconLite.intervalMs 60000); freeze flag in ~/.overdeck/panopticon.db app_settings key deacon.globally_paused; /home/eltmon/.fly/bin on the deacon child's PATH (/proc/<pid>/environ); fly auth whoami; fly machines list -a pan-workspaces --json (note but never touch pre-existing machines). If a fix commit is not deployed or the freeze is true: pan tell flywheel-orchestrator with the reason, record it in continue.json, and stop — never pan reload/restart, never unfreeze. Otherwise add the '### Post-deploy verification (PAN-4696)' heading and the preconditions paragraph (PRD WI-1 step 5 text) to docs/fly-provider.md after the PAN-4295 '## Live verification' paragraph and before '## Live verification (PAN-4652)'. Raw output goes to .tmp/pan-4696-evidence.md (gitignored). Commit with trailer 'Item: preflight-deployed-build'."
+        },
+        "items": [
+          {
+            "id": "preflight-deployed-build.ac1",
+            "title": "Given the deployed dashboard, when the agent runs the four git merge-base --is-ancestor checks against the health buildCommit, then each exits 0 and the commit hashes appear in the new docs paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preflight-deployed-build.ac2",
+            "title": "Given the deacon freeze flag reads true or a fix commit is missing, when the precondition check runs, then the agent emits a pan tell to flywheel-orchestrator and stops without running pan reload, pan restart or any unfreeze",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preflight-deployed-build.ac3",
+            "title": "docs/fly-provider.md renders a '### Post-deploy verification (PAN-4696)' heading located after the PAN-4295 Live verification paragraph and before '## Live verification (PAN-4652)', naming the build commit and deacon pid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "smoke-launch-remote",
+        "title": "Launch the throwaway smoke issue on Fly through pan plan --auto then pan start --remote",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:11:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4696",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh issue list --repo eltmon/overdeck --search 'Fly remote smoke test (PAN-4696)' --state all",
+            "fly machines list -a pan-workspaces --json"
+          ],
+          "expected_outputs": [
+            "one smoke issue is listed",
+            "the smoke machine named in remote-state.json vmName is listed as started"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Flip 'enabled = false' to 'enabled = true' under [remote] in ~/.overdeck/config.toml (touch nothing else). Create the smoke issue with the exact title 'Fly remote smoke test (PAN-4696)' and the PRD WI-2 body (one-line append to docs/fly-smoke.txt, then two 'sleep 75' steps, then commit and push; marked throwaway, do not merge). Run 'pan plan SMOKE --auto' and wait (single foreground loop, print on change, cap 30 min) until it is Planned; then run 'pan start SMOKE --remote' with no --plan and no --model (decision D-2). On guardrail or spend-cap refusal wait for headroom (poll every 5 min, cap 60 min), never --force; after the cap tell the flywheel and stop. If a second planning session starts or the image is missing, apply D-5: file a regression issue linking PAN-4683/PAN-4682, then use the old workaround (push feature branch + --plan skip, or [remote.fly] image override). Wait (cap 20 min) for ~/.overdeck/agents/agent-<smoke>/remote-state.json status running; record vmName, tier (must be ephemeral), machine id (fly machines list entry whose name equals vmName) and image. Append the launch sentence to the PAN-4696 subsection and commit with 'Item: smoke-launch-remote'."
+        },
+        "items": [
+          {
+            "id": "smoke-launch-remote.ac1",
+            "title": "Given remote.enabled flipped to true, when the agent runs pan plan SMOKE --auto then pan start SMOKE --remote, then remote-state.json reports status running with tier ephemeral and no second planning-<smoke> session is created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-launch-remote.ac2",
+            "title": "The PAN-4696 subsection in docs/fly-provider.md contains the smoke issue link, machine id, vmName, ephemeral tier and image, and records that no --plan skip, image override or manual push was used — or contains the link to the filed D-5 regression issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-launch-remote.ac3",
+            "title": "Given a guardrail or spend-cap refusal, when pan start is retried, then the agent never passes --force and falls back to pan tell flywheel-orchestrator after 60 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "heartbeat-check",
+        "title": "Prove the hygiene heartbeat keeps /workspace/.pan/host-heartbeat under 2 minutes old while the smoke agent works",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:11:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4696",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Heartbeat (FR-3)' docs/fly-provider.md",
+            "grep -a -c 'Host heartbeat refreshed for' ~/.overdeck/logs/dashboard.log"
+          ],
+          "expected_outputs": [
+            "grep prints the heartbeat table row",
+            "count is at least 1"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Within 2 min of status running, take reading 1 with: fly ssh console -a pan-workspaces --machine <id> -C \"sh -c 'date -u +%s; stat -c %Y /workspace/.pan/host-heartbeat; stat -c %y /workspace/.pan/host-heartbeat; test -f /workspace/.pan/REMOTE_DONE && echo DONE || echo WORKING'\" (fallback: fly machine exec <id> \"<cmd>\" -a pan-workspaces). Take reading 2 at least 60 s later. Pass: both ages (now - mtime) under 120 s, both WORKING, reading 2 mtime strictly later than reading 1; corroborate with a 'Host heartbeat refreshed for SMOKE on <vmName>' line in ~/.overdeck/logs/dashboard.log. Failure => decision D-3 (root-cause, file an issue linking PAN-4295 and PAN-4696, record honestly, pan tell flywheel-orchestrator; no code fix in this branch). Add the '| Check | Result |' table and the 'Heartbeat (FR-3)' row to the subsection; commit with 'Item: heartbeat-check'."
+        },
+        "items": [
+          {
+            "id": "heartbeat-check.ac1",
+            "title": "Given the smoke agent is WORKING, when the agent stats /workspace/.pan/host-heartbeat twice at least 60 s apart, then both readings are under 120 s old and the second mtime is later than the first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heartbeat-check.ac2",
+            "title": "The 'Heartbeat (FR-3)' table row in docs/fly-provider.md shows both ISO mtimes, their ages in seconds and the gap between readings, or links the filed D-3 issue on failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heartbeat-check.ac3",
+            "title": "dashboard.log contains at least one 'Host heartbeat refreshed for <SMOKE> on <vmName>' line quoted in the evidence file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-reap-check",
+        "title": "Prove the deployed deacon-lite tick hands the finished smoke agent off with no operator reap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:11:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4696",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Automatic reap (FR-1)' docs/fly-provider.md",
+            "grep -a 'Remote reap' ~/.overdeck/logs/dashboard.log | tail -3"
+          ],
+          "expected_outputs": [
+            "grep prints the reap table row",
+            "a '[deacon-lite] Remote reap <SMOKE>: handed-off' line is printed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. One foreground poll loop (every 20 s, print only on change with date -u; cap 30 min after running, then 10 min after REMOTE_DONE) watching: REMOTE_DONE on the VM (record its mtime), 'Remote reap SMOKE' in ~/.overdeck/logs/dashboard.log, and whether vmName is still in fly machines list -a pan-workspaces --json. Never run pan admin remote reap (even --dry-run) before the hand-off line appears or the 10-min timeout expires (NFR-3). Pass: '[deacon-lite] Remote reap SMOKE: handed-off (...)' within 600 s of REMOTE_DONE, machine gone, workspaces/feature-<smoke>/ exists. A failed first attempt followed by a later-tick hand-off still passes. Record whether details include 'Requested review through the dashboard review route' and how many .jsonl files ~/.overdeck/agents/agent-<smoke>/remote-sessions/ holds (D-8, informational). On timeout apply D-4 (check freeze + log, record failure per D-3, then run the manual reap once for cleanup only). Add the 'Automatic reap (FR-1)' row and commit with 'Item: auto-reap-check'."
+        },
+        "items": [
+          {
+            "id": "auto-reap-check.ac1",
+            "title": "Given REMOTE_DONE exists on the VM and no operator reap command has run, when deacon-lite ticks, then dashboard.log emits '[deacon-lite] Remote reap <SMOKE>: handed-off' within 600 seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-reap-check.ac2",
+            "title": "After the hand-off, fly machines list -a pan-workspaces no longer returns the smoke machine and workspaces/feature-<smoke>/ exists on the host",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-reap-check.ac3",
+            "title": "The 'Automatic reap (FR-1)' row in docs/fly-provider.md contains the quoted handed-off details line, the REMOTE_DONE time, the seconds to hand-off and the remote-sessions JSONL count, or contains the filed D-3 issue link on timeout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "journal-source-check",
+        "title": "Confirm the hand-off journals review.requested with source remote-reap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:11:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4696",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep '\"review.requested\"' workspaces/feature-<smoke>/.overdeck/pipeline.jsonl",
+            "grep -n 'Journal source (FR-2)' docs/fly-provider.md"
+          ],
+          "expected_outputs": [
+            "a review.requested line containing \"source\":\"remote-reap\" is printed",
+            "grep prints the journal table row"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Read workspaces/feature-<smoke>/.overdeck/pipeline.jsonl. Pass when a review.requested entry has \"source\":\"remote-reap\". If it says \"api\", or no review.requested entry exists (check the reap details for 'Review not requested (<reason>)'), apply D-3. Add the 'Journal source (FR-2)' row quoting the real journal line trimmed to type/issueId/source/ts; commit with 'Item: journal-source-check'."
+        },
+        "items": [
+          {
+            "id": "journal-source-check.ac1",
+            "title": "Given the automatic hand-off requested review, when the agent greps the materialized workspace's .overdeck/pipeline.jsonl, then a review.requested entry returns source remote-reap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-source-check.ac2",
+            "title": "The 'Journal source (FR-2)' row in docs/fly-provider.md quotes the journal line with \"source\":\"remote-reap\", or links the filed D-3 issue when the source is api or the entry is missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "smoke-cleanup",
+        "title": "Stop the smoke review, close its PR and issue, and restore remote.enabled=false",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:11:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4696",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh issue view <SMOKE> --repo eltmon/overdeck --json state",
+            "grep -A2 '^\\[remote\\]' ~/.overdeck/config.toml",
+            "fly machines list -a pan-workspaces --json"
+          ],
+          "expected_outputs": [
+            "state is CLOSED",
+            "enabled = false is printed under [remote]",
+            "no machine named after the smoke issue is listed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7, run right after journal-source-check so the review convoy stops billing (D-9). pan review abort SMOKE; pan kill SMOKE if a session is still listed. gh pr close <smoke PR> --repo eltmon/overdeck --delete-branch with a throwaway comment; gh issue close SMOKE with a comment. Restore 'enabled = false' under [remote] in ~/.overdeck/config.toml and remove any [remote.fly] image line D-5 added. Confirm no smoke machine remains. Leave workspaces/feature-<smoke>/ for the close-out reaper: no manual rm, no deep-wipe. Append the cleanup sentence under the table; commit with 'Item: smoke-cleanup'."
+        },
+        "items": [
+          {
+            "id": "smoke-cleanup.ac1",
+            "title": "Given the journal evidence is captured, when cleanup runs, then gh pr view on the smoke PR returns state CLOSED with mergedAt null and its branch is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-cleanup.ac2",
+            "title": "gh issue view SMOKE returns CLOSED and ~/.overdeck/config.toml shows enabled = false under [remote] with no [remote.fly] image line left from the run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-cleanup.ac3",
+            "title": "fly machines list -a pan-workspaces returns no smoke machine, and no deep-wipe request or manual rm of workspaces/feature-<smoke> is issued",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-link-result",
+        "title": "Point the PAN-4295 deferral sentence at the PAN-4696 result and refresh the codebase-map Fly bullet",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:11:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4696",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'see \"Post-deploy verification (PAN-4696)\" below' docs/fly-provider.md",
+            "grep -c 'are checked after deploy in' docs/fly-provider.md",
+            "grep -c 'last-verified' .overdeck/context/codebase/concerns.md"
+          ],
+          "expected_outputs": [
+            "prints 1",
+            "prints 0",
+            "prints 1"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (the documentation work item). In docs/fly-provider.md replace the three-line PAN-4295 sentence 'The automatic 60 s tick, the `remote-reap` journal source and the heartbeat / file are checked after deploy in / [#4696](...).' (lines 544-546 at planning; search 'file are checked after deploy in') with the PRD WI-6 replacement, keeping 'see \"Post-deploy verification (PAN-4696)\" below.' on one line. Under the PAN-4696 table add 'Filed from this run:' with each filed issue (link + one-line summary), or 'No defects found.'. In .overdeck/context/codebase/concerns.md append to the Fly bullet naming 'The three host loops for Fly agents (PAN-4295)' a clause '; verified live on the deployed build by PAN-4696 (<date>)' (or naming the filed issue on failure), and keep exactly one '<!-- last-verified: <run date> -->' line at the end. Commit with 'Item: docs-link-result'."
+        },
+        "items": [
+          {
+            "id": "docs-link-result.ac1",
+            "title": "docs/fly-provider.md renders the PAN-4295 deferral as 'were checked after deploy in [#4696](...)' followed by 'see \"Post-deploy verification (PAN-4696)\" below.' and no longer contains 'are checked after deploy in'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-link-result.ac2",
+            "title": "The PAN-4696 subsection shows a 'Filed from this run:' list with a link and summary per filed issue, or the sentence 'No defects found.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-link-result.ac3",
+            "title": "concerns.md's Fly host-loops bullet contains PAN-4696 and the run date, and the file contains exactly one last-verified line, at the end, carrying the run date",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "preflight-deployed-build",
+        "to": "smoke-launch-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "smoke-launch-remote",
+        "to": "heartbeat-check",
+        "type": "blocks"
+      },
+      {
+        "from": "heartbeat-check",
+        "to": "auto-reap-check",
+        "type": "blocks"
+      },
+      {
+        "from": "auto-reap-check",
+        "to": "journal-source-check",
+        "type": "blocks"
+      },
+      {
+        "from": "journal-source-check",
+        "to": "smoke-cleanup",
+        "type": "blocks"
+      },
+      {
+        "from": "smoke-cleanup",
+        "to": "docs-link-result",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
