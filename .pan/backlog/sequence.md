@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T00:25:09.152871Z · model: claude-opus-5-5 · open: 864_
+_Last sequenced: 2026-11-02T00:32:45.224504Z · model: claude-opus-5-5 · open: 863_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -604,7 +604,6 @@ _Last sequenced: 2026-11-02T00:25:09.152871Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 603 | PAN-4296 | L | medium | ok |  | PAN-1676 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
 | 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -1199,10 +1198,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T00:25:09.152871Z",
+  "generatedAt": "2026-11-02T00:32:45.224504Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 864,
+  "openCount": 863,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -8634,21 +8633,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
-      "issue": "PAN-4296",
-      "rank": 603,
-      "size": "L",
-      "importance": "medium",
-      "score": 34,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-1676"
-      ],
-      "why": "Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time",
-      "rationale": "Rank held; gained dependsOn PAN-1676 from the build order in PAN-2350's 2026-09-28 rebaseline.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-947",
       "rank": 604,
       "size": "M",
@@ -12682,13 +12666,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "from": "PAN-2350",
-      "to": "PAN-4296",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
       "to": "PAN-4297",
       "type": "contains",
       "source": "github-ref",
@@ -12719,13 +12696,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "from": "PAN-4294",
       "to": "PAN-4297",
       "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4296",
-      "to": "PAN-4298",
-      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
@@ -12756,13 +12726,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-1676",
-      "to": "PAN-4296",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
     },
     {
       "from": "PAN-2259",
@@ -13108,13 +13071,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 1
     },
     {
-      "from": "PAN-4296",
-      "to": "PAN-4638",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-2350",
       "to": "PAN-4646",
       "type": "contains",
@@ -13218,13 +13174,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-4748",
-      "to": "PAN-4296",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-4748",
