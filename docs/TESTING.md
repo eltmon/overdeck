@@ -148,6 +148,8 @@ All interactive dashboard elements should have `data-testid` attributes for reli
 - Prefer `data-testid` over `getByRole` or `getByText` for action buttons
 - Use `getByRole` for standard semantic elements (nav, headings)
 - Use `getByText` only for content verification, not for clicking
+- `getByRole(role, { name })` in Playwright is a case-insensitive **substring** match. Pass `exact: true` for short names that can appear inside other labels: `{ name: 'Yes' }` also matches a button whose text ends in "yesterday" (PAN-4757).
+- E2E fixture timestamps that the UI renders as relative time (`5m ago`, `yesterday`) are computed from `Date.now()`, never hard-coded dates; a fixed date changes the rendered text as the calendar moves.
 
 **Playwright patterns:**
 
