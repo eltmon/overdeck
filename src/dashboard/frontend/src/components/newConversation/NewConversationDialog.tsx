@@ -19,7 +19,7 @@ import { HarnessSelect, ModelSelect, pickerEffortLevels, useAvailableModels, typ
 import { loadStoredHarness, loadStoredModel, MODEL_EFFORT_SUPPORT } from '../chat/ModelPicker';
 import { fetchRegisteredProjects, type RegisteredProject } from '../CommandDeck/UnknownProjectState';
 import { buildConversationUrl } from '../../App/routes';
-import { ConversationSkillsField } from './ConversationSkillsField';
+import { ConversationSkillsField, summarizeSkills, useConversationSkillGroups } from './ConversationSkillsField';
 import { IssuePickerField } from './IssuePickerField';
 import { buildNewConversationPayload, createConversationWithOptions, createFleetConversation, fetchEffortDefault } from './newConversationApi';
 import { useNewConversationDialogStore } from './newConversationDialogStore';
@@ -85,8 +85,13 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
   const bareDescId = useId();
   const skipMdLabelId = useId();
   const skipMdDescId = useId();
+  const skillsPanelId = useId();
 
   const project = useMemo(() => projects?.find((p) => p.key === projectKey), [projects, projectKey]);
+
+  const skillsQuery = useConversationSkillGroups(projectKey ?? undefined, issueId ?? undefined);
+  const [skillsOpen, setSkillsOpen] = useState(() => Object.keys(skillOverrides).length > 0);
+  const skillsSummary = skillsQuery.data ? summarizeSkills(skillsQuery.data, skillOverrides) : null;
 
   useEffect(() => {
     if (presetApplied || !projectsFetched) return;
@@ -319,7 +324,30 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
 
       <section aria-labelledby={skillsHeadingId}>
         <h3 id={skillsHeadingId} className={styles.sectionTitle}>Skills</h3>
-        <div className={styles.group}>
+        <div className={styles.skillsSummary}>
+          <p className={styles.skillsText}>
+            {skillsSummary === null ? (skillsQuery.isError ? 'Skills unavailable' : 'Loading skills…') : <>
+              {skillsSummary.on} of {skillsSummary.total} skills on{' '}
+              <span className={styles.skillsAside}>
+                {skillsSummary.overrides === 0
+                  ? '· inherited from project and global settings, no overrides'
+                  : `· ${skillsSummary.overrides} ${skillsSummary.overrides === 1 ? 'override' : 'overrides'} in this conversation`}
+              </span>
+            </>}
+          </p>
+          {skillsSummary !== null && (
+            <button
+              type="button"
+              className={styles.linkButton}
+              aria-expanded={skillsOpen}
+              aria-controls={skillsPanelId}
+              onClick={() => setSkillsOpen((v) => !v)}
+            >
+              {skillsOpen ? 'Done' : 'Customize'}
+            </button>
+          )}
+        </div>
+        <div id={skillsPanelId} className={styles.skillsPanel} hidden={!skillsOpen}>
           <ConversationSkillsField
             projectKey={projectKey ?? undefined}
             issueId={issueId ?? undefined}

@@ -173,6 +173,7 @@ describe('NewConversationDialog', () => {
     await screen.findByText('Default: high (default)');
     fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Effort' })).getByRole('radio', { name: 'xhigh' }));
     fireEvent.click(screen.getByRole('switch', { name: 'No context' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Customize' }));
     fireEvent.click(await screen.findByRole('button', { name: /^Personal/ }));
     const skills = screen.getByRole('radiogroup', { name: 'grilling' });
     fireEvent.click(within(skills).getByRole('radio', { name: 'Off' }));
@@ -197,6 +198,55 @@ describe('NewConversationDialog', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(pushState).toHaveBeenCalledWith({}, '', '/conv/77');
     pushState.mockRestore();
+  });
+
+  it('collapses skills to a summary line', async () => {
+    act(() => openNewConversationDialog());
+    renderHost();
+    await screen.findByText('1 of 1 skills on');
+    expect(screen.getByText('· inherited from project and global settings, no overrides')).toBeTruthy();
+    expect(screen.queryByRole('textbox', { name: 'Filter skills' })).toBeNull();
+  });
+
+  it('Customize reveals the skills field and the summary counts the override', async () => {
+    act(() => openNewConversationDialog());
+    renderHost();
+    await screen.findByText('1 of 1 skills on');
+    fireEvent.click(screen.getByRole('button', { name: 'Customize' }));
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: /^Personal/ }));
+    const skills = screen.getByRole('radiogroup', { name: 'grilling' });
+    fireEvent.click(within(skills).getByRole('radio', { name: 'Off' }));
+    expect(await screen.findByText('0 of 1 skills on')).toBeTruthy();
+    expect(screen.getByText('· 1 override in this conversation')).toBeTruthy();
+  });
+
+  it('fetches skill overrides once', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/registered-projects') return { ok: true, status: 200, json: async () => PROJECTS };
+      if (url.startsWith('/api/effort/default')) {
+        return { ok: true, status: 200, json: async () => ({ effort: 'high', source: 'default', requested: 'high', clamped: false }) };
+      }
+      if (url.startsWith('/api/skills/overrides')) {
+        return {
+          ok: true, status: 200,
+          json: async () => ({ skills: [{ name: 'grilling', core: false, enabled: true, source: 'default', origin: 'personal' }], packs: [] }),
+        };
+      }
+      if (init?.method === 'POST' && url === '/api/conversations') {
+        posts.push(JSON.parse(String(init.body)));
+        return { ok: postResponse.ok, status: postResponse.ok ? 201 : 400, json: async () => postResponse.body };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    act(() => openNewConversationDialog());
+    renderHost();
+    await screen.findByText('1 of 1 skills on');
+    fireEvent.click(screen.getByRole('button', { name: 'Customize' }));
+    await screen.findByRole('button', { name: /^Personal/ });
+    const overridesCalls = fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/skills/overrides'));
+    expect(overridesCalls).toHaveLength(1);
   });
 
   it('sends a cwd only when it differs from the project path', async () => {
