@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4777",
   "created": "2026-11-02T04:11:59.143Z",
-  "updated": "2026-11-02T04:38:18.451Z",
+  "updated": "2026-11-02T04:38:36.165Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,6 +36,10 @@
     "rollback-vm-on-create-failure.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T04:38:18.450Z"
+    },
+    "fly-doc-clone-and-rollback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:38:36.165Z"
     }
   }
 }
