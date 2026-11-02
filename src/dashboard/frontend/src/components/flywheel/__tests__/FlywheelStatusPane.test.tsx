@@ -73,6 +73,16 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
       expect(screen.queryByTestId('flywheel-title-PAN-1')).toBeNull();
       expect(screen.queryByTestId('flywheel-tracker-unknown-PAN-1')).toBeNull();
     });
+
+    it('marks a row that folds a strike workspace onto its base issue (PAN-4752)', () => {
+      render(<FlywheelStatusPane status={rowStatus({ strike: true })} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByTestId('flywheel-strike-PAN-1')).toHaveTextContent('strike');
+    });
+
+    it('renders no strike marker for a plain row (PAN-4752)', () => {
+      render(<FlywheelStatusPane status={rowStatus({})} unreachable={false} nowMs={NOW} />);
+      expect(screen.queryByTestId('flywheel-strike-PAN-1')).toBeNull();
+    });
   });
 
   describe('no-agent and loop markers (PAN-4199 FR-5, FR-6)', () => {
