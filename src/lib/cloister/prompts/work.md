@@ -97,10 +97,10 @@ Before starting any work, you MUST read these files to understand the full conte
 These files contain critical context that may have been updated since the last session.
 {{/LOCAL}}
 {{#REMOTE}}
-Your workspace is at /workspace (a full clone of the repo, checked out on your feature branch). Check for planning artifacts:
-- `/workspace/.overdeck/continue.json` — decisions, hazards, and approach context carried over from planning.
-- `/workspace/.pan/specs/<date>-<ISSUE-ID>-*.xbrief.json` — the canonical xBRIEF plan. READ-ONLY: never edit a spec file.
-- `/workspace/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
+Your workspace is at {{WORKSPACE_PATH}} (a full clone of the repo, checked out on your feature branch). Check for planning artifacts:
+- `{{WORKSPACE_PATH}}/.overdeck/continue.json` — decisions, hazards, and approach context carried over from planning.
+- `{{WORKSPACE_PATH}}/.pan/specs/<date>-<ISSUE-ID>-*.xbrief.json` — the canonical xBRIEF plan. READ-ONLY: never edit a spec file.
+- `{{WORKSPACE_PATH}}/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
 - Task state is read from the merged xBRIEF with `pan task next {{ISSUE_ID}}` and `pan task show {{ISSUE_ID}} <item>`.
 
 Start by reading the continue file (if present) and the spec to understand the plan, then begin implementation.
