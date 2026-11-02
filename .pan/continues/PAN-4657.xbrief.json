@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4657",
   "created": "2026-11-02T03:48:30.667Z",
-  "updated": "2026-11-02T05:43:21.577Z",
+  "updated": "2026-11-02T05:52:51.543Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-02T05:52Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-02T05:52:51.543Z"
+    }
+  ],
   "items": {
     "contracts-presets": {
       "status": "completed",
@@ -195,5 +201,14 @@
       "status": "completed",
       "doneAt": "2026-11-02T05:43:21.577Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-02T05:52:51Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4657\n\nPull request: https://github.com/eltmon/overdeck/pull/4800 (head `d6288d57`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/125117793751/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41396149420/job/125117793751  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/overdeck/__tests__/conversation-list-costs.test.ts\u001b[2m > \u001b[22mconversation list worker costs\u001b[2m > \u001b[22mmatches string ledger IDs, preserves zero costs, falls back for old rows and retains enrichment fields\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/overdeck/__tests__/conversation-list-costs.test.ts\u001b[2m > \u001b[22mconversation list worker costs\u001b[2m > \u001b[22mmatches string ledger IDs, preserves zero costs, falls back for old rows and retains enrichment fields\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ …(3) ] to deeply equal [ …(3) ]\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[33m@@ -12,21 +12,24 @@\u001b[39m\n\u001b[2m      \"isWorking\": false,\u001b[22m\n\u001b[2m      \"isWorktree\": true,\u001b[22m\n\u001b[2m      \"lastActivityAt\": null,\u001b[22m\n\u001b[2m      \"name\": \"favorite\",\u001b[22m\n\u001b[2m      \"needsTerminal\": false,\u001b[22m\n\u001b[31m+     \"nextScheduledRunAt\": null,\u001b[39m\n\u001b[2m      \"pendingAskUserQuestion\": undefined,\u001b[22m\n\u001b[2m      \"pendingInputCount\": 0,\u001b[22m\n\u001b[2m      \"pendingInputKinds\": [],\u001b[22m\n\u001b[2m      \"projectKey\": \"project\",\u001b[22m\n\u001b[2m      \"providerError\": null,\u001b[22m\n\u001b[2m      \"pullRequest\": null,\u001b[22m\n\u001b[2m      \"pullRequestCount\": 0,\u001b[22m\n\u001b[31m+     \"scheduleCount\": 0,\u001b[39m\n\u001b[2m      \"sessionAlive\": false,\u001b[22m\n\u001b[2m      \"settleReason\": null,\u001b[22m\n\u001b[2m      \"settledAt\": null,\u001b[22m\n\u001b[2m      \"snoozedUntil\": null,\u001b[22m\n\u001b[31m+     \"stalledSince\": undefined,\u001b[39m\n\u001b[2m      \"status\": \"ended\",\u001b[22m\n\u001b[2m      \"title\": \"Conversation\",\u001b[22m\n\u001b[2m      \"tmuxSession\": \"conv-1\",\u001b[22m\n\u001b[2m      \"totalCost\": 7,\u001b[22m\n\u001b[2m      \"totalTokens\": 70,\u001b[22m\n\u001b[33m@@ -45,21 +48,24 @@\u001b[39m\n\u001b[2m      \"isWorking\": false,\u001b[22m\n\u001b[2m      \"isWorktree\": true,\u001b[22m\n\u001b[2m      \"lastActivityAt\": null,\u001b[22m\n\u001b[2m      \"name\": \"conv-2\",\u001b[22m\n\u001b[2m      \"needsTerminal\": false,\u001b[22m\n\u001b[31m+     \"nextScheduledRunAt\": null,\u001b[39m\n\u001b[2m      \"pendingAskUserQuesti\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m548 passed\u001b[39m\u001b[22m\u001b[90m (549)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
