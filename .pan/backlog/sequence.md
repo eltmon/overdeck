@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T23:02:46.208163Z · model: claude-opus-5-5 · open: 875_
+_Last sequenced: 2026-11-02T23:26:14.023659Z · model: claude-opus-5-5 · open: 876_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -312,6 +312,7 @@ _Last sequenced: 2026-11-02T23:02:46.208163Z · model: claude-opus-5-5 · open: 
 | 304 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
 | 305 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
 | 306 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
+| 307 | PAN-4863 | S | medium | ok |  |  | Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS. |
 | 308 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
@@ -1210,10 +1211,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T23:02:46.208163Z",
+  "generatedAt": "2026-11-02T23:26:14.023659Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 875,
+  "openCount": 876,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12180,6 +12181,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "New issue: an undecided low-priority question that the operator parked explicitly, so it ranks at the bottom of the backlog until they decide.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4863",
+      "rank": 307,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS.",
+      "rationale": "New issue split out of in-pipeline PAN-4774: Fly VMs lack systemd as PID 1, so AC-10 (connect survives logout and reboot) must run on a real VPS against the first release that ships `pan connect`. It is an operator-run verification step, so it takes free rank 307 beside the Anywhere epic and moves no other node.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13827,6 +13841,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4863",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
