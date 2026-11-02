@@ -406,9 +406,10 @@ its command.
    with npm into the same prefix. A failure in one CLI does not stop the next; the row
    shows the command's output.
 3. **Update Overdeck last** on a machine where it was installed with
-   `npm install -g @overdeck/core`, then restart that machine's dashboard. A repository
-   checkout (`pan reload` deployments) or the desktop app keeps its Overdeck and still
-   updates the CLIs.
+   `npm install -g @overdeck/core` or set up with `pan connect` (the update goes into
+   `~/.overdeck/runtime` with `npm install --prefix`, no `sudo`), then restart that
+   machine's dashboard. A repository checkout (`pan reload` deployments) or the desktop
+   app keeps its Overdeck and still updates the CLIs.
 
 Each version shows `before → after` once it changed. Update all always installs the
 latest version; it never lets anyone pick a version.

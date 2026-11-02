@@ -445,7 +445,8 @@ pan machines update [--now] [--machine <label>]... [--cancel] [--json]
 
 Starts **Update all**: each online machine updates its installed harness CLIs (Claude
 Code, Codex CLI, Kimi Code CLI, OpenCode) with their own update commands, then updates
-Overdeck itself on an `npm install -g` install and restarts its dashboard. By default each
+Overdeck itself on an `npm install -g` install or a machine set up with `pan connect`
+(into its `~/.overdeck/runtime`), and restarts its dashboard. By default each
 machine waits until no turn is running there. A development checkout or the desktop app
 keeps its Overdeck and still updates the CLIs. Offline, connecting, unsupported and
 revoked machines are skipped with the reason, and so is a machine whose link is
@@ -592,7 +593,11 @@ the output adds that Traefik and CLIProxy wait for `pan up` after a reboot.
 
 ### Updating and removing
 
-Update a machine connected with npx by running the newest version:
+Update a machine connected with npx from any linked machine with **Update all** (or `pan
+machines update`): it installs the newest version into `~/.overdeck/runtime` with `npm
+install --prefix` (no `sudo`) and restarts the dashboard from it. On the machine itself,
+`~/.overdeck/runtime/node_modules/.bin/pan update` does the same install. Running the
+newest version of `pan connect` also works, and also rewrites the service:
 
 ```bash
 npx @overdeck/core@latest connect
