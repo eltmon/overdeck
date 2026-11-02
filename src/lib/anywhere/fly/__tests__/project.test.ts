@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProjectConfig } from '../../../projects.js';
-import type { FlyExecResult } from '../../../remote/fly-api.js';
+import { FlyApiError, type FlyExecResult } from '../../../remote/fly-api.js';
 import { ensureFlyProject } from '../project.js';
 
 const MACHINE = { appName: 'overdeck-ws', machineId: '148e21ea7e1689' };
@@ -86,5 +86,38 @@ describe('ensureFlyProject (PAN-4652 WI-9)', () => {
     const settled = ensureFlyProject(MACHINE, 'overdeck', { api, getProject: () => PROJECT }).catch((e: unknown) => e);
     await vi.advanceTimersByTimeAsync(20 * 60_000);
     expect(await settled).toMatchObject({ code: 'project-failed' });
+  });
+
+  it('a 403 from the clone poll fails at once with fly-token-rejected (PAN-4748)', async () => {
+    let pollExecs = 0;
+    const api = {
+      execCommand: vi.fn(async (_app: string, _id: string, command: string[]) => {
+        if (command[2] === 'cat /tmp/pan-project.exit') {
+          pollExecs++;
+          throw new FlyApiError('Fly API error 403 for GET …', 403, '{"error":"unauthorized"}');
+        }
+        return { stdout: '', stderr: '', exit_code: 0 };
+      }),
+    };
+    const error = await ensureFlyProject(MACHINE, 'overdeck', { api, getProject: () => PROJECT }).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'fly-token-rejected' });
+    expect(pollExecs).toBe(1);
+  });
+
+  it('a non-auth probe error still counts as not finished', async () => {
+    let pollExecs = 0;
+    const { api } = fakeApi((command) => {
+      if (command === 'cat /tmp/pan-project.exit') {
+        pollExecs++;
+        if (pollExecs === 1) throw new Error('Fly API error 500 for GET …');
+        return { stdout: '0\n' };
+      }
+      if (command === 'pan project list --json') return { stdout: JSON.stringify({ overdeck: { name: 'overdeck' } }, null, 2) };
+      return undefined;
+    });
+    const pending = ensureFlyProject(MACHINE, 'overdeck', { api, getProject: () => PROJECT });
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(pending).resolves.toBeUndefined();
+    expect(pollExecs).toBe(2);
   });
 });

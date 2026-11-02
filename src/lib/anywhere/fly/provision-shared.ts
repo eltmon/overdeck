@@ -5,6 +5,7 @@
  * HTTP statuses, the detached-command wrapper, and the poll loop.
  * `provision.ts` re-exports all of them, so its importers are unchanged.
  */
+import { isFlyAuthError, flyTokenRejectedMessage } from '../../remote/fly-api.js';
 import { shellQuote } from '../../remote/remote-tmux.js';
 
 export type FlyMachineErrorCode =
@@ -12,6 +13,7 @@ export type FlyMachineErrorCode =
   | 'credentials-failed'
   | 'remote-disabled'
   | 'no-fly-token'
+  | 'fly-token-rejected'
   | 'cap-reached'
   | 'harness-unsupported'
   | 'version-mismatch'
@@ -27,6 +29,7 @@ export const FLY_MACHINE_ERROR_STATUS: Record<FlyMachineErrorCode, number> = {
   'credentials-failed': 424,
   'remote-disabled': 409,
   'no-fly-token': 424,
+  'fly-token-rejected': 424,
   'cap-reached': 409,
   'harness-unsupported': 400,
   'version-mismatch': 409,
@@ -51,7 +54,10 @@ export class FlyMachineError extends Error {
 /** How long a detached `npm install -g` on the VM is polled for. */
 export const INSTALL_POLL = { intervalMs: 5_000, limitMs: 5 * 60_000 };
 
-/** Probe every `intervalMs` until it returns true or `limitMs` passes. A throwing probe counts as false. */
+/**
+ * Probe every `intervalMs` until it returns true or `limitMs` passes. A throwing probe
+ * counts as false, except a rejected Fly token, which no later probe can fix (PAN-4748).
+ */
 export async function pollUntil(
   deps: { now: () => number; sleep: (ms: number) => Promise<void> },
   poll: { intervalMs: number; limitMs: number },
@@ -59,7 +65,13 @@ export async function pollUntil(
 ): Promise<boolean> {
   const deadline = deps.now() + poll.limitMs;
   for (;;) {
-    if (await probe().catch(() => false)) return true;
+    const done = await probe().catch((error: unknown) => {
+      if (isFlyAuthError(error)) {
+        throw new FlyMachineError('fly-token-rejected', flyTokenRejectedMessage(error), { status: error.statusCode });
+      }
+      return false;
+    });
+    if (done) return true;
     if (deps.now() + poll.intervalMs > deadline) return false;
     await deps.sleep(poll.intervalMs);
   }
