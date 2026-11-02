@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4813",
   "created": "2026-11-02T13:36:08.209Z",
-  "updated": "2026-11-02T14:18:49.521Z",
+  "updated": "2026-11-02T14:19:03.141Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "fallback-rows.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T14:18:49.520Z"
+    },
+    "fallback-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:19:03.141Z"
     }
   }
 }
