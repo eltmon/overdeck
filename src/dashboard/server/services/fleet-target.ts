@@ -51,7 +51,16 @@ export const defaultFleetTargetDeps = (): FleetTargetDeps => ({
 
 export type FleetTarget =
   | { ok: true; self: true; environmentId: string; label: string; reason: string | null }
-  | { ok: true; self: false; link: MachineLink; environmentId: string; label: string; reason: string | null }
+  | {
+      ok: true;
+      self: false;
+      link: MachineLink;
+      environmentId: string;
+      label: string;
+      reason: string | null;
+      /** Unlinks and destroys a Fly machine this spawn just created (PAN-4743). */
+      discard?: () => Promise<void>;
+    }
   | { ok: false; status: number; body: Record<string, unknown> };
 
 /** This machine first, then every non-hidden, non-revoked link in store order. */
