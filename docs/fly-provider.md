@@ -58,12 +58,16 @@ endpoint; port tunnelling uses `fly proxy`.
    ```
 
    Overdeck will:
+   - Push the local `feature/<id>` branch to origin when a local workspace exists, so the planned spec reaches the machine; creation stops with an error and creates no machine if that push is rejected
    - Create a Fly Machine in your configured app
    - Wait up to 120 s for it to reach `started`
    - Sync Claude Code and GitHub credentials from your local machine
    - Clone the repository over HTTPS into `/workspace` and check out the feature branch
    - Configure Claude Code and copy your local skills
    - Save workspace metadata to `~/.overdeck/workspaces/<id>.yaml`
+
+   Only committed work reaches the machine: uncommitted changes in the local
+   workspace are not pushed.
 
    No SSH private key is copied to the VM. Git authenticates over HTTPS with the
    synced `gh` token.
