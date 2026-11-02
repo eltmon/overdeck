@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4655",
   "created": "2026-11-02T03:52:43.700Z",
-  "updated": "2026-11-02T04:16:56.701Z",
+  "updated": "2026-11-02T04:18:38.863Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-02T04:16:54.794Z"
     },
     "cli-auto-settle-verb": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4655",
-      "claimedAt": "2026-11-02T04:16:56.701Z"
+      "claimedAt": "2026-11-02T04:16:56.701Z",
+      "doneAt": "2026-11-02T04:18:38.863Z"
     }
   }
 }
