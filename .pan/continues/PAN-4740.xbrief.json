@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4740",
   "created": "2026-11-02T12:44:07.052Z",
-  "updated": "2026-11-02T13:36:27.509Z",
+  "updated": "2026-11-02T13:38:08.523Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,10 @@
       "claimedBy": "agent-pan-4740",
       "claimedAt": "2026-11-02T13:35:36.306Z",
       "doneAt": "2026-11-02T13:36:27.509Z"
+    },
+    "pool-idle-expiry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:38:08.522Z"
     }
   }
 }
