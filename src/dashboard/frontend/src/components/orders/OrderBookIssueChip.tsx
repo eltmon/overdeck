@@ -8,7 +8,8 @@ async function fetchOrderBooks(): Promise<OrderBook[]> {
   return payload.books ?? [];
 }
 
-export function OrderBookIssueChip({ issueId }: { issueId: string }) {
+/** `compact` drops the visible book name (it stays in the tooltip and label) for narrow rows. */
+export function OrderBookIssueChip({ issueId, compact = false }: { issueId: string; compact?: boolean }) {
   const { data: books = [] } = useQuery({
     queryKey: ['order-books'],
     queryFn: fetchOrderBooks,
@@ -25,12 +26,12 @@ export function OrderBookIssueChip({ issueId }: { issueId: string }) {
       href="/orders"
       data-section="OrderBookIssueChip"
       onClick={(event) => event.stopPropagation()}
-      className="inline-flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground hover:text-primary"
+      className="inline-flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground hover:text-primary"
       title={`${membership.book.name} — ${membership.item.lane}${membership.item.order}`}
       aria-label={`${membership.item.lane}${membership.item.order} · book · ${membership.book.name}`}
     >
       <span className="shrink-0 rounded-[3px] border border-primary/30 bg-primary/[0.08] px-1.5 py-px font-mono text-[10px] text-foreground">{membership.item.lane}{membership.item.order} · book</span>
-      <span className="max-w-24 truncate">{membership.book.name}</span>
+      {!compact && <span className="max-w-24 truncate">{membership.book.name}</span>}
     </a>
   );
 }
