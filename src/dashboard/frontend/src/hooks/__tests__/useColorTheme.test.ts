@@ -115,7 +115,10 @@ describe('useColorTheme', () => {
       useTheme.setState({ theme: 'light', resolvedTheme: 'light' });
     });
 
-    for (const prop of ['--background', '--card', '--border', '--foreground', '--muted-foreground', '--primary', '--ring', '--primary-ink', '--primary-foreground']) {
+    for (const prop of [
+      '--background', '--card', '--border', '--foreground', '--muted-foreground', '--primary', '--ring', '--primary-ink', '--primary-foreground',
+      '--surface-overlay', '--surface-overlay-field', '--border-overlay', '--overlay-scrim',
+    ]) {
       expect(document.documentElement.style.getPropertyValue(prop)).toBe('');
     }
   });
@@ -140,6 +143,75 @@ describe('useColorTheme', () => {
     for (const prop of ['--state-live', '--success', '--warning', '--destructive', '--signal-live', '--signal-idle']) {
       expect(document.documentElement.style.getPropertyValue(prop)).toBe('');
     }
+  });
+
+  it('ui.overlay sets --surface-overlay directly', async () => {
+    const dark = theme({ id: 'dark-x', type: 'dark', ui: { background: '#10141c', overlay: '#141821' } });
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/color-themes') {
+        return Response.json({ themes: [dark], selection: { light: 'overdeck-light', dark: 'dark-x' }, warnings: [] });
+      }
+      return undefined;
+    });
+
+    const { result } = renderHook(() => useColorTheme());
+    await act(async () => {
+      await result.current.reconcileFromServer();
+    });
+    expect(document.documentElement.style.getPropertyValue('--surface-overlay')).toBe('#141821');
+  });
+
+  it('a light theme with only ui.background derives the overlay by mixing toward white', async () => {
+    const light = theme({ id: 'light-x', type: 'light', ui: { background: '#fcfcfc' } });
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/color-themes') {
+        return Response.json({ themes: [light], selection: { light: 'light-x', dark: 'overdeck-dark' }, warnings: [] });
+      }
+      return undefined;
+    });
+
+    const { result } = renderHook(() => useColorTheme());
+    await act(async () => {
+      await result.current.reconcileFromServer();
+    });
+    await act(async () => {
+      useTheme.setState({ theme: 'light', resolvedTheme: 'light' });
+    });
+    expect(document.documentElement.style.getPropertyValue('--surface-overlay')).toBe('color-mix(in srgb, var(--background), white 70%)');
+    expect(document.documentElement.style.getPropertyValue('--surface-overlay-field')).toBe('var(--background)');
+  });
+
+  it('a dark theme with only ui.background derives the overlay by mixing toward the foreground', async () => {
+    const dark = theme({ id: 'dark-x', type: 'dark', ui: { background: '#10141c' } });
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/color-themes') {
+        return Response.json({ themes: [dark], selection: { light: 'overdeck-light', dark: 'dark-x' }, warnings: [] });
+      }
+      return undefined;
+    });
+
+    const { result } = renderHook(() => useColorTheme());
+    await act(async () => {
+      await result.current.reconcileFromServer();
+    });
+    expect(document.documentElement.style.getPropertyValue('--surface-overlay')).toBe('color-mix(in srgb, var(--background), var(--foreground) 6%)');
+    expect(document.documentElement.style.getPropertyValue('--surface-overlay-field')).toBe('var(--background)');
+  });
+
+  it('ui.border sets --border-overlay', async () => {
+    const dark = theme({ id: 'dark-x', type: 'dark', ui: { border: '#2a2f45' } });
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/color-themes') {
+        return Response.json({ themes: [dark], selection: { light: 'overdeck-light', dark: 'dark-x' }, warnings: [] });
+      }
+      return undefined;
+    });
+
+    const { result } = renderHook(() => useColorTheme());
+    await act(async () => {
+      await result.current.reconcileFromServer();
+    });
+    expect(document.documentElement.style.getPropertyValue('--border-overlay')).toBe('#2a2f45');
   });
 
   it('ac5: reconcileFromServer applies the server selection and sends no PUT or POST', async () => {

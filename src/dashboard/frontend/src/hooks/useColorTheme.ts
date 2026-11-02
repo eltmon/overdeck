@@ -54,6 +54,7 @@ const ALL_UI_PROPS = [
   '--body-foreground', '--faint-foreground',
   '--muted-foreground',
   '--primary', '--ring', '--primary-ink', '--primary-foreground',
+  '--surface-overlay', '--surface-overlay-field', '--border-overlay', '--overlay-scrim',
 ] as const;
 
 /** Applies (or clears) the active theme's `ui` tokens as inline styles on `<html>`, which beat every stylesheet selector. */
@@ -98,6 +99,15 @@ function applyUiTokens(theme: ColorTheme): void {
     set('--primary-ink', ui.accent);
     set('--primary-foreground', readableForeground(ui.accent));
   }
+  if (ui.overlay !== undefined) {
+    set('--surface-overlay', ui.overlay);
+  } else if (ui.background !== undefined) {
+    set('--surface-overlay', theme.type === 'light'
+      ? 'color-mix(in srgb, var(--background), white 70%)'
+      : 'color-mix(in srgb, var(--background), var(--foreground) 6%)');
+  }
+  if (ui.background !== undefined) set('--surface-overlay-field', 'var(--background)');
+  if (ui.border !== undefined) set('--border-overlay', ui.border);
 }
 
 // Memoizes effectiveTerminalPalette per theme object reference, so
