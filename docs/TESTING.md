@@ -150,6 +150,7 @@ All interactive dashboard elements should have `data-testid` attributes for reli
 - Use `getByText` only for content verification, not for clicking
 - `getByRole(role, { name })` in Playwright is a case-insensitive **substring** match. Pass `exact: true` for short names that can appear inside other labels: `{ name: 'Yes' }` also matches a button whose text ends in "yesterday" (PAN-4757).
 - E2E fixture timestamps that the UI renders as relative time (`5m ago`, `yesterday`) are computed from `Date.now()`, never hard-coded dates; a fixed date changes the rendered text as the calendar moves.
+- Browser specs under `tests/e2e/*.spec.ts` run inside the default unit shards. Each `openRoute()`/`page.goto` in a fresh browser context is a full load of the unbundled Vite dev app, about 5–7 s on a loaded CI runner, so give each route its own `it` and keep an `it` to at most three page loads within its 45 s budget (PAN-4767). Moving these specs to a serial lane is PAN-4733.
 
 **Playwright patterns:**
 
