@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T15:15:03.219632Z · model: claude-opus-5-5 · open: 858_
+_Last sequenced: 2026-11-02T15:17:04.296030Z · model: claude-opus-5-5 · open: 859_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -863,6 +863,7 @@ _Last sequenced: 2026-11-02T15:15:03.219632Z · model: claude-opus-5-5 · open: 
 | 871 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 874 | PAN-4819 | XS | low | ok |  | PAN-4734 | Operator-run throwaway for the PAN-4734 live Fly check; closed without merging. Not Flywheel work, so it sits at the bottom. |
 
 ## Rationale detail
 
@@ -1193,10 +1194,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T15:15:03.219632Z",
+  "generatedAt": "2026-11-02T15:17:04.296030Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 858,
+  "openCount": 859,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11887,6 +11888,21 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "rationale": "New issue filed 2026-11-02 during PAN-4743's live verification: registry.fly.io/pan-workspaces:latest is the June image, so pan serve rejects --no-open and provisioning rolls the VM back. It is the visible symptom of PAN-4778 (the image CI never publishes), so it takes the free rank 279 directly behind PAN-4778 with no other node moving; a one-off manual image push can clear it sooner, but that needs operator Fly credentials.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4819",
+      "rank": 874,
+      "size": "XS",
+      "importance": "low",
+      "score": 5,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4734"
+      ],
+      "why": "Operator-run throwaway for the PAN-4734 live Fly check; closed without merging. Not Flywheel work, so it sits at the bottom.",
+      "rationale": "New issue filed 2026-11-02 as the WI-14 live checkpoint for PAN-4734 (pan start --remote on Fly). It carries no product value and is closed unmerged once the check is recorded, so it takes the free bottom rank and no other node moves.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13142,6 +13158,13 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4734",
+      "to": "PAN-4819",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }
