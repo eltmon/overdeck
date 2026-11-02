@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4683",
   "created": "2026-11-02T03:42:24.487Z",
-  "updated": "2026-11-02T04:29:40.401Z",
+  "updated": "2026-11-02T04:29:59.247Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "consent-workspace-location.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T04:29:40.401Z"
+    },
+    "consent-workspace-location.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:29:59.247Z"
     }
   }
 }
