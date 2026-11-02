@@ -377,7 +377,10 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
   // any open action persists it as the markdown open target so a later
   // left click reuses the choice.
   const openMarkdownContextMenu = useCallback((x: number, y: number) => {
-    void fetchAvailableEditors().then((availableEditors) => {
+    void Promise.all([
+      fetchAvailableEditors(),
+      canOpenInBrowser ? fetchAvailableBrowsers() : Promise.resolve<readonly BrowserId[]>([]),
+    ]).then(([availableEditors, availableBrowsers]) => {
       const items: ContextMenuFallbackItem[] = [
         {
           label: 'Open in internal editor',
@@ -396,13 +399,14 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
             openWithExternalEditor(entry.id);
           },
         })),
+        ...browserMenuItems(availableBrowsers),
         { label: 'Open containing folder', onClick: revealInFileManager },
         { label: 'Copy relative path', onClick: () => copyPath(displayPath, 'relative path') },
         { label: 'Copy full path', onClick: () => copyPath(targetPath, 'full path') },
       ];
       showContextMenu({ x, y, items });
     });
-  }, [deck, filePath, targetPath, basename, handleOpen, openWithExternalEditor, revealInFileManager, displayPath, copyPath]);
+  }, [deck, filePath, targetPath, basename, handleOpen, openWithExternalEditor, revealInFileManager, displayPath, copyPath, canOpenInBrowser, browserMenuItems]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

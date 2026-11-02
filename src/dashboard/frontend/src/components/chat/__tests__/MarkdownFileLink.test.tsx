@@ -58,6 +58,14 @@ const htmlMeta = {
   line: 4,
 };
 
+// PAN-4762 — a markdown chip whose extension is not browser-renderable.
+const mdxMeta = {
+  filePath: '/home/eltmon/project/docs/page.mdx',
+  targetPath: '/home/eltmon/project/docs/page.mdx',
+  displayPath: 'project/docs/page.mdx',
+  basename: 'page.mdx',
+};
+
 // PAN-3260 — the reported case: a repo-root markdown chip inside a
 // conversation with no workspace, so no issueId prop and no
 // /workspaces/feature-<issue>/ path segment for issueIdFromPath to match.
@@ -417,7 +425,7 @@ describe('MarkdownFileLink', () => {
     // the outer beforeEach; MarkdownFileLink caches that fetch module-wide
     // (same pattern as the Quickview highlighter cache), so every test in
     // this block sees the same two external editors.
-    it('lists the internal editor, then each available external editor, then the copy actions, in that order', async () => {
+    it('lists the internal editor, then each available external editor, then browser items, then the copy actions, in that order', async () => {
       renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane: vi.fn() });
 
       fireEvent.contextMenu(screen.getByRole('link'));
@@ -427,6 +435,9 @@ describe('MarkdownFileLink', () => {
           'Open in internal editor',
           'Open in Cursor',
           'Open in VS Code',
+          'Open in browser',
+          'Open in Google Chrome',
+          'Open in Firefox',
           'Open containing folder',
           'Copy relative path',
           'Copy full path',
@@ -495,6 +506,35 @@ describe('MarkdownFileLink', () => {
       fireEvent.click(internalItem);
 
       expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename);
+    });
+
+    it('shows no browser items for an .mdx chip', async () => {
+      renderWithDeck(<MarkdownFileLink {...mdxMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane: vi.fn() });
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+
+      await waitFor(() => {
+        const labels = screen.getAllByRole('menuitem').map((item) => item.textContent);
+        expect(labels.some((label) => label?.startsWith('Open in browser'))).toBe(false);
+        expect(labels.some((label) => label?.startsWith('Open in Google Chrome'))).toBe(false);
+        expect(labels.some((label) => label?.startsWith('Open in Firefox'))).toBe(false);
+      });
+    });
+
+    it('clicking Open in Google Chrome calls shellOpenInBrowser and leaves the markdown open target unchanged', async () => {
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane: vi.fn() });
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const chromeItem = await screen.findByRole('menuitem', { name: 'Open in Google Chrome' });
+      fireEvent.click(chromeItem);
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInBrowser).toHaveBeenCalledWith({
+          path: markdownMeta.filePath,
+          browser: 'chrome',
+        });
+      });
+      expect(localStorage.getItem('overdeck:markdown-open-target')).toBeNull();
     });
 
     it('renders the original items plus the reveal action for a non-markdown chip', () => {
