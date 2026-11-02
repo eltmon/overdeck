@@ -152,8 +152,8 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Google (Gemini)',
     compatibility: 'direct',
     defaultHarness: 'ohmypi',
-    models: ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'],
-    tierModels: { opus: 'gemini-3.1-pro-preview', sonnet: 'gemini-3-flash-preview', haiku: 'gemini-3.1-flash-lite-preview' },
+    models: ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'],
+    tierModels: { opus: 'gemini-3.1-pro-preview', sonnet: 'gemini-3-flash-preview', haiku: 'gemini-3.1-flash-lite' },
     tested: true,
     description: 'Route via local CLIProxyAPI Gemini backend using GOOGLE_API_KEY',
   },
@@ -179,9 +179,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: 'https://api.z.ai/api/anthropic',
     authType: 'static',
-    models: ['glm-5.3', 'glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
-    haikuModel: 'glm-4.7-flash',
-    tierModels: { opus: 'glm-5.2', sonnet: 'glm-4.7', haiku: 'glm-4.7-flash' },
+    models: ['glm-5.3', 'glm-5.3-flash', 'glm-5.3-flashx', 'glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
+    haikuModel: 'glm-5.3-flash',
+    tierModels: { opus: 'glm-5.3', sonnet: 'glm-5.3', haiku: 'glm-5.3-flash' },
     tested: true,
     description: 'Route directly to Z.AI Anthropic-compatible endpoint using ZHIPU_API_KEY.',
   },
@@ -237,9 +237,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: getOpenAICompatibleProxyBaseUrl('dashscope'),
     authType: 'static',
-    models: ['qwen3.7-plus', 'qwen3.8-flash', 'qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'],
-    haikuModel: 'qwen3-plus',
-    tierModels: { opus: 'qwen3-max', sonnet: 'qwen3-coder-plus', haiku: 'qwen3-plus' },
+    models: ['qwen3.7-plus', 'qwen3.8-flash', 'qwen3.7-max', 'qwen3.8-max'],
+    haikuModel: 'qwen3.8-flash',
+    tierModels: { opus: 'qwen3.8-max', sonnet: 'qwen3.7-plus', haiku: 'qwen3.8-flash' },
     tested: false,
     description: "Route Alibaba DashScope Qwen models through Overdeck's local Anthropic-compatible adapter using DASHSCOPE_API_KEY against the Singapore intl endpoint (ap-southeast-1).",
   },
@@ -484,7 +484,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check Google models
-  if (['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'].includes(modelId)) {
+  if (['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-3.1-flash-lite-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'].includes(modelId)) {
     return PROVIDERS.google;
   }
 
@@ -505,7 +505,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check Z.AI models
-  if (['glm-5.3', 'glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
+  if (['glm-5.3', 'glm-5.3-flash', 'glm-5.3-flashx', 'glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
     return PROVIDERS.zai;
   }
 

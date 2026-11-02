@@ -750,7 +750,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'gemini-3-flash-preview',
     provider: 'google',
     displayName: 'Gemini 3 Flash Preview',
-    costPer1MTokens: 0.4, // ~$0.15 in / $0.60 out
+    costPer1MTokens: 1.75, // $0.50 in / $3.00 out (text)
     contextWindow: 1000000,
     skills: {
       'code-generation': 80,
@@ -772,7 +772,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   'gemini-3.1-flash-lite-preview': {
     model: 'gemini-3.1-flash-lite-preview',
     provider: 'google',
-    displayName: 'Gemini 3.1 Flash Lite',
+    displayName: 'Gemini 3.1 Flash Lite Preview (deprecated)',
     costPer1MTokens: 0.9, // $0.25 in / $1.50 out
     contextWindow: 1000000,
     skills: {
@@ -788,7 +788,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 98, // Most cost-efficient
       'context-length': 100,
     },
-    notes: 'Most cost-efficient Google model. Great for high-volume, latency-sensitive workloads.',
+    notes: 'Shut down 2026-05-25; migrates to gemini-3.1-flash-lite. Row kept for historical pricing.',
   },
 
   // Legacy Google IDs — deprecated aliases kept for backward compat with saved configs
@@ -1037,7 +1037,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'glm-4.7',
     provider: 'zai',
     displayName: 'GLM-4.7 (deprecated)',
-    costPer1MTokens: 1.5,
+    costPer1MTokens: 1.4,
     contextWindow: 200000,
     skills: {
       'code-generation': 88,
@@ -1059,7 +1059,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'glm-4.7-flash',
     provider: 'zai',
     displayName: 'GLM-4.7 Flash (deprecated)',
-    costPer1MTokens: 0.3,
+    costPer1MTokens: 0,
     contextWindow: 200000,
     skills: {
       'code-generation': 78,
@@ -1165,7 +1165,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   'qwen3-max': {
     model: 'qwen3-max',
     provider: 'dashscope',
-    displayName: 'Qwen3 Max (DashScope)',
+    displayName: 'Qwen3 Max (deprecated)',
     costPer1MTokens: 0,
     contextWindow: 262144,
     skills: {
@@ -1181,13 +1181,13 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 72,
       'context-length': 98,
     },
-    notes: 'Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+    notes: 'Snapshots deprecated by Alibaba 2026-10-10 and absent from the Singapore price list; migrates to qwen3.7-max. Row kept for history.',
   },
 
   'qwen3-coder-plus': {
     model: 'qwen3-coder-plus',
     provider: 'dashscope',
-    displayName: 'Qwen3 Coder Plus (DashScope)',
+    displayName: 'Qwen3 Coder Plus (deprecated)',
     costPer1MTokens: 0,
     contextWindow: 262144,
     skills: {
@@ -1203,13 +1203,13 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 74,
       'context-length': 98,
     },
-    notes: 'Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+    notes: 'Deprecated by Alibaba 2026-10-10; migrates to qwen3.7-plus. No published Singapore price; row kept for history.',
   },
 
   'qwen3-plus': {
     model: 'qwen3-plus',
     provider: 'dashscope',
-    displayName: 'Qwen3 Plus (DashScope)',
+    displayName: 'Qwen3 Plus (deprecated)',
     costPer1MTokens: 0,
     contextWindow: 131072,
     skills: {
@@ -1225,14 +1225,14 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 82,
       'context-length': 96,
     },
-    notes: 'Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+    notes: 'Never a DashScope id (the real id is qwen-plus); migrates to qwen3.8-flash. Row kept for history.',
   },
 
   'qwen3.7-max': {
     model: 'qwen3.7-max',
     provider: 'dashscope',
     displayName: 'Qwen3.7 Max (DashScope)',
-    costPer1MTokens: 0,
+    costPer1MTokens: 5,
     contextWindow: 262144,
     skills: {
       'code-generation': 96,
@@ -1247,7 +1247,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 70,
       'context-length': 98,
     },
-    notes: 'Canonical DashScope ID verified from Qwen Cloud docs on 2026-05-22. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+    notes: 'Routed to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. $2.50/M input, $7.50/M output (Model Studio pricing, verified 2026-11-02).',
   },
 
 
@@ -1255,8 +1255,8 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'qwen3.8-max',
     provider: 'dashscope',
     displayName: 'Qwen3.8 Max (DashScope)',
-    costPer1MTokens: 0,
-    contextWindow: 1048576,
+    costPer1MTokens: 4,
+    contextWindow: 1000000,
     skills: {
       'code-generation': 97,
       'code-review': 95,
@@ -1270,7 +1270,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 68,
       'context-length': 99,
     },
-    notes: 'Canonical DashScope ID verified from Alibaba Cloud Model Studio docs on 2026-08-03. Preview release (2.4T MoE, always-on thinking, 1M-class context); free 1M-token Model Studio quota (90 days) on the Singapore intl endpoint (ap-southeast-1) via DASHSCOPE_API_KEY. Reported pay-as-you-go pricing $2/M in, $6/M out — cost placeholder until intl pricing is confirmed.',
+    notes: 'Singapore intl endpoint (ap-southeast-1) via DASHSCOPE_API_KEY. Context window 1,000,000 (max input 991,808, max output 131,072); $2/M input, $6/M output, $0.25/M implicit-cache read. Verified 2026-11-02 (model-studio/qwen3-8-max).',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════

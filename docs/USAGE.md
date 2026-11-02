@@ -161,12 +161,20 @@ Overdeck supports multiple AI model providers through direct Anthropic-compatibl
 - `gpt-5.6-luna` - Fast and cost-effective
 
 **Google (Gemini)**
-- `gemini-3-pro-preview` - Supports `thinking_level: high|low`
-- `gemini-3-flash-preview` - Supports `thinking_level: minimal|low|medium|high`
+- `gemini-4-argon` - Flagship model
+- `gemini-3.8-flash` - Fast tier
+- `gemini-3.6-flash` - Fast tier
+- `gemini-3.5-flash-lite` - Budget tier
+- `gemini-3.1-pro-preview` - Flagship tier
+- `gemini-3-flash-preview` - Fast tier; supports `thinking_level: minimal|low|medium|high`
+- `gemini-3.1-flash-lite` - Budget tier
 
 **Z.AI**
-- `glm-4.7` - General-purpose model
-- `glm-4.7-flash` - Faster variant
+- `glm-5.3` - Flagship model
+- `glm-5.3-flash` - Fast tier
+- `glm-5.3-flashx` - Fast tier, higher speed
+- `glm-5.2` - Previous flagship
+- `glm-5.1` - Previous flagship
 
 #### Configuration via Dashboard
 

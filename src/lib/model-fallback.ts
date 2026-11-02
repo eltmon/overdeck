@@ -68,10 +68,12 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // Google models (current)
   'gemini-4-argon': 'google',
   'gemini-3.8-flash': 'google',
+  'gemini-3.6-flash': 'google',
   'gemini-3.5-flash-lite': 'google',
   'gemini-3.1-pro-preview': 'google',
   'gemini-3-flash-preview': 'google',
   'gemini-3.1-flash-lite-preview': 'google',
+  'gemini-3.1-flash-lite': 'google',
 
   // Google legacy
   'gemini-3-pro-preview': 'google',
@@ -97,6 +99,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // Z.AI models
   'glm-5.3': 'zai',
+  'glm-5.3-flash': 'zai',
+  'glm-5.3-flashx': 'zai',
   'glm-5.2': 'zai',
   'glm-5.1': 'zai',
   'glm-4.7': 'zai',
@@ -186,7 +190,9 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'gemini-4-argon': 'claude-sonnet-5-5', // Flagship → Sonnet
   'gemini-3.1-pro-preview': 'claude-sonnet-5-5', // Flagship → Sonnet
   'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
+  'gemini-3.6-flash': 'claude-haiku-4-5', // Fast model → Haiku
   'gemini-3.1-flash-lite-preview': 'claude-haiku-4-5', // Budget model → Haiku
+  'gemini-3.1-flash-lite': 'claude-haiku-4-5', // Budget model → Haiku
   // Deprecated Google IDs
   'gemini-3-pro-preview': 'claude-sonnet-5-5',
   'gemini-2.5-pro': 'claude-sonnet-5-5',
@@ -210,6 +216,8 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'MiniMax-M3.1-Flash': 'claude-sonnet-5-5',
 
   // Z.AI → Anthropic
+  'glm-5.3-flash': 'claude-haiku-4-5', // fast tier → Haiku
+  'glm-5.3-flashx': 'claude-haiku-4-5', // fast tier → Haiku
   'glm-5.2': 'claude-sonnet-5-5', // Current GLM flagship → Sonnet
   'glm-5.1': 'claude-sonnet-5-5', // Previous GLM flagship → Sonnet
   // Deprecated Z.AI IDs — explicit targets preserve tier semantics independent of

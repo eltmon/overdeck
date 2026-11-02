@@ -50,8 +50,10 @@ function ompProviderDef(providerName: string): OmpProviderDef | undefined {
       api: 'google-generative-ai',
       models: [
         { id: 'gemini-4-argon', name: 'Gemini 4 Argon', cost: { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 0 } },
-        { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', cost: { input: 1.5, output: 9, cacheRead: 0.15, cacheWrite: 0 } },
+        { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', cost: { input: 0.75, output: 3.75, cacheRead: 0.075, cacheWrite: 0 } },
+        { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', cost: { input: 0.75, output: 3.75, cacheRead: 0.075, cacheWrite: 0 } },
         { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', cost: { input: 0.3, output: 2.5, cacheRead: 0.03, cacheWrite: 0 } },
+        { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', cost: { input: 0.25, output: 1.5, cacheRead: 0.025, cacheWrite: 0 } },
       ].map((model) => ({ ...model, reasoning: true, supportsTools: true, contextWindow: 1048576, maxTokens: 65536 })),
     };
   }
@@ -61,12 +63,9 @@ function ompProviderDef(providerName: string): OmpProviderDef | undefined {
   // output on the standard endpoint) — qwen3.8-max's 131072 is documented.
   const models: OmpModelDef[] = [
     { id: 'qwen3.7-plus', name: 'Qwen3.7 Plus', contextWindow: 1000000, maxTokens: 131072, cost: { input: 0.4, output: 1.6, cacheRead: 0.08, cacheWrite: 0 } },
-    { id: 'qwen3.8-flash', name: 'Qwen3.8 Flash', contextWindow: 1000000, maxTokens: 131072, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
-    { id: 'qwen3-max', name: 'Qwen3 Max', contextWindow: 262144, maxTokens: 65536, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
-    { id: 'qwen3-coder-plus', name: 'Qwen3 Coder Plus', contextWindow: 262144, maxTokens: 65536, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
-    { id: 'qwen3-plus', name: 'Qwen3 Plus', contextWindow: 131072, maxTokens: 32768, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
-    { id: 'qwen3.7-max', name: 'Qwen3.7 Max', contextWindow: 262144, maxTokens: 65536, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
-    { id: 'qwen3.8-max', name: 'Qwen3.8 Max', contextWindow: 1048576, maxTokens: 131072, cost: { input: 2, output: 6, cacheRead: 0, cacheWrite: 0 } },
+    { id: 'qwen3.8-flash', name: 'Qwen3.8 Flash', contextWindow: 1000000, maxTokens: 131072, cost: { input: 0.15, output: 0.47, cacheRead: 0, cacheWrite: 0 } },
+    { id: 'qwen3.7-max', name: 'Qwen3.7 Max', contextWindow: 262144, maxTokens: 65536, cost: { input: 2.5, output: 7.5, cacheRead: 0, cacheWrite: 0 } },
+    { id: 'qwen3.8-max', name: 'Qwen3.8 Max', contextWindow: 1000000, maxTokens: 131072, cost: { input: 2, output: 6, cacheRead: 0.25, cacheWrite: 0 } },
   ].map((m) => ({ ...m, reasoning: true, supportsTools: true }));
   return {
     baseUrl: getDashScopeUpstreamBaseUrl(),

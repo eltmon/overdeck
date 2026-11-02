@@ -54,6 +54,11 @@ const kimiK31AdditionIds = new Set(['k3.1-pro', 'k3.1-pro-highspeed', 'kimi-code
 const mimoV26Ids = ['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed'];
 // MiniMax M3.1 Flash is an addition after the fixture was captured (PAN-4825).
 const minimaxM31FlashId = 'MiniMax-M3.1-Flash';
+// Gemini 3.6 Flash and the GA id for 3.1 Flash Lite are additions after the fixture was captured (PAN-4827).
+const gemini36FlashId = 'gemini-3.6-flash';
+const gemini31FlashLiteId = 'gemini-3.1-flash-lite';
+// GLM-5.3 Flash / FlashX are additions after the fixture was captured (PAN-4827).
+const glm53FlashIds = ['glm-5.3-flash', 'glm-5.3-flashx'];
 // Meta's reasoning docs list max for muse-spark-1.3 but not for -contributor (PAN-4825).
 const expectedPreviousCatalog = {
   ...previousCatalog,
@@ -69,18 +74,39 @@ const expectedPreviousCatalog = {
     }
     return model;
   }),
+  // gemini-3.1-flash-lite-preview retired to the GA id; gemini-3.8-flash and gemini-3-flash-preview
+  // move off their launch-era placeholder rates to the official prices (PAN-4827).
+  google: previousCatalog.google
+    .filter((model: { id: string }) => model.id !== 'gemini-3.1-flash-lite-preview')
+    .map((model: { id: string; costPer1MTokens: number }) => {
+      if (model.id === 'gemini-3.8-flash') return { ...model, costPer1MTokens: 2.25 };
+      if (model.id === 'gemini-3-flash-preview') return { ...model, costPer1MTokens: 1.75 };
+      return model;
+    }),
+  // qwen3-max, qwen3-coder-plus and qwen3-plus retired 2026-10-10 (dead or never-real DashScope ids);
+  // qwen3.7-max, qwen3.8-flash and qwen3.8-max move off their $0 placeholders, and qwen3.8-max's
+  // context window corrects from 1,048,576 to the documented 1,000,000 (PAN-4827).
+  dashscope: previousCatalog.dashscope
+    .filter((model: { id: string }) => !['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus'].includes(model.id))
+    .map((model: { id: string; costPer1MTokens: number; contextWindow: number }) => {
+      if (model.id === 'qwen3.7-max') return { ...model, costPer1MTokens: 5 };
+      if (model.id === 'qwen3.8-flash') return { ...model, costPer1MTokens: 0.31 };
+      if (model.id === 'qwen3.8-max') return { ...model, costPer1MTokens: 4, contextWindow: 1000000 };
+      return model;
+    }),
 };
 
-function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }>; kimi: Array<{ id: string }>; mimo: Array<{ id: string }>; minimax: Array<{ id: string }> }>(catalog: T): T {
+function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }>; kimi: Array<{ id: string }>; mimo: Array<{ id: string }>; minimax: Array<{ id: string }>; zai: Array<{ id: string }> }>(catalog: T): T {
   return {
     ...catalog,
     anthropic: catalog.anthropic.filter((model) => ![opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
     openai: catalog.openai.filter((model) => !gpt6AdditionIds.has(model.id)),
-    google: catalog.google.filter((model) => model.id !== geminiArgon.id),
+    google: catalog.google.filter((model) => ![geminiArgon.id, gemini36FlashId, gemini31FlashLiteId].includes(model.id)),
     meta: catalog.meta.filter((model) => model.id !== museWonderId),
     kimi: catalog.kimi.filter((model) => !kimiK31AdditionIds.has(model.id)),
     mimo: catalog.mimo.filter((model) => !mimoV26Ids.includes(model.id)),
     minimax: catalog.minimax.filter((model) => model.id !== minimaxM31FlashId),
+    zai: catalog.zai.filter((model) => !glm53FlashIds.includes(model.id)),
   };
 }
 
