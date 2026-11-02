@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4777",
+  "created": "2026-11-02T04:11:59.143Z",
+  "updated": "2026-11-02T04:11:59.144Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "rollback-vm-on-create-failure": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4777",
+      "claimedAt": "2026-11-02T04:11:59.143Z"
+    }
+  }
+}
