@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T03:39:31.385582Z · model: claude-opus-5-5 · open: 876_
+_Last sequenced: 2026-11-02T03:41:35.518645Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -336,7 +336,6 @@ _Last sequenced: 2026-11-02T03:39:31.385582Z · model: claude-opus-5-5 · open: 
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 324 | PAN-4757 | S | high | ok |  |  | In-pipeline: flaky test-e2e on main; pan-2355-mobile spec finds two Yes buttons. Find render-twice vs two-questions cause. |
 | 325 | PAN-4473 | M | medium | ok |  |  | Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
@@ -1211,10 +1210,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T03:39:31.385582Z",
+  "generatedAt": "2026-11-02T03:41:35.518645Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 876,
+  "openCount": 875,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -5423,19 +5422,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "condition": "ok",
       "dependsOn": [],
       "why": "PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4757",
-      "rank": 324,
-      "size": "S",
-      "importance": "high",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: flaky test-e2e on main; pan-2355-mobile spec finds two Yes buttons. Find render-twice vs two-questions cause.",
-      "rationale": "New issue filed 2026-11-02 and already in the pipeline, so it is pinned at the free rank 324 slot and no other node moves. The substrate-improvement label sets a high-importance floor because a flaky e2e job turns main CI red; the body names the failing line and a clear fix direction, so the condition is ok.",
       "gate": "auto",
       "planning": "auto"
     },
