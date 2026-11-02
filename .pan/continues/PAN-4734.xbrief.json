@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T16:52:03.202Z",
+  "updated": "2026-11-02T16:52:20.963Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -133,6 +133,10 @@
     "wi3-push-daemon-workdir.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T16:52:03.201Z"
+    },
+    "wi4-sweep-defers-to-reap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:52:20.963Z"
     }
   }
 }
