@@ -169,20 +169,26 @@ There is no per-issue pipeline record since the Cut (PAN-3917).
 
 ## Remote (Fly.io) work agents
 
-Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
-`fly-provider.ts`; the VM is created by `src/lib/remote-workspace.ts`
-`createRemoteWorkspace`). State lives at
+Work agents can run on Fly.io VMs. State lives at
 `~/.overdeck/agents/agent-<issue>/remote-state.json` (`location: 'remote'`,
 `vmName`, `status`), scanned by `listActiveRemoteAgentStates()`
-(`remote-agents.ts`). The dashboard surfaces them only as an issue chip and
-aggregate status through `services/resource-discovery.ts` (PAN-1676). There is
-no remote session-row synthesis in `routes/projects.ts`
-`collectSessionTreeNodes()`: the PAN-1775 commit never merged, and a remote
-agent shows a row only when a `state.json` exists (dashboard spawn or after the
-reap). Remote agents have no local tmux session — never assume tmux discovery
-covers them. PAN-4652 adds **Fly machines**: Fly VMs that run `pan serve` and
-are linked from home (`src/lib/anywhere/fly/`, `services/fly-machine-service.ts`,
-`pan machines add-fly`); PAN-4734 moves work agents onto that path. The default
+(`remote-agents.ts`). Since PAN-4734, `pan start --remote` (and `--machine fly`)
+goes through `src/cli/commands/start-remote.ts` → `POST /api/remote/work-agents`
+→ `services/fly-work-agent-service.ts`: the agent runs as a **conversation** on a
+PAN-4652 Fly machine (VMs that run `pan serve`, linked from home:
+`src/lib/anywhere/fly/`, `services/fly-machine-service.ts`, `pan machines add-fly`),
+in the worktree `/workspace/<project>/workspaces/feature-<issue>`. Its remote-state
+carries `linked: true` plus the VM tmux target (`tmuxSession: conv-<name>`,
+`tmuxSocket: overdeck`) that every remote tmux helper resolves through
+`remoteTmuxTarget()`. The issue tree shows it as a linked conversation row
+(`resourceDetails.conversations`, `origin: 'linked'`), not a `SessionNode`. Legacy
+raw-tmux VMs (`src/lib/remote-workspace.ts` `createRemoteWorkspace`, no Overdeck
+server) remain only for workspaces created before PAN-4734; the dashboard helper
+`handleRemoteAgentSpawn` still spawns on them and writes `state.json`. Remote agents
+have no local tmux session — never assume tmux discovery covers them. The reap is
+`remote-completion.ts` (deacon-lite, behind the freeze, keyed on
+`/workspace/.pan/REMOTE_DONE`); for a linked agent it destroys the Fly machine
+through `destroyAndForgetFlyMachine` (`fly-machine-loops.ts`). The default
 image is `registry.fly.io/<app>:latest` (`defaultFlyImage()` in `fly-provider.ts`,
 used by both `FlyProvider` and `provisionFlyMachine`), because the Fly registry is
 app-scoped (PAN-4682).

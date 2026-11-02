@@ -132,6 +132,18 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   or every ephemeral watchdog would stop its machine); the reap runs in
   `deacon-lite.ts` via `remote-reap-routine.ts` (behind the freeze). The reap acts
   only on positive evidence: a failed exec is `indeterminate`, never a crash.
+- **Remote tmux helpers resolve their target from remote-state** — `getRemoteAgentOutput`,
+  `sendToRemoteAgent(Keyed)`, `killRemoteAgent`, `isRemoteAgentRunning` and the reap's
+  `probeRemoteSession` address `remoteTmuxTarget(agentId)`: a linked work agent's
+  `conv-<name>` on the VM's `overdeck` socket (PAN-4734), else the legacy `agent-<issue>` on
+  home's `getManagedTmuxSocketName()` (`overdeck-<hash>` on a non-default `OVERDECK_HOME`).
+  New code that runs commands in an agent's VM session must use the target, never the agent
+  id. Linked remote-state is also skipped by the spend cap's agent count, the remote heartbeat
+  and the credential refresh (its Fly machine record covers the VM), and the Fly idle sweep
+  never removes a machine hosting a `starting`/`running` linked agent. The legacy VM still
+  disagrees with its prompt about the continue file: `createRemoteWorkspace` writes
+  `/workspace/.pan/continue.json` but the REMOTE prompt names
+  `<workspace>/.overdeck/continue.json`.
 - **Fresh Claude Code state shows startup dialogs that eat the first message** — every
   Fly VM starts with an empty `~/.claude.json` (exec shell `HOME=/`). Each dialog
   Claude Code can show at launch must be pre-answered in
