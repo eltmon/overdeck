@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4658",
   "created": "2026-11-02T04:25:38.183Z",
-  "updated": "2026-11-02T05:18:22.217Z",
+  "updated": "2026-11-02T05:18:37.615Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "chip-passes-target.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T05:18:22.217Z"
+    },
+    "archive-clears-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:18:37.615Z"
     }
   }
 }
