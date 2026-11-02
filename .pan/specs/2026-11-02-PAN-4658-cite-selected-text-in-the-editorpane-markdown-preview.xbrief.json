@@ -4,17 +4,17 @@
     "created": "2026-11-02T04:19:56Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4658: Cite selected text in the EditorPane markdown preview",
-    "updated": "2026-11-02T04:24:19.690Z"
+    "updated": "2026-11-02T04:25:21.811Z"
   },
   "plan": {
     "id": "pan-4658",
     "title": "Cite selected text in the EditorPane markdown preview",
-    "status": "proposed",
+    "status": "running",
     "uid": "40a6c09e-2313-477f-97f6-ef38476209ec",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T04:19:56Z",
-    "updated": "2026-11-02T04:24:19.690Z",
+    "updated": "2026-11-02T04:25:21.811Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4658",
@@ -811,5 +811,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
