@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T16:50:51.334Z",
+  "updated": "2026-11-02T16:51:10.762Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -117,6 +117,10 @@
     "wi2-loops-skip-linked.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T16:50:51.334Z"
+    },
+    "wi2-loops-skip-linked.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:51:10.762Z"
     }
   }
 }
