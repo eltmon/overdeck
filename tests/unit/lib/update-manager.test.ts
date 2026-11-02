@@ -1,18 +1,9 @@
-import { promisify } from 'node:util';
+import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { packageRoot } from '../../../src/lib/paths.js';
 import { isVersionNewer, UpdateManager, updateChannelForVersion, type UpdateInstallDeps } from '../../../src/lib/update-manager.js';
-
-// The install() line that runs `pan sync` is not swapped to the injectable
-// deps until a later item (PAN-4722 WI-3); until then it calls the real,
-// module-level execFileAsync. Mock it so these tests never spawn a real
-// `pan` process even where `pan` happens to be on PATH.
-vi.mock('node:child_process', () => {
-  const execFile = vi.fn();
-  Object.defineProperty(execFile, promisify.custom, { value: vi.fn(async () => ({ stdout: '', stderr: '' })) });
-  return { execFile };
-});
 
 function availableFetchImpl(): typeof fetch {
   return vi.fn(async (input: string | URL | Request) => {
@@ -102,5 +93,39 @@ describe('install', () => {
     const snapshot = manager.getSnapshot();
     expect(snapshot.phase).toBe('error');
     expect(snapshot.error).toContain('Could not install');
+  });
+
+  it('runs pan sync through the bundled CLI, not PATH', async () => {
+    const execFile = vi.fn(async () => undefined);
+    const installDeps: Partial<UpdateInstallDeps> = { execFile, ensureDurableRuntime: vi.fn(async () => ({ root: '/h/.overdeck/runtime/node_modules/@overdeck/core', installed: true })) };
+    const manager = new UpdateManager({
+      currentVersion: '1.2.3', installMode: 'npm-global', fetchImpl: availableFetchImpl(), runtimeHome: '/h/.overdeck', installDeps,
+    });
+    await manager.check();
+
+    manager.install();
+    await vi.waitFor(() => expect(manager.getSnapshot().phase).not.toBe('installing'));
+
+    expect(execFile).toHaveBeenCalledWith(process.execPath, [join(packageRoot, 'dist', 'cli', 'index.js'), 'sync']);
+    for (const call of execFile.mock.calls) expect(call[0]).not.toBe('pan');
+    const snapshot = manager.getSnapshot();
+    expect(snapshot.phase).toBe('ready');
+    expect(snapshot.error).toBeNull();
+  });
+
+  it('is ready with a warning when pan sync fails after a good install', async () => {
+    const execFile = vi.fn(async (file: string, args: readonly string[]) => {
+      if (args.includes('sync')) throw new Error('ENOENT');
+    });
+    const installDeps: Partial<UpdateInstallDeps> = { execFile };
+    const manager = new UpdateManager({ currentVersion: '1.2.3', installMode: 'npm-global', fetchImpl: availableFetchImpl(), installDeps });
+    await manager.check();
+
+    manager.install();
+    await vi.waitFor(() => expect(manager.getSnapshot().phase).not.toBe('installing'));
+
+    const snapshot = manager.getSnapshot();
+    expect(snapshot.phase).toBe('ready');
+    expect(snapshot.error).toMatch(/^Installed 1\.2\.4, but pan sync failed:/);
   });
 });

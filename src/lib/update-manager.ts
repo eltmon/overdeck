@@ -12,6 +12,7 @@ import {
 } from '@overdeck/contracts';
 
 import { ensureDurableRuntime } from './anywhere/connect-runtime.js';
+import { panCliInvocation } from './pan-cli-invocation.js';
 
 const execFileAsync = promisify(execFile);
 const NPM_DIST_TAGS_URL = 'https://registry.npmjs.org/-/package/%40overdeck%2Fcore/dist-tags';
@@ -185,8 +186,7 @@ export class UpdateManager {
       this.installPromise = (async () => {
         try {
           await installOverdeckPackage(version, this.runtimeHome, this.installDeps);
-          await execFileAsync('pan', ['sync']);
-          this.snapshot = { ...this.snapshot, phase: 'ready' };
+          this.snapshot = { ...this.snapshot, phase: 'ready', error: await this.syncAfterInstall(version) };
         } catch (error) {
           this.snapshot = { ...this.snapshot, phase: 'error', error: error instanceof Error ? error.message : String(error) };
         } finally {
@@ -195,5 +195,18 @@ export class UpdateManager {
       })();
     }
     return this.getSnapshot();
+  }
+
+  /** D-5: the files are already replaced, so a sync failure is reported, never fatal. Null on success. */
+  private async syncAfterInstall(version: string): Promise<string | null> {
+    const sync = panCliInvocation(['sync']);
+    try {
+      await this.installDeps.execFile(sync.command, sync.args);
+      return null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[update] pan sync after install failed:', error);
+      return `Installed ${version}, but pan sync failed: ${message}. Run pan sync on this machine.`;
+    }
   }
 }
