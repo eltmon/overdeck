@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4653",
   "created": "2026-11-02T03:31:51.838Z",
-  "updated": "2026-11-02T04:23:00.549Z",
+  "updated": "2026-11-02T04:23:19.654Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "sweep-settles.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T04:23:00.549Z"
+    },
+    "sweep-settles.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:23:19.653Z"
     }
   }
 }
