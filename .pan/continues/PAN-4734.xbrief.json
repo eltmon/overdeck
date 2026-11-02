@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T17:00:34.411Z",
+  "updated": "2026-11-02T17:00:52.023Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -249,6 +249,10 @@
     "wi11-discovery-linked-conversations.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T17:00:34.411Z"
+    },
+    "wi12-tree-row-opens-linked.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:00:52.023Z"
     }
   }
 }
