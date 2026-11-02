@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T16:57:06.703Z",
+  "updated": "2026-11-02T16:57:25.006Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -201,6 +201,10 @@
     "wi8-work-door-route.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T16:57:06.703Z"
+    },
+    "wi8-work-door-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:57:25.006Z"
     }
   }
 }
