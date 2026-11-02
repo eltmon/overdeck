@@ -213,6 +213,114 @@ describe('PanOpen service', () => {
     });
   });
 
+  describe('openInBrowser', () => {
+    const originalPlatform = process.platform;
+    const setPlatform = (platform: NodeJS.Platform) => {
+      Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+    };
+
+    afterEach(() => {
+      setPlatform(originalPlatform);
+    });
+
+    async function openInBrowser(path: string, browser: string) {
+      const { PanOpen, PanOpenLive } = await import('../open.js');
+      const program = Effect.gen(function* () {
+        const svc = yield* PanOpen;
+        return yield* svc.openInBrowser({ path, browser: browser as never });
+      }).pipe(Effect.provide(PanOpenLive));
+      return Effect.runPromise(Effect.exit(program));
+    }
+
+    it('launches firefox detached with a file:// URL, encoding spaces', async () => {
+      setPlatform('linux');
+      mockExecAsync.mockImplementation(async (cmd: string) => {
+        if (cmd.includes('firefox')) return { stdout: '/usr/bin/firefox' };
+        throw new Error('not found');
+      });
+
+      await openInBrowser('/tmp/mock up/index.html', 'firefox');
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'firefox',
+        ['file:///tmp/mock%20up/index.html'],
+        { detached: true, stdio: 'ignore' },
+      );
+    });
+
+    it('launches chromium via the chromium-browser fallback command', async () => {
+      setPlatform('linux');
+      mockExecAsync.mockImplementation(async (cmd: string) => {
+        if (cmd.includes('chromium-browser')) return { stdout: '/usr/bin/chromium-browser' };
+        throw new Error('not found');
+      });
+
+      await openInBrowser('/tmp/a.html', 'chromium');
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'chromium-browser',
+        ['file:///tmp/a.html'],
+        { detached: true, stdio: 'ignore' },
+      );
+    });
+
+    it('launches default-browser via xdg-open on Linux', async () => {
+      setPlatform('linux');
+      mockExecAsync.mockImplementation(async (cmd: string) => {
+        if (cmd.includes('xdg-open')) return { stdout: '/usr/bin/xdg-open' };
+        throw new Error('not found');
+      });
+
+      await openInBrowser('/tmp/a.svg', 'default-browser');
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'xdg-open',
+        ['file:///tmp/a.svg'],
+        { detached: true, stdio: 'ignore' },
+      );
+    });
+
+    it('launches Chrome via open -a on macOS', async () => {
+      setPlatform('darwin');
+      mockExecAsync.mockResolvedValue({ stdout: '' });
+      mockAccess.mockImplementation(async (path: string) => {
+        if (path === '/Applications/Google Chrome.app') return undefined;
+        throw new Error('not found');
+      });
+
+      await openInBrowser('/tmp/a.html', 'chrome');
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'open',
+        ['-a', 'Google Chrome', 'file:///tmp/a.html'],
+        { detached: true, stdio: 'ignore' },
+      );
+    });
+
+    it('fails without spawning when the browser was not detected', async () => {
+      setPlatform('linux');
+      mockExecAsync.mockRejectedValue(new Error('not found'));
+
+      const exit = await openInBrowser('/tmp/a.html', 'vivaldi');
+
+      expect(exit._tag).toBe('Failure');
+      expect(mockSpawn).not.toHaveBeenCalled();
+    });
+
+    it('fails without spawning for a relative path', async () => {
+      setPlatform('linux');
+      mockExecAsync.mockImplementation(async (cmd: string) => {
+        if (cmd.includes('firefox')) return { stdout: '/usr/bin/firefox' };
+        throw new Error('not found');
+      });
+
+      const exit = await openInBrowser('docs/a.html', 'firefox');
+
+      expect(exit._tag).toBe('Failure');
+      expect(mockSpawn).not.toHaveBeenCalled();
+    });
+  });
+
   describe('openInEditor', () => {
     it('launches editor as detached process', async () => {
       mockExecAsync.mockRejectedValue(new Error('not found'));

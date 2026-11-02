@@ -2,10 +2,10 @@ import { spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { exec, execFile } from 'node:child_process';
 import { access } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Effect, Layer, Context } from 'effect';
-import { BROWSERS, EDITORS, type BrowserEntry, type BrowserId, type EditorId, type OpenInEditorInput } from '@overdeck/contracts';
+import { BROWSERS, EDITORS, type BrowserEntry, type BrowserId, type EditorId, type OpenInBrowserInput, type OpenInEditorInput } from '@overdeck/contracts';
 import { PanRpcError } from '@overdeck/contracts';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
 
@@ -167,6 +167,7 @@ export interface PanOpenShape {
   readonly openInEditor: (input: OpenInEditorInput) => Effect.Effect<void, PanRpcError>;
   readonly getAvailableEditors: () => Effect.Effect<EditorId[], PanRpcError>;
   readonly getAvailableBrowsers: () => Effect.Effect<BrowserId[], PanRpcError>;
+  readonly openInBrowser: (input: OpenInBrowserInput) => Effect.Effect<void, PanRpcError>;
   readonly getDefaultCwd: () => Effect.Effect<string, PanRpcError>;
 }
 
@@ -215,6 +216,30 @@ export const PanOpenLive = Layer.effect(
       getAvailableEditors: () => Effect.succeed(cachedEditors),
 
       getAvailableBrowsers: () => Effect.succeed([...cachedBrowsers.keys()]),
+
+      openInBrowser: (input) =>
+        Effect.tryPromise({
+          try: async () => {
+            if (!isAbsolute(input.path)) {
+              throw new Error(`Path must be absolute: ${input.path}`);
+            }
+            // Only spawn a launcher detection found: a spawn of a missing
+            // binary throws uncaught.
+            const launcher = cachedBrowsers.get(input.browser);
+            if (!launcher) {
+              throw new Error(`Browser "${input.browser}" is not available on this machine`);
+            }
+            launchDetached({
+              command: launcher.command,
+              args: [...launcher.args, pathToFileURL(input.path).href],
+            });
+          },
+          catch: (err) =>
+            new PanRpcError({
+              message: `Failed to open browser: ${err instanceof Error ? err.message : String(err)}`,
+              code: 'BROWSER_LAUNCH_FAILED',
+            }),
+        }),
 
       getDefaultCwd: () => Effect.sync(getDefaultCwd),
     });
