@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T22:12:20.138Z",
+  "updated": "2026-11-02T22:12:21.291Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,11 @@
     "ac05-fly-conversation": {
       "status": "completed",
       "doneAt": "2026-11-02T22:12:20.138Z"
+    },
+    "ac04-fly-worker-lanes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T22:12:21.291Z"
     }
   }
 }
