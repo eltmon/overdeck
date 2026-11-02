@@ -561,6 +561,15 @@ manual push.
 | Check | Result |
 |---|---|
 | Heartbeat (FR-3) | 2026-11-02T16:32:13Z (age 0 s) and 2026-11-02T16:33:13Z (age 28 s), 60 s apart; `dashboard.log` shows "Host heartbeat refreshed for PAN-4832 on pan-pan-4832-ws". |
+| Automatic reap (FR-1) | REMOTE_DONE at 2026-11-02T16:35:06Z; deacon-lite handed off at about 2026-11-02T16:35:56Z (about 50 s later) with no operator command: "Remote reap PAN-4832: handed-off (REMOTE_DONE sentinel present for PAN-4832; Review artifact: https://github.com/eltmon/overdeck/pull/4846; Destroyed machine pan-pan-4832-ws; …)". Machine `8911151a2e0d98` destroyed; `workspaces/feature-pan-4832/` materialized; PR [#4846](https://github.com/eltmon/overdeck/pull/4846) opened. Transcript copy-back: 1 JSONL in `remote-sessions/`. |
+
+FR-2 fails on this run: the reap's own details line ends "Review not
+requested (Workspace has uncommitted changes. …)" — the materialized
+workspace had unrelated, uncommitted drift in
+`.overdeck/context/codebase/concerns.md` (not the smoke agent's work), which
+tripped the clean-tree guard before `requestReviewThroughRoute` could run.
+Filed [#4847](https://github.com/eltmon/overdeck/issues/4847) with the root
+cause and evidence (D-3).
 
 ## Live verification (PAN-4652)
 
