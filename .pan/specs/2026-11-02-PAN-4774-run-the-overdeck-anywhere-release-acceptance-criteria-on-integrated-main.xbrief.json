@@ -4,17 +4,17 @@
     "created": "2026-11-02T20:50:37Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4774: Run the Overdeck Anywhere release acceptance criteria on integrated main",
-    "updated": "2026-11-02T20:59:17.906Z"
+    "updated": "2026-11-02T21:00:09.574Z"
   },
   "plan": {
     "id": "pan-4774",
     "title": "Run the Overdeck Anywhere release acceptance criteria on integrated main",
-    "status": "proposed",
+    "status": "running",
     "uid": "3bea81a8-0d7f-48da-97ba-f4be1b065ef7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T20:50:37Z",
-    "updated": "2026-11-02T20:59:17.906Z",
+    "updated": "2026-11-02T21:00:09.574Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4774",
@@ -1571,5 +1571,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

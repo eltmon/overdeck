@@ -599,4 +599,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `{ pr: null }` for "no PR" and `{ pr: null, error }` for a failed read. The DoD verdict rows must keep
   them apart: absence may be waived (strike path, tracker-closed settlement), a failed read may not.
   Never cache an `error` response in the PR-tab cache, and never collapse a read error to `null`.
+- **One-host two-dashboard tests: pull adopts into the owner's checkout** (PAN-4774) — `resolveTarget`
+  (`src/dashboard/server/services/vault-continue.ts`) prefers the record's saved `cwd` when it exists,
+  and on one host the owner's checkout exists for the puller too, so a WIP bundle is never applied
+  (`isWipPresent` is true). A test proving "pulled with uncommitted changes" must adopt elsewhere.
+  Also keep test `OVERDECK_HOME`s short: `${OVERDECK_HOME}/sockets/pty-conv-<name>.sock` over ~107
+  bytes makes the PTY supervisor exit and kills the harness.
 <!-- last-verified: 2026-11-02 -->
