@@ -172,7 +172,7 @@ describe('NewConversationDialog', () => {
     await waitFor(() => expect((screen.getByLabelText('Project') as HTMLSelectElement).value).toBe('overdeck'));
     await screen.findByText('Default: high (default)');
     fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Effort' })).getByRole('radio', { name: 'xhigh' }));
-    fireEvent.click(screen.getByLabelText('No context'));
+    fireEvent.click(screen.getByRole('switch', { name: 'No context' }));
     fireEvent.click(await screen.findByRole('button', { name: /^Personal/ }));
     const skills = screen.getByRole('radiogroup', { name: 'grilling' });
     fireEvent.click(within(skills).getByRole('radio', { name: 'Off' }));
@@ -221,7 +221,7 @@ describe('NewConversationDialog', () => {
     fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'gpt-5.5' } });
     fireEvent.change(screen.getByLabelText('Harness'), { target: { value: 'codex' } });
     fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Effort' })).getByRole('radio', { name: 'low' }));
-    fireEvent.click(screen.getByLabelText('No context'));
+    fireEvent.click(screen.getByRole('switch', { name: 'No context' }));
     fireEvent.click(screen.getByRole('button', { name: 'Create conversation' }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect({ ...localStorage }).toEqual(before);
@@ -230,15 +230,24 @@ describe('NewConversationDialog', () => {
   it('hides Skip CLAUDE.md for codex and omits effort for a model without effort', async () => {
     act(() => openNewConversationDialog());
     renderHost();
-    expect(await screen.findByLabelText('Skip CLAUDE.md')).toBeTruthy();
+    expect(await screen.findByRole('switch', { name: 'Skip CLAUDE.md' })).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Harness'), { target: { value: 'codex' } });
-    expect(screen.queryByLabelText('Skip CLAUDE.md')).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'Skip CLAUDE.md' })).toBeNull();
     fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'claude-haiku-4-5-20251001' } });
     expect(screen.getByText('Not supported by this model')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Create conversation' }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0]).not.toHaveProperty('effort');
     expect(posts[0]).not.toHaveProperty('skipClaudeMd');
+  });
+
+  it('flips the No context switch on click', async () => {
+    act(() => openNewConversationDialog());
+    renderHost();
+    const noContext = await screen.findByRole('switch', { name: 'No context' });
+    expect(noContext).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(noContext);
+    expect(noContext).toHaveAttribute('aria-checked', 'true');
   });
 
   it('shows a failed create inline and stays open', async () => {

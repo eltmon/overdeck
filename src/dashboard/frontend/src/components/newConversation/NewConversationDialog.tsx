@@ -81,6 +81,10 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
   const effortLabelId = useId();
   const issueLabelId = useId();
   const messageId = useId();
+  const bareLabelId = useId();
+  const bareDescId = useId();
+  const skipMdLabelId = useId();
+  const skipMdDescId = useId();
 
   const project = useMemo(() => projects?.find((p) => p.key === projectKey), [projects, projectKey]);
 
@@ -276,26 +280,41 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
 
       <section aria-labelledby={contextHeadingId}>
         <h3 id={contextHeadingId} className={styles.sectionTitle}>Context</h3>
-        <fieldset className={styles.group}>
-          <label className={styles.check}>
-            <input type="checkbox" checked={bareContext} onChange={(e) => setBareContext(e.target.checked)} />
-            No context
-          </label>
-          <p className={styles.hint}>
+        <div className={styles.option}>
+          <span className={styles.optionLabel}><span id={bareLabelId}>No context</span></span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={bareContext}
+            aria-labelledby={bareLabelId}
+            aria-describedby={bareDescId}
+            className={styles.switch}
+            onClick={() => setBareContext((v) => !v)}
+          />
+          <p id={bareDescId} className={styles.optionDescription}>
             New conversations start without Overdeck context: no bundled rules, session briefing, memory injection or resume message. Faster to spawn.
           </p>
-          {harness === 'claude-code' && (
-            <>
-              <label className={styles.check}>
-                <input type="checkbox" checked={skipClaudeMd} onChange={(e) => setSkipClaudeMd(e.target.checked)} />
-                Skip CLAUDE.md
-              </label>
-              <p className={styles.hint}>
-                Claude Code skips ~/.claude/CLAUDE.md, project CLAUDE.md files and auto memory (CLAUDE_CODE_DISABLE_CLAUDE_MDS).
-              </p>
-            </>
-          )}
-        </fieldset>
+        </div>
+        {harness === 'claude-code' && (
+          <div className={styles.option}>
+            <span className={styles.optionLabel}>
+              <span id={skipMdLabelId}>Skip CLAUDE.md</span>
+              <span className={styles.tag}>Claude Code</span>
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={skipClaudeMd}
+              aria-labelledby={skipMdLabelId}
+              aria-describedby={skipMdDescId}
+              className={styles.switch}
+              onClick={() => setSkipClaudeMd((v) => !v)}
+            />
+            <p id={skipMdDescId} className={styles.optionDescription}>
+              Claude Code skips <code>~/.claude/CLAUDE.md</code>, project CLAUDE.md files and auto memory (<code>CLAUDE_CODE_DISABLE_CLAUDE_MDS</code>).
+            </p>
+          </div>
+        )}
       </section>
 
       <section aria-labelledby={skillsHeadingId}>
