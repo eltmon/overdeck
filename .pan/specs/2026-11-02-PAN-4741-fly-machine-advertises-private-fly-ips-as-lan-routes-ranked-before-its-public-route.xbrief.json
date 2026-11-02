@@ -4,17 +4,17 @@
     "created": "2026-11-02T12:33:17Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4741: Fly machine advertises private Fly IPs as lan routes ranked before its public route",
-    "updated": "2026-11-02T12:34:15.911Z"
+    "updated": "2026-11-02T12:35:14.786Z"
   },
   "plan": {
     "id": "pan-4741",
     "title": "Fly machine advertises private Fly IPs as lan routes ranked before its public route",
-    "status": "proposed",
+    "status": "running",
     "uid": "20e75ffd-1cdb-4c16-a3d5-99dffdc7dc89",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T12:33:17Z",
-    "updated": "2026-11-02T12:34:15.911Z",
+    "updated": "2026-11-02T12:35:14.786Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4741",
@@ -187,5 +187,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
