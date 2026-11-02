@@ -4,17 +4,17 @@
     "created": "2026-11-02T06:38:54Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4805: Flaky e2e: isolated-dashboard fixture picks a random port without checking it is free (EADDRINUSE under 2 workers)",
-    "updated": "2026-11-02T06:45:57.136Z"
+    "updated": "2026-11-02T06:47:06.729Z"
   },
   "plan": {
     "id": "pan-4805",
     "title": "Flaky e2e: isolated-dashboard fixture picks a random port without checking it is free (EADDRINUSE under 2 workers)",
-    "status": "proposed",
+    "status": "running",
     "uid": "1f138840-ddae-421b-9d24-e4676c9eb05a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T06:38:54Z",
-    "updated": "2026-11-02T06:45:57.136Z",
+    "updated": "2026-11-02T06:47:06.729Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4805",
@@ -416,5 +416,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
