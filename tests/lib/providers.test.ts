@@ -74,6 +74,17 @@ describe('providers', () => {
         expect(() => resolveKimiCodeModelAlias(legacy)).toThrow(/has no native kimi-code CLI equivalent/);
       }
     });
+
+    it('registers K3.1 Pro and K3.1 Pro Highspeed as kimi provider models with same-named native aliases', () => {
+      expect(resolveKimiCodeModelAlias('k3.1-pro')).toBe('kimi-code/k3.1-pro');
+      expect(resolveKimiCodeModelAlias('k3.1-pro-highspeed')).toBe('kimi-code/k3.1-pro-highspeed');
+      expect(resolveKimiCodeModelAlias('kimi-code/k3.1-pro')).toBe('kimi-code/k3.1-pro');
+      expect(resolveKimiCodeModelAlias('kimi-code/k3.1-pro-highspeed')).toBe('kimi-code/k3.1-pro-highspeed');
+      for (const id of ['k3.1-pro', 'k3.1-pro-highspeed', 'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed']) {
+        expect(getProviderForModel(id).name).toBe('kimi');
+      }
+      expect(() => resolveKimiCodeModelAlias('kimi-k2.6')).toThrow(/kimi-code\/k3\.1-pro/);
+    });
   });
 
   it('resolves the zai provider for glm-5.2', () => {

@@ -119,7 +119,8 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     // stay in MODEL_DEPRECATIONS and in getProviderForModelSync so old configs
     // migrate and historical cost lookups still resolve.
     models: [
-      'k3', 'k3[1m]', 'kimi-k2.7-code',
+      'k3.1-pro', 'k3.1-pro-highspeed', 'k3', 'k3[1m]', 'kimi-k2.7-code',
+      'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed',
       'kimi-code/k3', 'kimi-code/k3-256k', 'kimi-code/kimi-for-coding', 'kimi-code/kimi-for-coding-highspeed',
     ],
     tierModels: { opus: 'k3[1m]', sonnet: 'k3', haiku: 'kimi-k2.7-code' },
@@ -331,7 +332,10 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
  * maxContextSize=1048576 (matches the claude-routed k3[1m] alias's 1M
  * context), kimi-code/k3-256k reports maxContextSize=262144 (matches the
  * claude-routed k3 alias's 256K context) — so the context tiers, not the
- * bare-string similarity, decide the mapping.
+ * bare-string similarity, decide the mapping. kimi-code/k3.1-pro and
+ * kimi-code/k3.1-pro-highspeed report maxContextSize=1048576 (kimi 2.0.2,
+ * 2026-11-02); K3.1 has one context tier, so each bare id maps to its
+ * same-named alias.
  *
  * This table must stay in sync with KIMI_ACP_MODEL_IDS in src/lib/acp/kimi.ts.
  * Both translate a claude-code-routed id into the same CLI catalog, because
@@ -339,6 +343,8 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
  * and the other rejects is a bug, not a harness difference.
  */
 const KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS: Record<string, string> = {
+  'k3.1-pro': 'kimi-code/k3.1-pro',
+  'k3.1-pro-highspeed': 'kimi-code/k3.1-pro-highspeed',
   'k3': 'kimi-code/k3-256k',
   'k3[1m]': 'kimi-code/k3',
   'kimi-k2.7-code': 'kimi-code/kimi-for-coding',
@@ -362,7 +368,8 @@ export function resolveKimiCodeModelAlias(model: string): string {
   if (mapped) return mapped;
   throw new Error(
     `Model "${model}" has no native kimi-code CLI equivalent — the installed binary's catalog only exposes `
-    + `kimi-code/k3, kimi-code/k3-256k, kimi-code/kimi-for-coding, and kimi-code/kimi-for-coding-highspeed. `
+    + `kimi-code/k3.1-pro, kimi-code/k3.1-pro-highspeed, kimi-code/k3, kimi-code/k3-256k, kimi-code/kimi-for-coding, `
+    + `and kimi-code/kimi-for-coding-highspeed. `
     + `Pick one of those models, or set providerHarnesses.kimi to 'claude-code' or 'acp' in config.yaml to keep using "${model}".`,
   );
 }
@@ -475,7 +482,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
 
   // Check Kimi models — supported set + retired K2.5/K2.6-generation ids
   // (still routed so the deprecation-migration path can fire before remap).
-  if (['k3', 'k3-256k', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
+  if (['k3.1-pro', 'k3.1-pro-highspeed', 'k3', 'k3-256k', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
     return PROVIDERS.kimi;
   }
 

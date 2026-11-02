@@ -104,6 +104,8 @@ describe("Kimi ACP support", () => {
 
 describe("Kimi ACP model translation", () => {
   it.each([
+    ["k3.1-pro", "kimi-code/k3.1-pro"],
+    ["k3.1-pro-highspeed", "kimi-code/k3.1-pro-highspeed"],
     ["k3", "kimi-code/k3-256k"],
     ["k3-256k", "kimi-code/k3-256k"],
     ["k3[1m]", "kimi-code/k3"],
