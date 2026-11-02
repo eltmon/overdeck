@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4805",
   "created": "2026-11-02T06:47:26.972Z",
-  "updated": "2026-11-02T06:49:08.409Z",
+  "updated": "2026-11-02T06:49:17.058Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4805",
       "claimedAt": "2026-11-02T06:47:26.972Z",
       "doneAt": "2026-11-02T06:49:08.408Z"
+    },
+    "health-pid-match": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4805",
+      "claimedAt": "2026-11-02T06:49:17.057Z"
     }
   }
 }
