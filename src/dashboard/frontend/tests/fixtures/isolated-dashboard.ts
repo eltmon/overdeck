@@ -15,9 +15,10 @@
  *   - `OVERDECK_DISABLE_DEACON=1`, so no second Deacon races the host's — two
  *     deacons sharing one home is a known way to make agents thrash
  *     (`single-deacon-invariant`);
- *   - a port that is never 3011. `shouldRefuseHostDashboardPort` only refuses
- *     when the port equals the host's configured `api_port`, so a high port is
- *     allowed by design and cannot collide with the live dashboard.
+ *   - an OS-assigned port, probed free at the moment of the call and never
+ *     3011 (the operator's host dashboard port); health is accepted only from
+ *     the spawned child's own PID, and a boot that loses the port race is
+ *     retried once on a fresh port with the same home.
  *
  * The built server is used deliberately: `dist/dashboard/server.js` under Node,
  * never Bun and never tsx, for the reasons in the dashboard-node22-only rule.
@@ -31,6 +32,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,9 +59,41 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../../../..');
 const BOOT_TIMEOUT_MS = 120_000;
 
-/** A high port, chosen per run so two suites can never collide. */
-function pickPort(): number {
-  return 39_000 + Math.floor(Math.random() * 900);
+/** The operator's live dashboard port; an isolated fixture must never bind it. */
+const HOST_DASHBOARD_PORT = 3011;
+const MAX_PORT_PROBES = 5;
+
+/** One OS-assigned port: listen on 0, read the port, release it. */
+function probeFreePort(): Promise<number> {
+  return new Promise((resolvePort, reject) => {
+    const probe = createServer();
+    probe.once('error', reject);
+    probe.listen(0, () => {
+      const address = probe.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      probe.close(() => resolvePort(port));
+    });
+  });
+}
+
+/**
+ * A port the OS reports free right now, never the host dashboard's 3011.
+ * The port is released before the child binds it, so a tiny race remains;
+ * `startIsolatedDashboard` covers it with one retry on EADDRINUSE.
+ */
+export interface PickPortOptions {
+  /** Test seam: where candidate ports come from. */
+  probe?: () => Promise<number>;
+  /** Ports to skip, e.g. the one a failed first boot just lost. */
+  exclude?: readonly number[];
+}
+
+export async function pickPort({ probe = probeFreePort, exclude = [] }: PickPortOptions = {}): Promise<number> {
+  for (let attempt = 0; attempt < MAX_PORT_PROBES; attempt += 1) {
+    const port = await probe();
+    if (port > 0 && port !== HOST_DASHBOARD_PORT && !exclude.includes(port)) return port;
+  }
+  throw new Error(`pickPort: no usable free port after ${MAX_PORT_PROBES} probes`);
 }
 
 async function waitForHealth(baseUrl: string, child: ChildProcess, logPath: string): Promise<void> {
@@ -97,7 +131,7 @@ function readLog(logPath: string): string {
  */
 export async function startIsolatedDashboard(opts: IsolatedDashboardOptions = {}): Promise<IsolatedDashboard> {
   const home = opts.home ?? mkdtempSync(join(tmpdir(), 'overdeck-e2e-home-'));
-  const port = opts.port ?? pickPort();
+  const port = opts.port ?? (await pickPort());
   const baseUrl = `http://127.0.0.1:${port}`;
   const logPath = join(home, 'server.log');
 
