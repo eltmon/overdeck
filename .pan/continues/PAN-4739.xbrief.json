@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4739",
   "created": "2026-11-02T06:14:09.782Z",
-  "updated": "2026-11-02T06:20:47.662Z",
+  "updated": "2026-11-02T06:32:11.592Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-02T06:20:40.574Z"
     },
     "repro-checkpoint": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4739",
-      "claimedAt": "2026-11-02T06:20:47.662Z"
+      "claimedAt": "2026-11-02T06:20:47.662Z",
+      "doneAt": "2026-11-02T06:32:11.592Z"
     }
   }
 }
