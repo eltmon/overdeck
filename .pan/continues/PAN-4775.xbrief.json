@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4775",
   "created": "2026-11-02T03:25:35.744Z",
-  "updated": "2026-11-02T03:35:01.307Z",
+  "updated": "2026-11-02T03:35:19.250Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "w1-note-and-plans.ac5": {
       "status": "completed",
       "doneAt": "2026-11-02T03:35:01.306Z"
+    },
+    "w2-shipped-table.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:35:19.250Z"
     }
   }
 }
