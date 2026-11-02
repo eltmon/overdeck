@@ -4,17 +4,17 @@
     "created": "2026-11-02T16:11:16Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4696: Verify automatic Fly reap and heartbeat on the deployed build (PAN-4295 follow-up)",
-    "updated": "2026-11-02T16:15:14.699Z"
+    "updated": "2026-11-02T16:16:26.947Z"
   },
   "plan": {
     "id": "pan-4696",
     "title": "Verify automatic Fly reap and heartbeat on the deployed build (PAN-4295 follow-up)",
-    "status": "proposed",
+    "status": "running",
     "uid": "ee5853d5-6228-4214-ad50-40916c90c08e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T16:11:16Z",
-    "updated": "2026-11-02T16:15:14.699Z",
+    "updated": "2026-11-02T16:16:26.947Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4696",
@@ -530,5 +530,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
