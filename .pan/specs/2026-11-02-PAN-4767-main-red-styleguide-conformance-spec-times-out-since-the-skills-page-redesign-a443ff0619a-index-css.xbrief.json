@@ -4,17 +4,17 @@
     "created": "2026-11-02T02:16:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4767: main red: styleguide-conformance spec times out since the Skills page redesign (a443ff0619a, index.css)",
-    "updated": "2026-11-02T02:19:47.619Z"
+    "updated": "2026-11-02T02:20:22.839Z"
   },
   "plan": {
     "id": "pan-4767",
     "title": "main red: styleguide-conformance spec times out since the Skills page redesign (a443ff0619a, index.css)",
-    "status": "proposed",
+    "status": "running",
     "uid": "57f1c279-18ae-41b2-833c-419509fbffdf",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T02:16:04Z",
-    "updated": "2026-11-02T02:19:47.619Z",
+    "updated": "2026-11-02T02:20:22.839Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4767",
@@ -203,5 +203,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
