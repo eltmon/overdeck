@@ -488,6 +488,24 @@ door that does not exist; a real record read door would be a separate change.
   deacon child would need two internal HTTP hops and could not pass a resume
   cause), and a scheduled prompt follows the operator-message rule, so the
   deacon pause toggle does not apply.
+  PAN-4657 adds the dashboard surface: `listScheduleSummariesForConversations`
+  (one grouped query per list page) returns `nextScheduledRunAt` (the earliest
+  enabled schedule's next run) and `scheduleCount`, spread into the list
+  enrichment next to triage; the frontend renders them as a next-run badge
+  (`ConversationRow.tsx`). A `conversation.schedules_changed` domain event
+  (payload `{ conversationName }`, reducer bumps `conversationsListRevision`)
+  is emitted by `emitConversationSchedulesChanged` on every successful
+  POST/PATCH/DELETE in `routes/conversation-schedules.ts` and by the sweep
+  after a delivered, failed, or skipped fire, so the list and the schedule
+  dialog refresh without polling. A delivered fire also calls
+  `clearConversationTriage` (nulls `settled_at`, `settle_reason`, and
+  `snoozed_until` together) on the delivered-to conversation — the clear-chain
+  head when the schedule's own conversation was superseded — so the run
+  resurfaces it in Inbox. The dialog itself
+  (`src/dashboard/frontend/src/components/chat/ConversationScheduleDialog.tsx`)
+  is opened via `openScheduleDialog(name)` from the row's overflow menu and the
+  tab menu (`ScheduleMenuItem`, hidden for a vault or linked row) and mounted
+  once at the app root as `ConversationScheduleDialogHost`.
 - `GET /api/conversations/:name/messages` and `/message-locator` resolve registered
   rows first. A name that is a bare Claude session UUID with no row (a Cmd-K hit on an
   indexed transcript Overdeck never registered) falls back to an exact `<uuid>.jsonl`
