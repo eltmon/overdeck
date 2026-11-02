@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T00:18:47.316635Z · model: claude-opus-5-5 · open: 863_
+_Last sequenced: 2026-11-02T00:20:14.098965Z · model: claude-opus-5-5 · open: 864_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 2 | PAN-4752 | S | high | ok |  |  | In-pipeline: Flywheel board shows strike workspaces as bogus PAN-<n>-STRIKE rows; map them to the base issue and strike PR. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4751 | S | medium | ok |  |  | In-pipeline: make the Flywheel NEEDS YOU banner reopen the pending AskUserQuestion dialog or jump to the conversation. |
 | 5 | PAN-4750 | M | critical | ok |  |  | Strike merge door requires head approval strikes never get; 5 green strike PRs unmergeable. needs-handoff (TENET-10). |
@@ -875,6 +876,10 @@ _Last sequenced: 2026-11-02T00:18:47.316635Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
+### PAN-4752 (rank 2)
+
+New issue filed 2026-11-02 and already in the pipeline, so it is pinned at the free rank 2 without moving any other node. The substrate-improvement label sets a high-importance floor; the fix is a small, well-specified change in src/lib/flywheel/derive-status.ts with a named unit test, so the condition is ok.
+
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1187,10 +1192,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
-### PAN-3100 (rank 81)
-
-New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1198,10 +1199,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T00:18:47.316635Z",
+  "generatedAt": "2026-11-02T00:20:14.098965Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 863,
+  "openCount": 864,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11947,6 +11948,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Strike merge door requires head approval strikes never get; 5 green strike PRs unmergeable. needs-handoff (TENET-10).",
       "rationale": "New substrate issue that blocks every strike PR from merging through Overdeck since #4066: the strike door reuses the feature merge gate with requireApprovalAtHead, and the operator cannot approve their own PR. Five green strike PRs are stuck today, so it ranks critical near the top; it is labeled needs-handoff, so pickup must be a supervised handoff rather than autonomous.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4752",
+      "rank": 2,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: Flywheel board shows strike workspaces as bogus PAN-<n>-STRIKE rows; map them to the base issue and strike PR.",
+      "rationale": "New issue filed 2026-11-02 and already in the pipeline, so it is pinned at the free rank 2 without moving any other node. The substrate-improvement label sets a high-importance floor; the fix is a small, well-specified change in src/lib/flywheel/derive-status.ts with a named unit test, so the condition is ok.",
       "gate": "auto",
       "planning": "auto"
     }
