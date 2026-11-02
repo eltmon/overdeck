@@ -78,12 +78,40 @@ describe('rereviewStaleApproval (PAN-4772)', () => {
     expect(requestReview).not.toHaveBeenCalled();
   });
 
-  it('journals a refused request too, so the head fires once', async () => {
+  // Review of #4783: only an answer that started (or found) a review latches
+  // the head. Any other answer leaves it unlatched, so a later tick asks again.
+  it.each([
+    ['already-passed'], ['tests-requeued'], ['circuit-breaker'], ['no-workspace'],
+    ['dirty-workspace'], ['no-project'], ['already-merged'],
+  ] as const)('does not latch the head when the door answers %s', async (kind) => {
     const { deps, journal, requestReview } = journalWorld();
-    requestReview.mockResolvedValueOnce({ kind: 'circuit-breaker', autoRequeueCount: 5 } as never);
+    requestReview.mockResolvedValueOnce({ kind, autoRequeueCount: 5, error: 'dirty' } as never);
     await expect(rereviewStaleApproval('PAN-4759', STALE, deps))
-      .resolves.toBe('approval is stale at 697a05f8; review re-requested (circuit-breaker)');
-    expect(journal).toHaveLength(1);
+      .resolves.toBe(`approval is stale at 697a05f8; review not started (${kind}), will ask again`);
+    expect(journal).toHaveLength(0);
+
+    await rereviewStaleApproval('PAN-4759', STALE, deps);
+    expect(requestReview).toHaveBeenCalledTimes(2);
+  });
+
+  it('latches the head when a review is already running', async () => {
+    const { deps, journal, requestReview } = journalWorld();
+    requestReview.mockResolvedValueOnce({ kind: 'already-running' } as never);
+    await expect(rereviewStaleApproval('PAN-4759', STALE, deps))
+      .resolves.toBe('approval is stale at 697a05f8; review re-requested (already-running)');
+    expect(journal.at(-1)).toMatchObject({ type: STALE_APPROVAL_ENTRY, data: { head: HEAD_B, outcome: 'already-running' } });
+
+    await rereviewStaleApproval('PAN-4759', STALE, deps);
+    expect(requestReview).toHaveBeenCalledOnce();
+  });
+
+  it('ignores a journaled entry whose answer started no review', async () => {
+    const { deps, requestReview } = journalWorld([{
+      at: '2026-11-02T02:00:00.000Z', type: STALE_APPROVAL_ENTRY, issueId: 'PAN-4759',
+      source: 'stale-approval', data: { head: HEAD_B, outcome: 'already-passed' },
+    }]);
+    await rereviewStaleApproval('PAN-4759', STALE, deps);
+    expect(requestReview).toHaveBeenCalledOnce();
   });
 
   it('writes nothing when no review door is registered, so a later tick can still ask', async () => {

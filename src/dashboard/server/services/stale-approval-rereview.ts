@@ -13,8 +13,11 @@
  * against its `MAX_AUTO_REQUEUE` breaker, so repeated pushes stay bounded.
  *
  * "Once per head" is the workspace's pipeline journal: a
- * `review.stale-approval-rerequested` entry naming the head is written at the
- * moment of the request, whatever the door answered. Nothing else is stored.
+ * `review.stale-approval-rerequested` entry naming the head is written when the
+ * door answers `started` or `already-running`. Any other answer (a refusal,
+ * `already-passed` on a transient forge read, `tests-requeued`) started no
+ * review, so it latches nothing and the next scheduler tick asks again.
+ * Nothing else is stored.
  */
 import { existsSync } from 'node:fs';
 
@@ -32,6 +35,8 @@ import {
 import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
 
 const SOURCE = 'stale-approval';
+/** Door answers that mean a review is running for the head; only these latch it. */
+const LATCHING_OUTCOMES: ReadonlySet<GuardedReviewRequestOutcome['kind']> = new Set(['started', 'already-running']);
 export const STALE_APPROVAL_ENTRY = 'review.stale-approval-rerequested' as const;
 
 export type StaleApprovalFacts = Partial<Pick<PrFacts,
@@ -83,7 +88,11 @@ export async function rereviewStaleApproval(
     return `approval is stale at ${short}; no workspace to re-review it from`;
   }
   const entries = (deps.readJournal ?? readPipelineJournal)(workspacePath);
-  if (entries.some((entry) => entry.type === STALE_APPROVAL_ENTRY && entry.data?.head === head)) {
+  if (entries.some((entry) => (
+    entry.type === STALE_APPROVAL_ENTRY
+    && entry.data?.head === head
+    && LATCHING_OUTCOMES.has(entry.data?.outcome as GuardedReviewRequestOutcome['kind'])
+  ))) {
     return `approval is stale at ${short}; review already re-requested for this head`;
   }
   if (isReviewInFlightEntry(entries.at(-1) ?? null)) {
@@ -94,6 +103,9 @@ export async function rereviewStaleApproval(
     `the approval is stale: head ${short} was pushed after the approving review`,
   );
   if (!outcome) return `approval is stale at ${short}; no review door in this process`;
+  if (!LATCHING_OUTCOMES.has(outcome.kind)) {
+    return `approval is stale at ${short}; review not started (${outcome.kind}), will ask again`;
+  }
   (deps.appendEntry ?? appendPipelineEntry)(workspacePath, {
     type: STALE_APPROVAL_ENTRY,
     issueId: issueId.toUpperCase(),
