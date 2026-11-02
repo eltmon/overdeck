@@ -1,0 +1,886 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T12:55:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4743: Fly (new VM) in the Machine field and --machine fly: neither PAN-4651 nor PAN-4652 delivers it",
+    "updated": "2026-11-02T12:51:29.309Z"
+  },
+  "plan": {
+    "id": "pan-4743",
+    "title": "Fly (new VM) in the Machine field and --machine fly: neither PAN-4651 nor PAN-4652 delivers it",
+    "status": "running",
+    "uid": "06f831a8-205d-4f35-9678-466cf8f0e368",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T12:55:00Z",
+    "updated": "2026-11-02T12:51:29.309Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4743",
+        "label": "PAN-4743",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4743.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4811",
+        "label": "PAN-4811 (lanes on a new Fly VM, follow-up)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4734",
+        "label": "PAN-4734 (Fly work agents)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "fly",
+      "fleet",
+      "dashboard",
+      "cli"
+    ],
+    "metadata": {
+      "sizeJustification": "One feature across its fixed callers: the Fly target door, the resolver branch, the conversation route, the Machine field and Settings dialog, the CLI sentence, and the docs. The subsystem count is inflated because each top-level doc file (cli/machines.mdx, configuration/linked-machines.mdx, docs/ANYWHERE-ARCHITECTURE.md, .overdeck/context) and each test root counts as its own subsystem; the code itself spans src/dashboard, src/cli and src/lib. Splitting off the Settings dialog or the docs would recreate the ownership gap this issue exists to close.",
+      "canonicalFilename": "2026-11-02-PAN-4743-fly-new-vm-in-the-machine-field-and-machine-fly-neither-pan-4651-nor-pan-4652-delivers-it.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-4651 deferred Fly (new VM), --machine fly and remote.auto_fly to PAN-4652, and PAN-4652 deferred them back to PAN-4651. Both merged: resolveTargetMachine refuses 'fly' with 'Fly (new VM) needs PAN-4652', the CLI refuses the same way, the Machine field shows the choice disabled, Settings has no Add-a-Fly-machine entry, and no code reads remote.auto_fly.",
+      "Proposal": "Add a Fly target door (startFlyTarget in services/fleet-fly-target.ts) that checks admin, project, GitHub origin and needs, calls addFlyMachine with the project, and returns a FleetTarget for the new link with a discard hook. resolveTargetMachine routes 'fly' to it when the route passes a spawn context, and Auto falls back to it when remote.auto_fly is true and no machine fits. Only POST /api/fleet/conversations passes a spawn context, so the Machine field's Fly (new VM) works; the conversation still starts through the owner's work door. Workers, issue starts and lanes refuse 'fly' with accurate sentences because a new VM cannot safely hold them today (idle sweep, no workspace, lane launch order). Add the Add-a-Fly-machine dialog and update the docs.",
+      "NonGoals": "- pan start --machine fly (work agents on a new Fly machine) and Auto creating a VM for pan start: PAN-4734 owns Fly work agents; the idle sweep would destroy the VM under an agent-<issue> session today.\n- pan worker run --machine fly: a worker needs its issue workspace, which a new VM never has.\n- pan lane start --machine fly and gauntlet.fly.max_vms: PAN-4811.\n- remote.auto_fly for workers, issue starts or lanes; it covers conversations only.\n- Any change to the idle sweep, the spend cap, provisioning, addFlyMachine or POST /api/machines/fly behavior.\n- Changes to MCP tool descriptions in src/lib/mcp/tools-write.ts.\n- POST /api/fleet/placement or the CLI's Auto answering Fly.\n- Region list, image, harness, model or first-message fields in the Add-a-Fly-machine dialog.\n- A Settings UI control for remote.auto_fly.\n- Fixing PAN-4740 or PAN-4741."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fly (new VM) ships for conversations only; pan start / pan worker run / pan lane start --machine fly refuse with accurate sentences.",
+        "rationale": "Verified on main: agent-<issue> rows are excluded from the shared list (conversations.ts:555) so the idle sweep (fly-machine-loops.ts:144-147) would destroy a new VM under a work agent; startWorker requires an existing issue workspace (worker/start.ts:130-131); launchLane resolves the machine before harness resolution and the one-live-lane check (launch.ts:412-450). Ownership recorded on PAN-4734 (comment) and PAN-4811 (new issue)."
+      },
+      {
+        "summary": "Only admin credentials may create a Fly VM through the fleet routes (403 fly-needs-admin otherwise); agent senders using the local internal token are allowed.",
+        "rationale": "POST /api/machines/fly needs admin (PAN-4652 D-14) because a VM costs money; fleet routes need only operate. Local agents hold the admin internal token and can already run pan machines add-fly, so refusing them would protect nothing."
+      },
+      {
+        "summary": "remote.auto_fly is a config.toml [remote] boolean, default false, consulted only when no machine fits, for conversations, with a GitHub origin and needs within linux/docker.",
+        "rationale": "Epic D-19 step 2: 'Fly, unless remote.auto_fly: true and every other candidate is excluded'. [remote] keys live in config.toml and survive the config.yaml overlay."
+      },
+      {
+        "summary": "A Fly machine created for a spawn that then fails is discarded at once via handleMachinesUnlink.",
+        "rationale": "Otherwise it holds a remote.max_concurrent_agents slot and costs money for machine_idle_minutes (default 30) until the idle sweep removes it."
+      },
+      {
+        "summary": "The conversation on the new VM starts through the owner's work door, not startFlyConversation.",
+        "rationale": "Keeps one path for every linked machine: the caller's actor and agent fence, the git-origin project match and the immediate linked-list refresh."
+      },
+      {
+        "summary": "The live Fly run is consent-gated through pan ask; browser UAT runs with remote.enabled false so it spends nothing.",
+        "rationale": "A real VM costs money; PAN-4652 set the same precedent."
+      }
+    ],
+    "items": [
+      {
+        "id": "fly-target-door",
+        "title": "Add the Fly target door startFlyTarget in services/fleet-fly-target.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:55:00Z",
+        "metadata": {
+          "issueLabel": "pan-4743",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "resolver-fly-branch",
+            "auto-fly-fallback",
+            "fleet-conversation-fly"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/fleet-fly-target.ts",
+            "src/dashboard/server/__tests__/fleet-fly-target.test.ts",
+            "src/dashboard/server/services/fleet-target.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-fly-target.test.ts",
+            "npm run lint:circular",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-fly-target.test.ts passes",
+            "lint:circular reports no new cycle",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/dashboard/server/services/fleet-fly-target.ts exporting FlySpawn, FlyTargetRequest, FLY_MACHINE_TAGS=['linux','docker'], FlyTargetDeps and startFlyTarget(request, deps=defaultFlyTargetDeps()). Add `discard?: () => Promise<void>` to the self:false variant of FleetTarget in fleet-target.ts (type only). Refuse in order with {code,error}: no admin (403 fly-needs-admin), no projectKey (400 fly-needs-project), gitOrigin null (409 project-has-no-origin), origin not starting github.com/ (409 project-not-on-github), needs outside FLY_MACHINE_TAGS (409 needs-unmet with missing). Then deps.addFly({projectKey, harness?, model?}); map FlyMachineError via FLY_MACHINE_ERROR_STATUS (from src/lib/anywhere/fly/provision.js), MachineLinkError via ERROR_STATUS (routes/machines.js), other errors 500 fly-failed. Find the stored MachineLink by result.link.id via deps.links(). discard() = deps.unlink(link.id), warning (never rethrowing) on failure. needs includes docker and record.docker false => discard + 409 needs-unmet missing ['docker']. Emit activity 'Added Fly machine \"<label>\" (<app>, <region>)'. Return {ok:true,self:false,link,environmentId,label:record.label,reason:'Fly (new VM) → <label> (<region>)',discard}. Defaults: addFly=(i)=>addFlyMachine(i,{notifyLinksChanged}), links=listLinks, unlink=handleMachinesUnlink(id), activity=emitActivityEntry, warn=console.warn('[fleet-fly] ...'). No execSync. Tests inject every dep."
+        },
+        "items": [
+          {
+            "id": "fly-target-door.ac1",
+            "title": "Given a request whose mayCreate is false, startFlyTarget returns 403 with code fly-needs-admin and the addFly dependency is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-target-door.ac2",
+            "title": "Given requests with no projectKey, a null gitOrigin, a gitlab.com origin, or needs ['gpu'], startFlyTarget returns 400 fly-needs-project, 409 project-has-no-origin, 409 project-not-on-github and 409 needs-unmet respectively, and addFly is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-target-door.ac3",
+            "title": "Given addFly rejects with FlyMachineError('cap-reached', msg), startFlyTarget returns status 409 with body { code: 'cap-reached', error: msg }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-target-door.ac4",
+            "title": "Given addFly resolves with record label fly-m1 in region iad, startFlyTarget returns a self:false target whose label is fly-m1, whose link is the stored MachineLink with that id, whose reason is 'Fly (new VM) → fly-m1 (iad)', and emits one activity entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-target-door.ac5",
+            "title": "Given needs ['docker'] and a record with docker false, startFlyTarget calls unlink once with the new link id and returns 409 needs-unmet with missing ['docker']; an unlink that throws is warned and not rethrown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolver-fly-branch",
+        "title": "Route machine 'fly' in resolveTargetMachine through a spawn context",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:55:00Z",
+        "metadata": {
+          "issueLabel": "pan-4743",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/fleet-target.ts",
+            "src/dashboard/server/__tests__/fleet-target.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-target.test.ts src/dashboard/server/routes/__tests__/lanes-route-machine.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-target.test.ts and lanes-route-machine.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/dashboard/server/services/fleet-target.ts add a fifth optional parameter `spawn?: FlySpawn` to resolveTargetMachine (deps stays fourth). Replace the line `if (wanted.toLowerCase() === 'fly') return refuse(400, 'fly-unavailable', 'Fly (new VM) needs PAN-4652');` with: no spawn => refuse(400,'fly-unavailable',FLY_CONVERSATIONS_ONLY); else return deps.startFly({...spawn, gitOrigin, needs}). FLY_CONVERSATIONS_ONLY = 'Fly (new VM) starts conversations only. To run this elsewhere, link a Fly machine with pan machines add-fly --project <key> and name it with --machine fly-<id>.' Add startFly to FleetTargetDeps with default (r)=>startFlyTarget(r). Update the module header bullet for fly. Update fleet-target.test.ts: replace the ac8 fly test (line ~35) and add the startFly dep to the test deps builder."
+        },
+        "items": [
+          {
+            "id": "resolver-fly-branch.ac1",
+            "title": "Given no spawn context, resolveTargetMachine('fly', ...) returns 400 with code fly-unavailable and error equal to FLY_CONVERSATIONS_ONLY, and startFly is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-fly-branch.ac2",
+            "title": "Given a spawn context { projectKey: 'overdeck', mayCreate: true }, resolveTargetMachine('FLY', 'github.com/eltmon/overdeck', [], deps, spawn) calls startFly once with projectKey, mayCreate, gitOrigin and needs, and returns its target unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-fly-branch.ac3",
+            "title": "Given POST /api/lanes with machine 'fly', lanes-route-machine.test.ts still observes 400 fly-unavailable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-fly-config",
+        "title": "Add the remote.auto_fly config key with boolean validation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:55:00Z",
+        "metadata": {
+          "issueLabel": "pan-4743",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "trivial",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/config.ts",
+            "tests/lib/config.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/lib/config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "config.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/lib/config.ts add `auto_fly?: boolean` (doc comment: Auto may create a Fly machine for a conversation when no machine fits, PAN-4743, epic D-19, default false) to RemoteConfig after max_concurrent_agents. In normalizeRemoteConfig throw new Error('remote.auto_fly must be a boolean') when auto_fly is defined and not a boolean. Add tests in tests/lib/config.test.ts."
+        },
+        "items": [
+          {
+            "id": "auto-fly-config.ac1",
+            "title": "Given remote.auto_fly = 'yes', normalizeRemoteConfig throws an Error whose message is 'remote.auto_fly must be a boolean'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-fly-config.ac2",
+            "title": "Given remote.auto_fly = true or absent, normalizeRemoteConfig accepts the config and preserves the value (true, or undefined)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-fly-fallback",
+        "title": "Let Auto create a Fly machine for a conversation when remote.auto_fly is on",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:55:00Z",
+        "metadata": {
+          "issueLabel": "pan-4743",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/fleet-target.ts",
+            "src/dashboard/server/__tests__/fleet-target.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-target.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-target.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In resolveTargetMachine's auto branch, when choosePlacement answers !ok: if spawn is given, gitOrigin is non-null, every needs tag is in FLY_MACHINE_TAGS, and await deps.autoFly() is true, call deps.startFly({...spawn, gitOrigin, needs}); on ok replace reason with `Auto → ${label} (new Fly machine). ${noMachineFits(rejections)}`; on !ok return it. Otherwise return the existing 409 no-machine-fits. Add autoFly to FleetTargetDeps; default async () => (await loadConfig()).remote?.auto_fly === true. Update header comment. Tests in fleet-target.test.ts."
+        },
+        "items": [
+          {
+            "id": "auto-fly-fallback.ac1",
+            "title": "Given every machine rejected, a spawn context, a github origin and autoFly true, resolveTargetMachine('auto', ...) calls startFly and returns a target whose reason starts with 'Auto → fly-m1 (new Fly machine). No machine fits:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-fly-fallback.ac2",
+            "title": "Given every machine rejected and autoFly false, or no spawn, or needs ['gpu'], or a null gitOrigin, resolveTargetMachine('auto', ...) returns 409 no-machine-fits and startFly is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-fly-fallback.ac3",
+            "title": "Given a machine that fits, resolveTargetMachine('auto', ...) returns that machine and autoFly is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fleet-conversation-fly",
+        "title": "Create the Fly machine from POST /api/fleet/conversations and discard it when the work door fails",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:55:00Z",
+        "metadata": {
+          "issueLabel": "pan-4743",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/fleet-work.ts",
+            "src/dashboard/server/__tests__/fleet-conversations.test.ts",
+            "src/dashboard/server/__tests__/fleet-workers.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-conversations.test.ts src/dashboard/server/__tests__/fleet-workers.test.ts",
+            "npm run lint:circular",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-conversations.test.ts and fleet-workers.test.ts pass",
+            "lint:circular reports no new cycle",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/dashboard/server/routes/fleet-work.ts: FleetCaller gains `mayCreateFly?: boolean`; fleetCaller() sets it to credential !== null && credentialScopes(credential).includes('admin') on both return paths (computed before the ceiling drops admin). FleetSpawnDeps.resolveTarget gains optional `spawn?: FlySpawn`; defaultFleetSpawnDeps passes resolveTargetMachine(machine, gitOrigin, needs, defaultFleetTargetDeps(), spawn). handleFleetConversation passes { projectKey: projectKey ?? null, harness: options.harness, model: options.model, mayCreate: caller.mayCreateFly === true }. When the work door answer is not 201 with a name: if it is 503 with code machine-unreachable (the 30 s WORK_DOOR_TIMEOUT_MS or a hang-up, PAN-4740), do NOT discard — the conversation may be starting on the VM; answer 503 with error '<label> (new Fly machine) did not answer in time; it is still linked. Open it from the conversation list, or remove it with pan machines unlink <label>.' and leave the VM to the idle sweep. For any other non-201 answer, await target.discard?.() before ownerRefusal. handleFleetWorker, handleFleetIssueStart and routes/lanes.ts pass no spawn. Update the file header bullet. Update fleet-conversations.test.ts (the toHaveBeenCalledWith assertion now has the spawn argument; the fly-unavailable passthrough message)."
+        },
+        "items": [
+          {
+            "id": "fleet-conversation-fly.ac1",
+            "title": "Given an admin caller and body { machine: 'fly', projectKey: 'overdeck', message: 'hi' } with a resolveTarget returning a fly target, handleFleetConversation passes spawn { projectKey: 'overdeck', mayCreate: true }, posts /api/machines/work/conversations to the new link and returns 201 with conversation '@env-fly/conv-9'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-conversation-fly.ac2",
+            "title": "Given the work door answers 404 for a fly target, handleFleetConversation calls discard exactly once and returns the owner refusal; given it answers 503 machine-unreachable, discard is not called and the 503 error names the fly-<id> label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-conversation-fly.ac3",
+            "title": "Given an internal-token credential fleetCaller returns mayCreateFly true, and given an odk_ token credential with only the operate scope it returns mayCreateFly false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-conversation-fly.ac4",
+            "title": "Given body { machine: 'fly' } on POST /api/fleet/workers or POST /api/fleet/issues/:id/start, resolveTarget receives no spawn argument (fleet-workers.test.ts asserts the call arguments)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-fly-refusal",
+        "title": "Replace the CLI --machine fly refusal sentence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:55:00Z",
+        "metadata": {
+          "issueLabel": "pan-4743",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "trivial",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/worker-remote.ts",
+            "tests/unit/cli/worker-remote.test.ts",
+            "tests/unit/cli/start-machine.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/worker-remote.test.ts tests/unit/cli/start-machine.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "worker-remote.test.ts and start-machine.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/cli/commands/worker-remote.ts export FLY_CLI_REFUSAL = '--machine fly starts a new Fly machine for a conversation only: use Fly (new VM) in the new-conversation dialog, or pan machines add-fly --project <key> --message <text>. Work agents on a new Fly machine are PAN-4734.' and return { kind: 'error', message: FLY_CLI_REFUSAL } where resolveMachineFlag refused with 'Fly (new VM) needs PAN-4652'. Update the file header. Update tests/unit/cli/worker-remote.test.ts (~line 77) and tests/unit/cli/start-machine.test.ts (~line 60)."
+        },
+        "items": [
+          {
+            "id": "cli-fly-refusal.ac1",
+            "title": "Given pan start PAN-123 --machine fly, startOnMachine prints FLY_CLI_REFUSAL to stderr, exits 1 and never calls the dashboard call dependency",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-fly-refusal.ac2",
+            "title": "Given pan worker run --machine fly, resolveMachineFlag returns { kind: 'error', message: FLY_CLI_REFUSAL } without calling the dashboard call dependency",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "machine-field-fly",
+        "title": "Enable Fly (new VM) in the Machine field when the dialog has a project",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:55:00Z",
+        "metadata": {
+          "issueLabel": "pan-4743",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/MachineField.tsx",
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/MachineField.test.tsx"
+          ],
+          "verify_commands": [
+            "(cd src/dashboard/frontend && npx vitest run src/components/newConversation/__tests__/MachineField.test.tsx)",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MachineField.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. MachineField takes `hasProject: boolean`. The fly option becomes `<option value=\"fly\" disabled={!hasProject} title={hasProject ? 'Starts a new Fly machine, clones the project and runs the conversation there' : 'Fly (new VM) needs a project'}>Fly (new VM)</option>`. Update its header comment. NewConversationDialog passes hasProject={projectKey !== null}; chooseProject resets the machine to THIS_MACHINE when the new key is empty and machine.machine === 'fly'. Update MachineField.test.tsx (the 'Needs PAN-4652' title assertion at ~line 67)."
+        },
+        "items": [
+          {
+            "id": "machine-field-fly.ac1",
+            "title": "Given hasProject true, the Machine select renders the Fly (new VM) option enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-field-fly.ac2",
+            "title": "Given hasProject false, the Fly (new VM) option renders disabled with title 'Fly (new VM) needs a project'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-field-fly.ac3",
+            "title": "Given Fly (new VM) is chosen and the operator selects 'No project', the Machine field value resets to this machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-fly-progress",
+        "title": "Show 'Starting a Fly machine' while the dialog creates a conversation on Fly (new VM)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:55:00Z",
+        "metadata": {
+          "issueLabel": "pan-4743",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/NewConversationDialog.test.tsx"
+          ],
+          "verify_commands": [
+            "(cd src/dashboard/frontend && npx vitest run src/components/newConversation/__tests__/NewConversationDialog.test.tsx)",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "NewConversationDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In NewConversationDialog.tsx, when submitting && machine.machine === 'fly': render <p role=\"status\">Starting a Fly machine. This takes a few minutes.</p> in the Modal pinned slot when there is no error, and the submit button text 'Starting…' instead of 'Creating…'. The createFleetConversation path is unchanged. Add a test in NewConversationDialog.test.tsx with the /api/fleet/conversations fetch held pending, then resolved."
+        },
+        "items": [
+          {
+            "id": "dialog-fly-progress.ac1",
+            "title": "Given a project and Fly (new VM) chosen, when the operator submits and /api/fleet/conversations is pending, the dialog renders 'Starting a Fly machine. This takes a few minutes.' and the submit button reads 'Starting…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-fly-progress.ac2",
+            "title": "Given the fetch resolves with conversation '@env-fly/conv-1', the dialog navigates to /conv/@env-fly/conv-1 and the request body carried machine 'fly' and the projectKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-fly-dialog",
+        "title": "Add the Add-a-Fly-machine dialog that posts /api/machines/fly",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:55:00Z",
+        "metadata": {
+          "issueLabel": "pan-4743",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/AddFlyMachineDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/machinesApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AddFlyMachineDialog.test.tsx"
+          ],
+          "verify_commands": [
+            "(cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/AddFlyMachineDialog.test.tsx)",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AddFlyMachineDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Add addFlyMachine(input: { projectKey?, region? }) to Settings/anywhere/machinesApi.ts posting /api/machines/fly with dashboardMutationJsonHeaders() and returning { status, body }. Create Settings/anywhere/AddFlyMachineDialog.tsx copying AddSshMachineDialog.tsx's structure: title 'Add a Fly machine', data-component 'add-fly-machine-dialog', Project select (No project + ['registered-projects'] query via fetchRegisteredProjects from ../../CommandDeck/UnknownProjectState), Region text input under <details> Advanced (placeholder iad), help line, busy line 'Starting a Fly machine. This takes a few minutes, longer with a project.' with Loader2, not dismissible while busy, submit 'Adding…'. Failure shows body.message ?? body.error ?? apiError(result) in role=alert. Success toasts 'Linked <label> (Fly app <app>, region <region>)', invalidates MACHINES_QUERY_KEY and ANYWHERE_STATUS_QUERY_KEY, and closes. Tests in __tests__/AddFlyMachineDialog.test.tsx."
+        },
+        "items": [
+          {
+            "id": "add-fly-dialog.ac1",
+            "title": "Given project overdeck and region ord, submitting posts /api/machines/fly with body { projectKey: 'overdeck', region: 'ord' }; with no project and an empty region the body is {}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-fly-dialog.ac2",
+            "title": "Given the route answers 409 { error: 'remote-disabled', message: 'Fly machines need remote.enabled: true in the Overdeck config.' }, the dialog renders that message in role=alert and stays open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-fly-dialog.ac3",
+            "title": "Given the route answers 201 with record { label: 'fly-m1', appName: 'pan-workspaces', region: 'iad' }, the dialog toasts 'Linked fly-m1 (Fly app pan-workspaces, region iad)' and calls onClose",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-fly-button",
+        "title": "Add the Add a Fly machine button to Settings → Anywhere → Machines",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:55:00Z",
+        "metadata": {
+          "issueLabel": "pan-4743",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/MachinesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx"
+          ],
+          "verify_commands": [
+            "(cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx)",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MachinesPanel.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. In Settings/anywhere/MachinesPanel.tsx add flyOpen state, a button 'Add a Fly machine' before 'Add an SSH machine' with the same buttonClass, and render <AddFlyMachineDialog open={flyOpen} onClose={() => setFlyOpen(false)} /> next to AddSshMachineDialog. Add a header comment line naming PAN-4743. Add a test in __tests__/MachinesPanel.test.tsx."
+        },
+        "items": [
+          {
+            "id": "add-fly-button.ac1",
+            "title": "Given the Machines panel renders, it shows a button named 'Add a Fly machine'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-fly-button.ac2",
+            "title": "Given the operator clicks 'Add a Fly machine', the panel renders the element [data-component=\"add-fly-machine-dialog\"]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-fly-new-vm",
+        "title": "Document Fly (new VM), remote.auto_fly and Add a Fly machine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:55:00Z",
+        "metadata": {
+          "issueLabel": "pan-4743",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "cli/machines.mdx",
+            "configuration/linked-machines.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md",
+            "src/dashboard/server/services/fly-machine-service.ts"
+          ],
+          "verify_commands": [
+            "git grep -n -E 'needs PAN-4652|until PAN-4652|Needs PAN-4652' -- cli configuration docs src .overdeck/context; test $? -eq 1",
+            "grep -c 'auto_fly = true' configuration/linked-machines.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the git grep prints nothing and exits 1",
+            "grep counts at least 1",
+            "lint:docs passes"
+          ],
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Edit cli/machines.mdx (the '`--machine fly` is refused until PAN-4652' sentence and the stale PAN-4638 lane sentence near line 212), configuration/linked-machines.mdx ('Start work on another machine' near line 425, 'Fly machines' near line 118, 'Auto placement' near line 462 with a [remote] auto_fly = true example and its rule, and remove the stale 'Lanes on other machines arrive with PAN-4638' sentence), docs/ANYWHERE-ARCHITECTURE.md (near lines 912-913 and 971, plus the Fly machines file table near 570-582: fleet-fly-target.ts, AddFlyMachineDialog.tsx, spawn context, discard, mayCreateFly, FLY_MACHINE_TAGS, auto_fly, lanes/workers/issue start pass no spawn), .overdeck/context/codebase/architecture.md line ~300 (and its last-verified date), and the header of src/dashboard/server/services/fly-machine-service.ts (lines 4-6)."
+        },
+        "items": [
+          {
+            "id": "docs-fly-new-vm.ac1",
+            "title": "Given the docs after this item, git grep for 'needs PAN-4652', 'until PAN-4652' or 'Needs PAN-4652' under cli, configuration, docs, src and .overdeck/context returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fly-new-vm.ac2",
+            "title": "Given configuration/linked-machines.mdx, its Auto placement section contains a [remote] auto_fly = true example stating Auto creates a Fly machine only for conversations and only when no machine fits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fly-new-vm.ac3",
+            "title": "Given configuration/linked-machines.mdx and cli/machines.mdx, they state that pan start --machine fly and pan worker run --machine fly refuse and name pan machines add-fly or the dialog's Fly (new VM) as the alternative",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fly-new-vm.ac4",
+            "title": "Given docs/ANYWHERE-ARCHITECTURE.md, its Fly machines file table lists src/dashboard/server/services/fleet-fly-target.ts and AddFlyMachineDialog.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-uat-fly",
+        "title": "Verify Fly (new VM) in a browser and, with operator consent, on a real Fly machine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:55:00Z",
+        "metadata": {
+          "issueLabel": "pan-4743",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "sequential",
+          "difficulty": "medium",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            ".pan/drafts/PAN-4743.md"
+          ],
+          "acJustification": "Two observable outcomes: the no-spend browser UAT and the consent-gated live run.",
+          "verify_commands": [
+            "npm run build",
+            "grep -n '## Live verification' .pan/drafts/PAN-4743.md"
+          ],
+          "expected_outputs": [
+            "build completes without errors",
+            "the PRD has a '## Live verification' section recording the browser UAT result, the screenshot names and the live-run result or the no-consent line"
+          ],
+          "traces": [
+            "FR-10",
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. Browser UAT (no spend) in an isolated Playwright browser profile against a dashboard built from the branch with remote.enabled false: new-conversation dialog with a project + Fly (new VM) submit shows 'Fly machines need remote.enabled: true in the Overdeck config.'; without a project the option is disabled; Settings → Anywhere → Machines → Add a Fly machine → submit shows the same error. Screenshots into the PR. Record the outcome under a new '## Live verification' section at the end of .pan/drafts/PAN-4743.md. Live run: ask the operator with pan ask before spending; with approval and remote.enabled = true, create a conversation with Fly (new VM) on a GitHub project, see it open at /conv/@<env>/<name> with a fly-<id> chip and a streamed reply, then pan machines unlink fly-<id>. Without approval, write 'live Fly run not done: no operator consent' in the PR body. Watch PAN-4740 and PAN-4741."
+        },
+        "items": [
+          {
+            "id": "live-uat-fly.ac1",
+            "title": "Given remote.enabled false and an isolated Playwright profile, submitting the new-conversation dialog with a project and Fly (new VM), and submitting Add a Fly machine, each renders 'Fly machines need remote.enabled: true in the Overdeck config.' and the PR includes both screenshots",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-uat-fly.ac2",
+            "title": "Given operator approval via pan ask, a Fly (new VM) conversation opens at /conv/@<env>/<name> with a fly-<id> chip and the VM is unlinked afterwards; without approval, the '## Live verification' section of .pan/drafts/PAN-4743.md and the PR body both contain 'live Fly run not done: no operator consent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fly-target-door",
+        "to": "resolver-fly-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-fly-branch",
+        "to": "auto-fly-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "auto-fly-config",
+        "to": "auto-fly-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-fly-branch",
+        "to": "fleet-conversation-fly",
+        "type": "blocks"
+      },
+      {
+        "from": "machine-field-fly",
+        "to": "dialog-fly-progress",
+        "type": "blocks"
+      },
+      {
+        "from": "add-fly-dialog",
+        "to": "add-fly-button",
+        "type": "blocks"
+      },
+      {
+        "from": "fleet-conversation-fly",
+        "to": "live-uat-fly",
+        "type": "blocks"
+      },
+      {
+        "from": "auto-fly-fallback",
+        "to": "live-uat-fly",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-fly-progress",
+        "to": "live-uat-fly",
+        "type": "blocks"
+      },
+      {
+        "from": "add-fly-button",
+        "to": "live-uat-fly",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-fly-refusal",
+        "to": "live-uat-fly",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

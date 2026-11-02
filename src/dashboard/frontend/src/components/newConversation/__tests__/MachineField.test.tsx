@@ -56,7 +56,7 @@ function renderDialog() {
 }
 
 describe('Machine field (PAN-4651 WI-11)', () => {
-  it('ac11: offers this machine, Auto, each online visible link, and a disabled Fly entry', async () => {
+  it('ac11: offers this machine, Auto, each online visible link, and a Fly entry disabled with no project', async () => {
     renderDialog();
     const select = screen.getByLabelText('Machine') as HTMLSelectElement;
     await waitFor(() => expect(within(select).getByRole('option', { name: 'This machine (laptop)' })).toBeTruthy());
@@ -64,7 +64,28 @@ describe('Machine field (PAN-4651 WI-11)', () => {
     expect(options.map((option) => option.textContent)).toEqual(['This machine (laptop)', 'Auto', 'desk', 'Fly (new VM)']);
     const fly = within(select).getByRole('option', { name: 'Fly (new VM)' }) as HTMLOptionElement;
     expect(fly.disabled).toBe(true);
-    expect(fly.title).toBe('Needs PAN-4652');
+    expect(fly.title).toBe('Fly (new VM) needs a project');
+  });
+
+  it('ac1 (PAN-4743): a chosen project enables Fly (new VM)', async () => {
+    renderDialog();
+    const select = screen.getByLabelText('Machine') as HTMLSelectElement;
+    await waitFor(() => expect(within(select).getByRole('option', { name: 'desk' })).toBeTruthy());
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'overdeck' } });
+    const fly = within(select).getByRole('option', { name: 'Fly (new VM)' }) as HTMLOptionElement;
+    expect(fly.disabled).toBe(false);
+    expect(fly.title).toBe('Starts a new Fly machine, clones the project and runs the conversation there');
+  });
+
+  it('ac3 (PAN-4743): clearing the project while Fly (new VM) is chosen resets the Machine field to this machine', async () => {
+    renderDialog();
+    const select = screen.getByLabelText('Machine') as HTMLSelectElement;
+    await waitFor(() => expect(within(select).getByRole('option', { name: 'desk' })).toBeTruthy());
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'overdeck' } });
+    fireEvent.change(select, { target: { value: 'fly' } });
+    expect(select.value).toBe('fly');
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: '' } });
+    expect(select.value).toBe('');
   });
 
   it('choosing Auto reveals Needs', async () => {

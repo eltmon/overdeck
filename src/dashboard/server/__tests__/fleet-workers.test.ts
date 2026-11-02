@@ -86,4 +86,14 @@ describe('POST /api/fleet/workers (D-4651-5)', () => {
     const missing = readJsonResponse(await handleFleetIssueStart('PAN-9', { machine: 'desk' }, { actor: 'operator' }, deps(REMOTE, { status: 404, json: { code: 'project-missing', gitOrigin: 'github.com/eltmon/overdeck' } })));
     expect((missing.body as { error: string }).error).toBe('desk has no project for github.com/eltmon/overdeck. Add it with: pan machines add-project laptop overdeck --to desk');
   });
+
+  it('ac4 (PAN-4743): resolveTarget receives no spawn argument for machine: fly', async () => {
+    const dWorker = deps(REMOTE);
+    await handleFleetWorker({ ...BODY, machine: 'fly' }, { actor: 'operator' }, dWorker);
+    expect(dWorker.resolveTarget).toHaveBeenCalledWith('fly', 'github.com/eltmon/overdeck', []);
+
+    const dIssueStart = deps(REMOTE, { status: 200, json: { issueId: 'PAN-9', agentId: 'agent-pan-9' } });
+    await handleFleetIssueStart('PAN-9', { machine: 'fly' }, { actor: 'operator' }, dIssueStart);
+    expect(dIssueStart.resolveTarget).toHaveBeenCalledWith('fly', 'github.com/eltmon/overdeck', []);
+  });
 });

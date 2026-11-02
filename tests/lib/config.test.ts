@@ -111,6 +111,26 @@ describe('config', () => {
       config.remote = { enabled: true, resiliency_tier: 'invalid' as any };
       expect(() => normalizeRemoteConfig(config)).toThrow('Invalid remote.resiliency_tier');
     });
+
+    it('accepts a boolean auto_fly and leaves it undefined when absent (PAN-4743)', async () => {
+      const { getDefaultConfig, normalizeRemoteConfig } = await import('../../src/lib/config.js');
+      const withAutoFly = getDefaultConfig();
+      withAutoFly.remote = { enabled: true, resiliency_tier: 'ephemeral', auto_fly: true };
+      normalizeRemoteConfig(withAutoFly);
+      expect(withAutoFly.remote.auto_fly).toBe(true);
+
+      const withoutAutoFly = getDefaultConfig();
+      delete (withoutAutoFly.remote as { auto_fly?: boolean }).auto_fly;
+      normalizeRemoteConfig(withoutAutoFly);
+      expect(withoutAutoFly.remote?.auto_fly).toBeUndefined();
+    });
+
+    it('rejects a non-boolean auto_fly (PAN-4743)', async () => {
+      const { getDefaultConfig, normalizeRemoteConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfig();
+      config.remote = { enabled: true, resiliency_tier: 'ephemeral', auto_fly: 'yes' as any };
+      expect(() => normalizeRemoteConfig(config)).toThrow('remote.auto_fly must be a boolean');
+    });
   });
 
   describe('loadConfigSync remote round-trip', () => {

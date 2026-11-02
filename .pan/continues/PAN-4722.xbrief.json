@@ -1,0 +1,121 @@
+{
+  "version": "1",
+  "issueId": "PAN-4722",
+  "created": "2026-11-02T15:37:17.298Z",
+  "updated": "2026-11-02T16:06:23.174Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "runtime-detect": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4722",
+      "claimedAt": "2026-11-02T15:37:17.298Z",
+      "doneAt": "2026-11-02T15:42:13.150Z"
+    },
+    "install-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4722",
+      "claimedAt": "2026-11-02T15:42:34.341Z",
+      "doneAt": "2026-11-02T15:47:32.207Z"
+    },
+    "sync-via-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4722",
+      "claimedAt": "2026-11-02T15:47:36.760Z",
+      "doneAt": "2026-11-02T15:50:26.763Z"
+    },
+    "dashboard-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4722",
+      "claimedAt": "2026-11-02T15:50:31.493Z",
+      "doneAt": "2026-11-02T15:52:32.490Z"
+    },
+    "cli-update": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4722",
+      "claimedAt": "2026-11-02T15:52:37.231Z",
+      "doneAt": "2026-11-02T15:56:28.497Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4722",
+      "claimedAt": "2026-11-02T15:56:33.131Z",
+      "doneAt": "2026-11-02T15:58:20.354Z"
+    },
+    "runtime-detect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:00:42.557Z"
+    },
+    "runtime-detect.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:01:00.859Z"
+    },
+    "runtime-detect.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:01:18.386Z"
+    },
+    "install-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:01:35.208Z"
+    },
+    "install-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:01:52.655Z"
+    },
+    "install-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:02:09.520Z"
+    },
+    "sync-via-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:02:34.355Z"
+    },
+    "sync-via-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:02:51.994Z"
+    },
+    "sync-via-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:03:12.452Z"
+    },
+    "dashboard-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:03:35.084Z"
+    },
+    "dashboard-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:04:01.013Z"
+    },
+    "dashboard-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:04:25.386Z"
+    },
+    "cli-update.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:04:50.175Z"
+    },
+    "cli-update.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:05:10.246Z"
+    },
+    "cli-update.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:05:30.048Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:05:47.538Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:06:05.962Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:06:23.173Z"
+    }
+  }
+}

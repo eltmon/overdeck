@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { checkUnpushedCommits, type GitRunner } from '../../../src/cli/commands/delegation-push-check.js';
 import { WORKER_EXIT, workerRunCommand, type WorkerCliDeps } from '../../../src/cli/commands/worker.js';
-import { type RemoteWorkerCliDeps, standInWaitDeps } from '../../../src/cli/commands/worker-remote.js';
+import { FLY_CLI_REFUSAL, type RemoteWorkerCliDeps, standInWaitDeps } from '../../../src/cli/commands/worker-remote.js';
 import type { RemoteStandIn } from '../../../src/lib/agents/worker/remote-standin.js';
 import { waitForWorkerReport, type WaitOutcome } from '../../../src/lib/agents/worker/index.js';
 
@@ -74,10 +74,11 @@ describe('pan worker run --machine (PAN-4651 WI-13)', () => {
     expect(deps.startWorker).toHaveBeenCalled();
   });
 
-  it('--machine fly refuses with the PAN-4652 line', async () => {
-    const { deps, err } = makeDeps(gitWith('0'));
+  it('ac2 (PAN-4743): --machine fly refuses with FLY_CLI_REFUSAL and never calls the dashboard', async () => {
+    const { deps, err, calls } = makeDeps(gitWith('0'));
     expect(await workerRunCommand({ issue: 'pan-9', prompt: 'Run it.', machine: 'fly' }, deps)).toBe(WORKER_EXIT.usage);
-    expect(err).toContain('Fly (new VM) needs PAN-4652');
+    expect(err).toContain(FLY_CLI_REFUSAL);
+    expect(calls).toEqual([]);
   });
 });
 
