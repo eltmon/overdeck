@@ -34,8 +34,8 @@ export interface ProjectFeatureResourceDetails {
   workspaceMissing?: boolean;
   /** PAN-1676: remote (fly.io) work agent for this issue, when one is active. */
   remoteAgent?: { vmName: string; status: string; model: string; startedAt: string } | null;
-  /** Non-archived conversations explicitly linked to this issue (PAN-2602). */
-  conversations: Array<{ id: number; name: string; title: string | null; status: string }>;
+  /** Non-archived conversations explicitly linked to this issue (PAN-2602); a linked machine's rows carry origin 'linked' (PAN-4734). */
+  conversations: Array<{ id: number; name: string; title: string | null; status: string; origin?: 'linked' }>;
 }
 
 export interface ProjectFeatureResourceIdentifiers {

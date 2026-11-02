@@ -109,6 +109,9 @@ vi.mock('../../../lib/projects.js', () => ({
 
 vi.mock('ora', () => ({ default: oraMocks.ora }));
 
+const startOnMachineMock = vi.hoisted(() => vi.fn(async () => true));
+vi.mock('../start-machine.js', () => ({ startOnMachine: startOnMachineMock }));
+
 import { issueCommand } from '../start.js';
 
 describe('pan start --remote on a planned issue (PAN-4683)', () => {
@@ -203,5 +206,18 @@ describe('pan start --remote on a planned issue (PAN-4683)', () => {
 
     expect(findIssuePlanMock).toHaveBeenCalledWith({ issueId: 'PAN-4677', projectRoot: tmpDir, localWorkspace: workspace });
     expect(startPlanningCalls()).toHaveLength(0);
+  });
+
+  it('treats --machine fly as --remote and never starts on a linked machine (PAN-4734 FR-2)', async () => {
+    findIssuePlanMock.mockResolvedValue('refs/heads/feature/pan-4677:.pan/specs/x.xbrief.json');
+    startOnMachineMock.mockClear();
+    const options = { model: '', machine: 'Fly', plan: 'auto' } as any;
+
+    await issueCommand('PAN-4677', options).catch(() => undefined);
+
+    expect(startOnMachineMock).not.toHaveBeenCalled();
+    expect(options.remote).toBe(true);
+    expect(options.machine).toBeUndefined();
+    expect(lifecycleMocks.assertCanStartFresh).toHaveBeenCalled();
   });
 });

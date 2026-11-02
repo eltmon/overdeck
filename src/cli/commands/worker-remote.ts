@@ -13,9 +13,10 @@
  * are confirmed dead, and an owner that cannot be reached is alive with no idle
  * age, so a sleeping desktop delays the report but never fails the wait.
  *
- * `--machine fly` refuses here (PAN-4743 D-4743-1): a work agent on a new Fly
- * machine is destroyed by the idle sweep until PAN-4734 lands. `FLY_CLI_REFUSAL`
- * names the conversation-only alternative.
+ * `--machine fly` refuses here (PAN-4743 D-4743-1): a worker needs its issue
+ * workspace, which a new VM never has. `pan start <id> --machine fly` never
+ * reaches this check: `issueCommand` turns it into `--remote`, which starts the
+ * work agent on a new Fly machine (PAN-4734). `FLY_CLI_REFUSAL` names both.
  */
 import type { PlacementAnswer, PlacementRejection } from '@overdeck/contracts';
 
@@ -70,7 +71,7 @@ export type MachineTarget =
   | { kind: 'error'; message: string };
 
 /** PAN-4743 D-4743-6: `--machine fly` refuses for work agents and workers. */
-export const FLY_CLI_REFUSAL = '--machine fly starts a new Fly machine for a conversation only: use Fly (new VM) in the new-conversation dialog, or pan machines add-fly --project <key> --message <text>. Work agents on a new Fly machine are PAN-4734.';
+export const FLY_CLI_REFUSAL = '--machine fly starts a new Fly machine for a conversation only: use Fly (new VM) in the new-conversation dialog, or pan machines add-fly --project <key> --message <text>. For a work agent on a new Fly machine, run pan start <id> --remote.';
 
 export async function resolveMachineFlag(
   machine: string,

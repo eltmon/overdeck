@@ -139,6 +139,18 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   [#4847](https://github.com/eltmon/overdeck/issues/4847) (automatic reap
   skips the review request when an unrelated process leaves a tracked
   workspace file dirty at hand-off).
+- **Remote tmux helpers resolve their target from remote-state** — `getRemoteAgentOutput`,
+  `sendToRemoteAgent(Keyed)`, `killRemoteAgent`, `isRemoteAgentRunning` and the reap's
+  `probeRemoteSession` address `remoteTmuxTarget(agentId)`: a linked work agent's
+  `conv-<name>` on the VM's `overdeck` socket (PAN-4734), else the legacy `agent-<issue>` on
+  home's `getManagedTmuxSocketName()` (`overdeck-<hash>` on a non-default `OVERDECK_HOME`).
+  New code that runs commands in an agent's VM session must use the target, never the agent
+  id. Linked remote-state is also skipped by the spend cap's agent count, the remote heartbeat
+  and the credential refresh (its Fly machine record covers the VM), and the Fly idle sweep
+  never removes a machine hosting a `starting`/`running` linked agent. The legacy VM still
+  disagrees with its prompt about the continue file: `createRemoteWorkspace` writes
+  `/workspace/.pan/continue.json` but the REMOTE prompt names
+  `<workspace>/.overdeck/continue.json`.
 - **Fresh Claude Code state shows startup dialogs that eat the first message** — every
   Fly VM starts with an empty `~/.claude.json` (exec shell `HOME=/`). Each dialog
   Claude Code can show at launch must be pre-answered in

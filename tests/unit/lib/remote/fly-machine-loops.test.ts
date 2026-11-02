@@ -11,6 +11,7 @@ import type { FlyMachineRecord } from '../../../../src/lib/anywhere/fly/machine-
 import { FlyApiError, flyTokenRejectedMessage } from '../../../../src/lib/remote/fly-api.js';
 import {
   _resetFlyMachineLoopsForTests,
+  destroyAndForgetFlyMachine,
   type FlyCodexSyncDeps,
   type FlyMachineLoopDeps,
   heartbeatFlyMachines,
@@ -31,7 +32,7 @@ function record(overrides: Partial<FlyMachineRecord> = {}): FlyMachineRecord {
   };
 }
 
-function harness(records: FlyMachineRecord[], opts: { state?: string; getMachineError?: Error; conversations?: LinkedConversationActivity[]; idleMinutes?: number } = {}) {
+function harness(records: FlyMachineRecord[], opts: { state?: string; getMachineError?: Error; conversations?: LinkedConversationActivity[]; idleMinutes?: number; busyEnvironments?: string[] } = {}) {
   const api = {
     execCommand: vi.fn(async () => ({ stdout: '', stderr: '', exit_code: 0 })),
     getMachine: vi.fn(async () => {
@@ -40,7 +41,7 @@ function harness(records: FlyMachineRecord[], opts: { state?: string; getMachine
     }),
     destroyMachine: vi.fn(async () => undefined),
   };
-  const state = { conversations: opts.conversations ?? [] };
+  const state = { conversations: opts.conversations ?? [], busyEnvironments: opts.busyEnvironments ?? [] };
   const deps = {
     listRecords: vi.fn(async () => records),
     api: vi.fn(async () => api),
@@ -50,6 +51,7 @@ function harness(records: FlyMachineRecord[], opts: { state?: string; getMachine
     removeRecord: vi.fn(async () => null),
     activity: vi.fn(),
     now: () => Date.now(),
+    activeLinkedAgentEnvironmentIds: () => new Set(state.busyEnvironments),
   } satisfies FlyMachineLoopDeps;
   return { api, deps, state };
 }
@@ -206,6 +208,65 @@ describe('sweepFlyMachines (PAN-4652 WI-11)', () => {
 
     expect(lines).toEqual([`could not check fly-m1: ${flyTokenRejectedMessage(error)}`]);
     expect(api.destroyMachine).not.toHaveBeenCalled();
+    expect(deps.removeLink).not.toHaveBeenCalled();
+    expect(deps.removeRecord).not.toHaveBeenCalled();
+  });
+});
+
+describe('sweepFlyMachines with a linked work agent (PAN-4734 WI-4)', () => {
+  it('keeps the machine of an active linked work agent past the idle window', async () => {
+    const { api, deps } = harness([record()], { conversations: [ended('2026-11-01T10:00:00Z')], busyEnvironments: [ENV] });
+    expect(await sweepFlyMachines(deps)).toEqual([]);
+    await vi.advanceTimersByTimeAsync(31 * MINUTE);
+    expect(await sweepFlyMachines(deps)).toEqual([]);
+    expect(api.destroyMachine).not.toHaveBeenCalled();
+    expect(deps.removeRecord).not.toHaveBeenCalled();
+  });
+
+  it('still removes a stopped machine that hosts an active linked work agent', async () => {
+    const { deps } = harness([record()], { state: 'stopped', busyEnvironments: [ENV] });
+    expect(await sweepFlyMachines(deps)).toEqual(['destroyed fly-m1: machine stopped']);
+    expect(deps.removeRecord).toHaveBeenCalledWith('rec-1');
+  });
+
+  it('applies the idle rule again once the agent is no longer active', async () => {
+    const { deps, state } = harness([record()], { conversations: [ended('2026-11-01T10:00:00Z')], busyEnvironments: [ENV] });
+    await vi.advanceTimersByTimeAsync(40 * MINUTE);
+    expect(await sweepFlyMachines(deps)).toEqual([]);
+
+    state.busyEnvironments = [];
+    expect(await sweepFlyMachines(deps)).toEqual([]);
+    await vi.advanceTimersByTimeAsync(29 * MINUTE);
+    expect(await sweepFlyMachines(deps)).toEqual([]);
+    await vi.advanceTimersByTimeAsync(MINUTE);
+    expect(await sweepFlyMachines(deps)).toEqual(['destroyed fly-m1: no active conversation for 30 min']);
+  });
+});
+
+describe('destroyAndForgetFlyMachine (PAN-4734 WI-4)', () => {
+  it('destroys, unlinks and forgets the record with one activity entry', async () => {
+    const { api, deps } = harness([]);
+    expect(await destroyAndForgetFlyMachine(record(), 'work agent handed to review', deps))
+      .toEqual({ destroyed: true, line: 'destroyed fly-m1: work agent handed to review' });
+    expect(api.destroyMachine).toHaveBeenCalledWith('overdeck-ws', 'm1');
+    expect(deps.removeLink).toHaveBeenCalledWith('link-1');
+    expect(deps.removeRecord).toHaveBeenCalledWith('rec-1');
+    expect(deps.activity).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts a machine the API no longer knows (404) as destroyed', async () => {
+    const { api, deps } = harness([]);
+    api.destroyMachine.mockRejectedValueOnce(new FlyApiError('not found', 404, ''));
+    expect((await destroyAndForgetFlyMachine(record(), 'work agent handed to review', deps)).destroyed).toBe(true);
+    expect(deps.removeRecord).toHaveBeenCalledWith('rec-1');
+  });
+
+  it('keeps the link and record when the destroy fails', async () => {
+    const { api, deps } = harness([]);
+    api.destroyMachine.mockRejectedValueOnce(new FlyApiError('boom', 500, ''));
+    const result = await destroyAndForgetFlyMachine(record(), 'work agent handed to review', deps);
+    expect(result.destroyed).toBe(false);
+    expect(result.line).toMatch(/^could not destroy fly-m1 \(work agent handed to review\)/);
     expect(deps.removeLink).not.toHaveBeenCalled();
     expect(deps.removeRecord).not.toHaveBeenCalled();
   });

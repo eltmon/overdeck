@@ -1,0 +1,1123 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T14:40:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4734: Fly work agents run as linked conversations on the VM's server (closes PAN-1775)",
+    "updated": "2026-11-02T14:23:35.385Z"
+  },
+  "plan": {
+    "id": "pan-4734",
+    "title": "Fly work agents run as linked conversations on the VM's server (closes PAN-1775)",
+    "status": "running",
+    "uid": "3dc20483-6350-4c0d-9d01-24077f94658c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T14:40:00Z",
+    "updated": "2026-11-02T14:23:35.385Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4734",
+        "label": "PAN-4734",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1775",
+        "label": "PAN-1775",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4734.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "fly",
+      "remote",
+      "anywhere",
+      "linked-conversations",
+      "work-agent"
+    ],
+    "metadata": {
+      "sizeJustification": "The finalize lint counts every docs/*.md and configuration/*.mdx path as its own subsystem, so any change spanning src/lib, src/dashboard, src/cli and four doc files exceeds 6 regardless of coupling. The ~40 files are one vertical change: the work door (service, route, CLI) is useless without the reap, tmux-target and loop changes that keep tell/kill/output/reap working against the new session, and the issue-tree row is what closes PAN-1775, which this issue's title promises. Splitting the row out would leave this issue unable to close PAN-1775; splitting the loops out would ship a VM that the sweep destroys or the cap double-counts.",
+      "canonicalFilename": "2026-11-02-PAN-4734-fly-work-agents-run-as-linked-conversations-on-the-vm-s-server-closes-pan-1775.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "pan start --remote work agents run Claude Code in raw tmux over the Fly Machines exec API with no Overdeck server, so home sees no transcript and no issue-tree row until the reap (PAN-1775). PAN-4652 made a Fly VM a linked machine whose conversations stream live at home, but nothing starts a work agent there; an owner-spawned agent-<issue> would be excluded from the shared list and destroyed by the idle sweep.",
+      "Proposal": "pan start --remote (and --machine fly) POSTs a new dashboard route, POST /api/remote/work-agents. Its service provisions a Fly machine with addFlyMachine, creates the issue worktree on the VM with git worktree add, and starts the work prompt as a conversation through the link (POST /api/conversations with cwd and issueId). remote-state records the linked fields, including the VM tmux session conv-<name> and socket, and the remote tmux helpers resolve their target from it so tell, kill, output and the reap keep working. The loops skip linked states (the Fly record owns cap, heartbeat, credentials), the sweep leaves a working agent's VM to the reap, and the reap tears down through the Fly machine path. Resource discovery lists cached linked conversations under their issue so the tree row opens /conv/@<env>/<name>.",
+      "NonGoals": "- Durable tier for Fly work agents: pan start --remote refuses it and never falls back to a legacy VM.\n- Codex or any harness other than Claude Code as a Fly work agent.\n- pan start --machine auto creating a Fly VM under remote.auto_fly (not on main; follow-up after PAN-4743).\n- pan worker run --machine fly and pan lane start --machine fly (PAN-4743, PAN-4811).\n- Deleting legacy raw-tmux remote code (createRemoteWorkspace, spawnRemoteAgent, handleRemoteAgentSpawn, /api/remote/workspaces/*, pan workspace create --remote); legacy remote-state keeps working unchanged.\n- Pull here for a linked work agent.\n- Review, test or merge running on the Fly VM.\n- A SessionNode contract change or rendering a linked conversation in SessionPanel.\n- Docker Compose stacks for the agent on the VM.\n- A dashboard Machine field for issue starts.\n- Changing pan tell, pan kill, messaging.ts, routes/agents/conversation.ts or agent-output-service.ts call sites (target resolution lives in the remote helpers).\n- Changing the shared conversation list's agent-% filter."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep the issue-tree row in this issue and set sizeJustification instead of splitting it out.",
+        "rationale": "The row is what closes PAN-1775, which the issue title promises; the size lint's subsystem count is driven by per-file doc paths."
+      },
+      {
+        "summary": "The tree row is a conversation row fed by home's linked conversation cache, not a new SessionNode.",
+        "rationale": "FeatureItem already renders resourceDetails.conversations as /conv links and SharedConversationRow carries issueId; a SessionNode row would need a contracts change and a SessionPanel that cannot render linked conversations."
+      },
+      {
+        "summary": "Take pan start --machine fly as an alias of --remote; leave remote.auto_fly for pan start to a follow-up.",
+        "rationale": "The planning comment names this issue as the owner of --machine fly; remote.auto_fly is PAN-4743's unmerged setting."
+      },
+      {
+        "summary": "pan start --remote calls a new dashboard route (POST /api/remote/work-agents) instead of provisioning in the CLI.",
+        "rationale": "addFlyMachine needs notifyLinksChanged and linkFetch needs the dashboard's link pool; POST /api/machines/fly sets the precedent."
+      },
+      {
+        "summary": "Start the agent with POST /api/conversations, not the owner's issue-start door.",
+        "rationale": "The issue asks for it; server-generated YYYYMMDD-NNNN names pass the shared list's agent-% filter; the owner door would run the pipeline on the VM."
+      },
+      {
+        "summary": "Create the VM worktree with git worktree add (not pan workspace create) and use it as the conversation cwd.",
+        "rationale": "pan task resolves <project>/workspaces/feature-<issue>; createWorkspace's 10 GiB disk floor has no bypass and a Fly rootfs is not guaranteed to meet it."
+      },
+      {
+        "summary": "Resolve the tmux session and socket from remote-state inside the remote helpers.",
+        "rationale": "Keeps tell.ts, kill.ts, messaging.ts and both output paths unchanged and keeps legacy states byte-identical."
+      },
+      {
+        "summary": "The sweep skips idle-removal of a Fly machine with a running linked agent; the reap owns its teardown.",
+        "rationale": "The sweep is not behind the deacon freeze and could destroy the VM before the hand-off, so review would never be requested."
+      },
+      {
+        "summary": "Refuse the durable tier and non-Anthropic models for Fly work agents.",
+        "rationale": "Fly machines are ephemeral-only (PAN-4652) and the REMOTE prompt contract is Claude Code's."
+      },
+      {
+        "summary": "Include an operator-consented live checkpoint item with explicit fallbacks.",
+        "rationale": "The Done-when is observable only on a real Fly machine; PAN-4652 WI-14 set the pattern."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-remote-state-tmux-target",
+        "title": "Record linked fields in remote-state and resolve the VM tmux target from it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "wi2-loops-skip-linked",
+            "wi3-push-daemon-workdir",
+            "wi4-sweep-defers-to-reap",
+            "wi7-fly-work-agent-service",
+            "wi10-reap-linked-agents"
+          ],
+          "files_scope": [
+            "src/lib/remote/remote-agents.ts",
+            "src/lib/remote/remote-tmux.ts",
+            "src/lib/remote/remote-keyed-delivery.ts",
+            "tests/lib/remote/remote-agents.test.ts",
+            "src/lib/remote/__tests__/remote-keyed-delivery.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/lib/remote/remote-agents.test.ts src/lib/remote/__tests__/remote-keyed-delivery.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass, including the new conv-session and legacy-snapshot cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Extend RemoteAgentState (src/lib/remote/remote-agents.ts:286-297) with linked, environmentId, linkId, flyMachineId, conversationName, tmuxSession, tmuxSocket, projectKey, workdir. Give getRemoteTmuxBaseArgs/buildRemoteTmuxCommand (remote-tmux.ts) an optional socket. Add exported remoteTmuxTarget(agentId) = { session: state?.tmuxSession ?? agentId, socket: state?.tmuxSocket }. getRemoteAgentOutput, sendToRemoteAgent, killRemoteAgent, isRemoteAgentRunning and sendToRemoteAgentKeyed use target.session for every -t/has-session argument and target.socket for every buildRemoteTmuxCommand call; buffer and file names keep agentId; killRemoteAgent still saves status stopped on agentId. Legacy states (no tmuxSession) must produce byte-identical commands."
+        },
+        "items": [
+          {
+            "id": "wi1-remote-state-tmux-target.ac1",
+            "title": "Given remote-state with tmuxSession 'conv-20261102-1234' and tmuxSocket 'overdeck', when getRemoteAgentOutput runs, then the exec command contains '-L overdeck' and 'capture-pane -t conv-20261102-1234' (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-remote-state-tmux-target.ac2",
+            "title": "Given the same state, sendToRemoteAgent pastes to '-t conv-20261102-1234' and killRemoteAgent kills that session and persists status 'stopped' on agent-<issue> (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-remote-state-tmux-target.ac3",
+            "title": "Given a legacy remote-state without tmuxSession, the output, send and kill commands equal the pre-change strings (snapshot assertion).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-remote-state-tmux-target.ac4",
+            "title": "Given the linked state, sendToRemoteAgentKeyed targets 'conv-20261102-1234' for paste and submit (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-loops-skip-linked",
+        "title": "Skip linked remote-state in the spend cap, remote heartbeat and credential refresh",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/remote/remote-agents.ts",
+            "src/lib/remote/remote-credential-refresh.ts",
+            "tests/lib/remote/remote-agents.test.ts",
+            "tests/lib/remote/remote-credential-refresh.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/lib/remote/remote-agents.test.ts tests/lib/remote/remote-credential-refresh.test.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass"
+          ],
+          "traces": [
+            "FR-10",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. checkRemoteSpendCap counts listActiveRemoteAgentStates().filter(s => s.linked !== true).length + countFlyMachines(); refreshHostHeartbeatForEphemeralVms adds && state.linked !== true to its filter; refreshClaudeCredentialsForActiveRemoteAgents builds agent targets from states with linked !== true. The Fly machine record already covers the linked VM."
+        },
+        "items": [
+          {
+            "id": "wi2-loops-skip-linked.ac1",
+            "title": "Given remote.max_concurrent_agents 2, one linked running state and one Fly machine record, checkRemoteSpendCap returns allowed true (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-loops-skip-linked.ac2",
+            "title": "Given one linked running state, refreshHostHeartbeatForEphemeralVms issues no exec for it (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-loops-skip-linked.ac3",
+            "title": "Given one linked state whose vmName equals a Fly machine name, one refresh patrol calls syncClaudeCredentials for that VM exactly once (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-push-daemon-workdir",
+        "title": "Run the push daemon in the linked agent's workdir",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/remote/remote-agents.ts",
+            "tests/lib/remote/remote-agents.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/lib/remote/remote-agents.test.ts"
+          ],
+          "expected_outputs": [
+            "remote-agents tests pass including the workdir case"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. installPushDaemon(fly, vmName, issueId, workdir = '/workspace') passes workdir to generatePushDaemonScript (cwd for git add/commit/push) and to the tmux new-session -c argument. The legacy caller at remote-agents.ts:690 passes nothing."
+        },
+        "items": [
+          {
+            "id": "wi3-push-daemon-workdir.ac1",
+            "title": "Given workdir '/workspace/overdeck/workspaces/feature-pan-1', the generated daemon script and the new-session command both contain that path (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-push-daemon-workdir.ac2",
+            "title": "Given no workdir, the daemon script and new-session command contain '/workspace' as before (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-sweep-defers-to-reap",
+        "title": "Keep a Fly machine that hosts a running linked work agent out of the idle sweep",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/remote/fly-machine-loops.ts",
+            "tests/unit/lib/remote/fly-machine-loops.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/remote/fly-machine-loops.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "fly-machine-loops tests pass with fake timers",
+            "no new circular import reported"
+          ],
+          "traces": [
+            "FR-11",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add FlyMachineLoopDeps.activeLinkedAgentEnvironmentIds (default: environmentIds of listActiveRemoteAgentStates() with linked true). In reasonToRemove, after the gone-machine check and before the idle check, return null (and clear idleSince) when the record's environmentId is in that set. Extract and export destroyAndForgetFlyMachine(record, reason, deps) (destroyFlyVm with 404 ok, removeLink when linkId non-null, removeFlyMachine, idleSince.delete, one activity entry) and make sweepFlyMachines call it. remote-agents.js is already imported by fly-machine-loops.ts:45, so no new cycle appears."
+        },
+        "items": [
+          {
+            "id": "wi4-sweep-defers-to-reap.ac1",
+            "title": "Given a linked record idle for 31 minutes whose environmentId hosts a running linked remote-state, sweepFlyMachines keeps it (unit test, fake timers).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-sweep-defers-to-reap.ac2",
+            "title": "Given the same record reported 'stopped' by the Fly API, sweepFlyMachines destroys it and removes its link and record (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-sweep-defers-to-reap.ac3",
+            "title": "Given the remote-state then changes to 'stopped', the idle rule removes the record once 30 idle minutes elapse (unit test, fake timers).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-remote-prompt-workspace-path",
+        "title": "Name {{WORKSPACE_PATH}} in the REMOTE block of the work prompt",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/cloister/prompts/work.md",
+            "src/lib/cloister/__tests__/work-agent-prompt-remote.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/work-agent-prompt-remote.test.ts",
+            "npm run lint:prompts"
+          ],
+          "expected_outputs": [
+            "the new prompt test passes",
+            "lint:prompts exits 0"
+          ],
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/lib/cloister/prompts/work.md lines 99-108, replace the literal /workspace in 'Your workspace is at', the continue file, spec and draft paths with {{WORKSPACE_PATH}}. Keep 'touch /workspace/.pan/REMOTE_DONE' and line 344 unchanged. Add src/lib/cloister/__tests__/work-agent-prompt-remote.test.ts mirroring work-agent-prompt-tests-mode.test.ts. Run npm run lint:prompts."
+        },
+        "items": [
+          {
+            "id": "wi5-remote-prompt-workspace-path.ac1",
+            "title": "Given env REMOTE and workspacePath '/workspace/overdeck/workspaces/feature-pan-1', the rendered prompt contains '/workspace/overdeck/workspaces/feature-pan-1/.overdeck/continue.json' and 'touch /workspace/.pan/REMOTE_DONE' (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-remote-prompt-workspace-path.ac2",
+            "title": "Given workspacePath '/workspace', the rendered prompt contains '/workspace/.overdeck/continue.json' as before (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-fly-conversation-cwd-and-workspace",
+        "title": "Pass cwd and issueId to the Fly conversation and create the VM worktree",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/fly-machine-service.ts",
+            "src/dashboard/server/services/__tests__/fly-machine-service.test.ts",
+            "src/lib/anywhere/fly/project.ts",
+            "src/lib/anywhere/fly/provision-shared.ts",
+            "src/lib/anywhere/fly/__tests__/project.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/fly-machine-service.test.ts src/lib/anywhere/fly/__tests__/project.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. startFlyConversation (fly-machine-service.ts:309-327) accepts optional cwd and issueId, sends them only when set, and returns tmuxSession (response tmuxSession or conv-<name>). Add ensureFlyWorkspace(machine, projectKey, issueId, overrides) to src/lib/anywhere/fly/project.ts: validate projectKey (PROJECT_KEY_RE) and issueId (/^[A-Za-z][A-Za-z0-9]*-\\d+$/), then one 60 s exec in /workspace/<projectKey>: git config user.email/user.name (as remote-workspace.ts:208) && git fetch origin feature/<issue-lower> && git worktree add -b feature/<issue-lower> workspaces/feature-<issue-lower> origin/feature/<issue-lower>; verify 'git -C <worktree> branch --show-current' prints feature/<issue-lower>; return the worktree path. Do NOT use 'pan workspace create': createWorkspace refuses below a 10 GiB disk floor (create.ts:202-207) that a Fly rootfs is not guaranteed to meet. A non-zero exit throws FlyMachineError('workspace-failed') with stderr; add 'workspace-failed' to the code union and map it to 502 in FLY_MACHINE_ERROR_STATUS (provision-shared.ts:26)."
+        },
+        "items": [
+          {
+            "id": "wi6-fly-conversation-cwd-and-workspace.ac1",
+            "title": "Given cwd and issueId, startFlyConversation POSTs /api/conversations with both fields; without them the body has neither key (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-fly-conversation-cwd-and-workspace.ac2",
+            "title": "Given the exec answers exit 0 and the branch check prints feature/pan-1, ensureFlyWorkspace sends the git worktree add command for workspaces/feature-pan-1 and returns '/workspace/overdeck/workspaces/feature-pan-1' (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-fly-conversation-cwd-and-workspace.ac3",
+            "title": "Given the worktree exec exits 1, ensureFlyWorkspace rejects with code 'workspace-failed' and the stderr (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-fly-conversation-cwd-and-workspace.ac4",
+            "title": "Given issueId 'bad id', ensureFlyWorkspace rejects before any execCommand call (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-fly-work-agent-service",
+        "title": "Start a work agent as a conversation on a new Fly machine (startFlyWorkAgent)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "wi8-work-door-route",
+            "wi9-cli-start-remote"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/fly-work-agent-service.ts",
+            "src/dashboard/server/services/__tests__/fly-work-agent-service.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/fly-work-agent-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the service tests pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-13",
+            "NFR-1",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Touches only two new files; its inputs (wi3, wi6) are DAG predecessors, and no other item edits these files."
+        },
+        "narrative": {
+          "Action": "PRD WI-7. New src/dashboard/server/services/fly-work-agent-service.ts exporting startFlyWorkAgent(input, deps) and FlyWorkAgentError. Steps in order: resolve project (resolveProjectFromIssueSync, else project-unknown 404); model via determineModel(role work) + resolveEffort(harness claude-code), non-anthropic provider => harness-unsupported 400; remote-state status running, or starting with startedAt under 30 minutes old => already-running 409; a starting state 30+ minutes old is crashed provisioning and is overwritten; consent wrap per D-11; save remote-state starting with linked true, vmName '', tmuxSocket 'overdeck'; addFlyMachine({projectKey, harness:'claude-code'},{notifyLinksChanged}); patch vmName=machineName, environmentId, linkId, flyMachineId; ensureFlyWorkspace; copy home .overdeck/continue.json to <workdir>/.overdeck/continue.json when present; fly.copySkillsToVm; build prompt (env REMOTE, workspacePath workdir, skipDynamicContext) inline when <=50,000 chars else write /workspace/.pan/prompts/agent-<issue-lower>.md and send the pointer sentence; startFlyConversation with cwd and issueId; patch conversationName and tmuxSession; installPushDaemon with workdir; accept consent; save running; refresh linked cache via currentLinkedConversationsSync()?.onConnect(link). Rollback after addFlyMachine: injected unlink(linkId) (non-200 logged with [fly-work]), save status error, rethrow. Every dependency injectable."
+        },
+        "items": [
+          {
+            "id": "wi7-fly-work-agent-service.ac1",
+            "title": "Given all deps succeed, startFlyWorkAgent persists remote-state with linked, environmentId, linkId, flyMachineId, conversationName, tmuxSession 'conv-<name>', tmuxSocket 'overdeck', workdir and status 'running', and returns path '/conv/@<env>/<name>' (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-fly-work-agent-service.ac2",
+            "title": "Given the conversation starts, the POST body carries cwd equal to the workdir, issueId, harness 'claude-code' and the rendered prompt; a prompt over 50,000 characters is written to the prompt file and the message is the pointer sentence (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-fly-work-agent-service.ac3",
+            "title": "Given project-unknown, a non-Anthropic model, a running remote-state, or a starting remote-state 5 minutes old, startFlyWorkAgent rejects with that code and never calls addFlyMachine; given a starting state 31 minutes old it proceeds (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-fly-work-agent-service.ac4",
+            "title": "Given ensureFlyWorkspace rejects after provisioning, unlink is called once with the linkId and remote-state persists status 'error' (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-fly-work-agent-service.ac5",
+            "title": "Given a non-operator startedBy with autoSpawnConsentRequired true, the start runs inside the consent claim and accepts it only after the conversation started (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-work-door-route",
+        "title": "Expose POST /api/remote/work-agents",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/remote-work-agents.ts",
+            "src/dashboard/server/routes/__tests__/remote-work-agents.test.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/remote-work-agents.test.ts tests/unit/lib/overdeck",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route tests pass",
+            "no-loss matrix tests pass with the new row"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. New src/dashboard/server/routes/remote-work-agents.ts copying routes/machines-fly.ts:63-95: refuse channel callers 403, rejectUnsafeDashboardMutationRequest, parse {issueId (required, issue-id pattern), model?, effort?, startedBy? (default 'operator:dashboard'), autoSpawnConsentRequired?}, call startFlyWorkAgent with notifyLinksChanged and unlink (id) => handleMachinesUnlink(id) from routes/machines.ts:146, map FlyMachineError via FLY_MACHINE_ERROR_STATUS and FlyWorkAgentError via its status, else 500 fly-work-failed; 201 with the result and one emitActivityEntry. Register remoteWorkAgentsRouteLayer in server.ts next to machinesFlyRouteLayer (:73, :438). Add the no-loss row after 'POST /api/machines/fly' (no-loss-matrix.ts:520). No route-scopes row (default admin)."
+        },
+        "items": [
+          {
+            "id": "wi8-work-door-route.ac1",
+            "title": "Given a request arriving over a secure channel, POST /api/remote/work-agents returns 403 and calls no service (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-work-door-route.ac2",
+            "title": "Given a body without issueId, the route returns 400 (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-work-door-route.ac3",
+            "title": "Given the service rejects with already-running, the route returns 409 with that code; given success it returns 201 with path '/conv/@<env>/<name>' (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-work-door-route.ac4",
+            "title": "Given the new row for 'POST /api/remote/work-agents', the no-loss matrix test returns no missing-surface failure (vitest run of tests/unit/lib/overdeck).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-cli-start-remote",
+        "title": "Make pan start --remote and --machine fly call the work door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/start-remote.ts",
+            "src/cli/commands/start.ts",
+            "src/cli/commands/__tests__/start-remote.test.ts",
+            "src/cli/commands/machines-fly.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/start-remote.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "wc -l src/cli/commands/start.ts"
+          ],
+          "expected_outputs": [
+            "start-remote tests pass",
+            "typecheck completes without errors",
+            "lint:file-size exits 0",
+            "start.ts has fewer than 1281 lines"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Touches start.ts, a new start-remote.ts, its new test and one comment in machines-fly.ts; no other item edits these files."
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Move handleRemoteWorkspace (start.ts:316-517) out; new src/cli/commands/start-remote.ts exports startRemoteWorkAgent(issueId, options, spinner, deps): refuse durable tier (sentence in PRD), refuse legacy metadata (findRemoteWorkspaceMetadata non-null; name the VM and 'pan workspace destroy <ISSUE>', which destroys legacy remote workspaces via workspace-list.ts:398-401), push the local feature branch with pushFeatureBranch when <project>/workspaces/feature-<id>/.git exists, refuse branch-not-pushed when async 'git ls-remote --heads origin feature/<id>' is empty, then postWithoutTimeout(base, '/api/remote/work-agents', {issueId, model, effort, startedBy: resolveCliStartedBy('operator:cli:pan-start'), autoSpawnConsentRequired}), print the machines-call.ts sentence when unreachable, print message on non-201 and exit 1, on 201 run the tracker block from start.ts:455-487 and print the /conv/@ URL. In issueCommand, before start.ts:717, map options.machine 'fly' (any case) to options.remote = true and delete options.machine. Replace the call at start.ts:966-967 with a dynamic import of start-remote.js. start.ts must end below 1,281 lines. Update the postWithoutTimeout header comment in machines-fly.ts to name both production callers."
+        },
+        "items": [
+          {
+            "id": "wi9-cli-start-remote.ac1",
+            "title": "Given --tier durable, startRemoteWorkAgent exits 1 with the durable-unsupported sentence and sends no dashboard request (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-cli-start-remote.ac2",
+            "title": "Given legacy remote workspace metadata or an empty ls-remote result, it exits 1 and sends no dashboard request (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-cli-start-remote.ac3",
+            "title": "Given a 201 answer, it prints 'Open: <dashboard>/conv/@<env>/<name>'; given 409, it prints the message and exits 1 (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-cli-start-remote.ac4",
+            "title": "Given pan start <id> --machine fly, the flow reaches startRemoteWorkAgent and never calls startOnMachine (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-cli-start-remote.ac5",
+            "title": "After the change, wc -l src/cli/commands/start.ts reports fewer than 1281 lines and npm run lint:file-size exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-reap-linked-agents",
+        "title": "Reap linked work agents through the Fly machine teardown",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/remote/remote-completion.ts",
+            "tests/lib/remote/remote-completion.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/lib/remote/remote-completion.test.ts"
+          ],
+          "expected_outputs": [
+            "remote-completion tests pass including linked cases"
+          ],
+          "traces": [
+            "FR-12",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. In remote-completion.ts: probeRemoteSession (:67-76) and the 401 heal use remoteTmuxTarget(agentId); continue copy-back (:352-364) copies ${workdir}/.overdeck/continue.json to <local workspace>/.overdeck/continue.json when workdir is set; teardown (:418-428) for linked === true kills the session, then calls destroyAndForgetFlyMachine on listFlyMachines().find(r => r.machineId === flyMachineId) (missing record = already gone) and skips fly.deleteVm and deleteWorkspaceMetadata. Legacy branch and crash path unchanged."
+        },
+        "items": [
+          {
+            "id": "wi10-reap-linked-agents.ac1",
+            "title": "Given a linked running agent with the REMOTE_DONE sentinel and its branch on origin, the reap requests review, removes its Fly record and link, and never calls deleteVm (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-reap-linked-agents.ac2",
+            "title": "Given a legacy agent in the same situation, the reap still calls deleteVm and deleteWorkspaceMetadata (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-reap-linked-agents.ac3",
+            "title": "Given a linked agent, the session probe runs 'has-session -t conv-<name>' on socket 'overdeck' and the continue file is copied from '<workdir>/.overdeck/continue.json' (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-discovery-linked-conversations",
+        "title": "List cached linked conversations under their issue in resource discovery",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery-shared.ts",
+            "src/dashboard/server/services/resource-discovery.ts",
+            "tests/unit/dashboard/server/services/resource-discovery.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/resource-discovery.test.ts"
+          ],
+          "expected_outputs": [
+            "resource-discovery tests pass including the linked cases"
+          ],
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. captureSharedResourceSignals (resource-discovery-shared.ts) also returns linkedConversations: listLinkedConversations({ readOnly: true }) rows with row.issueId and row.releasedTo === null, mapped to { id: -record.id, name: linkedConversationName(environmentId, name), title, status, tmuxSession: null, origin: 'linked' }; a read error yields []. The conversation loop at resource-discovery.ts:561-573 walks them too; the detail type (:140) and serialized shapes (:262, :922) gain origin?: 'linked'."
+        },
+        "items": [
+          {
+            "id": "wi11-discovery-linked-conversations.ac1",
+            "title": "Given a cached linked row with issueId 'PAN-9' and releasedTo null, PAN-9's resourceDetails.conversations includes name '@env-1/20261102-1234' with origin 'linked' (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-discovery-linked-conversations.ac2",
+            "title": "Given a cached linked row with a non-null releasedTo, it does not appear (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-discovery-linked-conversations.ac3",
+            "title": "Given a local conversation with an issueId, its serialized entry is unchanged and has no origin field (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-tree-row-opens-linked",
+        "title": "Open a linked conversation from its issue-tree row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/feature-types.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.linkedConversation.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/ProjectTree/FeatureItem.linkedConversation.test.tsx src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx"
+          ],
+          "expected_outputs": [
+            "the new test and the existing FeatureItem tests pass"
+          ],
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. Add origin?: 'linked' to the conversation type (feature-types.ts:38). In FeatureItem.tsx conversation rows (:890-903) use conversationRouteKey(conv) from lib/linkedConversation.ts for href (/conv/<key>), key and data-testid, and render 'linked' instead of '#<id>' for linked rows. New test FeatureItem.linkedConversation.test.tsx copies the render setup of FeatureItem.test.tsx:1531-1600; add only that new file to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "wi12-tree-row-opens-linked.ac1",
+            "title": "Given a conversation entry with origin 'linked' and name '@env-1/20261102-1234', FeatureItem renders an anchor with href '/conv/@env-1/20261102-1234' and the text 'linked' (frontend test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-tree-row-opens-linked.ac2",
+            "title": "Given a local conversation entry with id 42, FeatureItem still renders href '/conv/42' (frontend test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-tree-row-opens-linked.ac3",
+            "title": "scripts/frontend-test-subset.txt contains the new test path in sorted order, so CI runs it (grep).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-docs",
+        "title": "Document Fly work agents in user and developer docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/fly-provider.md",
+            "configuration/linked-machines.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "cli/machines.mdx"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Work agents on Fly' configuration/linked-machines.mdx",
+            "grep -n 'POST /api/remote/work-agents' docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "each grep prints at least one line"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-11",
+            "FR-12",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. docs/fly-provider.md (Overview, Machine Lifecycle, Automatic loops; durable tier refused); configuration/linked-machines.mdx (new '### Work agents on Fly' under '## Fly machines'; fix the setup sentence near :149); docs/ANYWHERE-ARCHITECTURE.md ('### Work agents (PAN-4734)' in '## Fly machines (PAN-4652)', module table rows); cli/machines.mdx (--machine fly on pan start starts a Fly work agent, like --remote; edit whatever sentence main has)."
+        },
+        "items": [
+          {
+            "id": "wi13-docs.ac1",
+            "title": "configuration/linked-machines.mdx contains a '### Work agents on Fly' heading whose section names 'pan start <id> --remote', '--machine fly', the fly-<id> chip, the reap hand-off and the durable-tier refusal (grep).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-docs.ac2",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md contains '### Work agents (PAN-4734)' naming 'POST /api/remote/work-agents' and 'fly-work-agent-service.ts' (grep).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-docs.ac3",
+            "title": "docs/fly-provider.md contains a sentence that the sweep leaves a machine with a running linked work agent to the reap, and cli/machines.mdx contains a sentence that pan start --machine fly starts a Fly work agent (grep).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-live-checkpoint",
+        "title": "Live checkpoint: a Fly work agent end to end (operator-consented)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T14:40:00Z",
+        "metadata": {
+          "issueLabel": "pan-4734",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "sequential",
+          "difficulty": "complex",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/fly-provider.md"
+          ],
+          "verify_commands": [
+            "grep -n 'Live verification (PAN-4734)' docs/fly-provider.md"
+          ],
+          "expected_outputs": [
+            "the section exists with O1-O4, or the PR body records the operator's decline"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-8",
+            "FR-12",
+            "FR-14"
+          ],
+          "acJustification": "Four observations map to the issue's Done-when; one AC per observation plus the record."
+        },
+        "narrative": {
+          "Action": "PRD WI-14. Ask the operator with one self-contained AskUserQuestion and pan tell flywheel-orchestrator before spending Fly money. npm run build, run a dashboard from dist (Node 22), run node dist/cli/index.js start <ISSUE> --remote on a small planned GitHub issue, observe O1 (conversation listed with fly-<id> chip, transcript streams; Playwright screenshot in an isolated profile), O2 (tree row href /conv/@<env>/<name> opens it), O3 (pan tell reaches the pane; tmux -L overdeck has-session -t conv-<name> exits 0 over exec), O4 (reap requests review within 2 minutes; fly machines list no longer shows the machine). Record O1-O4 in '## Live verification (PAN-4734)' in docs/fly-provider.md. Fallbacks per PRD: operator declines -> leave pending, say so in PR, tell orchestrator; socket differs -> set observed name in WI-7 constant."
+        },
+        "items": [
+          {
+            "id": "wi14-live-checkpoint.ac1",
+            "title": "Given operator consent and a running dashboard from this build, when pan start <ISSUE> --remote runs, then the home conversation list shows the agent's conversation with a fly-<machineId> chip and its transcript grows while it works (Playwright screenshot).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-live-checkpoint.ac2",
+            "title": "The issue's tree row renders href '/conv/@<env>/<name>' and opens that conversation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-live-checkpoint.ac3",
+            "title": "pan tell agent-<issue> delivers a message that appears in the transcript, and 'tmux -L overdeck has-session -t conv-<name>' exits 0 over exec.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-live-checkpoint.ac4",
+            "title": "After the agent creates REMOTE_DONE, review is requested within 2 minutes and fly machines list no longer shows the machine.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-live-checkpoint.ac5",
+            "title": "docs/fly-provider.md contains '## Live verification (PAN-4734)' with O1-O4, or the PR body states the operator declined and the orchestrator was told.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-remote-state-tmux-target",
+        "to": "wi2-loops-skip-linked",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-loops-skip-linked",
+        "to": "wi3-push-daemon-workdir",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-remote-state-tmux-target",
+        "to": "wi4-sweep-defers-to-reap",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-push-daemon-workdir",
+        "to": "wi7-fly-work-agent-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-fly-conversation-cwd-and-workspace",
+        "to": "wi7-fly-work-agent-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-fly-work-agent-service",
+        "to": "wi8-work-door-route",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-work-door-route",
+        "to": "wi9-cli-start-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-remote-state-tmux-target",
+        "to": "wi10-reap-linked-agents",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-sweep-defers-to-reap",
+        "to": "wi10-reap-linked-agents",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-discovery-linked-conversations",
+        "to": "wi12-tree-row-opens-linked",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-docs",
+        "to": "wi14-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-cli-start-remote",
+        "to": "wi14-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-reap-linked-agents",
+        "to": "wi14-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-tree-row-opens-linked",
+        "to": "wi14-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-remote-prompt-workspace-path",
+        "to": "wi14-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-remote-state-tmux-target",
+        "to": "wi3-push-daemon-workdir",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
