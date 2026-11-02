@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4813",
   "created": "2026-11-02T13:36:08.209Z",
-  "updated": "2026-11-02T13:56:16.711Z",
+  "updated": "2026-11-02T13:56:27.234Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4813",
       "claimedAt": "2026-11-02T13:36:08.209Z",
       "doneAt": "2026-11-02T13:56:16.710Z"
+    },
+    "fallback-rows": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4813",
+      "claimedAt": "2026-11-02T13:56:27.234Z"
     }
   }
 }
