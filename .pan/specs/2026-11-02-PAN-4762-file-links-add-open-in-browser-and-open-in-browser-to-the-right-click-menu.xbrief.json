@@ -4,17 +4,17 @@
     "created": "2026-11-02T01:17:07Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4762: File links: add Open in browser and Open in <Browser> to the right-click menu",
-    "updated": "2026-11-02T01:20:16.044Z"
+    "updated": "2026-11-02T01:21:16.141Z"
   },
   "plan": {
     "id": "pan-4762",
     "title": "File links: add Open in browser and Open in <Browser> to the right-click menu",
-    "status": "proposed",
+    "status": "running",
     "uid": "8eace65f-137c-4f86-920b-e7f8f34b6b4c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T01:17:07Z",
-    "updated": "2026-11-02T01:20:16.044Z",
+    "updated": "2026-11-02T01:21:16.141Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4762",
@@ -578,5 +578,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
