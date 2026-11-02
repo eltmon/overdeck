@@ -86,6 +86,8 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'gemini-3.1-flash-lite': 'small',
   'gemini-3.5-flash-lite': 'small',
   'glm-4.7-flash': 'small',
+  'glm-5.3-flash': 'small',
+  'glm-5.3-flashx': 'small',
   'ql-nano-1b': 'small',
   'llama-3.1-8b-instant': 'small',
   'gemma2-9b-it': 'small',

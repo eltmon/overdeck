@@ -170,6 +170,8 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // Z.AI (GLM) — PAN-1935: previously absent, so pi-harness GLM agents recorded $0 cost.
   // GLM-5.x: $1.4/M in, $4.4/M out (docs.z.ai/guides/overview/pricing). cacheRead set to
   // ~7% of input to approximate Z.AI's context-cache discount — verify upstream and refine.
+  { provider: 'custom', model: 'glm-5.3-flashx', inputPer1k: 0.00037, outputPer1k: 0.00125, cacheReadPer1k: 0.000075, currency: 'USD' },
+  { provider: 'custom', model: 'glm-5.3-flash', inputPer1k: 0.00015, outputPer1k: 0.0005, cacheReadPer1k: 0.00003, currency: 'USD' },
   { provider: 'custom', model: 'glm-5.2', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.0001, currency: 'USD' },
   { provider: 'custom', model: 'glm-5.1', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.0001, currency: 'USD' },
   // GLM-4.7: approximate in/out split of the $1.5/M blended average — verify upstream.

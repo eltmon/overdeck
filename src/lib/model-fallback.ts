@@ -96,6 +96,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // Z.AI models
   'glm-5.3': 'zai',
+  'glm-5.3-flash': 'zai',
+  'glm-5.3-flashx': 'zai',
   'glm-5.2': 'zai',
   'glm-5.1': 'zai',
   'glm-4.7': 'zai',
@@ -193,6 +195,8 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'MiniMax-M3': 'claude-sonnet-5-5', // Top-tier coding → Sonnet
 
   // Z.AI → Anthropic
+  'glm-5.3-flash': 'claude-haiku-4-5', // fast tier → Haiku
+  'glm-5.3-flashx': 'claude-haiku-4-5', // fast tier → Haiku
   'glm-5.2': 'claude-sonnet-5-5', // Current GLM flagship → Sonnet
   'glm-5.1': 'claude-sonnet-5-5', // Previous GLM flagship → Sonnet
   // Deprecated Z.AI IDs — explicit targets preserve tier semantics independent of

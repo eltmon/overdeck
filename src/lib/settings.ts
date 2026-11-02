@@ -40,7 +40,7 @@ export type KimiModel = 'k3.1-pro' | 'k3.1-pro-highspeed' | 'k3' | 'k3[1m]' | 'k
   | 'kimi-code/k3.1-pro' | 'kimi-code/k3.1-pro-highspeed'
   | 'kimi-code/k3' | 'kimi-code/k3-256k' | 'kimi-code/kimi-for-coding' | 'kimi-code/kimi-for-coding-highspeed';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3';
-export type ZAIModel = 'glm-5.3' | 'glm-5.2' | 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
+export type ZAIModel = 'glm-5.3' | 'glm-5.3-flash' | 'glm-5.3-flashx' | 'glm-5.2' | 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
 export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
 export type NousModel = 'qwen/qwen3.6-plus';
 export type DashScopeModel = 'qwen3.7-plus' | 'qwen3.8-flash' | 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max' | 'qwen3.8-max';

@@ -26,4 +26,12 @@ describe('November 2026 Gemini, Qwen and GLM catalog refresh (PAN-4827)', () => 
       expect(model.costPer1MTokens).not.toBe(0);
     }
   });
+
+  it('registers glm-5.3-flash and glm-5.3-flashx', () => {
+    const group = MODELS_BY_PROVIDER.zai;
+    expect(group).toBeDefined();
+    const byId = Object.fromEntries(group.models.map((m) => [m.id, m]));
+    expect(byId['glm-5.3-flash'].costPer1MTokens).toBe(0.325);
+    expect(byId['glm-5.3-flashx'].costPer1MTokens).toBe(0.81);
+  });
 });

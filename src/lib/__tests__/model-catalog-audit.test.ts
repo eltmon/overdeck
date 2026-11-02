@@ -52,6 +52,8 @@ describe('September model catalog no-loss audit', () => {
     ['gemini-3.1-flash-lite', 'google', 1048576],
     ['gemini-3.6-flash', 'google', 1048576],
     ['qwen3.8-max', 'dashscope', 1000000],
+    ['glm-5.3-flash', 'zai', 1000000],
+    ['glm-5.3-flashx', 'zai', 1000000],
   ] as const)('registers %s with the intended context and provider', (id, provider, contextWindow) => {
     expect(MODEL_CAPABILITIES[id].contextWindow).toBe(contextWindow);
     expect(getProviderForModel(id).name).toBe(provider);
@@ -136,5 +138,13 @@ describe('November 2026 Gemini, Qwen and GLM refresh (PAN-4827)', () => {
     expect(MODEL_CAPABILITIES[id].costPer1MTokens).not.toBe(0);
     expect(MODEL_CAPABILITIES[id].costPer1MTokens).toBe(costPer1MTokens);
     expect(getPricing('custom', id)).toMatchObject({ inputPer1k, outputPer1k });
+  });
+
+  it('registers glm-5.3-flash and glm-5.3-flashx with image support and prefix-correct pricing', () => {
+    expect(getPricing('custom', 'glm-5.3-flashx-legal')!.inputPer1k).toBe(0.00037);
+    for (const id of ['glm-5.3-flash', 'glm-5.3-flashx'] as const) {
+      expect(MODEL_CAPABILITIES[id].effortLevels).toEqual(['low', 'high', 'max']);
+      expect(MODEL_CAPABILITIES[id].supportsImages).toBe(true);
+    }
   });
 });

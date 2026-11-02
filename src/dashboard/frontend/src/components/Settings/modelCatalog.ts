@@ -109,6 +109,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
     name: 'Zhipu (GLM)',
     models: [
       { id: 'glm-5.3' as ModelId, name: 'GLM-5.3 (1M context)', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
+      { id: 'glm-5.3-flash' as ModelId, name: 'GLM-5.3 Flash (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.325, capabilities: ['fast', 'cost-efficient', 'code', 'vision', 'large-context'], description: 'Z.AI fast tier. $0.15/$0.50 per MTok, 1M context, image and video input.' },
+      { id: 'glm-5.3-flashx' as ModelId, name: 'GLM-5.3 FlashX (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.81, capabilities: ['fast', 'cost-efficient', 'code', 'vision', 'large-context'], description: 'Z.AI faster paid Flash tier. $0.37/$1.25 per MTok, 1M context, image and video input.' },
       { id: 'glm-5.2' as ModelId, name: 'GLM-5.2 (1M context)', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Z.AI flagship, 1M context, high/max effort, strong agentic coding. Text-only (vision is a separate model line).' },
       { id: 'glm-5.1' as ModelId, name: 'GLM-5.1 (200K context)', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Previous Z.AI flagship, 200K context, strong agentic coding. Text-only (vision is a separate model line).' },
     ],
