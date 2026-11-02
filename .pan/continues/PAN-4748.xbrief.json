@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4748",
   "created": "2026-11-02T03:23:38.611Z",
-  "updated": "2026-11-02T05:21:04.572Z",
+  "updated": "2026-11-02T05:21:28.110Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "fly-api-retry.ac5": {
       "status": "completed",
       "doneAt": "2026-11-02T05:21:04.572Z"
+    },
+    "poll-token-hard-fail.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:21:28.110Z"
     }
   }
 }
