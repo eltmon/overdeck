@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T23:45:11.241Z",
+  "updated": "2026-11-02T23:45:27.899Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -208,6 +208,10 @@
     "smoke-needs-docker.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T23:45:11.241Z"
+    },
+    "smoke-needs-docker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:45:27.898Z"
     }
   }
 }
