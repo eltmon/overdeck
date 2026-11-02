@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProjectConfig } from '../../../projects.js';
 import { FlyApiError, type FlyExecResult } from '../../../remote/fly-api.js';
-import { ensureFlyProject } from '../project.js';
+import { ensureFlyProject, ensureFlyWorkspace } from '../project.js';
 
 const MACHINE = { appName: 'overdeck-ws', machineId: '148e21ea7e1689' };
 const PROJECT = { name: 'overdeck', path: '/home/me/Projects/overdeck', github_repo: 'eltmon/overdeck', issue_prefix: 'PAN' } as ProjectConfig;
@@ -119,5 +119,48 @@ describe('ensureFlyProject (PAN-4652 WI-9)', () => {
     await vi.advanceTimersByTimeAsync(5_000);
     await expect(pending).resolves.toBeUndefined();
     expect(pollExecs).toBe(2);
+  });
+});
+
+describe('ensureFlyWorkspace (PAN-4734 WI-6)', () => {
+  const WORKTREE = '/workspace/overdeck/workspaces/feature-pan-4734';
+
+  it('fetches the branch, adds the worktree with the agent identity and returns its path', async () => {
+    const { api, execs } = fakeApi((command) =>
+      command.startsWith('git -C') ? { stdout: 'feature/pan-4734\n' } : undefined);
+
+    expect(await ensureFlyWorkspace(MACHINE, 'overdeck', 'PAN-4734', { api })).toBe(WORKTREE);
+    expect(execs).toEqual([
+      'cd /workspace/overdeck && git config user.email "panopticon-agent[bot]@users.noreply.github.com" && git config user.name "panopticon-agent[bot]" && git fetch origin feature/pan-4734 && git worktree add -b feature/pan-4734 workspaces/feature-pan-4734 origin/feature/pan-4734',
+      `git -C ${WORKTREE} branch --show-current`,
+    ]);
+    expect(api.execCommand).toHaveBeenCalledWith(MACHINE.appName, MACHINE.machineId, ['/bin/sh', '-c', expect.any(String)], 60);
+  });
+
+  it('fails with workspace-failed and the stderr when the worktree command exits non-zero', async () => {
+    const { api } = fakeApi((command) =>
+      command.startsWith('cd ') ? { exit_code: 128, stderr: "fatal: couldn't find remote ref feature/pan-4734\n" } : undefined);
+
+    await expect(ensureFlyWorkspace(MACHINE, 'overdeck', 'PAN-4734', { api })).rejects.toMatchObject({
+      code: 'workspace-failed',
+      message: expect.stringContaining("couldn't find remote ref feature/pan-4734"),
+    });
+  });
+
+  it('fails with workspace-failed when the worktree is on another branch', async () => {
+    const { api } = fakeApi((command) => command.startsWith('git -C') ? { stdout: 'main\n' } : undefined);
+
+    await expect(ensureFlyWorkspace(MACHINE, 'overdeck', 'PAN-4734', { api })).rejects.toMatchObject({
+      code: 'workspace-failed',
+      message: expect.stringContaining('is on main, not feature/pan-4734'),
+    });
+  });
+
+  it('fails before any exec for an invalid issue id or project key', async () => {
+    const { api } = fakeApi(() => undefined);
+
+    await expect(ensureFlyWorkspace(MACHINE, 'overdeck', 'PAN-1; rm -rf /', { api })).rejects.toMatchObject({ code: 'workspace-failed' });
+    await expect(ensureFlyWorkspace(MACHINE, '../etc', 'PAN-1', { api })).rejects.toMatchObject({ code: 'workspace-failed' });
+    expect(api.execCommand).not.toHaveBeenCalled();
   });
 });

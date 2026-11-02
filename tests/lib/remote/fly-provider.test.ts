@@ -40,6 +40,12 @@ vi.mock('../../../src/lib/remote/fly-api.js', () => ({
   createFlyApiClient: vi.fn(() => mockApi),
 }));
 
+const { listFlyMachinesMock } = vi.hoisted(() => ({ listFlyMachinesMock: vi.fn().mockResolvedValue([]) }));
+
+vi.mock('../../../src/lib/anywhere/fly/machine-store.js', () => ({
+  listFlyMachines: listFlyMachinesMock,
+}));
+
 // Mock fs so resolveVm can't find workspace metadata
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -407,6 +413,21 @@ describe('resolveVm — public method', () => {
     const result = await provider.resolveVm('test-vm');
     expect(result.appName).toBe('test-app');
     expect(result.machineId).toBe('machine-1');
+  });
+
+  it('resolves a Fly machine record by name, in its own app, without listing (PAN-4734)', async () => {
+    listFlyMachinesMock.mockResolvedValueOnce([
+      { id: 'rec-1', machineName: 'overdeck-machine-1a2b3c4d', machineId: 'm-42', appName: 'custom-app' },
+    ]);
+    const result = await provider.resolveVm('overdeck-machine-1a2b3c4d');
+    expect(result).toEqual({ appName: 'custom-app', machineId: 'm-42' });
+    expect(mockApi.listMachines).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the API listing when the Fly machine store is unreadable', async () => {
+    listFlyMachinesMock.mockRejectedValueOnce(new Error('unexpected shape'));
+    mockApi.listMachines.mockResolvedValue([{ id: 'machine-1', name: 'test-vm', state: 'started', region: 'iad' }]);
+    expect(await provider.resolveVm('test-vm')).toEqual({ appName: 'test-app', machineId: 'machine-1' });
   });
 
   it('throws when vm not found', async () => {

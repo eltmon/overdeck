@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   listSessionNames: vi.fn(),
   listWorkspaces: vi.fn(),
   listConversations: vi.fn(),
+  listLinkedConversations: vi.fn(),
   openPullRequests: [] as unknown[],
   readdir: vi.fn(),
   resolveAgentGitInfo: vi.fn(),
@@ -96,6 +97,10 @@ vi.mock('../../../../../src/dashboard/server/services/tracker-config.js', () => 
   getGitHubConfig: mocks.getGitHubConfig,
 }));
 
+vi.mock('../../../../../src/lib/overdeck/linked-conversations.js', () => ({
+  listLinkedConversations: mocks.listLinkedConversations,
+}));
+
 vi.mock('../../../../../src/lib/overdeck/conversations.js', () => ({
   listConversations: mocks.listConversations,
 }));
@@ -153,6 +158,7 @@ beforeEach(() => {
     sessionNames: new Set(await Effect.runPromise(mocks.listSessionNames())),
   }));
   mocks.listConversations.mockReturnValue([]);
+  mocks.listLinkedConversations.mockReturnValue([]);
   mocks.openPullRequests = [];
   mocks.readdir.mockResolvedValue([]);
   mocks.stat.mockRejectedValue(new Error('no such file'));
@@ -899,6 +905,44 @@ describe('resource-discovery conversation signal', () => {
     expect(issue!.resourceDetails.conversations).toEqual([
       { id: 1, name: 'conv-pan-9003', title: 'Conversation title', status: 'active' },
     ]);
+  });
+
+  it('lists a cached linked conversation under its issue with origin linked (PAN-4734)', async () => {
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([membership('PAN-9003')]);
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9003', title: 'Conv issue', state: 'in_progress', rawTrackerState: 'In Progress' },
+    ]);
+    mocks.listConversations.mockReturnValue([makeConversation({})]);
+    const linkedRow = (id: number, name: string, releasedTo: string | null) => ({
+      id, environmentId: 'env-1', name, nativeSessionId: null, cachedAt: '', listHash: '',
+      row: { issueId: 'PAN-9003', releasedTo, title: 'Work agent', status: 'active' },
+    });
+    mocks.listLinkedConversations.mockReturnValue([
+      linkedRow(7, '20261102-1234', null),
+      linkedRow(8, '20261102-5678', 'env-home'),
+    ]);
+
+    const discovered = await discoverResourceAllocatedIssues();
+    const issue = discovered.find((entry) => entry.issueId === 'PAN-9003');
+
+    expect(issue!.resourceDetails.conversations).toEqual([
+      { id: 1, name: 'conv-pan-9003', title: 'Conversation title', status: 'active' },
+      { id: -7, name: '@env-1/20261102-1234', title: 'Work agent', status: 'active', origin: 'linked' },
+    ]);
+    expect(mocks.listLinkedConversations).toHaveBeenCalledWith({ readOnly: true });
+  });
+
+  it('lists no linked conversation when the linked cache cannot be read', async () => {
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([membership('PAN-9003')]);
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9003', title: 'Conv issue', state: 'in_progress', rawTrackerState: 'In Progress' },
+    ]);
+    mocks.listConversations.mockReturnValue([makeConversation({})]);
+    mocks.listLinkedConversations.mockImplementation(() => { throw new Error('no database'); });
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.find((entry) => entry.issueId === 'PAN-9003')!.resourceDetails.conversations).toHaveLength(1);
   });
 
   it('ignores conversations with a null issueId', async () => {

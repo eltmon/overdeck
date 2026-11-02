@@ -204,7 +204,7 @@ function ComposerFooterInput({
       const def = findModelDef(model);
       toast.warning(
         `${def?.name ?? model} can't read images — image${imageFiles.length === 1 ? '' : 's'} not attached. ` +
-        `Switch to a vision-capable model (e.g. MiMo V2.5) to send images.`,
+        `Switch to a vision-capable model to send images.`,
       );
     }
 

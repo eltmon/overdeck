@@ -68,6 +68,10 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   (`kimi-claude-routing.ts`, a narrow id set) and `resolveKimiModelForEndpoint` (`providers.ts`,
   coding vs platform endpoint); native `kimi-code/*` aliases need rows in both
   `KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS` and `acp/kimi.ts` `KIMI_ACP_MODEL_IDS` (a lockstep test).
+  `MODEL_CAPABILITIES` is `Record<ModelId, …>`: a retired id stays in its type union and
+  routing list (only `models`/`tierModels`/pickers drop it). A provider-native id containing `/`
+  (Nous `qwen/qwen3.6-plus`) needs a carve-out before the OpenRouter slash catch-all in
+  `getProviderForModel` and `isOpenRouterModel`. Effort = model ∩ harness row (`effort-support.ts`).
 - `config-yaml.ts` — `~/.overdeck/*.yaml` settings: `RoleConfig` (model/harness/effort
   per role), `providerHarnesses`, workhorses, normalization + defaults.
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
@@ -176,20 +180,26 @@ There is no per-issue pipeline record since the Cut (PAN-3917).
 
 ## Remote (Fly.io) work agents
 
-Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
-`fly-provider.ts`; the VM is created by `src/lib/remote-workspace.ts`
-`createRemoteWorkspace`). State lives at
+Work agents can run on Fly.io VMs. State lives at
 `~/.overdeck/agents/agent-<issue>/remote-state.json` (`location: 'remote'`,
 `vmName`, `status`), scanned by `listActiveRemoteAgentStates()`
-(`remote-agents.ts`). The dashboard surfaces them only as an issue chip and
-aggregate status through `services/resource-discovery.ts` (PAN-1676). There is
-no remote session-row synthesis in `routes/projects.ts`
-`collectSessionTreeNodes()`: the PAN-1775 commit never merged, and a remote
-agent shows a row only when a `state.json` exists (dashboard spawn or after the
-reap). Remote agents have no local tmux session — never assume tmux discovery
-covers them. PAN-4652 adds **Fly machines**: Fly VMs that run `pan serve` and
-are linked from home (`src/lib/anywhere/fly/`, `services/fly-machine-service.ts`,
-`pan machines add-fly`); PAN-4734 moves work agents onto that path. The default
+(`remote-agents.ts`). Since PAN-4734, `pan start --remote` (and `--machine fly`)
+goes through `src/cli/commands/start-remote.ts` → `POST /api/remote/work-agents`
+→ `services/fly-work-agent-service.ts`: the agent runs as a **conversation** on a
+PAN-4652 Fly machine (VMs that run `pan serve`, linked from home:
+`src/lib/anywhere/fly/`, `services/fly-machine-service.ts`, `pan machines add-fly`),
+in the worktree `/workspace/<project>/workspaces/feature-<issue>`. Its remote-state
+carries `linked: true` plus the VM tmux target (`tmuxSession: conv-<name>`,
+`tmuxSocket: overdeck`) that every remote tmux helper resolves through
+`remoteTmuxTarget()`. The issue tree shows it as a linked conversation row
+(`resourceDetails.conversations`, `origin: 'linked'`), not a `SessionNode`. Legacy
+raw-tmux VMs (`src/lib/remote-workspace.ts` `createRemoteWorkspace`, no Overdeck
+server) remain only for workspaces created before PAN-4734; the dashboard helper
+`handleRemoteAgentSpawn` still spawns on them and writes `state.json`. Remote agents
+have no local tmux session — never assume tmux discovery covers them. The reap is
+`remote-completion.ts` (deacon-lite, behind the freeze, keyed on
+`/workspace/.pan/REMOTE_DONE`); for a linked agent it destroys the Fly machine
+through `destroyAndForgetFlyMachine` (`fly-machine-loops.ts`). The default
 image is `registry.fly.io/<app>:latest` (`defaultFlyImage()` in `fly-provider.ts`,
 used by both `FlyProvider` and `provisionFlyMachine`), because the Fly registry is
 app-scoped (PAN-4682).
@@ -312,4 +322,4 @@ Gauntlet lanes across machines (PAN-4638): home keeps the run rules in `src/lib/
 
 Model and built-ins (`overdeck-dark`, `overdeck-light`; read-only, full terminal palette, no `ui`/`syntax`) live in `packages/contracts/src/color-theme.ts` (`normalizeColorTheme`, `effectiveTerminalPalette`, `slugifyThemeId`, `RESERVED_COLOR_THEME_IDS`). User themes are `~/.overdeck/themes/<id>.json` via `src/lib/color-themes/store.ts` (read fresh on every list; `saveColorTheme` is create-only — `claimThemeFile` uses `link()` and suffixes `-2`, never overwrites; `updateColorTheme` is the in-place counterpart — temp file + `rename()`, refuses built-in/reserved ids). Selection is `ui.color_theme.{light,dark}` in `config.yaml` (`selection.ts` read, `selection-write.ts` write door); `terminal-background.ts` feeds the tmux `window-style` stamp for new sessions only. VS Code import: `vscode-import.ts` maps one theme JSON(C); `.vsix` packages (PAN-4659) are read in memory by `zip-reader.ts` and every contributed theme is mapped by `vsix-import.ts`; the preview route returns a `themes[]` array and writes nothing. Routes: `src/dashboard/server/routes/color-themes.ts` (`GET /api/color-themes`, `PUT …/selection`, `POST …/import/preview`, `POST /api/color-themes`, `PUT /api/color-themes/:id`). Frontend: `hooks/useColorTheme.ts` (zustand; `applyUiTokens` writes the `ui` subset as inline styles on `<html>`, never signal/state tokens; `reconcileFromServer` refetches and re-applies; `updateTheme` PUTs then reconciles), `lib/uiTokenStyles.ts` (pure `uiTokenStyles(theme)`, shared by `applyUiTokens` and the editor preview), `lib/colorThemeEditor.ts` (pure draft model: `createDraft`/`setEdit`/`revertEdit`/`draftToFile`/`pickerValue`), `lib/syntaxTheme.ts` (content-hashed Shiki theme names), consumers `XTerminal.tsx`, `chat/ChatMarkdown.tsx`, `chat/MarkdownFileLink.tsx`; UI in `Settings/sections/ColorThemeSection.tsx` (theme list, Duplicate-and-edit/Edit entry points) + `ColorThemeImportPreview.tsx` + `ColorThemeEditor.tsx` + `ColorThemeEditorPreview.tsx`. Docs: `configuration/appearance.mdx` "Color themes".
 
-<!-- last-verified: 2026-11-02 (PAN-4820, PAN-4813, PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759, PAN-4682, PAN-4655, PAN-4644, PAN-4659, PAN-4660, PAN-4743, PAN-4722) -->
+<!-- last-verified: 2026-11-02 (PAN-4820, PAN-4825, PAN-4813, PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759, PAN-4682, PAN-4655, PAN-4644, PAN-4659, PAN-4660, PAN-4743, PAN-4722) -->

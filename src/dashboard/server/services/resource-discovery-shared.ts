@@ -1,7 +1,10 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
+import { linkedConversationName } from '@overdeck/contracts';
+
 import { listConversations, type LegacyConversation as Conversation } from '../../../lib/overdeck/conversations.js';
+import { listLinkedConversations } from '../../../lib/overdeck/linked-conversations.js';
 import { getRuntimeCensus } from '../../../lib/runtime-census.js';
 
 const execFileAsync = promisify(execFile);
@@ -26,11 +29,25 @@ interface ActiveRemoteAgentState {
   startedAt: string;
 }
 
+/** A cached conversation on a linked machine that names an issue (PAN-4734 FR-14). */
+export interface LinkedIssueConversation {
+  /** The negative `linked_conversations` rowid, as in the merged conversation list. */
+  id: number;
+  /** `@<environmentId>/<name>`, the conversation's route key. */
+  name: string;
+  issueId: string;
+  title: string | null;
+  status: string;
+  tmuxSession: null;
+  origin: 'linked';
+}
+
 export interface SharedResourceSignals {
   trackerIssues: Map<string, TrackerIssueRecord>;
   tmuxSessions: string[];
   dockerContainers: string[];
   conversations: Conversation[];
+  linkedConversations: LinkedIssueConversation[];
   remoteAgentStates: ActiveRemoteAgentState[];
 }
 
@@ -61,6 +78,26 @@ async function loadDockerContainers(): Promise<string[]> {
   }
 }
 
+/** Linked conversations with an issue that are still on their machine (not pulled here). */
+function loadLinkedIssueConversations(): LinkedIssueConversation[] {
+  try {
+    return listLinkedConversations({ readOnly: true })
+      .filter((record) => record.row.issueId && record.row.releasedTo === null)
+      .map((record) => ({
+        id: -record.id,
+        name: linkedConversationName(record.environmentId, record.name),
+        issueId: record.row.issueId!,
+        title: record.row.title,
+        status: record.row.status,
+        tmuxSession: null,
+        origin: 'linked' as const,
+      }));
+  } catch {
+    // The linked cache is optional for resource discovery.
+    return [];
+  }
+}
+
 async function loadActiveRemoteAgentStates(): Promise<ActiveRemoteAgentState[]> {
   try {
     const { listActiveRemoteAgentStates } = await import('../../../lib/remote/remote-agents.js');
@@ -84,5 +121,5 @@ export async function captureSharedResourceSignals(): Promise<SharedResourceSign
   } catch {
     // Conversation state is optional for resource discovery.
   }
-  return { trackerIssues, tmuxSessions, dockerContainers, conversations, remoteAgentStates };
+  return { trackerIssues, tmuxSessions, dockerContainers, conversations, linkedConversations: loadLinkedIssueConversations(), remoteAgentStates };
 }

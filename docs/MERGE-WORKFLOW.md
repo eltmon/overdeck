@@ -487,6 +487,13 @@ Close-out's DoD row 8 (deploy) probes the dashboard's `/api/health` up to 3 time
 can stall for several seconds right after a close-out. The row reports `dashboard not
 reachable` only when every attempt fails, and the observed text says `after 3 attempts`.
 
+Close-out's DoD rows 1 (review) and 2 (tests) read the issue's PR from the forge, retrying once after
+1 s (`src/lib/lifecycle/dod-pr-read.ts`). A read that fails twice is a `MISS` whose observed text is
+`pull request read failed on the forge after 2 attempts: <error>` — never `no pull request found`, which
+now means only that the forge answered and no PR exists. A failed read is never waived by the strike
+path or by tracker-closed settlement. Each failed attempt prints a `[dod-gate] … pull request read
+failed (attempt n of 2)` warning. `fetchIssuePullRequest` never caches a failed read (PAN-4821).
+
 Close-out prunes only regenerable agent-directory weight: `pending.lock`,
 `*.sock`, and each `codex-home*/` entry except `sessions/`. It keeps
 `state.json`, the append-only `sessions.json` index, lifecycle and activity

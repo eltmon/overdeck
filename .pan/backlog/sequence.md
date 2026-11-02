@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T17:08:47.110787Z · model: claude-opus-5-5 · open: 874_
+_Last sequenced: 2026-11-02T18:22:22.036632Z · model: claude-opus-5-5 · open: 876_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -274,7 +274,6 @@ _Last sequenced: 2026-11-02T17:08:47.110787Z · model: claude-opus-5-5 · open: 
 | 266 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 267 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 268 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 269 | PAN-4696 | XS | medium | ok |  |  | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
 | 272 | PAN-4820 | XL | medium | ok |  |  | Run one issue on Deft Directive pipeline (hidden temp install, merge guard, native dashboard view, switch back); decisions made |
@@ -282,6 +281,7 @@ _Last sequenced: 2026-11-02T17:08:47.110787Z · model: claude-opus-5-5 · open: 
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4849 | XL | medium | ok |  | PAN-4820 | Part B of PAN-4820: Deft state surfaces, review-cycle view and Run on Deft switch in the dashboard; blocked by PAN-4820 |
 | 276 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
+| 277 | PAN-4852 | L | medium | ok |  | PAN-4820 | SageOx core: transient per-project binding, Overdeck-built ox, Codex launches, fork rebase; in pipeline, waits on PAN-4820 merge |
 | 278 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
 | 278 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
 | 279 | PAN-4817 | S | medium | ok |  | PAN-4778 | Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification. |
@@ -300,6 +300,7 @@ _Last sequenced: 2026-11-02T17:08:47.110787Z · model: claude-opus-5-5 · open: 
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
 | 292 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
 | 293 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
+| 294 | PAN-4853 | M | low | ok |  | PAN-4852 | SageOx dashboard views (session tab, context trace, project panel); blocked by PAN-4852; session-to-issue mapping is a checkpoint |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
 | 296 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
 | 297 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
@@ -879,6 +880,7 @@ _Last sequenced: 2026-11-02T17:08:47.110787Z · model: claude-opus-5-5 · open: 
 | 878 | PAN-4841 | M | medium | ok |  | PAN-4774 | Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases. |
 | 879 | PAN-4839 | S | low | ok |  | PAN-4774, PAN-4838 | Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838 and PAN-4774. |
 | 880 | PAN-4842 | S | medium | ok |  | PAN-4774, PAN-4837 | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
+| 881 | PAN-4851 | S | low | needs-refinement |  | PAN-4820 | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 
 ## Rationale detail
 
@@ -1209,10 +1211,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T17:08:47.110787Z",
+  "generatedAt": "2026-11-02T18:22:22.036632Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 874,
+  "openCount": 876,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -4632,19 +4634,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "condition": "ok",
       "dependsOn": [],
       "why": "pan tell contradicts itself on dead ohmypi sessions",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4696",
-      "rank": 269,
-      "size": "XS",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build.",
-      "rationale": "Rank 275->269: PAN-4295 merged, so this post-merge smoke on the deployed build is unblocked and actionable now.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12164,6 +12153,51 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "New issue split from PAN-4820 at the operator's request; its design (WI-15 to WI-29) lives in the PAN-4820 PRD and it is explicitly blocked by PAN-4820, so it sits in the free slot just after its blocker.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4851",
+      "rank": 881,
+      "size": "S",
+      "importance": "low",
+      "score": 15,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4820"
+      ],
+      "why": "Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them",
+      "rationale": "New issue: an undecided low-priority question that the operator parked explicitly, so it ranks at the bottom of the backlog until they decide.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4852",
+      "rank": 277,
+      "size": "L",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4820"
+      ],
+      "why": "SageOx core: transient per-project binding, Overdeck-built ox, Codex launches, fork rebase; in pipeline, waits on PAN-4820 merge",
+      "rationale": "New in-pipeline issue, pinned in the free rank after the Deft part-B work: it reuses PAN-4820's worktree hide module and merge guard and states work starts after PAN-4820 merges, so it ranks just behind that cluster as decided feature work, not substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4853",
+      "rank": 294,
+      "size": "M",
+      "importance": "low",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4852"
+      ],
+      "why": "SageOx dashboard views (session tab, context trace, project panel); blocked by PAN-4852; session-to-issue mapping is a checkpoint",
+      "rationale": "New issue: dashboard read-only views over SageOx files, explicitly blocked by PAN-4852 part A, so it sits right after part A with lower importance as UI follow-up.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13771,15 +13805,36 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "confidence": 0.8
     },
     {
-      "from": "PAN-4847",
-      "to": "PAN-4696",
+      "from": "PAN-4820",
+      "to": "PAN-4849",
       "type": "unblocks",
       "source": "github-ref",
-      "confidence": 0.9
+      "confidence": 1
     },
     {
       "from": "PAN-4820",
-      "to": "PAN-4849",
+      "to": "PAN-4851",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4849",
+      "to": "PAN-4851",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4820",
+      "to": "PAN-4852",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4852",
+      "to": "PAN-4853",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1

@@ -54,8 +54,8 @@ export function buildKimiAcpSpawnInput(
  *   kimi-code/k3.1-pro-highspeed         K3.1 Pro Highspeed, 1,048,576-token context
  *   kimi-code/k3                         K3, 1,048,576-token context
  *   kimi-code/k3-256k                    K3, 262,144-token context
- *   kimi-code/kimi-for-coding            K2.7 Coding, 262,144-token context
- *   kimi-code/kimi-for-coding-highspeed  K2.7 Coding Highspeed
+ *   kimi-code/kimi-for-coding            K2.8 Preview, 1,048,576-token context
+ *   kimi-code/kimi-for-coding-highspeed  K2.7 Code Highspeed, 262,144-token context
  *
  * Overdeck's catalog ids (`k3` = 256K, `k3[1m]` = 1M — see
  * src/lib/model-capabilities.ts) must be translated at this boundary or the

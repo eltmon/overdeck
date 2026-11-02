@@ -278,6 +278,8 @@ describe('settings', () => {
         'gpt-6-luna',
         'gpt-6.1-sol',
         'gpt-6.1-terra',
+        'gpt-6-rosalind',
+        'gpt-6-astra-law',
       ]);
     });
 
@@ -307,7 +309,7 @@ describe('settings', () => {
 
       const available = getAvailableModels(settings);
 
-      expect(available.minimax).toEqual(['MiniMax-M3', 'minimax-m2.7', 'minimax-m2.7-highspeed']);
+      expect(available.minimax).toEqual(['MiniMax-M3', 'MiniMax-M3.1-Flash', 'minimax-m2.7', 'minimax-m2.7-highspeed']);
     });
 
     it('should return Kimi models when API key is configured', async () => {
@@ -329,7 +331,7 @@ describe('settings', () => {
 
       const available = getAvailableModels(settings);
 
-      expect(available.xai).toEqual(['grok-build-0.1']);
+      expect(available.xai).toEqual(['grok-build-0.1', 'grok-4.7', 'grok-4.3']);
     });
 
     it('should return multiple providers when multiple API keys configured', async () => {

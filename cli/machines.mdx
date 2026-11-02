@@ -209,11 +209,12 @@ pan lane start --run hotel --key 663 --role builder --brief b.md --machine auto
 | `--push-first` | (`pan start`, `pan worker run`) Push unpushed commits before starting on the other machine. |
 | `--ignore-unpushed` | (`pan start`, `pan worker run`) Start even though local commits are not pushed. |
 
-`--machine fly` refuses on `pan start`, `pan worker run` and `pan lane start`: a work agent
-on a new Fly machine is [PAN-4734](https://github.com/eltmon/overdeck/issues/4734) and a
-worker needs its issue workspace, which a new VM never has. A new Fly machine for a
-*conversation* is the new-conversation dialog's **Fly (new VM)** choice, or
-`pan machines add-fly --project <key> --message <text>`. See
+`pan start <id> --machine fly` starts the issue's work agent on a new Fly machine, the same
+as `pan start <id> --remote` (PAN-4734); see
+[Work agents on Fly](/configuration/linked-machines#work-agents-on-fly). `--machine fly`
+refuses on `pan worker run` and `pan lane start`: a worker needs its issue workspace, which
+a new VM never has. A new Fly machine for a *conversation* is the new-conversation dialog's
+**Fly (new VM)** choice, or `pan machines add-fly --project <key> --message <text>`. See
 [Linked machines](/configuration/linked-machines#start-work-on-another-machine).
 
 ## who

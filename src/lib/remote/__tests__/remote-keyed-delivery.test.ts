@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
-import { sendToRemoteAgentKeyed } from '../remote-agents.js';
+import { saveRemoteAgentState, sendToRemoteAgentKeyed } from '../remote-agents.js';
 import { dedupPendingOptionName, dedupPoisonOptionName, dedupTerminalOptionName, KeyedMarkerVerificationError, KeyedSubmitTargetDeadError } from '../../tmux-dedup.js';
 
 /**
@@ -461,6 +461,46 @@ describe('sendToRemoteAgentKeyed', () => {
 
     await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake', 'bad key with spaces', exec))
       .rejects.toThrow(/dedupKey/);
+  });
+});
+
+describe('sendToRemoteAgentKeyed linked work agent target (PAN-4734)', () => {
+  it('pastes and submits into the conversation session on the VM socket', async () => {
+    const linkedAgent = 'agent-pan-4734-keyed';
+    saveRemoteAgentState({
+      id: linkedAgent,
+      issueId: 'PAN-4734',
+      vmName: 'overdeck-machine-1a2b3c4d',
+      model: 'claude-opus-5-5',
+      status: 'running',
+      startedAt: '2026-11-02T00:00:00.000Z',
+      location: 'remote',
+      startedBy: 'operator',
+      linked: true,
+      tmuxSession: 'conv-20261102-1234',
+      tmuxSocket: 'overdeck',
+    });
+    const { exec, state } = createFakeRemoteTmux();
+
+    const outcome = await sendToRemoteAgentKeyed(linkedAgent, 'overdeck-machine-1a2b3c4d', 'wake up remote', KEY, exec);
+
+    expect(outcome).toBe('delivered');
+    expect(state.pastes).toBe(1);
+    expect(state.enters).toBe(1);
+    const tmuxCommands = state.commands.filter(command => command.startsWith(`'tmux'`));
+    expect(tmuxCommands.length).toBeGreaterThan(0);
+    for (const command of tmuxCommands) {
+      expect(command).toContain(`'tmux' '-L' 'overdeck'`);
+    }
+    const paste = state.commands.find(command => command.includes('if-shell') && command.includes('paste-buffer'));
+    const submit = state.commands.find(command => command.includes('if-shell') && command.includes('send-keys'));
+    expect(paste).toContain(`paste-buffer -b pan-keyed-`);
+    expect(paste).toContain(`-p -t conv-20261102-1234`);
+    expect(submit).toContain(`send-keys -t conv-20261102-1234 C-m`);
+    expect(submit).toContain(`'if-shell' '-t' 'conv-20261102-1234'`);
+    expect(state.commands.join('\n')).not.toMatch(/-t'? '?agent-pan-4734-keyed/);
+    // The prompt file keeps the agent id.
+    expect(state.writes[0]).toContain(`/prompts/${linkedAgent}-keyed-`);
   });
 });
 
