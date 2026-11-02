@@ -30,7 +30,7 @@ import { resolveSwarmPolicy } from '../../lib/swarm-policy.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { checkPlanFreshness, formatPlanFreshnessRefusal } from '../../lib/xbrief/freshness.js';
-import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
+import { findIssuePlan } from '../../lib/xbrief/issue-plan-lookup.js';
 import { writeAutoStartXBrief, type AutoSynthesizeIssueInput } from '../../lib/xbrief/auto-synthesize.js';
 import { transitionStartedXBrief, updateWorkspaceDraftPlanStatus } from './start-status.js';
 import { headDeletionEpoch } from './start-freshness.js';
@@ -870,9 +870,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // PAN-2407: route unplanned issues to the start-planning endpoint before
     // any workspace creation or remote provisioning.
     const projectRoot = findProjectRoot(id);
-    const existingPlan = workspacePath && !isRemote
-      ? findPlanSync(workspacePath)
-      : await Effect.runPromise(findSpecByIssue(projectRoot, id));
+    const existingPlan = await findIssuePlan({ issueId: id, projectRoot, localWorkspace: isRemote ? findLocalWorkspace(id) : workspacePath });
 
     if (!existingPlan) {
       if (resolvedPlanningMode === 'auto' || resolvedPlanningMode === 'interactive') {
