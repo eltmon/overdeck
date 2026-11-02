@@ -94,6 +94,13 @@ interface MergedRowDeps {
   readBranchContainment?: (ctx: LifecycleContext) => Promise<IssueBranchContainment>;
 }
 
+/** Row 4's PR read (PAN-4821): retried once; a final failure throws `PullRequestReadError`. */
+export async function readMergedRowPullRequest(ctx: LifecycleContext, branchName: string) {
+  if (!ctx.github) return {};
+  void branchName;
+  return (await readPullRequestWithRetry(fetchIssuePullRequest, ctx.issueId)) ?? {};
+}
+
 const defaultMergedRowDeps: MergedRowDeps = {
   verifyMerged: async () => ({
     step: 'close-out:verify-merged',
@@ -101,13 +108,7 @@ const defaultMergedRowDeps: MergedRowDeps = {
     skipped: false,
     error: 'merge verifier was not supplied',
   }),
-  readPullRequest: async (ctx, branchName) => {
-    if (!ctx.github) return {};
-    void branchName;
-    const response = await fetchIssuePullRequest(ctx.issueId);
-    if (response.error) throw new Error(response.error);
-    return response.pr ?? {};
-  },
+  readPullRequest: readMergedRowPullRequest,
   readMergedForgeArtifacts: async ctx => {
     const repos = resolveProjectReposForIssue(ctx.issueId)?.filter(repo => repo.required) ?? [];
     const artifacts = await Promise.all(repos.map(repo => getForgeAdapter(repo.forge).findMergedArtifact({
