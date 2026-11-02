@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4682",
   "created": "2026-11-02T03:20:08.527Z",
-  "updated": "2026-11-02T03:34:57.397Z",
+  "updated": "2026-11-02T03:35:14.661Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "provision-default-image.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T03:34:57.396Z"
+    },
+    "remote-setup-omit-image.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:35:14.661Z"
     }
   }
 }
