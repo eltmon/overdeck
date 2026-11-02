@@ -51,6 +51,7 @@ describe('September model catalog no-loss audit', () => {
     ['mimo-v2.5', 'mimo', 1048576],
     ['gemini-3.1-flash-lite', 'google', 1048576],
     ['gemini-3.6-flash', 'google', 1048576],
+    ['qwen3.8-max', 'dashscope', 1000000],
   ] as const)('registers %s with the intended context and provider', (id, provider, contextWindow) => {
     expect(MODEL_CAPABILITIES[id].contextWindow).toBe(contextWindow);
     expect(getProviderForModel(id).name).toBe(provider);
@@ -124,5 +125,16 @@ describe('November 2026 Gemini, Qwen and GLM refresh (PAN-4827)', () => {
   it('sets the DashScope tiers to the live ids', () => {
     expect(PROVIDERS.dashscope.tierModels).toEqual({ opus: 'qwen3.8-max', sonnet: 'qwen3.7-plus', haiku: 'qwen3.8-flash' });
     expect(PROVIDERS.dashscope.haikuModel).toBe('qwen3.8-flash');
+  });
+
+  it.each([
+    ['qwen3.7-plus', 1, 0.0004, 0.0016],
+    ['qwen3.8-flash', 0.31, 0.00015, 0.00047],
+    ['qwen3.7-max', 5, 0.0025, 0.0075],
+    ['qwen3.8-max', 4, 0.002, 0.006],
+  ] as const)('prices the live DashScope id %s with no $0 placeholder', (id, costPer1MTokens, inputPer1k, outputPer1k) => {
+    expect(MODEL_CAPABILITIES[id].costPer1MTokens).not.toBe(0);
+    expect(MODEL_CAPABILITIES[id].costPer1MTokens).toBe(costPer1MTokens);
+    expect(getPricing('custom', id)).toMatchObject({ inputPer1k, outputPer1k });
   });
 });

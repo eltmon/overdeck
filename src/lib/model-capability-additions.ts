@@ -260,14 +260,14 @@ export const AUDITED_MODEL_ADDITIONS = {
       speed: 68,
       'context-length': 99,
     },
-    notes: 'Verified September 2026: 1M context, 128K maximum output. Availability and pricing depend on provider region and account.',
+    notes: 'Verified September 2026: 1M context, 128K maximum output. $0.40/M input, $1.60/M output up to 256K input ($1.20/$4.80 above), a limited-time 20% discount as of 2026-11-02.',
   },
 
   'qwen3.8-flash': {
     model: 'qwen3.8-flash',
     provider: 'dashscope',
     displayName: 'Qwen3.8 Flash',
-    costPer1MTokens: 0,
+    costPer1MTokens: 0.31,
     contextWindow: 1000000,
     skills: {
       'code-generation': 97,
@@ -282,7 +282,7 @@ export const AUDITED_MODEL_ADDITIONS = {
       speed: 68,
       'context-length': 99,
     },
-    notes: 'Verified September 2026: 1M context, 128K maximum output. Availability and pricing depend on provider region and account.',
+    notes: 'Verified September 2026: 1M context, 128K maximum output. $0.15/M input, $0.47/M output (Singapore, verified 2026-11-02).',
   },
 
   // GPT-6 Sol / Luna (2026-09-22). Codex 0.157.1 `codex debug models`: context_window 272000,

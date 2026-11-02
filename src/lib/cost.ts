@@ -175,6 +175,13 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // GLM-4.7: approximate in/out split of the $1.5/M blended average — verify upstream.
   { provider: 'custom', model: 'glm-4.7', inputPer1k: 0.0005, outputPer1k: 0.002, cacheReadPer1k: 0.00005, currency: 'USD' },
   { provider: 'custom', model: 'glm-4.7-flash', inputPer1k: 0.0001, outputPer1k: 0.0005, currency: 'USD' },
+  // Alibaba DashScope Qwen, Singapore (ap-southeast-1), verified 2026-11-02 against
+  // alibabacloud.com/help/en/model-studio/model-pricing. The pi reconciler maps dashscope → custom.
+  // qwen3.7-plus: ≤256K-input rate, shown as a limited-time 20% discount; 256K–1M input is $1.20/$4.80.
+  { provider: 'custom', model: 'qwen3.8-max', inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.00025, currency: 'USD' },
+  { provider: 'custom', model: 'qwen3.8-flash', inputPer1k: 0.00015, outputPer1k: 0.00047, currency: 'USD' },
+  { provider: 'custom', model: 'qwen3.7-max', inputPer1k: 0.0025, outputPer1k: 0.0075, currency: 'USD' },
+  { provider: 'custom', model: 'qwen3.7-plus', inputPer1k: 0.0004, outputPer1k: 0.0016, currency: 'USD' },
   // Moonshot Kimi K2.7 Code (platform.moonshot.ai/docs/pricing/chat):
   // $0.95/M in (cache-miss), $4.00/M out, $0.19/M in (cache-hit). PAN-1935.
   { provider: 'custom', model: 'kimi-k2.7-code', inputPer1k: 0.00095, outputPer1k: 0.004, cacheReadPer1k: 0.00019, currency: 'USD' },

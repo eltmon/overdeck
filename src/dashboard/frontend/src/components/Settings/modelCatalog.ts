@@ -137,10 +137,10 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   dashscope: {
     name: 'Alibaba DashScope',
     models: [
-      { id: 'qwen3.7-max' as ModelId, name: 'Qwen3.7 Max (256K context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.7 Max model.' },
-      { id: 'qwen3.7-plus' as ModelId, name: 'Qwen3.7 Plus (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 1, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
-      { id: 'qwen3.8-flash' as ModelId, name: 'Qwen3.8 Flash (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
-      { id: 'qwen3.8-max' as ModelId, name: 'Qwen3.8 Max (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.8 Max preview; free 1M-token Model Studio quota.' },
+      { id: 'qwen3.7-max' as ModelId, name: 'Qwen3.7 Max (256K context)', icon: Gem, tier: 'premium', costPer1MTokens: 5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope Qwen3.7 Max. $2.50/$7.50 per MTok.' },
+      { id: 'qwen3.7-plus' as ModelId, name: 'Qwen3.7 Plus (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 1, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope balanced tier. $0.40/$1.60 per MTok up to 256K input (limited-time discount).' },
+      { id: 'qwen3.8-flash' as ModelId, name: 'Qwen3.8 Flash (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 0.31, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope fast tier. $0.15/$0.47 per MTok, 1M context.' },
+      { id: 'qwen3.8-max' as ModelId, name: 'Qwen3.8 Max (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 4, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.8 Max. $2/$6 per MTok, 1,000,000-token context.' },
     ],
   },
   xai: {

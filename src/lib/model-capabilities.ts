@@ -1232,7 +1232,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'qwen3.7-max',
     provider: 'dashscope',
     displayName: 'Qwen3.7 Max (DashScope)',
-    costPer1MTokens: 0,
+    costPer1MTokens: 5,
     contextWindow: 262144,
     skills: {
       'code-generation': 96,
@@ -1247,7 +1247,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 70,
       'context-length': 98,
     },
-    notes: 'Canonical DashScope ID verified from Qwen Cloud docs on 2026-05-22. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+    notes: 'Routed to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. $2.50/M input, $7.50/M output (Model Studio pricing, verified 2026-11-02).',
   },
 
 
@@ -1255,8 +1255,8 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'qwen3.8-max',
     provider: 'dashscope',
     displayName: 'Qwen3.8 Max (DashScope)',
-    costPer1MTokens: 0,
-    contextWindow: 1048576,
+    costPer1MTokens: 4,
+    contextWindow: 1000000,
     skills: {
       'code-generation': 97,
       'code-review': 95,
@@ -1270,7 +1270,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 68,
       'context-length': 99,
     },
-    notes: 'Canonical DashScope ID verified from Alibaba Cloud Model Studio docs on 2026-08-03. Preview release (2.4T MoE, always-on thinking, 1M-class context); free 1M-token Model Studio quota (90 days) on the Singapore intl endpoint (ap-southeast-1) via DASHSCOPE_API_KEY. Reported pay-as-you-go pricing $2/M in, $6/M out — cost placeholder until intl pricing is confirmed.',
+    notes: 'Singapore intl endpoint (ap-southeast-1) via DASHSCOPE_API_KEY. Context window 1,000,000 (max input 991,808, max output 131,072); $2/M input, $6/M output, $0.25/M implicit-cache read. Verified 2026-11-02 (model-studio/qwen3-8-max).',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════

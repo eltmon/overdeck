@@ -115,6 +115,16 @@ describe('PAN-1935: pi-harness cost capture', () => {
       expect(ev!.cost).toBeGreaterThan(0);
     });
 
+    it('extracts a qwen3.8-max event with non-zero cost (PAN-4827)', () => {
+      const content = piMessage('qwen3.8-max', 'dashscope', { input: 50000, output: 1000, cacheRead: 0, cacheWrite: 0, totalTokens: 51000 }, 'qresp-1', 'q1');
+      const events = extractPiCostEvents(content, 'agent-pan-4827', 'PAN-4827', 'work', sessionId);
+      expect(events).toHaveLength(1);
+      const [ev] = events;
+      expect(ev!.model).toBe('qwen3.8-max');
+      expect(ev!.provider).toBe('custom');
+      expect(ev!.cost).toBeGreaterThan(0);
+    });
+
     it('skips messages with all-zero usage (no hallucinated cost)', () => {
       const content = piMessage('glm-5.2', 'zai', { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 }, 'z1', 'z1');
       expect(extractPiCostEvents(content, 'a', 'PAN-1', 'work', sessionId)).toHaveLength(0);

@@ -18,4 +18,12 @@ describe('November 2026 Gemini, Qwen and GLM catalog refresh (PAN-4827)', () => 
     const byId = Object.fromEntries(group.models.map((m) => [m.id, m]));
     expect(byId['gemini-3.8-flash'].costPer1MTokens).toBe(2.25);
   });
+
+  it('prices every live DashScope model with no $0 placeholder', () => {
+    const group = MODELS_BY_PROVIDER.dashscope;
+    expect(group).toBeDefined();
+    for (const model of group.models) {
+      expect(model.costPer1MTokens).not.toBe(0);
+    }
+  });
 });
