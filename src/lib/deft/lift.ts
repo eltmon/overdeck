@@ -83,6 +83,12 @@ export async function withDeftInstallLifted<T>(worktree: string, targetRef: stri
   const snapshot = await readDeftSnapshot(worktree);
   if (!snapshot) return fn();
 
+  // Check the target as the operation will see it: callers fetch inside `fn`,
+  // so a stale remote ref would miss a path main only now tracks. Best effort:
+  // when the fetch fails, the operation's own fetch fails the same way.
+  const remoteBranch = /^origin\/(.+)$/.exec(targetRef)?.[1];
+  if (remoteBranch) await gitSucceeds(worktree, ['fetch', '-q', 'origin', remoteBranch]);
+
   for (const path of snapshot.createdPaths) {
     const object = path.endsWith('/') ? path.slice(0, -1) : path;
     if (await gitSucceeds(worktree, ['cat-file', '-e', `${targetRef}:${object}`])) {

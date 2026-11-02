@@ -150,6 +150,17 @@ describe('withDeftInstallLifted', () => {
     expect(git(wt, 'ls-files', '-v', 'package.json')).toBe('S package.json\n');
   });
 
+  it('fetches the target before checking it, so a stale origin ref cannot hide a newly tracked path', async () => {
+    git(wt, 'remote', 'add', 'origin', main);
+    git(wt, 'fetch', '-q', 'origin', 'main');
+    commitOnMain('AGENTS.md', '# main now has one\n');
+    expect(gitCode(wt, 'cat-file', '-e', 'origin/main:AGENTS.md')).not.toBe(0);
+    const fn = vi.fn(async () => 'ran');
+
+    await expect(withDeftInstallLifted(wt, 'origin/main', fn)).rejects.toBeInstanceOf(DeftLiftError);
+    expect(fn).not.toHaveBeenCalled();
+  });
+
   it('runs fn alone without a snapshot', async () => {
     // Not a git repository: any git command would fail.
     const plain = mkdtempSync(join(scratch, 'plain-'));
