@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T22:26:04.870262Z · model: claude-opus-5-5 · open: 874_
+_Last sequenced: 2026-11-02T21:58:13.211426Z · model: claude-opus-5-5 · open: 873_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -229,7 +229,6 @@ _Last sequenced: 2026-11-02T22:26:04.870262Z · model: claude-opus-5-5 · open: 
 | 223 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
-| 227 | PAN-4860 | S | medium | ok |  |  | Project create proposes issue prefixes with digits (ABC123X) that parseIssueId rejects, so no issue resolves. Found in PAN-4774 AC-4. |
 | 228 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
 | 229 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 230 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -1209,10 +1208,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T22:26:04.870262Z",
+  "generatedAt": "2026-11-02T21:58:13.211426Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 874,
+  "openCount": 873,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12153,19 +12152,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "New bug found by the in-pipeline Anywhere release acceptance run (PAN-4774, AC-15 / W-CONV9): sshHostFor reads the hostname of the SSH route, which is the local port forward, so Open in editor targets the local machine instead of the SSH host. The fix is small and well specified (look up SshMachineRecord.destination by link id, check the Remote-SSH authority form for user and port, add an open-remote unit test). It takes the free rank 269, just ahead of PAN-4774, because the release checklist item cannot pass on an SSH-linked machine until it lands.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4860",
-      "rank": 227,
-      "size": "S",
-      "importance": "medium",
-      "score": 54,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Project create proposes issue prefixes with digits (ABC123X) that parseIssueId rejects, so no issue resolves. Found in PAN-4774 AC-4.",
-      "rationale": "New bug found during the PAN-4774 Anywhere acceptance run: create.ts proposes and validates prefixes with digits while parseIssueId accepts letters only, so any project key containing a digit gets an unusable prefix. It is a small, well-specified correctness fix in the shared project-create core, so it takes free rank 227 ahead of the similar PAN-4859 without moving any other node.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13785,20 +13771,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4860",
-      "to": "PAN-4774",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4860",
-      "to": "PAN-3852",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
     }
   ]
 }
