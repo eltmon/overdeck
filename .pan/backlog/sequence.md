@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T16:54:33.149791Z · model: claude-opus-5-5 · open: 874_
+_Last sequenced: 2026-11-02T16:58:31.525230Z · model: claude-opus-5-5 · open: 873_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -280,7 +280,6 @@ _Last sequenced: 2026-11-02T16:54:33.149791Z · model: claude-opus-5-5 · open: 
 | 272 | PAN-4820 | XL | medium | ok |  |  | Run one issue on Deft Directive pipeline (hidden temp install, merge guard, native dashboard view, switch back); decisions made |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
 | 276 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
 | 278 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
 | 278 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
@@ -1209,10 +1208,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T16:54:33.149791Z",
+  "generatedAt": "2026-11-02T16:58:31.525230Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 874,
+  "openCount": 873,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -4706,19 +4705,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "condition": "ok",
       "dependsOn": [],
       "why": "CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4722",
-      "rank": 275,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed.",
-      "rationale": "Dependency PAN-4656 (pan connect) closed 2026-11-01, so its edge is dropped and this is now unblocked; rank held since no body change.",
       "gate": "auto",
       "planning": "auto"
     },
