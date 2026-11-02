@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4751",
   "created": "2026-11-02T00:16:08.781Z",
-  "updated": "2026-11-02T01:15:42.678Z",
+  "updated": "2026-11-02T01:16:08.289Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "conversation-pane-jump.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T01:15:42.678Z"
+    },
+    "needs-you-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:16:08.288Z"
     }
   }
 }
