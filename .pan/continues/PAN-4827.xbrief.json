@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4827",
   "created": "2026-11-02T16:36:08.290Z",
-  "updated": "2026-11-02T17:22:48.992Z",
+  "updated": "2026-11-02T17:37:26.337Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-02T17:22:42.676Z"
     },
     "dashscope-retire-tier-ids": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4827",
-      "claimedAt": "2026-11-02T17:22:48.991Z"
+      "claimedAt": "2026-11-02T17:22:48.991Z",
+      "doneAt": "2026-11-02T17:37:26.336Z"
     }
   }
 }
