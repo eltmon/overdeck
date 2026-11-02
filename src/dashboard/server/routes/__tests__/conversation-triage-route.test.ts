@@ -1,4 +1,4 @@
-/** PAN-4639 WI-2: POST /api/conversations/triage. */
+/** PAN-4639 WI-2: POST /api/conversations/triage. PAN-4653: GET/POST /api/conversations/auto-settle-on-merge. */
 import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,11 +15,11 @@ function decode(response: { body: unknown }): unknown {
   return text ? JSON.parse(text) : null;
 }
 
-async function request(path: string, body?: unknown, headers: Record<string, string> = {}) {
+async function request(path: string, body?: unknown, headers: Record<string, string> = {}, method: 'GET' | 'POST' = 'POST') {
   const { conversationTriageRouteLayer } = await import('../conversation-triage.js');
   const req = HttpServerRequest.fromWeb(
     new Request(`http://localhost${path}`, {
-      method: 'POST',
+      method,
       headers: { Origin: 'http://localhost:3011', 'Content-Type': 'application/json', ...headers },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     }),
@@ -150,5 +150,38 @@ describe('POST /api/conversations/triage (PAN-4639 WI-2)', () => {
       ),
     );
     expect(response.status).toBe(403);
+  });
+});
+
+describe('GET/POST /api/conversations/auto-settle-on-merge (PAN-4653 WI-4)', () => {
+  const PATH = '/api/conversations/auto-settle-on-merge';
+
+  it('GET reports enabled when the setting is unset', async () => {
+    const response = await request(PATH, undefined, {}, 'GET');
+    expect(response.status).toBe(200);
+    expect(decode(response)).toEqual({ enabled: true });
+  });
+
+  it('POST { enabled: false } stores it and the next GET agrees', async () => {
+    const response = await request(PATH, { enabled: false });
+    expect(response.status).toBe(200);
+    expect(decode(response)).toEqual({ enabled: false });
+
+    const next = await request(PATH, undefined, {}, 'GET');
+    expect(decode(next)).toEqual({ enabled: false });
+  });
+
+  it('POST 400s when enabled is not a boolean', async () => {
+    const response = await request(PATH, { enabled: 'no' });
+    expect(response.status).toBe(400);
+    expect(decode(response)).toEqual({ error: 'enabled must be a boolean' });
+  });
+
+  it('POST 403s on a failing origin', async () => {
+    const response = await request(PATH, { enabled: false }, { Origin: 'https://evil.example' });
+    expect(response.status).toBe(403);
+
+    const { isConversationsAutoSettleOnMerge } = await import('../../../../lib/overdeck/control-settings.js');
+    expect(isConversationsAutoSettleOnMerge()).toBe(true);
   });
 });
