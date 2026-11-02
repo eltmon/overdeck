@@ -302,7 +302,8 @@ Cloudflare Durable Object per account that knows the account's machines and intr
 - **WebRTC transport** (`src/lib/anywhere/channel/rtc-transport.ts`, `rtc-duplex.ts`, werift
   0.25.1, bundled): one peer connection per (peer, relay, purpose), shared by every dial; each
   dial opens an ordered `ovdl` data channel wrapped as a `Duplex` (16 KiB messages, backpressure
-  above 1 MiB). Either side may open channels on an existing connection, so both accept them.
+  above 1 MiB). werift reads a single TURN URL per peer connection, so the relay route orders its
+  list first (see "Relay and metering" below). Either side may open channels on an existing connection, so both accept them.
   The offer, answer and ICE candidates ride the directory socket as `signal` frames; the
   Durable Object stamps `from` from the sender's socket.
 - **Routes** (`directory-rtc.ts`, `directory-routes.ts`): `rtc://<id>` (kind `direct`) and
@@ -353,7 +354,12 @@ Linking two machines of one account with no pairing code, confirmed on both scre
 
 A relay-plan account (`tester` until billing) may dial `rtc+turn://`: the initiator asks the
 directory for TURN credentials (`ice-servers { relay: true }`, Cloudflare Realtime, 600 s TTL)
-and sets `iceTransportPolicy: 'relay'`. The directory refuses with `relay_not_allowed` (free),
+and sets `iceTransportPolicy: 'relay'`. Both ends pass the credential list through
+`relayIceServers` (`src/lib/anywhere/channel/relay-ice-servers.ts`, PAN-4862). It puts `turns:` on
+port 443 first, then other `turns:`, then `turn:` over TCP, then `turn:` over UDP, and drops STUN
+URLs. werift 0.25.1 uses only the first TURN URL, and when UDP is blocked its UDP-to-TCP fallback
+starts after about 6.35 s, which the 10 s relay probe cannot afford. Dropping STUN also spares the
+responder a 5 s wait for a server-reflexive candidate on a UDP-blocked network. The directory refuses with `relay_not_allowed` (free),
 `relay_cap_reached` (month total at 50 GB) or `turn_unavailable` (no TURN secrets), and the
 dialer fails with `ChannelOpenError('unreachable', …)`. `relay-client.ts` meters every relay
 data channel this machine dialed (the responder never reports, so each channel counts once)

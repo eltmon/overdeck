@@ -299,7 +299,8 @@ overdeck.ai account, you can also link them without a pairing link: click **Link
 **Settings → Anywhere → Directory** (or run `pan machines join`), then approve on the other
 machine after checking that both screens show the same six-digit code. The directory also adds
 `direct` routes (`rtc://<environment id>`, a peer-to-peer WebRTC path) and, on the relay plan,
-`relay` routes (`rtc+turn://<environment id>`, through a TURN relay). They are tried only when
+`relay` routes (`rtc+turn://<environment id>`, through a TURN relay). The relay tries the TURN
+server over TLS on port 443 first, so a network that blocks UDP can still reach it. These routes are tried only when
 no LAN, Tailscale, SSH or public route answers, appear with the source `directory`, and are
 never saved with the link. See
 [Find your machines through overdeck.ai](/configuration/remote-access#find-your-machines-through-overdeck-ai).
