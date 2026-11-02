@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4759",
   "created": "2026-11-02T01:10:45.557Z",
-  "updated": "2026-11-02T01:57:47.594Z",
+  "updated": "2026-11-02T01:58:04.170Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,10 @@
     "fork-runbook.ac5": {
       "status": "completed",
       "doneAt": "2026-11-02T01:57:47.593Z"
+    },
+    "move-mattpocock-pstack.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:58:04.170Z"
     }
   }
 }
