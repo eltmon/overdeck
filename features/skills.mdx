@@ -381,32 +381,6 @@ A few pstack skills name Cursor model ids (`arena`, `architect`, `setup-pstack`)
 
 Codex receives the same Claude Code build; the fork has no Codex-specific build.
 
-### Names: `pack/skill` and `pack:skill`
-
-Overdeck names a pack skill `pack/skill`, for example `mattpocock/grilling`. You use that id in the CLI, the dashboard, and the override files. The agent sees the skill as `pack:skill` (`mattpocock:grilling`), because the harness namespaces plugin skills. Overdeck's own `grilling` and `mattpocock:grilling` can both be present in the same session.
-
-### Turning packs and pack skills on
-
-Pack skills are **off** until you turn them on. You can turn on a whole pack or single skills, at the same three levels as other skills:
-
-```bash
-pan skills set --pack mattpocock on                      # the whole pack, globally
-pan skills set --pack mattpocock off --issue PAN-12      # off for one issue
-pan skills set mattpocock/grilling on --project myapp    # one skill in one project
-```
-
-For a pack skill, Overdeck checks the levels from narrowest to widest. At each level, a value for the skill itself beats that level's pack toggle, and the first level with any value decides. With no value anywhere, the skill is off.
-
-| Global | Project | Issue | Result |
-|--------|---------|-------|--------|
-| pack on | `mattpocock/tdd` off | — | `tdd` off (project) |
-| pack on | — | pack off | every skill off (issue pack) |
-| — | `mattpocock/grilling` on | pack off | `grilling` off (the issue level decides first) |
-| `mattpocock/grilling` on | — | — | only `grilling` on |
-| pack on | — | — | `setup-matt-pocock-skills` off (opt-in) |
-
-**Opt-in skills** are skills that change files Overdeck owns, such as `setup-matt-pocock-skills`, which edits `CLAUDE.md`/`AGENTS.md` and writes tracker docs. The pack toggle never turns them on; only a value for that skill does.
-
 ### What is not applied
 
 Overdeck mounts skill directories only. If a pack also carries hooks, MCP servers, commands, agents, context injection, git hooks, or scripts, the preview and the dashboard list them as **Not applied**, and none of them reach the agent. Scripts inside a skill directory are copied with the skill but never run by Overdeck.
