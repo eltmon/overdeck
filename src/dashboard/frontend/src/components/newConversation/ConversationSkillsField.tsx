@@ -17,7 +17,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import styles from './ConversationSkillsField.module.css';
 
@@ -169,14 +169,17 @@ export function ConversationSkillsField({ projectKey, issueId, value, onChange }
 
   return (
     <div className={styles.field}>
-      <input
-        type="text"
-        className={styles.filter}
-        aria-label="Filter skills"
-        placeholder="Filter skills by name or description"
-        value={filter}
-        onChange={event => setFilter(event.target.value)}
-      />
+      <div className={styles.filterField}>
+        <span className={styles.lead} aria-hidden="true"><Search size={14} /></span>
+        <input
+          type="text"
+          className={styles.filter}
+          aria-label="Filter skills"
+          placeholder="Filter skills by name or description"
+          value={filter}
+          onChange={event => setFilter(event.target.value)}
+        />
+      </div>
       <div className={styles.list}>
         {visible.length === 0 && <p className={styles.note}>No skills match.</p>}
         {visible.map(({ group, rows: groupRows }) => {
