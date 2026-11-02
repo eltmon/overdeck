@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4777",
   "created": "2026-11-02T04:11:59.143Z",
-  "updated": "2026-11-02T04:35:35.311Z",
+  "updated": "2026-11-02T04:37:23.014Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,10 @@
       "claimedBy": "agent-pan-4777",
       "claimedAt": "2026-11-02T04:34:27.201Z",
       "doneAt": "2026-11-02T04:35:35.310Z"
+    },
+    "rollback-vm-on-create-failure.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:37:23.014Z"
     }
   }
 }
