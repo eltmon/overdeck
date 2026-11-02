@@ -1,4 +1,4 @@
-/** PAN-4639 WI-2: POST /api/conversations/triage. */
+/** PAN-4639 WI-2: POST /api/conversations/triage. PAN-4655 WI-4: GET/PUT /api/conversations/triage/auto-settle. */
 import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,11 +15,11 @@ function decode(response: { body: unknown }): unknown {
   return text ? JSON.parse(text) : null;
 }
 
-async function request(path: string, body?: unknown, headers: Record<string, string> = {}) {
+async function request(path: string, body?: unknown, headers: Record<string, string> = {}, method = 'POST') {
   const { conversationTriageRouteLayer } = await import('../conversation-triage.js');
   const req = HttpServerRequest.fromWeb(
     new Request(`http://localhost${path}`, {
-      method: 'POST',
+      method,
       headers: { Origin: 'http://localhost:3011', 'Content-Type': 'application/json', ...headers },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     }),
@@ -130,6 +130,42 @@ describe('POST /api/conversations/triage (PAN-4639 WI-2)', () => {
         ),
       ),
     );
+    expect(response.status).toBe(403);
+  });
+});
+
+describe('GET/PUT /api/conversations/triage/auto-settle (PAN-4655 WI-4)', () => {
+  const path = '/api/conversations/triage/auto-settle';
+
+  it('GET returns the default of 3 days on a fresh database', async () => {
+    const response = await request(path, undefined, {}, 'GET');
+    expect(response.status).toBe(200);
+    expect(decode(response)).toEqual({ idleDays: 3 });
+  });
+
+  it('PUT stores a valid value and GET reads it back', async () => {
+    const put = await request(path, { idleDays: 5 }, {}, 'PUT');
+    expect(put.status).toBe(200);
+    expect(decode(put)).toEqual({ idleDays: 5 });
+
+    const get = await request(path, undefined, {}, 'GET');
+    expect(decode(get)).toEqual({ idleDays: 5 });
+  });
+
+  it.each([[{ idleDays: -1 }], [{ idleDays: 1.5 }], [{ idleDays: 'abc' }], [{ idleDays: 366 }], [{}]])(
+    'PUT 400s on %j and stores nothing',
+    async (body) => {
+      const response = await request(path, body, {}, 'PUT');
+      expect(response.status).toBe(400);
+      expect(decode(response)).toEqual({ error: 'idleDays must be a whole number from 0 to 365' });
+
+      const get = await request(path, undefined, {}, 'GET');
+      expect(decode(get)).toEqual({ idleDays: 3 });
+    },
+  );
+
+  it('PUT 403s from a foreign origin', async () => {
+    const response = await request(path, { idleDays: 5 }, { Origin: 'https://evil.example' }, 'PUT');
     expect(response.status).toBe(403);
   });
 });

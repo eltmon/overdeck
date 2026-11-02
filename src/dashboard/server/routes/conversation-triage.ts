@@ -1,9 +1,17 @@
-/** PAN-4639 WI-2: the triage write door — POST /api/conversations/triage. */
+/**
+ * PAN-4639 WI-2: the triage write door — POST /api/conversations/triage.
+ * PAN-4655 WI-4: GET/PUT /api/conversations/triage/auto-settle — the idle-settle days setting.
+ */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { applyTriageUpdate, parseTriageUpdates } from '../../../lib/overdeck/conversation-triage-store.js';
 import { getConversationByName } from '../../../lib/overdeck/conversations.js';
+import {
+  getConversationsAutoSettleIdleDays,
+  parseAutoSettleIdleDays,
+  setConversationsAutoSettleIdleDays,
+} from '../../../lib/overdeck/control-settings.js';
 import { invalidateConversationListEnrichmentCache } from '../../../lib/overdeck/conversation-list.js';
 import { validateOrigin } from './origin-validation.js';
 
@@ -58,4 +66,31 @@ const postConversationTriageRoute = HttpRouter.add(
   }),
 );
 
-export const conversationTriageRouteLayer = Layer.mergeAll(postConversationTriageRoute);
+const getAutoSettleRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/triage/auto-settle',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    return jsonResponse({ idleDays: getConversationsAutoSettleIdleDays() });
+  }),
+);
+
+const putAutoSettleRoute = HttpRouter.add(
+  'PUT',
+  '/api/conversations/triage/auto-settle',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+
+    const body = yield* readJsonBody;
+    const days = parseAutoSettleIdleDays(body.idleDays);
+    if (days === null) return jsonResponse({ error: 'idleDays must be a whole number from 0 to 365' }, { status: 400 });
+    setConversationsAutoSettleIdleDays(days);
+    return jsonResponse({ idleDays: days });
+  }),
+);
+
+export const conversationTriageRouteLayer = Layer.mergeAll(postConversationTriageRoute, getAutoSettleRoute, putAutoSettleRoute);
