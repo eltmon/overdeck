@@ -1,15 +1,14 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T15:45:05.360001Z · model: claude-opus-5-5 · open: 856_
+_Last sequenced: 2026-11-02T15:46:00.515870Z · model: claude-opus-5-5 · open: 855_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 2 | PAN-4801 | M | critical | ok |  |  | Merge train never rebases approved siblings after a merge (reconcile hook unwired), so each merge strands siblings conflicting. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
-| 6 | PAN-4803 | M | high | ok |  | PAN-4801 | After PAN-4801, carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews. |
+| 6 | PAN-4803 | M | high | ok |  |  | PAN-4801 landed; now carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -868,10 +867,6 @@ _Last sequenced: 2026-11-02T15:45:05.360001Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
-### PAN-4801 (rank 2)
-
-New substrate bug in the merge path, PR in review: runMergeTrainReconcile is only reachable from firePostMergeLifecycle, which no merge door calls, so every merge leaves approved siblings conflicting until the Flywheel relays merge-main by hand (three times on 2026-11-02). It takes the free rank 2 because it throttles every multi-PR merge day. It carries needs-handoff (TENET-10), so it runs as a supervised strike.
-
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -882,7 +877,7 @@ Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort 
 
 ### PAN-4803 (rank 6)
 
-New substrate follow-up to PAN-4801: once siblings are rebased after each merge, PAN-4772 re-requests review for every one, so review load grows quadratically. Carrying the approval when git patch-id is unchanged removes that cost. It takes the free rank 6, after its PAN-4801 dependency; needs-handoff (TENET-10) because it touches merge-gate trust.
+Rank held at 6; its only dependency, PAN-4801 (wire the merge-train reconcile hook), closed since the prior run, so it is now unblocked and next in the merge-path tier. Needs-handoff (TENET-10) because it touches merge-gate trust.
 
 ### PAN-4733 (rank 7)
 
@@ -1184,6 +1179,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
+### PAN-3106 (rank 80)
+
+New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1191,10 +1190,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T15:45:05.360001Z",
+  "generatedAt": "2026-11-02T15:46:00.515870Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 856,
+  "openCount": 855,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1206,19 +1205,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4801",
-      "rank": 2,
-      "size": "M",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merge train never rebases approved siblings after a merge (reconcile hook unwired), so each merge strands siblings conflicting.",
-      "rationale": "New substrate bug in the merge path, PR in review: runMergeTrainReconcile is only reachable from firePostMergeLifecycle, which no merge door calls, so every merge leaves approved siblings conflicting until the Flywheel relays merge-main by hand (three times on 2026-11-02). It takes the free rank 2 because it throttles every multi-PR merge day. It carries needs-handoff (TENET-10), so it runs as a supervised strike.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1255,11 +1241,9 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "importance": "high",
       "score": 78,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4801"
-      ],
-      "why": "After PAN-4801, carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews.",
-      "rationale": "New substrate follow-up to PAN-4801: once siblings are rebased after each merge, PAN-4772 re-requests review for every one, so review load grows quadratically. Carrying the approval when git patch-id is unchanged removes that cost. It takes the free rank 6, after its PAN-4801 dependency; needs-handoff (TENET-10) because it touches merge-gate trust.",
+      "dependsOn": [],
+      "why": "PAN-4801 landed; now carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews.",
+      "rationale": "Rank held at 6; its only dependency, PAN-4801 (wire the merge-train reconcile hook), closed since the prior run, so it is now unblocked and next in the merge-path tier. Needs-handoff (TENET-10) because it touches merge-gate trust.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13047,13 +13031,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4801",
-      "to": "PAN-4803",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-4702",
