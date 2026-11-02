@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4827",
   "created": "2026-11-02T16:36:08.290Z",
-  "updated": "2026-11-02T19:03:37.383Z",
+  "updated": "2026-11-02T19:03:56.013Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -206,6 +206,10 @@
     "zai-reprice.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T19:03:37.383Z"
+    },
+    "zai-reprice.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:03:56.013Z"
     }
   }
 }
