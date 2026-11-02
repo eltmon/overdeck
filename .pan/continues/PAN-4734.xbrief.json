@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T14:35:26.030Z",
+  "updated": "2026-11-02T14:35:29.800Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4734",
       "claimedAt": "2026-11-02T14:34:23.489Z",
       "doneAt": "2026-11-02T14:35:26.030Z"
+    },
+    "wi6-fly-conversation-cwd-and-workspace": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:35:29.799Z"
     }
   }
 }
