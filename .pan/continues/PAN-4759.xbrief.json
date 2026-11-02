@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4759",
   "created": "2026-11-02T01:10:45.557Z",
-  "updated": "2026-11-02T01:54:38.227Z",
+  "updated": "2026-11-02T01:54:52.133Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "move-adding-not-applied.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T01:54:38.227Z"
+    },
+    "trust-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:54:52.133Z"
     }
   }
 }
