@@ -92,7 +92,9 @@ Registration detects:
   would point every later workspace at a branch that may not exist). The diff
   panel's "vs main" view compares against this branch, so a project on
   `master` or `trunk` still gets a correct "vs main" view.
-- `issue_prefix` — proposed from the project key, up to ten characters
+- `issue_prefix` — proposed from the letters of the project key (digits and
+  dashes dropped), up to ten characters. A key with no letters gets no
+  proposal; pass `--issue-prefix`.
 - The main workspace row
 
 Adding a **subdirectory** of a repository adds the repository root instead,
@@ -241,7 +243,7 @@ projects:
 |-------|----------|-------------|
 | `name` | Yes | Human-readable project name |
 | `path` | Yes | Absolute path to project root |
-| `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN"). Automatically proposed during registration based on the repository name. |
+| `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN"). Automatically proposed during registration based on the repository name. 1 to 10 uppercase letters; digits are rejected because issue IDs must match `LETTERS-NUMBER`. For tracker IDs that do not fit, use `issue_pattern`. |
 | `tracker` | No | Issue tracker type: `linear`, `github`, `gitlab`, `rally`. Set it explicitly when the code host and issue tracker differ. |
 | `issue_prefixes` | No | Array of prefixes for multi-prefix trackers (e.g., `[F, US, DE, TA]`) |
 | `issue_pattern` | No | Custom regex for issue ID parsing: `^(PREFIX)-(\\d+)$` |
