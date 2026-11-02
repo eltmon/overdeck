@@ -1,15 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T20:01:39.850194Z · model: claude-opus-5-5 · open: 876_
+_Last sequenced: 2026-11-02T23:38:54.816671Z · model: claude-opus-5-5 · open: 876_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 2 | PAN-4825 | M | high | ok |  |  | MiMo, Groq and Cerebras ship only dead ids (tierModels too), so every launch on them fails; also refreshes MiniMax/xAI/Mistral/Kimi |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
-| 6 | PAN-4821 | S | high | ok |  |  | Close-out says no PR found when the forge read fails transiently; dod-gate maps every lookup error to null and caches it. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -153,7 +151,6 @@ _Last sequenced: 2026-11-02T20:01:39.850194Z · model: claude-opus-5-5 · open: 
 | 144 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
 | 145 | PAN-4302 | M | high | ok |  |  | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
 | 146 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
-| 147 | PAN-4734 | L | high | ok |  |  | pan start --remote work agents launch as linked conversations on the Fly VM, live at home; closes PAN-1775. Unblocked. |
 | 148 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
 | 149 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
 | 150 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
@@ -175,13 +172,13 @@ _Last sequenced: 2026-11-02T20:01:39.850194Z · model: claude-opus-5-5 · open: 
 | 166 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
 | 167 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 168 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
-| 169 | PAN-1775 | M | medium | ok |  | PAN-4734 | Superseded: PAN-4734's PR closes this. Pick PAN-4734 (Fly work agents as linked conversations), not this issue. |
+| 169 | PAN-1775 | M | medium | needs-refinement |  |  | PAN-4734 merged 2026-11-02 and should deliver this; verify Fly work agents show as session rows, then close. |
 | 170 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 171 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
 | 172 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 173 | PAN-4634 | M | medium | needs-refinement |  |  | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
 | 174 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 175 | PAN-4827 | M | high | ok |  | PAN-4825 | Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices |
+| 175 | PAN-4862 | M | high | ok |  |  | werift keeps only the first (UDP) TURN URL, so the Anywhere relay never connects when UDP is blocked; fails PAN-4774 AC-3. |
 | 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 177 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
 | 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
@@ -230,9 +227,10 @@ _Last sequenced: 2026-11-02T20:01:39.850194Z · model: claude-opus-5-5 · open: 
 | 221 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 222 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 223 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 224 | PAN-4826 | M | medium | ok |  |  | OpenAI/Anthropic catalog: fix 7 wrong prices, add gpt-6-rosalind, hide sonnet-4-5 before 11-30 retirement, raise 4-6 to 1M |
+| 224 | PAN-4861 | S | medium | ok |  |  | Removing a managed SSH machine kills only the dashboard pid; the pan up supervisor restarts it. Found in PAN-4774 AC-6. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
+| 227 | PAN-4860 | S | medium | ok |  |  | Project create proposes issue prefixes with digits (ABC123X) that parseIssueId rejects, so no issue resolves. Found in PAN-4774 AC-4. |
 | 228 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
 | 229 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 230 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -274,6 +272,7 @@ _Last sequenced: 2026-11-02T20:01:39.850194Z · model: claude-opus-5-5 · open: 
 | 266 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 267 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 268 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
+| 269 | PAN-4859 | S | medium | ok |  |  | Open in editor on an SSH-host machine opens ssh-remote+127.0.0.1 (local forward); use the SSH record destination. Blocks AC-15 W-CONV9. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
 | 272 | PAN-4820 | XL | medium | ok |  |  | Run one issue on Deft Directive pipeline (hidden temp install, merge guard, native dashboard view, switch back); decisions made |
@@ -313,6 +312,7 @@ _Last sequenced: 2026-11-02T20:01:39.850194Z · model: claude-opus-5-5 · open: 
 | 304 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
 | 305 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
 | 306 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
+| 307 | PAN-4863 | S | medium | ok |  |  | Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS. |
 | 308 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
@@ -888,10 +888,6 @@ _Last sequenced: 2026-11-02T20:01:39.850194Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
-### PAN-4825 (rank 2)
-
-New in-pipeline issue from the 2026-11-02 model catalog audit. MiMo, Groq and Cerebras currently carry only provider-retired ids, including their tierModels, so every launch on those providers fails today; the issue retires them through MODEL_DEPRECATIONS with official-source decision rules and also refreshes MiniMax, xAI, Mistral, Meta and Kimi entries. As an in-pipeline issue it is pinned in the free rank 2 (no prior rank), so no other node moves. It also unblocks PAN-4827, whose all-provider tierModels test fails while these dead tier ids remain.
-
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -899,10 +895,6 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 ### PAN-4553 (rank 4)
 
 Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
-
-### PAN-4821 (rank 6)
-
-New in-pipeline substrate bug: pan close --force failed three times on 2026-11-02 for merged PRs because readPullRequest in dod-gate.ts turns any forge lookup error into "no PR" and fetchIssuePullRequest caches the error. The fix is small and well-specified (typed read-failure row, one retry, no error caching, log the cause). It takes rank 6, freed when PAN-4803 closed, so no other node moves.
 
 ### PAN-4733 (rank 7)
 
@@ -1204,6 +1196,14 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
+### PAN-3106 (rank 80)
+
+New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
+
+### PAN-3100 (rank 81)
+
+New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1211,7 +1211,7 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T20:01:39.850194Z",
+  "generatedAt": "2026-11-02T23:38:54.816671Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 876,
@@ -1226,19 +1226,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4825",
-      "rank": 2,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "MiMo, Groq and Cerebras ship only dead ids (tierModels too), so every launch on them fails; also refreshes MiniMax/xAI/Mistral/Kimi",
-      "rationale": "New in-pipeline issue from the 2026-11-02 model catalog audit. MiMo, Groq and Cerebras currently carry only provider-retired ids, including their tierModels, so every launch on those providers fails today; the issue retires them through MODEL_DEPRECATIONS with official-source decision rules and also refreshes MiniMax, xAI, Mistral, Meta and Kimi entries. As an in-pipeline issue it is pinned in the free rank 2 (no prior rank), so no other node moves. It also unblocks PAN-4827, whose all-provider tierModels test fails while these dead tier ids remain.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1265,19 +1252,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails.",
       "rationale": "Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4821",
-      "rank": 6,
-      "size": "S",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Close-out says no PR found when the forge read fails transiently; dod-gate maps every lookup error to null and caches it.",
-      "rationale": "New in-pipeline substrate bug: pan close --force failed three times on 2026-11-02 for merged PRs because readPullRequest in dod-gate.ts turns any forge lookup error into \"no PR\" and fetchIssuePullRequest caches the error. The fix is small and well-specified (typed read-failure row, one retry, no error caching, log the cause). It takes rank 6, freed when PAN-4803 closed, so no other node moves.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3141,19 +3115,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
-      "issue": "PAN-4734",
-      "rank": 147,
-      "size": "L",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan start --remote work agents launch as linked conversations on the Fly VM, live at home; closes PAN-1775. Unblocked.",
-      "rationale": "Rank held: its only dependency PAN-4652 (Fly VMs as machines) closed as completed on 2026-11-01, so this issue is now unblocked and ready to plan.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1436",
       "rank": 148,
       "size": "S",
@@ -3416,13 +3377,11 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rank": 169,
       "size": "M",
       "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4734"
-      ],
-      "why": "Superseded: PAN-4734's PR closes this. Pick PAN-4734 (Fly work agents as linked conversations), not this issue.",
-      "rationale": "Re-ranked: new issue PAN-4734 carries this outcome on the Overdeck Anywhere link path and its PR closes this one, so this issue now only tracks the result.",
+      "score": 30,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "PAN-4734 merged 2026-11-02 and should deliver this; verify Fly work agents show as session rows, then close.",
+      "rationale": "Dependency PAN-4734 closed as completed, so this issue is likely satisfied; demoted in score pending a verify-and-close check.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -3493,17 +3452,15 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "isEpic": true
     },
     {
-      "issue": "PAN-4827",
+      "issue": "PAN-4862",
       "rank": 175,
       "size": "M",
       "importance": "high",
-      "score": 70,
+      "score": 72,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4825"
-      ],
-      "why": "Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices",
-      "rationale": "New issue from the 2026-11-02 catalog audit: Google's haiku tier and all three DashScope tiers point at shut-down or never-real ids, so Claude Code subagents on those providers fail, and several Qwen rows carry $0 placeholder prices. It is a well-specified provider bug fix, not substrate, so it takes the free rank 175 among high-importance fixes. Its AC1 test asserts no provider's tierModels is in MODEL_DEPRECATIONS, which cannot pass until PAN-4825 retires the MiMo/Groq/Cerebras tier ids, so it depends on PAN-4825.",
+      "dependsOn": [],
+      "why": "werift keeps only the first (UDP) TURN URL, so the Anywhere relay never connects when UDP is blocked; fails PAN-4774 AC-3.",
+      "rationale": "New bug found by the live Overdeck Anywhere release acceptance run (in-pipeline PAN-4774, AC-3 and the relay half of AC-2): werift 0.25.1 parseIceServers keeps only the first TURN URL, and Cloudflare lists the UDP one first, so the rtc+turn:// route cannot reach TURN over TCP or TLS on networks that block UDP, which is the case the relay exists for. It blocks an in-pipeline release gate, so it takes the free rank 175 vacated by closed PAN-4827. The fix (order turns:/transport=tcp first for the relay route, or retry with a TCP/TLS URL) is well scoped; the second observation (pair checks failing with UDP open) is not root-caused and may need its own issue.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3519,6 +3476,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "Cost-bleed circuit breaker — progress-aware, always-on guard against runaway spend; the one real guard the epic authorizes. Updated since the prior run (comment/label activity); body substance unchanged, rank held. Note: its costBleedMonitor is described as a deacon patrol — deacon-lite is the new home. Blocker PAN-2466 closed since the prior run; dependsOn pruned.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-4847",
+      "rank": 177,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open.",
+      "rationale": "New issue placed in the open rank-177 slot: a silent pipeline stall (review never requested after Fly reap) that also blocks PAN-4696 FR-2; root cause is an unidentified background writer of .overdeck/context/codebase/concerns.md plus an over-strict porcelain dirty check in requestReviewThroughRoute.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1042",
@@ -4091,15 +4061,15 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
-      "issue": "PAN-4826",
+      "issue": "PAN-4861",
       "rank": 224,
-      "size": "M",
+      "size": "S",
       "importance": "medium",
-      "score": 62,
+      "score": 56,
       "condition": "ok",
       "dependsOn": [],
-      "why": "OpenAI/Anthropic catalog: fix 7 wrong prices, add gpt-6-rosalind, hide sonnet-4-5 before 11-30 retirement, raise 4-6 to 1M",
-      "rationale": "New issue from the 2026-11-02 catalog audit. Nothing is broken today: claude-sonnet-4-5 already migrates through MODEL_DEPRECATIONS, so the 2026-11-30 retirement only needs it hidden from new selections, and the rest is price accuracy, a new opt-in model and two context windows. It takes the free rank 224, after PAN-4364 (GPT-6 OpenAI catalog alignment, rank 208), which edits the same OpenAI rows and should land first to avoid conflicts.",
+      "why": "Removing a managed SSH machine kills only the dashboard pid; the pan up supervisor restarts it. Found in PAN-4774 AC-6.",
+      "rationale": "New bug found during the PAN-4774 Anywhere acceptance run (AC-6): stopLocked in the SSH helper signals only the dashboard pid, so the supervisor restarts it and the deleted launch marker leaves a server no later remove can stop. It is a small, well-evidenced fix that makes the remove dialog's promise true, so it takes free rank 224 beside its sibling acceptance bugs PAN-4860 and PAN-4859 without moving any other node.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4125,6 +4095,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback",
       "rationale": "New issue: an observation follow-up to in-pipeline PAN-4614; ranked mid-tier because it only matters if GitHub ignores union, and any fallback touches the merge gate's trust boundary and needs its own plan.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4860",
+      "rank": 227,
+      "size": "S",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Project create proposes issue prefixes with digits (ABC123X) that parseIssueId rejects, so no issue resolves. Found in PAN-4774 AC-4.",
+      "rationale": "New bug found during the PAN-4774 Anywhere acceptance run: create.ts proposes and validates prefixes with digits while parseIssueId accepts letters only, so any project key containing a digit gets an unusable prefix. It is a small, well-specified correctness fix in the shared project-create core, so it takes free rank 227 ahead of the similar PAN-4859 without moving any other node.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4638,6 +4621,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
+      "issue": "PAN-4859",
+      "rank": 269,
+      "size": "S",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Open in editor on an SSH-host machine opens ssh-remote+127.0.0.1 (local forward); use the SSH record destination. Blocks AC-15 W-CONV9.",
+      "rationale": "New bug found by the in-pipeline Anywhere release acceptance run (PAN-4774, AC-15 / W-CONV9): sshHostFor reads the hostname of the SSH route, which is the local port forward, so Open in editor targets the local machine instead of the SSH host. The fix is small and well specified (look up SshMachineRecord.destination by link id, check the Remote-SSH authority form for user and port, add an open-remote unit test). It takes the free rank 269, just ahead of PAN-4774, because the release checklist item cannot pass on an SSH-linked machine until it lands.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2243",
       "rank": 270,
       "size": "S",
@@ -4699,6 +4695,21 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
+      "issue": "PAN-4849",
+      "rank": 275,
+      "size": "XL",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4820"
+      ],
+      "why": "Part B of PAN-4820: Deft state surfaces, review-cycle view and Run on Deft switch in the dashboard; blocked by PAN-4820",
+      "rationale": "New issue split from PAN-4820 at the operator's request; its design (WI-15 to WI-29) lives in the PAN-4820 PRD and it is explicitly blocked by PAN-4820, so it sits in the free slot just after its blocker.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4811",
       "rank": 276,
       "size": "M",
@@ -4708,6 +4719,21 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked.",
       "rationale": "Moved up from rank 277 into the vacated PAN-4743 slot: its only dependency PAN-4743 closed as completed on 2026-11-02, so startFlyTarget exists and lane provisioning can start.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4852",
+      "rank": 277,
+      "size": "L",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4820"
+      ],
+      "why": "SageOx core: transient per-project binding, Overdeck-built ox, Codex launches, fork rebase; in pipeline, waits on PAN-4820 merge",
+      "rationale": "New in-pipeline issue, pinned in the free rank after the Deft part-B work: it reuses PAN-4820's worktree hide module and merge guard and states work starts after PAN-4820 merges, so it ranks just behind that cluster as decided feature work, not substrate.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4932,6 +4958,21 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "condition": "ok",
       "dependsOn": [],
       "why": "work agents hang on Claude Code settings-file protection when editing .claude/**",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4853",
+      "rank": 294,
+      "size": "M",
+      "importance": "low",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4852"
+      ],
+      "why": "SageOx dashboard views (session tab, context trace, project panel); blocked by PAN-4852; session-to-issue mapping is a checkpoint",
+      "rationale": "New issue: dashboard read-only views over SageOx files, explicitly blocked by PAN-4852 part A, so it sits right after part A with lower importance as UI follow-up.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12127,34 +12168,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
-      "issue": "PAN-4847",
-      "rank": 177,
-      "size": "S",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open.",
-      "rationale": "New issue placed in the open rank-177 slot: a silent pipeline stall (review never requested after Fly reap) that also blocks PAN-4696 FR-2; root cause is an unidentified background writer of .overdeck/context/codebase/concerns.md plus an over-strict porcelain dirty check in requestReviewThroughRoute.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4849",
-      "rank": 275,
-      "size": "XL",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4820"
-      ],
-      "why": "Part B of PAN-4820: Deft state surfaces, review-cycle view and Run on Deft switch in the dashboard; blocked by PAN-4820",
-      "rationale": "New issue split from PAN-4820 at the operator's request; its design (WI-15 to WI-29) lives in the PAN-4820 PRD and it is explicitly blocked by PAN-4820, so it sits in the free slot just after its blocker.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4851",
       "rank": 881,
       "size": "S",
@@ -12170,32 +12183,15 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
-      "issue": "PAN-4852",
-      "rank": 277,
-      "size": "L",
+      "issue": "PAN-4863",
+      "rank": 307,
+      "size": "S",
       "importance": "medium",
-      "score": 54,
+      "score": 45,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4820"
-      ],
-      "why": "SageOx core: transient per-project binding, Overdeck-built ox, Codex launches, fork rebase; in pipeline, waits on PAN-4820 merge",
-      "rationale": "New in-pipeline issue, pinned in the free rank after the Deft part-B work: it reuses PAN-4820's worktree hide module and merge guard and states work starts after PAN-4820 merges, so it ranks just behind that cluster as decided feature work, not substrate.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4853",
-      "rank": 294,
-      "size": "M",
-      "importance": "low",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4852"
-      ],
-      "why": "SageOx dashboard views (session tab, context trace, project panel); blocked by PAN-4852; session-to-issue mapping is a checkpoint",
-      "rationale": "New issue: dashboard read-only views over SageOx files, explicitly blocked by PAN-4852 part A, so it sits right after part A with lower importance as UI follow-up.",
+      "dependsOn": [],
+      "why": "Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS.",
+      "rationale": "New issue split out of in-pipeline PAN-4774: Fly VMs lack systemd as PID 1, so AC-10 (connect survives logout and reboot) must run on a real VPS against the first release that ships `pan connect`. It is an operator-run verification step, so it takes free rank 307 beside the Anywhere epic and moves no other node.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13336,13 +13332,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "confidence": 0.6
     },
     {
-      "from": "PAN-4734",
-      "to": "PAN-1775",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4705",
       "to": "PAN-4746",
       "type": "informs",
@@ -13413,13 +13402,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "confidence": 0.5
     },
     {
-      "from": "PAN-4821",
-      "to": "PAN-4547",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-4774",
       "to": "PAN-4823",
       "type": "unblocks",
@@ -13427,20 +13409,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "confidence": 1
     },
     {
-      "from": "PAN-4825",
-      "to": "PAN-4827",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-4364",
-      "to": "PAN-4826",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-4823",
       "to": "PAN-4828",
       "type": "contains",
@@ -13509,13 +13477,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.9
-    },
-    {
-      "from": "PAN-4827",
-      "to": "PAN-4844",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-4823",
@@ -13836,6 +13797,55 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "from": "PAN-4852",
       "to": "PAN-4853",
       "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4859",
+      "to": "PAN-4774",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4860",
+      "to": "PAN-4774",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4860",
+      "to": "PAN-3852",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4861",
+      "to": "PAN-4774",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4862",
+      "to": "PAN-4774",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-4862",
+      "to": "PAN-4482",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4863",
+      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     }
