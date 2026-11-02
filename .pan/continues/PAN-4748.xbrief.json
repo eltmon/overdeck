@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4748",
   "created": "2026-11-02T03:23:38.611Z",
-  "updated": "2026-11-02T05:25:44.261Z",
+  "updated": "2026-11-02T05:26:08.489Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "doctor-fly-token.ac5": {
       "status": "completed",
       "doneAt": "2026-11-02T05:25:44.261Z"
+    },
+    "docs-fly-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:26:08.488Z"
     }
   }
 }
