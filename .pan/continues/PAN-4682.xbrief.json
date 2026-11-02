@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4682",
   "created": "2026-11-02T03:20:08.527Z",
-  "updated": "2026-11-02T03:36:10.896Z",
+  "updated": "2026-11-02T03:36:29.696Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "add-fly-image-help.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T03:36:10.895Z"
+    },
+    "add-fly-image-help.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:36:29.695Z"
     }
   }
 }
