@@ -17,6 +17,7 @@ import {
 import type { ProjectConfig } from '../projects.js';
 import { getAutoCloseOutCanonicalState } from './auto-close-out-canonical-state.js';
 import { DEPLOY_PROBE_TIMEOUT_MS, readHealthWithRetry } from './dod-deploy-probe.js';
+import { PullRequestReadError, readPullRequestWithRetry } from './dod-pr-read.js';
 import {
   findLaterGreenDefaultBranchRun,
   hasRequiredChecksGreen,
@@ -93,6 +94,13 @@ interface MergedRowDeps {
   readBranchContainment?: (ctx: LifecycleContext) => Promise<IssueBranchContainment>;
 }
 
+/** Row 4's PR read (PAN-4821): retried once; a final failure throws `PullRequestReadError`. */
+export async function readMergedRowPullRequest(ctx: LifecycleContext, branchName: string) {
+  if (!ctx.github) return {};
+  void branchName;
+  return (await readPullRequestWithRetry(fetchIssuePullRequest, ctx.issueId)) ?? {};
+}
+
 const defaultMergedRowDeps: MergedRowDeps = {
   verifyMerged: async () => ({
     step: 'close-out:verify-merged',
@@ -100,13 +108,7 @@ const defaultMergedRowDeps: MergedRowDeps = {
     skipped: false,
     error: 'merge verifier was not supplied',
   }),
-  readPullRequest: async (ctx, branchName) => {
-    if (!ctx.github) return {};
-    void branchName;
-    const response = await fetchIssuePullRequest(ctx.issueId);
-    if (response.error) throw new Error(response.error);
-    return response.pr ?? {};
-  },
+  readPullRequest: readMergedRowPullRequest,
   readMergedForgeArtifacts: async ctx => {
     const repos = resolveProjectReposForIssue(ctx.issueId)?.filter(repo => repo.required) ?? [];
     const artifacts = await Promise.all(repos.map(repo => getForgeAdapter(repo.forge).findMergedArtifact({
@@ -135,11 +137,25 @@ interface PostMergeRowDeps {
   isAlive: (agentId: string) => Promise<LivenessVerdict>;
 }
 
+/**
+ * Row 5's secondary signal. A failed read stays `undefined` (PAN-4821): the
+ * row's evidence is the canonical state, and a missing mergedAt can only turn
+ * a pass into a miss. The helper has already logged the failure.
+ */
+export async function readPullRequestMergedAt(issueId: string): Promise<string | undefined> {
+  try {
+    return (await readPullRequestWithRetry(fetchIssuePullRequest, issueId))?.mergedAt;
+  } catch (error) {
+    if (error instanceof PullRequestReadError) return undefined;
+    throw error;
+  }
+}
+
 const defaultPostMergeRowDeps: PostMergeRowDeps = {
   readCanonicalState: async ctx => {
     return getAutoCloseOutCanonicalState(ctx.issueId) as Promise<CanonicalState | null>;
   },
-  readMergedAt: async issueId => (await defaultDeps.readPullRequest(issueId))?.mergedAt,
+  readMergedAt: readPullRequestMergedAt,
   listAgents: async () => Effect.runPromise(listRunningAgents()),
   isAlive: agentId => isAlive(agentId),
 };
@@ -300,10 +316,7 @@ const defaultDeployRowDeps: DeployRowDeps = {
 };
 
 const defaultDeps: DodStatusRowDeps = {
-  readPullRequest: async issueId => {
-    const response = await fetchIssuePullRequest(issueId);
-    return response.error ? null : response.pr;
-  },
+  readPullRequest: issueId => readPullRequestWithRetry(fetchIssuePullRequest, issueId),
   readVerification: issueId => {
     const workspacePath = getIssueWorkspacePath(issueId);
     return workspacePath ? readVerificationArtifact(workspacePath) : null;
@@ -389,9 +402,19 @@ async function checkVerdict(
   settlement?: TerminalVerdictSettlement,
   landing?: LandingEvidence,
 ): Promise<DodRowResult> {
-  // A door that throws synchronously must read as "no evidence", not as a gate
-  // crash: `Promise.resolve(fn())` never sees a throw from `fn` itself.
-  const pr = await (async () => deps.readPullRequest(issueId))().catch(() => null);
+  // A door that throws (synchronously or not) is a gate miss, not a crash:
+  // `Promise.resolve(fn())` never sees a throw from `fn` itself. PAN-4821: a
+  // failed read is not "no PR" — it fails closed with the real error, and the
+  // strike and terminal-settlement waivers below never apply to it.
+  let pr: IssuePullRequestData | null;
+  try {
+    pr = await (async () => deps.readPullRequest(issueId))();
+  } catch (error) {
+    const observed = error instanceof PullRequestReadError
+      ? error.message
+      : `pull request read failed on the forge: ${error instanceof Error ? error.message : String(error)}`;
+    return result(id, 'miss', observed);
+  }
 
   if (!pr) {
     const observed = 'no pull request found on the forge for this issue';

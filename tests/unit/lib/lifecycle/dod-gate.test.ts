@@ -16,6 +16,7 @@ vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
 
 import type { VerificationArtifact } from '../../../../src/lib/cloister/verification-artifact.js';
 import type { IssuePullRequestData } from '../../../../src/lib/overdeck/pull-requests.js';
+import { PullRequestReadError } from '../../../../src/lib/lifecycle/dod-pr-read.js';
 import {
   checkMergedRow,
   checkMainVerifyRow,
@@ -150,20 +151,59 @@ describe('Definition-of-Done status rows', () => {
     expect(row.observed).toContain('stale non-terminal artifact');
   });
 
-  it('returns misses instead of throwing when there is no PR or a door fails', async () => {
+  it('reports absence when the forge answers that no PR exists', async () => {
     const empty = deps(null);
+    for (const row of await Promise.all([checkReviewRow(issueId, empty), checkTestsRow(issueId, empty)])) {
+      expect(row).toMatchObject({ status: 'miss', observed: 'no pull request found on the forge for this issue' });
+    }
+    expect(await checkVerificationRow(issueId, empty)).toMatchObject({
+      status: 'miss',
+      observed: 'no verification artifact in the workspace',
+    });
+  });
+
+  it('reports a failed PR read with its error, never as absence', async () => {
     const failing: DodStatusRowDeps = {
       readPullRequest: () => { throw new Error('forge unavailable'); },
       readVerification: () => { throw new Error('workspace unavailable'); },
     };
-    for (const source of [empty, failing]) {
-      for (const row of await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source)])) {
-        expect(row).toMatchObject({ status: 'miss', observed: 'no pull request found on the forge for this issue' });
-      }
-      expect(await checkVerificationRow(issueId, source)).toMatchObject({
+    for (const row of await Promise.all([checkReviewRow(issueId, failing), checkTestsRow(issueId, failing)])) {
+      expect(row).toMatchObject({ status: 'miss', observed: 'pull request read failed on the forge: forge unavailable' });
+      expect(row.observed).not.toContain('no pull request found');
+    }
+    expect(await checkVerificationRow(issueId, failing)).toMatchObject({
+      status: 'miss',
+      observed: 'no verification artifact in the workspace',
+    });
+  });
+
+  it('reports a PullRequestReadError message verbatim', async () => {
+    const source: DodStatusRowDeps = {
+      readPullRequest: () => { throw new PullRequestReadError(issueId, 'GitHub App PR lookup failed: 403'); },
+      readVerification: () => null,
+    };
+    for (const row of await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source)])) {
+      expect(row).toMatchObject({
         status: 'miss',
-        observed: 'no verification artifact in the workspace',
+        observed: 'pull request read failed on the forge after 2 attempts: GitHub App PR lookup failed: 403',
       });
+    }
+  });
+
+  it('never settles or strike-skips a failed PR read', async () => {
+    const failing: DodStatusRowDeps = {
+      readPullRequest: () => { throw new Error('forge unavailable'); },
+      readVerification: () => null,
+    };
+    const settlement = { trackerClosed: true, landedWork: true, mainVerifyStatus: 'pass' as const };
+    const landing = { strikeLanded: true };
+    for (const row of await Promise.all([
+      checkReviewRow(issueId, failing, settlement),
+      checkTestsRow(issueId, failing, settlement),
+      checkReviewRow(issueId, failing, undefined, landing),
+      checkTestsRow(issueId, failing, undefined, landing),
+    ])) {
+      expect(row).toMatchObject({ status: 'miss' });
     }
   });
 
