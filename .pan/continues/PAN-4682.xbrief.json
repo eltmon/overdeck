@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4682",
   "created": "2026-11-02T03:20:08.527Z",
-  "updated": "2026-11-02T03:33:29.953Z",
+  "updated": "2026-11-02T03:33:48.399Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,10 @@
     "provider-default-image.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T03:33:29.953Z"
+    },
+    "provider-default-image.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:33:48.399Z"
     }
   }
 }
