@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4827",
   "created": "2026-11-02T16:36:08.290Z",
-  "updated": "2026-11-02T19:02:01.215Z",
+  "updated": "2026-11-02T19:02:26.462Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "zai-add-glm-5-3-flash.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T19:02:01.215Z"
+    },
+    "zai-tiers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:02:26.462Z"
     }
   }
 }
