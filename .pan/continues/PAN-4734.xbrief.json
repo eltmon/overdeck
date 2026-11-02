@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T14:54:34.852Z",
+  "updated": "2026-11-02T14:54:39.729Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
       "claimedBy": "agent-pan-4734",
       "claimedAt": "2026-11-02T14:52:29.817Z",
       "doneAt": "2026-11-02T14:54:34.852Z"
+    },
+    "wi12-tree-row-linked-conversation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:54:39.729Z"
     }
   }
 }
