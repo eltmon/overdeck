@@ -8,6 +8,7 @@ import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import { useStageDeck } from '../StageDeckContext'
 import { CiteSelectionLayer } from '../../chat/citations/CiteSelectionToolbar'
 import { fileSelectionResolver } from '../../chat/citations/resolveSelectionCitation'
+import { useFileCitationHighlight } from '../../chat/citations/citationHighlight'
 import { CitationTargetContext } from '../../../lib/composerCitations'
 import type { PaneWrapperProps } from '../types'
 import styles from '../stage.module.css'
@@ -237,17 +238,18 @@ export function EditorPane({ pane }: PaneWrapperProps) {
         )}
       </div>
       {activeTab === 'preview' && pane.citeConversationName && !dirty && (
-        <EditorPreviewCite conversationName={pane.citeConversationName} path={filePath} rootRef={previewRootRef} />
+        <EditorPreviewCite conversationName={pane.citeConversationName} path={filePath} rootRef={previewRootRef} text={draft} />
       )}
     </div>
   )
 }
 
 /** PAN-4658: Cite for the Preview — file citations into the pane's origin conversation. */
-function EditorPreviewCite({ conversationName, path, rootRef }: {
-  conversationName: string; path: string; rootRef: RefObject<HTMLDivElement | null>
+function EditorPreviewCite({ conversationName, path, rootRef, text }: {
+  conversationName: string; path: string; rootRef: RefObject<HTMLDivElement | null>; text: string
 }) {
   const deck = useStageDeck()
+  useFileCitationHighlight(rootRef, conversationName, path, text)
   const resolve = useMemo(() => fileSelectionResolver(path), [path])
   const onSaved = useCallback(() => {
     toast.success('Citation added', {
