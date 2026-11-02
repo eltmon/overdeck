@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4740",
   "created": "2026-11-02T12:44:07.052Z",
-  "updated": "2026-11-02T13:22:32.441Z",
+  "updated": "2026-11-02T13:24:56.988Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-02T13:22:24.228Z"
     },
     "channel-timer-rearm": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4740",
-      "claimedAt": "2026-11-02T13:22:32.440Z"
+      "claimedAt": "2026-11-02T13:22:32.440Z",
+      "doneAt": "2026-11-02T13:24:56.988Z"
     }
   }
 }
