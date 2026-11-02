@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4786",
   "created": "2026-11-02T04:47:22.459Z",
-  "updated": "2026-11-02T05:13:00.983Z",
+  "updated": "2026-11-02T05:13:20.324Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,6 +36,10 @@
     "adopted-plan-helper.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T05:13:00.983Z"
+    },
+    "adopted-plan-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:13:20.324Z"
     }
   }
 }
