@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4767",
+  "created": "2026-11-02T02:20:34.096Z",
+  "updated": "2026-11-02T02:20:34.097Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "split-styleguide-route-its": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4767",
+      "claimedAt": "2026-11-02T02:20:34.096Z"
+    }
+  }
+}
