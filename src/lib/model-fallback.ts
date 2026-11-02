@@ -120,6 +120,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // xAI models
   'grok-build-0.1': 'xai',
+  'grok-4.7': 'xai',
+  'grok-4.3': 'xai',
 
   // Groq models
   'openai/gpt-oss-120b': 'groq',
@@ -229,6 +231,8 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // xAI → Anthropic
   'grok-build-0.1': 'claude-sonnet-5-5', // Coding flagship → Sonnet
+  'grok-4.7': 'claude-sonnet-5-5',
+  'grok-4.3': 'claude-sonnet-5-5',
 
   // Groq → Anthropic
   'openai/gpt-oss-120b': 'claude-sonnet-5-5',

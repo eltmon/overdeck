@@ -175,6 +175,9 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'custom', model: 'gpt-oss-120b', inputPer1k: 0.00035, outputPer1k: 0.00075, currency: 'USD' },
   // Mistral Large 4 (docs.mistral.ai/models/mistral-large-4-0, Public Preview)
   { provider: 'custom', model: 'mistral-large-4-0', inputPer1k: 0.0007, outputPer1k: 0.0021, cacheReadPer1k: 0.00007, currency: 'USD' },
+  // xAI Grok (docs.x.ai/docs/models). <200K-prompt rates; the >=200K double rate is in capability notes.
+  { provider: 'custom', model: 'grok-4.7', inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0005, currency: 'USD' },
+  { provider: 'custom', model: 'grok-4.3', inputPer1k: 0.00125, outputPer1k: 0.0025, cacheReadPer1k: 0.0002, currency: 'USD' },
   // Z.AI (GLM) — PAN-1935: previously absent, so pi-harness GLM agents recorded $0 cost.
   // GLM-5.x: $1.4/M in, $4.4/M out (docs.z.ai/guides/overview/pricing). cacheRead set to
   // ~7% of input to approximate Z.AI's context-cache discount — verify upstream and refine.

@@ -329,7 +329,7 @@ describe('settings', () => {
 
       const available = getAvailableModels(settings);
 
-      expect(available.xai).toEqual(['grok-build-0.1']);
+      expect(available.xai).toEqual(['grok-build-0.1', 'grok-4.7', 'grok-4.3']);
     });
 
     it('should return multiple providers when multiple API keys configured', async () => {

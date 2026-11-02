@@ -150,6 +150,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
     name: 'xAI (Grok)',
     models: [
       { id: 'grok-build-0.1' as ModelId, name: 'Grok Build 0.1 (256K context)', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'vision'], description: 'xAI\'s agentic coding model (May 2026). 256K context, reasoning always active.' },
+      { id: 'grok-4.7' as ModelId, name: 'Grok 4.7 (500K context)', icon: Layers, tier: 'premium', costPer1MTokens: 4, capabilities: ['reasoning', 'code', 'large-context'], description: 'xAI flagship. 500K context, $2/M in, $6/M out; a prompt of 200K+ tokens bills the whole request at double.' },
+      { id: 'grok-4.3' as ModelId, name: 'Grok 4.3 (1M context)', icon: Zap, tier: 'balanced', costPer1MTokens: 1.875, capabilities: ['reasoning', 'code', 'large-context'], description: '1M context, $1.25/M in, $2.50/M out; a prompt of 200K+ tokens bills the whole request at double.' },
     ],
   },
   groq: {

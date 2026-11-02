@@ -251,7 +251,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: 'https://api.x.ai/v1',
     authType: 'static',
-    models: ['grok-build-0.1'] as GrokModel[],
+    models: ['grok-build-0.1', 'grok-4.7', 'grok-4.3'] as GrokModel[],
     tierModels: { opus: 'grok-build-0.1', sonnet: 'grok-build-0.1', haiku: 'grok-build-0.1' },
     tested: false,
     description: 'Route directly to xAI Anthropic-compatible endpoint using XAI_API_KEY. Model: grok-build-0.1 (256K ctx, $1/M in, $2/M out).',
@@ -500,7 +500,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check xAI models
-  if (['grok-build-0.1'].includes(modelId)) {
+  if (['grok-build-0.1', 'grok-4.7', 'grok-4.3'].includes(modelId)) {
     return PROVIDERS.xai;
   }
 

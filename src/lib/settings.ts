@@ -45,7 +45,7 @@ export type ZAIModel = 'glm-5.3' | 'glm-5.2' | 'glm-5.1' | 'glm-4.7' | 'glm-4.7-
 export type MimoModel = 'mimo-v2.6-pro' | 'mimo-v2.6-flash' | 'mimo-v2.6-pro-ultraspeed' | 'mimo-v2.5-pro' | 'mimo-v2.5';
 export type NousModel = 'qwen/qwen3.6-plus';
 export type DashScopeModel = 'qwen3.7-plus' | 'qwen3.8-flash' | 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max' | 'qwen3.8-max';
-export type GrokModel = 'grok-build-0.1';
+export type GrokModel = 'grok-build-0.1' | 'grok-4.7' | 'grok-4.3';
 export type GroqModel = 'openai/gpt-oss-120b' | 'openai/gpt-oss-20b';
 export type CerebrasModel = 'gpt-oss-120b';
 export type MistralModel = 'mistral-large-4-0';
@@ -244,7 +244,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     : [];
 
   const xaiModels: GrokModel[] = settings.api_keys.xai
-    ? ['grok-build-0.1']
+    ? ['grok-build-0.1', 'grok-4.7', 'grok-4.3']
     : [];
 
   const quantumllamaModels: QuantumLlamaModel[] = settings.api_keys.quantumllama

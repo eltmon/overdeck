@@ -100,3 +100,14 @@ describe('Mistral Large 4', () => {
     expect(PROVIDERS.mistral.tierModels).toEqual({ opus: 'mistral-large-latest', sonnet: 'mistral-large-latest', haiku: 'mistral-small-latest' });
   });
 });
+
+describe('xAI Grok 4.7 and 4.3', () => {
+  it.each(['grok-4.7', 'grok-4.3'])('registers %s under xai', (id) => {
+    expectRegistered(id, 'xai');
+    expect(getModelProvider(id)).toBe('xai');
+  });
+
+  it('keeps grok-build-0.1 in every tier slot', () => {
+    expect(PROVIDERS.xai.tierModels).toEqual({ opus: 'grok-build-0.1', sonnet: 'grok-build-0.1', haiku: 'grok-build-0.1' });
+  });
+});
