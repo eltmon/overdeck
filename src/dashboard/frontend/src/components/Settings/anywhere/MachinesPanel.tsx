@@ -12,6 +12,9 @@
  * `AddSshMachineDialog`; an SSH-backed row shows its destination, forward
  * state and launch kind in muted text, and its Remove confirmation offers to
  * leave a server this dashboard started running (`RemoveSshMachineDialog`).
+ *
+ * Fly machines (PAN-4743): an **Add a Fly machine** button opens
+ * `AddFlyMachineDialog`, which posts `POST /api/machines/fly`.
  */
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,6 +23,7 @@ import { toast } from 'sonner';
 
 import { formatRelativeTime } from '../../../lib/dashboard-utils';
 import { useConfirm } from '../../DialogProvider';
+import { AddFlyMachineDialog } from './AddFlyMachineDialog';
 import { AddSshMachineDialog } from './AddSshMachineDialog';
 import { ANYWHERE_STATUS_QUERY_KEY, apiError, isOk } from './anywhereApi';
 import { LinkMachineDialog } from './LinkMachineDialog';
@@ -311,6 +315,7 @@ export function MachinesPanel() {
   const queryClient = useQueryClient();
   const [linkOpen, setLinkOpen] = useState(false);
   const [sshOpen, setSshOpen] = useState(false);
+  const [flyOpen, setFlyOpen] = useState(false);
   const { data, error, isLoading } = useQuery({
     queryKey: MACHINES_QUERY_KEY,
     queryFn: loadMachines,
@@ -329,6 +334,9 @@ export function MachinesPanel() {
       <div className="flex items-center justify-between gap-4 mb-2">
         <h3 className="text-sm font-medium text-foreground">Machines</h3>
         <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setFlyOpen(true)} className={buttonClass}>
+            Add a Fly machine
+          </button>
           <button type="button" onClick={() => setSshOpen(true)} className={buttonClass}>
             Add an SSH machine
           </button>
@@ -371,6 +379,7 @@ export function MachinesPanel() {
 
       <LinkMachineDialog open={linkOpen} onClose={() => setLinkOpen(false)} />
       <AddSshMachineDialog open={sshOpen} onClose={() => setSshOpen(false)} />
+      <AddFlyMachineDialog open={flyOpen} onClose={() => setFlyOpen(false)} />
     </div>
   );
 }

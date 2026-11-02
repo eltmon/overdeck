@@ -391,6 +391,41 @@ describe('NewConversationDialog', () => {
     expect(useNewConversationDialogStore.getState().open).toBe(false);
   });
 
+  it('ac1/ac2 (PAN-4743): Fly (new VM) shows the starting status and button text, then navigates on success', async () => {
+    let resolveFleet: ((value: { ok: boolean; status: number; json: () => Promise<unknown> }) => void) | null = null;
+    const fleetPosts: Array<Record<string, unknown>> = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST' && url === '/api/fleet/conversations') {
+        fleetPosts.push(JSON.parse(String(init.body)));
+        return new Promise((resolve) => { resolveFleet = resolve; });
+      }
+      if (url === '/api/registered-projects') return { ok: true, status: 200, json: async () => PROJECTS };
+      if (url.startsWith('/api/effort/default')) {
+        return { ok: true, status: 200, json: async () => ({ effort: 'high', source: 'default', requested: 'high', clamped: false }) };
+      }
+      if (url.startsWith('/api/skills/overrides')) return { ok: true, status: 200, json: async () => ({ skills: [], packs: [] }) };
+      return { ok: false, status: 404, json: async () => ({}) };
+    }));
+    act(() => openNewConversationDialog({ projectKey: 'overdeck' }));
+    renderHost();
+    await waitFor(() => expect((screen.getByLabelText('Project') as HTMLSelectElement).value).toBe('overdeck'));
+    fireEvent.change(screen.getByLabelText('Machine'), { target: { value: 'fly' } });
+    const pushState = vi.spyOn(window.history, 'pushState');
+    fireEvent.click(screen.getByRole('button', { name: 'Create conversation' }));
+
+    await waitFor(() => expect(screen.getByText('Starting a Fly machine. This takes a few minutes.')).toBeTruthy());
+    expect(screen.getByRole('button', { name: 'Create conversation' })).toHaveTextContent('Starting…');
+    expect(fleetPosts).toHaveLength(1);
+    expect(fleetPosts[0]).toMatchObject({ machine: 'fly', projectKey: 'overdeck' });
+
+    act(() => resolveFleet!({
+      ok: true, status: 201,
+      json: async () => ({ conversation: '@env-fly/conv-1', machine: { environmentId: 'env-fly', label: 'fly-m1', self: false }, reason: 'Fly (new VM) → fly-m1 (iad)' }),
+    }));
+    await waitFor(() => expect(pushState).toHaveBeenCalledWith({}, '', '/conv/@env-fly/conv-1'));
+    pushState.mockRestore();
+  });
+
   it('Escape does nothing while submitting', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       if (init?.method === 'POST' && url === '/api/conversations') return new Promise<Response>(() => {});

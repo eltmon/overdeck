@@ -593,6 +593,8 @@ tmux and no Overdeck server; moving those onto this path is
 | Heartbeat, sweep and Codex sign-in sync loops | `src/lib/remote/fly-machine-loops.ts` (registered in `src/lib/cloister/hygiene-scheduler.ts`) |
 | Credential refresh | `src/lib/remote/remote-credential-refresh.ts` (Fly machine names join the remote agents' VMs) |
 | Spend cap | `checkRemoteSpendCap` in `src/lib/remote/remote-agents.ts` counts Fly machine records |
+| The Fly target door: `startFlyTarget`, `FlySpawn`, `FLY_MACHINE_TAGS` (PAN-4743) | `src/dashboard/server/services/fleet-fly-target.ts` |
+| The Add-a-Fly-machine dialog (Settings → Anywhere → Machines) | `src/dashboard/frontend/src/components/Settings/anywhere/AddFlyMachineDialog.tsx` |
 
 ### Decisions
 
@@ -928,7 +930,14 @@ keeps each peer's last values. `choosePlacement` (`anywhere/placement.ts`, pure)
 offline/unsupported, `no project`, `no <tag>`, `CPU saturated`, then `reserved` (unless
 only reserved machines have the needed tag), and scores by lowest PSI, most memory, fewest
 working agents, this machine, label. `services/fleet-target.ts` resolves every fleet
-spawn's `machine` (self, `auto`, a link label or id, `fly` refused until #4652).
+spawn's `machine` (self, `auto`, a link label or id, `fly`). `fly` calls the Fly target door
+(`services/fleet-fly-target.ts`, `startFlyTarget`) when the route passes a spawn context
+(`FlySpawn`: `projectKey`, `harness?`, `model?`, `mayCreate`); without one it answers 400
+`fly-unavailable`. Only `POST /api/fleet/conversations` passes a spawn — `mayCreateFly` on
+`FleetCaller`, true only for an admin credential (PAN-4743 D-4743-4); workers, issue starts
+and lanes pass none, so `fly` there always refuses. `auto` falls back to the Fly target door
+too, when nothing else fits, the spawn and git origin are set, `needs` stays within
+`FLY_MACHINE_TAGS` (`linux`, `docker`) and `remote.auto_fly` is `true`.
 `OVERDECK_TEST_FORCE_CPU_SATURATED=1` is the smoke hook, read only by `machine-load.ts`.
 
 ### Projects, Needs-You and search across machines (D-4651-11 … D-4651-16)
