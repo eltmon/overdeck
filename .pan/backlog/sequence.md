@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T01:57:32.006261Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-02T01:59:00.659353Z · model: claude-opus-5-5 · open: 872_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 1 | PAN-4767 | S | critical | ok |  |  | Main is red: styleguide-conformance e2e spec times out since the Skills page redesign changed index.css; blocks every merge. |
 | 2 | PAN-4752 | S | high | ok |  |  | In-pipeline: Flywheel board shows strike workspaces as bogus PAN-<n>-STRIKE rows; map them to the base issue and strike PR. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4751 | S | medium | ok |  |  | In-pipeline: make the Flywheel NEEDS YOU banner reopen the pending AskUserQuestion dialog or jump to the conversation. |
@@ -883,6 +884,10 @@ _Last sequenced: 2026-11-02T01:57:32.006261Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
+### PAN-4767 (rank 1)
+
+New issue filed 2026-11-02 and already in the pipeline with a live workspace, so it is pinned at rank 1 beside PAN-4702 without moving any other node. Main CI fails unit shard 4 twice in a row on tests/e2e/styleguide-conformance.spec.ts after commit a443ff0619a changed the global stylesheet, and a red main empties the merge gate for every approved PR. The substrate-improvement label and the pipeline-blocking effect make it critical; the fix is scoped to one spec and one stylesheet change with a clear acceptance, so the condition is ok.
+
 ### PAN-4752 (rank 2)
 
 New issue filed 2026-11-02 and already in the pipeline, so it is pinned at the free rank 2 without moving any other node. The substrate-improvement label sets a high-importance floor; the fix is a small, well-specified change in src/lib/flywheel/derive-status.ts with a named unit test, so the condition is ok.
@@ -1195,10 +1200,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
-### PAN-3118 (rank 79)
-
-Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1206,10 +1207,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T01:57:32.006261Z",
+  "generatedAt": "2026-11-02T01:59:00.659353Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 871,
+  "openCount": 872,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12064,6 +12065,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "In-pipeline: file-link right-click menu gains Open in browser and per-installed-browser items for html/svg/pdf/image files.",
       "rationale": "New in-pipeline issue with a fully specified body and ACs; pinned in the free rank 603 beside comparable dashboard UX features so no existing node moves.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4767",
+      "rank": 1,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Main is red: styleguide-conformance e2e spec times out since the Skills page redesign changed index.css; blocks every merge.",
+      "rationale": "New issue filed 2026-11-02 and already in the pipeline with a live workspace, so it is pinned at rank 1 beside PAN-4702 without moving any other node. Main CI fails unit shard 4 twice in a row on tests/e2e/styleguide-conformance.spec.ts after commit a443ff0619a changed the global stylesheet, and a red main empties the merge gate for every approved PR. The substrate-improvement label and the pipeline-blocking effect make it critical; the fix is scoped to one spec and one stylesheet change with a clear acceptance, so the condition is ok.",
       "gate": "auto",
       "planning": "auto"
     }
