@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T18:15:31.853Z",
+  "updated": "2026-11-02T18:15:48.566Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -204,6 +204,10 @@
     "no-review-dispatch.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T18:15:31.853Z"
+    },
+    "no-review-dispatch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:15:48.566Z"
     }
   }
 }
