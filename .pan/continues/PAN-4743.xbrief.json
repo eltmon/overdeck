@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T14:58:02.891Z",
+  "updated": "2026-11-02T14:58:17.462Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "add-fly-dialog.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T14:58:02.891Z"
+    },
+    "add-fly-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:58:17.462Z"
     }
   }
 }
