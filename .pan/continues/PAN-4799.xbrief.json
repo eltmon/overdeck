@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4799",
   "created": "2026-11-02T05:59:19.070Z",
-  "updated": "2026-11-02T06:03:24.426Z",
+  "updated": "2026-11-02T06:03:35.499Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4799",
       "claimedAt": "2026-11-02T05:59:19.070Z",
       "doneAt": "2026-11-02T06:03:24.426Z"
+    },
+    "wire-ac-cache": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4799",
+      "claimedAt": "2026-11-02T06:03:35.498Z"
     }
   }
 }
