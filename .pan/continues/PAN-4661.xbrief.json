@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4661",
   "created": "2026-11-02T03:25:40.567Z",
-  "updated": "2026-11-02T04:03:07.710Z",
+  "updated": "2026-11-02T04:03:25.630Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "mobile-issue-sheet.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T04:03:07.710Z"
+    },
+    "mobile-issue-sheet.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:03:25.630Z"
     }
   }
 }
