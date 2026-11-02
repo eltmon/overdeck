@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4657",
   "created": "2026-11-02T03:48:30.667Z",
-  "updated": "2026-11-02T05:40:00.585Z",
+  "updated": "2026-11-02T05:40:20.177Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "schedule-dialog.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T05:40:00.585Z"
+    },
+    "schedule-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:40:20.176Z"
     }
   }
 }
