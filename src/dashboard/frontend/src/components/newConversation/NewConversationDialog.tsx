@@ -130,6 +130,8 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
     const next = projects?.find((p) => p.key === key);
     setProjectKey(next ? next.key : null);
     setCwd(next?.path ?? '');
+    // PAN-4743: Fly (new VM) needs a project; clearing it resets the choice to this machine.
+    if (!next && machine.machine === 'fly') setMachine(THIS_MACHINE);
   };
 
   const submit = async (event: FormEvent) => {
@@ -212,7 +214,7 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
             <ChevronDown size={14} className={styles.chev} />
           </div>
 
-          <MachineField value={machine} onChange={setMachine} />
+          <MachineField value={machine} onChange={setMachine} hasProject={projectKey !== null} />
 
           <label htmlFor={cwdId} className={styles.label}>Working directory</label>
           <div className={styles.field}>
