@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4786",
   "created": "2026-11-02T04:47:22.459Z",
-  "updated": "2026-11-02T05:15:03.764Z",
+  "updated": "2026-11-02T05:15:23.280Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
     "verify-door-wiring.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T05:15:03.763Z"
+    },
+    "verify-door-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:15:23.280Z"
     }
   }
 }
