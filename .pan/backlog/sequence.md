@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T00:41:15.552296Z · model: claude-opus-5-5 · open: 866_
+_Last sequenced: 2026-11-02T00:42:26.460807Z · model: claude-opus-5-5 · open: 867_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -285,6 +285,7 @@ _Last sequenced: 2026-11-02T00:41:15.552296Z · model: claude-opus-5-5 · open: 
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
 | 276 | PAN-4743 | M | medium | ok |  |  | Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; PAN-4651 merged, so this is now unblocked. |
 | 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
+| 278 | PAN-4756 | L | medium | ok |  | PAN-4755 | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755; surface/structure only. Waits for PAN-4755 to land. |
 | 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
@@ -1201,10 +1202,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T00:41:15.552296Z",
+  "generatedAt": "2026-11-02T00:42:26.460807Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 866,
+  "openCount": 867,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11992,6 +11993,21 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "New, well-specified operator-UX fix with exact files and acceptance criteria; ranked with other medium operator-surface fixes.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4756",
+      "rank": 278,
+      "size": "L",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4755"
+      ],
+      "why": "Move ~45 bespoke dialogs onto the shared Modal from PAN-4755; surface/structure only. Waits for PAN-4755 to land.",
+      "rationale": "New this pass: a well-specified follow-up that depends on the in-pipeline PAN-4755 Modal primitive, so it sits in a free mid-tier slot behind it.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13261,6 +13277,13 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4755",
+      "to": "PAN-4756",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
