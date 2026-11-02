@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4826",
   "created": "2026-11-02T16:31:08.878Z",
-  "updated": "2026-11-02T17:32:07.550Z",
+  "updated": "2026-11-02T17:32:23.624Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
     "rosalind-astra-law-cost.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T17:32:07.550Z"
+    },
+    "settings-catalog-order.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:32:23.624Z"
     }
   }
 }
