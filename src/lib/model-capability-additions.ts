@@ -144,7 +144,7 @@ export const AUDITED_MODEL_ADDITIONS = {
     model: 'gemini-3.8-flash',
     provider: 'google',
     displayName: 'Gemini 3.8 Flash',
-    costPer1MTokens: 5.25, // $1.50 in / $9 out
+    costPer1MTokens: 2.25, // $0.75 in / $3.75 out through 2026-12-31; $1.50/$7.50 from 2027-01-01
     contextWindow: 1048576,
     maxOutputTokens: 65536,
     skills: {
@@ -186,6 +186,52 @@ export const AUDITED_MODEL_ADDITIONS = {
     notes: 'Stable Google model. 1,048,576 input tokens and 65,536 maximum output tokens; verified September 2026.',
   },
 
+  'gemini-3.6-flash': {
+    model: 'gemini-3.6-flash',
+    provider: 'google',
+    displayName: 'Gemini 3.6 Flash',
+    costPer1MTokens: 2.25, // $0.75 in / $3.75 out through 2026-12-31; $1.50/$7.50 from 2027-01-01
+    contextWindow: 1048576,
+    maxOutputTokens: 65536,
+    skills: {
+      'code-generation': 80,
+      'code-review': 75,
+      debugging: 72,
+      planning: 68,
+      documentation: 76,
+      testing: 72,
+      security: 60,
+      performance: 70,
+      synthesis: 75,
+      speed: 96, // Very fast
+      'context-length': 100,
+    },
+    notes: 'Stable Google model (latest update July 2026). 1,048,576 input tokens, 65,536 output. $0.75/M input, $3.75/M output, $0.075/M cached until 2026-12-31; from 2027-01-01 $1.50/M, $7.50/M and $0.15/M. Google names it the replacement for gemini-3-flash-preview. Skill scores inherit Gemini 3 Flash until benchmarked. Verified 2026-11-02.',
+  },
+
+  'gemini-3.1-flash-lite': {
+    model: 'gemini-3.1-flash-lite',
+    provider: 'google',
+    displayName: 'Gemini 3.1 Flash Lite',
+    costPer1MTokens: 0.875,
+    contextWindow: 1048576,
+    maxOutputTokens: 65536,
+    skills: {
+      'code-generation': 72,
+      'code-review': 68,
+      debugging: 65,
+      planning: 60,
+      documentation: 70,
+      testing: 65,
+      security: 52,
+      performance: 62,
+      synthesis: 68,
+      speed: 98, // Most cost-efficient
+      'context-length': 100,
+    },
+    notes: 'Stable Google model (GA successor of gemini-3.1-flash-lite-preview). 1,048,576 input tokens, 65,536 output. $0.25/M input, $1.50/M output, $0.025/M cached (text). Google shuts it down 2027-05-07; replacement gemini-3.5-flash-lite. Verified 2026-11-02.',
+  },
+
   'glm-5.3': {
     model: 'glm-5.3',
     provider: 'zai',
@@ -216,6 +262,54 @@ export const AUDITED_MODEL_ADDITIONS = {
     notes: 'Verified September 2026: 1M context, 128K maximum output. Availability and pricing depend on provider region and account.',
   },
 
+  'glm-5.3-flash': {
+    model: 'glm-5.3-flash',
+    provider: 'zai',
+    displayName: 'GLM-5.3 Flash',
+    costPer1MTokens: 0.325,
+    contextWindow: 1000000,
+    effortLevels: ['low', 'high', 'max'],
+    supportsImages: true,
+    skills: {
+      'code-generation': 78,
+      'code-review': 74,
+      debugging: 72,
+      planning: 70,
+      documentation: 72,
+      testing: 72,
+      security: 68,
+      performance: 70,
+      synthesis: 74,
+      speed: 95,
+      'context-length': 92,
+    },
+    notes: 'Z.AI fast tier (verified 2026-11-02, docs.z.ai/guides/llm/glm-5.3-flash). 1M context, 128K output; input video/image/text/file. Reasoning always on; effort low/high/max per the chat-completion API reference. $0.15/M input, $0.03/M cached, $0.50/M output.',
+  },
+
+  'glm-5.3-flashx': {
+    model: 'glm-5.3-flashx',
+    provider: 'zai',
+    displayName: 'GLM-5.3 FlashX',
+    costPer1MTokens: 0.81,
+    contextWindow: 1000000,
+    effortLevels: ['low', 'high', 'max'],
+    supportsImages: true,
+    skills: {
+      'code-generation': 78,
+      'code-review': 74,
+      debugging: 72,
+      planning: 70,
+      documentation: 72,
+      testing: 72,
+      security: 68,
+      performance: 70,
+      synthesis: 74,
+      speed: 95,
+      'context-length': 92,
+    },
+    notes: 'Z.AI faster paid Flash tier (verified 2026-11-02, docs.z.ai/guides/llm/glm-5.3-flash). 1M context, 128K output; input video/image/text/file. Reasoning always on; effort enum from the vision-model API schema. $0.37/M input, $0.075/M cached, $1.25/M output.',
+  },
+
   'qwen3.7-plus': {
     model: 'qwen3.7-plus',
     provider: 'dashscope',
@@ -235,14 +329,14 @@ export const AUDITED_MODEL_ADDITIONS = {
       speed: 68,
       'context-length': 99,
     },
-    notes: 'Verified September 2026: 1M context, 128K maximum output. Availability and pricing depend on provider region and account.',
+    notes: 'Verified September 2026: 1M context, 128K maximum output. $0.40/M input, $1.60/M output up to 256K input ($1.20/$4.80 above), a limited-time 20% discount as of 2026-11-02.',
   },
 
   'qwen3.8-flash': {
     model: 'qwen3.8-flash',
     provider: 'dashscope',
     displayName: 'Qwen3.8 Flash',
-    costPer1MTokens: 0,
+    costPer1MTokens: 0.31,
     contextWindow: 1000000,
     skills: {
       'code-generation': 97,
@@ -257,7 +351,7 @@ export const AUDITED_MODEL_ADDITIONS = {
       speed: 68,
       'context-length': 99,
     },
-    notes: 'Verified September 2026: 1M context, 128K maximum output. Availability and pricing depend on provider region and account.',
+    notes: 'Verified September 2026: 1M context, 128K maximum output. $0.15/M input, $0.47/M output (Singapore, verified 2026-11-02).',
   },
 
   // GPT-6 Sol / Luna (2026-09-22). Codex 0.157.1 `codex debug models`: context_window 272000,

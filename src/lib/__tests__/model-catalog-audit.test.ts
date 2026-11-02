@@ -51,6 +51,11 @@ describe('September model catalog no-loss audit', () => {
     ['qwen3.7-plus', 'dashscope', 1000000],
     ['qwen3.8-flash', 'dashscope', 1000000],
     ['mimo-v2.6-pro', 'mimo', 1048576],
+    ['gemini-3.1-flash-lite', 'google', 1048576],
+    ['gemini-3.6-flash', 'google', 1048576],
+    ['qwen3.8-max', 'dashscope', 1000000],
+    ['glm-5.3-flash', 'zai', 1000000],
+    ['glm-5.3-flashx', 'zai', 1000000],
   ] as const)('registers %s with the intended context and provider', (id, provider, contextWindow) => {
     expect(MODEL_CAPABILITIES[id].contextWindow).toBe(contextWindow);
     expect(getProviderForModel(id).name).toBe(provider);
@@ -90,5 +95,78 @@ describe('September model catalog no-loss audit', () => {
     expect(getProviderForModel('claude-sonnet-4-5').name).toBe('anthropic');
     expect(Object.hasOwn(MODEL_CAPABILITIES, 'claude-sonnet-4-5')).toBe(true);
     expect(getPricing('anthropic', 'claude-sonnet-4-5')?.inputPer1k).toBe(0.003);
+  });
+});
+
+describe('November 2026 Gemini, Qwen and GLM refresh (PAN-4827)', () => {
+  it('retires gemini-3.1-flash-lite-preview to the GA id', () => {
+    const id = 'gemini-3.1-flash-lite-preview';
+    const target = 'gemini-3.1-flash-lite';
+    expect(MODEL_DEPRECATIONS[id]).toBe(target);
+    expect(resolveModelId(id)).toBe(target);
+    expect(Object.hasOwn(MODEL_DEPRECATIONS, target)).toBe(false);
+    expect(PROVIDERS.google.models).toContain(target);
+    expect(PROVIDERS.google.models).not.toContain(id);
+    expect(Object.hasOwn(MODEL_CAPABILITIES, id)).toBe(true);
+    expect(PROVIDERS.google.tierModels.haiku).toBe(target);
+  });
+
+  it('registers gemini-3.6-flash with its official price', () => {
+    expect(getPricing('google', 'gemini-3.6-flash')).toMatchObject({ inputPer1k: 0.00075, outputPer1k: 0.00375 });
+  });
+
+  it('reprices gemini-3.8-flash and gemini-3-flash-preview to the official rates', () => {
+    expect(getPricing('google', 'gemini-3.8-flash')).toMatchObject({ inputPer1k: 0.00075, outputPer1k: 0.00375 });
+    expect(getPricing('google', 'gemini-3-flash-preview')).toMatchObject({ inputPer1k: 0.0005, outputPer1k: 0.003 });
+    expect(MODEL_CAPABILITIES['gemini-3.8-flash'].costPer1MTokens).toBe(2.25);
+    expect(MODEL_CAPABILITIES['gemini-3-flash-preview'].costPer1MTokens).toBe(1.75);
+  });
+
+  it.each([
+    ['qwen3-coder-plus', 'qwen3.7-plus'],
+    ['qwen3-max', 'qwen3.7-max'],
+    ['qwen3-plus', 'qwen3.8-flash'],
+  ] as const)('retires %s to %s', (id, target) => {
+    expect(MODEL_DEPRECATIONS[id]).toBe(target);
+    expect(resolveModelId(id)).toBe(target);
+    expect(Object.hasOwn(MODEL_DEPRECATIONS, target)).toBe(false);
+    expect(PROVIDERS.dashscope.models).toContain(target);
+    expect(PROVIDERS.dashscope.models).not.toContain(id);
+    expect(Object.hasOwn(MODEL_CAPABILITIES, id)).toBe(true);
+  });
+
+  it('sets the DashScope tiers to the live ids', () => {
+    expect(PROVIDERS.dashscope.tierModels).toEqual({ opus: 'qwen3.8-max', sonnet: 'qwen3.7-plus', haiku: 'qwen3.8-flash' });
+    expect(PROVIDERS.dashscope.haikuModel).toBe('qwen3.8-flash');
+  });
+
+  it.each([
+    ['qwen3.7-plus', 1, 0.0004, 0.0016],
+    ['qwen3.8-flash', 0.31, 0.00015, 0.00047],
+    ['qwen3.7-max', 5, 0.0025, 0.0075],
+    ['qwen3.8-max', 4, 0.002, 0.006],
+  ] as const)('prices the live DashScope id %s with no $0 placeholder', (id, costPer1MTokens, inputPer1k, outputPer1k) => {
+    expect(MODEL_CAPABILITIES[id].costPer1MTokens).not.toBe(0);
+    expect(MODEL_CAPABILITIES[id].costPer1MTokens).toBe(costPer1MTokens);
+    expect(getPricing('custom', id)).toMatchObject({ inputPer1k, outputPer1k });
+  });
+
+  it('registers glm-5.3-flash and glm-5.3-flashx with image support and prefix-correct pricing', () => {
+    expect(getPricing('custom', 'glm-5.3-flashx-legal')!.inputPer1k).toBe(0.00037);
+    for (const id of ['glm-5.3-flash', 'glm-5.3-flashx'] as const) {
+      expect(MODEL_CAPABILITIES[id].effortLevels).toEqual(['low', 'high', 'max']);
+      expect(MODEL_CAPABILITIES[id].supportsImages).toBe(true);
+    }
+  });
+
+  it('corrects the glm-4.7 and glm-4.7-flash capability costs', () => {
+    expect(MODEL_CAPABILITIES['glm-4.7'].costPer1MTokens).toBe(1.4);
+    expect(MODEL_CAPABILITIES['glm-4.7-flash'].costPer1MTokens).toBe(0);
+  });
+
+  it.each(Object.entries(PROVIDERS))('%s tier ids and haikuModel name no retired model', (_name, provider) => {
+    const ids = [...Object.values(provider.tierModels ?? {}), provider.haikuModel]
+      .filter((id): id is string => typeof id === 'string');
+    for (const id of ids) expect(Object.hasOwn(MODEL_DEPRECATIONS, id), id).toBe(false);
   });
 });

@@ -155,11 +155,14 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'openai', model: 'o4-mini', inputPer1k: 0.004, outputPer1k: 0.016, cacheReadPer1k: 0.001, currency: 'USD' },
   // Google — Gemini 4 Argon introductory rates through 2026-11-30; from 2026-12-01 $4/$20/$0.20 per MTok
   { provider: 'google', model: 'gemini-4-argon', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0001, currency: 'USD' },
-  { provider: 'google', model: 'gemini-3.8-flash', inputPer1k: 0.0015, outputPer1k: 0.009, cacheReadPer1k: 0.00015, currency: 'USD' },
+  // Gemini 3.8 / 3.6 Flash: $0.75/$3.75/$0.075 per MTok through 2026-12-31; from 2027-01-01 $1.50/$7.50/$0.15.
+  { provider: 'google', model: 'gemini-3.8-flash', inputPer1k: 0.00075, outputPer1k: 0.00375, cacheReadPer1k: 0.000075, currency: 'USD' },
+  { provider: 'google', model: 'gemini-3.6-flash', inputPer1k: 0.00075, outputPer1k: 0.00375, cacheReadPer1k: 0.000075, currency: 'USD' },
   { provider: 'google', model: 'gemini-3.5-flash-lite', inputPer1k: 0.0003, outputPer1k: 0.0025, cacheReadPer1k: 0.00003, currency: 'USD' },
   { provider: 'google', model: 'gemini-3.1-pro-preview', inputPer1k: 0.002, outputPer1k: 0.012, currency: 'USD' },
-  { provider: 'google', model: 'gemini-3-flash-preview', inputPer1k: 0.00015, outputPer1k: 0.0006, currency: 'USD' },
+  { provider: 'google', model: 'gemini-3-flash-preview', inputPer1k: 0.0005, outputPer1k: 0.003, cacheReadPer1k: 0.00005, currency: 'USD' },
   { provider: 'google', model: 'gemini-3.1-flash-lite-preview', inputPer1k: 0.00025, outputPer1k: 0.0015, currency: 'USD' },
+  { provider: 'google', model: 'gemini-3.1-flash-lite', inputPer1k: 0.00025, outputPer1k: 0.0015, cacheReadPer1k: 0.000025, currency: 'USD' },
   // Moonshot AI (Kimi)
   { provider: 'custom', model: 'kimi-for-coding', inputPer1k: 0.0006, outputPer1k: 0.002, cacheReadPer1k: 0.00006, cacheWrite5mPer1k: 0.00075, currency: 'USD' },
   { provider: 'custom', model: 'kimi-k2.6', inputPer1k: 0.0006, outputPer1k: 0.002, cacheReadPer1k: 0.00006, cacheWrite5mPer1k: 0.00075, currency: 'USD' },
@@ -186,14 +189,21 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // xAI Grok (docs.x.ai/docs/models). <200K-prompt rates; the >=200K double rate is in capability notes.
   { provider: 'custom', model: 'grok-4.7', inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0005, currency: 'USD' },
   { provider: 'custom', model: 'grok-4.3', inputPer1k: 0.00125, outputPer1k: 0.0025, cacheReadPer1k: 0.0002, currency: 'USD' },
-  // Z.AI (GLM) — PAN-1935: previously absent, so pi-harness GLM agents recorded $0 cost.
-  // GLM-5.x: $1.4/M in, $4.4/M out (docs.z.ai/guides/overview/pricing). cacheRead set to
-  // ~7% of input to approximate Z.AI's context-cache discount — verify upstream and refine.
-  { provider: 'custom', model: 'glm-5.2', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.0001, currency: 'USD' },
-  { provider: 'custom', model: 'glm-5.1', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.0001, currency: 'USD' },
-  // GLM-4.7: approximate in/out split of the $1.5/M blended average — verify upstream.
-  { provider: 'custom', model: 'glm-4.7', inputPer1k: 0.0005, outputPer1k: 0.002, cacheReadPer1k: 0.00005, currency: 'USD' },
-  { provider: 'custom', model: 'glm-4.7-flash', inputPer1k: 0.0001, outputPer1k: 0.0005, currency: 'USD' },
+  // Z.AI GLM, verified 2026-11-02 against docs.z.ai/guides/overview/pricing (cached-input storage is limited-time free).
+  { provider: 'custom', model: 'glm-5.3-flashx', inputPer1k: 0.00037, outputPer1k: 0.00125, cacheReadPer1k: 0.000075, currency: 'USD' },
+  { provider: 'custom', model: 'glm-5.3-flash', inputPer1k: 0.00015, outputPer1k: 0.0005, cacheReadPer1k: 0.00003, currency: 'USD' },
+  { provider: 'custom', model: 'glm-5.3', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.00026, currency: 'USD' },
+  { provider: 'custom', model: 'glm-5.2', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.00026, currency: 'USD' },
+  { provider: 'custom', model: 'glm-5.1', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.00026, currency: 'USD' },
+  { provider: 'custom', model: 'glm-4.7-flash', inputPer1k: 0, outputPer1k: 0, currency: 'USD' }, // free tier
+  { provider: 'custom', model: 'glm-4.7', inputPer1k: 0.0006, outputPer1k: 0.0022, cacheReadPer1k: 0.00011, currency: 'USD' },
+  // Alibaba DashScope Qwen, Singapore (ap-southeast-1), verified 2026-11-02 against
+  // alibabacloud.com/help/en/model-studio/model-pricing. The pi reconciler maps dashscope → custom.
+  // qwen3.7-plus: ≤256K-input rate, shown as a limited-time 20% discount; 256K–1M input is $1.20/$4.80.
+  { provider: 'custom', model: 'qwen3.8-max', inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.00025, currency: 'USD' },
+  { provider: 'custom', model: 'qwen3.8-flash', inputPer1k: 0.00015, outputPer1k: 0.00047, currency: 'USD' },
+  { provider: 'custom', model: 'qwen3.7-max', inputPer1k: 0.0025, outputPer1k: 0.0075, currency: 'USD' },
+  { provider: 'custom', model: 'qwen3.7-plus', inputPer1k: 0.0004, outputPer1k: 0.0016, currency: 'USD' },
   // Moonshot Kimi K2.7 Code (platform.moonshot.ai/docs/pricing/chat):
   // $0.95/M in (cache-miss), $4.00/M out, $0.19/M in (cache-hit). PAN-1935.
   { provider: 'custom', model: 'kimi-k2.7-code', inputPer1k: 0.00095, outputPer1k: 0.004, cacheReadPer1k: 0.00019, currency: 'USD' },

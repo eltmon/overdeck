@@ -38,6 +38,13 @@ describe('PAN-1935: pi-harness cost capture', () => {
       expect(getPricing('custom', 'glm-5.1')).not.toBeNull();
       expect(getPricing('custom', 'glm-4.7')).not.toBeNull();
     });
+
+    it('prices glm-5.3 and the corrected glm-5.2/glm-4.7 rates (PAN-4827)', () => {
+      expect(getPricing('custom', 'glm-5.3')).toMatchObject({ inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.00026 });
+      expect(getPricing('custom', 'glm-5.2')).toMatchObject({ cacheReadPer1k: 0.00026 });
+      expect(getPricing('custom', 'glm-4.7')).toMatchObject({ inputPer1k: 0.0006, outputPer1k: 0.0022 });
+      expect(getPricing('custom', 'glm-4.7-flash')).toMatchObject({ inputPer1k: 0, outputPer1k: 0 });
+    });
   });
 
   describe('extractPiCostEvents parses the pi transcript shape', () => {
@@ -111,6 +118,16 @@ describe('PAN-1935: pi-harness cost capture', () => {
       const content = piMessage('k3', 'kimi', { input: 50000, output: 1000, cacheRead: 0, cacheWrite: 0, totalTokens: 51000 }, 'kresp-3', 'k3');
       const [ev] = extractPiCostEvents(content, 'agent-pan-2859', 'PAN-2859', 'work', sessionId);
       expect(ev!.model).toBe('k3');
+      expect(ev!.provider).toBe('custom');
+      expect(ev!.cost).toBeGreaterThan(0);
+    });
+
+    it('extracts a qwen3.8-max event with non-zero cost (PAN-4827)', () => {
+      const content = piMessage('qwen3.8-max', 'dashscope', { input: 50000, output: 1000, cacheRead: 0, cacheWrite: 0, totalTokens: 51000 }, 'qresp-1', 'q1');
+      const events = extractPiCostEvents(content, 'agent-pan-4827', 'PAN-4827', 'work', sessionId);
+      expect(events).toHaveLength(1);
+      const [ev] = events;
+      expect(ev!.model).toBe('qwen3.8-max');
       expect(ev!.provider).toBe('custom');
       expect(ev!.cost).toBeGreaterThan(0);
     });

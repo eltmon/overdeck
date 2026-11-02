@@ -87,10 +87,11 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
     name: 'Google',
     models: [
       { id: 'gemini-4-argon' as ModelId, name: 'Gemini 4 Argon (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 6, capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship for complex coding and agentic work. Introductory pricing through 2026-11-30, then $4/$20 per MTok.' },
-      { id: 'gemini-3.8-flash' as ModelId, name: 'Gemini 3.8 Flash (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 5.25, capabilities: ['reasoning', 'large-context', 'code'], description: 'Current model; see provider documentation for availability and pricing.' },
+      { id: 'gemini-3.8-flash' as ModelId, name: 'Gemini 3.8 Flash (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 2.25, capabilities: ['reasoning', 'large-context', 'code'], description: 'Stable Gemini Flash. $0.75/$3.75 per MTok through 2026-12-31, then $1.50/$7.50.' },
+      { id: 'gemini-3.6-flash' as ModelId, name: 'Gemini 3.6 Flash (1M context)', icon: Layers, tier: 'balanced', costPer1MTokens: 2.25, capabilities: ['reasoning', 'large-context', 'code'], description: 'Stable Gemini Flash (July 2026). $0.75/$3.75 per MTok through 2026-12-31, then $1.50/$7.50.' },
       { id: 'gemini-3.1-pro-preview' as ModelId, name: 'Gemini 3.1 Pro (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 7, capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship, 1M context, strong agentic coding' },
       { id: 'gemini-3.5-flash-lite' as ModelId, name: 'Gemini 3.5 Flash Lite (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 1.4, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
-      { id: 'gemini-3.1-flash-lite-preview' as ModelId, name: 'Gemini 3.1 Flash Lite (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.9, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Most cost-efficient Google model' },
+      { id: 'gemini-3.1-flash-lite' as ModelId, name: 'Gemini 3.1 Flash Lite (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.875, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'GA successor of the 3.1 Flash Lite preview. $0.25/$1.50 per MTok. Google shuts it down 2027-05-07 (replacement: 3.5 Flash Lite).' },
     ],
   },
   kimi: {
@@ -110,6 +111,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
     name: 'Zhipu (GLM)',
     models: [
       { id: 'glm-5.3' as ModelId, name: 'GLM-5.3 (1M context)', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
+      { id: 'glm-5.3-flash' as ModelId, name: 'GLM-5.3 Flash (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.325, capabilities: ['fast', 'cost-efficient', 'code', 'vision', 'large-context'], description: 'Z.AI fast tier. $0.15/$0.50 per MTok, 1M context, image and video input.' },
+      { id: 'glm-5.3-flashx' as ModelId, name: 'GLM-5.3 FlashX (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.81, capabilities: ['fast', 'cost-efficient', 'code', 'vision', 'large-context'], description: 'Z.AI faster paid Flash tier. $0.37/$1.25 per MTok, 1M context, image and video input.' },
       { id: 'glm-5.2' as ModelId, name: 'GLM-5.2 (1M context)', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Z.AI flagship, 1M context, high/max effort, strong agentic coding. Text-only (vision is a separate model line).' },
       { id: 'glm-5.1' as ModelId, name: 'GLM-5.1 (200K context)', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Previous Z.AI flagship, 200K context, strong agentic coding. Text-only (vision is a separate model line).' },
     ],
@@ -140,13 +143,10 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   dashscope: {
     name: 'Alibaba DashScope',
     models: [
-      { id: 'qwen3-max' as ModelId, name: 'Qwen3 Max (256K context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship reasoning model.' },
-      { id: 'qwen3-coder-plus' as ModelId, name: 'Qwen3 Coder Plus (256K context)', icon: FlaskConical, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope coding-specialist model.' },
-      { id: 'qwen3-plus' as ModelId, name: 'Qwen3 Plus (131.072K context)', icon: Sparkles, tier: 'balanced', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope balanced Qwen3 model.' },
-      { id: 'qwen3.7-max' as ModelId, name: 'Qwen3.7 Max (256K context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.7 Max model.' },
-      { id: 'qwen3.7-plus' as ModelId, name: 'Qwen3.7 Plus (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 1, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
-      { id: 'qwen3.8-flash' as ModelId, name: 'Qwen3.8 Flash (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
-      { id: 'qwen3.8-max' as ModelId, name: 'Qwen3.8 Max (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.8 Max preview; free 1M-token Model Studio quota.' },
+      { id: 'qwen3.7-max' as ModelId, name: 'Qwen3.7 Max (256K context)', icon: Gem, tier: 'premium', costPer1MTokens: 5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope Qwen3.7 Max. $2.50/$7.50 per MTok.' },
+      { id: 'qwen3.7-plus' as ModelId, name: 'Qwen3.7 Plus (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 1, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope balanced tier. $0.40/$1.60 per MTok up to 256K input (limited-time discount).' },
+      { id: 'qwen3.8-flash' as ModelId, name: 'Qwen3.8 Flash (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 0.31, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope fast tier. $0.15/$0.47 per MTok, 1M context.' },
+      { id: 'qwen3.8-max' as ModelId, name: 'Qwen3.8 Max (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 4, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.8 Max. $2/$6 per MTok, 1,000,000-token context.' },
     ],
   },
   xai: {

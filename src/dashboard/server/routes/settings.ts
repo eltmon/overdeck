@@ -129,10 +129,10 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   'o1': { apiModel: 'gpt-4o' },
   'o3-mini': { apiModel: 'gpt-4o-mini' },
   // Google models
-  'gemini-3-pro-preview': { apiModel: 'gemini-1.5-pro' },
-  'gemini-3-flash-preview': { apiModel: 'gemini-1.5-flash' },
-  'gemini-2.5-pro': { apiModel: 'gemini-1.5-pro' },
-  'gemini-2.5-flash': { apiModel: 'gemini-1.5-flash' },
+  'gemini-3-pro-preview': { apiModel: 'gemini-3.1-pro-preview' },
+  'gemini-3-flash-preview': { apiModel: 'gemini-3-flash-preview' },
+  'gemini-2.5-pro': { apiModel: 'gemini-3.1-pro-preview' },
+  'gemini-2.5-flash': { apiModel: 'gemini-3-flash-preview' },
   // Kimi models
   'kimi-k2': { apiModel: 'moonshot-v1-8k' },
   'kimi-k2.5': { apiModel: 'moonshot-v1-32k' },
@@ -153,9 +153,9 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   // Nous Portal models
   'qwen/qwen3.6-plus': { apiModel: 'qwen/qwen3.6-plus' },
   // Alibaba DashScope models
-  'qwen3-max': { apiModel: 'qwen3-max' },
-  'qwen3-coder-plus': { apiModel: 'qwen3-coder-plus' },
-  'qwen3-plus': { apiModel: 'qwen3-plus' },
+  'qwen3-max': { apiModel: 'qwen3.7-max' },
+  'qwen3-coder-plus': { apiModel: 'qwen3.7-plus' },
+  'qwen3-plus': { apiModel: 'qwen3.8-flash' },
   'qwen3.7-max': { apiModel: 'qwen3.7-max' },
   'qwen3.8-max': { apiModel: 'qwen3.8-max' },
 };
@@ -283,7 +283,7 @@ const postTestApiKeyRoute = HttpRouter.add(
         }
 
         case 'google': {
-          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'gemini-1.5-flash') : 'gemini-1.5-flash';
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || model) : 'gemini-3.5-flash-lite';
           try {
             const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`, {
               method: 'POST',
@@ -488,7 +488,7 @@ const postTestApiKeyRoute = HttpRouter.add(
         }
 
         case 'dashscope': {
-          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'qwen3-max') : 'qwen3-max';
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || model) : 'qwen3.8-flash';
           try {
             const resp = await fetch(`${getDashScopeUpstreamBaseUrl()}/chat/completions`, {
               method: 'POST',
@@ -586,7 +586,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
             });
             if (resp.ok || resp.status === 400) {
               valid = true;
-              models = ['gemini-3-pro-preview', 'gemini-3-flash-preview'];
+              models = ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'];
             } else if (resp.status === 401 || resp.status === 403) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
@@ -720,7 +720,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
             if (resp.ok) {
               const data = await resp.json() as { data?: Array<{ id: string }> };
               valid = true;
-              models = data.data?.map(m => m.id) || ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'];
+              models = data.data?.map(m => m.id) || ['qwen3.8-max', 'qwen3.7-max', 'qwen3.7-plus', 'qwen3.8-flash'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
