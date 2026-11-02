@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4813",
   "created": "2026-11-02T13:36:08.209Z",
-  "updated": "2026-11-02T14:16:44.745Z",
+  "updated": "2026-11-02T14:17:50.356Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
       "claimedBy": "agent-pan-4813",
       "claimedAt": "2026-11-02T14:13:54.762Z",
       "doneAt": "2026-11-02T14:16:44.745Z"
+    },
+    "catalog-registry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:17:50.355Z"
     }
   }
 }
