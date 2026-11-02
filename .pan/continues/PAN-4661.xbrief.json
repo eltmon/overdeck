@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4661",
   "created": "2026-11-02T03:25:40.567Z",
-  "updated": "2026-11-02T03:46:05.472Z",
+  "updated": "2026-11-02T03:46:15.111Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4661",
       "claimedAt": "2026-11-02T03:42:30.304Z",
       "doneAt": "2026-11-02T03:46:05.471Z"
+    },
+    "mobile-route-pipeline": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4661",
+      "claimedAt": "2026-11-02T03:46:15.110Z"
     }
   }
 }
