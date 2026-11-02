@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T17:54:09.956Z",
+  "updated": "2026-11-02T17:54:27.387Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
       "claimedBy": "agent-pan-4820",
       "claimedAt": "2026-11-02T17:53:52.956Z",
       "doneAt": "2026-11-02T17:54:09.956Z"
+    },
+    "merge-guard-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:54:27.387Z"
     }
   }
 }
