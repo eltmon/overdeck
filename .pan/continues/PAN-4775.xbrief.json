@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4775",
   "created": "2026-11-02T03:25:35.744Z",
-  "updated": "2026-11-02T03:38:35.043Z",
+  "updated": "2026-11-02T03:38:51.035Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "w5-supersede-header.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T03:38:35.043Z"
+    },
+    "w5-supersede-header.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:38:51.035Z"
     }
   }
 }
