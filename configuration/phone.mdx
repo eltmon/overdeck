@@ -6,7 +6,7 @@ description: Install one machine's dashboard on a phone over Tailscale and answe
 # Use Overdeck on your phone
 
 The phone app is a small version of the dashboard at `/m`. It shows what needs
-you and your conversations, and it answers agent questions. You install it
+you, your conversations and the pipeline, and it answers agent questions. You install it
 from the browser to the home screen. It connects to one machine through that
 machine's Tailscale address and signs in with its own pairing, never with the
 machine's root token.
@@ -71,6 +71,15 @@ When an agent asks a question, it needs three taps:
 The first open question is already expanded. A notification link opens its own
 question. To give an answer that is not an option, tap **Type an answer**.
 
+## See the pipeline
+
+Tap **Pipeline** (or open `/m/pipeline`) to see the active issues grouped by
+phase: Ship, Review, Work, Plan and Ready. Each row shows the issue ID and
+title. **Needs you** marks an issue that waits for you. Tap a row to see the
+issue: its phase, state, pull request, agent, project, labels and a link to
+the tracker. The pipeline on the phone is read-only. To start, stop, merge or
+move an issue, use the desktop.
+
 ## What the phone can and cannot do
 
 The phone answers questions from agents and conversations, including questions
@@ -83,7 +92,8 @@ session resume, held handoffs and turns that ended. For a conversation, tap
 **Open** to read it. For an agent, answer it on the desktop.
 
 The phone lists conversations and opens one full screen. It does not show
-terminals.
+terminals. The phone shows the pipeline but does not change it: there are no
+issue actions, filters or drag and drop.
 
 ## Notifications
 

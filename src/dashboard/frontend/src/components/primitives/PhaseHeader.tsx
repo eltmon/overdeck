@@ -6,7 +6,7 @@ import PhaseGlyph, { type PhaseGlyphPhase } from './PhaseGlyph';
 export type PhaseHeaderPhase = 'ship' | 'review' | 'verifying' | 'work' | 'plan' | 'ready' | 'todo';
 export type PhaseHeaderVariant = 'pipeline' | 'command-deck';
 
-const PHASE_LABELS = {
+export const PHASE_LABELS = {
   ship: 'Ship',
   review: 'Review',
   verifying: 'Verifying',

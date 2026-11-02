@@ -130,7 +130,9 @@ src/components/home/__tests__/useTypeToFocus.test.tsx
 src/components/merge-train/__tests__/MergeTrainView.test.tsx
 src/components/mobile/__tests__/MobileApp.test.tsx
 src/components/mobile/__tests__/MobileConversations.test.tsx
+src/components/mobile/__tests__/MobileIssueSheet.test.tsx
 src/components/mobile/__tests__/MobileNeedsYou.test.tsx
+src/components/mobile/__tests__/MobilePipeline.test.tsx
 src/components/newConversation/__tests__/ConversationSkillsField.test.tsx
 src/components/newConversation/__tests__/IssuePickerField.test.tsx
 src/components/newConversation/__tests__/MachineField.test.tsx
@@ -182,6 +184,7 @@ src/lib/__tests__/useDecisions.fleet.test.tsx
 src/lib/__tests__/useDecisions.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts
 src/lib/decisionContext.test.ts
+src/lib/pipeline-state.test.ts
 src/lib/sessionOutcome.test.ts
 src/lib/simple/uiMode.test.ts
 src/lib/simple/useSimpleActions.test.tsx
