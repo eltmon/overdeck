@@ -754,27 +754,19 @@ export async function capturePaneViewport(sessionName: string): Promise<PaneView
   }
 }
 
-/**
- * PAN-4739: `-u` makes the tmux client treat its output as UTF-8. Without a
- * UTF-8 locale (Fly's exec shell sets no LANG) tmux 3.4 replaces every
- * non-printable byte in `-F` output with `_`, tab separators included, so a
- * multi-field record parses as nothing and the runtime census drops every pane.
- */
-const UTF8_CLIENT_FLAG = '-u';
-
 export function listPaneValuesSync(target: string, format: string): string[] {
   try {
-    const output = tmuxExecSync([UTF8_CLIENT_FLAG, 'list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf8' }) as string;
+    const output = tmuxExecSync(['-u', 'list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf8' }) as string;
     return output.split('\n').map((line) => line.trim()).filter(Boolean);
   } catch {
     return [];
   }
 }
 
-/** List one `#{format}` value per pane of a target; empty on any tmux failure. */
+/** List one `#{format}` value per pane of a target (UTF-8 client, PAN-4739); empty on any tmux failure. */
 export async function listPaneValues(target: string, format: string): Promise<string[]> {
   try {
-    const { stdout } = await tmuxExecAsync([UTF8_CLIENT_FLAG, 'list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf-8' });
+    const { stdout } = await tmuxExecAsync(['-u', 'list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf-8' });
     return String(stdout).split('\n').map((line: string) => line.trim()).filter(Boolean);
   } catch {
     return [];
@@ -890,8 +882,7 @@ export const listAllPaneRecords = (): Effect.Effect<readonly TmuxPaneRecord[], T
   Effect.tryPromise({
     try: async () => {
       const { stdout } = await tmuxExecAsync([
-        UTF8_CLIENT_FLAG,
-        'list-panes',
+        '-u', 'list-panes', // PAN-4739: -u keeps -F tabs when the server has no UTF-8 locale (Fly)
         '-a',
         '-F',
         '#{session_name}\t#{pane_pid}\t#{pane_dead}\t#{pane_dead_status}',
