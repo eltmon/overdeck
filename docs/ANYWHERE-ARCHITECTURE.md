@@ -573,10 +573,10 @@ service, lingering, then one pairing link (`.pan/drafts/PAN-4656.md`).
 A Fly machine is a Fly.io VM that runs `pan serve` and is linked one way from home
 (W-FLY2, epic FR-18, D-12; issue PRD `.pan/drafts/PAN-4652.md`). It is an ordinary linked
 machine: its conversations stream into home's list with a `fly-<machineId>` chip and come
-home with **Pull here**. It is a different thing from a remote work agent VM
-(`pan start --remote`, `src/lib/remote/remote-agents.ts`), which runs Claude Code in raw
-tmux and no Overdeck server; moving those onto this path is
-[PAN-4734](https://github.com/eltmon/overdeck/issues/4734). User-facing pages: the
+home with **Pull here**. Since [PAN-4734](https://github.com/eltmon/overdeck/issues/4734)
+it also hosts `pan start --remote` work agents (`### Work agents (PAN-4734)` below). A
+legacy remote work agent VM (`src/lib/remote/remote-agents.ts`, created before PAN-4734)
+runs Claude Code in raw tmux and no Overdeck server. User-facing pages: the
 `## Fly machines` section of `configuration/linked-machines.mdx` and `add-fly` in
 `cli/machines.mdx`.
 
@@ -589,6 +589,10 @@ tmux and no Overdeck server; moving those onto this path is
 | `${OVERDECK_HOME}/fly-machines.json` (0600, atomic; a corrupt file throws and is never rewritten) | `src/lib/anywhere/fly/machine-store.ts` |
 | `addFlyMachine`, `startFlyConversation`, `removeFlyMachineForLink` (unlink hook) | `src/dashboard/server/services/fly-machine-service.ts` |
 | `POST /api/machines/fly` | `src/dashboard/server/routes/machines-fly.ts` |
+| `startFlyWorkAgent` (PAN-4734) | `src/dashboard/server/services/fly-work-agent-service.ts` |
+| `POST /api/remote/work-agents` (PAN-4734) | `src/dashboard/server/routes/remote-work-agents.ts` |
+| `pan start --remote`, `--machine fly` (PAN-4734) | `src/cli/commands/start-remote.ts` |
+| The issue worktree on the VM, `ensureFlyWorkspace` (PAN-4734) | `src/lib/anywhere/fly/project.ts` |
 | `pan machines add-fly` | `src/cli/commands/machines-fly.ts` |
 | Heartbeat, sweep and Codex sign-in sync loops | `src/lib/remote/fly-machine-loops.ts` (registered in `src/lib/cloister/hygiene-scheduler.ts`) |
 | Credential refresh | `src/lib/remote/remote-credential-refresh.ts` (Fly machine names join the remote agents' VMs) |
@@ -783,12 +787,58 @@ non-Claude harness stays `false`.
 No `auth.json` content, token or base64 of either appears in a log line, an activity entry
 or an error: the VM read and push helpers name only the path and the exit code.
 
+### Work agents (PAN-4734)
+
+`pan start <id> --remote` and `pan start <id> --machine fly` run the work agent as a
+conversation on a new Fly machine (issue PRD `.pan/drafts/PAN-4734.md`; closes PAN-1775).
+
+- **The work door.** The CLI (`startRemoteWorkAgent`) refuses the durable tier, an issue
+  with legacy remote workspace metadata and a feature branch that is not on origin after
+  its push. It then posts `POST /api/remote/work-agents` with no client timeout, because
+  provisioning needs the link supervisor (`notifyLinksChanged`) and the link pool. The
+  route refuses a channel caller (403), as every operator machines route does.
+- **The service (`startFlyWorkAgent`).** It refuses an unknown project (404), a
+  non-Anthropic model (400 `harness-unsupported`) and an agent whose remote-state is
+  `running` or under 30 minutes `starting` (409) before any VM exists. It saves remote-state
+  `starting` with `linked: true` and `vmName: ''`, runs `addFlyMachine({ projectKey,
+  harness: 'claude-code' })`, adds the worktree `/workspace/<project>/workspaces/feature-<issue>`
+  with `git worktree add` on the pushed branch (not `pan workspace create`, whose 10 GiB
+  disk floor a Fly rootfs may not meet), copies home's `continue.json` and the skills,
+  starts the conversation through the link with `cwd` and `issueId`, installs the push
+  daemon in the worktree and saves `running`. The first message is the REMOTE work
+  prompt, or a pointer to `/workspace/.pan/prompts/agent-<issue>.md` when the prompt is
+  over 50,000 characters. A failure after provisioning unlinks the machine (which destroys
+  it through the unlink hook) and saves `error`. Non-operator starts run inside the
+  auto-spawn consent claim.
+- **Remote-state's linked fields.** `linked`, `environmentId`, `linkId`, `flyMachineId`,
+  `conversationName`, `tmuxSession` (`conv-<name>`), `tmuxSocket` (`overdeck`, the VM
+  server's default instance), `projectKey` and `workdir`; `vmName` is the Fly machine name.
+  `FlyProvider.resolveVm` resolves that name through `fly-machines.json`, so exec reaches
+  the machine in whatever app provisioned it.
+- **Tmux target resolution.** `remoteTmuxTarget(agentId)` returns `{ session: tmuxSession ??
+  agentId, socket: tmuxSocket }`. Output capture, `pan tell`, keyed delivery, `pan kill`
+  and the reap's probe address that target; a legacy state produces the old commands byte
+  for byte, so callers are unchanged.
+- **Loop rules.** The spend cap's agent count, the remote heartbeat and the credential
+  refresh's agent list skip a linked state, because its Fly machine record already counts,
+  heartbeats and syncs the VM (FR-10). `sweepFlyMachines` never idle-removes a machine whose
+  environment hosts a linked agent that is `starting` or `running` (FR-11); gone and
+  never-linked machines are removed as before.
+- **The reap.** On `REMOTE_DONE` and a pushed branch it copies
+  `<workdir>/.overdeck/continue.json` home, hands the branch to review, kills the session and
+  destroys, unlinks and forgets the Fly machine through `destroyAndForgetFlyMachine`. It
+  never calls `fly.deleteVm` or deletes workspace metadata for a linked agent. On a crash it
+  salvages the worktree and stops the machine; the sweep removes it once the state is no
+  longer active.
+- **The issue tree.** Resource discovery lists every cached linked conversation with an
+  `issueId` and no `releasedTo` under that issue with `origin: 'linked'`, and the tree row
+  opens `/conv/@<environmentId>/<name>`.
+
 ### Split
 
-`pan start --remote` work agents moving onto this path, and their session rows (closing
-PAN-1775), are [PAN-4734](https://github.com/eltmon/overdeck/issues/4734). The Machine
-field, **Fly (new VM)** and `--machine fly` are #4651; lanes on Fly are #4638. Codex on
-Fly is #4296 (above); other harnesses cannot run on a Fly machine.
+The Machine field, **Fly (new VM)** and `--machine fly` for other commands are #4651;
+lanes on Fly are #4638. Codex on Fly is #4296 (above); other harnesses cannot run on a Fly
+machine, and Codex does not run as a Fly work agent.
 
 ## Decisions added by sibling issues
 

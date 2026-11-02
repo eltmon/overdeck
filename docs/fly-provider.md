@@ -15,6 +15,14 @@ Machine lifecycle and exec are managed through the Fly Machines REST API
 (`https://api.machines.dev/v1`). SSH-style command execution uses the Machines exec
 endpoint; port tunnelling uses `fly proxy`.
 
+**Work agents (PAN-4734).** `pan start <id> --remote`, and `pan start <id> --machine fly`,
+start a new Fly machine as [Fly machines (linked)](#fly-machines-linked) describes and run
+the work agent there as a conversation in `/workspace/<project>/workspaces/feature-<issue>`.
+Its transcript streams into home's dashboard while it works. The durable tier is refused
+(`--tier durable` or `remote.resiliency_tier = "durable"`). The raw-tmux VM that the rest of
+this page describes remains only for remote workspaces created before PAN-4734; `pan start
+--remote` refuses an issue that still has one and names `pan workspace destroy <id>`.
+
 ---
 
 ## Prerequisites
@@ -209,19 +217,20 @@ else `registry.fly.io/<app>:latest`.
 
 A **Fly machine** (PAN-4652) is a Fly VM that runs `pan serve` and is linked one way
 from home, so its conversations stream into home's dashboard like any linked machine's.
-It is not a remote work agent: a remote work agent VM (`pan start --remote`, the rest of
-this page) runs Claude Code in raw tmux and no Overdeck server. Start one with
+Since PAN-4734 it also hosts `pan start --remote` work agents, as a conversation each. A
+legacy remote work agent VM (created before PAN-4734, the rest of this page) runs Claude
+Code in raw tmux and no Overdeck server. Start one with
 `pan machines add-fly`; the operator guide is the `## Fly machines` section of
 `configuration/linked-machines.mdx`, and the design is `## Fly machines (PAN-4652)` in
 `docs/ANYWHERE-ARCHITECTURE.md`.
 
-| | Remote work agent VM | Fly machine |
+| | Legacy remote work agent VM | Fly machine |
 |---|---|---|
-| Started by | `pan start --remote` | `pan machines add-fly`, `POST /api/machines/fly` |
+| Started by | `pan start --remote` before PAN-4734 | `pan machines add-fly`, `POST /api/machines/fly`, `pan start --remote` (`POST /api/remote/work-agents`) |
 | Runs | Claude Code in tmux | `pan serve`, then Claude Code or Codex conversations through it |
 | Reached by | Machines exec API | a secure channel over `wss://<app>.fly.dev/ws/link` |
 | State on home | `agents/agent-<issue>/remote-state.json` | `fly-machines.json` plus a machine link |
-| Removed by | the reap, after hand-off | unlink, the idle sweep, the stopped-machine sweep (always destroyed) |
+| Removed by | the reap, after hand-off | unlink, the idle sweep, the stopped-machine sweep, the reap after a work agent's hand-off (always destroyed) |
 
 **Server environment (D-4).** The VM's `pan serve --port 3011 --no-open` runs with
 `OVERDECK_TERMINAL_BACKEND=tmux`, `IS_SANDBOX=1`, `OVERDECK_PUBLIC_LINK_ONLY=1` and
@@ -249,6 +258,10 @@ disables), or that provisioning never linked within 30 minutes. Fly machines cou
 ---
 
 ## Machine Lifecycle
+
+This section describes legacy remote workspaces (created before PAN-4734). A `pan start
+--remote` work agent now runs on a Fly machine, whose lifecycle is in
+[Fly machines (linked)](#fly-machines-linked) and [Automatic loops](#automatic-loops).
 
 Each workspace maps to exactly one Fly Machine inside the configured app.
 
@@ -375,6 +388,17 @@ With no Fly machine record, none calls the Fly API.
 | `heartbeatFlyMachines` | every 60 s | Writes `/workspace/.pan/host-heartbeat` on every Fly machine, so its watchdog keeps it running while home is up. A failed exec is reported as a failure, never as refreshed. | keeps running |
 | `syncFlyCodexAuth` | every 60 s | For each linked Fly machine whose record has a `codexAuthPath`, reads the VM's Codex `auth.json` and decides by newest refresh wins: copies a newer same-account VM refresh home (atomic write), otherwise copies home's sign-in to the VM when the two differ. A VM that does not answer is skipped until the next tick. With no such record it makes no Fly API call. | keeps running |
 | `sweepFlyMachines` | every 60 s | Destroys the machine, removes its link and deletes its record when the Fly API reports it `stopped`, `destroyed` or `failed` or answers 404; when no unreleased linked conversation on it has been active for `[remote.fly] machine_idle_minutes` (default 30, 0 disables); or when provisioning never linked it within 30 min. Any other API error leaves it alone. | keeps running |
+
+**Linked work agents (PAN-4734).** A `pan start --remote` work agent keeps a
+`remote-state.json` with `linked: true`. The remote heartbeat, the spend cap's agent count
+and the credential refresh's agent list skip it, because its Fly machine record already
+covers the VM. `sweepFlyMachines` never idle-removes a Fly machine that hosts a linked work
+agent whose state is `starting` or `running`; it still removes one that is stopped or gone.
+The reap owns that machine: on `REMOTE_DONE` it probes the conversation's tmux session
+(`conv-<name>` on the VM's `overdeck` socket), copies `<worktree>/.overdeck/continue.json`
+home, hands the branch to review, then destroys the Fly machine, removes its link and
+deletes its record. On a crash it salvages the worktree and stops the machine; the sweep
+then removes it.
 
 A rejected Fly token (PAN-4748) shows as `Fly token rejected (<status>)` in each loop's
 line instead of a raw API error; `sweepFlyMachines` keeps the record rather than

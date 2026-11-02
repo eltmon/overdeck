@@ -209,8 +209,10 @@ pan lane start --run hotel --key 663 --role builder --brief b.md --machine auto
 | `--push-first` | (`pan start`, `pan worker run`) Push unpushed commits before starting on the other machine. |
 | `--ignore-unpushed` | (`pan start`, `pan worker run`) Start even though local commits are not pushed. |
 
-`--machine fly` is refused until PAN-4652. `pan lane start --machine` refuses another machine
-until PAN-4638. See [Linked machines](/configuration/linked-machines#start-work-on-another-machine).
+`pan start <id> --machine fly` starts the issue's work agent on a new Fly machine, the same
+as `pan start <id> --remote` (PAN-4734); see
+[Work agents on Fly](/configuration/linked-machines#work-agents-on-fly). `pan lane start
+--machine` refuses another machine until PAN-4638. See [Linked machines](/configuration/linked-machines#start-work-on-another-machine).
 
 ## who
 

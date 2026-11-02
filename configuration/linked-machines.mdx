@@ -145,8 +145,8 @@ The conversation then streams in this dashboard like any linked conversation: us
 
 ### Setup
 
-Fly machines use the same `[remote]` and `[remote.fly]` settings as remote work agents
-(`pan start --remote`):
+Fly machines use the `[remote]` and `[remote.fly]` settings, which `pan start --remote`
+also uses to start [work agents on Fly](#work-agents-on-fly):
 
 - `remote.enabled = true` in `~/.overdeck/config.toml`.
 - A Fly token: `fly auth login`, or `FLY_API_TOKEN` (or the variable that
@@ -180,6 +180,34 @@ Its conversations go with it. [Pull here](#pull-here) first to keep one.
 
 Fly machines count toward `remote.max_concurrent_agents`, the same cap as remote work
 agents; `add-fly` refuses with `cap-reached` when it is full (0 or unset means no cap).
+
+### Work agents on Fly
+
+`pan start <id> --remote`, or `pan start <id> --machine fly`, starts the issue's work agent
+on a new Fly machine:
+
+```bash
+pan start PAN-123 --remote
+pan start PAN-123 --machine fly
+```
+
+- The command pushes the feature branch, then asks the running dashboard to start a Fly
+  machine with the project, add the issue's worktree there and start the work agent as a
+  conversation in it. It waits 5–15 minutes and prints the conversation's URL. It needs
+  `pan up`.
+- The transcript streams in this dashboard while the agent works, with the `fly-<machineId>`
+  chip. The issue's row in the project tree lists the conversation and opens it.
+- `pan tell <id>`, `pan kill <id>` and the dashboard's output view reach the agent's session
+  on the Fly machine.
+- When the agent finishes and touches its done marker, the reap hands the branch to review
+  here, then destroys the Fly machine. While the agent works, the idle sweep leaves the
+  machine alone.
+- [Pull here](#pull-here) is not for work agents: pulling the conversation home stops the
+  agent from continuing, and the reap will not hand it to review.
+- Claude Code with an Anthropic model only; Codex is not supported as a Fly work agent. The
+  durable tier (`--tier durable`, or `remote.resiliency_tier = "durable"`) is refused.
+- An issue that still has a remote workspace from before this change is refused; destroy
+  it with `pan workspace destroy <id>` first.
 
 ### Codex
 
