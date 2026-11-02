@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4754",
   "created": "2026-11-02T00:55:26.468Z",
-  "updated": "2026-11-02T01:53:50.240Z",
+  "updated": "2026-11-02T01:54:05.838Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -236,6 +236,10 @@
     "dialog-consequences-layout.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T01:53:50.240Z"
+    },
+    "dialog-needs-you-tone.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:54:05.838Z"
     }
   }
 }
