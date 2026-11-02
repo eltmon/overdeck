@@ -1,4 +1,6 @@
-export type CitationSource = { kind: 'message'; messageId: string; role: 'assistant' | 'user' };
+export type CitationSource =
+  | { kind: 'message'; messageId: string; role: 'assistant' | 'user' }
+  | { kind: 'file'; path: string };
 
 export interface PendingCitation {
   id: string;
