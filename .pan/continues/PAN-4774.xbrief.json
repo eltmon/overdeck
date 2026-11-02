@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T23:50:03.612Z",
+  "updated": "2026-11-02T23:50:20.945Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -280,6 +280,10 @@
     "ac05-fly-conversation.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T23:50:03.612Z"
+    },
+    "ac05-fly-conversation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:50:20.945Z"
     }
   }
 }
