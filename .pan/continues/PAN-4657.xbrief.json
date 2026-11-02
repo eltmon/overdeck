@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4657",
   "created": "2026-11-02T03:48:30.667Z",
-  "updated": "2026-11-02T04:29:33.130Z",
+  "updated": "2026-11-02T04:29:40.849Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4657",
       "claimedAt": "2026-11-02T04:21:01.328Z",
       "doneAt": "2026-11-02T04:29:33.129Z"
+    },
+    "sweep-resurface": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4657",
+      "claimedAt": "2026-11-02T04:29:40.849Z"
     }
   }
 }
