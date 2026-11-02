@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T22:24:29.954Z",
+  "updated": "2026-11-02T22:24:37.184Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,11 @@
       "claimedBy": "agent-pan-4774",
       "claimedAt": "2026-11-02T22:12:21.291Z",
       "doneAt": "2026-11-02T22:24:29.953Z"
+    },
+    "ac08-wdoc": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T22:24:37.184Z"
     }
   }
 }
