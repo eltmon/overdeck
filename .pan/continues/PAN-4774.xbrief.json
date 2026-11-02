@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T23:34:59.012Z",
+  "updated": "2026-11-02T23:40:58.315Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
       "claimedBy": "agent-pan-4774",
       "claimedAt": "2026-11-02T23:33:57.146Z",
       "doneAt": "2026-11-02T23:34:59.012Z"
+    },
+    "adopt-skip-saved-cwd-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:40:58.314Z"
     }
   }
 }
