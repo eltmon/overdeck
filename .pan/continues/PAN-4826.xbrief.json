@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4826",
   "created": "2026-11-02T16:31:08.878Z",
-  "updated": "2026-11-02T17:28:05.248Z",
+  "updated": "2026-11-02T17:28:26.789Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "openai-cost-reprice.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T17:28:05.248Z"
+    },
+    "openai-capability-reprice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:28:26.789Z"
     }
   }
 }
