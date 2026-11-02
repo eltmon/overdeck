@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4754",
   "created": "2026-11-02T00:55:26.468Z",
-  "updated": "2026-11-02T01:54:05.838Z",
+  "updated": "2026-11-02T01:54:21.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -240,6 +240,10 @@
     "dialog-needs-you-tone.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T01:54:05.838Z"
+    },
+    "dialog-needs-you-tone.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:54:21.078Z"
     }
   }
 }
