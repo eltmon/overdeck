@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T21:16:37.326Z",
+  "updated": "2026-11-02T21:17:17.870Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-02T21:14:22.370Z"
     },
     "ci-run-ac1-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4774",
-      "claimedAt": "2026-11-02T21:16:37.326Z"
+      "claimedAt": "2026-11-02T21:16:37.326Z",
+      "doneAt": "2026-11-02T21:17:17.870Z"
     }
   }
 }
