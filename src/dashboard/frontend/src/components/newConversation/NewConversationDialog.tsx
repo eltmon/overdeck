@@ -223,17 +223,26 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
 
           <span id={effortLabelId} className={styles.label}>Effort</span>
           {effortSupported ? (
-            <div className={styles.effort}>
-              <select
-                aria-label="Effort"
-                aria-labelledby={effortLabelId}
-                className={styles.select}
-                value={effort ?? ''}
-                onChange={(e) => { setEffort(e.target.value); setEffortTouched(true); }}
-              >
-                {effort === null && <option value="">…</option>}
-                {effortLevels.map((level) => <option key={level} value={level}>{level}</option>)}
-              </select>
+            <div className={styles.effortRow}>
+              <div role="radiogroup" aria-labelledby={effortLabelId} className={styles.segmented}>
+                {effortLevels.map((level) => {
+                  const isDefault = effortDefault?.effort === level;
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      role="radio"
+                      aria-checked={effort === level}
+                      data-default={isDefault ? 'true' : undefined}
+                      className={styles.segment}
+                      onClick={() => { setEffort(level); setEffortTouched(true); }}
+                    >
+                      {level}
+                      {isDefault && <span className={styles.defaultDot} aria-hidden="true" />}
+                    </button>
+                  );
+                })}
+              </div>
               {effortDefault && (
                 <span className={styles.hint}>
                   Default: {effortDefault.effort} ({effortDefault.source})

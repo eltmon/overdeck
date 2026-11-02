@@ -148,20 +148,75 @@
   .grid > .label:first-child {
     margin-top: 0;
   }
+  .segmented {
+    display: flex;
+    width: 100%;
+  }
+  .segment {
+    flex: 1;
+    min-width: 0;
+    padding: 0 4px;
+  }
 }
 
-.effort {
+.effortRow {
   display: flex;
-  flex: 1;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
+  gap: 6px 12px;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 7px;
+  background: var(--surface-overlay-field, var(--background));
+  border: 1px solid var(--border-overlay, var(--border));
+}
+
+.segment {
+  position: relative;
+  min-width: 58px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+}
+
+.segment[aria-checked="true"] {
+  background: var(--surface-overlay, var(--popover));
+  color: var(--foreground);
+  box-shadow: var(--shadow-sm), 0 0 0 1px var(--border-overlay, var(--border));
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.defaultDot {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 3px;
+  height: 3px;
+  margin-left: -1.5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .55;
 }
 
 .hint {
   margin: 0;
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--muted-foreground);
 }
 
