@@ -480,3 +480,13 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   (`pan merge cancel <id>`) to hold for unanswered CodeRabbit findings, and
   clears blockers. Strike PRs (`strike/<id>`) are excluded on purpose
   (PAN-3973): the operator merges them.
+- 2026-11-02 00:20 UTC: strike PRs have been unmergeable through Overdeck since
+  #4066 / PAN-4384 (Sept 25-29). `merge-gate.ts:136` requires head approval for
+  every door, strikes included, and the operator authors strikes, so they cannot
+  self-approve. Filed PAN-4750 (needs-handoff, merge route). Until it lands,
+  strike PRs merge on GitHub by the operator. The Flywheel board's
+  `PAN-<n>-STRIKE` rows are a parse artifact of `feature-pan-<n>-strike`
+  dirs (PAN-4752).
+- Operator 2026-11-02: roles.flywheel.maxAgents 4 -> 8; auto_pickup_backlog stays
+  OFF. "Nothing pickable" means no ready+released backlog items, which is
+  different from an empty pipeline. Say so explicitly when reporting.
