@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4825",
   "created": "2026-11-02T16:35:14.732Z",
-  "updated": "2026-11-02T16:58:26.223Z",
+  "updated": "2026-11-02T16:58:27.602Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4825",
       "claimedAt": "2026-11-02T16:55:07.602Z",
       "doneAt": "2026-11-02T16:58:26.223Z"
+    },
+    "minimax-m31-flash": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T16:58:27.602Z"
     }
   }
 }
