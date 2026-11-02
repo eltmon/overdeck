@@ -25,11 +25,11 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { access, lstat, mkdir, readFile, readlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { installPreRebaseHook } from '../workspace-manager/worktree-ops.js';
 import { detectDirectiveProject } from './detect.js';
-import { type DeftInstallSnapshot, readDeftSnapshot, writeDeftSnapshot } from './install-snapshot.js';
+import { type DeftInstallSnapshot, readDeftSnapshot, touchedDeftDir, writeDeftSnapshot } from './install-snapshot.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -266,6 +266,12 @@ async function effectiveGlobalExcludes(worktree: string): Promise<string> {
   }
 }
 
+/** `<gitdir>/info/overdeck-deft-exclude`; the git dir is per worktree. */
+export async function deftExcludeFilePath(worktree: string): Promise<string> {
+  const gitDir = resolve(worktree, (await gitOut(worktree, ['rev-parse', '--git-dir'])).trim());
+  return join(gitDir, 'info', EXCLUDE_FILE_NAME);
+}
+
 function tail(text: string, lines: number): string {
   return text.trimEnd().split('\n').slice(-lines).join('\n');
 }
@@ -334,10 +340,7 @@ async function computeChanges(worktree: string, before: BeforeState): Promise<In
   const touchedPreexisting: string[] = [];
   for (const entry of before.entries) {
     if (!isUntrackedOrIgnored(entry) || !isDir(entry.path)) continue;
-    const deftDir = entry.path === 'node_modules/' || entry.path.endsWith('/node_modules/')
-      ? join(entry.path, '@deftai')
-      : join(entry.path, 'node_modules', '@deftai');
-    if (await exists(join(worktree, deftDir))) touchedPreexisting.push(entry.path);
+    if (await exists(join(worktree, touchedDeftDir(entry.path)))) touchedPreexisting.push(entry.path);
   }
 
   return { createdPaths, modifiedTracked, modifiedUntracked, touchedPreexisting };
@@ -402,8 +405,7 @@ export async function installDeftIntoWorktree(
   const { createdPaths, modifiedTracked, modifiedUntracked, touchedPreexisting } = changes;
 
   // 7. Hide.
-  const gitDir = resolve(worktree, (await gitOut(worktree, ['rev-parse', '--git-dir'])).trim());
-  const excludeFile = join(gitDir, 'info', EXCLUDE_FILE_NAME);
+  const excludeFile = await deftExcludeFilePath(worktree);
   const globalExcludes = await effectiveGlobalExcludes(worktree);
   const excludeText = [
     ...(globalExcludes ? [globalExcludes.trimEnd()] : []),
@@ -412,7 +414,7 @@ export async function installDeftIntoWorktree(
     ...createdPaths.map(excludeLine),
     '',
   ].join('\n');
-  await mkdir(join(gitDir, 'info'), { recursive: true });
+  await mkdir(dirname(excludeFile), { recursive: true });
   await writeFile(excludeFile, excludeText, 'utf8');
   await gitOut(worktree, ['config', '--worktree', 'core.excludesFile', excludeFile]);
   if (modifiedTracked.length > 0) {

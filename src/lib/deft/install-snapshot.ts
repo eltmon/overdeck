@@ -30,6 +30,18 @@ export interface DeftInstallSnapshot {
   excludeFile: string;
 }
 
+/**
+ * The Directive package directory inside a pre-existing untracked or ignored
+ * directory: `node_modules/@deftai` for a `node_modules/` entry, else
+ * `<entry>/node_modules/@deftai`. Install records the entry; undo removes
+ * only this directory.
+ */
+export function touchedDeftDir(entry: string): string {
+  return entry === 'node_modules/' || entry.endsWith('/node_modules/')
+    ? join(entry, '@deftai')
+    : join(entry, 'node_modules', '@deftai');
+}
+
 export function deftSnapshotPath(worktree: string): string {
   return join(worktree, '.overdeck', 'deft-install.json');
 }
