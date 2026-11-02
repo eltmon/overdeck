@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T17:42:44.660Z",
+  "updated": "2026-11-02T17:44:00.016Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,9 +66,10 @@
       "doneAt": "2026-11-02T17:39:36.280Z"
     },
     "uninstall-restore": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4820",
-      "claimedAt": "2026-11-02T17:39:44.111Z"
+      "claimedAt": "2026-11-02T17:39:44.111Z",
+      "doneAt": "2026-11-02T17:44:00.015Z"
     },
     "uninstall-restore.ac1": {
       "status": "completed",
