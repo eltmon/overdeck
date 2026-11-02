@@ -133,7 +133,9 @@ This one command, which takes a few minutes:
    machine's.
 2. Copies your Claude, Codex (when this machine has a Codex sign-in) and GitHub
    credentials to it (no SSH key ever reaches the VM).
-3. Starts Overdeck there and links to it. Its chip reads `fly-<machineId>`.
+3. Starts Overdeck there and links to it. Its chip reads `fly-<machineId>`. The Fly machine
+   advertises no private addresses, so this machine reaches it only over
+   `wss://<app>.fly.dev`.
 4. With `--project`, clones that project onto the VM (GitHub projects only).
 5. With `--message`, starts a Claude Code or Codex conversation (`--harness`) there and
    prints its URL.
