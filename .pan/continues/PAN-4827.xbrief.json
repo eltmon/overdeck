@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4827",
   "created": "2026-11-02T16:36:08.290Z",
-  "updated": "2026-11-02T18:57:05.830Z",
+  "updated": "2026-11-02T18:57:22.668Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "google-add-3-6-flash.ac5": {
       "status": "completed",
       "doneAt": "2026-11-02T18:57:05.830Z"
+    },
+    "google-reprice-flash.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:57:22.668Z"
     }
   }
 }
