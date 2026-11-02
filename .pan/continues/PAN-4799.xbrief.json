@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4799",
   "created": "2026-11-02T05:59:19.070Z",
-  "updated": "2026-11-02T06:19:39.925Z",
+  "updated": "2026-11-02T06:21:28.797Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,10 @@
       "claimedBy": "agent-pan-4799",
       "claimedAt": "2026-11-02T06:18:12.914Z",
       "doneAt": "2026-11-02T06:19:39.925Z"
+    },
+    "member-spec-roots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:21:28.796Z"
     }
   }
 }
