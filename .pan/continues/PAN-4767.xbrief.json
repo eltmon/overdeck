@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4767",
   "created": "2026-11-02T02:20:34.096Z",
-  "updated": "2026-11-02T02:50:50.295Z",
+  "updated": "2026-11-02T02:51:08.050Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
     "docs-browser-spec-page-load-budget.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T02:50:50.295Z"
+    },
+    "docs-browser-spec-page-load-budget.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:51:08.050Z"
     }
   }
 }
