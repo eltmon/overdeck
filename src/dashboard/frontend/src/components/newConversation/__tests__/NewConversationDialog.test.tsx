@@ -100,6 +100,28 @@ describe('NewConversationDialog', () => {
     expect((screen.getByLabelText('Working directory') as HTMLInputElement).value).toBe('/home/me/Projects/myapp');
   });
 
+  it('renders five sections in order', async () => {
+    act(() => openNewConversationDialog());
+    renderHost();
+    await screen.findByRole('dialog');
+    const headings = screen.getAllByRole('heading', { level: 3 });
+    expect(headings.map((h) => h.textContent)).toEqual([
+      'Where it runs',
+      'Agent',
+      expect.stringMatching(/^Task/),
+      'Context',
+      'Skills',
+    ]);
+    expect(headings[2]?.textContent).toContain('Both optional');
+  });
+
+  it('the First message placeholder reads "Sent as soon as the conversation starts"', async () => {
+    act(() => openNewConversationDialog());
+    renderHost();
+    await screen.findByRole('dialog');
+    expect(screen.getByLabelText('First message')).toHaveAttribute('placeholder', 'Sent as soon as the conversation starts');
+  });
+
   it('shows the resolved default effort with its source', async () => {
     act(() => openNewConversationDialog());
     renderHost();

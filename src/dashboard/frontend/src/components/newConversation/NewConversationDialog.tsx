@@ -8,10 +8,12 @@
  * After a create it opens the conversation through its `/conv/<id>` route
  * (D6); the Command Deck's deep-link effect selects it.
  */
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronDown, Folder } from 'lucide-react';
 import { toast } from 'sonner';
 import { EFFORT_LEVELS } from '@overdeck/contracts';
+import { cn } from '../../lib/utils';
 import { Modal } from '../shared/Modal';
 import { HarnessSelect, ModelSelect, pickerEffortLevels, useAvailableModels, type Harness } from '../shared/ModelPicker';
 import { loadStoredHarness, loadStoredModel, MODEL_EFFORT_SUPPORT } from '../chat/ModelPicker';
@@ -66,6 +68,19 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
   const [machine, setMachine] = useState<MachineChoice>(THIS_MACHINE);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const whereHeadingId = useId();
+  const agentHeadingId = useId();
+  const taskHeadingId = useId();
+  const contextHeadingId = useId();
+  const skillsHeadingId = useId();
+  const projectId = useId();
+  const cwdId = useId();
+  const modelLabelId = useId();
+  const harnessLabelId = useId();
+  const effortLabelId = useId();
+  const issueLabelId = useId();
+  const messageId = useId();
 
   const project = useMemo(() => projects?.find((p) => p.key === projectKey), [projects, projectKey]);
 
@@ -160,106 +175,131 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
         </button>
       </>}
     >
-      <label className={styles.row}>
-        <span className={styles.label}>Project</span>
-        <select aria-label="Project" className={styles.control} value={projectKey ?? ''} onChange={(e) => chooseProject(e.target.value)}>
-          <option value="">No project</option>
-          {(projects ?? []).map((p) => (
-            <option key={p.key} value={p.key}>{p.name ?? p.key}</option>
-          ))}
-        </select>
-      </label>
-
-      <MachineField value={machine} onChange={setMachine} />
-
-      <label className={styles.row}>
-        <span className={styles.label}>Working directory</span>
-        <input
-          aria-label="Working directory"
-          className={styles.control}
-          value={cwd}
-          disabled={!projectKey || machine.machine !== ''}
-          placeholder={projectKey ? '' : 'Default working directory'}
-          onChange={(e) => setCwd(e.target.value)}
-        />
-      </label>
-
-      <ModelSelect label="Model" value={model} onChange={chooseModel} groups={groups} />
-      <HarnessSelect value={harness} onChange={setHarness} modelId={model} harnessPolicy={harnessPolicy} />
-
-      <div className={styles.row}>
-        <span className={styles.label}>Effort</span>
-        {effortSupported ? (
-          <div className={styles.effort}>
+      <section aria-labelledby={whereHeadingId}>
+        <h3 id={whereHeadingId} className={styles.sectionTitle}>Where it runs</h3>
+        <div className={styles.grid}>
+          <label htmlFor={projectId} className={styles.label}>Project</label>
+          <div className={styles.field}>
             <select
-              aria-label="Effort"
-              className={styles.control}
-              value={effort ?? ''}
-              onChange={(e) => { setEffort(e.target.value); setEffortTouched(true); }}
+              id={projectId}
+              className={styles.select}
+              value={projectKey ?? ''}
+              onChange={(e) => chooseProject(e.target.value)}
             >
-              {effort === null && <option value="">…</option>}
-              {effortLevels.map((level) => <option key={level} value={level}>{level}</option>)}
+              <option value="">No project</option>
+              {(projects ?? []).map((p) => (
+                <option key={p.key} value={p.key}>{p.name ?? p.key}</option>
+              ))}
             </select>
-            {effortDefault && (
-              <span className={styles.hint}>
-                Default: {effortDefault.effort} ({effortDefault.source})
-                {effortDefault.clamped ? ` · clamped from ${effortDefault.requested}` : ''}
-              </span>
-            )}
+            <ChevronDown size={14} className={styles.chev} />
           </div>
-        ) : (
-          <span className={styles.hint}>Not supported by this model</span>
-        )}
-      </div>
 
-      <fieldset className={styles.group}>
-        <legend className={styles.label}>Context</legend>
-        <label className={styles.check}>
-          <input type="checkbox" checked={bareContext} onChange={(e) => setBareContext(e.target.checked)} />
-          No context
-        </label>
-        <p className={styles.hint}>
-          New conversations start without Overdeck context: no bundled rules, session briefing, memory injection or resume message. Faster to spawn.
-        </p>
-        {harness === 'claude-code' && (
-          <>
-            <label className={styles.check}>
-              <input type="checkbox" checked={skipClaudeMd} onChange={(e) => setSkipClaudeMd(e.target.checked)} />
-              Skip CLAUDE.md
-            </label>
-            <p className={styles.hint}>
-              Claude Code skips ~/.claude/CLAUDE.md, project CLAUDE.md files and auto memory (CLAUDE_CODE_DISABLE_CLAUDE_MDS).
-            </p>
-          </>
-        )}
-      </fieldset>
+          <MachineField value={machine} onChange={setMachine} />
 
-      <div className={styles.group}>
-        <span className={styles.label}>Skills</span>
-        <ConversationSkillsField
-          projectKey={projectKey ?? undefined}
-          issueId={issueId ?? undefined}
-          value={skillOverrides}
-          onChange={setSkillOverrides}
-        />
-      </div>
+          <label htmlFor={cwdId} className={styles.label}>Working directory</label>
+          <div className={styles.field}>
+            <span className={styles.lead} aria-hidden="true"><Folder size={14} /></span>
+            <input
+              id={cwdId}
+              className={cn(styles.input, styles.mono)}
+              spellCheck={false}
+              value={cwd}
+              disabled={!projectKey || machine.machine !== ''}
+              placeholder={projectKey ? '' : 'Default working directory'}
+              onChange={(e) => setCwd(e.target.value)}
+            />
+          </div>
+        </div>
+      </section>
 
-      <div className={styles.group}>
-        <span className={styles.label}>Linked issue</span>
-        <IssuePickerField value={issueId} onChange={setIssueId} />
-      </div>
+      <section aria-labelledby={agentHeadingId}>
+        <h3 id={agentHeadingId} className={styles.sectionTitle}>Agent</h3>
+        <div className={styles.grid}>
+          <span id={modelLabelId} className={styles.label}>Model</span>
+          <ModelSelect labelId={modelLabelId} label="Model" value={model} onChange={chooseModel} groups={groups} />
 
-      <label className={styles.group}>
-        <span className={styles.label}>First message</span>
-        <textarea
-          aria-label="First message"
-          className={styles.textarea}
-          rows={3}
-          placeholder="Optional"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-        />
-      </label>
+          <span id={harnessLabelId} className={styles.label}>Harness</span>
+          <HarnessSelect labelId={harnessLabelId} value={harness} onChange={setHarness} modelId={model} harnessPolicy={harnessPolicy} />
+
+          <span id={effortLabelId} className={styles.label}>Effort</span>
+          {effortSupported ? (
+            <div className={styles.effort}>
+              <select
+                aria-label="Effort"
+                aria-labelledby={effortLabelId}
+                className={styles.select}
+                value={effort ?? ''}
+                onChange={(e) => { setEffort(e.target.value); setEffortTouched(true); }}
+              >
+                {effort === null && <option value="">…</option>}
+                {effortLevels.map((level) => <option key={level} value={level}>{level}</option>)}
+              </select>
+              {effortDefault && (
+                <span className={styles.hint}>
+                  Default: {effortDefault.effort} ({effortDefault.source})
+                  {effortDefault.clamped ? ` · clamped from ${effortDefault.requested}` : ''}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className={styles.hint}>Not supported by this model</span>
+          )}
+        </div>
+      </section>
+
+      <section aria-labelledby={taskHeadingId}>
+        <h3 id={taskHeadingId} className={styles.sectionTitle}>Task<span className={styles.aside}>Both optional</span></h3>
+        <div className={styles.grid}>
+          <span id={issueLabelId} className={styles.label}>Linked issue</span>
+          <IssuePickerField value={issueId} onChange={setIssueId} />
+
+          <label htmlFor={messageId} className={cn(styles.label, styles.full)}>First message</label>
+          <textarea
+            id={messageId}
+            className={cn(styles.textarea, styles.full)}
+            rows={3}
+            placeholder="Sent as soon as the conversation starts"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
+        </div>
+      </section>
+
+      <section aria-labelledby={contextHeadingId}>
+        <h3 id={contextHeadingId} className={styles.sectionTitle}>Context</h3>
+        <fieldset className={styles.group}>
+          <label className={styles.check}>
+            <input type="checkbox" checked={bareContext} onChange={(e) => setBareContext(e.target.checked)} />
+            No context
+          </label>
+          <p className={styles.hint}>
+            New conversations start without Overdeck context: no bundled rules, session briefing, memory injection or resume message. Faster to spawn.
+          </p>
+          {harness === 'claude-code' && (
+            <>
+              <label className={styles.check}>
+                <input type="checkbox" checked={skipClaudeMd} onChange={(e) => setSkipClaudeMd(e.target.checked)} />
+                Skip CLAUDE.md
+              </label>
+              <p className={styles.hint}>
+                Claude Code skips ~/.claude/CLAUDE.md, project CLAUDE.md files and auto memory (CLAUDE_CODE_DISABLE_CLAUDE_MDS).
+              </p>
+            </>
+          )}
+        </fieldset>
+      </section>
+
+      <section aria-labelledby={skillsHeadingId}>
+        <h3 id={skillsHeadingId} className={styles.sectionTitle}>Skills</h3>
+        <div className={styles.group}>
+          <ConversationSkillsField
+            projectKey={projectKey ?? undefined}
+            issueId={issueId ?? undefined}
+            value={skillOverrides}
+            onChange={setSkillOverrides}
+          />
+        </div>
+      </section>
     </Modal>
   );
 }
