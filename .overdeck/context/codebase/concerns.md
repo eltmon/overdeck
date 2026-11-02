@@ -131,6 +131,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   or every ephemeral watchdog would stop its machine); the reap runs in
   `deacon-lite.ts` via `remote-reap-routine.ts` (behind the freeze). The reap acts
   only on positive evidence: a failed exec is `indeterminate`, never a crash.
+  The deacon child inherits the dashboard's stdout, so its `[deacon-lite]` and
+  `[hygiene-scheduler]` lines land in `~/.overdeck/logs/dashboard.log`, not
+  `deacon.log`. Verified live on the deployed build by PAN-4696 (2026-11-02):
+  the reap and heartbeat loops both fired automatically with no operator
+  command (FR-1, FR-3 passed); PAN-4696's deployed-build check found
+  [#4847](https://github.com/eltmon/overdeck/issues/4847) (automatic reap
+  skips the review request when an unrelated process leaves a tracked
+  workspace file dirty at hand-off).
 - **Remote tmux helpers resolve their target from remote-state** — `getRemoteAgentOutput`,
   `sendToRemoteAgent(Keyed)`, `killRemoteAgent`, `isRemoteAgentRunning` and the reap's
   `probeRemoteSession` address `remoteTmuxTarget(agentId)`: a linked work agent's
@@ -143,14 +151,6 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   disagrees with its prompt about the continue file: `createRemoteWorkspace` writes
   `/workspace/.pan/continue.json` but the REMOTE prompt names
   `<workspace>/.overdeck/continue.json`.
-  The deacon child inherits the dashboard's stdout, so its `[deacon-lite]` and
-  `[hygiene-scheduler]` lines land in `~/.overdeck/logs/dashboard.log`, not
-  `deacon.log`. Verified live on the deployed build by PAN-4696 (2026-11-02):
-  the reap and heartbeat loops both fired automatically with no operator
-  command (FR-1, FR-3 passed); PAN-4696's deployed-build check found
-  [#4847](https://github.com/eltmon/overdeck/issues/4847) (automatic reap
-  skips the review request when an unrelated process leaves a tracked
-  workspace file dirty at hand-off).
 - **Fresh Claude Code state shows startup dialogs that eat the first message** — every
   Fly VM starts with an empty `~/.claude.json` (exec shell `HOME=/`). Each dialog
   Claude Code can show at launch must be pre-answered in
