@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T16:37:25.401875Z · model: claude-opus-5-5 · open: 874_
+_Last sequenced: 2026-11-02T16:40:13.055247Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -183,6 +183,7 @@ _Last sequenced: 2026-11-02T16:37:25.401875Z · model: claude-opus-5-5 · open: 
 | 174 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 175 | PAN-4827 | M | high | ok |  | PAN-4825 | Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices |
 | 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
+| 177 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
 | 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
 | 179 | PAN-4844 | S | medium | ok |  |  | Claude Code parser prices glm-*/qwen3* as Sonnet 4, ohmypi prices DashScope at $0; route both to custom rows. |
 | 180 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
@@ -1209,10 +1210,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T16:37:25.401875Z",
+  "generatedAt": "2026-11-02T16:40:13.055247Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 874,
+  "openCount": 875,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12162,6 +12163,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "New child of epic PAN-4823 (work item W-DOC). It is written alongside each item and finished last, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 880 behind the earlier phone children.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4847",
+      "rank": 177,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open.",
+      "rationale": "New issue placed in the open rank-177 slot: a silent pipeline stall (review never requested after Fly reap) that also blocks PAN-4696 FR-2; root cause is an unidentified background writer of .overdeck/context/codebase/concerns.md plus an over-strict porcelain dirty check in requestReviewThroughRoute.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13774,6 +13788,20 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-4847",
+      "to": "PAN-4696",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4832",
+      "to": "PAN-4847",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
