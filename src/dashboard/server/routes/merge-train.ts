@@ -37,6 +37,7 @@ import {
   type ProjectAutoMergeDefault,
 } from '../../../lib/cloister/auto-merge-policy.js';
 import { getMergeBlockersPayload } from '../../../lib/cloister/merge-blockers.js';
+import { listNotScheduledAutoMerges, type NotScheduledAutoMerge } from '../services/auto-merge-skip-reasons.js';
 import {
   isFlywheelAutoPickupBacklog,
   isFlywheelRequireUatBeforeMerge,
@@ -663,8 +664,12 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
 
 const AUTO_MERGE_POLL_LIMIT = 100;
 
-export function getPendingAutoMergePayload(): PendingAutoMerge[] {
-  return listActiveAutoMerges(AUTO_MERGE_POLL_LIMIT);
+/**
+ * PAN-4772: the cooldown queue plus why the scheduler's last completed pass
+ * left each other candidate unscheduled.
+ */
+export function getPendingAutoMergePayload(): { pending: PendingAutoMerge[]; notScheduled: NotScheduledAutoMerge[] } {
+  return { pending: listActiveAutoMerges(AUTO_MERGE_POLL_LIMIT), notScheduled: listNotScheduledAutoMerges() };
 }
 
 export function getAutoMergeProblemPayload(): PendingAutoMerge[] {

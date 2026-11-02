@@ -43,11 +43,13 @@ vi.mock('../../../../lib/overdeck/control-settings.js', () => ({
 
 const {
   deleteAutoMergePayload,
+  getPendingAutoMergePayload,
   getMergeTrainConfigPayload,
   postAutoMergeSchedulePayload,
   postMergeTrainConfigPayload,
 } = await import('../merge-train.js');
 const controlSettings = await import('../../../../lib/overdeck/control-settings.js');
+const skipReasons = await import('../../services/auto-merge-skip-reasons.js');
 
 const READY_FACTS: PrFacts = {
   issueId: 'PAN-3917',
@@ -266,5 +268,26 @@ describe('GET/POST /api/merge-train/config', () => {
 
   it('rejects a body that is not a JSON object', async () => {
     expect((await postMergeTrainConfigPayload([])).status).toBe(400);
+  });
+});
+
+describe('GET /api/merge-train/auto-merge/pending payload (PAN-4772)', () => {
+  it('serves the cooldown queue and the scheduler\'s latest skip reasons', () => {
+    skipReasons.resetSchedulerOutcomes();
+    skipReasons.recordSchedulerOutcomes(
+      [{ projectKey: 'overdeck', issueId: 'PAN-4759', scheduled: false, reason: 'PR is not approved at PR HEAD 697a05f8', head: '697a05f8' }],
+      { now: () => Date.parse('2026-11-02T02:45:00.000Z'), log: () => {} },
+    );
+    try {
+      expect(getPendingAutoMergePayload()).toEqual({
+        pending: [],
+        notScheduled: [{
+          issueId: 'PAN-4759', projectKey: 'overdeck', head: '697a05f8',
+          reason: 'PR is not approved at PR HEAD 697a05f8', at: '2026-11-02T02:45:00.000Z',
+        }],
+      });
+    } finally {
+      skipReasons.resetSchedulerOutcomes();
+    }
   });
 });

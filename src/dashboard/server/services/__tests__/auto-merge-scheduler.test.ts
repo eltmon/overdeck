@@ -33,6 +33,8 @@ const {
   scheduleReadyAutoMerges,
 } = await import('../auto-merge-scheduler.js');
 const { autoMergePolicyRefusal, postAutoMergeSchedulePayload } = await import('../../routes/merge-train.js');
+const { rereviewStaleApproval } = await import('../stale-approval-rereview.js');
+const { listNotScheduledAutoMerges, resetSchedulerOutcomes } = await import('../auto-merge-skip-reasons.js');
 const { evaluateIssueMergeGate } = await import('../../../../lib/cloister/merge-gate.js');
 const { getPrFacts } = await import('../../../../lib/cloister/pr-facts.js');
 const { isAutoMergeEligible } = await import('../../../../lib/cloister/auto-merge-eligibility.js');
@@ -149,6 +151,8 @@ function world(options: WorldOptions = {}) {
       schedule: (input) => insert({ ...input, canSchedule }),
       announce: vi.fn(),
     }),
+    // PAN-4772: no stale-approval re-review unless a test wires one.
+    rereview: vi.fn(async (): Promise<string | null> => null),
     log: vi.fn(),
     env: {},
   };
@@ -634,5 +638,139 @@ describe('runAutoMergeSchedulerTick (#3983)', () => {
     // The finished pass is released: the next tick starts a fresh one.
     await runAutoMergeSchedulerTick(deps);
     expect(listProjects).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * PAN-4772 (the PAN-4759 / #4768 incident): approved at head A, the agent
+ * pushed head B, and the PR sat "approved and green" with no review request
+ * and no visible reason.
+ */
+describe('stale approval re-review and visible skip reasons (PAN-4772)', () => {
+  const HEAD_A = '1d360ce2d0000000000000000000000000000000';
+  const HEAD_B = '697a05f820000000000000000000000000000000';
+  type JournalEntry = import('../../../../lib/cloister/pipeline-journal.js').PipelineJournalEntry;
+
+  function staleWorld() {
+    let current = facts({ headSha: HEAD_A });
+    const w = world({ labels: ['auto-merge'], getFacts: async () => current });
+    const journal: JournalEntry[] = [];
+    const requestReview = vi.fn(async () => ({ kind: 'started' as const, autoRequeueCount: 0 }));
+    w.deps.rereview = vi.fn((issueId: string, gateFacts: Parameters<typeof rereviewStaleApproval>[1]) => rereviewStaleApproval(issueId, gateFacts, {
+      workspacePathFor: () => '/repos/overdeck/workspaces/feature-pan-42',
+      exists: () => true,
+      readJournal: () => journal,
+      appendEntry: (_path, entry) => {
+        const stamped = { at: '2026-11-02T02:45:00.000Z', ...entry };
+        journal.push(stamped);
+        return stamped;
+      },
+      requestReview,
+    }));
+    return { ...w, requestReview, journal, setFacts: (next: Partial<PrFacts>) => { current = facts(next); } };
+  }
+
+  it('requests exactly one review for head B, then schedules once B is approved', async () => {
+    const { deps, insert, requestReview, setFacts } = staleWorld();
+
+    // Approved at A: scheduled as before.
+    await expect(scheduleReadyAutoMerges(deps)).resolves.toEqual([{ projectKey: 'overdeck', issueId: 'PAN-42', scheduled: true }]);
+    deps.latestAutoMerge = () => row('blocked', { headSha: HEAD_A });
+
+    // Head B pushed after the approval: GitHub still says APPROVED.
+    setFacts({ headSha: HEAD_B, approvedAtHead: false });
+    const [stale] = await scheduleReadyAutoMerges(deps);
+    expect(stale).toMatchObject({
+      scheduled: false,
+      head: HEAD_B,
+      reason: expect.stringContaining('approval is stale at 697a05f8; review re-requested (started)'),
+    });
+    expect(requestReview).toHaveBeenCalledTimes(1);
+
+    // Every later tick at B asks nothing more.
+    for (let tick = 0; tick < 3; tick += 1) {
+      const [again] = await scheduleReadyAutoMerges(deps);
+      expect(again.reason).toContain('review already re-requested for this head');
+    }
+    expect(requestReview).toHaveBeenCalledTimes(1);
+
+    // The review approves B: the PR schedules with no human action.
+    setFacts({ headSha: HEAD_B, approvedAtHead: true });
+    await expect(scheduleReadyAutoMerges(deps)).resolves.toEqual([{ projectKey: 'overdeck', issueId: 'PAN-42', scheduled: true }]);
+    expect(insert).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not ask for review when the gate refuses for another reason', async () => {
+    const { deps, requestReview, setFacts } = staleWorld();
+    setFacts({ headSha: HEAD_B, checks: 'red' });
+    const [outcome] = await scheduleReadyAutoMerges(deps);
+    expect(outcome.reason).toBe(`CI checks failing on PR HEAD ${HEAD_B}`);
+    expect(requestReview).not.toHaveBeenCalled();
+  });
+
+  it('keeps each skip reason from the last completed tick and logs it only when it changes', async () => {
+    vi.useFakeTimers();
+    resetSchedulerOutcomes();
+    try {
+      vi.setSystemTime(new Date('2026-11-02T02:45:00.000Z'));
+      const { deps, setFacts } = staleWorld();
+      setFacts({ headSha: HEAD_B, checks: 'red' });
+
+      await runAutoMergeSchedulerTick(deps, 1_000);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await runAutoMergeSchedulerTick(deps, 1_000);
+      expect(listNotScheduledAutoMerges()).toEqual([{
+        issueId: 'PAN-42', projectKey: 'overdeck', head: HEAD_B,
+        reason: `CI checks failing on PR HEAD ${HEAD_B}`, at: '2026-11-02T02:45:00.000Z',
+      }]);
+      const notScheduledLogs = () => deps.log.mock.calls.filter(([line]) => String(line).includes('PAN-42 not scheduled')).length;
+      expect(notScheduledLogs()).toBe(1);
+
+      setFacts({ headSha: HEAD_B, mergeable: false });
+      await runAutoMergeSchedulerTick(deps, 1_000);
+      expect(listNotScheduledAutoMerges()[0].reason).toContain('PR is not mergeable');
+      expect(notScheduledLogs()).toBe(2);
+
+      // Scheduled now: nothing left to explain.
+      setFacts({ headSha: HEAD_B });
+      await runAutoMergeSchedulerTick(deps, 1_000);
+      expect(listNotScheduledAutoMerges()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+      resetSchedulerOutcomes();
+    }
+  });
+
+  it('does not report an issue that is already pending as not scheduled', async () => {
+    vi.useFakeTimers();
+    resetSchedulerOutcomes();
+    try {
+      const { deps } = world({ labels: ['auto-merge'], latest: row('pending') });
+      await runAutoMergeSchedulerTick(deps, 1_000);
+      expect(listNotScheduledAutoMerges()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+      resetSchedulerOutcomes();
+    }
+  });
+
+  it('keeps the previous reasons when a pass is abandoned', async () => {
+    vi.useFakeTimers();
+    resetSchedulerOutcomes();
+    try {
+      const { deps, setFacts } = staleWorld();
+      setFacts({ headSha: HEAD_B, checks: 'red' });
+      await runAutoMergeSchedulerTick(deps, 1_000);
+      expect(listNotScheduledAutoMerges()).toHaveLength(1);
+
+      deps.listCandidates = vi.fn(() => new Promise<never>(() => {}));
+      const hung = runAutoMergeSchedulerTick(deps, 1_000);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await expect(hung).resolves.toEqual([]);
+      expect(listNotScheduledAutoMerges()).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+      resetSchedulerOutcomes();
+    }
   });
 });

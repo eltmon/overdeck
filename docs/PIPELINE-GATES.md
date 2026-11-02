@@ -752,7 +752,17 @@ train), the dashboard Merge button, the auto-merge executor and the merge
 train's merge-next (all through `triggerMerge`), the per-project merge
 queue, and the auto-merge scheduler (#3983,
 `dashboard/server/services/auto-merge-scheduler.ts`), which asks it before it
-schedules a ready, opted-in PR on the merge-train reconciler tick.
+schedules a ready, opted-in PR on the merge-train reconciler tick. When the
+gate refuses a GitHub PR whose approval is stale (GitHub still says approved,
+but no approval names the current head, because the author pushed after the
+review), the scheduler asks the guarded review door once for that head
+(PAN-4772, `stale-approval-rereview.ts`; journal entry
+`review.stale-approval-rerequested`). It asks nothing while a review is already
+running. Every completed pass keeps each candidate's skip reason
+(`auto-merge-skip-reasons.ts`), served as `notScheduled` on
+`GET /api/merge-train/auto-merge/pending` and shown on the Flywheel page's
+Pending auto-merges card as "Not scheduled: <reason>". A reason is logged only
+when it changes.
 Auto-merge eligibility applies the same rule. Nothing is stored; each input is
 read when the question is asked. The PR is merge-ready when, in order:
 
@@ -1530,6 +1540,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
+| `review.stale-approval-rerequested` | `dashboard/server/services/stale-approval-rereview.ts`, when the auto-merge scheduler asked the guarded review door for a head whose approval is stale, once per head whatever the door answered (`data.head`, `data.outcome`, PAN-4772) |
 | `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered, with `data.staleApproval: true` when the approval stood at an older head (PAN-4467) |
 | `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
 | `blocked.declared` | `pan task block <issue> <item> --on <ref>...` (source `pan-task-block`), with `data.item` and canonical `data.blockers` |
