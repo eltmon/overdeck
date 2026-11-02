@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4762",
   "created": "2026-11-02T01:21:42.220Z",
-  "updated": "2026-11-02T01:33:53.747Z",
+  "updated": "2026-11-02T01:33:59.443Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4762",
       "claimedAt": "2026-11-02T01:31:13.140Z",
       "doneAt": "2026-11-02T01:33:53.746Z"
+    },
+    "rpc-browser-methods": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4762",
+      "claimedAt": "2026-11-02T01:33:59.443Z"
     }
   }
 }
