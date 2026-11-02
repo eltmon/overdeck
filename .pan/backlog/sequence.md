@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T15:44:28.892563Z · model: claude-opus-5-5 · open: 858_
+_Last sequenced: 2026-11-02T15:45:05.360001Z · model: claude-opus-5-5 · open: 856_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,11 +9,9 @@ _Last sequenced: 2026-11-02T15:44:28.892563Z · model: claude-opus-5-5 · open: 
 | 2 | PAN-4801 | M | critical | ok |  |  | Merge train never rebases approved siblings after a merge (reconcile hook unwired), so each merge strands siblings conflicting. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
-| 5 | PAN-4810 | M | critical | ok |  |  | Verification merges main into a stale workspace, never the PR head; handoff-pushed PRs verify the wrong tree and never reach review |
 | 6 | PAN-4803 | M | high | ok |  | PAN-4801 | After PAN-4801, carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
-| 9 | PAN-4813 | M | medium | ok |  |  | Add Kimi K3.1 Pro + Highspeed on Claude Code, kimi-code and ACP routes; already in pipeline, so pinned near the top. |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 10 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 11 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
@@ -882,10 +880,6 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 
 Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
 
-### PAN-4810 (rank 5)
-
-New since the prior run. Verification syncs main into the workspace without first moving it to origin/<branch>, so any PR whose commits arrive from a handoff worktree, a train sibling rebase or a suggestion commit is verified on a stale tree and silently never dispatched to review; three PRs (PAN-4772, PAN-4785, PAN-4801) stalled five hours on it. It is substrate pipeline machinery with a concrete fix direction, so it ranks in the critical top tier beside the merge-train and adoption fixes it unblocks. Labeled needs-handoff (TENET-10): supervised handoff only.
-
 ### PAN-4803 (rank 6)
 
 New substrate follow-up to PAN-4801: once siblings are rebased after each merge, PAN-4772 re-requests review for every one, so review load grows quadratically. Carrying the approval when git patch-id is unchanged removes that cost. It takes the free rank 6, after its PAN-4801 dependency; needs-handoff (TENET-10) because it touches merge-gate trust.
@@ -897,10 +891,6 @@ Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as 
 ### PAN-4690 (rank 8)
 
 New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).
-
-### PAN-4813 (rank 9)
-
-New issue that entered the pipeline before this pass (live workspace feature-pan-4813), so it is pinned rather than ranked. It takes the free rank-9 slot so no other node moves. The PRD is complete with verified ids and decisions; the only open point is the native-alias checkpoint in WI-4, which has a stated fallback.
 
 ### PAN-4554 (rank 10)
 
@@ -1186,6 +1176,14 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
+### PAN-3205 (rank 78)
+
+New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
+
+### PAN-3118 (rank 79)
+
+Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1193,10 +1191,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T15:44:28.892563Z",
+  "generatedAt": "2026-11-02T15:45:05.360001Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 858,
+  "openCount": 856,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1251,19 +1249,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-4810",
-      "rank": 5,
-      "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Verification merges main into a stale workspace, never the PR head; handoff-pushed PRs verify the wrong tree and never reach review",
-      "rationale": "New since the prior run. Verification syncs main into the workspace without first moving it to origin/<branch>, so any PR whose commits arrive from a handoff worktree, a train sibling rebase or a suggestion commit is verified on a stale tree and silently never dispatched to review; three PRs (PAN-4772, PAN-4785, PAN-4801) stalled five hours on it. It is substrate pipeline machinery with a concrete fix direction, so it ranks in the critical top tier beside the merge-train and adoption fixes it unblocks. Labeled needs-handoff (TENET-10): supervised handoff only.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4803",
       "rank": 6,
       "size": "M",
@@ -1301,19 +1286,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched",
       "rationale": "New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4813",
-      "rank": 9,
-      "size": "M",
-      "importance": "medium",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add Kimi K3.1 Pro + Highspeed on Claude Code, kimi-code and ACP routes; already in pipeline, so pinned near the top.",
-      "rationale": "New issue that entered the pipeline before this pass (live workspace feature-pan-4813), so it is pinned rather than ranked. It takes the free rank-9 slot so no other node moves. The PRD is complete with verified ids and decisions; the only open point is the native-alias checkpoint in WI-4, which has a stated fallback.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13089,13 +13061,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-4810",
-      "to": "PAN-4801",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-4743",
