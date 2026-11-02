@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T13:35:22.782411Z · model: claude-opus-5-5 · open: 859_
+_Last sequenced: 2026-11-02T13:36:12.311648Z · model: claude-opus-5-5 · open: 857_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -19,7 +19,6 @@ _Last sequenced: 2026-11-02T13:35:22.782411Z · model: claude-opus-5-5 · open: 
 | 11 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 12 | PAN-4669 | S | critical | ok |  |  | Herdr hosts: idle-stack reaper checks tmux only, so it stops server/frontend containers of every live agent after 10m; needs-handoff |
 | 13 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
-| 13 | PAN-4772 | M | high | ok |  |  | Push after approval leaves PR stale-approved and silently unscheduled; auto re-request review per head, show skip reasons. Handoff. |
 | 14 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 15 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 16 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
@@ -29,7 +28,6 @@ _Last sequenced: 2026-11-02T13:35:22.782411Z · model: claude-opus-5-5 · open: 
 | 19 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 20 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 21 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
-| 21 | PAN-4785 | M | high | ok |  |  | pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff. |
 | 22 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 23 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 24 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
@@ -923,10 +921,6 @@ New since the prior run: on the default Herdr backend the idle-stack reaper deci
 
 Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by hand. With false DoD refusals fixed by PAN-4543, auto close-out only needs a patrol on the existing verify-on-main path and live settings. High because unclosed issues distort every pipeline view.
 
-### PAN-4772 (rank 13)
-
-New substrate issue: merge-gate.ts already computes staleApproval but nothing acts on it, and the auto-merge scheduler discards its skip reasons, so approved green PRs (PAN-4759) stall unseen until the Flywheel finds them by hand. It shares rank 13 with no other node moving; needs-handoff (TENET-10) means a supervised strike, not an autonomous pickup.
-
 ### PAN-4511 (rank 14)
 
 pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.
@@ -962,10 +956,6 @@ New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network
 ### PAN-4705 (rank 21)
 
 New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.
-
-### PAN-4785 (rank 21)
-
-New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.
 
 ### PAN-4746 (rank 22)
 
@@ -1187,6 +1177,14 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
+### PAN-4623 (rank 76)
+
+New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.
+
+### PAN-3234 (rank 77)
+
+Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1194,10 +1192,10 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T13:35:22.782411Z",
+  "generatedAt": "2026-11-02T13:36:12.311648Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 859,
+  "openCount": 857,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1358,19 +1356,6 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "planning": "auto"
     },
     {
-      "issue": "PAN-4772",
-      "rank": 13,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Push after approval leaves PR stale-approved and silently unscheduled; auto re-request review per head, show skip reasons. Handoff.",
-      "rationale": "New substrate issue: merge-gate.ts already computes staleApproval but nothing acts on it, and the auto-merge scheduler discards its skip reasons, so approved green PRs (PAN-4759) stall unseen until the Flywheel finds them by hand. It shares rank 13 with no other node moving; needs-handoff (TENET-10) means a supervised strike, not an autonomous pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4511",
       "rank": 14,
       "size": "S",
@@ -1484,19 +1469,6 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [],
       "why": "quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards.",
       "rationale": "New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4785",
-      "rank": 21,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff.",
-      "rationale": "New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13100,32 +13072,11 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "confidence": 0.7
     },
     {
-      "from": "PAN-4772",
-      "to": "PAN-4773",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-4671",
       "to": "PAN-4773",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4702",
-      "to": "PAN-4772",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4785",
-      "to": "PAN-4636",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
     },
     {
       "from": "PAN-4801",
@@ -13135,46 +13086,11 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "confidence": 1
     },
     {
-      "from": "PAN-4772",
-      "to": "PAN-4803",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4772",
-      "to": "PAN-4785",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4801",
-      "to": "PAN-4772",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-4702",
       "to": "PAN-4803",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-4810",
-      "to": "PAN-4772",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-4810",
-      "to": "PAN-4785",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.75
     },
     {
       "from": "PAN-4810",
