@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T14:56:55.162Z",
+  "updated": "2026-11-02T14:57:09.413Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,10 @@
     "machine-field-fly.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T14:56:55.162Z"
+    },
+    "machine-field-fly.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:57:09.413Z"
     }
   }
 }
