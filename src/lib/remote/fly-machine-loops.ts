@@ -15,7 +15,10 @@
  *   when no linked conversation on it has been active for
  *   `remote.fly.machine_idle_minutes` (default 30, 0 disables), or when its
  *   provisioning never linked it within 30 minutes. A stopped Fly machine has
- *   lost its rootfs, so it is destroyed, never restarted.
+ *   lost its rootfs, so it is destroyed, never restarted. A machine that hosts
+ *   a linked work agent whose remote-state is `starting` or `running` is never
+ *   removed for idleness: the reap tears it down after the hand-off to review
+ *   (PAN-4734 FR-11, D-8).
  * - `syncFlyCodexAuth` reads the Codex `auth.json` of every linked machine with
  *   a `codexAuthPath` and decides by newest refresh wins (PAN-4296 D-3): it
  *   pushes home's sign-in, copies a newer VM refresh home, or does nothing. A
@@ -42,7 +45,7 @@ import { loadConfig } from '../config.js';
 import { listLinkedConversations } from '../overdeck/linked-conversations.js';
 import type { FlyApiClient } from './fly-api.js';
 import { FlyApiError, flyTokenRejectedMessage, isFlyAuthError } from './fly-api.js';
-import { REMOTE_HOST_HEARTBEAT_PATH } from './remote-agents.js';
+import { listActiveRemoteAgentStates, REMOTE_HOST_HEARTBEAT_PATH } from './remote-agents.js';
 import { REMOTE_PAN_DIR } from './remote-tmux.js';
 
 const DEFAULT_IDLE_MINUTES = 30;
@@ -70,6 +73,8 @@ export interface FlyMachineLoopDeps {
   removeRecord: (id: string) => Promise<unknown>;
   activity: (message: string, details: Record<string, unknown>) => void;
   now: () => number;
+  /** Environments hosting a linked work agent that is `starting` or `running` (PAN-4734 FR-11). */
+  activeLinkedAgentEnvironmentIds: () => Set<string>;
 }
 
 const defaultDeps: FlyMachineLoopDeps = {
@@ -86,6 +91,9 @@ const defaultDeps: FlyMachineLoopDeps = {
   removeRecord: removeFlyMachine,
   activity: (message, details) => emitActivityEntry({ source: 'cloister', level: 'info', message, details: JSON.stringify(details) }),
   now: Date.now,
+  activeLinkedAgentEnvironmentIds: () => new Set(listActiveRemoteAgentStates()
+    .filter((state) => state.linked === true && state.environmentId)
+    .map((state) => state.environmentId!)),
 };
 
 /** Record id → when its machine was first seen with no active conversation. */
@@ -129,6 +137,7 @@ async function reasonToRemove(
   deps: FlyMachineLoopDeps,
   idleMs: number,
   conversations: LinkedConversationActivity[],
+  busy: Set<string>,
 ): Promise<string | null> {
   try {
     const machine = await api.getMachine(record.appName, record.machineId);
@@ -139,6 +148,11 @@ async function reasonToRemove(
     return null;
   }
 
+  // A working linked agent's machine belongs to the reap until the hand-off (D-8).
+  if (record.environmentId && busy.has(record.environmentId)) {
+    idleSince.delete(record.id);
+    return null;
+  }
   if (idleMs <= 0) return null;
   const now = deps.now();
   const active = conversations.some((row) =>
@@ -154,6 +168,32 @@ async function reasonToRemove(
   return now - since >= idleMs ? `no active conversation for ${Math.round(idleMs / 60_000)} min` : null;
 }
 
+/**
+ * Destroy a Fly machine (an already-gone one counts as destroyed), then
+ * remove its link and forget its record. A failed destroy keeps the link and
+ * the record so the next sweep retries. The sweep and the reap (PAN-4734
+ * FR-12) both remove machines through here.
+ */
+export async function destroyAndForgetFlyMachine(
+  record: FlyMachineRecord,
+  reason: string,
+  overrides: Partial<FlyMachineLoopDeps> = {},
+  loadedApi?: LoopApi,
+): Promise<{ destroyed: boolean; line: string }> {
+  const deps = { ...defaultDeps, ...overrides };
+  try {
+    await destroyFlyVm(record.appName, record.machineId, { api: loadedApi ?? await deps.api() });
+  } catch (error) {
+    const detail = isFlyAuthError(error) ? flyTokenRejectedMessage(error) : (error as Error).message;
+    return { destroyed: false, line: `could not destroy ${record.label} (${reason}): ${detail}; will retry` };
+  }
+  if (record.linkId !== null) await deps.removeLink(record.linkId);
+  await deps.removeRecord(record.id);
+  idleSince.delete(record.id);
+  deps.activity(`Destroyed Fly machine ${record.label}: ${reason}`, { machineId: record.machineId, appName: record.appName, linkId: record.linkId, reason });
+  return { destroyed: true, line: `destroyed ${record.label}: ${reason}` };
+}
+
 /** FR-16: destroy, unlink and forget Fly machines that are gone, idle, or never finished provisioning. */
 export async function sweepFlyMachines(overrides: Partial<FlyMachineLoopDeps> = {}): Promise<string[]> {
   const deps = { ...defaultDeps, ...overrides };
@@ -162,6 +202,7 @@ export async function sweepFlyMachines(overrides: Partial<FlyMachineLoopDeps> = 
   const api = await deps.api();
   const idleMs = Math.max(0, await deps.idleMinutes()) * 60_000;
   const conversations = idleMs > 0 ? deps.listConversations() : [];
+  const busy = deps.activeLinkedAgentEnvironmentIds();
   const lines: string[] = [];
 
   for (const record of records) {
@@ -170,7 +211,7 @@ export async function sweepFlyMachines(overrides: Partial<FlyMachineLoopDeps> = 
       reason = deps.now() - Date.parse(record.createdAt) >= UNLINKED_LIMIT_MS ? 'provisioning never linked it' : null;
     } else {
       try {
-        reason = await reasonToRemove(record, api, deps, idleMs, conversations);
+        reason = await reasonToRemove(record, api, deps, idleMs, conversations, busy);
       } catch (error) {
         if (!isFlyAuthError(error)) throw error;
         lines.push(`could not check ${record.label}: ${flyTokenRejectedMessage(error)}`);
@@ -178,20 +219,7 @@ export async function sweepFlyMachines(overrides: Partial<FlyMachineLoopDeps> = 
       }
     }
     if (reason === null) continue;
-
-    try {
-      await destroyFlyVm(record.appName, record.machineId, { api });
-    } catch (error) {
-      lines.push(isFlyAuthError(error)
-        ? `could not destroy ${record.label} (${reason}): ${flyTokenRejectedMessage(error)}; will retry`
-        : `could not destroy ${record.label} (${reason}): ${(error as Error).message}; will retry`);
-      continue;
-    }
-    if (record.linkId !== null) await deps.removeLink(record.linkId);
-    await deps.removeRecord(record.id);
-    idleSince.delete(record.id);
-    deps.activity(`Destroyed Fly machine ${record.label}: ${reason}`, { machineId: record.machineId, appName: record.appName, linkId: record.linkId, reason });
-    lines.push(`destroyed ${record.label}: ${reason}`);
+    lines.push((await destroyAndForgetFlyMachine(record, reason, deps, api)).line);
   }
   return lines;
 }
