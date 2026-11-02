@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4655",
   "created": "2026-11-02T03:52:43.700Z",
-  "updated": "2026-11-02T04:45:11.763Z",
+  "updated": "2026-11-02T04:45:29.763Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "idle-settle-patrol.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T04:45:11.762Z"
+    },
+    "settings-auto-settle-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:45:29.763Z"
     }
   }
 }
