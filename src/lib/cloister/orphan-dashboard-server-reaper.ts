@@ -6,9 +6,11 @@
  * stale data and, worse, run a SECOND Deacon racing the live one (single-deacon
  * invariant; PAN-821/PAN-698).
  *
- * THIS RUNS INSIDE THE LIVE SERVER PROCESS. The Deacon is in-process with
- * `dist/dashboard/server.js`, so `process.pid` IS the live server. The hard
- * safety rule: never kill `process.pid`, never kill the current port owner,
+ * THIS RUNS IN THE DEACON CHILD, which the live server spawns, so the live
+ * server is `process.ppid` (PAN-4734: a Fly machine has no `lsof`, so the
+ * port-owner guard alone could not protect it, and the reaper killed its own
+ * server ten minutes after boot). The hard safety rule: never kill
+ * `process.pid` or `process.ppid`, never kill the current port owner,
  * never kill a just-spawned server (could be a legitimate restart handoff), and
  * never kill a process living inside a container (a workspace-container server
  * is legitimate — only host-level orphans are reaped). Everything is built on a
@@ -36,8 +38,10 @@ export interface DashboardServerProc {
 
 export interface SelectOrphanOptions {
   servers: DashboardServerProc[];
-  /** The live server's own pid — NEVER reaped. */
+  /** The reaper's own pid — NEVER reaped. */
   selfPid: number;
+  /** The reaper's parent: the live server when the reaper runs in the deacon child — NEVER reaped. */
+  parentPid?: number | null;
   /** The pid currently listening on the dashboard API port — NEVER reaped. */
   portOwnerPid: number | null;
   /** Don't reap a server younger than this (avoids racing a restart handoff). */
@@ -53,6 +57,7 @@ export function selectOrphanServerPids(opts: SelectOrphanOptions): number[] {
   const minAge = opts.minAgeSeconds ?? DEFAULT_MIN_AGE_SECONDS;
   return opts.servers
     .filter((s) => s.pid !== opts.selfPid)
+    .filter((s) => opts.parentPid == null || s.pid !== opts.parentPid)
     .filter((s) => opts.portOwnerPid == null || s.pid !== opts.portOwnerPid)
     .filter((s) => s.ageSeconds >= minAge)
     .map((s) => s.pid);
@@ -117,6 +122,7 @@ async function isContainerProcess(pid: number): Promise<boolean> {
 
 export interface ReapDeps {
   selfPid?: number;
+  parentPid?: number;
   apiPort?: number;
   listServers?: () => Promise<DashboardServerProc[]>;
   resolvePortOwner?: (port: number) => Promise<number | null>;
@@ -136,6 +142,7 @@ export async function reapOrphanedDashboardServers(deps: ReapDeps = {}): Promise
   if (isDeaconGloballyPaused()) return [];
 
   const selfPid = deps.selfPid ?? process.pid;
+  const parentPid = deps.parentPid ?? process.ppid;
   const kill = deps.kill ?? ((pid, signal) => process.kill(pid, signal));
   const graceMs = deps.graceMs ?? REAP_GRACE_MS;
   const apiPort = deps.apiPort ?? await loadConfig().then(
@@ -151,6 +158,7 @@ export async function reapOrphanedDashboardServers(deps: ReapDeps = {}): Promise
   let candidates = selectOrphanServerPids({
     servers,
     selfPid,
+    parentPid,
     portOwnerPid,
     minAgeSeconds: deps.minAgeSeconds,
   });
