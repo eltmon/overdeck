@@ -558,6 +558,10 @@ Smoke issue PAN-4832 ([#4832](https://github.com/eltmon/overdeck/issues/4832));
 `registry.fly.io/pan-workspaces:latest`) without re-planning and without a
 manual push.
 
+| Check | Result |
+|---|---|
+| Heartbeat (FR-3) | 2026-11-02T16:32:13Z (age 0 s) and 2026-11-02T16:33:13Z (age 28 s), 60 s apart; `dashboard.log` shows "Host heartbeat refreshed for PAN-4832 on pan-pan-4832-ws". |
+
 ## Live verification (PAN-4652)
 
 Fly machines were tested live on 2026-11-01, before merge, against app
