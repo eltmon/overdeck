@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4740",
   "created": "2026-11-02T12:44:07.052Z",
-  "updated": "2026-11-02T13:40:02.500Z",
+  "updated": "2026-11-02T13:40:19.242Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,10 @@
     "stale-channel-retry.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T13:40:02.499Z"
+    },
+    "stale-channel-retry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:40:19.241Z"
     }
   }
 }
