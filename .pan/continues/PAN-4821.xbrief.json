@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4821",
   "created": "2026-11-02T16:00:29.674Z",
-  "updated": "2026-11-02T17:19:31.340Z",
+  "updated": "2026-11-02T17:19:48.749Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "wi3-verdict-read-error.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T17:19:31.339Z"
+    },
+    "wi3-verdict-read-error.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:19:48.749Z"
     }
   }
 }
