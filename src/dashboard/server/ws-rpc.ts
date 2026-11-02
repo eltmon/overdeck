@@ -894,6 +894,13 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           defaultCwd: panOpen.getDefaultCwd(),
         }),
 
+      // ── shellOpenInBrowser / getAvailableBrowsers — file links (PAN-4762) ──
+      [WS_METHODS.shellOpenInBrowser]: (input) =>
+        panOpen.openInBrowser(input),
+
+      [WS_METHODS.getAvailableBrowsers]: () =>
+        panOpen.getAvailableBrowsers().pipe(Effect.map((browsers) => ({ browsers }))),
+
       [WS_METHODS.scanConversations]: (input) =>
         getConversationsConfig().pipe(
           Effect.flatMap((config) => Effect.promise(async () => {

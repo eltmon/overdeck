@@ -168,12 +168,14 @@ chips always call the original `handleOpen()`. The fallback matrix:
 Right-click on a markdown chip lists **Open in internal editor**, one
 **Open in `<EDITORS label>`** entry per editor the server reports available
 (`pan.getAvailableEditors`, fetched once and cached module-wide, same
-pattern as the chip's Quickview syntax-highlighter cache), then the
-**Open containing folder**, then the existing **Copy relative path** /
-**Copy full path** items. Choosing any editor open action calls
-`setMarkdownOpenTarget` before opening, so the choice survives a reload.
-Right-click on a non-markdown chip lists **Open in editor** / **Open
-containing folder** / **Copy relative path** / **Copy full path**.
+pattern as the chip's Quickview syntax-highlighter cache), then one
+**Open in browser** / **Open in `<Browser>`** entry per browser the server
+detected (PAN-4762, see below), then the **Open containing folder**, then
+the existing **Copy relative path** / **Copy full path** items. Choosing
+any editor open action calls `setMarkdownOpenTarget` before opening, so the
+choice survives a reload. Right-click on a non-markdown chip lists **Open
+in editor**, the same browser items, **Open containing folder**, **Copy
+relative path** and **Copy full path**.
 
 **Open containing folder** sends `shellOpenInEditor` with
 `editor: 'file-manager'` and `reveal: true` for `filePath` (never
@@ -183,3 +185,16 @@ parent folder with the file selected: `open -R` on macOS,
 `org.freedesktop.FileManager1.ShowItems` D-Bus call on Linux, which falls
 back to `xdg-open` on the parent folder when no file manager implements it.
 It does not change the persisted markdown open target.
+
+Browser items (PAN-4762) appear only for `html`, `htm`, `xhtml`, `svg`,
+`pdf`, `png`, `jpg`, `jpeg`, `gif`, `webp`, `avif`, `md` and `txt` chips;
+`.mdx`/`.markdown` chips get none. **Open in browser** sends
+`pan.shellOpenInBrowser` with `browser: 'default-browser'`, which hands the
+`file://` URL to `xdg-open` / `open` / `explorer`; for non-HTML types the OS
+may pick a non-browser app for that type. One **Open in `<Browser>`** item
+appears for each browser the server detected at startup (Google Chrome,
+Chromium, Firefox, Brave, Microsoft Edge, Vivaldi): on Linux by command on
+`PATH`, on macOS by `/Applications/<App>.app`; Windows offers only **Open
+in browser**. The request uses `filePath`, never `targetPath`, and the
+browser opens on the machine that runs the dashboard server. Browser items
+do not change the persisted markdown open target.

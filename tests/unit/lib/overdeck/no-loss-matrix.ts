@@ -883,6 +883,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'pan.resizeTerminal',             kind: 'rpc', disposition: 'RELOCATE',    door: 'Terminal RPC (ws-terminal.ts)' },
   { surface: 'pan.shellOpenInEditor',          kind: 'rpc', disposition: 'OUT_OF_SCOPE', door: 'Shell editor open; outside 8 remodel domains' },
   { surface: 'pan.getAvailableEditors',        kind: 'rpc', disposition: 'OUT_OF_SCOPE', door: 'Editor discovery; outside 8 remodel domains' },
+  { surface: 'pan.shellOpenInBrowser',         kind: 'rpc', disposition: 'OUT_OF_SCOPE', door: 'Shell browser open (PAN-4762); outside 8 remodel domains' },
+  { surface: 'pan.getAvailableBrowsers',       kind: 'rpc', disposition: 'OUT_OF_SCOPE', door: 'Browser discovery (PAN-4762); outside 8 remodel domains' },
 
   // ══════════════════════════════════════════════════════════════════════════
   // CLI verbs (`pan <verb>`) — from issues.md Part-1 table (primary)
