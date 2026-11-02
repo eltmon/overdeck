@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4658",
   "created": "2026-11-02T04:25:38.183Z",
-  "updated": "2026-11-02T05:16:12.834Z",
+  "updated": "2026-11-02T05:16:40.561Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "cite-layer-resolver.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T05:16:12.834Z"
+    },
+    "pane-cite-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:16:40.561Z"
     }
   }
 }
