@@ -4,17 +4,17 @@
     "created": "2026-11-02T05:46:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4799: Merge train 'What to UAT' never finds member plans: xBRIEF lookup reads main, but specs live on unmerged feature branches",
-    "updated": "2026-11-02T05:57:57.885Z"
+    "updated": "2026-11-02T05:59:05.556Z"
   },
   "plan": {
     "id": "pan-4799",
     "title": "Merge train 'What to UAT' never finds member plans: xBRIEF lookup reads main, but specs live on unmerged feature branches",
-    "status": "proposed",
+    "status": "running",
     "uid": "fb2f6219-2cbd-4bd5-be1f-6c4a4754b051",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T05:46:12Z",
-    "updated": "2026-11-02T05:57:57.885Z",
+    "updated": "2026-11-02T05:59:05.556Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4799",
@@ -362,5 +362,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
