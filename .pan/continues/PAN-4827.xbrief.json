@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4827",
   "created": "2026-11-02T16:36:08.290Z",
-  "updated": "2026-11-02T19:06:57.073Z",
+  "updated": "2026-11-02T19:25:05.186Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-02T19:25Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-02T19:25:05.186Z"
+    }
+  ],
   "items": {
     "google-flash-lite-ga": {
       "status": "completed",
@@ -255,5 +261,14 @@
       "status": "completed",
       "doneAt": "2026-11-02T19:06:57.072Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-02T19:25:05Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4827\n\nPull request: https://github.com/eltmon/overdeck/pull/4858 (head `35e1f04b`)\n\nSource: check_run:test-shard (2/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (2/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/125495245204/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41508890122/job/125495245204  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/settings-model-catalog.test.ts\u001b[2m > \u001b[22mmodel catalog no-loss audit\u001b[2m > \u001b[22mpreserves every previous provider, ordered model, display name, price and effort field\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/settings-model-catalog.test.ts\u001b[2m > \u001b[22mmodel catalog no-loss audit\u001b[2m > \u001b[22mpreserves every previous provider, ordered model, display name, price and effort field\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected { Object (anthropic, openai, ...) } to deeply equal { Object (anthropic, openai, ...) }\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[33m@@ -103,89 +103,88 @@\u001b[39m\n\u001b[2m        \"name\": \"Claude Sonnet 4.6 (200K context)\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      {\u001b[22m\n\u001b[2m        \"contextWindow\": 200000,\u001b[22m\n\u001b[2m        \"costPer1MTokens\": 3,\u001b[22m\n\u001b[31m+       \"effortLevels\": undefined,\u001b[39m\n\u001b[2m        \"id\": \"claude-haiku-4-5\",\u001b[22m\n\u001b[2m        \"name\": \"Claude Haiku 4.5 (200K context)\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m    ],\u001b[22m\n\u001b[2m    \"dashscope\": [\u001b[22m\n\u001b[2m      {\u001b[22m\n\u001b[2m        \"contextWindow\": 1000000,\u001b[22m\n\u001b[2m        \"costPer1MTokens\": 1,\u001b[22m\n\u001b[31m+       \"effortLevels\": undefined,\u001b[39m\n\u001b[2m        \"id\": \"qwen3.7-plus\",\u001b[22m\n\u001b[2m        \"name\": \"Qwen3.7 Plus (1M context)\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      {\u001b[22m\n\u001b[2m        \"contextWindow\": 1000000,\u001b[22m\n\u001b[32m-       \"costPer1MTokens\": 0,\u001b[39m\n\u001b[31m+       \"costPer1MTokens\": 0.31,\u001b[39m\n\u001b[31m+       \"effortLevels\": undefined,\u001b[39m\n\u001b[2m        \"id\": \"qwen3.8-flash\",\u001b[22m\n\u001b[2m        \"name\": \"Qwen3.8 Flash (1M context)\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      {\u001b[22m\n\u001b[2m        \"contextWindow\": 262144,\u001b[22m\n\u001b[32m-       \"costPer1MTokens\": 0,\u001b[39m\n\u001b[32m-       \"id\": \"qwen3-max\",\u001b[39m\n\u001b[32m-       \"name\": \"Qwen3 Max (DashScope) (256K context)\",\u001b[39m\n\u001b[32m-     },\u001b[39m\n\u001b[32m-\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m554 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (556)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
