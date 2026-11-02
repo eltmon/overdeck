@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4739",
   "created": "2026-11-02T06:14:09.782Z",
-  "updated": "2026-11-02T06:42:43.817Z",
+  "updated": "2026-11-02T06:43:01.068Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "list-repair-door-test.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T06:42:43.817Z"
+    },
+    "repro-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:43:01.068Z"
     }
   }
 }
