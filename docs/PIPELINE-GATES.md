@@ -67,10 +67,16 @@ runs these steps in order. Each step that fails returns early with the named
 12. Run the plan checklist check (`checkIncompletePlanItems`) —
     `failedCheck: incomplete-plan-items`. It is skipped (`skipPlanChecklist`)
     for a strike merge, and for an adopted PR workspace whose journal has
-    `workspace.adopted` when no xBRIEF resolves for the issue (PAN-4786).
-    `runVerificationForIssue` decides this from workspace state on every run,
-    so retries and merge verification get the same answer. An adopted
-    workspace whose issue has an xBRIEF still runs the check.
+    `workspace.adopted` or `workspace.adoption-failed` when no xBRIEF resolves
+    for the issue (PAN-4786, PAN-4810). Only adoption writes either entry, so
+    both mean the PR came from outside the pipeline. `runVerificationForIssue`
+    decides this from workspace state on every run, so retries and merge
+    verification get the same answer. The worker decides it again at this
+    step: a review requested while adoption was still creating the workspace
+    is dispatched before `workspace.adopted` is journaled. A feedback-only
+    `.pan/continues/<id>.xbrief.json` written by a failed run is not a plan
+    (`findPlan` reads specs and drafts only). An adopted workspace whose issue
+    has an xBRIEF still runs the check.
 13. Run the empty-changeset guard, which catches a changeset that touched only
     `.pan/` task state — `failedCheck: empty-changeset`.
 14. On a full pass: post a success check run, lift any verification-stuck

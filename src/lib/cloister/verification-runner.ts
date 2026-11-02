@@ -47,7 +47,7 @@ import { postVerificationCheckRun } from './verification-check-run.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { appendPipelineEntry } from './pipeline-journal.js';
 import { resolveIssueFeedbackTarget } from './feedback-target.js';
-import { withAdoptedPlanChecklistSkip } from './adopted-plan-checklist.js';
+import { isAdoptedWorkspaceWithoutPlan, withAdoptedPlanChecklistSkip } from './adopted-plan-checklist.js';
 import { syncSingleRepo, syncWorkspaceRootsToPrHead, type SyncResult } from './workspace-pr-head-sync.js';
 import { messageAgent } from '../agents.js';
 import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
@@ -255,8 +255,7 @@ export async function runVerificationForIssueInProcess(
   const mergedOutcome = await skipMergedVerification(issueId, logPrefix);
   if (mergedOutcome) return mergedOutcome;
 
-  // PAN-4810: verify the PR head. Commits pushed from elsewhere move the
-  // workspace first; a refused move fails the sync check below.
+  // PAN-4810: verify the PR head; a refused move fails the sync check below.
   const prHeadFailures = options.syncTargetBranch === false ? [] : await syncWorkspaceRootsToPrHead(issueId, workspacePath, logPrefix);
 
   // PAN-3917: how many failed runs are already recorded against this exact
@@ -777,7 +776,8 @@ export async function runVerificationForIssueInProcess(
       return failedOutcome(failedCheck, newCycleCount);
     }
 
-    const taskBlockers = options.skipPlanChecklist
+    // PAN-4810: decided again here; adoption may journal its entry after this run was dispatched.
+    const taskBlockers = options.skipPlanChecklist || await isAdoptedWorkspaceWithoutPlan(workspacePath)
       ? []
       : await checkIncompletePlanItems(workspacePath, issueId);
     const postChecklistMergedOutcome = await skipMergedVerification(issueId, logPrefix);
