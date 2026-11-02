@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T16:52:53.578Z",
+  "updated": "2026-11-02T16:53:13.516Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -145,6 +145,10 @@
     "wi4-sweep-defers-to-reap.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T16:52:53.578Z"
+    },
+    "wi5-remote-prompt-workspace-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:53:13.516Z"
     }
   }
 }
