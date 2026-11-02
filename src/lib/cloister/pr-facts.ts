@@ -913,6 +913,8 @@ export interface MergeReadinessPolicy {
    * never counts. A GitLab approval is the forge's own and is taken as it is.
    */
   requireApprovalAtHead?: boolean;
+  /** PAN-4750: `false` waives approval entirely (operator-started strike merge only). */
+  requireApproval?: boolean;
 }
 
 /**
@@ -928,7 +930,9 @@ export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPol
   if (facts.closed) return { ready: false, reason: 'PR is closed' };
   if (facts.draft) return { ready: false, reason: 'PR is a draft' };
   if (facts.changesRequested) return { ready: false, reason: 'latest review requested changes' };
-  if (policy.requireApprovalAtHead && facts.forge === 'github') {
+  if (policy.requireApproval === false) {
+    // PAN-4750: no approval rule applies; every other check below still does.
+  } else if (policy.requireApprovalAtHead && facts.forge === 'github') {
     // PAN-4540: the reviews are read only for a green, mergeable PR
     // (withForgeApprovalAtHead), so an unproven approval on any other PR is a
     // missing read, not a missing review. Let the checks and mergeability
