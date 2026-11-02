@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, Loader2, Pause, Pencil, Play, Trash2, X } from 'lucide-react';
 import { presetToCron, SCHEDULE_PRESET_DAYS, type SchedulePreset } from '@overdeck/contracts';
 import { MenuItemButton } from '../shared/ContextMenu';
+import { formatLocalWhen } from '../CommandDeck/conversation-triage';
 import { useDashboardStore } from '../../lib/store';
 
 /**
@@ -115,16 +116,19 @@ interface ScheduleFormState {
   time: string;
   day: string;
   customCron: string;
+  timeZone: string;
 }
 
-const EMPTY_FORM: ScheduleFormState = { prompt: '', repeatMode: 'daily', time: '21:00', day: SCHEDULE_PRESET_DAYS[0], customCron: '' };
+function defaultForm(): ScheduleFormState {
+  return { prompt: '', repeatMode: 'daily', time: '09:00', day: SCHEDULE_PRESET_DAYS[0], customCron: '', timeZone: browserTimeZone() };
+}
 
 export function ConversationScheduleDialog({ conversationName, onClose }: { conversationName: string; onClose: () => void }) {
   const queryClient = useQueryClient();
-  const queryKey = ['conversation-schedules', conversationName];
+  const queryKey = ['conversation-schedules', conversationName] as const;
   const conversationsListRevision = useDashboardStore((s) => s.conversationsListRevision);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(defaultForm);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const promptRef = useRef<HTMLTextAreaElement>(null);
@@ -142,11 +146,14 @@ export function ConversationScheduleDialog({ conversationName, onClose }: { conv
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   useEffect(() => {
+    // PAN-4657 D14: refresh this dialog's own query when a sweep run (or any
+    // list event) bumps the revision. The global ['conversations'] query is
+    // ConversationList's job (it already invalidates on this same revision),
+    // so re-invalidating it here would refetch the whole list per keystroke.
     if (conversationsListRevision > 0) {
-      void queryClient.invalidateQueries({ queryKey });
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversation-schedules', conversationName] });
     }
-  }, [conversationsListRevision, queryClient, queryKey]);
+  }, [conversationsListRevision, conversationName, queryClient]);
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
@@ -164,12 +171,12 @@ export function ConversationScheduleDialog({ conversationName, onClose }: { conv
     }
   };
 
-  const resetForm = () => { setEditingId(null); setForm(EMPTY_FORM); };
+  const resetForm = () => { setEditingId(null); setForm(defaultForm()); };
 
   const submit = async () => {
     const result = buildScheduleCron(form.repeatMode, form.time, form.day, form.customCron);
     if (!result.ok) { setError(result.error); return; }
-    const body = { prompt: form.prompt.trim(), cron: result.cron, timeZone: browserTimeZone() };
+    const body = { prompt: form.prompt.trim(), cron: result.cron, timeZone: form.timeZone.trim() };
     const ok = editingId === null
       ? await run(async () => readJson(await fetch(schedulesUrl(conversationName), {
         method: 'POST',
@@ -187,7 +194,14 @@ export function ConversationScheduleDialog({ conversationName, onClose }: { conv
   const startEdit = (schedule: ConversationSchedule) => {
     setError(null);
     setEditingId(schedule.id);
-    setForm({ prompt: schedule.prompt, repeatMode: 'cron', time: EMPTY_FORM.time, day: EMPTY_FORM.day, customCron: schedule.cron });
+    setForm({
+      prompt: schedule.prompt,
+      repeatMode: 'cron',
+      time: '09:00',
+      day: SCHEDULE_PRESET_DAYS[0],
+      customCron: schedule.cron,
+      timeZone: schedule.timeZone,
+    });
     promptRef.current?.focus();
   };
 
@@ -229,7 +243,7 @@ export function ConversationScheduleDialog({ conversationName, onClose }: { conv
               className="min-h-16 w-full resize-y rounded-[var(--radius-sm)] border border-border bg-background px-2 py-1 text-[12px]"
               value={form.prompt}
               placeholder="Prompt to send on each occurrence"
-              aria-label="Prompt"
+              aria-label="Schedule prompt"
               onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))}
             />
             <div className="flex flex-wrap items-center gap-2">
@@ -269,6 +283,13 @@ export function ConversationScheduleDialog({ conversationName, onClose }: { conv
                   onChange={(e) => setForm((f) => ({ ...f, customCron: e.target.value }))}
                 />
               )}
+              <input
+                className="min-w-0 rounded-[var(--radius-sm)] border border-border bg-background px-2 py-1 text-[12px]"
+                value={form.timeZone}
+                placeholder="IANA time zone"
+                aria-label="Time zone"
+                onChange={(e) => setForm((f) => ({ ...f, timeZone: e.target.value }))}
+              />
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -296,44 +317,52 @@ export function ConversationScheduleDialog({ conversationName, onClose }: { conv
           ) : schedules.length === 0 ? (
             <div className="text-[12px] text-muted-foreground">No schedules yet.</div>
           ) : (
-            <ul className="flex flex-col gap-1.5" aria-label="Schedules list">
-              {schedules.map((schedule) => (
-                <li key={schedule.id} className="flex items-center gap-2 text-[12px]">
-                  <span className="min-w-0 flex-1 truncate" title={schedule.prompt}>{schedule.prompt}</span>
-                  <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{schedule.cron}</span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">{schedule.enabled ? 'active' : 'paused'}</span>
-                  <button
-                    type="button"
-                    className="shrink-0 rounded-[var(--radius-sm)] border border-border p-1 hover:bg-accent disabled:opacity-50"
-                    disabled={busy}
-                    onClick={() => { void togglePause(schedule); }}
-                    aria-label={schedule.enabled ? 'Pause' : 'Resume'}
-                    title={schedule.enabled ? 'Pause' : 'Resume'}
-                  >
-                    {schedule.enabled ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-                  </button>
-                  <button
-                    type="button"
-                    className="shrink-0 rounded-[var(--radius-sm)] border border-border p-1 hover:bg-accent disabled:opacity-50"
-                    disabled={busy}
-                    onClick={() => startEdit(schedule)}
-                    aria-label="Edit"
-                    title="Edit"
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </button>
-                  <button
-                    type="button"
-                    className="shrink-0 rounded-[var(--radius-sm)] border border-border p-1 hover:bg-accent disabled:opacity-50"
-                    disabled={busy}
-                    onClick={() => { void remove(schedule); }}
-                    aria-label="Delete"
-                    title="Delete"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </li>
-              ))}
+            <ul className="flex flex-col gap-1.5" aria-label="Schedules">
+              {schedules.map((schedule) => {
+                const next = schedule.enabled && schedule.nextRunAt ? `next ${formatLocalWhen(schedule.nextRunAt, new Date())}` : 'paused';
+                return (
+                  <li key={schedule.id} className="flex items-center gap-2 text-[12px]">
+                    <span className="min-w-0 flex-1 truncate" title={schedule.prompt}>{schedule.prompt}</span>
+                    <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{`${schedule.cron} · ${schedule.timeZone}`}</span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">{next}</span>
+                    {schedule.lastRunStatus && (
+                      <span className="shrink-0 text-[11px] text-muted-foreground" title={schedule.lastRunError ?? undefined}>
+                        {`last ${schedule.lastRunStatus}`}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-[var(--radius-sm)] border border-border p-1 hover:bg-accent disabled:opacity-50"
+                      disabled={busy}
+                      onClick={() => { void togglePause(schedule); }}
+                      aria-label={schedule.enabled ? `Pause schedule ${schedule.id}` : `Resume schedule ${schedule.id}`}
+                      title={schedule.enabled ? 'Pause' : 'Resume'}
+                    >
+                      {schedule.enabled ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                    </button>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-[var(--radius-sm)] border border-border p-1 hover:bg-accent disabled:opacity-50"
+                      disabled={busy}
+                      onClick={() => startEdit(schedule)}
+                      aria-label={`Edit schedule ${schedule.id}`}
+                      title="Edit"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-[var(--radius-sm)] border border-border p-1 hover:bg-accent disabled:opacity-50"
+                      disabled={busy}
+                      onClick={() => { void remove(schedule); }}
+                      aria-label={`Delete schedule ${schedule.id}`}
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

@@ -101,12 +101,13 @@ describe('ScheduleMenuItem', () => {
 });
 
 describe('ConversationScheduleDialog (PAN-4657)', () => {
-  it('creates a daily schedule with the browser time zone', async () => {
+  it('creates a daily schedule defaulting Time zone to the browser zone', async () => {
     renderHostWith({ schedules: [] });
     act(() => openScheduleDialog('conv-a'));
     await screen.findByRole('dialog', { name: 'Schedules' });
 
-    fireEvent.change(screen.getByLabelText('Prompt'), { target: { value: 'Summarize the day' } });
+    expect(screen.getByLabelText('Time zone')).toHaveValue(BROWSER_ZONE);
+    fireEvent.change(screen.getByLabelText('Schedule prompt'), { target: { value: 'Summarize the day' } });
     fireEvent.change(screen.getByLabelText('Repeat'), { target: { value: 'daily' } });
     fireEvent.change(screen.getByLabelText('Time'), { target: { value: '21:00' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create schedule' }));
@@ -114,6 +115,23 @@ describe('ConversationScheduleDialog (PAN-4657)', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(BASE, expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ prompt: 'Summarize the day', cron: '0 21 * * *', timeZone: BROWSER_ZONE }),
+    })));
+  });
+
+  it('creates a schedule with a typed time zone', async () => {
+    renderHostWith({ schedules: [] });
+    act(() => openScheduleDialog('conv-a'));
+    await screen.findByRole('dialog', { name: 'Schedules' });
+
+    fireEvent.change(screen.getByLabelText('Schedule prompt'), { target: { value: 'Summarize the day' } });
+    fireEvent.change(screen.getByLabelText('Repeat'), { target: { value: 'daily' } });
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '21:00' } });
+    fireEvent.change(screen.getByLabelText('Time zone'), { target: { value: 'America/New_York' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create schedule' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(BASE, expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ prompt: 'Summarize the day', cron: '0 21 * * *', timeZone: 'America/New_York' }),
     })));
   });
 
@@ -136,34 +154,52 @@ describe('ConversationScheduleDialog (PAN-4657)', () => {
     });
     renderHost();
     act(() => openScheduleDialog('conv-a'));
-    await screen.findByRole('list', { name: 'Schedules list' });
+    await screen.findByRole('list', { name: 'Schedules' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pause schedule 3' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`${BASE}/3`, expect.objectContaining({
       method: 'PATCH', body: JSON.stringify({ enabled: false }),
     })));
-    await screen.findByRole('button', { name: 'Resume' });
+    await screen.findByRole('button', { name: 'Resume schedule 3' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Resume schedule 3' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`${BASE}/3`, expect.objectContaining({
       method: 'PATCH', body: JSON.stringify({ enabled: true }),
     })));
-    await screen.findByRole('button', { name: 'Pause' });
+    await screen.findByRole('button', { name: 'Pause schedule 3' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete schedule 3' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`${BASE}/3`, { method: 'DELETE' }));
     await waitFor(() => expect(screen.getByText('No schedules yet.')).toBeInTheDocument());
   });
 
-  it('pre-fills Cron expression on Edit and saves with PATCH, showing a 400 error as an alert', async () => {
-    renderHostWith({ schedules: [schedule(3, { prompt: 'Evening wrap-up', cron: '0 20 * * *' })] });
+  it('shows the cron, time zone, next run and last outcome on each row', async () => {
+    renderHostWith({
+      schedules: [
+        schedule(3),
+        schedule(4, { enabled: false, lastRunStatus: 'failed', lastRunError: 'Waiting: permission answer needed' }),
+      ],
+    });
     act(() => openScheduleDialog('conv-a'));
-    await screen.findByRole('list', { name: 'Schedules list' });
+    const list = await screen.findByRole('list', { name: 'Schedules' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(list).toHaveTextContent('0 21 * * * · UTC');
+    expect(list).toHaveTextContent('last failed');
+    const failedLine = screen.getByText('last failed');
+    expect(failedLine).toHaveAttribute('title', 'Waiting: permission answer needed');
+    expect(list).toHaveTextContent('paused');
+  });
+
+  it('pre-fills Cron expression and Time zone on Edit, saves with PATCH keeping the stored zone, and shows a 400 error as an alert', async () => {
+    renderHostWith({ schedules: [schedule(3, { prompt: 'Evening wrap-up', cron: '0 20 * * *', timeZone: 'UTC' })] });
+    act(() => openScheduleDialog('conv-a'));
+    await screen.findByRole('list', { name: 'Schedules' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit schedule 3' }));
     expect(screen.getByLabelText('Repeat')).toHaveValue('cron');
     expect(screen.getByLabelText('Cron expression')).toHaveValue('0 20 * * *');
-    expect(screen.getByLabelText('Prompt')).toHaveValue('Evening wrap-up');
+    expect(screen.getByLabelText('Schedule prompt')).toHaveValue('Evening wrap-up');
+    expect(screen.getByLabelText('Time zone')).toHaveValue('UTC');
 
     fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => {
       if (init?.method === 'PATCH') return Response.json({ error: 'Schedules must be at least 15 minutes apart' }, { status: 400 });
@@ -173,7 +209,7 @@ describe('ConversationScheduleDialog (PAN-4657)', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`${BASE}/3`, expect.objectContaining({
       method: 'PATCH',
-      body: JSON.stringify({ prompt: 'Evening wrap-up', cron: '0 20 * * *', timeZone: BROWSER_ZONE }),
+      body: JSON.stringify({ prompt: 'Evening wrap-up', cron: '0 20 * * *', timeZone: 'UTC' }),
     })));
     expect(await screen.findByRole('alert')).toHaveTextContent('Schedules must be at least 15 minutes apart');
   });

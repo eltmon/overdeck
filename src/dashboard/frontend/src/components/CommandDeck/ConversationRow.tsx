@@ -381,7 +381,7 @@ export function ConversationRow({
       extraCount={Math.max(0, (conv.pullRequestCount ?? 1) - 1)}
     />
   ) : null;
-  const scheduleCount = conv.scheduleCount ?? 1;
+  const scheduleCount = conv.scheduleCount ?? 0;
   const scheduleBadgeLabel = conv.nextScheduledRunAt
     ? `${scheduleCount} active schedule${scheduleCount === 1 ? '' : 's'} · next run ${new Date(conv.nextScheduledRunAt).toLocaleString()}`
     : '';

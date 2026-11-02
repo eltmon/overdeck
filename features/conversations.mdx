@@ -375,7 +375,10 @@ conversation's schedules without the CLI. The dialog lists every schedule and
 lets you create, edit, pause, resume, or delete one. Repeat offers Hourly,
 Daily, Weekdays, Weekly, and Custom cron; Custom cron takes the same 5-field
 expression `--cron` does, and editing a schedule always pre-fills Custom cron
-with its stored expression so the raw cron is never lost on save.
+with its stored expression so the raw cron is never lost on save. Time zone
+is its own field, defaulting to the browser's zone for a new schedule;
+editing a schedule keeps its stored zone instead of overwriting it with the
+browser's, so an edit never silently shifts when the schedule fires.
 
 A conversation with at least one active (non-paused) schedule shows a
 next-run badge on its row, naming its active schedule count and the soonest
@@ -383,8 +386,7 @@ run time; a conversation whose schedules are all paused, or that has none,
 shows no badge.
 
 A delivered run also returns the conversation to Inbox: it clears any settle
-or snooze, the same way answering a pending question does, so a scheduled
-check-in is never buried in Snoozed or Settled.
+or snooze, so a scheduled check-in is never buried in Snoozed or Settled.
 
 ## Why hand off?
 
@@ -890,8 +892,8 @@ it off. Conversations also settle themselves when their pull requests merge
 [Pull requests on conversations](#pull-requests-on-conversations).
 
 A [scheduled run](#scheduled-runs) delivering its prompt also clears any
-settle or snooze on that conversation, the same as an answered question —
-settling or snoozing never buries a conversation past its next scheduled run.
+settle or snooze on that conversation — settling or snoozing never buries a
+conversation past its next scheduled run.
 
 ## Stopping or archiving a conversation
 
