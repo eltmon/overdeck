@@ -1,0 +1,103 @@
+{
+  "version": "1",
+  "issueId": "PAN-4682",
+  "created": "2026-11-02T03:20:08.527Z",
+  "updated": "2026-11-02T03:37:20.181Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "provider-default-image": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4682",
+      "claimedAt": "2026-11-02T03:20:08.526Z",
+      "doneAt": "2026-11-02T03:22:20.087Z"
+    },
+    "provision-default-image": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4682",
+      "claimedAt": "2026-11-02T03:22:29.532Z",
+      "doneAt": "2026-11-02T03:24:09.652Z"
+    },
+    "remote-setup-omit-image": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4682",
+      "claimedAt": "2026-11-02T03:24:15.786Z",
+      "doneAt": "2026-11-02T03:25:29.680Z"
+    },
+    "add-fly-image-help": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4682",
+      "claimedAt": "2026-11-02T03:25:34.808Z",
+      "doneAt": "2026-11-02T03:26:52.314Z"
+    },
+    "fly-provider-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4682",
+      "claimedAt": "2026-11-02T03:26:57.456Z",
+      "doneAt": "2026-11-02T03:31:57.762Z"
+    },
+    "provider-default-image.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:33:11.516Z"
+    },
+    "provider-default-image.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:33:29.953Z"
+    },
+    "provider-default-image.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:33:48.399Z"
+    },
+    "provider-default-image.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:34:06.511Z"
+    },
+    "provision-default-image.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:34:24.538Z"
+    },
+    "provision-default-image.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:34:41.214Z"
+    },
+    "provision-default-image.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:34:57.396Z"
+    },
+    "remote-setup-omit-image.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:35:14.661Z"
+    },
+    "remote-setup-omit-image.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:35:32.891Z"
+    },
+    "add-fly-image-help.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:35:52.255Z"
+    },
+    "add-fly-image-help.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:36:10.895Z"
+    },
+    "add-fly-image-help.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:36:29.695Z"
+    },
+    "fly-provider-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:36:46.345Z"
+    },
+    "fly-provider-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:37:03.154Z"
+    },
+    "fly-provider-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:37:20.181Z"
+    }
+  }
+}

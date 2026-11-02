@@ -182,7 +182,10 @@ agent shows a row only when a `state.json` exists (dashboard spawn or after the
 reap). Remote agents have no local tmux session — never assume tmux discovery
 covers them. PAN-4652 adds **Fly machines**: Fly VMs that run `pan serve` and
 are linked from home (`src/lib/anywhere/fly/`, `services/fly-machine-service.ts`,
-`pan machines add-fly`); PAN-4734 moves work agents onto that path.
+`pan machines add-fly`); PAN-4734 moves work agents onto that path. The default
+image is `registry.fly.io/<app>:latest` (`defaultFlyImage()` in `fly-provider.ts`,
+used by both `FlyProvider` and `provisionFlyMachine`), because the Fly registry is
+app-scoped (PAN-4682).
 
 ## Dashboard Agents page (`/agents`)
 
@@ -298,4 +301,4 @@ Owner side: `routes/machines-work.ts` (the `/api/machines/work/*` doors: convers
 
 Gauntlet lanes across machines (PAN-4638): home keeps the run rules in `src/lib/lanes/launch.ts` (`deps.remote` / `resolveMachine`) over `src/lib/lanes/lane-rows.ts` (`listAllLaneRows`: local lane rows plus stand-ins, cwd key `<environmentId>:<cwd>`) and `src/lib/lanes/remote-lanes.ts` (the stand-in store `~/.overdeck/remote-lanes/<name>/{lane,mirror,archived}.json` and the `lane-link.json` critic sidecar); `routes/lanes.ts` resolves `machine` and adds `POST /api/lanes/:name/stop` and the remote reap; `services/remote-lane-follower.ts` mirrors the owner's status and reports. Owner side: `routes/machines-work-lanes.ts` (`/api/machines/work/lanes`, `…/:name/status`, `…/:name/reap`) runs `src/lib/lanes/owner-launch.ts` (`launchOwnedLane`). Views, pairing (by name) and waits: `src/lib/lanes/views.ts`, `pairing.ts`, `wait.ts`; nesting: `src/lib/overdeck/linked-conversations-merge.ts` (`remoteLanes`). CLI: `cli/commands/lane.ts`. Docs: `reference/lanes.mdx` "Lanes on other machines", `docs/ANYWHERE-ARCHITECTURE.md` "Gauntlet lanes across machines".
 
-<!-- last-verified: 2026-11-02 (PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759, PAN-4655) -->
+<!-- last-verified: 2026-11-02 (PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759, PAN-4682, PAN-4655) -->

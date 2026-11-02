@@ -1410,3 +1410,11 @@ URL. The payload contract is `{ title, body, url, tag }`, where `url` is a
 same-origin path: `/m?subject=<encodeURIComponent(id)>` for questions and
 approvals, `/m` for everything else. A click focuses an open window and
 navigates it to `url`, else opens one; a cross-origin `url` becomes `/m`.
+
+**The phone pipeline tab (PAN-4661).** The shell adds the routes
+`/m/pipeline` and `/m/pipeline?issue=<id>`; `App.tsx` matches those two paths
+exactly, never a `/m/` prefix. The tab reads `selectIssues`,
+`derivedIssueStateByIssueId` and `selectAgents` from the store `EventRouter`
+fills, and groups with `groupPipelineIssues` in `lib/pipeline-state.ts`,
+which the desktop `PipelineView` shares — one definition of "active issue",
+one phase order, one sort. It adds no API route and no HTTP request.

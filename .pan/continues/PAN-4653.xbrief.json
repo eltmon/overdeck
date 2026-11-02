@@ -1,0 +1,185 @@
+{
+  "version": "1",
+  "issueId": "PAN-4653",
+  "created": "2026-11-02T03:31:51.838Z",
+  "updated": "2026-11-02T04:30:46.802Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "override-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4653",
+      "claimedAt": "2026-11-02T03:31:51.838Z",
+      "doneAt": "2026-11-02T03:40:14.025Z"
+    },
+    "global-setting": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4653",
+      "claimedAt": "2026-11-02T03:40:26.315Z",
+      "doneAt": "2026-11-02T03:42:41.382Z"
+    },
+    "sweep-settles": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4653",
+      "claimedAt": "2026-11-02T03:42:51.171Z",
+      "doneAt": "2026-11-02T03:47:38.335Z"
+    },
+    "setting-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4653",
+      "claimedAt": "2026-11-02T03:47:42.538Z",
+      "doneAt": "2026-11-02T03:49:04.360Z"
+    },
+    "settings-toggle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4653",
+      "claimedAt": "2026-11-02T03:49:09.193Z",
+      "doneAt": "2026-11-02T03:51:22.260Z"
+    },
+    "cli-verbs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4653",
+      "claimedAt": "2026-11-02T03:51:29.038Z",
+      "doneAt": "2026-11-02T03:59:21.638Z"
+    },
+    "menu-override": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4653",
+      "claimedAt": "2026-11-02T03:59:28.299Z",
+      "doneAt": "2026-11-02T04:02:59.363Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4653",
+      "claimedAt": "2026-11-02T04:03:05.199Z",
+      "doneAt": "2026-11-02T04:03:58.130Z"
+    },
+    "override-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:20:31.474Z"
+    },
+    "override-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:20:51.287Z"
+    },
+    "override-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:21:12.684Z"
+    },
+    "override-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:21:38.505Z"
+    },
+    "override-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:21:59.366Z"
+    },
+    "global-setting.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:22:18.834Z"
+    },
+    "global-setting.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:22:40.545Z"
+    },
+    "sweep-settles.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:23:00.549Z"
+    },
+    "sweep-settles.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:23:19.653Z"
+    },
+    "sweep-settles.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:23:37.670Z"
+    },
+    "sweep-settles.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:23:55.828Z"
+    },
+    "sweep-settles.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:24:12.505Z"
+    },
+    "setting-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:24:29.710Z"
+    },
+    "setting-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:24:49.979Z"
+    },
+    "setting-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:25:09.910Z"
+    },
+    "setting-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:25:32.370Z"
+    },
+    "settings-toggle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:26:03.781Z"
+    },
+    "settings-toggle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:26:33.072Z"
+    },
+    "settings-toggle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:26:52.966Z"
+    },
+    "settings-toggle.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:27:11.810Z"
+    },
+    "cli-verbs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:27:30.732Z"
+    },
+    "cli-verbs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:27:50.621Z"
+    },
+    "cli-verbs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:28:10.458Z"
+    },
+    "cli-verbs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:28:31.347Z"
+    },
+    "menu-override.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:28:49.412Z"
+    },
+    "menu-override.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:29:06.778Z"
+    },
+    "menu-override.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:29:25.134Z"
+    },
+    "menu-override.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:29:42.556Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:30:01.500Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:30:25.430Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:30:46.801Z"
+    }
+  }
+}

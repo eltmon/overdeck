@@ -64,8 +64,9 @@ src/components/Settings/anywhere/__tests__/TriggersPanel.test.tsx
 src/components/Settings/anywhere/__tests__/TailscalePeersPanel.test.tsx
 src/components/Settings/anywhere/__tests__/TailscalePhoneQr.test.tsx
 src/components/Settings/anywhere/__tests__/TailscaleSetupDialog.test.tsx
-src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx
+src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
+src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
 src/components/Settings/sections/__tests__/CloseOutSection.test.tsx
 src/components/Settings/sections/__tests__/TelemetrySection.test.tsx
 src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx
@@ -131,7 +132,9 @@ src/components/home/__tests__/useTypeToFocus.test.tsx
 src/components/merge-train/__tests__/MergeTrainView.test.tsx
 src/components/mobile/__tests__/MobileApp.test.tsx
 src/components/mobile/__tests__/MobileConversations.test.tsx
+src/components/mobile/__tests__/MobileIssueSheet.test.tsx
 src/components/mobile/__tests__/MobileNeedsYou.test.tsx
+src/components/mobile/__tests__/MobilePipeline.test.tsx
 src/components/newConversation/__tests__/ConversationSkillsField.test.tsx
 src/components/newConversation/__tests__/IssuePickerField.test.tsx
 src/components/newConversation/__tests__/MachineField.test.tsx
@@ -183,6 +186,7 @@ src/lib/__tests__/useDecisions.fleet.test.tsx
 src/lib/__tests__/useDecisions.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts
 src/lib/decisionContext.test.ts
+src/lib/pipeline-state.test.ts
 src/lib/sessionOutcome.test.ts
 src/lib/simple/uiMode.test.ts
 src/lib/simple/useSimpleActions.test.tsx

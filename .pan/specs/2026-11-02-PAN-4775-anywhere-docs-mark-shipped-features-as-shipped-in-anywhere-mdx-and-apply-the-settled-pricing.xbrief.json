@@ -1,0 +1,441 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T03:22:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4775: Anywhere docs: mark shipped features as shipped in anywhere.mdx and apply the settled pricing",
+    "updated": "2026-11-02T03:24:45.163Z"
+  },
+  "plan": {
+    "id": "pan-4775",
+    "title": "Anywhere docs: mark shipped features as shipped in anywhere.mdx and apply the settled pricing",
+    "status": "running",
+    "uid": "54aba28a-09ef-4b26-b376-1b3e605a8fa0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T03:22:00Z",
+    "updated": "2026-11-02T03:24:45.163Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4775",
+        "label": "PAN-4775",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/.pan/drafts/pan-2350.md",
+        "label": "PAN-2350 PRD (W-DOC, OD-3)",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "docs",
+      "anywhere",
+      "pricing",
+      "mintlify"
+    ],
+    "narratives": {
+      "Problem": "The Overdeck Anywhere release merged to main after v0.72.0, but anywhere.mdx (the 'Plans and pricing' page) still calls most of it planned: the top note, the 'What has shipped' table, and the 'One Overdeck server per machine', notifications and Fly roadmap steps. Its pricing reasoning predates OD-3 (relay and push costs 'not modeled', 'at launch only the vault exists', no reasons for the free directory or the relay cap). .pan/drafts/pan-2356.md lacks the supersede header W-DOC requires.",
+      "Proposal": "Edit anywhere.mdx in four sequential slices (note and Plans; shipped table; roadmap steps; pricing reasoning) using the exact replacement text in .pan/drafts/pan-4775.md, plus one independent slice adding the supersede header to pan-2356.md. Shipped status was verified against git tags at planning time; every post-v0.72.0 feature says 'next release'. Unshipped items (hosted vault, billing, Shared Sessions, Hermes, hosted compute, PAN-4734, PAN-1676) stay labeled planned.",
+      "NonGoals": "- Fixing pre-existing mint broken-links findings in vision.mdx, cli/agent-commands.mdx or configuration/linked-machines.mdx (PAN-4779)\n- Editing any docs page other than anywhere.mdx, including session-vault.mdx's stale 'v0.65.0' line and remote-access.mdx 'What comes next'\n- Adding Anywhere entries to changelog.mdx's v0.73.0 Upcoming block\n- Changing any price, tier or limit beyond OD-3 and the 2026-09-28 decision\n- Adding supersede headers to pan-2352.md, pan-2355.md or pan-3513.md, or editing pan-2350.md\n- Removing the accurate v0.64.0 and v0.65.0 table rows\n- Renumbering accordions 1-9\n- Writing a version number for features not in a release tag"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep the v0.64.0 and v0.65.0 rows of the shipped table and add a v0.65.0 row for Continue on another device (PAN-4455)",
+        "rationale": "W-DOC calls them stale, but every row's PR is contained in tag v0.65.0 and listed in changelog.mdx under v0.65.0; deleting accurate history would make the table wrong."
+      },
+      {
+        "summary": "Keep the free account's 1 GB hosted vault on 2 machines, labeled planned, beside the directory's 3 machines",
+        "rationale": "OD-3 lists only the directory for the free account, but pan-2350.md says the 2026-09-28 decision (1 GB, 2 machines) is carried over unchanged, and accordions 2 and 8 depend on it; separate nouns avoid a contradiction."
+      },
+      {
+        "summary": "Add the Hermes bridge (PAN-2353) as a 'Still planned' line in a new 'Webhook triggers and the MCP server' roadmap step",
+        "rationale": "The issue says keep Hermes planned, but the page never mentions it; external-agent access belongs with triggers and MCP."
+      },
+      {
+        "summary": "Retitle the Fly step 'Fly VMs as machines', mark it shipped via PAN-4652/PAN-4638, and list PAN-4734 and PAN-1676 as still planned",
+        "rationale": "PAN-4652 merged; PAN-1775 and PAN-1676 are still open, so linking them as shipped would be wrong; PAN-4734 replaces PAN-1775."
+      },
+      {
+        "summary": "Drop the PAN-2352 (Cloudflare Tunnel) link from the notifications step and link PAN-1254 instead",
+        "rationale": "PAN-2352 closed as superseded by Tailscale Serve, which is how remote access shipped."
+      },
+      {
+        "summary": "Append the two new OD-3 reasoning accordions as 10 and 11 instead of renumbering",
+        "rationale": "Renumbering 1-9 churns the diff with no reader benefit."
+      },
+      {
+        "summary": "pan-2356.md header copies the sibling first sentence and adapts the second ('Kept as the record of how PAN-2356 was built')",
+        "rationale": "The issue requires the header, but pan-2356.md is already rebaselined, so the sibling text 'until rebaselined' would be false."
+      },
+      {
+        "summary": "Scope the Mintlify link-check acceptance to anywhere.mdx and file PAN-4779 for the pre-existing failures",
+        "rationale": "mint broken-links exits 1 on main today because of vision.mdx and two parse errors in pages this issue does not own."
+      }
+    ],
+    "items": [
+      {
+        "id": "w1-note-and-plans",
+        "title": "Rewrite the top note, frontmatter description and Plans section of anywhere.mdx to OD-3",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:22:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4775",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "sed -n 1,20p anywhere.mdx",
+            "grep -n 'Tailscale Funnel\\|&#36;13 a month\\|&#36;126 a year\\|invite-allowlisted' anywhere.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed' and exits 0",
+            "the Note names PAN-4294 and invite-allowlisted accounts",
+            "grep prints the Self-hosted Funnel bullet, the relay combined prices and the Availability paragraph"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4775.md work item W1 exactly: replace the frontmatter description (line 4), the top <Note> (lines 7-11), the Self-hosted, Free account and Anywhere card bullet lists, the relay add-on paragraph (add the combined prices and a new **Availability:** paragraph), the extra-storage paragraph, and the third bullet of 'What stays free and open source' (split into two bullets). Founding card unchanged. Write every dollar sign as &#36;. Commit with trailer 'Item: w1-note-and-plans'."
+        },
+        "items": [
+          {
+            "id": "w1-note-and-plans.ac1",
+            "title": "Given anywhere.mdx after this item, when `sed -n 1,16p anywhere.mdx` runs, then it renders a frontmatter description without the word 'planned' and a <Note> that names PAN-4294 and says the paid tiers are available to invite-allowlisted accounts until billing ships",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-note-and-plans.ac2",
+            "title": "Given the Plans section, when grepped, then the Self-hosted card lists 'Tailscale Funnel', 'push notifications' and 'MCP server', and the Free account card lists 'up to 3 machines' and labels the 1 GB hosted vault '(planned)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-note-and-plans.ac3",
+            "title": "Given the relay add-on paragraph, when read, then it states +&#36;3 a month or +&#36;30 a year, '&#36;13 a month or &#36;126 a year in all', the 50 GB monthly cap and the one-time &#36;3 purchase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-note-and-plans.ac4",
+            "title": "Given 'What stays free and open source', when read, then it contains a bullet for linked, SSH and Fly machines with Tailscale setup, and a bullet for webhook triggers, push notifications and the MCP server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-note-and-plans.ac5",
+            "title": "Given the edited file, when `npm run lint:docs` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-shipped-table",
+        "title": "Add the shipped Anywhere features to the 'What has shipped' table in anywhere.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:22:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4775",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '| next release |' anywhere.mdx",
+            "grep -c '| v0.65.0 |' anywhere.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "first grep prints 20",
+            "second grep prints 6",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4775.md work item W2 exactly: keep the 7 existing v0.64.0/v0.65.0 rows and the 4 directory rows, insert the v0.65.0 'Continue on another device' row after the scoped API tokens row, and append the 16 'next release' rows in the listed order. Run the anchor grep commands in W2 first; if a heading no longer matches, link the page without the anchor. Commit with trailer 'Item: w2-shipped-table'."
+        },
+        "items": [
+          {
+            "id": "w2-shipped-table.ac1",
+            "title": "Given the table after this item, when `grep -c '| next release |' anywhere.mdx` runs, then it prints 20",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-shipped-table.ac2",
+            "title": "Given the table, when `grep -c '| v0.65.0 |' anywhere.mdx` runs, then it prints 6 and the new v0.65.0 row links /configuration/remote-access#open-one-conversation-on-another-screen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-shipped-table.ac3",
+            "title": "Given each of the 16 new rows, when its link is followed, then it resolves to an existing page from the PRD 'Verified facts' table (linked-machines, lanes, cli/machines, remote-access, tailscale, phone, push-notifications, triggers, mcp, cli/account, session-vault) and every #anchor matches a heading on that page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-roadmap-steps",
+        "title": "Mark the shipped Roadmap steps as shipped in anywhere.mdx and add the triggers and MCP step",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:22:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4775",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Partly shipped\\|PAN-2352\\|PAN-1775' anywhere.mdx",
+            "grep -n 'Shipped (next release)' anywhere.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "first grep prints nothing",
+            "second grep prints 4 lines, one per shipped step",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4775.md work item W3 exactly: replace the 'One Overdeck server per machine' step (retitled '... , linked'), the notifications step and the Fly step (retitled 'Fly VMs as machines'); insert the new 'Webhook triggers and the MCP server' step after the Fly step; rewrite the status line, first paragraph and issue links of 'Hosted services on overdeck.ai' while keeping its FSL paragraph unchanged. Steps 'Session Vault, Phase A' and 'Hosted agent capacity' stay unchanged. Commit with trailer 'Item: w3-roadmap-steps'."
+        },
+        "items": [
+          {
+            "id": "w3-roadmap-steps.ac1",
+            "title": "Given the Roadmap after this item, when `grep -n 'Partly shipped\\|PAN-2352\\|PAN-1775' anywhere.mdx` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-roadmap-steps.ac2",
+            "title": "Given the steps titled 'One Overdeck server per machine, linked', 'Notifications, remote access and a mobile web app', 'Fly VMs as machines' and 'Webhook triggers and the MCP server', when `grep -n 'Shipped (next release)' anywhere.mdx` runs, then it prints one line inside each of those four steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-roadmap-steps.ac3",
+            "title": "Given the Fly step and the triggers step, when the file is grepped, then each contains a 'Still planned' line that links PAN-4734 and PAN-1676 (Fly) or PAN-2353 (triggers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-roadmap-steps.ac4",
+            "title": "Given the 'Hosted services on overdeck.ai' step, when read, then it says billing, the hosted Session Vault and shared sessions are planned, links PAN-4294, PAN-4297, PAN-658 and PAN-4473, and keeps the FSL-1.1-MIT paragraph unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-pricing-reasoning",
+        "title": "Apply OD-3 to the pricing reasoning accordions and 'What we still need to learn' in anywhere.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:22:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4775",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'not modeled yet\\|At launch only the vault exists\\|What the relay costs to run per user' anywhere.mdx",
+            "grep -n -i planned anywhere.mdx",
+            "npm run lint:docs",
+            "timeout 300 npx --yes mint@4 broken-links  # downloads mint@4; run with a Bash timeout of at least 300000 ms"
+          ],
+          "expected_outputs": [
+            "first grep prints nothing",
+            "every 'planned' hit is about the hosted vault, billing, shared sessions, Hermes, hosted agent capacity, PAN-4734 or PAN-1676",
+            "lint:docs exits 0",
+            "broken-links output names no broken link and no parse error in anywhere.mdx (it may still exit 1 on other pages' pre-existing findings tracked in PAN-4779)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4775.md work item W4 exactly: add the &#36;13 and &#36;126 rows to accordion 3's fee table, replace accordion 4's second paragraph and accordion 6's last paragraph, append accordions 10 and 11 before </AccordionGroup>, and replace the relay-cost bullet in 'What we still need to learn'. This is the last anywhere.mdx item, so also run the whole-page checks (AC-5 and AC-7 of the PRD). Commit with trailer 'Item: w4-pricing-reasoning'. `npx --yes mint@4 broken-links` downloads the Mintlify CLI and takes up to about 3 minutes: run it with a Bash timeout of at least 300000 ms."
+        },
+        "items": [
+          {
+            "id": "w4-pricing-reasoning.ac1",
+            "title": "Given anywhere.mdx after this item, when `grep -n 'not modeled yet\\|At launch only the vault exists\\|What the relay costs to run per user' anywhere.mdx` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-pricing-reasoning.ac2",
+            "title": "Given the accordion group, when read, then it renders accordions titled '10. Why the directory is free for three machines' and '11. Why the relay is an add-on with a hard cap', and accordion 3's table has rows for '&#36;13 a month' (&#36;0.91, 7.0%) and '&#36;126 a year' (&#36;5.31, 4.2%)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-pricing-reasoning.ac3",
+            "title": "Given the whole page, when `grep -n -i planned anywhere.mdx` runs, then every printed line is about the hosted Session Vault, billing, shared sessions, the Hermes bridge, hosted agent capacity, PAN-4734 or PAN-1676",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-pricing-reasoning.ac4",
+            "title": "Given the whole page, when `npm run lint:docs` runs, then it exits 0, and when `npx --yes mint@4 broken-links` runs, then its output names no broken link or parse error in anywhere.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-supersede-header",
+        "title": "Add the supersede header to .pan/drafts/pan-2356.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:22:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4775",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/pan-2356.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "head -3 .pan/drafts/pan-2356.md",
+            "git diff --stat origin/main -- .pan/drafts/pan-2356.md"
+          ],
+          "expected_outputs": [
+            "line 1 starts with '> **Superseded by [pan-2350.md](pan-2350.md)**' and line 3 is the original '# PAN-2356 — Directory and relay service:' title",
+            "diff stat shows 2 insertions and 0 deletions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/pan-4775.md work item W5 exactly: insert the header line from the PRD and one blank line before line 1 of .pan/drafts/pan-2356.md. Change nothing else. Commit with trailer 'Item: w5-supersede-header'."
+        },
+        "items": [
+          {
+            "id": "w5-supersede-header.ac1",
+            "title": "Given .pan/drafts/pan-2356.md after this item, when `head -1` runs, then it prints a line starting '> **Superseded by [pan-2350.md](pan-2350.md)**' that contains 'Kept as the record of how PAN-2356 was built'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-supersede-header.ac2",
+            "title": "Given the same file, when `sed -n 3p` runs, then it prints the original '# PAN-2356 — Directory and relay service:' title, and `git diff origin/main` shows only 2 added lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-note-and-plans",
+        "to": "w2-shipped-table",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-shipped-table",
+        "to": "w3-roadmap-steps",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-roadmap-steps",
+        "to": "w4-pricing-reasoning",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4775-anywhere-docs-mark-shipped-features-as-shipped-in-anywhere-mdx-and-apply-the-settled-pricing.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

@@ -1,15 +1,14 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T03:26:46.872141Z · model: claude-opus-5-5 · open: 876_
+_Last sequenced: 2026-11-02T04:47:31.528157Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 1 | PAN-4767 | S | critical | ok |  |  | Main is red: styleguide-conformance e2e spec times out since the Skills page redesign changed index.css; blocks every merge. |
-| 2 | PAN-4752 | S | high | ok |  |  | In-pipeline: Flywheel board shows strike workspaces as bogus PAN-<n>-STRIKE rows; map them to the base issue and strike PR. |
+| 2 | PAN-4786 | S | critical | ok |  |  | Adopted PRs fail incomplete-plan-items (no xBRIEF); blocks handoff PRs #4780/#4783. Narrower overlap of PAN-4636. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
-| 4 | PAN-4751 | S | medium | ok |  |  | In-pipeline: make the Flywheel NEEDS YOU banner reopen the pending AskUserQuestion dialog or jump to the conversation. |
 | 5 | PAN-4750 | M | critical | ok |  |  | Strike merge door requires head approval strikes never get; 5 green strike PRs unmergeable. needs-handoff (TENET-10). |
 | 6 | PAN-4755 | M | medium | ok |  |  | In-pipeline: overlay tokens + shared Modal primitive; rebuild New conversation dialog to the approved mockup. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
@@ -30,6 +29,7 @@ _Last sequenced: 2026-11-02T03:26:46.872141Z · model: claude-opus-5-5 · open: 
 | 19 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 20 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 21 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
+| 21 | PAN-4785 | M | high | ok |  |  | pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff. |
 | 22 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 23 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 24 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
@@ -336,7 +336,6 @@ _Last sequenced: 2026-11-02T03:26:46.872141Z · model: claude-opus-5-5 · open: 
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 324 | PAN-4757 | S | high | ok |  |  | In-pipeline: flaky test-e2e on main; pan-2355-mobile spec finds two Yes buttons. Find render-twice vs two-questions cause. |
 | 325 | PAN-4473 | M | medium | ok |  |  | Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
@@ -599,7 +598,7 @@ _Last sequenced: 2026-11-02T03:26:46.872141Z · model: claude-opus-5-5 · open: 
 | 585 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
 | 586 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
 | 587 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 588 | PAN-1485 | M | medium | needs-refinement |  |  | Idle auto-archive (warn 7d, archive 10d); the archive-after-idle part is now split into #4655 as undoable idle auto-settle. |
+| 588 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
 | 589 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 590 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
 | 591 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
@@ -892,17 +891,13 @@ New substrate bug in the merge door: on 2026-11-01 it refused three approved, gr
 
 New issue filed 2026-11-02 and already in the pipeline with a live workspace, so it is pinned at rank 1 beside PAN-4702 without moving any other node. Main CI fails unit shard 4 twice in a row on tests/e2e/styleguide-conformance.spec.ts after commit a443ff0619a changed the global stylesheet, and a red main empties the merge gate for every approved PR. The substrate-improvement label and the pipeline-blocking effect make it critical; the fix is scoped to one spec and one stylesheet change with a clear acceptance, so the condition is ok.
 
-### PAN-4752 (rank 2)
+### PAN-4786 (rank 2)
 
-New issue filed 2026-11-02 and already in the pipeline, so it is pinned at the free rank 2 without moving any other node. The substrate-improvement label sets a high-importance floor; the fix is a small, well-specified change in src/lib/flywheel/derive-status.ts with a named unit test, so the condition is ok.
+New in-pipeline substrate bug: adoption starts review without skipPlanChecklist, so every adopted PR with no xBRIEF fails verification, and today that stalls the handoff PRs for critical PAN-4750 and PAN-4772. TENET-10 routes merge-machinery fixes through supervised handoffs, so until this lands no handoff PR can be reviewed; it takes the free rank-2 slot. It covers the checklist half of PAN-4636, which keeps the operator-signal half.
 
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
-
-### PAN-4751 (rank 4)
-
-New in-pipeline issue pinned near the top per the never-re-rank rule. It is a contained frontend enhancement that reuses the existing AskUserQuestion dialog and pending-question read model, so it carries low risk and a clear component-test acceptance.
 
 ### PAN-4750 (rank 5)
 
@@ -983,6 +978,10 @@ New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network
 ### PAN-4705 (rank 21)
 
 New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.
+
+### PAN-4785 (rank 21)
+
+New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.
 
 ### PAN-4746 (rank 22)
 
@@ -1211,10 +1210,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T03:26:46.872141Z",
+  "generatedAt": "2026-11-02T04:47:31.528157Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 876,
+  "openCount": 875,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1243,19 +1242,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "planning": "auto"
     },
     {
-      "issue": "PAN-4752",
-      "rank": 2,
-      "size": "S",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: Flywheel board shows strike workspaces as bogus PAN-<n>-STRIKE rows; map them to the base issue and strike PR.",
-      "rationale": "New issue filed 2026-11-02 and already in the pipeline, so it is pinned at the free rank 2 without moving any other node. The substrate-improvement label sets a high-importance floor; the fix is a small, well-specified change in src/lib/flywheel/derive-status.ts with a named unit test, so the condition is ok.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4636",
       "rank": 3,
       "size": "S",
@@ -1265,19 +1251,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "dependsOn": [],
       "why": "Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently.",
       "rationale": "New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4751",
-      "rank": 4,
-      "size": "S",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: make the Flywheel NEEDS YOU banner reopen the pending AskUserQuestion dialog or jump to the conversation.",
-      "rationale": "New in-pipeline issue pinned near the top per the never-re-rank rule. It is a contained frontend enhancement that reuses the existing AskUserQuestion dialog and pending-question read model, so it carries low risk and a clear component-test acceptance.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5427,19 +5400,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "planning": "auto"
     },
     {
-      "issue": "PAN-4757",
-      "rank": 324,
-      "size": "S",
-      "importance": "high",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: flaky test-e2e on main; pan-2355-mobile spec finds two Yes buttons. Find render-twice vs two-questions cause.",
-      "rationale": "New issue filed 2026-11-02 and already in the pipeline, so it is pinned at the free rank 324 slot and no other node moves. The substrate-improvement label sets a high-importance floor because a flaky e2e job turns main CI red; the body names the failing line and a clear fix direction, so the condition is ok.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4473",
       "rank": 325,
       "size": "M",
@@ -8653,13 +8613,13 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
     {
       "issue": "PAN-1485",
       "rank": 588,
-      "size": "M",
+      "size": "S",
       "importance": "medium",
-      "score": 36,
+      "score": 32,
       "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Idle auto-archive (warn 7d, archive 10d); the archive-after-idle part is now split into #4655 as undoable idle auto-settle.",
-      "rationale": "Rank unchanged; stays needs-refinement because new PAN-4655 supersedes its archive-after-idle part, so what remains of this issue must be rescoped or closed.",
+      "why": "Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call.",
+      "rationale": "Rank unchanged; a 2026-11-02 comment confirms PAN-4655 delivers idle auto-settle, so only day-10 archive and favorite clearing remain (size M→S, score trimmed), still needs-refinement pending the operator close decision.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12139,6 +12099,32 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "rationale": "New issue: small, well-scoped docs fix with mechanical ACs; placed in a free medium-tier slot beside comparable XS/S doc hygiene work.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4785",
+      "rank": 21,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff.",
+      "rationale": "New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4786",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Adopted PRs fail incomplete-plan-items (no xBRIEF); blocks handoff PRs #4780/#4783. Narrower overlap of PAN-4636.",
+      "rationale": "New in-pipeline substrate bug: adoption starts review without skipPlanChecklist, so every adopted PR with no xBRIEF fails verification, and today that stalls the handoff PRs for critical PAN-4750 and PAN-4772. TENET-10 routes merge-machinery fixes through supervised handoffs, so until this lands no handoff PR can be reviewed; it takes the free rank-2 slot. It covers the checklist half of PAN-4636, which keeps the operator-signal half.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13464,6 +13450,34 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4785",
+      "to": "PAN-4636",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4786",
+      "to": "PAN-4750",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4786",
+      "to": "PAN-4772",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4786",
+      "to": "PAN-4636",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.9
     }
   ]
 }

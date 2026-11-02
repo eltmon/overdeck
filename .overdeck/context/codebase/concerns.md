@@ -385,11 +385,6 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   Background work from a route uses `void work().catch((err) => console.error(...))`
   (`routes/hooks.ts`, `routes/resources/snapshot.ts`); use `Effect.forkDetach` only
   where the work must stay inside the Effect runtime.
-- PR sync auto-archive liveness is tmux-only: `listLiveConversationSessions` in
-  `services/pull-request-sync-service.ts` runs `tmux list-sessions`, but
-  conversations launch through the terminal-backend door (Herdr default,
-  PAN-3921). With `conversations.auto_archive_on_merge` on under Herdr, every
-  conversation reads as not live. Use `getBackendPanes()` + `paneAgentKey`.
 - TanStack `rowVirtualizer.measure()` (virtual-core 3.17.11) clears cached sizes
   but re-reads no element; a row whose height did not change gets no
   ResizeObserver callback, and `resizeItem` caches only a changed size. So in
@@ -526,4 +521,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   filter drops, and `resolveMissingIssue` memoizes failures for the process
   lifetime. A drawer for such an issue shows `Issue details` with no title.
   Never widen the snapshot to fix one view: about 14 frontend views read `issuesRaw`.
+- **`npx mint broken-links` is red on `main`** (PAN-4779) — two MDX parse errors
+  (a bare `<machine>` in `configuration/linked-machines.mdx`, a bare `<label>` in
+  `cli/agent-commands.mdx`) and 15 links in `vision.mdx` to repo files that
+  `.mintignore` excludes. `npm run lint:docs` catches `$` in prose and `<` before a
+  digit, not `<word>` in prose. Until PAN-4779 lands, scope a docs change's link check
+  to its own pages and compare the rest against this baseline.
 <!-- last-verified: 2026-11-01 -->

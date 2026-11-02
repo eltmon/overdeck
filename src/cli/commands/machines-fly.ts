@@ -120,7 +120,7 @@ export function registerMachinesFlyCommands(machines: Command): void {
     .option('--model <id>', 'Model for the conversation (required with --harness codex)')
     .option('--effort <level>', 'Reasoning effort for the conversation')
     .option('--region <code>', 'Fly region (default: remote.fly.region, else iad)')
-    .option('--image <ref>', 'Image (default: remote.fly.image, else registry.fly.io/pan-workspace:latest)')
+    .option('--image <ref>', 'Image (default: remote.fly.image, else registry.fly.io/<app>:latest)')
     .option('--json', 'Print { link, record, conversation? } as JSON')
     .action((options: AddFlyOptions) => runMachinesAddFly(options));
 }
