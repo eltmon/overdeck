@@ -18,6 +18,7 @@ Picker context labels describe the configured session budget. They are not a cla
 | Qwen 3.7 Plus / 3.8 Flash | 1,000,000 | Official model pages give the exact decimal context and 131,072 max output. |
 | Kimi K3 256K / K2.7 Code / Highspeed | 262,144 | Installed Kimi CLI 0.40.1 catalog. |
 | Kimi K3 1M | 1,048,576 | Installed Kimi CLI 0.40.1 catalog. |
+| Kimi K3.1 Pro / Highspeed | 1,048,576 | Installed Kimi CLI 2.0.2 catalog (2026-11-02); no 256K tier. |
 
 Other retained entries show their existing configured budget. This audit does not silently raise every older model to its largest advertised API window. Known non-Anthropic models routed through Claude Code receive both `CLAUDE_CODE_AUTO_COMPACT_WINDOW` and `CLAUDE_CODE_MAX_CONTEXT_TOKENS`; supplying only the first can leave Claude's unknown-model 200K ceiling in place.
 
@@ -39,7 +40,7 @@ Managed Codex configuration and app-server turns explicitly default to High. `re
 
 Managed omp launches explicitly supply `--thinking high` unless an effort was chosen. Native Kimi and ACP launches initialize the chosen effort. K3 supports Low/High/Max; saved Medium maps to High and Extra High maps to Max. K2.7 Code has no adjustable effort, so its picker does not advertise one. ACP live updates wait for provider acceptance. Terminal-only sessions use launch settings and their native terminal controls; a dashboard-only label change is not treated as a runtime update.
 
-Kimi's bare Overdeck `k3` historically denotes the smaller window. It now translates to the real `k3-256k` endpoint; `k3[1m]` remains Claude Code's full-window syntax. Native aliases retain the CLI's own namespace. Claude tier environment values use the same 256K route. K2.7 maps to `kimi-for-coding` on the coding endpoint, while Moonshot platform requests retain their platform ID.
+Kimi's bare Overdeck `k3` historically denotes the smaller window. It now translates to the real `k3-256k` endpoint; `k3[1m]` remains Claude Code's full-window syntax. Native aliases retain the CLI's own namespace. Claude tier environment values use the same 256K route. K2.7 maps to `kimi-for-coding` on the coding endpoint, while Moonshot platform requests retain their platform ID. K3.1 Pro ids (`k3.1-pro`, `k3.1-pro-highspeed`) are sent unchanged to the coding endpoint and as `kimi-k3.1-pro` / `kimi-k3.1-pro-highspeed` to the Moonshot platform endpoint.
 
 ## Sources
 

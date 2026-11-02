@@ -1,0 +1,585 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T13:40:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4813: feat(models): support Kimi K3.1 Pro and K3.1 Pro Highspeed",
+    "updated": "2026-11-02T13:34:48.776Z"
+  },
+  "plan": {
+    "id": "pan-4813",
+    "title": "feat(models): support Kimi K3.1 Pro and K3.1 Pro Highspeed",
+    "status": "running",
+    "uid": "0497d812-ecfc-48a4-a1ff-28c3b5a344d9",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T13:40:00Z",
+    "updated": "2026-11-02T13:34:48.776Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4813",
+        "label": "PAN-4813",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4813.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "models",
+      "kimi",
+      "providers",
+      "cost",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "Moonshot released Kimi K3.1 Pro and K3.1 Pro Highspeed (about 2026-10-23). Overdeck cannot select or launch them on the Claude Code, kimi-code, or ACP routes, prices them as K3 if at all, and does not show them in pickers or docs.",
+      "Proposal": "Register canonical ids k3.1-pro and k3.1-pro-highspeed plus native aliases kimi-code/k3.1-pro and kimi-code/k3.1-pro-highspeed across the type union, capability/class/fallback tables, PROVIDERS.kimi, the kimi-code and ACP alias maps, native effort translation, the cost table, and the Settings catalog. Claude Code launches with a platform key translate to kimi-k3.1-pro ids through a new KIMI_PLATFORM_MODEL_IDS map used by resolveKimiModelForEndpoint and a widened getClaudeCodeLaunchModel guard. The 1M context pin comes from the capability row. Docs describe ids, routes, effort and context. Full detail: .pan/drafts/PAN-4813.md.",
+      "NonGoals": "- Changing PROVIDERS.kimi.tierModels (opus/sonnet/haiku Kimi tiers)\n- Deprecating K3 or adding it to MODEL_DEPRECATIONS\n- Changing the launch model id of k3 or k3[1m] on any endpoint\n- Updating kimi-code/kimi-for-coding metadata (K2.8 Preview)\n- Adding a [1m] or 256K variant of K3.1\n- Editing src/lib/model-capabilities.ts or raising any scripts/file-size-allowlist.txt cap\n- Any other provider's models\n- Upgrading the kimi binary or running kimi login"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Capability rows go in src/lib/model-capability-additions.ts, not model-capabilities.ts as the issue says.",
+        "rationale": "model-capabilities.ts is 1422 lines with a 1422 allowlist cap; lint-file-size.sh would fail and agents may not raise caps. The additions object is spread first into MODEL_CAPABILITIES, so behavior is identical."
+      },
+      {
+        "summary": "Widen getClaudeCodeLaunchModel's guard to kimi-k2.7-code plus the K3.1 ids (not every Kimi id).",
+        "rationale": "The --model argument for Kimi is translated only there; changing resolveKimiModelForEndpoint alone would leave platform-key launches sending k3.1-pro. A narrow set keeps k3/k3[1m] launch ids unchanged (out of scope)."
+      },
+      {
+        "summary": "Platform-id translation applies only when the base URL equals KIMI_PLATFORM_BASE_URL.",
+        "rationale": "The issue's sketch translated for every non-coding URL, which breaks the existing 'does not translate unrelated endpoints' test contract."
+      },
+      {
+        "summary": "Use live-verified native aliases kimi-code/k3.1-pro and kimi-code/k3.1-pro-highspeed with no PR-body caveat.",
+        "rationale": "Operator issue comment 2026-11-02 shows both in kimi provider list --json (kimi 2.0.2) with 1048576 context and low/high/max effort."
+      },
+      {
+        "summary": "Settings modelCatalog.ts gets only the two bare rows; native picker rows need no static change.",
+        "rationale": "Chat picker Kimi rows are generated from MODEL_CAPABILITIES by settings-model-catalog.ts and expandHarnessRows; modelCatalog.ts has no kimi-code rows for K3 either."
+      },
+      {
+        "summary": "Docs touch harnesses.mdx, harness-landscape.mdx, effort.mdx and docs/MODEL-CONTEXT-AUDIT.md; model-presets.mdx is skipped.",
+        "rationale": "model-presets.mdx lists no Kimi model ids; MODEL-CONTEXT-AUDIT.md is the source record the additions file cites."
+      },
+      {
+        "summary": "Keep Overdeck display names 'Kimi K3.1 Pro (1M)' / 'Kimi K3.1 Pro Highspeed (1M)' rather than the CLI's 'K3.1 Pro Highspeed 2x Usage Cost'.",
+        "rationale": "Matches the issue's stated names and the K3 naming pattern; quota cost is documented in descriptions and docs."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Adding one model family touches every registration table it must appear in (type union, capability/class/fallback tables, PROVIDERS.kimi, kimi-code and ACP alias maps, effort, cost, Settings catalog) plus their tests and docs. Each table is a one- to four-line change. Splitting into sibling issues would ship half-registered ids: the ACP lockstep test, the capability-class completeness test and the exhaustive MODEL_CAPABILITIES type each reject a partial registration, and a picker row without a launch path is a visible bug. The 7 subsystems are breadth, not depth; the plan is already 8 small items with only two real edges.",
+      "canonicalFilename": "2026-11-02-PAN-4813-feat-models-support-kimi-k3-1-pro-and-k3-1-pro-highspeed.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "catalog-registry",
+        "title": "Register the four K3.1 ids in the type union, capability table, and class table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T13:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4813",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "tests/lib/settings.test.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-audit.test.ts tests/lib/settings.test.ts src/lib/__tests__/settings-model-catalog.test.ts src/lib/__tests__/model-capability-class.test.ts src/lib/__tests__/model-capabilities.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all five named test files pass",
+            "file-size guard prints '✓ file-size guard passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "provider-native-aliases",
+            "claude-endpoint-routing"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4813.md). In src/lib/settings.ts add 'k3.1-pro' | 'k3.1-pro-highspeed' and 'kimi-code/k3.1-pro' | 'kimi-code/k3.1-pro-highspeed' to the KimiModel union, and prepend the two bare ids to the kimiModels available list (search `? ['k3', 'k3[1m]', 'kimi-k2.7-code'`). Add four one-line rows to AUDITED_MODEL_ADDITIONS in src/lib/model-capability-additions.ts (NOT model-capabilities.ts, which is at its 1422-line file-size cap), copying the 'k3[1m]' row's shape: contextWindow 1048576, effortLevels ['low','medium','high','xhigh','max'], costPer1MTokens 6 (Pro) / 12 (Highspeed), K3 skill scores with 'context-length': 100, Highspeed speed 88, displayName 'Kimi K3.1 Pro (1M)' / 'Kimi K3.1 Pro Highspeed (1M)'. Add four 'frontier' rows above 'k3' in src/lib/model-capability-class.ts. The union and capability rows must land in one commit because MODEL_CAPABILITIES is Record<ModelId, ModelCapability>. Write the tests listed in PRD WI-1 step 5."
+        },
+        "items": [
+          {
+            "id": "catalog-registry.ac1",
+            "title": "Given the change, when `npx vitest run src/lib/__tests__/model-catalog-audit.test.ts` runs, then a new test asserts MODEL_CAPABILITIES returns contextWindow 1048576 for k3.1-pro, k3.1-pro-highspeed, kimi-code/k3.1-pro and kimi-code/k3.1-pro-highspeed and effortLevels ['low','medium','high','xhigh','max'], and it passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-registry.ac2",
+            "title": "Given a Kimi key is configured, when getAvailableModelsApi() runs, then its kimi list returns k3.1-pro and k3.1-pro-highspeed with harness 'claude-code' and kimi-code/k3.1-pro and kimi-code/k3.1-pro-highspeed with harness 'kimi-code', asserted in src/lib/__tests__/settings-model-catalog.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-registry.ac3",
+            "title": "Given the change, when src/lib/__tests__/model-capability-class.test.ts runs, then capabilityClassOf returns 'frontier' for all four ids and the test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-registry.ac4",
+            "title": "Given the change, when `wc -l src/lib/model-capabilities.ts` runs, then it reports 1422 lines (the capped file is unchanged) and `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fallback-rows",
+        "title": "Add K3.1 rows to the model-fallback provider and fallback maps",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T13:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4813",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-fallback.ts",
+            "tests/lib/model-fallback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/model-fallback.test.ts"
+          ],
+          "expected_outputs": [
+            "tests/lib/model-fallback.test.ts passes including the new K3.1 assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/model-fallback.ts add 'k3.1-pro': 'kimi' and 'k3.1-pro-highspeed': 'kimi' above 'k3': 'kimi' in MODEL_PROVIDERS, and 'k3.1-pro': 'claude-sonnet-5-5' and 'k3.1-pro-highspeed': 'claude-sonnet-5-5' above 'k3' in FALLBACK_MAP. In tests/lib/model-fallback.test.ts next to the K3 assertions (~line 517) assert getModelProvider returns 'kimi' and getFallbackModel(id, PROVIDER_FALLBACK) returns 'claude-sonnet-5-5' for both ids. Use getFallbackModel, not applyFallback, so this item does not depend on capability rows."
+        },
+        "items": [
+          {
+            "id": "fallback-rows.ac1",
+            "title": "Given the change, when getModelProvider('k3.1-pro') and getModelProvider('k3.1-pro-highspeed') are called, then each returns 'kimi'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fallback-rows.ac2",
+            "title": "Given the change, when getFallbackModel('k3.1-pro', PROVIDER_FALLBACK) and getFallbackModel('k3.1-pro-highspeed', PROVIDER_FALLBACK) are called, then each returns 'claude-sonnet-5-5' instead of the unmapped fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider-native-aliases",
+        "title": "Register K3.1 in PROVIDERS.kimi and map bare ids to native kimi-code aliases for kimi-code and ACP",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T13:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4813",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/providers.ts",
+            "src/lib/acp/kimi.ts",
+            "tests/lib/providers.test.ts",
+            "src/lib/acp/__tests__/kimi.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/providers.test.ts src/lib/acp/__tests__/kimi.test.ts src/lib/__tests__/model-capability-class.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three named test files pass, including the ACP/native lockstep test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/lib/providers.ts: insert 'k3.1-pro', 'k3.1-pro-highspeed' before 'k3' and 'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed' before 'kimi-code/k3' in PROVIDERS.kimi.models; prepend both bare ids to the getProviderForModelSync Kimi list (search `if (['k3', 'k3-256k', 'k3[1m]'`); add 'k3.1-pro' -> 'kimi-code/k3.1-pro' and 'k3.1-pro-highspeed' -> 'kimi-code/k3.1-pro-highspeed' to KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS; list both new aliases in its doc comment and in the resolveKimiCodeModelAlias error string. In src/lib/acp/kimi.ts add the same two mappings to KIMI_ACP_MODEL_IDS and to its doc-comment alias table. Aliases are live-verified (kimi 2.0.2, 2026-11-02). Both maps must change in this one item because the lockstep test iterates PROVIDERS.kimi.models. Do not touch tierModels. Write the tests in PRD WI-3 step 6."
+        },
+        "items": [
+          {
+            "id": "provider-native-aliases.ac1",
+            "title": "Given the change, when resolveKimiCodeModelAlias('k3.1-pro') and resolveKimiCodeModelAlias('k3.1-pro-highspeed') are called, then they return 'kimi-code/k3.1-pro' and 'kimi-code/k3.1-pro-highspeed', and already-native kimi-code/k3.1-pro passes through unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-native-aliases.ac2",
+            "title": "Given the change, when translateKimiAcpModelId('k3.1-pro-highspeed') is called, then it returns 'kimi-code/k3.1-pro-highspeed', and the lockstep test in src/lib/acp/__tests__/kimi.test.ts passes for every PROVIDERS.kimi.models id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-native-aliases.ac3",
+            "title": "Given the change, when getProviderForModel is called with any of the four K3.1 ids, then it returns the kimi provider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-native-aliases.ac4",
+            "title": "Given an unknown id 'kimi-k2.6', when resolveKimiCodeModelAlias is called, then it still throws and the error message lists kimi-code/k3.1-pro",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-endpoint-routing",
+        "title": "Translate K3.1 ids to platform ids for Claude Code launches with a Moonshot platform key",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T13:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4813",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/providers.ts",
+            "src/lib/kimi-claude-routing.ts",
+            "src/lib/__tests__/kimi-claude-routing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/kimi-claude-routing.test.ts tests/lib/providers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both named test files pass, including the existing K2.7 routing tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/lib/providers.ts export KIMI_PLATFORM_MODEL_IDS = { 'k3.1-pro': 'kimi-k3.1-pro', 'k3.1-pro-highspeed': 'kimi-k3.1-pro-highspeed' } and restructure resolveKimiModelForEndpoint exactly as the PRD's after-snippet: translate via KIMI_PLATFORM_MODEL_IDS only when the trailing-slash-stripped base URL equals KIMI_PLATFORM_BASE_URL; unrelated endpoints pass through; coding-endpoint behavior unchanged. In src/lib/kimi-claude-routing.ts replace the `if (model !== 'kimi-k2.7-code') return model;` guard with a Set of 'kimi-k2.7-code' plus Object.keys(KIMI_PLATFORM_MODEL_IDS). Do not widen it to k3/k3[1m]. Add a 'Claude Code K3.1 endpoint routing' describe in src/lib/__tests__/kimi-claude-routing.test.ts as in PRD WI-4 step 3."
+        },
+        "items": [
+          {
+            "id": "claude-endpoint-routing.ac1",
+            "title": "Given a sk-kimi- key, when getAgentRuntimeBaseCommand('k3.1-pro') and generateLauncherScript for a claude-code work agent on k3.1-pro run, then every --model argument is 'k3.1-pro'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-endpoint-routing.ac2",
+            "title": "Given a non-sk-kimi platform key, when getAgentRuntimeBaseCommand('k3.1-pro-highspeed') and generateLauncherScript run, then every --model argument is 'kimi-k3.1-pro-highspeed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-endpoint-routing.ac3",
+            "title": "Given an unrelated base URL https://another.example/anthropic, when resolveKimiModelForEndpoint('k3.1-pro', url) is called, then it returns 'k3.1-pro' unchanged, and resolveKimiModelForEndpoint('k3', KIMI_PLATFORM_BASE_URL) returns 'k3'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-endpoint-routing.ac4",
+            "title": "Given the change, when getClaudeCodeContextPolicyForModel is called with 'k3.1-pro' and with 'k3.1-pro-highspeed', then each returns { autoCompactWindow: 1048576, maxContextTokens: 1048576 }, and the existing K2.7 tier-env assertions still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "native-effort",
+        "title": "Accept K3.1 ids in the Kimi native effort translation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T13:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4813",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/kimi-effort.ts",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/harnessRows.ts",
+            "src/lib/__tests__/kimi-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/kimi-effort.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/__tests__/kimi-effort.test.ts passes including the K3.1 rows"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add 'k3.1-pro', 'k3.1-pro-highspeed', 'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed' to the gate list in resolveKimiNativeEffort (src/lib/kimi-effort.ts); change both error messages from 'Kimi K3' to 'Kimi K3/K3.1' and the header comment to cover K3.1. In harnessRows.ts add a one-line comment above the `startsWith('kimi-code/k3')` check saying it covers K3 and K3.1; no logic change. Update src/lib/__tests__/kimi-effort.test.ts: add the four ids to the gate it.each, add the two mapping asserts, and update the 'Invalid Kimi K3 effort' expectation to 'Invalid Kimi K3/K3.1 effort'."
+        },
+        "items": [
+          {
+            "id": "native-effort.ac1",
+            "title": "Given the change, when resolveKimiNativeEffort('kimi-code/k3.1-pro', 'medium') is called, then it returns 'high', and resolveKimiNativeEffort('k3.1-pro-highspeed', 'xhigh') returns 'max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-effort.ac2",
+            "title": "Given a K3.1 id and an undefined effort, when resolveKimiNativeEffort is called, then it throws an error containing 'Kimi K3/K3.1', and an invalid effort throws 'Invalid Kimi K3/K3.1 effort'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-rows",
+        "title": "Price K3.1 Pro and Highspeed usage at K3.1 rates",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T13:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4813",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "src/lib/cost-parsers/__tests__/kimi-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cost-parsers/__tests__/kimi-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/cost-parsers/__tests__/kimi-parser.test.ts passes including the K3.1 pricing asserts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Insert the four DEFAULT_PRICING rows (k3.1-pro, k3.1-pro-highspeed, kimi-k3.1-pro, kimi-k3.1-pro-highspeed) with the PRD's comment immediately above the `// Kimi K3 coding endpoint aliases:` comment in src/lib/cost.ts. Exact rows are required because getPricing's startsWith fallback would otherwise price k3.1-pro at K3's 'k3' row. Add the pricing asserts from PRD WI-6 to kimi-parser.test.ts."
+        },
+        "items": [
+          {
+            "id": "cost-rows.ac1",
+            "title": "Given a kimi-code/k3.1-pro usage record, when getPricing('custom', bareKimiModel('kimi-code/k3.1-pro')) is used to price 1,000,000 input tokens, then the cost is $2.00, not K3's $3.00",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-rows.ac2",
+            "title": "Given the change, when getPricing('custom', 'k3.1-pro-highspeed') and getPricing('custom', 'kimi-k3.1-pro') are called, then they return outputPer1k 0.02 and inputPer1k 0.002, while getPricing('custom', 'k3') still returns inputPer1k 0.003",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-catalog-rows",
+        "title": "Show K3.1 Pro and Highspeed in the Settings page model catalog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T13:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4813",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/dashboard/frontend/src/components/Settings/__tests__/kimi-k31-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Settings/__tests__/kimi-k31-catalog.test.ts"
+          ],
+          "expected_outputs": [
+            "the new kimi-k31-catalog test file passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add the two rows from the PRD above the 'k3' row in the kimi group of MODELS_BY_PROVIDER in src/dashboard/frontend/src/components/Settings/modelCatalog.ts. Do not add kimi-code/* rows here: native picker rows come from MODEL_CAPABILITIES server-side. Create kimi-k31-catalog.test.ts modeled on quantumllama-catalog.test.ts."
+        },
+        "items": [
+          {
+            "id": "settings-catalog-rows.ac1",
+            "title": "Given the change, when MODELS_BY_PROVIDER.kimi.models is read, then it contains k3.1-pro named 'Kimi K3.1 Pro (1M context)' with costPer1MTokens 6 and k3.1-pro-highspeed named 'Kimi K3.1 Pro Highspeed (1M context)' with costPer1MTokens 12",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-catalog-rows.ac2",
+            "title": "Given the change, when MODELS_BY_PROVIDER.kimi.models is read, then both K3.1 rows appear at lower indexes than the k3 row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-k31",
+        "title": "Document K3.1 ids, routes, effort, and context in the harness, effort, and context-audit docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T13:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4813",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "reference/harness-landscape.mdx",
+            "configuration/effort.mdx",
+            "docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n \"k3.1-pro\" configuration/harnesses.mdx reference/harness-landscape.mdx configuration/effort.mdx docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "expected_outputs": [
+            "the grep prints at least one matching line from each of the four files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. configuration/harnesses.mdx: add kimi-code/k3.1-pro and kimi-code/k3.1-pro-highspeed to the native catalog list in the migration note and state bare K3.1 ids remap to the same-named alias; add three K3.1 rows to the picker-label table; add the paragraph on coding vs platform ids (k3.1-pro vs kimi-k3.1-pro), the single 1,048,576-token tier, and Highspeed's Allegretto plan / 2x quota; rename the effort-table rows to 'Kimi K3 / K3.1 (ACP)' and 'Kimi K3 / K3.1 (native)'. reference/harness-landscape.mdx and configuration/effort.mdx: extend the K3 effort sentences to K3.1 Pro. docs/MODEL-CONTEXT-AUDIT.md: add the K3.1 context row and the endpoint-id sentence. configuration/model-presets.mdx needs no change (it lists no Kimi ids)."
+        },
+        "items": [
+          {
+            "id": "docs-k31.ac1",
+            "title": "Given the change, when configuration/harnesses.mdx is rendered, then the Kimi picker table shows rows 'Kimi K3.1 Pro (1M) — Claude Code' (k3.1-pro), '— Kimi Code CLI' and '— ACP (Kimi Code)' (kimi-code/k3.1-pro), and the native catalog list names kimi-code/k3.1-pro-highspeed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-k31.ac2",
+            "title": "Given the change, when configuration/harnesses.mdx is read, then it states that a sk-kimi- key sends k3.1-pro to the coding endpoint, any other key sends kimi-k3.1-pro to the Moonshot platform endpoint, and K3.1 has no 256K tier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-k31.ac3",
+            "title": "Given the change, when reference/harness-landscape.mdx and configuration/effort.mdx are read, then each names k3.1-pro alongside K3 as supporting Low, High, and Max effort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-k31.ac4",
+            "title": "Given the change, when docs/MODEL-CONTEXT-AUDIT.md is read, then its context table shows a 'Kimi K3.1 Pro / Highspeed' row with 1,048,576 tokens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "catalog-registry",
+        "to": "provider-native-aliases",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-native-aliases",
+        "to": "claude-endpoint-routing",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

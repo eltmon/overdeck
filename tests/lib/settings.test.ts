@@ -318,7 +318,7 @@ describe('settings', () => {
 
       const available = getAvailableModels(settings);
 
-      expect(available.kimi).toEqual(['k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']);
+      expect(available.kimi).toEqual(['k3.1-pro', 'k3.1-pro-highspeed', 'k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']);
     });
 
     it('should return xAI models when XAI_API_KEY is configured', async () => {
