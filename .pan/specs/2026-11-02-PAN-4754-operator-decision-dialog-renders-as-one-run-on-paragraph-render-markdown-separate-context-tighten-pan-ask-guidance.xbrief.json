@@ -4,17 +4,17 @@
     "created": "2026-11-02T00:49:24Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4754: Operator decision dialog renders as one run-on paragraph: render markdown, separate context, tighten pan ask guidance",
-    "updated": "2026-11-02T00:54:25.118Z"
+    "updated": "2026-11-02T00:55:20.271Z"
   },
   "plan": {
     "id": "pan-4754",
     "title": "Operator decision dialog renders as one run-on paragraph: render markdown, separate context, tighten pan ask guidance",
-    "status": "proposed",
+    "status": "running",
     "uid": "f0375c9f-dcee-47e5-ae77-e005063bbe0d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T00:49:24Z",
-    "updated": "2026-11-02T00:54:25.118Z",
+    "updated": "2026-11-02T00:55:20.271Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4754",
@@ -914,5 +914,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
