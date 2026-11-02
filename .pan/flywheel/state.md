@@ -533,3 +533,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - HOLD all 15 children (4828 4829 4830 4831 4833 4834 4835 4836 4843 4837 4838 4839 4840 4841 4842): never pan start any until PAN-4774 (Anywhere release acceptance) passes AND the release ships.
 - After release, start in PRD build order (.pan/drafts/pan-4823.md): wave 1 = 4828, 4831, 4833; wave 2 = 4829, 4835; wave 3 = 4834, 4830, 4836, 4843; wave 4 = 4837; wave 5 = 4838, 4840, 4839.
 - PAN-4841 (store/console setup) and PAN-4842 (docs) are orchestrator-driven: never start them.
+
+## 2026-11-02 17:35Z — operator queue: Shared Sessions remaining slices
+- share.overdeck.ai is deployed and smoke-tested; slice 1 is live.
+- HOLD every remaining slice until the Anywhere release ships (same hold as PAN-4823). They may run alongside the PAN-4823 phone-app issues (separate code areas).
+- Order (per each issue's Depends-on): PAN-4473 -> PAN-4474 -> PAN-4475; then PAN-4476, PAN-4477, PAN-4479, PAN-4480 in parallel; then PAN-4478 (needs 4476); PAN-4482 last (needs all).
+- PAN-4481 (hosted web join page): HOLD for an operator decision; start only when the operator gives the answer.
