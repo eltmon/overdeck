@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4826",
   "created": "2026-11-02T16:31:08.878Z",
-  "updated": "2026-11-02T17:35:36.252Z",
+  "updated": "2026-11-02T17:36:02.048Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "claude-46-context-lock.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T17:35:36.252Z"
+    },
+    "docs-catalog-refresh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:36:02.048Z"
     }
   }
 }
