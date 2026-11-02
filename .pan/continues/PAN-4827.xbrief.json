@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4827",
   "created": "2026-11-02T16:36:08.290Z",
-  "updated": "2026-11-02T19:02:26.462Z",
+  "updated": "2026-11-02T19:02:41.949Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,6 +190,10 @@
     "zai-tiers.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T19:02:26.462Z"
+    },
+    "zai-tiers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:02:41.949Z"
     }
   }
 }
