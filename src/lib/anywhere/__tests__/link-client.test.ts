@@ -9,7 +9,7 @@ import { duplexPair, type Duplex } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { LINK_ACTOR_HEADER, LINK_CEILING_HEADER } from '../link-actor.js';
-import { _resetLinkClientForTests, LINK_POOL_IDLE_MS, LinkAgent, linkActorHeaders, linkFetch, type LinkRouteSource } from '../link-client.js';
+import { _resetLinkClientForTests, isStaleChannelFailure, LINK_POOL_IDLE_MS, LinkAgent, linkActorHeaders, linkFetch, linkForward, type LinkRouteSource } from '../link-client.js';
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {
@@ -164,5 +164,91 @@ describe('pooled channels (PAN-4740)', () => {
     const result = await linkFetch('env-peer', '/x', { agent, routeSource: source });
     expect(result.status).toBe(200);
     expect(connections()).toBe(2);
+  });
+});
+
+describe('stale channel retry (PAN-4740)', () => {
+  let server: Server;
+  const agentCleanups: Array<() => void> = [];
+
+  afterEach(async () => {
+    for (const cleanup of agentCleanups.splice(0)) cleanup();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  /** Destroys the raw socket on the `destroyOnRequest`-th request it sees, without answering. */
+  async function startDestroyingServer(destroyOnRequest: number): Promise<{ port: number; seen: () => number }> {
+    let count = 0;
+    server = createServer((req, res) => {
+      count += 1;
+      if (count === destroyOnRequest) {
+        req.socket.destroy();
+        return;
+      }
+      res.end('ok');
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    return { port: (server.address() as net.AddressInfo).port, seen: () => count };
+  }
+
+  it('linkFetch resends a GET once when a reused channel hangs up', async () => {
+    const { port, seen } = await startDestroyingServer(2);
+    const source = poolSource();
+    const { agent, connections } = pooledAgent(port, source);
+    agentCleanups.push(() => agent.destroy());
+
+    await expect(linkFetch('env-peer', '/x', { agent, routeSource: source })).resolves.toMatchObject({ status: 200 });
+    await expect(linkFetch('env-peer', '/x', { agent, routeSource: source })).resolves.toMatchObject({ status: 200 });
+
+    expect(seen()).toBe(3);
+    expect(connections()).toBe(2);
+  });
+
+  it('linkFetch never resends a POST', async () => {
+    const { port, seen } = await startDestroyingServer(2);
+    const source = poolSource();
+    const { agent } = pooledAgent(port, source);
+    agentCleanups.push(() => agent.destroy());
+
+    await expect(linkFetch('env-peer', '/x', { agent, routeSource: source })).resolves.toMatchObject({ status: 200 });
+    await expect(linkFetch('env-peer', '/x', { method: 'POST', agent, routeSource: source })).rejects.toMatchObject({ code: 'ECONNRESET' });
+
+    expect(seen()).toBe(2);
+  });
+
+  it('a hang-up on a fresh channel is not retried', async () => {
+    const { port, seen } = await startDestroyingServer(1);
+    const source = poolSource();
+    const { agent } = pooledAgent(port, source);
+    agentCleanups.push(() => agent.destroy());
+
+    await expect(linkFetch('env-peer', '/x', { agent, routeSource: source })).rejects.toMatchObject({ code: 'ECONNRESET' });
+
+    expect(seen()).toBe(1);
+  });
+
+  it('linkForward resends a GET once when a reused channel hangs up', async () => {
+    const { port, seen } = await startDestroyingServer(2);
+    const source = poolSource();
+    const { agent } = pooledAgent(port, source);
+    agentCleanups.push(() => agent.destroy());
+
+    await expect(linkFetch('env-peer', '/x', { agent, routeSource: source })).resolves.toMatchObject({ status: 200 });
+    const result = await linkForward('env-peer', { method: 'GET', path: '/x', agent, routeSource: source });
+
+    expect(result.status).toBe(200);
+    expect(seen()).toBe(3);
+  });
+
+  it('isStaleChannelFailure accepts only a safe method on a reused channel before a response', () => {
+    const econnreset = Object.assign(new Error('x'), { code: 'ECONNRESET' });
+    const epipe = Object.assign(new Error('x'), { code: 'EPIPE' });
+    const etimedout = Object.assign(new Error('x'), { code: 'ETIMEDOUT' });
+    expect(isStaleChannelFailure('GET', econnreset, { reusedSocket: true, responded: false })).toBe(true);
+    expect(isStaleChannelFailure('POST', econnreset, { reusedSocket: true, responded: false })).toBe(false);
+    expect(isStaleChannelFailure('GET', econnreset, { reusedSocket: false, responded: false })).toBe(false);
+    expect(isStaleChannelFailure('GET', econnreset, { reusedSocket: true, responded: true })).toBe(false);
+    expect(isStaleChannelFailure('GET', etimedout, { reusedSocket: true, responded: false })).toBe(false);
+    expect(isStaleChannelFailure('head', epipe, { reusedSocket: true, responded: false })).toBe(true);
   });
 });
