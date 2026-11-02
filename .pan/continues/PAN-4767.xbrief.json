@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4767",
   "created": "2026-11-02T02:20:34.096Z",
-  "updated": "2026-11-02T02:50:32.558Z",
+  "updated": "2026-11-02T02:50:50.295Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,6 +40,10 @@
     "split-styleguide-route-its.ac5": {
       "status": "completed",
       "doneAt": "2026-11-02T02:50:32.558Z"
+    },
+    "docs-browser-spec-page-load-budget.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:50:50.295Z"
     }
   }
 }
