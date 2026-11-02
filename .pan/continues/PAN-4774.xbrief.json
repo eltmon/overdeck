@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T23:56:53.744Z",
+  "updated": "2026-11-02T23:57:08.832Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -384,6 +384,10 @@
     "ac08-wdoc.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T23:56:53.744Z"
+    },
+    "ac08-wdoc.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:57:08.832Z"
     }
   }
 }
