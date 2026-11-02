@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4813",
   "created": "2026-11-02T13:36:08.209Z",
-  "updated": "2026-11-02T14:23:05.686Z",
+  "updated": "2026-11-02T14:23:20.887Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,10 @@
     "docs-k31.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T14:23:05.686Z"
+    },
+    "docs-k31.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:23:20.887Z"
     }
   }
 }
