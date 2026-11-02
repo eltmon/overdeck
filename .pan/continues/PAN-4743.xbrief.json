@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T14:57:22.683Z",
+  "updated": "2026-11-02T14:57:35.946Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,10 @@
     "dialog-fly-progress.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T14:57:22.682Z"
+    },
+    "dialog-fly-progress.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:57:35.945Z"
     }
   }
 }
