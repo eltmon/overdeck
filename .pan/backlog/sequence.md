@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T12:26:46.542866Z · model: claude-opus-5-5 · open: 863_
+_Last sequenced: 2026-11-02T12:27:18.433717Z · model: claude-opus-5-5 · open: 862_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -867,7 +867,6 @@ _Last sequenced: 2026-11-02T12:26:46.542866Z · model: claude-opus-5-5 · open: 
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 880 | PAN-4805 | S | high | ok |  |  | Merged; verifying on main. e2e isolated-dashboard fixture now takes a free OS port. Close-out only, not pickable. |
-| 881 | PAN-4799 | S | high | ok |  |  | Merged; verifying on main. UAT train reads member xBRIEFs from feature workspaces. Close-out only, not pickable. |
 
 ## Rationale detail
 
@@ -1198,10 +1197,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T12:26:46.542866Z",
+  "generatedAt": "2026-11-02T12:27:18.433717Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 863,
+  "openCount": 862,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11940,19 +11939,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "rationale": "New issue whose fix already merged (verifying-on-main), so it sits at the tail; the substrate label keeps importance at high.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4799",
-      "rank": 881,
-      "size": "S",
-      "importance": "high",
-      "score": 5,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merged; verifying on main. UAT train reads member xBRIEFs from feature workspaces. Close-out only, not pickable.",
-      "rationale": "New issue whose fix already merged (verifying-on-main), so it sits at the tail; the substrate label keeps importance at high.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13236,13 +13222,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4748",
-      "to": "PAN-4799",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.5
     },
     {
       "from": "PAN-4801",
