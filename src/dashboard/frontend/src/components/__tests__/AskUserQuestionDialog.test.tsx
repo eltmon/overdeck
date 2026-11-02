@@ -302,3 +302,83 @@ describe('AskUserQuestionDialog option plus note', () => {
     expect(onSubmit).toHaveBeenCalledWith(['just this']);
   });
 });
+
+describe('AskUserQuestionDialog keyboard shortcuts', () => {
+  const twoOptions = {
+    toolUseId: 'toolu_keys',
+    askedAt: '2026-11-01T12:00:00.000Z',
+    questions: [{ question: 'Pick one?', options: [{ label: 'First' }, { label: 'Second' }] }],
+  };
+
+  function renderKeys() {
+    const onSubmit = vi.fn();
+    const onDismiss = vi.fn();
+    render(
+      <AskUserQuestionDialog
+        subject={{ id: 'agent-pan-1', pendingAskUserQuestion: twoOptions }}
+        isOpen
+        onSubmit={onSubmit}
+        onDismiss={onDismiss}
+      />,
+    );
+    return { onSubmit, onDismiss, dialog: screen.getByRole('dialog') };
+  }
+
+  it('Esc minimizes', () => {
+    const { onDismiss, dialog } = renderKeys();
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('Ctrl+Enter sends the selected option', () => {
+    const { onSubmit, dialog } = renderKeys();
+    fireEvent.keyDown(dialog, { key: 'Enter', ctrlKey: true });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'First' }));
+    const note = screen.getByLabelText('Add a note (optional)');
+    fireEvent.change(note, { target: { value: 'ship it' } });
+    fireEvent.keyDown(note, { key: 'Enter', ctrlKey: true });
+
+    expect(onSubmit).toHaveBeenCalledWith(['First\n\nNote: ship it']);
+  });
+
+  it('Cmd+Enter sends the selected option', () => {
+    const { onSubmit, dialog } = renderKeys();
+    fireEvent.click(screen.getByRole('radio', { name: 'Second' }));
+    fireEvent.keyDown(dialog, { key: 'Enter', metaKey: true });
+    expect(onSubmit).toHaveBeenCalledWith(['Second']);
+  });
+
+  it('pressing 2 selects the second option', () => {
+    const { dialog } = renderKeys();
+    fireEvent.keyDown(dialog, { key: '2' });
+    expect(screen.getByRole('radio', { name: 'Second' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'First' })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('number keys type into the note box instead of selecting', () => {
+    renderKeys();
+    const note = screen.getByLabelText('Add a note (optional)');
+    fireEvent.keyDown(note, { key: '2' });
+    fireEvent.change(note, { target: { value: '2' } });
+
+    expect(note).toHaveValue('2');
+    expect(screen.getByRole('radio', { name: 'Second' })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('keys pressed inside the dialog do not reach a document keydown listener', () => {
+    const listener = vi.fn();
+    document.addEventListener('keydown', listener);
+    try {
+      const { dialog } = renderKeys();
+      fireEvent.keyDown(dialog, { key: 'g' });
+      fireEvent.keyDown(dialog, { key: 'p' });
+      fireEvent.keyDown(screen.getByLabelText('Add a note (optional)'), { key: '/' });
+      fireEvent.keyDown(dialog, { key: 'Escape' });
+      expect(listener).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener('keydown', listener);
+    }
+  });
+});

@@ -159,9 +159,42 @@ export function AskUserQuestionDialog({
     onSubmit(answers)
   }
 
-  // Tab and Shift+Tab wrap at the panel's last and first focusable elements.
+  // PAN-4754 FR-9 — Esc minimizes, Cmd/Ctrl+Enter sends, 1–4 pick an option
+  // of a single question (unless typing in the note). No key pressed inside
+  // the dialog reaches the dashboard's document-level shortcuts.
   const handlePanelKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
-    if (e.key !== 'Tab' || !panelRef.current) return
+    e.stopPropagation()
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      if (!isSubmitting) onDismiss()
+      return
+    }
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      if (canSubmit && !isSubmitting) handleSubmit()
+      return
+    }
+    const optionIndex = ['1', '2', '3', '4'].indexOf(e.key)
+    if (
+      optionIndex >= 0
+      && questions.length === 1
+      && !(e.target instanceof HTMLTextAreaElement)
+      && !e.metaKey && !e.ctrlKey && !e.altKey
+      && !isSubmitting
+    ) {
+      const option = questions[0].options[optionIndex]
+      if (option) {
+        e.preventDefault()
+        chooseOption(0, option.label)
+      }
+      return
+    }
+    if (e.key === 'Tab') trapTab(e)
+  }
+
+  // Tab and Shift+Tab wrap at the panel's last and first focusable elements.
+  const trapTab = (e: KeyboardEvent<HTMLDivElement>): void => {
+    if (!panelRef.current) return
     const focusables = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
     if (focusables.length === 0) return
     const first = focusables[0]
