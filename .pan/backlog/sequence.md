@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T12:49:20.629362Z · model: claude-opus-5-5 · open: 858_
+_Last sequenced: 2026-11-02T13:28:13.757457Z · model: claude-opus-5-5 · open: 859_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -13,6 +13,7 @@ _Last sequenced: 2026-11-02T12:49:20.629362Z · model: claude-opus-5-5 · open: 
 | 6 | PAN-4803 | M | high | ok |  | PAN-4801 | After PAN-4801, carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
+| 9 | PAN-4813 | M | medium | ok |  |  | Add Kimi K3.1 Pro + Highspeed on Claude Code, kimi-code and ACP routes; already in pipeline, so pinned near the top. |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 10 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 11 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
@@ -898,6 +899,10 @@ Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as 
 
 New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).
 
+### PAN-4813 (rank 9)
+
+New issue that entered the pipeline before this pass (live workspace feature-pan-4813), so it is pinned rather than ranked. It takes the free rank-9 slot so no other node moves. The PRD is complete with verified ids and decisions; the only open point is the native-alias checkpoint in WI-4, which has a stated fallback.
+
 ### PAN-4554 (rank 10)
 
 New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.
@@ -1182,10 +1187,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
-### PAN-4623 (rank 76)
-
-New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1193,10 +1194,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T12:49:20.629362Z",
+  "generatedAt": "2026-11-02T13:28:13.757457Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 858,
+  "openCount": 859,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11883,6 +11884,19 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       ],
       "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; split out of PAN-4743, which must land its Fly target door first.",
       "rationale": "New issue filed 2026-11-02: PAN-4743's plan ships Fly (new VM) for conversations only, so lane provisioning and the per-run VM cap move here. It needs startFlyTarget from in-pipeline PAN-4743, so it takes the free rank 277 directly behind it with no other node moving.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4813",
+      "rank": 9,
+      "size": "M",
+      "importance": "medium",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add Kimi K3.1 Pro + Highspeed on Claude Code, kimi-code and ACP routes; already in pipeline, so pinned near the top.",
+      "rationale": "New issue that entered the pipeline before this pass (live workspace feature-pan-4813), so it is pinned rather than ranked. It takes the free rank-9 slot so no other node moves. The PRD is complete with verified ids and decisions; the only open point is the native-alias checkpoint in WI-4, which has a stated fallback.",
       "gate": "auto",
       "planning": "auto"
     }

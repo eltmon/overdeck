@@ -292,7 +292,8 @@ Cloudflare Durable Object per account that knows the account's machines and intr
   at 10 s only if that found no channel and no `unknown-peer`; `relay` at 10 s last. With no
   relay plan the detail is "No direct path; install Tailscale or use the relay plan".
 - `OVERDECK_ANYWHERE_NO_ADVERTISE=1` makes a dashboard advertise no endpoints (the directory
-  smoke uses it so only `direct` can link two dashboards on one host).
+  smoke uses it so only `direct` can link two dashboards on one host). `OVERDECK_PUBLIC_LINK_ONLY=1`
+  has the same effect (PAN-4741).
 
 ## Approval (D-2356-9/10)
 
@@ -619,6 +620,11 @@ neither inside a secure channel nor from a loopback peer without a proxy forward
 on every path including the static SPA. The `/ws/link` upgrade is handled before the gate,
 so home still links in, and a link-mode channel request is judged by its machine credential
 as before. On a Fly machine this makes the public URL answer nothing but the link.
+
+A server in this mode also advertises no endpoints: `discoverEndpoints` returns `[]`, the
+same as under `OVERDECK_ANYWHERE_NO_ADVERTISE=1` (PAN-4741). So home's link to a Fly machine
+holds only the `public` pairing route, and a link created before this change drops its stale
+`advertised` routes through `mergeAdvertised` on its next connect.
 
 ### The record file
 

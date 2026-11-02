@@ -1,7 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bullets 2026-11-02).
-Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly and feature-branch-push bullets 2026-11-01).
+Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bullets 2026-11-02, feature-branch-push bullets 2026-11-01).
 
 - **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
   ohmypi/prime-agent + Anthropic + subscription auth (plus the model/harness pairing
