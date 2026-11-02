@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4805",
   "created": "2026-11-02T06:47:26.972Z",
-  "updated": "2026-11-02T06:50:34.477Z",
+  "updated": "2026-11-02T06:50:41.636Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4805",
       "claimedAt": "2026-11-02T06:49:17.057Z",
       "doneAt": "2026-11-02T06:50:34.477Z"
+    },
+    "boot-retry-eaddrinuse": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4805",
+      "claimedAt": "2026-11-02T06:50:41.636Z"
     }
   }
 }
