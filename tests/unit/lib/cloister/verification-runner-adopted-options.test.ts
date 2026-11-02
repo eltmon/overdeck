@@ -130,7 +130,8 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, exec: execMock };
 });
 
-import { runVerificationForIssue } from '../../../../src/lib/cloister/verification-runner.js';
+import { runVerificationForIssue, runVerificationForIssueInProcess } from '../../../../src/lib/cloister/verification-runner.js';
+import { checkIncompletePlanItems } from '../../../../src/lib/work/done-preflight.js';
 
 let root: string;
 let workspacePath: string;
@@ -218,5 +219,50 @@ describe('runVerificationForIssue resolves skipPlanChecklist for adopted workspa
     ));
 
     expect(resolvedOptions()).toEqual({ syncTargetBranch: false, skipPlanChecklist: true });
+  });
+});
+
+describe('the verification worker re-decides the adopted checklist skip (PAN-4810)', () => {
+  const noSync = { syncTargetBranch: false } as const;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mockGetPrFacts.mockResolvedValue({
+      issueId: 'PAN-9001', exists: true, open: true, merged: false, closed: false, draft: false,
+      approved: true, changesRequested: false, checks: 'green', mergeable: true,
+    });
+    mockResolveWorkspaceRepoRootsSync.mockReturnValue([]);
+    mockRunTestSkipGate.mockResolvedValue({ passed: true, violations: [] });
+    mockRunQualityGates.mockResolvedValue([]);
+    mockSnapshotHeads.mockResolvedValue('a'.repeat(40));
+    mockWriteArtifact.mockReturnValue({ path: '/tmp/verification-latest.json' });
+    vi.mocked(checkIncompletePlanItems).mockResolvedValue(['  The required xBRIEF checklist is missing or unreadable.']);
+
+    root = await mkdtemp(join(tmpdir(), 'pan-4810-worker-'));
+    workspacePath = join(root, 'workspaces', 'feature-pan-9001');
+    await mkdir(workspacePath, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it('skips the checklist when adoption journaled after dispatch (options carry no skip)', async () => {
+    // Dispatched with `{}` — the journal had no adoption yet. Adoption lands before the checklist step.
+    await writeJournal([adoptedEntry()]);
+
+    const result = await runVerificationForIssueInProcess('PAN-9001', workspacePath, { isRemote: false }, 'request-review', noSync);
+
+    expect(checkIncompletePlanItems).not.toHaveBeenCalled();
+    expect(result).not.toMatchObject({ failedCheck: 'incomplete-plan-items' });
+  });
+
+  it('still runs the checklist for a workspace that was never adopted', async () => {
+    await writeJournal([{ at: '2026-11-02T04:22:00.000Z', type: 'review.requested', issueId: 'PAN-9001', source: 'pan-done' }]);
+
+    const result = await runVerificationForIssueInProcess('PAN-9001', workspacePath, { isRemote: false }, 'request-review', noSync);
+
+    expect(checkIncompletePlanItems).toHaveBeenCalledWith(workspacePath, 'PAN-9001');
+    expect(result).toMatchObject({ outcome: 'failed', failedCheck: 'incomplete-plan-items' });
   });
 });

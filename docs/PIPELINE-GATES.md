@@ -21,8 +21,23 @@ failing is visible directly in the PR's check history.
 runs these steps in order. Each step that fails returns early with the named
 `failedCheck`; later steps do not run.
 
-0. Skip the run if the PR already merged, or if this head already used its
-   `VERIFICATION_MAX_CYCLES` (3) attempts (outcome `skipped`, no `failedCheck`).
+0. Skip the run if the PR already merged. Unless the run sets
+   `syncTargetBranch: false`, bring each repo root to its PR head,
+   `origin/<feature branch>` (`syncWorkspaceRootsToPrHead`, PAN-4810).
+   Commits pushed from elsewhere (a handoff worktree, the merge train, a
+   GitHub suggestion) would otherwise be missing from the verified tree:
+   - A root at the PR head, or ahead of it, is left alone.
+   - A root behind it fast-forwards.
+   - A root whose only local-only commits are merges of the target branch
+     resets to the PR head.
+   - Each move is journaled as `workspace.synced-to-pr-head`.
+   - A root with real commits on both sides, or with uncommitted tracked
+     changes that a reset would destroy, is not moved. The run then fails
+     with `failedCheck: sync-target-branch`, and the agent gets the reason.
+   - A root on another branch, or whose branch is not on origin yet, is
+     skipped.
+   Then skip the run if this head already used its `VERIFICATION_MAX_CYCLES`
+   (3) attempts (outcome `skipped`, no `failedCheck`).
 1. Snapshot the head for the test-skip waiver.
 2. Merge the target branch into each repo root (`syncSingleRepo`), unless the
    project sets `syncTargetBranch: false` — `failedCheck: sync-target-branch`.
@@ -52,10 +67,16 @@ runs these steps in order. Each step that fails returns early with the named
 12. Run the plan checklist check (`checkIncompletePlanItems`) —
     `failedCheck: incomplete-plan-items`. It is skipped (`skipPlanChecklist`)
     for a strike merge, and for an adopted PR workspace whose journal has
-    `workspace.adopted` when no xBRIEF resolves for the issue (PAN-4786).
-    `runVerificationForIssue` decides this from workspace state on every run,
-    so retries and merge verification get the same answer. An adopted
-    workspace whose issue has an xBRIEF still runs the check.
+    `workspace.adopted` or `workspace.adoption-failed` when no xBRIEF resolves
+    for the issue (PAN-4786, PAN-4810). Only adoption writes either entry, so
+    both mean the PR came from outside the pipeline. `runVerificationForIssue`
+    decides this from workspace state on every run, so retries and merge
+    verification get the same answer. The worker decides it again at this
+    step: a review requested while adoption was still creating the workspace
+    is dispatched before `workspace.adopted` is journaled. A feedback-only
+    `.pan/continues/<id>.xbrief.json` written by a failed run is not a plan
+    (`findPlan` reads specs and drafts only). An adopted workspace whose issue
+    has an xBRIEF still runs the check.
 13. Run the empty-changeset guard, which catches a changeset that touched only
     `.pan/` task state — `failedCheck: empty-changeset`.
 14. On a full pass: post a success check run, lift any verification-stuck
@@ -1563,6 +1584,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | `operator.decision-withdrawn` | `pan ask --withdraw` |
 | `workspace.adopted` | `cloister/pr-workspace-adoption.ts` `adoptPrWorkspace`, after it creates the pipeline workspace on an outside PR's head (`data.prNumber`, `headSha`, `repo`) |
 | `workspace.adoption-failed` | the same function, when a failure leaves a workspace behind; also `cloister/pr-adoption-review.ts` when the review does not start after a successful adoption (`data.reason`, `detail`, `fix`) |
+| `workspace.synced-to-pr-head` | `cloister/workspace-pr-head-sync.ts` `syncWorkspaceRootsToPrHead`, at the start of a verification run that moved a repo root to its PR head (`data.branch`, `from`, `to`, `mode` `fast-forward` or `reset`, and `repo` for a polyrepo root) |
 
 `pan show <id>` prints the last six entries under the derived state; `--json`
 carries the whole journal.

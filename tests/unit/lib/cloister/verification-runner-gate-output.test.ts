@@ -127,6 +127,16 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, exec: execMock };
 });
 
+const { mockSyncToPrHead, mockSyncSingleRepo } = vi.hoisted(() => ({
+  mockSyncToPrHead: vi.fn(async (): Promise<unknown[]> => []),
+  mockSyncSingleRepo: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/cloister/workspace-pr-head-sync.js', () => ({
+  syncWorkspaceRootsToPrHead: mockSyncToPrHead,
+  syncSingleRepo: mockSyncSingleRepo,
+}));
+
 import { runVerificationForIssueInProcess } from '../../../../src/lib/cloister/verification-runner.js';
 
 const issueId = 'PAN-3847';
@@ -232,5 +242,45 @@ describe('verification runner gate output (PAN-3847, re-pointed PAN-3917)', () =
     const skipGate = gateWrites.find((g: { name?: string }) => g?.name === 'test-skip');
     expect(skipGate?.output ?? skipGate?.error).toContain('Could not diff origin/main...HEAD');
     expect(mockRunQualityGates).not.toHaveBeenCalled();
+  });
+});
+
+describe('verification runner PR-head sync (PAN-4810)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetPrFacts.mockResolvedValue({
+      issueId, exists: true, open: true, merged: false, closed: false, draft: false,
+      approved: true, changesRequested: false, checks: 'green', mergeable: true,
+    });
+    mockResolveWorkspaceRepoRootsSync.mockReturnValue([
+      { repoKey: 'main', dir: workspacePath, isPolyrepo: false, sourceBranch: 'feature/pan-3847', targetBranch: 'main' },
+    ]);
+    mockRunTestSkipGate.mockResolvedValue({ passed: true, violations: [] });
+    mockRunQualityGates.mockResolvedValue([]);
+    mockSnapshotHeads.mockResolvedValue('a'.repeat(40));
+    mockWriteArtifact.mockReturnValue({ path: '/tmp/verification-latest.json' });
+  });
+
+  it('fails the sync check, without merging the target branch, when the move to the PR head is refused', async () => {
+    mockSyncToPrHead.mockResolvedValue([{
+      repoDir: workspacePath,
+      repoName: 'feature-pan-3847',
+      targetBranch: 'feature/pan-3847',
+      success: false,
+      errorOutput: 'Verification checks the PR head, and the workspace is not at it (diverged): …',
+    }]);
+
+    const result = await runVerificationForIssueInProcess(issueId, workspacePath, { isRemote: false }, 'test', { skipPlanChecklist: true });
+
+    expect(mockSyncToPrHead).toHaveBeenCalledWith(issueId, workspacePath, 'test');
+    expect(result).toMatchObject({ outcome: 'failed', failedCheck: 'sync-target-branch' });
+    expect(mockSyncSingleRepo).not.toHaveBeenCalled();
+    expect(mockRunQualityGates).not.toHaveBeenCalled();
+  });
+
+  it('does not move the workspace when the run skips the target-branch sync', async () => {
+    await run();
+
+    expect(mockSyncToPrHead).not.toHaveBeenCalled();
   });
 });

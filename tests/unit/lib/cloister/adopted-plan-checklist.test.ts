@@ -99,4 +99,27 @@ describe('isAdoptedWorkspaceWithoutPlan / withAdoptedPlanChecklistSkip', () => {
     expect(await isAdoptedWorkspaceWithoutPlan(workspacePath)).toBe(true);
     expect(await withAdoptedPlanChecklistSkip(workspacePath, {})).toEqual({ skipPlanChecklist: true });
   });
+
+  it('case 8: only a failed adoption (workspace-head-mismatch), no plan — skips the checklist (PAN-4810)', async () => {
+    await writeJournal([{
+      at: '2026-11-02T06:15:00.000Z', type: 'workspace.adoption-failed', issueId: 'PAN-9001', source: 'pr-adoption',
+      data: { prNumber: 1, reason: 'workspace-head-mismatch' },
+    }]);
+
+    expect(await isAdoptedWorkspaceWithoutPlan(workspacePath)).toBe(true);
+    expect(await withAdoptedPlanChecklistSkip(workspacePath, {})).toEqual({ skipPlanChecklist: true });
+  });
+
+  it('case 9: a feedback-only continues file from a failed run is not a plan (PAN-4810)', async () => {
+    await writeJournal([adoptedEntry()]);
+    const feedbackOnly = JSON.stringify({
+      version: '1', issueId: 'PAN-9001', sessionHistory: [], feedback: [{ seq: 1, specialist: 'verification-gate', outcome: 'failed' }],
+    });
+    for (const dir of [workspacePath, root]) {
+      await mkdir(join(dir, '.pan', 'continues'), { recursive: true });
+      await writeFile(join(dir, '.pan', 'continues', 'PAN-9001.xbrief.json'), feedbackOnly, 'utf-8');
+    }
+
+    expect(await isAdoptedWorkspaceWithoutPlan(workspacePath)).toBe(true);
+  });
 });
