@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T16:52:30.563723Z · model: claude-opus-5-5 · open: 874_
+_Last sequenced: 2026-11-02T16:54:33.149791Z · model: claude-opus-5-5 · open: 874_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -658,7 +658,7 @@ _Last sequenced: 2026-11-02T16:52:30.563723Z · model: claude-opus-5-5 · open: 
 | 657 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 658 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 659 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 660 | PAN-4823 | XL | medium | needs-refinement | ✓ | PAN-4774 | Epic: Capacitor phone client for Anywhere without Tailscale; all 15 children filed (#4828-4843); OD-1 open; after PAN-4774. |
+| 660 | PAN-4823 | XL | medium | ok | ✓ | PAN-4774 | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; after PAN-4774. |
 | 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
@@ -877,7 +877,7 @@ _Last sequenced: 2026-11-02T16:52:30.563723Z · model: claude-opus-5-5 · open: 
 | 876 | PAN-4838 | M | medium | ok |  | PAN-4774, PAN-4837, PAN-4830, PAN-4843 | Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts. |
 | 877 | PAN-4840 | M | medium | ok |  | PAN-4774, PAN-4837, PAN-4830, PAN-4843 | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
 | 878 | PAN-4841 | M | medium | ok |  | PAN-4774 | Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases. |
-| 879 | PAN-4839 | S | low | needs-refinement |  | PAN-4774, PAN-4838 | Phone app W-IOS2: Live Activity, counts only behind phoneApp.liveActivity (off); OD-1 operator call open. |
+| 879 | PAN-4839 | S | low | ok |  | PAN-4774, PAN-4838 | Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838 and PAN-4774. |
 | 880 | PAN-4842 | S | medium | ok |  | PAN-4774, PAN-4837 | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 
 ## Rationale detail
@@ -1209,7 +1209,7 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T16:52:30.563723Z",
+  "generatedAt": "2026-11-02T16:54:33.149791Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 874,
@@ -9366,12 +9366,12 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "size": "XL",
       "importance": "medium",
       "score": 32,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4774"
       ],
-      "why": "Epic: Capacitor phone client for Anywhere without Tailscale; all 15 children filed (#4828-4843); OD-1 open; after PAN-4774.",
-      "rationale": "Rank unchanged at 660. The remaining eleven children (PAN-4833 to PAN-4843) are now filed, so all 15 PRD work items exist and carry contains edges; the epic itself is never picked. It stays needs-refinement only because operator decision OD-1 (what the Live Activity may show) is open, and the whole tree waits for PAN-4774.",
+      "why": "Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; after PAN-4774.",
+      "rationale": "Rank unchanged at 660. The operator settled OD-1 on 2026-11-02 (the Live Activity shows counts only), so the epic no longer carries an open decision and moves to ok; the whole tree still waits for the Anywhere acceptance run PAN-4774.",
       "gate": "auto",
       "planning": "auto",
       "isEpic": true
@@ -12124,13 +12124,13 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "size": "S",
       "importance": "low",
       "score": 22,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4774",
         "PAN-4838"
       ],
-      "why": "Phone app W-IOS2: Live Activity, counts only behind phoneApp.liveActivity (off); OD-1 operator call open.",
-      "rationale": "New child of epic PAN-4823 (work item W-IOS2). It needs W-IOS1 (PAN-4838) and carries open operator decision OD-1, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 879 behind the earlier phone children.",
+      "why": "Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838 and PAN-4774.",
+      "rationale": "Rank unchanged at 879. OD-1 is now settled as counts only, so the issue moves from needs-refinement to ok; it still needs W-IOS1 (PAN-4838) and the PAN-4774 acceptance run first.",
       "gate": "auto",
       "planning": "auto"
     },
