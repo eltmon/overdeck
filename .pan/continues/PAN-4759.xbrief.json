@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4759",
   "created": "2026-11-02T01:10:45.557Z",
-  "updated": "2026-11-02T02:00:13.507Z",
+  "updated": "2026-11-02T02:00:29.949Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -254,6 +254,10 @@
     "move-deft.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T02:00:13.506Z"
+    },
+    "move-deft.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:00:29.949Z"
     }
   }
 }
