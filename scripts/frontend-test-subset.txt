@@ -73,6 +73,7 @@ src/components/Settings/sections/__tests__/tiered-crews.test.ts
 src/components/Stage/HomePane/Launcher.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx
 src/components/Stage/launcherFocusStore.test.ts
+src/components/Stage/panes/EditorPane.test.tsx
 src/components/XTerminal.test.tsx
 src/components/__tests__/AskUserQuestionDialog.test.tsx
 src/components/__tests__/DecisionsPanel.test.tsx
@@ -94,6 +95,7 @@ src/components/chat/__tests__/EffortPicker.test.tsx
 src/components/chat/__tests__/HandoffNotice.test.tsx
 src/components/chat/__tests__/HeldHandoffView.test.tsx
 src/components/chat/__tests__/ImageLightbox.test.tsx
+src/components/chat/__tests__/MarkdownFileLink.test.tsx
 src/components/chat/__tests__/ModelPicker.test.tsx
 src/components/chat/__tests__/OpenPreviewPopover.test.tsx
 src/components/chat/__tests__/PullHereDialog.test.tsx
@@ -186,6 +188,7 @@ src/lib/__tests__/useDecisions.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts
 src/lib/decisionContext.test.ts
 src/lib/pipeline-state.test.ts
+src/lib/panesStore.test.ts
 src/lib/sessionOutcome.test.ts
 src/lib/simple/uiMode.test.ts
 src/lib/simple/useSimpleActions.test.tsx
