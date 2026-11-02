@@ -4,17 +4,17 @@
     "created": "2026-11-02T17:30:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4826: fix(models): OpenAI and Anthropic catalog refresh (prices, gpt-6-rosalind, sonnet-4-5 retirement, 1M context)",
-    "updated": "2026-11-02T16:29:45.078Z"
+    "updated": "2026-11-02T16:30:53.208Z"
   },
   "plan": {
     "id": "pan-4826",
     "title": "fix(models): OpenAI and Anthropic catalog refresh (prices, gpt-6-rosalind, sonnet-4-5 retirement, 1M context)",
-    "status": "proposed",
+    "status": "running",
     "uid": "8adc8b3e-de30-448e-b616-83cc30e6e9f7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T17:30:00.000Z",
-    "updated": "2026-11-02T16:29:45.078Z",
+    "updated": "2026-11-02T16:30:53.208Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4826",
@@ -767,5 +767,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
