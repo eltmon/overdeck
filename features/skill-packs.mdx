@@ -355,13 +355,13 @@ Deft's skills depend on its engine and project files, so Overdeck mounts only a 
 
 [Deft Directive](https://github.com/eltmon/directive) is a process engine. `directive init` installs it by writing tracked files into a repository: an `AGENTS.md` managed section, agent hooks that call `deft-hook`, `.githooks/` with `core.hooksPath`, a `package.json` pin of `@deftai/directive`, `deft-directive-*` pointer skills, and an `xbrief/` tree. A repository with that deposit is a **Directive project**.
 
-Overdeck never runs a Deft CLI, never installs the engine, and never writes a tracked file in any project. It offers three levels:
+Overdeck never runs a Deft CLI for the read-only pack. The per-issue Deft pipeline is the one exception: it runs `directive install` inside that issue's worktree and hides the result from git. It offers three levels:
 
 | Level | What you get |
 |-------|--------------|
 | Off | No Deft skills. In a Directive project, an explicit off also turns the deposit's enforcement off for Overdeck launches (the kill switch below). |
 | Methodology on | The read-only `deft` pack: seven Deft skills that need no engine, mounted per launch with a host notice. In a Directive project you can also turn on managed mode. |
-| Full Deft | Deft owns worktrees, review, and merge. Overdeck does not target this level. |
+| Deft pipeline (per issue) | One issue runs on Deft's own pipeline; Overdeck merges. See [Running an issue on Deft](#running-an-issue-on-deft). |
 
 #### Adding the deft pack
 
@@ -443,16 +443,17 @@ pan skills deft enable --project <key> [--yes]      # print the ownership plan, 
 pan skills deft disable --project <key>             # remove the decision; project files untouched
 ```
 
-`enable` refuses a project that is not a Directive project (Overdeck never runs `directive init`). It prints the ownership report, one owner per concern (xbrief, context, agent hooks, git hooks, worktrees, gates, task state, review, release, skills, workspace settings), and asks `Enable managed mode with this ownership plan? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. It stores only `projects.<key>.deft_integration: { mode: managed, plan_digest, enabled_at }` in `~/.overdeck/projects.yaml`, where `plan_digest` is the sha256 of the report text you saw. Launches in a managed project that is not off export `DEFT_ORCHESTRATOR=overdeck`.
+`enable` refuses a project that is not a Directive project (managed mode never runs `directive init`; to run one issue on Deft in any project, see [Running an issue on Deft](#running-an-issue-on-deft)). It prints the ownership report, one owner per concern (xbrief, context, agent hooks, git hooks, worktrees, gates, task state, review, release, skills, workspace settings), and asks `Enable managed mode with this ownership plan? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. It stores only `projects.<key>.deft_integration: { mode: managed, plan_digest, enabled_at }` in `~/.overdeck/projects.yaml`, where `plan_digest` is the sha256 of the report text you saw. Launches in a managed project that is not off export `DEFT_ORCHESTRATOR=overdeck`.
 
 #### Environment contract
 
-Overdeck exports at most these two literal lines, from a per-launch env file that the launcher reads with an allowlist and never sources:
+Overdeck exports at most these three variables, from a per-launch env file that the launcher reads with an allowlist and never sources:
 
 | Variable | Value | Meaning to the engine |
 |----------|-------|-----------------------|
 | `DEFT_DIRECTIVE_DISABLE` | `1` | Same as an untracked root `.deft-directive-disable` |
 | `DEFT_ORCHESTRATOR` | `overdeck` | External-orchestrator mode: Deft enforcement defers to the host; Deft contributes methodology only |
+| `DEFT_RUN_SUMMARY_PATH` | `<worktree>/.overdeck/deft-run-summary.jsonl` | Deft-pipeline issues only: where Deft appends its run summary, including gate results. The env file carries only the literal token `DEFT_RUN_SUMMARY_PATH=overdeck`; the launcher supplies the path. |
 
 Both variables are a no-op until your project pins an engine that reads them ([PAN-4425](https://github.com/eltmon/overdeck/issues/4425)). The flag file works on every engine from v0.92.0.
 
@@ -461,6 +462,50 @@ Both variables are a no-op until your project pins an engine that reads them ([P
 - **Git hooks.** The deposited `.githooks/pre-commit` runs `deft verify:branch` and does not check the kill switch; whether `verify:branch` itself reads it is unverified. Feature-branch commits pass `verify:branch`. Main-branch plan-artifact commits in a Directive plan home may be refused.
 - **Workspace settings.** In a Directive project `.claude/settings.json` is a tracked Deft deposit, and Overdeck's workspace creation merges its own hooks into it, which leaves that file modified in the worktree.
 - **Scope.** Detection runs at the launch directory's repository root only, not in polyrepo sub-repositories. There is no conversation-level toggle; conversations inherit global and project toggles.
+
+#### Running an issue on Deft
+
+One issue at a time can run on Deft's own pipeline: Deft's skills, hooks, gates, and review cycle, unchanged. Overdeck hosts the run. It installs Directive into that issue's worktree, keeps the install out of the branch, and merges the PR when a person clicks Merge.
+
+```bash
+pan skills deft use <ISSUE> [--start] [--json]   # install Directive into the issue's worktree and switch its pipeline
+pan skills deft save <ISSUE>                     # commit Deft's state archive under .pan/deft/<ISSUE>/
+pan skills deft show <ISSUE> [--json]            # pipeline, install, drift, lift conflicts, merge-guard verdict
+pan skills deft back <ISSUE> [--json]            # save, remove the install exactly, switch back to Overdeck
+```
+
+**Switching.** `use` stops the issue's agents, writes `pipeline: deft` into `.pan/skill-overrides/<ISSUE>.yaml`, creates the workspace if it is missing, and installs Directive. When the issue has no plan, it writes a one-item stand-in plan, so `pan start` works. `--start` then starts the work agent. That agent gets a Deft kickoff instead of Overdeck's: build with `deft-directive-build`, run `deft-directive-pre-pr` before pushing, run `deft-directive-review-cycle` when a supported bot reviewer exists, save the state archive, use `pan sync-main` instead of a rebase, and never merge. `back` saves the archive, removes the install, restores every file the install changed, and deletes the stand-in plan. `pan start <ISSUE>` then plans the issue the Overdeck way. A project whose default branch already tracks a Directive deposit gets no install: its tracked deposit is used as it is. Overdeck decides this from the default branch's committed files, never from the worktree, because a temporary install leaves the same files on disk.
+
+**What the install writes, and how it is hidden.** npm and pnpm projects run Deft's installer, `npx --yes @deftai/directive install --yes`. Deft's installer refuses Bun projects, so for a project with `bun.lock` or `bun.lockb` Overdeck adds `@deftai/directive-runtime` with `bun add -d --exact` and then runs the runtime's own `setup` step. The deposit (pointer skills, slash wrappers, hook registrations, `.githooks/`, `AGENTS.md`, `Taskfile.yml`, `xbrief/`, `.deft/`, the `package.json` pin, and the lockfile change) stays out of git:
+
+- New paths go into a per-worktree exclude file, `<git-dir>/info/overdeck-deft-exclude`, which starts with a copy of your global excludes.
+- Tracked files that the install changed, such as `package.json`, `.gitignore`, and the lockfile, get `--skip-worktree`.
+- `core.hooksPath=.githooks` is set for that worktree only, through `extensions.worktreeConfig`. The shared value and the sibling worktrees are not changed.
+
+The snapshot `.overdeck/deft-install.json` records the pre-install bytes, so `back` is exact. Hidden tracked files cannot be committed, so an edit to one (a dependency change, for example) is drift: the merge guard refuses, and Needs-you asks whether to switch back or discard the edits. `pan sync-main` and server-side rebases lift the install around the git operation and merge a moved file's new base back in. A file that cannot be merged keeps the install's version and shows under lift conflicts in `show`.
+
+**Merge guard.** A Deft PR merges only when all of these are true:
+
+- The worktree's install snapshot, `.overdeck/deft-install.json`, is present and readable (a native Directive project has none and needs none). A deleted or corrupt snapshot refuses the merge, because nothing else proves what the install hid.
+- Its diff carries no install path: none of the deposit paths, and no `AGENTS.md`, `package.json`, `Taskfile.yml`, or `.gitignore` that carries Directive's marker at the PR head.
+- No hidden tracked file has drifted.
+- `.pan/deft/<ISSUE>/` at the PR head matches what `save` would write now.
+
+The guard runs in the merge gate and in the forge-merge route. It fails closed: when it cannot read the PR's head or diff, the PR is not mergeable.
+
+Without a readable snapshot, `back` cannot undo the install exactly. It then clears the worktree hooks path, the exclude file, and the skip-worktree flags, and warns: the install's files become visible to git, so review `git status` in the workspace and discard what you do not want.
+
+**Approval and auto-merge.** No Overdeck review, test, or verification agents run for a Deft issue, because Deft runs its own. So the merge gate does not require an approval at the PR head: the person who clicks Merge is the approval. Green checks, CI tests, UAT, mergeability, and the merge guard still apply, and the issue shows as awaiting merge when they pass. Auto-merge never acts on a Deft issue whose Deft policy requires a human merge: `requireHumanMerge`, or `autoDeployOnMerge` when that key is absent. A missing or unreadable `xbrief/PROJECT-DEFINITION.xbrief.json` counts as requiring a human merge.
+
+**Network.** The install needs the npm registry for `npx`, `npm view`, and the package install.
+
+**Limits.**
+
+- Claude Code and Codex agents only.
+- No polyrepo or remote (Fly) workspaces. `use` refuses them.
+- Deft's swarm mode refuses Bun projects, so a Deft issue in a Bun project runs without Deft swarm.
+- After `back`, the runtime's own dependencies stay in a `node_modules/` that existed before the install; only `node_modules/@deftai/` is removed.
+- The dashboard views for Deft issues (escalations, scopes, gates, and menu actions) are planned in [PAN-4849](https://github.com/eltmon/overdeck/issues/4849).
 
 ### SageOx
 

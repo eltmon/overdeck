@@ -11,6 +11,12 @@
  *   yes        on or default           yes      DEFT_ORCHESTRATOR=overdeck
  *   yes        on or default           no       nothing; Deft runs as the user configured it
  *
+ * PAN-4820: an issue on Deft's pipeline overrides the table. Its worktree
+ * holds a temporary install, which detects as a Directive project (H6), so
+ * the pipeline input wins: no kill switch, flag, orchestrator, deny or hidden
+ * skills, and Deft's run summary goes to `.overdeck/deft-run-summary.jsonl`
+ * (AD-9).
+ *
  * Explicit off means the `deft` pack toggle resolves off at the issue or
  * project level; the default never disables a deposit. Apply writes only the
  * per-launch env file, the untracked marked flag file, and one line in the
@@ -24,6 +30,7 @@ import { promisify } from 'node:util';
 import { listPacks } from '../skill-packs/sources.js';
 import { issueIdFromWorkspacePath } from '../xbrief/io.js';
 import { DEFT_FLAG_FILE, DEFT_FLAG_MARKER, detectDirectiveProject, findRepoRoot } from './detect.js';
+import { type IssuePipeline, readIssuePipeline } from './issue-pipeline.js';
 import { readDeftIntegration } from './project-mode.js';
 
 export { DEFT_FLAG_MARKER } from './detect.js';
@@ -59,6 +66,8 @@ export interface DeftLaunchPlan {
   hideSkills: string[];
   /** One `[launcher] deft:` line for stderr. */
   provenance: string;
+  /** PAN-4820: export DEFT_RUN_SUMMARY_PATH for a Deft-pipeline issue. */
+  runSummary?: boolean;
 }
 
 export interface DeftLaunchContext {
@@ -66,6 +75,8 @@ export interface DeftLaunchContext {
   issueId?: string;
   projectKey?: string;
   deftSkillsMounted: boolean;
+  /** PAN-4820: the issue's pipeline; read with `readIssuePipeline` when absent. */
+  pipeline?: IssuePipeline;
 }
 
 async function packProvenance(deftSkillsMounted: boolean): Promise<string> {
@@ -80,8 +91,10 @@ export async function resolveDeftLaunch(ctx: DeftLaunchContext): Promise<DeftLau
     import('../skill-overrides/resolve.js'),
   ]);
   const root = await findRepoRoot(ctx.cwd);
+  const issueId = ctx.issueId ?? issueIdFromWorkspacePath(root) ?? undefined;
+  const pipeline = ctx.pipeline ?? (issueId ? await readIssuePipeline(issueId) : 'overdeck');
   const [layers, detection, managed, pack] = await Promise.all([
-    loadSkillOverrideLayers({ projectKey: ctx.projectKey, issueId: ctx.issueId ?? issueIdFromWorkspacePath(root) ?? undefined }),
+    loadSkillOverrideLayers({ projectKey: ctx.projectKey, issueId }),
     detectDirectiveProject(root),
     ctx.projectKey ? readDeftIntegration(ctx.projectKey) : Promise.resolve(null),
     packProvenance(ctx.deftSkillsMounted),
@@ -98,6 +111,18 @@ export async function resolveDeftLaunch(ctx: DeftLaunchContext): Promise<DeftLau
 
   const engine = detection.pinnedEngine ?? detection.coreVersion;
   const project = directive ? `project directive${engine ? ` engine ${engine}` : ''}` : 'project not directive';
+  if (pipeline === 'deft') {
+    return {
+      directive,
+      killSwitch: false,
+      writeFlag: false,
+      orchestrator: false,
+      denyCli: false,
+      hideSkills: [],
+      runSummary: true,
+      provenance: `[launcher] deft: ${pack}; ${project}; deft pipeline`,
+    };
+  }
   const state = killSwitch ? 'kill switch' : orchestrator ? 'managed' : directive ? 'untouched' : 'read-only';
   return {
     directive,
@@ -175,6 +200,7 @@ export async function applyDeftLaunch(plan: DeftLaunchPlan, root: string, envFil
   const lines = [
     ...(plan.killSwitch ? ['DEFT_DIRECTIVE_DISABLE=1'] : []),
     ...(plan.orchestrator ? ['DEFT_ORCHESTRATOR=overdeck'] : []),
+    ...(plan.runSummary ? ['DEFT_RUN_SUMMARY_PATH=overdeck'] : []),
   ];
   if (lines.length > 0) {
     await mkdir(dirname(envFile), { recursive: true });

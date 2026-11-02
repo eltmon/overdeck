@@ -25,6 +25,7 @@ import { exec, execFile } from 'child_process';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { promisify } from 'util';
+import { withDeftInstallLifted } from '../deft/lift.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import type { MergeGateResult } from './merge-gate.js';
 import type { ApprovalCarry, ReconcileDeps, RebaseStatus } from './merge-train-reconciler.js';
@@ -53,9 +54,12 @@ export interface TrainIo {
   postApproval: (input: PostReviewVerdictInput) => Promise<PostReviewVerdictResult>;
   journal: (workspacePath: string, entry: Omit<PipelineJournalEntry, 'at'>) => void;
   log: (line: string) => void;
+  /** PAN-4820: run a git operation with a hidden Deft install lifted; `withDeftInstallLifted` by default. */
+  withDeftInstallLifted: <T>(worktree: string, targetRef: string, fn: () => Promise<T>) => Promise<T>;
 }
 
 const defaultIo: TrainIo = {
+  withDeftInstallLifted,
   git: async (cwd, args) => (await execFileAsync('git', args, { cwd, encoding: 'utf-8' })).stdout,
   workspacePathFor: (issueId) => {
     const project = resolveProjectFromIssueSync(issueId);
@@ -151,22 +155,29 @@ export function buildRealReconcileDeps(overrides: Partial<TrainIo> = {}): Reconc
       const forkPoint = await git('merge-base', 'HEAD', 'origin/main');
       const patchBefore = await io.patchId(ws, forkPoint, prHead);
 
-      try {
-        await git('rebase', 'origin/main');
-      } catch {
-        await git('rebase', '--abort').catch(() => {});
-        return { status: 'conflict' };
-      }
-      const newHead = await git('rev-parse', 'HEAD');
-      try {
-        await git('push', `--force-with-lease=refs/heads/${branch}:${prHead}`, 'origin', `${newHead}:refs/heads/${branch}`);
-      } catch (err) {
-        // Put the workspace back on the PR head it had, so the agent's next
-        // push is not a surprise rebase.
-        await git('reset', '--hard', prHead).catch(() => {});
-        const message = err instanceof Error ? err.message : String(err);
-        throw new Error(`push of the rebased ${branch} failed: ${message}`);
-      }
+      // PAN-4820: a Deft issue's hidden install is lifted for the rebase and
+      // push (skip-worktree files abort a rebase; Deft's pre-push hook would
+      // refuse the push). Without an install this runs the body alone.
+      const newHead = await io.withDeftInstallLifted(ws, 'origin/main', async () => {
+        try {
+          await git('rebase', 'origin/main');
+        } catch {
+          await git('rebase', '--abort').catch(() => {});
+          return null;
+        }
+        const rebasedHead = await git('rev-parse', 'HEAD');
+        try {
+          await git('push', `--force-with-lease=refs/heads/${branch}:${prHead}`, 'origin', `${rebasedHead}:refs/heads/${branch}`);
+        } catch (err) {
+          // Put the workspace back on the PR head it had, so the agent's next
+          // push is not a surprise rebase.
+          await git('reset', '--hard', prHead).catch(() => {});
+          const message = err instanceof Error ? err.message : String(err);
+          throw new Error(`push of the rebased ${branch} failed: ${message}`);
+        }
+        return rebasedHead;
+      });
+      if (newHead === null) return { status: 'conflict' };
       const patchAfter = await io.patchId(ws, main, newHead);
       return patchBefore && patchBefore === patchAfter
         ? { status: 'clean', carry: { from: prHead, to: newHead, patchId: patchAfter } }

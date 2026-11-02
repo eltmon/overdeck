@@ -105,9 +105,11 @@ import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './regis
 import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
 import { requireManagedKimiDelivery } from './managed-kimi-delivery.js';
 import { resolveEffort } from './resolve-effort.js';
+import { assertRoleRunsOnPipeline } from '../deft/role-refusal.js';
 const execAsync = promisify(exec);
 
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
+  await assertRoleRunsOnPipeline(issueId, role);
   if (role !== 'work') return spawnRunWithoutConsentClaim(issueId, role, options);
 
   const startedBy = resolveAgentStartedBy(options.startedBy);

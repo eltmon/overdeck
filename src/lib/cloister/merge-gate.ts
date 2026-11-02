@@ -16,6 +16,8 @@
  * Nothing is stored: each input is read from the forge, `projects.yaml`, the
  * tracker's labels, or the global setting at the moment it is asked.
  */
+import { isDeftPipelineIssue } from '../deft/issue-pipeline.js';
+import { type DeftGuardVerdict, deftMergeGuardForIssue } from '../deft/merge-guard.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { issueHoldsForUat } from './auto-merge-eligibility.js';
 import {
@@ -41,6 +43,10 @@ export interface MergeGateDeps {
   readReviews?: ReadGitHubReviews;
   /** The logins Overdeck posts as, for a review whose association alone is not trusted. */
   overdeckLogins?: () => Promise<readonly string[]>;
+  /** PAN-4820: true when the issue runs on Deft Directive's pipeline. */
+  isDeftPipeline?: (issueId: string) => Promise<boolean>;
+  /** PAN-4820: the Deft merge guard for the issue's PR at a head. */
+  deftGuard?: (issueId: string, headSha: string | null) => Promise<DeftGuardVerdict & { drifted: string[] }>;
 }
 
 /**
@@ -58,6 +64,8 @@ function mergeabilityPending(facts: PrFacts): boolean {
 
 export interface MergeGateResult extends MergeReadiness {
   facts: PrFacts;
+  /** PAN-4820: Deft-hidden files edited outside any commit; the caller raises an operator decision. */
+  deftDrift?: string[];
 }
 
 /** The issue's project config, or null when no project claims the issue. */
@@ -98,6 +106,10 @@ export async function defaultUatRequired(issueId: string, deps: UatRequiredDeps 
  * strike merge passes `false`, which waives approval entirely: a strike PR is
  * authored as the operator, who cannot approve their own PR. Every other check
  * (draft, changes requested, checks, CI test job, UAT, mergeability) still applies.
+ *
+ * PAN-4820 (AD-4): a Deft issue defaults to `false` too, because no Overdeck
+ * reviewer runs for it; the person who clicks Merge is the approval. Its PR
+ * must also pass the Deft merge guard.
  */
 export interface MergeGateOptions extends PrFactsOptions {
   requireApprovalAtHead?: boolean;
@@ -121,7 +133,8 @@ export async function evaluateIssueMergeGate(
   deps: MergeGateDeps = {},
   options: MergeGateOptions = {},
 ): Promise<MergeGateResult> {
-  const { requireApprovalAtHead = true, ...readOptions } = options;
+  const deft = await (deps.isDeftPipeline ?? isDeftPipelineIssue)(issueId);
+  const { requireApprovalAtHead = !deft, ...readOptions } = options;
   const getFacts = (readOptions: PrFactsOptions) => deps.getFacts
     ? deps.getFacts(issueId, readOptions)
     : getPrFacts(issueId, {}, readOptions);
@@ -143,12 +156,19 @@ export async function evaluateIssueMergeGate(
       uatRequired = true;
     }
   }
-  return {
-    ...evaluateMergeReadiness(facts, {
-      ciTestsRequired, uatRequired, requireApprovalAtHead, requireApproval: requireApprovalAtHead,
-    }),
-    facts,
-  };
+  const readiness = evaluateMergeReadiness(facts, {
+    ciTestsRequired, uatRequired, requireApprovalAtHead, requireApproval: requireApprovalAtHead,
+  });
+  if (deft) {
+    // The guard judges the PR's diff at a head; with no head (a GitLab read can
+    // lack one) there is nothing to judge, so a Deft PR is refused, not waved through.
+    if (!facts.headSha) {
+      return { ...readiness, ready: false, reason: 'the Deft merge guard needs the PR head, and the forge reported none', facts };
+    }
+    const verdict = await (deps.deftGuard ?? deftMergeGuardForIssue)(issueId, facts.headSha);
+    if (!verdict.ok) return { ...readiness, ready: false, reason: verdict.reason, facts, deftDrift: verdict.drifted };
+  }
+  return { ...readiness, facts };
 }
 
 export interface ConflictRepairGateResult {

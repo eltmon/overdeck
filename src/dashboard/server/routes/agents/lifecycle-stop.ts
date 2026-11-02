@@ -330,6 +330,8 @@ async function requestReviewInProcess(issueId: string): Promise<ReviewRequestOut
       return { requested: false, reason: 'the workspace does not exist' };
     case 'no-project':
       return { requested: false, reason: `no project is configured for ${issueId}` };
+    case 'deft-pipeline':
+      return { requested: false, noReviewNeeded: true, reason: `${issueId} runs on Deft; Overdeck review is off` };
   }
 }
 

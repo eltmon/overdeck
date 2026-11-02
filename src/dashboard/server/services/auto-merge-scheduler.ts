@@ -60,6 +60,8 @@ export interface AutoMergeSchedulerDeps {
   listCandidates?: (projectPath: string) => Promise<readonly string[]>;
   /** The door's forge-free policy check; `autoMergePolicyRefusal` by default. */
   policyRefusal?: (issueId: string) => DoorResult | null;
+  /** PAN-4820: the Deft human-merge hold; `deftAutoMergeHold` by default. */
+  deftHold?: (issueId: string) => Promise<string | null>;
   latestAutoMerge?: (issueId: string) => PendingAutoMerge | null;
   mergeGate?: (issueId: string) => Promise<GateAnswer>;
   /** The schedule door; `postAutoMergeSchedulePayload` with a guarded insert by default. */
@@ -231,6 +233,7 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
   const forgeOf = deps.forgeOf ?? await defaultForgeOf();
   const listCandidates = deps.listCandidates ?? ((projectPath: string) => listScheduleCandidates(projectPath));
   const policyRefusal = deps.policyRefusal ?? await defaultPolicyRefusal();
+  const deftHold = deps.deftHold ?? (await import('../../../lib/deft/policy.js')).deftAutoMergeHold;
   const mergeGate = deps.mergeGate ?? defaultMergeGate;
   const schedule = deps.schedule ?? defaultSchedule;
   const rereview = deps.rereview ?? defaultRereview;
@@ -268,6 +271,11 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
         const refusal = policyRefusal(issueId);
         if (refusal) {
           skip(refusalReason(refusal));
+          continue;
+        }
+        const hold = await deftHold(issueId);
+        if (hold) {
+          skip(hold);
           continue;
         }
         const latest = latestAutoMerge(issueId);

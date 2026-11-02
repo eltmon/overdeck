@@ -243,6 +243,19 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
     }));
   });
 
+  it('creates no auto-merge row for a Deft issue that requires a human merge (PAN-4820)', async () => {
+    const { deps, insert, factsReads } = world({ labels: ['auto-merge'] });
+    const outcomes = await scheduleReadyAutoMerges({
+      ...deps,
+      deftHold: async (issueId) => `${issueId} runs on Deft and requires a human merge`,
+    });
+    expect(outcomes).toEqual([
+      { projectKey: 'overdeck', issueId: 'PAN-42', scheduled: false, reason: 'PAN-42 runs on Deft and requires a human merge' },
+    ]);
+    expect(insert).not.toHaveBeenCalled();
+    expect(factsReads).not.toHaveBeenCalled();
+  });
+
   it('schedules a PR opted in by the project default', async () => {
     const { deps, insert } = world({ projectDefault: 'auto' });
     await scheduleReadyAutoMerges(deps);

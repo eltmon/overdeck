@@ -74,6 +74,14 @@ async function loadLaunchLayers(ctx: LaunchSkillContext): Promise<SkillOverrideL
   return conversation ? { ...layers, conversation } : layers;
 }
 
+/** PAN-4820: the launch's issue runs on Deft's pipeline. */
+async function isDeftPipelineLaunch(ctx: LaunchSkillContext): Promise<boolean> {
+  const { issueId } = await resolveLaunchScope(ctx);
+  if (!issueId) return false;
+  const { readIssuePipeline } = await import('../deft/issue-pipeline.js');
+  return (await readIssuePipeline(issueId)) === 'deft';
+}
+
 /** Skill names the launch should hide. */
 export async function resolveLaunchDisabledSkills(ctx: LaunchSkillContext): Promise<string[]> {
   const { disabledSkillNames } = await import('./resolve.js');
@@ -102,11 +110,13 @@ export async function resolveLaunchPackSelection(
     import('../skill-packs/adapters.js'),
     import('../skill-packs/gstack.js'),
   ]);
-  const [layers, packs] = await Promise.all([loadLaunchLayers(ctx), listPackCatalog()]);
+  const [layers, packs, deftPipeline] = await Promise.all([loadLaunchLayers(ctx), listPackCatalog(), isDeftPipelineLaunch(ctx)]);
   const selection: MountSelection = { packs: [] };
   const warnings: string[] = [];
   for (const pack of packs) {
     if (exclude.has(pack.id)) continue;
+    // PAN-4820: a Deft-pipeline issue runs Deft's own deposit, never the read-only deft pack.
+    if (deftPipeline && pack.id === 'deft') continue;
     if (!pack.manifest) {
       const perSkillOn = [layers.conversation, layers.global, layers.project, layers.issue].some(map =>
         Object.entries(map ?? {}).some(([id, enabled]) => enabled && id.startsWith(`${pack.id}/`)));

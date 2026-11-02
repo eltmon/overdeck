@@ -58,7 +58,7 @@ export const requestReviewPipeline = createRequestReviewPipeline();
 /** What a review-pipeline start did, for the caller to report. */
 export type StartRequestReviewOutcome =
   | { started: true; remoteVmName?: string }
-  | { started: false; reason: 'no-workspace' | 'already-running' | 'no-project' }
+  | { started: false; reason: 'no-workspace' | 'already-running' | 'no-project' | 'deft-pipeline' }
   | { started: false; reason: 'dirty-workspace'; error: string };
 
 /** Who asked for the review — journalled as the `review.requested` source. */
@@ -97,6 +97,8 @@ export type GuardedReviewRequestOutcome =
   | { kind: 'dirty-workspace'; error: string }
   | { kind: 'no-project'; autoRequeueCount: number }
   | { kind: 'already-running' }
+  /** PAN-4820: the issue runs on Deft's pipeline; Overdeck review is off. */
+  | { kind: 'deft-pipeline' }
   | { kind: 'started'; autoRequeueCount: number; remoteVmName?: string };
 
 export type GuardedReviewRequester = (

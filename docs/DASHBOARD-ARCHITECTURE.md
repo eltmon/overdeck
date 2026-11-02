@@ -1446,3 +1446,22 @@ exactly, never a `/m/` prefix. The tab reads `selectIssues`,
 fills, and groups with `groupPipelineIssues` in `lib/pipeline-state.ts`,
 which the desktop `PipelineView` shares — one definition of "active issue",
 one phase order, one sort. It adds no API route and no HTTP request.
+
+## Deft pipeline routes (planned, PAN-4849)
+
+PAN-4820 shipped the per-issue Deft pipeline as library and CLI code
+(`src/lib/deft/`, `pan skills deft use|back|save|show`); the dashboard has no
+Deft routes yet. [PAN-4849](https://github.com/eltmon/overdeck/issues/4849)
+plans these, and none of them is served today:
+
+| Route | Purpose |
+|---|---|
+| `GET /api/issues/:id/deft` | One issue's Deft state for the cockpit (scopes, escalations, gates, drift) |
+| `GET /api/deft/issues` | Batched Deft state for the board, tree rows and pipeline strip |
+| `POST /api/issues/:id/pipeline` | Run on Deft / Back to Overdeck; shells `pan skills deft use|back` |
+| `POST /api/issues/:id/deft/escalations/:escId/resolve` | Answer a Deft escalation (rewrites the escalation file) |
+| `POST /api/issues/:id/deft/scopes/signoff` | Sign off a scope item's disposition as a human event |
+
+The one Deft fact already in the read model is `deftPipeline` on the derived
+issue state's facts (`src/lib/overdeck/derived-issue-state.ts`), which lets a
+Deft issue's PR derive `ready` without an Overdeck approval.
