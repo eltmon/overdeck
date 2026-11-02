@@ -82,6 +82,9 @@ function QuestionCard({ decision, pending, error, onError }: {
         <fieldset key={`q-${qIdx}`} className="space-y-2">
           {q.header ? <legend className="text-xs text-muted-foreground">{q.header}</legend> : null}
           <p className="text-sm font-medium text-foreground">{q.question}</p>
+          {q.context ? (
+            <p className="whitespace-pre-line text-sm text-muted-foreground">{q.context}</p>
+          ) : null}
           {q.options.map((opt, oIdx) => {
             const selected = custom.length === 0 && selections[qIdx] === opt.label;
             return (

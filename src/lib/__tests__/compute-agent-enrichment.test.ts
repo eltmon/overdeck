@@ -628,6 +628,24 @@ describe('computeAgentEnrichment operator decision', () => {
     rmSync(workspace, { recursive: true, force: true })
   })
 
+  it('carries the decision context as its own field', async () => {
+    const agentId = 'agent-pan-1'
+    const workspace = setup(agentId)
+    requestOperatorDecision(workspace, {
+      issueId: 'PAN-1',
+      agentId,
+      question: 'Rotate the leaked token?',
+      options: ['Yes', 'No'],
+      context: 'Push protection blocked the branch.',
+    })
+
+    const e = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
+
+    expect(e.pendingAskUserQuestion?.questions[0]?.question).toBe('Rotate the leaked token?')
+    expect(e.pendingAskUserQuestion?.questions[0]?.context).toBe('Push protection blocked the branch.')
+    rmSync(workspace, { recursive: true, force: true })
+  })
+
   it('reports no askUserQuestion once the decision is answered', async () => {
     const agentId = 'agent-pan-1'
     const workspace = setup(agentId)

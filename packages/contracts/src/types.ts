@@ -369,6 +369,7 @@ export const AgentSnapshot = Schema.Struct({
     askedAt: Schema.String,
     questions: Schema.Array(Schema.Struct({
       question: Schema.String,
+      context: Schema.optional(Schema.String),
       header: Schema.optional(Schema.String),
       multiSelect: Schema.optional(Schema.Boolean),
       options: Schema.Array(Schema.Struct({

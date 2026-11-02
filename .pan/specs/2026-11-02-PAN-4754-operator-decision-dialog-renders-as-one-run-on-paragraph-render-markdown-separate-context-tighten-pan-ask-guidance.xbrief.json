@@ -1,0 +1,918 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T00:49:24Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4754: Operator decision dialog renders as one run-on paragraph: render markdown, separate context, tighten pan ask guidance",
+    "updated": "2026-11-02T00:55:20.271Z"
+  },
+  "plan": {
+    "id": "pan-4754",
+    "title": "Operator decision dialog renders as one run-on paragraph: render markdown, separate context, tighten pan ask guidance",
+    "status": "running",
+    "uid": "f0375c9f-dcee-47e5-ae77-e005063bbe0d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T00:49:24Z",
+    "updated": "2026-11-02T00:55:20.271Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4754",
+        "label": "PAN-4754",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-4754/.pan/drafts/pan-4754.md",
+        "label": "PRD draft (.pan/drafts/pan-4754.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "operator-decision",
+      "pan-ask",
+      "markdown",
+      "prompt"
+    ],
+    "narratives": {
+      "Problem": "Operator decisions from `pan ask` (and transcript AskUserQuestion prompts) render in the dashboard dialog as one run-on paragraph. `operatorDecisionAsPendingQuestion` (src/lib/cloister/operator-decision.ts) concatenates question and context into `question`, and AskUserQuestionDialog.tsx renders it in a plain <p> that collapses newlines and ignores markdown. roles/work.md tells agents to pack every fact into the quoted question argument, and option labels end up as full sentences.",
+      "Proposal": "Carry `context` as its own optional field on the pending question (operator-decision.ts -> agent-enrichment.ts toPendingAskUserQuestion -> contracts schemas -> frontend types). Render the question and the context with the shared ChatMarkdown component in the decision dialog, context in a muted bordered block under the question. Show context as plain pre-line text on the other two answer surfaces (SimpleQuestionCard, MobileNeedsYou); summary surfaces keep showing the question only. Rewrite the `pan ask` section of roles/work.md (short question, markdown bullet context with real newlines, short option labels, worked example) with a Prompt-Change trailer. Prove the rendering with a committed Playwright spec on the isolated-dashboard fixture (light + dark screenshots) and document the contract in docs/PIPELINE-GATES.md. Operator-approved design-review scope (FR-8..FR-14): make the dialog an accessible modal with focus trap, add Esc / Cmd+Enter / number-key shortcuts that never leak to global shortcuts, radio/checkbox option semantics with multiSelect, option-plus-note answers, consequences lifted next to options from `- **<label>:**` context lines, decision-first layout with a waiting age, and the amber needs-you tone with a single-Send footer. These six items all edit AskUserQuestionDialog.tsx and run in sequence.",
+      "NonGoals": "- No change to `pan ask` CLI flags, help text or the pipeline journal entry format (NFR-1).\n- No option-description syntax for `--option`; consequences go in the context.\n- No new dependencies; reuse ChatMarkdown (NFR-2). Do not copy UpdateDialog's bare ReactMarkdown + prose-invert.\n- Do not modify ChatMarkdown.tsx itself.\n- Summary surfaces (NeedsYouStrip, DecisionsPanel row, SimpleHomePage sentence, SessionFeedSidebar, browser/push notification previews, useIssueView prompt, awaitingInput prompt) do not gain the context; they show the question only.\n- No change to conversation-row pending-question types (ConversationList.tsx); conversations never carry operator decisions.\n- No markdown rendering in SimpleQuestionCard or MobileNeedsYou (plain pre-line text only).\n- No change to docs/GOD-VIEW.md, configuration/push-notifications.mdx or docs/DASHBOARD-ARCHITECTURE.md; they mention `pan ask` but not its text format.\n- No focus-trap or hotkey library (NFR-2).\n- No change to the answer wire contract: answers stay string[] one per question; a note is appended to the last answer as '\\n\\nNote: <note>'.\n- No consequence lifting on SimpleQuestionCard or MobileNeedsYou."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Answer surfaces (decision dialog, SimpleQuestionCard, MobileNeedsYou) show the context; summary surfaces show the question only.",
+        "rationale": "The issue requires consumers to keep the context where they show it today. The three answer surfaces show full text and let the operator decide, so they keep it. Summary surfaces clamp or truncate (NeedsYouStrip line-clamp-2, push preview 140 chars), so the context rarely showed there. This corrects the earlier PRD FR-4, which wrongly filed SimpleQuestionCard and MobileNeedsYou as compact summaries."
+      },
+      {
+        "summary": "SimpleQuestionCard and MobileNeedsYou render the context as plain text with whitespace-pre-line, not ChatMarkdown.",
+        "rationale": "Smallest change that keeps line breaks readable; avoids adding providers to those components' tests. The dialog is the primary answer surface and gets full markdown."
+      },
+      {
+        "summary": "Screenshot verification is a committed Playwright spec (tests/pan-4754-decision-dialog.spec.ts) on the isolated-dashboard fixture with a mocked pending-input row.",
+        "rationale": "Follows the existing pan-2355-mobile.spec.ts recipe, is repeatable, and satisfies Playwright isolation (own temp OVERDECK_HOME, own port, own browser context)."
+      },
+      {
+        "summary": "Reuse ChatMarkdown in the dialog rather than bare react-markdown as the issue suggested.",
+        "rationale": "ChatMarkdown wraps react-markdown + remark-gfm with dashboard theming and is already used by the sibling PlanApprovalDialog; UpdateDialog's bare ReactMarkdown uses prose-invert and ignores the light theme. Satisfies the issue's intent (GFM rendering) with no new dependencies."
+      },
+      {
+        "summary": "Folded the operator-approved design-review addendum (FR-8..FR-14, work items 7-12) into the PRD and plan; serialized all dialog items because they edit the same file.",
+        "rationale": "Operator instruction 2026-11-01. Items 2 and 7-12 all mutate AskUserQuestionDialog.tsx and its test file, so the shared-mutation rule requires edges."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Twelve small items across ~16 files; one subsystem chain (operator decision -> enrichment -> dashboard decision dialog) plus its prompt and docs. The design-review items are inseparable from the dialog rewrite they reorder.",
+      "canonicalFilename": "2026-11-02-PAN-4754-operator-decision-dialog-renders-as-one-run-on-paragraph-render-markdown-separate-context-tighten-pan-ask-guidance.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "context-field",
+        "title": "Carry pan ask context as its own optional field on the pending question",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:49:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/operator-decision.ts",
+            "src/lib/cloister/__tests__/operator-decision.test.ts",
+            "src/lib/agent-enrichment.ts",
+            "src/lib/__tests__/compute-agent-enrichment.test.ts",
+            "packages/contracts/src/events.ts",
+            "packages/contracts/src/types.ts",
+            "src/dashboard/frontend/src/types.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npx vitest run src/lib/cloister/__tests__/operator-decision.test.ts src/lib/__tests__/compute-agent-enrichment.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "contracts build completes without errors",
+            "operator-decision.test.ts and compute-agent-enrichment.test.ts pass, including the new no-context and context-survives cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 1. In operatorDecisionAsPendingQuestion (operator-decision.ts, grep `d.context ?`), set `question: d.question` and spread `...(d.context ? { context: d.context } : {})`; add `context?: string` to the return type's question element. In agent-enrichment.ts add `context?: string` to `interface Question` (grep `export interface Question {`) and to the question element of `PendingAskUserQuestionSnapshot`; in `toPendingAskUserQuestion` copy context with the same conditional spread. Add `context: Schema.optional(Schema.String),` after `question: Schema.String,` in the pendingAskUserQuestion struct of packages/contracts/src/events.ts (~line 321) and packages/contracts/src/types.ts (~line 371). Add `context?: string;` after `question: string;` in src/dashboard/frontend/src/types.ts (~line 151). Do NOT edit AskUserQuestionDialog.tsx (item dialog-markdown owns it). Leave the awaitingInput prompt `.map(q => q.question)` unchanged. Run `npm run build:contracts`. Tests: update `maps the decision to a pending AskUserQuestion shape` to expect separate question/context; add a no-context case asserting `not.toHaveProperty('context')`; add `carries the decision context as its own field` in compute-agent-enrichment.test.ts `describe('computeAgentEnrichment operator decision')`."
+        },
+        "items": [
+          {
+            "id": "context-field.ac1",
+            "title": "Given a decision with context, when operatorDecisionAsPendingQuestion maps it, then it returns question equal to the raw d.question and a separate context field (operator-decision.test.ts asserts the exact object)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-field.ac2",
+            "title": "Given a decision without context, when it is mapped, then the question object has no context key (expect(...).not.toHaveProperty('context') passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-field.ac3",
+            "title": "Given an open decision with context, when computeAgentEnrichment runs, then pendingAskUserQuestion.questions[0] carries question 'Rotate the leaked token?' and the context string as separate fields (new compute-agent-enrichment.test.ts case passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-field.ac4",
+            "title": "Both contracts pendingAskUserQuestion structs declare context as Schema.optional(Schema.String) and src/dashboard/frontend/src/types.ts declares context?: string; npm run typecheck exits 0 after npm run build:contracts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-markdown",
+        "title": "Render the question as markdown and the context as a separate block in AskUserQuestionDialog",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:49:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+            "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/AskUserQuestionDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AskUserQuestionDialog.test.tsx passes, including the three new markdown/context tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 2. Add `context?: string` after `question: string` in AskUserQuestionSubject's question element (~line 41). Import ChatMarkdown from './chat/ChatMarkdown'. Replace `<p className=\"text-sm font-medium text-foreground\">{q.question}</p>` (~line 159) with a `div.text-sm.text-foreground` wrapping `<ChatMarkdown text={q.question} cwd={undefined} />`. If ChatMarkdown margins are loose, tighten only via wrapper classes such as `[&>*:first-child]:mt-0 [&>*:last-child]:mb-0`; never edit ChatMarkdown.tsx. Add describe('AskUserQuestionDialog markdown') with a render helper that takes its own pendingAskUserQuestion and three tests: list in question renders 2 listitems; context renders in a separate element from the question; no context block without context. Implementation checkpoint: if ChatMarkdown throws in the test for a missing provider, wrap in the providers PrdViewer.test.tsx uses; fallback vi.mock('../chat/ChatMarkdown') with a react-markdown + remark-gfm stub. Add `src/components/__tests__/AskUserQuestionDialog.test.tsx` to scripts/frontend-test-subset.txt in sorted position. Layout per FR-13 (PRD work item 2 'After' snippet): question text, then the existing options div, then the context under an `eyebrow` label \"Agent's notes\" in `border-l-2 border-border pl-3 text-sm text-muted-foreground` (a left rule, not a bordered box)."
+        },
+        "items": [
+          {
+            "id": "dialog-markdown.ac1",
+            "title": "Given a question 'Pick a path.\\n\\n- first fact\\n- second fact', when the dialog renders, then screen.getAllByRole('listitem') returns 2 elements and 'Pick a path.' is in the document",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-markdown.ac2",
+            "title": "Given a question with context '- tried A\\n- tried B', when the dialog renders, then the context list items render under the \"Agent's notes\" label, after the option buttons, and the element containing 'Pick a path.' does not contain 'tried A'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-markdown.ac3",
+            "title": "Given a question without context, when the dialog renders, then no context block renders (queryByText on a context string returns null) and the existing issue-reference and answer-state tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-markdown.ac4",
+            "title": "scripts/frontend-test-subset.txt contains the line src/components/__tests__/AskUserQuestionDialog.test.tsx in sorted position, and ChatMarkdown.tsx is unchanged in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "answer-surfaces-context",
+        "title": "Show decision context on SimpleQuestionCard and MobileNeedsYou",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:49:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/simple/SimpleQuestionCard.tsx",
+            "src/dashboard/frontend/src/components/simple/SimpleQuestionCard.test.tsx",
+            "src/dashboard/frontend/src/components/mobile/MobileNeedsYou.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileNeedsYou.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/simple/SimpleQuestionCard.test.tsx src/components/mobile/__tests__/MobileNeedsYou.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SimpleQuestionCard.test.tsx and MobileNeedsYou.test.tsx pass, including the new context cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 6. In SimpleQuestionCard.tsx, after the quoted question div (grep `{question.question}`), render `{question.context ? <div className=\"mt-2 whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground\">{question.context}</div> : null}`. In MobileNeedsYou.tsx, after `<p className=\"text-sm font-medium text-foreground\">{q.question}</p>`, render `{q.context ? <p className=\"whitespace-pre-line text-sm text-muted-foreground\">{q.context}</p> : null}`. Plain text only, no ChatMarkdown. Add a with-context and a without-context case to each test file. Add `src/components/simple/SimpleQuestionCard.test.tsx` to scripts/frontend-test-subset.txt in sorted position (MobileNeedsYou.test.tsx is already listed). Requires context-field (typed context on AgentSnapshot) and runs after dialog-markdown because both edit frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "answer-surfaces-context.ac1",
+            "title": "Given an agent whose pending question has context '- tried A\\n- tried B', when SimpleQuestionCard renders, then the context text renders under the question; without context, queryByText(/tried A/) returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-surfaces-context.ac2",
+            "title": "Given a pending Needs-you row whose question has context, when MobileNeedsYou renders, then the context text renders under the question; without context, no context paragraph renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-surfaces-context.ac3",
+            "title": "scripts/frontend-test-subset.txt contains src/components/simple/SimpleQuestionCard.test.tsx in sorted position, and the diff adds no ChatMarkdown import to SimpleQuestionCard.tsx or MobileNeedsYou.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "work-md-guidance",
+        "title": "Rewrite the pan ask section of roles/work.md for scannable decisions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:49:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompts",
+            "npm run lint:prompt-trailer",
+            "npx vitest run src/lib/__tests__/role-definitions.test.ts"
+          ],
+          "expected_outputs": [
+            "lint:prompts passes",
+            "lint:prompt-trailer finds the Prompt-Change trailer and passes",
+            "role-definitions.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 3. In roles/work.md section `## Ask the operator with \\`pan ask\\`` (~lines 106-114), replace the single-line code block with the multi-line form from the PRD (short question, short --option labels, --context $'- ...\\n- ...\\n- **<label>:** ...'), add the paragraph stating the dashboard renders question and context as markdown in separate blocks, the three formatting bullets (question = one or two plain sentences with no facts; --context = short bullet list with real newlines via $'...' or a variable; option labels a few words with consequences in the context under a bullet starting with the bold label), and the PAN-4638 example verbatim from the PRD. Keep the existing '`pan ask` writes the request...' paragraph unchanged. Commit with a trailer line `Prompt-Change: pan ask guidance asks for a short question, bulleted markdown context and short option labels`. The example's consequence bullets must use the exact option labels (the dialog matches `- **<label>:**` lines to options); the PRD example already does."
+        },
+        "items": [
+          {
+            "id": "work-md-guidance.ac1",
+            "title": "roles/work.md's pan ask section contains the multi-line command template with --context $'...\\n...' and the sentence that the dashboard renders the question and the context as markdown in separate blocks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-md-guidance.ac2",
+            "title": "The section contains the three formatting bullets (one-or-two-sentence question, bulleted --context with real newlines, short option labels with consequences keyed by bold label) and the PAN-4638 example command; each consequence bullet in the example starts with **<exact option label>:**",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-md-guidance.ac3",
+            "title": "The commit that edits roles/work.md carries a Prompt-Change: trailer, so npm run lint:prompt-trailer exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pipeline-gates",
+        "title": "Document the decision formatting contract in docs/PIPELINE-GATES.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:49:24Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 5. In docs/PIPELINE-GATES.md `## Operator decisions (PAN-4383)` (~line 1654), after the paragraph describing the pan ask flags, add the PRD's paragraph: the answer dialog renders question and --context as markdown in separate blocks (context in a muted box under the question); the pending question carries context as its own optional `context` field; the simple issue page's question card and the phone Needs-you list show the context as plain text; summary surfaces (Needs-you strip, decisions panel row, push previews) show the question only; roles/work.md tells agents to keep the question short, put facts in a bulleted context and keep option labels short. Note in the PR body that docs/GOD-VIEW.md, configuration/push-notifications.mdx and docs/DASHBOARD-ARCHITECTURE.md mention pan ask but not its format, so they are unchanged. Also state the `- **<option label>:** <text>` consequence convention (shown under that option) and the dialog shortcuts Esc, Cmd/Ctrl+Enter and 1-4, plus option-plus-note answers, per the PRD paragraph."
+        },
+        "items": [
+          {
+            "id": "docs-pipeline-gates.ac1",
+            "title": "docs/PIPELINE-GATES.md section '## Operator decisions (PAN-4383)' states that the dialog renders the question and --context as markdown in separate blocks and that the pending question carries an optional `context` field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pipeline-gates.ac2",
+            "title": "The same paragraph names which surfaces show the context (dialog, simple question card, phone Needs-you) and which show the question only (Needs-you strip, decisions panel row, push previews), and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pipeline-gates.ac3",
+            "title": "The paragraph contains the `- **<option label>:** <text>` consequence convention and names Esc, Cmd/Ctrl+Enter and the 1–4 number keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-screenshot",
+        "title": "Playwright spec that screenshots the decision dialog in light and dark themes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:49:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4754-decision-dialog.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4754-decision-dialog.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "the spec passes and writes test-results/pan-4754/decision-dialog-light.png and test-results/pan-4754/decision-dialog-dark.png"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 4. New spec modeled on src/dashboard/frontend/tests/pan-2355-mobile.spec.ts: startIsolatedDashboard (own temp OVERDECK_HOME, own port; never the operator's live dashboard), a fresh browser.newContext() at 1280x900, page.route('**/api/conversations/pending-input') returning one row whose pendingAskUserQuestion question is two paragraphs and whose context is a three-bullet list, three short options. Open the dialog from Needs-you, assert 3 li elements, two separate p elements for the question paragraphs and the context in a different element, screenshot light to test-results/pan-4754/decision-dialog-light.png, switch to dark (html gets the `dark` class, see useTheme.ts) and screenshot decision-dialog-dark.png. Open both PNGs and inspect them yourself; tighten wrapper spacing in AskUserQuestionDialog.tsx only if needed (that is a dialog-markdown concern; keep any such fix in its own commit). Describe both screenshots in the PR body. Checkpoint: if the mocked row cannot open the dialog, add the routes the page requests; fallback is a real pan ask on the workspace dev stack, recorded in the PR body. Also capture (light and dark): one decision whose context lifts consequences under options, one multiSelect question, and keyboard focus visible on an option (press Tab before the shot)."
+        },
+        "items": [
+          {
+            "id": "dialog-screenshot.ac1",
+            "title": "Given an isolated dashboard with a mocked pending decision (two-paragraph question, three-bullet context), when the dialog opens, then the spec asserts 3 li elements and two separate question paragraphs, and the context renders in a different element from the question",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-screenshot.ac2",
+            "title": "The spec produces test-results/pan-4754/decision-dialog-light.png and decision-dialog-dark.png, and the dark capture is taken with the `dark` class on <html>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-screenshot.ac3",
+            "title": "The PR body shows or describes both screenshots, stating that paragraphs are separate, bullets are visible and the context block is visually distinct",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-screenshot.ac4",
+            "title": "The spec also produces light and dark screenshots of a decision with lifted consequences, a multiSelect question and a focused option, and asserts the lifted consequence text renders inside the option button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-a11y",
+        "title": "Make AskUserQuestionDialog an accessible modal with focus trap and focus restore",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:49:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+            "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/AskUserQuestionDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AskUserQuestionDialog.test.tsx passes, including this item's new tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 7 and the design-review decisions 'No focus-trap library' and 'Initial focus'. Add a panel ref on the element grepped by `max-w-2xl overflow-hidden rounded-xl` (~line 114), useId for title/description ids, role=\"dialog\", aria-modal=\"true\", aria-labelledby (the header h2) and aria-describedby (the first question's text wrapper). A useEffect on open records document.activeElement, focuses the first option of the first question (or the selected option), and restores focus on close/unmount. Tab/Shift+Tab at the last/first focusable element (button:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex=\"-1\"])) wraps inside the panel. No new dependency."
+        },
+        "items": [
+          {
+            "id": "dialog-a11y.ac1",
+            "title": "Given the dialog is open, then getByRole('dialog') has aria-modal='true' and its accessible name equals the h2 text (test 'has dialog semantics' passes and the dialog renders with these attributes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-a11y.ac2",
+            "title": "Given the dialog opens, then document.activeElement is the first option button (test 'focuses the first option on open' passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-a11y.ac3",
+            "title": "Given focus on the last focusable element, when Tab is pressed, then focus moves to the first focusable element (wrap test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-a11y.ac4",
+            "title": "Given a button had focus before open, when the dialog closes, then focus returns to that button (restore test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-keys",
+        "title": "Add Esc, Cmd/Ctrl+Enter and number-key shortcuts to the dialog and stop key propagation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:49:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+            "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/AskUserQuestionDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AskUserQuestionDialog.test.tsx passes, including this item's new tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 8. In the panel onKeyDown: Esc -> onDismiss() unless isSubmitting; Cmd/Ctrl+Enter -> handleSubmit() when canSubmit; keys 1-4 select the matching option when questions.length === 1 and e.target is not the textarea; then e.stopPropagation() for every key. Implementation checkpoint: a test proves a document keydown listener receives nothing pressed inside the dialog. Fallback only if propagation leaks: in App.tsx handleKeyDown (registered ~line 681) return early when document.querySelector('[role=\"dialog\"][aria-modal=\"true\"]') is non-null. App.tsx is touched only under the fallback. Runs after dialog-option-semantics and dialog-option-note, so number keys write into the string[][] selections and aria-checked already exists."
+        },
+        "items": [
+          {
+            "id": "dialog-keys.ac1",
+            "title": "Given the dialog is open and not submitting, when Escape is pressed, then onDismiss is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-keys.ac2",
+            "title": "Given an option is selected, when Ctrl+Enter is pressed, then onSubmit receives that option's label (and the note when one is typed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-keys.ac3",
+            "title": "Given one question, when '2' is pressed outside the textarea, then the second option has aria-checked='true'; when '2' is typed in the textarea, then the textarea value contains '2' and the selection is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-keys.ac4",
+            "title": "Given a document keydown listener attached in the test, when keys are pressed inside the dialog, then the listener is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-option-semantics",
+        "title": "Give dialog options radio/checkbox semantics, multiSelect toggling, check icon and focus rings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:49:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4754",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+            "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/AskUserQuestionDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AskUserQuestionDialog.test.tsx passes, including this item's new tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ],
+          "foundationFor": [
+            "dialog-option-note",
+            "dialog-keys",
+            "dialog-consequences-layout"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 9. Change selections from string[] to string[][] (chosen labels per question). Single-choice click replaces; multiSelect click toggles. Options get role radio (inside role radiogroup) or checkbox (inside role group) with aria-checked, a lucide Check icon when selected, and `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`. Replace the textarea's `focus:outline-none focus:border-primary` with the same ring classes. Turn the 'Or type a custom answer' <p> into a <label htmlFor> bound to the textarea id. MultiSelect answers join chosen labels with ', ' in option order."
+        },
+        "items": [
+          {
+            "id": "dialog-option-semantics.ac1",
+            "title": "Given a single-choice question, then its options render as role='radio' inside role='radiogroup' and the selected one has aria-checked='true' and shows a check icon",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-option-semantics.ac2",
+            "title": "Given a multiSelect question with options A, B, C, when A and C are clicked and Send pressed, then onSubmit receives ['A, C']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-option-semantics.ac3",
+            "title": "The note textarea renders with an accessible label (getByLabelText finds it) and every option button contains the focus-visible:ring-2 class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-option-note",
+        "title": "Let the operator send an option plus a note",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:49:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+            "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/AskUserQuestionDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AskUserQuestionDialog.test.tsx passes, including this item's new tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 10 and the design-review decision 'Answer format with a note'. Remove setCustomText('') from the option click handler (~line 173) and the selection reset from the textarea onChange (~line 203). handleSubmit: choices only -> answers[i] = label(s); choices + note -> same, last answer gets '\\n\\nNote: ' + note appended; note only -> [note]. Codex approvals keep the note box hidden and send only the option. Label 'Add a note (optional)', placeholder 'Anything the agent should know with your answer.' capture('agent_question_answered') answer_type becomes 'selection' | 'note' | 'selection+note'. Update the existing tests in describe('AskUserQuestionDialog answer state') to the new semantics (choice and note no longer clear each other) instead of deleting them: deleting tests trips the test-skip gate, and .only/skipIf fail lint."
+        },
+        "items": [
+          {
+            "id": "dialog-option-note.ac1",
+            "title": "Given a typed note, when an option is clicked, then the textarea still holds the note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-option-note.ac2",
+            "title": "Given Option A selected and note 'also X', when Send is pressed, then onSubmit receives ['Option A\\n\\nNote: also X']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-option-note.ac3",
+            "title": "Given no selection and note 'just this', when Send is pressed, then onSubmit receives ['just this']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-consequences-layout",
+        "title": "Lift option consequences from context, reorder the dialog and show the waiting age",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:49:24Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+            "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx",
+            "src/dashboard/frontend/src/lib/decisionContext.ts",
+            "src/dashboard/frontend/src/lib/decisionContext.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/decisionContext.test.ts src/components/__tests__/AskUserQuestionDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "decisionContext.test.ts and AskUserQuestionDialog.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "FR-13"
+          ],
+          "readinessReason": "Its file overlaps are serialized by blocks edges (dialog-keys and answer-surfaces-context before it, dialog-needs-you-tone after it); it never runs alongside another item that edits the same files."
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 11. New pure function liftOptionConsequences(context, optionLabels) in src/dashboard/frontend/src/lib/decisionContext.ts using /^\\s*[-*]\\s+\\*\\*(.+?)(?::\\*\\*|\\*\\*:)\\s*(.+)$/, matching labels trimmed and case-insensitively, keyed by exact option label; remainingContext undefined when only blank lines remain; applies only to options with empty description. In the dialog, render each option's label (font-medium, line-clamp-2, title=label) and below it opt.description || consequences[opt.label] in text-xs text-muted-foreground; render remainingContext in the 'Agent's notes' block. Replace the metadata grid (grep `grid gap-4 sm:grid-cols-2`) with the header subtitle `<agent id> · waiting <age>` using formatRelativeTime on askedAt, re-rendered by a 60 s setInterval cleared on unmount (tests use vi.useFakeTimers()). Order: header, question, options, notes, note box. Add src/lib/decisionContext.test.ts to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "dialog-consequences-layout.ac1",
+            "title": "decisionContext.test.ts passes: '- **Label:** text' and '* **Label**: text' lift case-insensitively, non-matching bullets stay in remainingContext, nothing-left returns undefined, labels matching no option are ignored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-consequences-layout.ac2",
+            "title": "Given context '- **Option A:** runs the check later', when the dialog renders, then that text appears under Option A and not inside the Agent's notes block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-consequences-layout.ac3",
+            "title": "Given options and a notes block, then the first option precedes the notes block in document order (compareDocumentPosition), and the AGENT/ISSUE grid no longer renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-consequences-layout.ac4",
+            "title": "Given askedAt 12 minutes before the fake clock, then the header subtitle shows the waiting age from formatRelativeTime; scripts/frontend-test-subset.txt lists src/lib/decisionContext.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-needs-you-tone",
+        "title": "Apply the needs-you warning tone, eyebrow labels and single-Send footer to the dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:49:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+            "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/AskUserQuestionDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AskUserQuestionDialog.test.tsx passes, including this item's new tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 12. Panel border-primary/30 -> border-warning/40; header icon bg-primary/15 + text-primary -> bg-warning/15 + text-warning. Replace ad-hoc `text-xs font-semibold uppercase tracking-wide` label classes with `eyebrow`. Remove the footer Minimize button (grep `title=\"Keeps the question in the activity feed`), keep the header Minimize icon, Esc and backdrop click. Add footer helper text: 'Send delivers your answer to the agent, which then continues.', or 'Choose an option or write a note.' when Send is disabled. Only Send keeps bg-primary."
+        },
+        "items": [
+          {
+            "id": "dialog-needs-you-tone.ac1",
+            "title": "Given the dialog renders, then the panel has class border-warning/40 and no element has class border-primary/30",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-needs-you-tone.ac2",
+            "title": "The footer renders exactly one button (Send) and no footer Minimize button; the header Minimize icon button still calls onDismiss",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-needs-you-tone.ac3",
+            "title": "With nothing chosen, the footer helper reads 'Choose an option or write a note.'; after choosing, it reads 'Send delivers your answer to the agent, which then continues.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "context-field",
+        "to": "answer-surfaces-context",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-markdown",
+        "to": "answer-surfaces-context",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-markdown",
+        "to": "dialog-a11y",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-a11y",
+        "to": "dialog-option-semantics",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-option-semantics",
+        "to": "dialog-option-note",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-option-note",
+        "to": "dialog-keys",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-keys",
+        "to": "dialog-consequences-layout",
+        "type": "blocks"
+      },
+      {
+        "from": "answer-surfaces-context",
+        "to": "dialog-consequences-layout",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-consequences-layout",
+        "to": "dialog-needs-you-tone",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-needs-you-tone",
+        "to": "dialog-screenshot",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -1661,6 +1661,21 @@ the question, the options and the asking agent's id. `pan ask <ISSUE> --withdraw
 appends `operator.decision-withdrawn` for the open request and exits 1 when
 there is none.
 
+The dashboard's answer dialog renders the question and `--context` as
+markdown, in separate blocks: the question first, then the options, then the
+context under an "Agent's notes" label. The pending question carries the
+context as its own optional `context` field. The other answer surfaces (the
+simple issue page's question card and the phone Needs-you list) show the
+context as plain text under the question; summary surfaces (the Needs-you
+strip, the decisions panel row, push previews) show the question only. A
+context line of the form `- **<option label>:** <text>` is shown under that
+option in the dialog instead of in the notes block, so agents must write the
+option label exactly. The dialog supports Esc (minimize), Cmd/Ctrl+Enter
+(send) and the number keys 1–4 (pick an option), and lets the operator send an
+option plus a note. `roles/work.md` tells agents to keep the question to one
+or two sentences, put facts in the context as a bullet list, and keep option
+labels short.
+
 Nothing stores "open". `src/lib/cloister/operator-decision.ts` derives it on
 read: the most recent `operator.decision-requested` entry is the open decision
 until a later `operator.decision-answered` or `operator.decision-withdrawn`

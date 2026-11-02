@@ -72,6 +72,7 @@ src/components/Stage/HomePane/Launcher.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx
 src/components/Stage/launcherFocusStore.test.ts
 src/components/XTerminal.test.tsx
+src/components/__tests__/AskUserQuestionDialog.test.tsx
 src/components/__tests__/DecisionsPanel.test.tsx
 src/components/__tests__/DegradedModeBanner.test.tsx
 src/components/__tests__/GitHubQuotaPill.test.tsx
@@ -152,6 +153,7 @@ src/components/sessionFeed/__tests__/useActivityEntryFeed.test.ts
 src/components/sessionFeed/__tests__/useConversationFeed.test.ts
 src/components/sessionFeed/__tests__/useMergedFeed.test.ts
 src/components/sidebar/__tests__/AddProjectToMachineDialog.test.tsx
+src/components/simple/SimpleQuestionCard.test.tsx
 src/components/terminal/TerminalDrawer.pending.test.tsx
 src/components/terminal/terminalControlFrames.test.ts
 src/components/workspace/new/__tests__/smartField.test.ts
@@ -176,6 +178,7 @@ src/lib/__tests__/telemetry.test.ts
 src/lib/__tests__/useDecisions.fleet.test.tsx
 src/lib/__tests__/useDecisions.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts
+src/lib/decisionContext.test.ts
 src/lib/sessionOutcome.test.ts
 src/lib/simple/uiMode.test.ts
 src/lib/simple/useSimpleActions.test.tsx
