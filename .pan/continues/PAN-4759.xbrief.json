@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4759",
   "created": "2026-11-02T01:10:45.557Z",
-  "updated": "2026-11-02T01:53:40.668Z",
+  "updated": "2026-11-02T01:53:55.144Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "move-toggles.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T01:53:40.668Z"
+    },
+    "move-adding-not-applied.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:53:55.144Z"
     }
   }
 }
