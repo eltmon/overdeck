@@ -4,17 +4,17 @@
     "created": "2026-11-02T16:07:07Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4820: Deft Directive per issue: run an issue on Deft's pipeline, see its state natively, switch back",
-    "updated": "2026-11-02T16:14:29.594Z"
+    "updated": "2026-11-02T17:12:41.751Z"
   },
   "plan": {
     "id": "pan-4820",
     "title": "Deft Directive per issue: run an issue on Deft's pipeline, see its state natively, switch back",
-    "status": "proposed",
+    "status": "running",
     "uid": "26fdfa8a-8859-4a36-a483-3d9265d3b1a0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-02T16:07:07Z",
-    "updated": "2026-11-02T16:14:29.594Z",
+    "updated": "2026-11-02T17:12:41.751Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4820",
@@ -1318,5 +1318,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
