@@ -4,17 +4,17 @@
     "created": "2026-11-02T05:40:28Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4659: Import VS Code themes from a .vsix extension package",
-    "updated": "2026-11-02T05:45:58.145Z"
+    "updated": "2026-11-02T05:46:47.178Z"
   },
   "plan": {
     "id": "pan-4659",
     "title": "Import VS Code themes from a .vsix extension package",
-    "status": "proposed",
+    "status": "running",
     "uid": "30eefe63-7c64-437a-82f9-3dacb409ff30",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T05:40:28Z",
-    "updated": "2026-11-02T05:45:58.145Z",
+    "updated": "2026-11-02T05:46:47.178Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4659",
@@ -545,5 +545,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
