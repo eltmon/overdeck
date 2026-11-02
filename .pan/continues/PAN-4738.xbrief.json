@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4738",
   "created": "2026-11-02T05:12:04.950Z",
-  "updated": "2026-11-02T05:33:06.553Z",
+  "updated": "2026-11-02T05:33:25.513Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,10 @@
     "readiness-refuses-auto-default-nudge.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T05:33:06.552Z"
+    },
+    "readiness-refuses-auto-default-nudge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:33:25.513Z"
     }
   }
 }
