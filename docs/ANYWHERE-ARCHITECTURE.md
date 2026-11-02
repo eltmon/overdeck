@@ -28,7 +28,7 @@ step, each named in the output:
 
 | Step | What it asserts |
 | --- | --- |
-| `fake-clis` | fresh homes, each with a fake `HOME`, a fake npm prefix holding fake `claude` 2.1.0 and `codex` 0.150.0, and a fake `npm`; the servers run on a hard link to Node in `.tmp/anywhere-node/bin` (see below) |
+| `fake-clis` | fresh homes, each with a fake `HOME`, a fake npm prefix holding fake `claude` 2.1.0 and `codex` 0.150.0, and a fake `npm` (B's prefix also holds a `docker` that exits 1); the servers run on a hard link to Node in `.tmp/anywhere-node/bin` (see below) |
 | `start` | both servers answer `GET /api/environment` within 90 s |
 | `proxy` | a byte-logging TCP proxy on a free loopback port fronts B |
 | `pair+link` | `pan pair --url http://127.0.0.1:<proxy> --json` on B, `pan machines link <url> --allow-loopback --json` on A; B holds the reverse link |
@@ -42,6 +42,7 @@ step, each named in the output:
 | `tell-once` | a repeated `pan tell … --message-id` replays the first answer; the same id with other text is refused (the seeded conversation has no live pane, so that answer is a failed delivery; `remote-reply` checks delivery) |
 | `released-409` | with `released_to` set on B, a message through A answers 409 `conversation-released` |
 | `forward` | `pan machines forward` reaches a dev server on B; B's dashboard port is refused |
+| `needs-docker` | (#4774) B carries no `docker` tag; `POST /api/fleet/placement` on A with `needs: ['docker']` picks A, and `pan lane start --machine auto --needs docker --json` on A launches the lane on A, which is then stopped and reaped. Skipped, with a logged reason, when this host's `docker info` fails |
 | `lane-remote` | (#4638) `pan lane start --role play --machine <B> --json` on A, under a root conversation on A, answers with B as the machine and a null id (B's `projects.yaml` puts the lanes root under B's fake `HOME`) |
 | `lane-report` | `pan lane report --status done` inside the lane on B; `pan lane wait <name>` on A exits 0 with the body within 20 s, and `pan lane list --json` on A lists the lane on B |
 | `lane-nest` | A's `GET /api/conversations` lists `@<B>/<name>` with A's root conversation id as `parentConversationId` and `gauntletRun` `smoke` |

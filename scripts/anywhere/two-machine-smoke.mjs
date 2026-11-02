@@ -53,6 +53,10 @@
 //      projects    B registers a project with github_repo smoke/repo (projects.yaml);
 //                  A's GET /api/fleet/projects lists it under github.com/smoke/repo.
 //      needs       POST /api/fleet/placement on A with needs [smoke-tag] picks B.
+//      needs-docker B's fake `docker` exits 1, so B has no docker tag: placement with
+//                  needs [docker] picks A, and `pan lane start --machine auto --needs docker`
+//                  launches the lane on A; it is then stopped and reaped. Skipped (logged)
+//                  when this host's own `docker info` fails (PAN-4774 WI-6).
 //      compare     A's and B's resources.quality_gate_slots differ (2 vs 4): Compare
 //                  settings lists that key with a copy line, and B's api_keys entry only
 //                  as "set" (its value never reaches A).
@@ -198,6 +202,8 @@ function fakeClis(home) {
     'exit 1',
     '',
   ].join('\n'), { mode: 0o755 });
+  // PAN-4774 WI-6: B's `docker info` fails, so B carries no docker tag and needs-docker must pick A.
+  if (home === HOMES.b && !LIVE_CLAUDE) writeFileSync(resolve(prefix, 'bin', 'docker'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
 }
 
 /**
@@ -596,7 +602,8 @@ function machineConfigs() {
   // A holds the same repository, so a worker for SMK-1 resolves its git origin here.
   const projectA = resolve(HOMES.a, 'project');
   mkdirSync(projectA, { recursive: true });
-  writeFileSync(resolve(HOMES.a, 'projects.yaml'), projectsYaml(projectA));
+  // A's lanes root sits under A's fake HOME, as the lane door requires (needs-docker runs a lane on A).
+  writeFileSync(resolve(HOMES.a, 'projects.yaml'), projectsYaml(projectA, resolve(HOMES.a, 'fakehome', 'lanes')));
 }
 
 function projectsYaml(path, lanesRoot = null) {
@@ -663,6 +670,39 @@ async function fleetWorkSteps(selfA, selfB) {
     const { status, json } = await apiA('POST', '/api/fleet/placement', { gitOrigin: null, needs: ['smoke-tag'] });
     if (status !== 200 || !json?.ok || json.environmentId !== selfB.environmentId) throw new Error(`placement answered ${status}: ${JSON.stringify(json)}`);
     log(`needs smoke-tag -> ${json.label}: ${json.reason}`);
+  });
+
+  await step('needs-docker', async () => {
+    const hostDocker = await execFileAsync('docker', ['info'], { timeout: 10_000 }).then(() => true, () => false);
+    if (!hostDocker) {
+      log('needs-docker skipped: `docker info` fails on this host, so A has no docker tag either');
+      return;
+    }
+    const bTags = linkTo(await cli('a', ['machines', 'list', '--json']), selfB.environmentId)?.tags ?? [];
+    if (bTags.includes('docker')) throw new Error(`B carries a docker tag although its docker is the failing fake: ${JSON.stringify(bTags)}`);
+    const { status, json } = await apiA('POST', '/api/fleet/placement', { gitOrigin: null, needs: ['docker'] });
+    if (status !== 200 || !json?.ok || json.environmentId !== selfA.environmentId) throw new Error(`placement answered ${status}: ${JSON.stringify(json)}`);
+    log(`needs docker -> ${json.label}: ${json.reason}`);
+    const a = openDb('a');
+    insertConversation(a, { name: DOCKER_LANE_ROOT, cwd: resolve(HOMES.a, 'project'), title: 'Smoke: docker orchestrator', status: 'active', origin: 'local', environmentId: null });
+    a.close();
+    const start = await cliRaw('a', ['lane', 'start', '--role', 'play', '--run', 'smoke-docker', '--key', 'docker', '--prompt', 'hi', '--parent', DOCKER_LANE_ROOT,
+      '--project', 'smoke', '--model', 'claude-opus-5-5', '--harness', 'claude-code', '--machine', 'auto', '--needs', 'docker', '--no-wait', '--json'], 90_000);
+    if (start.code !== 0) throw new Error(`pan lane start --machine auto --needs docker failed (${start.code}): ${start.stderr || start.stdout}`);
+    const result = JSON.parse(start.stdout);
+    // Auto that picks this machine launches a local lane: no machine in the answer, a cwd under A's lanes root.
+    if (result.machine !== null || !String(result.cwd).startsWith(resolve(HOMES.a, 'fakehome', 'lanes'))) {
+      throw new Error(`the docker lane did not run on A: ${start.stdout}`);
+    }
+    const lane = result.conversation.name;
+    log(`lane ${lane} on A (machine auto, needs docker) in ${result.cwd}`);
+    const stopped = await cliRaw('a', ['lane', 'stop', lane], 60_000);
+    if (stopped.code !== 0) throw new Error(`pan lane stop ${lane} failed (${stopped.code}): ${stopped.stderr}`);
+    await pollUntil(`pan lane reap ${lane} succeeds`, 30_000, async () => {
+      const answer = await cliRaw('a', ['lane', 'reap', lane], 60_000);
+      return answer.code === 0 ? { ok: true, value: answer } : { ok: false, detail: answer.stderr.trim() };
+    });
+    log(`stopped and reaped ${lane}`);
   });
 
   await step('compare', async () => {
@@ -754,6 +794,7 @@ async function reportOnB(remoteId, body) {
 // ─── PAN-4638: gauntlet lanes across machines ──────────────────────────────
 
 const LANE_ROOT = 'smoke-orch';
+const DOCKER_LANE_ROOT = 'smoke-orch-docker';
 
 async function laneSteps(selfB) {
   const lane = await step('lane-remote', async () => {
