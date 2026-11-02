@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4805",
   "created": "2026-11-02T06:47:26.972Z",
-  "updated": "2026-11-02T07:04:16.830Z",
+  "updated": "2026-11-02T07:04:37.032Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "boot-retry-eaddrinuse.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T07:04:16.830Z"
+    },
+    "boot-retry-eaddrinuse.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:04:37.031Z"
     }
   }
 }
