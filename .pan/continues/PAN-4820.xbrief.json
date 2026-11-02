@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T17:20:05.903Z",
+  "updated": "2026-11-02T17:30:41.942Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-02T17:16:58.907Z"
     },
     "issue-pipeline-field": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4820",
-      "claimedAt": "2026-11-02T17:17:26.980Z"
+      "claimedAt": "2026-11-02T17:17:26.980Z",
+      "doneAt": "2026-11-02T17:30:41.942Z"
     },
     "live-install-probe.ac1": {
       "status": "completed",
