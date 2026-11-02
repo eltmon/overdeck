@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4755",
   "created": "2026-11-02T01:00:42.371Z",
-  "updated": "2026-11-02T01:26:27.097Z",
+  "updated": "2026-11-02T01:26:35.800Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4755",
       "claimedAt": "2026-11-02T01:24:09.529Z",
       "doneAt": "2026-11-02T01:26:27.097Z"
+    },
+    "skills-field-restyle": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:26:35.800Z"
     }
   }
 }
