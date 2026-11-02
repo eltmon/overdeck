@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4825",
   "created": "2026-11-02T16:35:14.732Z",
-  "updated": "2026-11-02T17:36:59.365Z",
+  "updated": "2026-11-02T17:37:15.448Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,10 @@
     "docs-ledger.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T17:36:59.365Z"
+    },
+    "docs-ledger.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:37:15.447Z"
     }
   }
 }
