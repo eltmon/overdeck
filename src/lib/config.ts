@@ -99,6 +99,8 @@ export interface RemoteConfig {
   resiliency_tier?: 'ephemeral' | 'durable';
   /** Maximum concurrent remote work agents (0 = unlimited) */
   max_concurrent_agents?: number;
+  /** Auto may create a Fly machine for a conversation when no machine fits (PAN-4743, epic D-19). Default false. */
+  auto_fly?: boolean;
   /** Fly.io specific configuration */
   fly?: RemoteFlyConfig;
 }
@@ -321,6 +323,13 @@ export function normalizeRemoteConfig(config: OverdeckConfig): void {
     typeof config.remote.max_concurrent_agents !== 'number'
   ) {
     throw new Error('remote.max_concurrent_agents must be a number');
+  }
+
+  if (
+    config.remote.auto_fly !== undefined &&
+    typeof config.remote.auto_fly !== 'boolean'
+  ) {
+    throw new Error('remote.auto_fly must be a boolean');
   }
 }
 
