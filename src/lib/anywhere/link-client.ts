@@ -6,7 +6,10 @@
  * channel with the link's machine token and the actor stamp
  * (`x-overdeck-link-actor`, optional `x-overdeck-link-ceiling`). `LinkAgent`
  * is an `http.Agent` whose connections are channels, so keep-alive pools
- * amortise the 1-RTT handshake (D-4645-3).
+ * amortise the 1-RTT handshake (D-4645-3). A pooled channel expires after
+ * `LINK_POOL_IDLE_MS` idle; a `GET`/`HEAD`/`OPTIONS` request that dies on a
+ * reused channel before any response is resent once on a fresh channel
+ * (PAN-4740).
  *
  * No user-facing call waits more than 2.5 s on an unreachable machine: an
  * `offline`, `revoked` or `unsupported` link fails at once, a `connecting` link
@@ -24,6 +27,13 @@ import { LINK_ACTOR_HEADER, LINK_CEILING_HEADER } from './link-actor.js';
 import type { MachineKeyPair } from './machine-key.js';
 
 export const LINK_WAIT_MS = 2_500;
+
+/**
+ * Longest a pooled channel sits idle before the agent closes it. The other machine's HTTP
+ * server closes an idle channel after 5 s; behind the Fly proxy home does not always see that
+ * close in time, so the pool must give the channel up first (PAN-4740).
+ */
+export const LINK_POOL_IDLE_MS = 4_000;
 
 export type LinkUnavailableCode = 'no-link' | 'machine-offline' | 'machine-unreachable' | 'machine-revoked' | 'machine-unsupported';
 
@@ -118,7 +128,7 @@ export class LinkAgent extends Agent {
     options: AgentOptions = {},
     private readonly routeSource?: LinkRouteSource,
   ) {
-    super({ keepAlive: true, maxSockets: 4, ...options });
+    super({ keepAlive: true, maxSockets: 4, timeout: LINK_POOL_IDLE_MS, ...options });
   }
 
   override createConnection(_options: ClientRequestArgs, callback?: (error: Error | null, stream: Duplex) => void): Duplex | null | undefined {
@@ -154,6 +164,37 @@ function agentFor(environmentId: string, routeSource?: LinkRouteSource): LinkAge
   const created = new LinkAgent(environmentId, {}, routeSource);
   agents.set(environmentId, created);
   return created;
+}
+
+/** Methods a stale pooled channel may resend: they change nothing on the other machine (PAN-4740 D3). */
+const RETRY_SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const STALE_CHANNEL_CODES = new Set(['ECONNRESET', 'EPIPE']);
+
+/**
+ * True when a request died on a reused pooled channel before any response byte: the far end
+ * had already closed it. Pure.
+ */
+export function isStaleChannelFailure(
+  method: string, error: unknown, attempt: { reusedSocket: boolean; responded: boolean },
+): boolean {
+  if (!attempt.reusedSocket || attempt.responded) return false;
+  if (!RETRY_SAFE_METHODS.has(method.toUpperCase())) return false;
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  return typeof code === 'string' && STALE_CHANNEL_CODES.has(code);
+}
+
+/** Close every idle channel in a pool; they idled and died together (PAN-4740 D4). */
+function dropIdleChannels(agent: Agent): void {
+  for (const sockets of Object.values(agent.freeSockets)) {
+    for (const socket of sockets ?? []) socket.destroy();
+  }
+}
+
+const ATTEMPT = Symbol('linkAttempt');
+
+interface AttemptFacts {
+  reusedSocket: boolean;
+  responded: boolean;
 }
 
 /** Drop pooled channels to a machine (after unlink or revoke). */
@@ -202,10 +243,13 @@ export async function linkFetch(
   const info = await onlineRoute(environmentId, init.routeSource);
   const payload = init.body === undefined ? null : Buffer.from(JSON.stringify(init.body), 'utf8');
   const agent = init.agent ?? agentFor(environmentId, init.routeSource);
-  return new Promise((resolve, reject) => {
+  const method = init.method ?? 'GET';
+
+  const attempt = (): Promise<{ status: number; json: unknown }> => new Promise((resolve, reject) => {
+    let responded = false;
     const req = httpRequest(
       {
-        method: init.method ?? 'GET',
+        method,
         path,
         host: 'link.invalid',
         agent,
@@ -218,6 +262,7 @@ export async function linkFetch(
         ...(init.signal ? { signal: init.signal } : {}),
       },
       (res) => {
+        responded = true;
         let text = '';
         res.setEncoding('utf8');
         res.on('data', (chunk: string) => { text += chunk; });
@@ -230,13 +275,22 @@ export async function linkFetch(
           }
           resolve({ status: res.statusCode ?? 0, json });
         });
-        res.on('error', reject);
+        res.on('error', (error: Error) => reject(Object.assign(error, { [ATTEMPT]: { reusedSocket: req.reusedSocket === true, responded: true } satisfies AttemptFacts })));
       },
     );
-    req.on('error', reject);
+    req.on('error', (error: Error) => reject(Object.assign(error, { [ATTEMPT]: { reusedSocket: req.reusedSocket === true, responded } satisfies AttemptFacts })));
     if (payload) req.write(payload);
     req.end();
   });
+
+  try {
+    return await attempt();
+  } catch (error) {
+    const facts = (error as { [ATTEMPT]?: AttemptFacts })[ATTEMPT];
+    if (!facts || init.signal?.aborted || !isStaleChannelFailure(method, error, facts)) throw error;
+    dropIdleChannels(agent);
+    return attempt();
+  }
 }
 
 /** Largest request or response body `linkForward` carries (D-4650-4). */
@@ -284,7 +338,9 @@ export async function linkForward(environmentId: string, init: LinkForwardInit):
   if (init.body && init.body.length > LINK_FORWARD_MAX_BYTES) throw new LinkForwardTooLargeError('request');
   const info = await onlineRoute(environmentId, init.routeSource);
   const agent = init.agent ?? agentFor(environmentId, init.routeSource);
-  return new Promise((resolve, reject) => {
+
+  const attempt = (): Promise<LinkForwardResponse> => new Promise((resolve, reject) => {
+    let responded = false;
     const req = httpRequest(
       {
         method: init.method,
@@ -301,6 +357,7 @@ export async function linkForward(environmentId: string, init: LinkForwardInit):
         ...(init.signal ? { signal: init.signal } : {}),
       },
       (res) => {
+        responded = true;
         const chunks: Buffer[] = [];
         let size = 0;
         res.on('data', (chunk: Buffer) => {
@@ -313,12 +370,22 @@ export async function linkForward(environmentId: string, init: LinkForwardInit):
           chunks.push(chunk);
         });
         res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks) }));
-        res.on('error', reject);
+        res.on('error', (error: Error) => reject(Object.assign(error, { [ATTEMPT]: { reusedSocket: req.reusedSocket === true, responded: true } satisfies AttemptFacts })));
       },
     );
     req.on('timeout', () => req.destroy(new LinkUnavailableError('machine-unreachable', `${info.label} did not answer in time`)));
-    req.on('error', reject);
+    req.on('error', (error: Error) => reject(Object.assign(error, { [ATTEMPT]: { reusedSocket: req.reusedSocket === true, responded } satisfies AttemptFacts })));
     if (init.body) req.write(init.body);
     req.end();
   });
+
+  const method = init.method;
+  try {
+    return await attempt();
+  } catch (error) {
+    const facts = (error as { [ATTEMPT]?: AttemptFacts })[ATTEMPT];
+    if (!facts || init.signal?.aborted || !isStaleChannelFailure(method, error, facts)) throw error;
+    dropIdleChannels(agent);
+    return attempt();
+  }
 }

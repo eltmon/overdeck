@@ -13,8 +13,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { MachineKeyPair } from '../../machine-key.js';
 import { acceptChannel, type AcceptChannelOptions } from '../accept.js';
-import { type ChannelSocket, isChannelSocket } from '../channel-socket.js';
-import { approvalCommitment, approvalNonce, approvalSas, pairingSecrets, prologueFor, xxInitiator } from '../noise.js';
+import { type ChannelSocket, createChannelSocket, isChannelSocket } from '../channel-socket.js';
+import { approvalCommitment, approvalNonce, approvalSas, pairingSecrets, prologueFor, type HandshakeResult, xxInitiator } from '../noise.js';
 import { FLY_INSTANCE_PARAM, openChannel } from '../open.js';
 import {
   encodeFrame,
@@ -619,5 +619,51 @@ describe('fly-instance route parameter (PAN-4652 WI-4)', () => {
       .rejects.toMatchObject({ code: 'unreachable' });
 
     expect(recorder.upgrades).toEqual([{ url: '/ws/link?keep=1', instance: undefined }]);
+  });
+});
+
+describe('ChannelSocket idle timeout (PAN-4740)', () => {
+  const key = (fill: number, length = 32): Buffer => Buffer.alloc(length, fill);
+
+  function freshChannel(): ChannelSocket {
+    const [raw] = duplexPair();
+    return createChannelSocket({
+      raw, initiator: true,
+      handshake: { tx: key(1), rx: key(2), hash: key(3, 64), localPublicKey: key(4), remotePublicKey: key(5) } as HandshakeResult,
+      channel: { mode: 'link', remoteKeyHex: 'ab'.repeat(32), pairingId: null },
+    });
+  }
+
+  it('fires timeout again when traffic follows the first timeout', () => {
+    const channel = freshChannel();
+    cleanups.push(() => channel.destroy());
+    vi.useFakeTimers();
+    let fired = 0;
+    channel.on('timeout', () => { fired += 1; });
+    channel.setTimeout(1000);
+
+    vi.advanceTimersByTime(1000);
+    expect(fired).toBe(1);
+
+    channel.write(Buffer.from('x'));
+    vi.advanceTimersByTime(1000);
+    expect(fired).toBe(2);
+  });
+
+  it('setTimeout(0) disables the idle timer even after traffic', () => {
+    const channel = freshChannel();
+    cleanups.push(() => channel.destroy());
+    vi.useFakeTimers();
+    let fired = 0;
+    channel.on('timeout', () => { fired += 1; });
+    channel.setTimeout(1000);
+
+    vi.advanceTimersByTime(1000);
+    expect(fired).toBe(1);
+
+    channel.setTimeout(0);
+    channel.write(Buffer.from('x'));
+    vi.advanceTimersByTime(5000);
+    expect(fired).toBe(1);
   });
 });

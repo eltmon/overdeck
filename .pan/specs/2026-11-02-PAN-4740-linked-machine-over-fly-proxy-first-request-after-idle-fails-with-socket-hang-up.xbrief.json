@@ -1,0 +1,350 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T12:39:28Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4740: Linked machine over Fly proxy: first request after idle fails with 'socket hang up'",
+    "updated": "2026-11-02T12:43:47.402Z"
+  },
+  "plan": {
+    "id": "pan-4740",
+    "title": "Linked machine over Fly proxy: first request after idle fails with 'socket hang up'",
+    "status": "running",
+    "uid": "2a5412f5-7905-49be-9095-6a5b72c1e10a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T12:39:28Z",
+    "updated": "2026-11-02T12:43:47.402Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4740",
+        "label": "PAN-4740",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4740.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "machine-links",
+      "link-client",
+      "fly",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "LinkAgent (src/lib/anywhere/link-client.ts) pools secure channels with keepAlive but no `timeout`, so Node's keepSocketAlive ignores the peer's `Keep-Alive: timeout=5` hint and a free channel never expires. The linked machine's stock HTTP server closes idle channels after 5 s; behind the Fly WebSocket proxy home does not see that close before its next request, reuses the dead channel, and the request fails with `socket hang up` (ECONNRESET, req.reusedSocket true). ChannelSocket's idle timer is also one-shot, unlike net.Socket, so a channel whose timer fired once mid-request never expires in the pool afterwards.",
+      "Proposal": "Two layers. (1) Give LinkAgent an explicit pool idle timeout LINK_POOL_IDLE_MS = 4000 (below the 5 s server keep-alive; Node lowers it further for a shorter hint) and make ChannelSocket's idle timer re-arm on traffic like net.Socket. (2) In linkFetch and linkForward, when a GET/HEAD/OPTIONS request dies with ECONNRESET or EPIPE on a reused pooled channel before any response byte, close the pool's other idle channels and resend it exactly once on a fresh channel. Non-safe methods are never resent. Document both in docs/ANYWHERE-ARCHITECTURE.md and the link-client.ts header.",
+      "NonGoals": "- Raising or changing the linked machine's HTTP server keepAliveTimeout\n- WebSocket-level pings on the /ws/link transport\n- Resending POST, PUT, PATCH, DELETE or any other non-safe method\n- Resending more than once\n- Making LINK_POOL_IDLE_MS configurable or adding any config key\n- Changing channel-agent.ts, openLinkSocket, ws-linked.ts or port-forwards.ts (they open their own channels and are not pooled through LinkAgent)\n- Retrying a failure on a freshly opened channel, after a response began, on abort, on a linkForward timeout, or on a LinkUnavailableError\n- A live reproduction against a real Fly machine as an acceptance gate"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix both layers: pool idle expiry and a one-time resend on a stale reused channel.",
+        "rationale": "The issue lists both as candidate fixes; expiry removes the common idle case and the resend covers a channel that dies inside the expiry window (proxy or VM restart). Neither alone covers every path."
+      },
+      {
+        "summary": "LINK_POOL_IDLE_MS = 4000, passed as the http.Agent `timeout` option; not configurable.",
+        "rationale": "It sits below the linked machine's 5 s keepAliveTimeout and equals what Node derives from the `timeout=5` hint (5000 minus the 1000 ms agentKeepAliveTimeoutBuffer). Passing it as the agent option lets Node's own keepSocketAlive apply it and lower it for a shorter hint."
+      },
+      {
+        "summary": "Resend only safe methods (GET, HEAD, OPTIONS).",
+        "rationale": "A resent POST could start a second agent or deliver a conversation message twice. After the 4 s expiry a POST reaches a stale channel only inside a narrow window and then fails loudly as it does today, which the caller can handle. The issue's observed failures were GETs (conversation-list fetch)."
+      },
+      {
+        "summary": "Exactly one resend, after destroying the agent's other free channels.",
+        "rationale": "With maxSockets 4, channels idle together and die together; a bare resend could land on a sibling stale channel. agent.freeSockets is a public Node property."
+      },
+      {
+        "summary": "Fix ChannelSocket's one-shot idle timer in channel-socket.ts instead of overriding keepSocketAlive in LinkAgent.",
+        "rationale": "Its header already promises net.Socket semantics; a planning probe showed net.Socket fires twice when traffic follows the first timeout while ChannelSocket fires once. Fixing the socket keeps pool expiry working after a mid-request timeout for every consumer."
+      },
+      {
+        "summary": "No live Fly reproduction is required; unit tests reproduce the mechanism.",
+        "rationale": "Planning probes reproduced every step (free socket timeout 0 without an agent timeout, 4000 with it; reused-socket hang-up yields ECONNRESET 'socket hang up' with reusedSocket true) on loopback; a Fly check costs money and is not deterministic."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Small bug fix: 2 source files, 2 test files, 1 doc file in one subsystem (src/lib/anywhere).",
+      "canonicalFilename": "2026-11-02-PAN-4740-linked-machine-over-fly-proxy-first-request-after-idle-fails-with-socket-hang-up.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "pool-idle-expiry",
+        "title": "Give LinkAgent a 4 s pool idle timeout (LINK_POOL_IDLE_MS)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T12:39:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4740",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/link-client.ts",
+            "src/lib/anywhere/__tests__/link-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/link-client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "link-client.test.ts passes including the three new 'pooled channels (PAN-4740)' tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4740.md WI-1. In src/lib/anywhere/link-client.ts add `export const LINK_POOL_IDLE_MS = 4_000;` (with the doc comment from the PRD) below LINK_WAIT_MS, and change the LinkAgent constructor's `super({ keepAlive: true, maxSockets: 4, ...options })` to `super({ keepAlive: true, maxSockets: 4, timeout: LINK_POOL_IDLE_MS, ...options })`. Add a `describe('pooled channels (PAN-4740)')` block to src/lib/anywhere/__tests__/link-client.test.ts using a real loopback node:http server and a LinkAgent whose createConnection is overridden to net.connect(port) (call back on 'connect', return undefined) and counted. The existing duplexPair stand-in cannot be pooled because keepSocketAlive calls setKeepAlive on it. Pass agent and routeSource through linkFetch init. After each request await setImmediate, then read Object.values(agent.freeSockets).flat(). No timer waits in these tests: emit 'timeout' directly.",
+          "Why": "Without an agent timeout Node's keepSocketAlive ignores the peer's Keep-Alive hint and a pooled channel never expires, so home reuses channels the linked machine closed after 5 s."
+        },
+        "items": [
+          {
+            "id": "pool-idle-expiry.ac1",
+            "title": "Given a loopback server with keepAliveTimeout 60000, when one linkFetch GET completes through a LinkAgent, then the single free socket's `.timeout` equals LINK_POOL_IDLE_MS (4000)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pool-idle-expiry.ac2",
+            "title": "Given a loopback server with keepAliveTimeout 3000 (hint timeout=3), when one linkFetch GET completes, then the free socket's `.timeout` equals 2000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pool-idle-expiry.ac3",
+            "title": "Given one completed GET leaves a free socket, when the test emits 'timeout' on it, then the socket is destroyed and the next linkFetch GET returns 200 over a second connection (createConnection counter equals 2)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pool-idle-expiry.ac4",
+            "title": "The existing test that constructs LinkAgent with { keepAlive: false } still passes unchanged, because the options argument still overrides the defaults",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "channel-timer-rearm",
+        "title": "Re-arm ChannelSocket's idle timer on traffic after it fires (net.Socket semantics)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T12:39:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4740",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/channel-socket.ts",
+            "src/lib/anywhere/channel/__tests__/channel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/channel/__tests__/channel.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "channel.test.ts passes including the two new 'ChannelSocket idle timeout (PAN-4740)' tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. In src/lib/anywhere/channel/channel-socket.ts extract a private armIdle() that creates the unref'd timer (whose callback sets idleTimer = null and emits 'timeout'); setTimeout(ms) calls clearIdle(), stores idleMs, registers the optional callback, then calls armIdle() when idleMs > 0; touch() refreshes a live timer, or calls armIdle() when idleTimer is null, idleMs > 0 and the socket is not destroyed. clearIdle() is unchanged. In src/lib/anywhere/channel/__tests__/channel.test.ts add describe('ChannelSocket idle timeout (PAN-4740)') that builds a ChannelSocket over one side of duplexPair() with the dummy handshake from the PRD (tx/rx/localPublicKey/remotePublicKey 32-byte fills, hash 64-byte fill; this construction was verified in a planning probe), calls vi.useFakeTimers() after construction, and destroys the channel at the end.",
+          "Why": "A reused pooled channel keeps the 4 s pool timer while it serves a request; if that timer fires mid-request, the one-shot timer never re-arms, keepSocketAlive sees socket.timeout already equal to the agent timeout and does not reset it, and the channel never expires in the pool."
+        },
+        "items": [
+          {
+            "id": "channel-timer-rearm.ac1",
+            "title": "Given a ChannelSocket with setTimeout(1000) under fake timers, when 1000 ms pass, then it emits 'timeout' once; when channel.write(Buffer.from('x')) follows and another 1000 ms pass, then it has emitted 'timeout' twice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channel-timer-rearm.ac2",
+            "title": "Given a ChannelSocket whose timeout fired once, when setTimeout(0) is called, a write follows and 5000 ms pass, then no further 'timeout' is emitted (count stays 1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channel-timer-rearm.ac3",
+            "title": "When channel.test.ts runs after the change, then the existing tests (Noise IK open, WebSocket upgrade close(4401), handshake timeout under fake timers) still pass without edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stale-channel-retry",
+        "title": "Resend a GET/HEAD/OPTIONS once when a reused pooled channel hangs up before any response",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T12:39:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4740",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/link-client.ts",
+            "src/lib/anywhere/__tests__/link-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/link-client.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "link-client.test.ts passes including the five new resend tests",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly. In src/lib/anywhere/link-client.ts add RETRY_SAFE_METHODS (GET, HEAD, OPTIONS), STALE_CHANNEL_CODES (ECONNRESET, EPIPE), the exported pure isStaleChannelFailure(method, error, { reusedSocket, responded }), and a private dropIdleChannels(agent) that destroys every socket in agent.freeSockets. Wrap the request bodies of linkFetch and linkForward in a local attempt() function that tracks `responded` (set at the top of the response callback) and attaches { reusedSocket: req.reusedSocket === true, responded } to a rejected error under a module-level symbol. Call attempt(); on rejection, rethrow unless the facts are present, init.signal is not aborted and isStaleChannelFailure is true; otherwise dropIdleChannels(agent) and return attempt() once more. linkForward's 'timeout' handler and size cap live inside attempt(). Update the link-client.ts header comment to state the pool idle expiry and the one-resend rule. Add the five tests named in PRD WI-3 to link-client.test.ts using the loopback harness from pool-idle-expiry, with a server that destroys the socket of a chosen request number without answering.",
+          "Why": "Expiry cannot cover a channel that dies inside the 4 s window (proxy or VM restart). Node documents a reused socket that hangs up before any response as the server-closed-idle-connection case; resending a safe request once fixes it without duplicate side effects."
+        },
+        "items": [
+          {
+            "id": "stale-channel-retry.ac1",
+            "title": "Given a server that answers request 1, destroys request 2 and answers request 3, when a second linkFetch GET runs on the reused channel, then it resolves with status 200, the server saw 3 requests and createConnection ran 2 times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-channel-retry.ac2",
+            "title": "Given the same server, when the second call is linkFetch with method POST, then it rejects with code ECONNRESET and the server saw exactly 2 requests (no resend)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-channel-retry.ac3",
+            "title": "Given a server that destroys request 1, when the first linkFetch GET runs on a fresh channel, then it rejects with code ECONNRESET and the server saw exactly 1 request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-channel-retry.ac4",
+            "title": "Given the request-2-destroying server, when linkForward({ method: 'GET', path: '/x' }) runs on the reused channel, then it resolves with status 200 from a second connection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-channel-retry.ac5",
+            "title": "isStaleChannelFailure returns true for ('GET', ECONNRESET, reused, no response) and ('head', EPIPE, reused, no response), and returns false for POST, for reusedSocket false, for responded true, and for code ETIMEDOUT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pool-and-retry",
+        "title": "Document pool idle expiry and the one-resend rule in ANYWHERE-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:39:28Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4740",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"LINK_POOL_IDLE_MS\" docs/ANYWHERE-ARCHITECTURE.md",
+            "grep -n \"never resent\" docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints exactly one matching line inside the 'One session per connection; the same port' section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In docs/ANYWHERE-ARCHITECTURE.md, section 'One session per connection; the same port (D-4645-3, D-4645-4)', after the sentence ending '…which is exactly what the first smoke run hit.' add the paragraph given verbatim in the PRD: pooled channels close after LINK_POOL_IDLE_MS (4 s) or sooner on a shorter Keep-Alive hint; why (5 s server keep-alive, Fly proxy may hide the close, PAN-4740); GET/HEAD/OPTIONS that die on a reused channel before any response with ECONNRESET or EPIPE are resent once after closing the pool's other idle channels; other methods are never resent; ChannelSocket.setTimeout re-arms on traffic like net.Socket. configuration/linked-machines.mdx is not changed: it documents no pooling or retry behavior.",
+          "Why": "The architecture doc is the developer reference for LinkAgent pooling; it must describe the new expiry and resend behavior."
+        },
+        "items": [
+          {
+            "id": "docs-pool-and-retry.ac1",
+            "title": "Given the doc change, when a reader opens the 'One session per connection' section of docs/ANYWHERE-ARCHITECTURE.md, then it shows LINK_POOL_IDLE_MS with its 4 s value and says a shorter Keep-Alive hint from the other machine closes the channel sooner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pool-and-retry.ac2",
+            "title": "Given the doc change, when a reader opens the same section, then it states that GET, HEAD and OPTIONS requests that die with ECONNRESET or EPIPE on a reused channel are resent once, and that other methods are never resent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pool-idle-expiry",
+        "to": "stale-channel-retry",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

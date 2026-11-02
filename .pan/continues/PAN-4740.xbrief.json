@@ -1,0 +1,93 @@
+{
+  "version": "1",
+  "issueId": "PAN-4740",
+  "created": "2026-11-02T12:44:07.052Z",
+  "updated": "2026-11-02T13:41:38.734Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "pool-idle-expiry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4740",
+      "claimedAt": "2026-11-02T12:44:07.052Z",
+      "doneAt": "2026-11-02T13:22:24.228Z"
+    },
+    "channel-timer-rearm": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4740",
+      "claimedAt": "2026-11-02T13:22:32.440Z",
+      "doneAt": "2026-11-02T13:24:56.988Z"
+    },
+    "stale-channel-retry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4740",
+      "claimedAt": "2026-11-02T13:25:01.503Z",
+      "doneAt": "2026-11-02T13:35:30.931Z"
+    },
+    "docs-pool-and-retry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4740",
+      "claimedAt": "2026-11-02T13:35:36.306Z",
+      "doneAt": "2026-11-02T13:36:27.509Z"
+    },
+    "pool-idle-expiry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:38:08.522Z"
+    },
+    "pool-idle-expiry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:38:23.242Z"
+    },
+    "pool-idle-expiry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:38:39.226Z"
+    },
+    "pool-idle-expiry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:38:55.429Z"
+    },
+    "channel-timer-rearm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:39:14.082Z"
+    },
+    "channel-timer-rearm.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:39:29.247Z"
+    },
+    "channel-timer-rearm.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:39:44.287Z"
+    },
+    "stale-channel-retry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:40:02.499Z"
+    },
+    "stale-channel-retry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:40:19.241Z"
+    },
+    "stale-channel-retry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:40:34.869Z"
+    },
+    "stale-channel-retry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:40:50.248Z"
+    },
+    "stale-channel-retry.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:41:05.946Z"
+    },
+    "docs-pool-and-retry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:41:23.409Z"
+    },
+    "docs-pool-and-retry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T13:41:38.734Z"
+    }
+  }
+}

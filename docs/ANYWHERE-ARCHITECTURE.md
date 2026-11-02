@@ -169,6 +169,18 @@ four channels per linked machine for `linkFetch`. A plain `http.request` with on
 `createConnection` would send `Connection: close` and the peer would end the channel after
 the first answer, which is exactly what the first smoke run hit.
 
+A pooled channel does not sit idle forever: `LinkAgent` gives every channel a
+`LINK_POOL_IDLE_MS` (4 s) idle timeout, and a shorter `Keep-Alive` hint from the linked
+machine lowers it further. This matters behind the Fly WebSocket proxy, where the linked
+machine's own HTTP server closes an idle channel after 5 s and home does not always see
+that close before reusing it; without a pool-side timeout the next request over the dead
+channel failed with `socket hang up` (PAN-4740). Even so, the far end can close a channel
+in the narrow window between the pool handing it out and the request reaching the wire, so
+`linkFetch` and `linkForward` resend a `GET`, `HEAD` or `OPTIONS` request once, on a fresh
+channel, when it dies with `ECONNRESET` or `EPIPE` on a reused channel before any response
+byte arrives. Every other method, and any request that already got a response, is never
+resent.
+
 No new port is opened. `installChannelListener` (`src/dashboard/server/channel-listener.ts`)
 is installed in the `NodeHttpServer.make` factory and reads the first byte of every
 connection on the dashboard port: `0x00` is a channel, anything else goes to the HTTP
