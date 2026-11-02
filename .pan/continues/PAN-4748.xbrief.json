@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4748",
   "created": "2026-11-02T03:23:38.611Z",
-  "updated": "2026-11-02T04:36:53.197Z",
+  "updated": "2026-11-02T04:37:00.082Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4748",
       "claimedAt": "2026-11-02T04:19:13.984Z",
       "doneAt": "2026-11-02T04:36:53.197Z"
+    },
+    "unlink-rollback-token-rejected": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4748",
+      "claimedAt": "2026-11-02T04:37:00.082Z"
     }
   }
 }
