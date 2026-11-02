@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T16:18:30.394005Z · model: claude-opus-5-5 · open: 859_
+_Last sequenced: 2026-11-02T16:22:30.325480Z · model: claude-opus-5-5 · open: 859_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -657,7 +657,7 @@ _Last sequenced: 2026-11-02T16:18:30.394005Z · model: claude-opus-5-5 · open: 
 | 657 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 658 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 659 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 660 | PAN-4823 | XL | medium | needs-refinement |  | PAN-4774 | Native iOS/Android Anywhere client without Tailscale; PRD still being written, children unfiled; sequenced after PAN-4774 acceptance run. |
+| 660 | PAN-4823 | XL | medium | needs-refinement |  | PAN-4774 | Capacitor 8 phone client for Anywhere without Tailscale; PRD written (15 work items), children unfiled, OD-1 open; after PAN-4774. |
 | 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
@@ -1194,7 +1194,7 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T16:18:30.394005Z",
+  "generatedAt": "2026-11-02T16:22:30.325480Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 859,
@@ -9296,13 +9296,13 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rank": 660,
       "size": "XL",
       "importance": "medium",
-      "score": 30,
+      "score": 32,
       "condition": "needs-refinement",
       "dependsOn": [
         "PAN-4774"
       ],
-      "why": "Native iOS/Android Anywhere client without Tailscale; PRD still being written, children unfiled; sequenced after PAN-4774 acceptance run.",
-      "rationale": "New issue filed 2026-11-02. It is a large new product surface (React Native app, QR pairing, encrypted push, Live Activities) whose PRD is not yet written and whose child issues are not filed, so it is needs-refinement. Its body sequences it after the Anywhere release acceptance run (PAN-4774), so it takes the free rank 660 beside the other deferred Anywhere follow-ups and no other node moves.",
+      "why": "Capacitor 8 phone client for Anywhere without Tailscale; PRD written (15 work items), children unfiled, OD-1 open; after PAN-4774.",
+      "rationale": "Rank unchanged at 660. The PRD (.pan/drafts/pan-4823.md) is now written: it switches the stack to Capacitor 8, defines 15 work items with a build order, and makes PAN-4823 the epic for per-work-item child issues. Those children are not filed yet and OD-1 (Live Activity content) is still open, so the issue stays needs-refinement and must not be picked as one XL unit; it remains sequenced after the Anywhere acceptance run (PAN-4774). Score rises slightly because the plan is now concrete.",
       "gate": "auto",
       "planning": "auto"
     },
