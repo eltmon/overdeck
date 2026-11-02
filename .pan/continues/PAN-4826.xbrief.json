@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4826",
   "created": "2026-11-02T16:31:08.878Z",
-  "updated": "2026-11-02T17:30:44.525Z",
+  "updated": "2026-11-02T17:31:05.281Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "register-rosalind-astra-law.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T17:30:44.525Z"
+    },
+    "register-rosalind-astra-law.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:05.280Z"
     }
   }
 }
