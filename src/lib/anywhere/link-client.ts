@@ -25,6 +25,13 @@ import type { MachineKeyPair } from './machine-key.js';
 
 export const LINK_WAIT_MS = 2_500;
 
+/**
+ * Longest a pooled channel sits idle before the agent closes it. The other machine's HTTP
+ * server closes an idle channel after 5 s; behind the Fly proxy home does not always see that
+ * close in time, so the pool must give the channel up first (PAN-4740).
+ */
+export const LINK_POOL_IDLE_MS = 4_000;
+
 export type LinkUnavailableCode = 'no-link' | 'machine-offline' | 'machine-unreachable' | 'machine-revoked' | 'machine-unsupported';
 
 export class LinkUnavailableError extends Error {
@@ -118,7 +125,7 @@ export class LinkAgent extends Agent {
     options: AgentOptions = {},
     private readonly routeSource?: LinkRouteSource,
   ) {
-    super({ keepAlive: true, maxSockets: 4, ...options });
+    super({ keepAlive: true, maxSockets: 4, timeout: LINK_POOL_IDLE_MS, ...options });
   }
 
   override createConnection(_options: ClientRequestArgs, callback?: (error: Error | null, stream: Duplex) => void): Duplex | null | undefined {
