@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4799",
   "created": "2026-11-02T05:59:19.070Z",
-  "updated": "2026-11-02T06:22:24.475Z",
+  "updated": "2026-11-02T06:22:44.960Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,10 @@
     "member-spec-roots.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T06:22:24.474Z"
+    },
+    "wire-ac-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:22:44.960Z"
     }
   }
 }
