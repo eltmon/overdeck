@@ -1,0 +1,144 @@
+{
+  "version": "1",
+  "issueId": "PAN-4751",
+  "created": "2026-11-02T00:16:08.781Z",
+  "updated": "2026-11-02T01:24:45.717Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-02T01:24Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-02T01:24:45.717Z"
+    }
+  ],
+  "items": {
+    "tick-message-id": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4751",
+      "claimedAt": "2026-11-02T00:16:08.781Z",
+      "doneAt": "2026-11-02T00:23:31.111Z"
+    },
+    "status-pane-button": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4751",
+      "claimedAt": "2026-11-02T00:23:53.355Z",
+      "doneAt": "2026-11-02T00:26:34.656Z"
+    },
+    "conversation-pane-jump": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4751",
+      "claimedAt": "2026-11-02T00:26:50.527Z",
+      "doneAt": "2026-11-02T00:30:16.562Z"
+    },
+    "needs-you-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4751",
+      "claimedAt": "2026-11-02T00:30:31.973Z",
+      "doneAt": "2026-11-02T00:47:40.630Z"
+    },
+    "needs-you-page-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4751",
+      "claimedAt": "2026-11-02T00:47:50.900Z",
+      "doneAt": "2026-11-02T01:06:33.382Z"
+    },
+    "flywheel-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4751",
+      "claimedAt": "2026-11-02T01:06:42.698Z",
+      "doneAt": "2026-11-02T01:07:54.041Z"
+    },
+    "tick-message-id.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:12:55.035Z"
+    },
+    "tick-message-id.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:13:13.268Z"
+    },
+    "tick-message-id.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:13:31.231Z"
+    },
+    "status-pane-button.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:13:52.791Z"
+    },
+    "status-pane-button.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:14:10.871Z"
+    },
+    "status-pane-button.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:14:28.496Z"
+    },
+    "conversation-pane-jump.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:14:45.751Z"
+    },
+    "conversation-pane-jump.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:15:03.586Z"
+    },
+    "conversation-pane-jump.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:15:24.330Z"
+    },
+    "conversation-pane-jump.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:15:42.678Z"
+    },
+    "needs-you-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:16:08.288Z"
+    },
+    "needs-you-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:16:28.536Z"
+    },
+    "needs-you-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:16:46.351Z"
+    },
+    "needs-you-page-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:17:04.893Z"
+    },
+    "needs-you-page-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:17:25.150Z"
+    },
+    "needs-you-page-wiring.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:17:45.411Z"
+    },
+    "needs-you-page-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:18:02.949Z"
+    },
+    "needs-you-page-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:18:21.520Z"
+    },
+    "flywheel-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:18:39.784Z"
+    },
+    "flywheel-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:18:57.940Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-02T01:24:45Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4751\n\nPull request: https://github.com/eltmon/overdeck/pull/4764 (head `2cc0fe4c`)\n\nSource: check_run:test-e2e\n\n## Failing checks (1)\n\n### test-e2e\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/125044003637/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41371917603/job/125044003637  \n```\nts/command-deck-resource-strip.spec.ts tests/pan-4523-river-bands.spec.ts tests/pan-2355-mobile.spec.ts\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.0\nTemporarily overriding HOME='/home/runner/work/_temp/ddeca505-7c1f-4234-a0cb-b529f8def5dc' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\nTerminate orphan process: pid (3779) (node)\nTerminate orphan process: pid (3883) (node)\nTerminate orphan process: pid (4060) (cliproxy)\nTerminate orphan process: pid (5296) (tmux: server)\nTerminate orphan process: pid (5465) (tmux: server)\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

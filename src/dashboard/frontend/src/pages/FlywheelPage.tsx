@@ -8,9 +8,10 @@
  * itself. A failed status fetch reads as "can't reach the server", never idle.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Activity } from 'lucide-react';
 
-import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
+import { FlywheelConversationPane, type FlywheelTickTarget } from '../components/flywheel/FlywheelConversationPane';
 import { FlywheelHeadlineStrip } from '../components/flywheel/FlywheelHeadlineStrip';
 import { FlywheelOrderBookCard } from '../components/flywheel/FlywheelOrderBookCard';
 import { FlywheelReportPane, FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
@@ -19,8 +20,11 @@ import { FlywheelStatusPane, FreshnessBadge, inFlightCountLabel } from '../compo
 import { FlywheelUatBatchesCard } from '../components/flywheel/FlywheelUatBatchesCard';
 import { PendingAutoMergesCard } from '../components/flywheel/PendingAutoMergesCard';
 import { RailCard, StatusBadge, ToggleSwitch } from '../components/flywheel/primitives';
-import { formatDuration, useFlywheelStatus, useMergeTrainConfig, useMergeTrainConfigMutation } from '../lib/flywheelApi';
+import { FLYWHEEL_CONVERSATION_NAME, formatDuration, useFlywheelStatus, useMergeTrainConfig, useMergeTrainConfigMutation } from '../lib/flywheelApi';
 import { consumePendingReveal, subscribeRevealNeedsYou } from '../lib/flywheelReveal';
+import { resolveNeedsYouAction } from '../lib/flywheelNeedsYou';
+import { fetchConversationPendingInput } from '../lib/useDecisions';
+import { useAskUserQuestionUiStore } from '../lib/askUserQuestionUiStore';
 
 type RailTab = 'status' | 'state' | 'report' | 'stats';
 const RAIL_TABS = ['status', 'state', 'report', 'stats'] as const;
@@ -58,8 +62,28 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
   const [tab, setTab] = useState<RailTab>('status');
   const [leftWidth, setLeftWidth] = useState<number>(readStoredSplit);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [tickJump, setTickJump] = useState<FlywheelTickTarget | null>(null);
   const leftWidthRef = useRef(leftWidth);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const pendingInputQuery = useQuery({
+    queryKey: ['conv-ask-user-question'],
+    queryFn: ({ signal }) => fetchConversationPendingInput(signal),
+    refetchInterval: 5_000,
+  });
+
+  const handleNeedsYouClick = useCallback(() => {
+    const ui = useAskUserQuestionUiStore.getState();
+    const action = resolveNeedsYouAction(pendingInputQuery.data, ui.answeredToolUseIds);
+    if (action.kind === 'reopen-question') {
+      ui.requestReopen(FLYWHEEL_CONVERSATION_NAME);
+      return;
+    }
+    setTickJump((prev) => ({ messageId: status?.lastTick?.messageId, nonce: (prev?.nonce ?? 0) + 1 }));
+  }, [pendingInputQuery.data, status?.lastTick?.messageId]);
+
+  const handleTickTargetHandled = useCallback(() => {
+    setTickJump((prev) => (prev ? { nonce: prev.nonce, messageId: undefined } : prev));
+  }, []);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNowMs(Date.now()), 5_000);
@@ -209,7 +233,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
               {tab === 'status' && (
                 <div className="space-y-4">
                   <FlywheelHeadlineStrip orderBook={status?.orderBook ?? null} />
-                  <FlywheelStatusPane status={status} unreachable={unreachable} nowMs={nowMs} onNavigateIssue={onNavigateIssue} />
+                  <FlywheelStatusPane status={status} unreachable={unreachable} nowMs={nowMs} onNavigateIssue={onNavigateIssue} onNeedsYouClick={handleNeedsYouClick} />
                 </div>
               )}
               {tab === 'state' && <FlywheelStatePane />}
@@ -228,7 +252,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
         />
 
         <div className="min-w-0 flex-1 overflow-hidden" aria-label="Flywheel conversation column">
-          <FlywheelConversationPane onOpenSettings={onOpenSettings} />
+          <FlywheelConversationPane onOpenSettings={onOpenSettings} tickTarget={tickJump} onTickTargetHandled={handleTickTargetHandled} />
         </div>
       </div>
     </div>

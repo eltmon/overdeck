@@ -1,0 +1,489 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T00:08:57Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4751: Flywheel page: clicking NEEDS YOU reopens the pending question dialog",
+    "updated": "2026-11-02T00:15:55.586Z"
+  },
+  "plan": {
+    "id": "pan-4751",
+    "title": "Flywheel page: clicking NEEDS YOU reopens the pending question dialog",
+    "status": "running",
+    "uid": "218e4bf2-00fe-4121-97aa-dd73064139b6",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T00:08:57Z",
+    "updated": "2026-11-02T00:15:55.586Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4751",
+        "label": "PAN-4751",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4751.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "flywheel",
+      "ask-user-question"
+    ],
+    "narratives": {
+      "Problem": "The Flywheel page's NEEDS YOU banner (FlywheelStatusPane.tsx, data-testid flywheel-needs-you) is plain text. Once the operator dismisses or loses the AskUserQuestion dialog for conv-flywheel, nothing on the page brings the question back, and there is no quick way to find the message that produced the tick.",
+      "Proposal": "Make the banner a button. FlywheelPage reads the shared pending-input feed (query key ['conv-ask-user-question']) and a pure resolveNeedsYouAction() decides the branch: an unanswered AskUserQuestion on conv-flywheel => useAskUserQuestionUiStore.requestReopen('conv-flywheel'), which makes the existing app-wide AskUserQuestionDialog show it again; otherwise the embedded flywheel conversation pane switches to Conversation view and jumps (ConversationPanel targetMessageId/targetMessageNonce) to the tick message. The tick message id reaches the page through a new optional FlywheelLastTick.messageId set by findLastTick().",
+      "NonGoals": "- The app-header NeedsYouIndicator keeps its current reveal behavior.\n- Plan approvals, permission prompts, pane choices and held kickoffs do not trigger the reopen branch.\n- No new dialog component, HTTP route, Zustand store, or network poll.\n- The pop-out window (/popout/flywheel-conversation) is not scrolled.\n- No navigation away from the Flywheel page (no Command Deck tab opens).\n- No change to the tick marker format or to how needsYou is parsed."
+    },
+    "autoDecisions": [
+      {
+        "summary": "'Navigates to the Flywheel conversation' means the embedded conversation pane on the Flywheel page: switch it to Conversation view and jump to the tick message.",
+        "rationale": "The page already shows conv-flywheel in its right column; leaving the page would drop the rail context, and the issue asks for the conversation scrolled to the tick message, which the embedded pane can do through existing ConversationPanel target props."
+      },
+      {
+        "summary": "Only a pending AskUserQuestion (pendingAskUserQuestion.toolUseId) selects the reopen branch; plan/permission/pane-choice/held-kickoff rows fall to show-tick.",
+        "rationale": "The issue names AskUserQuestion specifically; the existing reopen effect already routes a permission prompt first when both are pending."
+      },
+      {
+        "summary": "Add optional messageId to FlywheelLastTick instead of matching the tick by createdAt in the frontend.",
+        "rationale": "The id is stable across the deriver's and the panel's parsers (both use conversation/parser.ts), and ConversationPanel jumps by id; optional keeps id-less transcript rows decoding and existing tests passing."
+      },
+      {
+        "summary": "Keep FlywheelStatusPane query-free; the feed query, branch rule and jump state live in FlywheelPage.",
+        "rationale": "FlywheelStatusPane tests render it without a QueryClientProvider; a prop callback matches the existing onNavigateIssue pattern."
+      },
+      {
+        "summary": "An optimistically answered toolUseId (askUserQuestionUiStore.answeredToolUseIds) counts as no pending question.",
+        "rationale": "The feed keeps reporting an answered question until its next poll, and reopening it would show nothing."
+      }
+    ],
+    "items": [
+      {
+        "id": "tick-message-id",
+        "title": "Carry the tick message id in FlywheelLastTick",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:08:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4751",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "needs-you-page-wiring"
+          ],
+          "files_scope": [
+            "packages/contracts/src/flywheel-derived.ts",
+            "src/lib/flywheel/tick-marker.ts",
+            "tests/unit/lib/flywheel/tick-marker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/contracts && bun run build",
+            "npx vitest run tests/unit/lib/flywheel/tick-marker.test.ts tests/unit/lib/flywheel/derive-status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "contracts build completes",
+            "tick-marker.test.ts and derive-status.test.ts pass, including the new messageId case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In packages/contracts/src/flywheel-derived.ts add `messageId: Schema.optional(Schema.String)` (with a one-line doc comment) after `at` in FlywheelLastTick. In src/lib/flywheel/tick-marker.ts add `id?: string` to TickMarkerMessage; change findLastTick's return type to `(TickMarker & { at: string; messageId?: string }) | null` and return `{ ...parsed, at: message.createdAt, ...(message.id ? { messageId: message.id } : {}) }`. derive-status.ts needs no change. Add test 'findLastTick carries the tick message id when present (PAN-4751)' in tests/unit/lib/flywheel/tick-marker.test.ts; leave the existing id-less test unchanged. Rebuild packages/contracts before the root typecheck (server imports contracts via dist)."
+        },
+        "items": [
+          {
+            "id": "tick-message-id.ac1",
+            "title": "Given an assistant tick message with id 'msg-1', when findLastTick runs, then it returns messageId 'msg-1' alongside tick/pick/phase/inFlight/needsYou/at",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tick-message-id.ac2",
+            "title": "Given tick messages without an id, findLastTick returns an object with no messageId key, so the existing toEqual assertions in tick-marker.test.ts and derive-status.test.ts still pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tick-message-id.ac3",
+            "title": "FlywheelLastTick in packages/contracts/src/flywheel-derived.ts declares messageId as Schema.optional(Schema.String), and decodeFlywheelDerivedStatus accepts a status whose lastTick omits it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-pane-button",
+        "title": "Render the NEEDS YOU banner as a button in FlywheelStatusPane",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:08:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4751",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusPane.test.tsx passes, including the new onNeedsYouClick test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add `onNeedsYouClick?: () => void` to FlywheelStatusPaneProps. Replace the `<div role=\"note\" data-testid=\"flywheel-needs-you\">` block (grep anchor `data-testid=\"flywheel-needs-you\"`) with `<button type=\"button\" className=\"block w-full border-l-2 border-warning bg-warning/[0.08] px-3 py-2 text-left text-sm text-foreground hover:bg-warning/[0.14]\" data-testid=\"flywheel-needs-you\" title=\"Open the question the flywheel is waiting on, or the message that raised this\" onClick={() => onNeedsYouClick?.()}>` keeping the same 'Needs you' label span and `{tick.needsYou}` text. Keep data-testid (FlywheelPage's reveal effect queries it). No new colors (pan-style-guide). Add test 'the needs-you banner is a button that calls onNeedsYouClick (PAN-4751)'. The component must stay free of useQuery: its tests render without a QueryClientProvider."
+        },
+        "items": [
+          {
+            "id": "status-pane-button.ac1",
+            "title": "Given a lastTick with needsYou text, FlywheelStatusPane renders a <button type=\"button\"> with data-testid 'flywheel-needs-you' that contains 'Needs you' and the needsYou text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-pane-button.ac2",
+            "title": "When the banner button is clicked, the onNeedsYouClick prop is called exactly once; with no prop, clicking does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-pane-button.ac3",
+            "title": "FlywheelStatusPane.tsx contains no useQuery/useQueryClient import, and the existing FlywheelStatusPane tests still render it without a QueryClientProvider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-pane-jump",
+        "title": "Let FlywheelConversationPane accept a tick jump target",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:08:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4751",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "FlywheelConversationPane.test.tsx passes, including the new tick-target test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Export `type FlywheelTickTarget = { messageId?: string; nonce: number }`. Change the props to `{ onOpenSettings?: () => void; tickTarget?: FlywheelTickTarget | null; onTickTargetHandled?: () => void }`. Add an effect keyed on `tickTarget?.nonce` that calls `setViewMode('conversation')` when tickTarget is set. On the embedded `<ConversationPanel>` add `targetMessageId={tickTarget?.messageId}`, `targetMessageNonce={tickTarget?.nonce}` and `onTargetMessageHandled={onTickTargetHandled}` (required: a Terminal->Conversation toggle remounts the panel and would re-scroll to a still-set target). In the test file, extend the ConversationPanel mock to render `data-target-id`, `data-target-nonce` and a `mock-target-handled` button wired to onTargetMessageHandled, and add 'a tick target switches to Conversation view and forwards the jump (PAN-4751)': select Terminal view, rerender with tickTarget {messageId:'msg-7', nonce:1}, assert the panel renders (xterminal gone) with data-target-id 'msg-7' and data-target-nonce '1'. The popout route passes no tickTarget and must keep working."
+        },
+        "items": [
+          {
+            "id": "conversation-pane-jump.ac1",
+            "title": "Given the pane shows the Terminal view, when tickTarget changes to {messageId:'msg-7', nonce:1}, then the pane renders ConversationPanel instead of XTerminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-pane-jump.ac2",
+            "title": "ConversationPanel receives targetMessageId 'msg-7' and targetMessageNonce 1 from that tickTarget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-pane-jump.ac4",
+            "title": "When ConversationPanel calls onTargetMessageHandled (mock button click), the pane forwards it so the onTickTargetHandled prop is called exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-pane-jump.ac3",
+            "title": "With tickTarget omitted (popout route) or {nonce:2} with no messageId, the pane renders without error and passes targetMessageId undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-resolver",
+        "title": "Add the pure resolveNeedsYouAction branch rule",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:08:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4751",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/flywheelNeedsYou.ts",
+            "src/dashboard/frontend/src/lib/__tests__/flywheelNeedsYou.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/flywheelNeedsYou.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "flywheelNeedsYou.test.ts passes all six cases",
+            "typecheck completes without errors",
+            "lint (including lint:circular) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Create src/dashboard/frontend/src/lib/flywheelNeedsYou.ts exporting `type NeedsYouAction = { kind: 'reopen-question'; toolUseId: string } | { kind: 'show-tick' }` and `resolveNeedsYouAction(rows: unknown, answeredToolUseIds: ReadonlySet<string>): NeedsYouAction` exactly as the PRD snippet: coerce non-array rows to [], find the row named FLYWHEEL_CONVERSATION_NAME ('conv-flywheel'), read pendingAskUserQuestion?.toolUseId; a non-empty string not in answeredToolUseIds => reopen-question, else show-tick. Import the ConversationPendingInputRow type from ./useDecisions. If importing ./flywheelApi trips lint:circular, inline 'conv-flywheel' with a comment naming FLYWHEEL_CONVERSATION_NAME. Add six tests (pending on conv-flywheel; no row; pending only on another conversation; answered toolUseId; non-array body {}; plan-only row). Add 'src/lib/__tests__/flywheelNeedsYou.test.ts' to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "needs-you-resolver.ac1",
+            "title": "Given a feed row {name:'conv-flywheel', pendingAskUserQuestion:{toolUseId:'tu-1',…}} and an empty answered set, resolveNeedsYouAction returns {kind:'reopen-question', toolUseId:'tu-1'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-resolver.ac2",
+            "title": "resolveNeedsYouAction returns {kind:'show-tick'} for: no conv-flywheel row, a pending question only on another conversation, a toolUseId in the answered set, a non-array body, and a plan-only row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-resolver.ac3",
+            "title": "scripts/frontend-test-subset.txt lists src/lib/__tests__/flywheelNeedsYou.test.ts in sorted position, and npm run lint exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-page-wiring",
+        "title": "Wire the banner click on FlywheelPage to reopen or jump",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:08:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4751",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/FlywheelPage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/pages/__tests__/FlywheelPage.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "FlywheelPage.test.tsx passes, including both NEEDS YOU click cases",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In FlywheelPage add `useQuery({ queryKey: ['conv-ask-user-question'], queryFn: ({ signal }) => fetchConversationPendingInput(signal), refetchInterval: 5_000 })` (shared key: no new poll), `const [tickJump, setTickJump] = useState<FlywheelTickTarget | null>(null)`, and a `handleNeedsYouClick` callback: read `useAskUserQuestionUiStore.getState()`, call `resolveNeedsYouAction(pendingInputRows, ui.answeredToolUseIds)`; on 'reopen-question' call `ui.requestReopen(FLYWHEEL_CONVERSATION_NAME)` and return; otherwise `setTickJump(prev => ({ messageId: status?.lastTick?.messageId, nonce: (prev?.nonce ?? 0) + 1 }))`. Add `handleTickTargetHandled = useCallback(() => setTickJump(prev => prev ? { nonce: prev.nonce, messageId: undefined } : prev), [])` — clear only the id, never reset the nonce (a reused nonce makes MessagesTimeline skip the jump). Pass `onNeedsYouClick={handleNeedsYouClick}` to FlywheelStatusPane and `tickTarget={tickJump}` plus `onTickTargetHandled={handleTickTargetHandled}` to FlywheelConversationPane. Do not add a dialog: the app-level AskUserQuestionDialog in AppLiveStoreHost renders the reopened subject. Tests in pages/__tests__/FlywheelPage.test.tsx: make the FlywheelConversationPane mock expose tickTarget as data-target-id/data-target-nonce and render a `mock-tick-handled` button wired to onTickTargetHandled; stub '/api/conversations/pending-input' (default []); reset useAskUserQuestionUiStore ({reopenId:null, reopenNonce:0, answeredToolUseIds:new Set()}) in beforeEach; case A pending question => after the feed loads, click flywheel-needs-you => reopenId 'conv-flywheel', reopenNonce +1, data-target-id ''; case B no question => click => data-target-id 'msg-9', data-target-nonce '1'; second click => '2'; reopenNonce unchanged; click mock-tick-handled => data-target-id '' and nonce '2'; third banner click => 'msg-9' with nonce '3'. Add 'src/pages/__tests__/FlywheelPage.test.tsx' to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "needs-you-page-wiring.ac1",
+            "title": "Given the pending-input feed reports an unanswered AskUserQuestion on conv-flywheel, when the operator clicks flywheel-needs-you, then useAskUserQuestionUiStore.reopenId becomes 'conv-flywheel' and reopenNonce increases by exactly 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-page-wiring.ac2",
+            "title": "Given no pending question and lastTick.messageId 'msg-9', when the operator clicks flywheel-needs-you, then the conversation pane receives tickTarget {messageId:'msg-9', nonce:1}; a second click produces nonce 2; reopenNonce stays unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-page-wiring.ac5",
+            "title": "When the conversation pane reports the jump handled, then the pane's tickTarget messageId becomes undefined while the nonce stays 2, and the next banner click produces {messageId:'msg-9', nonce:3}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-page-wiring.ac3",
+            "title": "FlywheelPage reads the feed with queryKey ['conv-ask-user-question'] and fetchConversationPendingInput, so the reopened question renders in the existing app-level AskUserQuestionDialog; the diff contains no new dialog component and no new fetch URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-page-wiring.ac4",
+            "title": "scripts/frontend-test-subset.txt contains src/pages/__tests__/FlywheelPage.test.tsx in sorted position, and the existing reveal, tab and policy cases in FlywheelPage.test.tsx keep their assertions and run green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-docs",
+        "title": "Document the NEEDS YOU banner click in docs/FLYWHEEL.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:08:57Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4751",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Needs-you banner' docs/FLYWHEEL.md",
+            "grep -n 'messageId' docs/FLYWHEEL.md"
+          ],
+          "expected_outputs": [
+            "docs/FLYWHEEL.md has a 'Needs-you banner' row naming requestReopen and resolveNeedsYouAction",
+            "docs/FLYWHEEL.md mentions lastTick.messageId"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In docs/FLYWHEEL.md 'Sources' table: extend the 'Last tick, pick, phase, needs-you' row to say lastTick.messageId is the tick message's transcript id (absent when the row has none); add a 'Needs-you banner' row: clicking it reopens the AskUserQuestion dialog (requestReopen('conv-flywheel')) when conv-flywheel has an unanswered question in GET /api/conversations/pending-input, otherwise switches the conversation pane to Conversation view and scrolls to the tick message; code column `resolveNeedsYouAction()`, `FlywheelPage`. Do not edit the codebase map under .overdeck/context/codebase/ (it describes main; the next planner refreshes it). No Mintlify .mdx page documents the Status tab, so no .mdx change."
+        },
+        "items": [
+          {
+            "id": "flywheel-docs.ac1",
+            "title": "docs/FLYWHEEL.md Sources table contains a 'Needs-you banner' row that states the click reopens the AskUserQuestion dialog via requestReopen when a question is pending, and otherwise scrolls the conversation pane to the tick message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-docs.ac2",
+            "title": "docs/FLYWHEEL.md's last-tick row names lastTick.messageId and says it is absent when the transcript row has no id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "tick-message-id",
+        "to": "needs-you-page-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "status-pane-button",
+        "to": "needs-you-page-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-pane-jump",
+        "to": "needs-you-page-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-resolver",
+        "to": "needs-you-page-wiring",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4751-flywheel-page-clicking-needs-you-reopens-the-pending-question-dialog.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

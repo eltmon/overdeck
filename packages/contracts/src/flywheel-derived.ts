@@ -65,6 +65,8 @@ export const FlywheelLastTick = Schema.Struct({
   needsYou: Schema.NullOr(Schema.String),
   /** The assistant message's `createdAt`. */
   at: Schema.String,
+  /** The assistant message's id, when the harness records one. */
+  messageId: Schema.optional(Schema.String),
 })
 export type FlywheelLastTick = typeof FlywheelLastTick.Type
 
