@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T14:48:29.295Z",
+  "updated": "2026-11-02T14:52:25.651Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,9 +64,10 @@
       "doneAt": "2026-11-02T14:48:24.183Z"
     },
     "wi9-cli-start-remote": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4734",
-      "claimedAt": "2026-11-02T14:48:29.295Z"
+      "claimedAt": "2026-11-02T14:48:29.295Z",
+      "doneAt": "2026-11-02T14:52:25.651Z"
     }
   }
 }
