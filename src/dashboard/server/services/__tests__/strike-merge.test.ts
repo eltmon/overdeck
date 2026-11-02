@@ -74,3 +74,32 @@ describe('postStrikeMergePayload', () => {
     expect(triggerMerge).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * PAN-4750 review (CodeRabbit): the builder resolves the project exactly as
+ * `triggerMerge` does, including the GitHub-config repo-prefix fallback for a
+ * prefix the project registry does not know.
+ */
+describe('buildStrikeMergeRequest default project path', () => {
+  it('uses the getProjectPath repo-prefix fallback', async () => {
+    vi.resetModules();
+    vi.doMock('../project-path.js', () => ({
+      getProjectPath: vi.fn((_linear: string | undefined, prefix: string) => (prefix === 'KRUX' ? '/home/op/Projects/krux' : '/home/op/Projects')),
+    }));
+    try {
+      const { buildStrikeMergeRequest: build } = await import('../strike-merge.js');
+      const exists = vi.fn((path: string) => path === '/home/op/Projects/krux/workspaces/feature-krux-7-strike');
+      const built = await build('KRUX-7', { operatorStarted: true }, {
+        exists,
+        git: async (args) => (args[0] === 'rev-parse' ? SHA : ''),
+      });
+      expect(built).toEqual(expect.objectContaining({
+        ok: true,
+        request: expect.objectContaining({ workspacePath: '/home/op/Projects/krux/workspaces/feature-krux-7-strike' }),
+      }));
+    } finally {
+      vi.doUnmock('../project-path.js');
+      vi.resetModules();
+    }
+  });
+});

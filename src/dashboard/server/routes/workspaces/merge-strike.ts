@@ -315,28 +315,30 @@ export function automaticMergePin(
  * train, the queue) is pinned to the head the server merges: the head the
  * merge gate passed, or the commit the merge's own rebase or `.planning/`
  * strip produced. A push that lands after that fails the merge instead of
- * landing code the gate never saw. A strike landing is not pinned.
+ * landing code the gate never saw. PAN-4750 review: an operator-started strike
+ * merge is pinned the same way.
  */
 export function mergeHeadPin(
   request: TriggerMergeRequest,
   head?: string | null,
 ): { matchHeadCommit?: string } {
   if (automaticMergeHead(request)) return automaticMergePin(request, head);
-  return request.kind === 'normal' && head ? { matchHeadCommit: head } : {};
+  return head ? { matchHeadCommit: head } : {};
 }
 
 /**
  * #4066 review: a manual merge about to land the PR's live head as it is (the
  * direct path, or a branch already up to date) refuses when that head is not
  * the one the merge gate passed: a push landed in between. Null when the heads
- * agree, either is unknown, or the merge is automatic or a strike.
+ * agree, either is unknown, or the merge is automatic. PAN-4750 review: a
+ * manual strike merge is checked too.
  */
 export function manualMergeHeadMoved(
   request: TriggerMergeRequest,
   gatedHead: string | null | undefined,
   liveHead: string | null | undefined,
 ): string | null {
-  if (request.kind !== 'normal' || automaticMergeHead(request) || !gatedHead || !liveHead) return null;
+  if (automaticMergeHead(request) || !gatedHead || !liveHead) return null;
   if (sameCommit(liveHead, gatedHead)) return null;
   return `Cannot merge: the PR head moved to ${liveHead.slice(0, 12)} after the merge gate passed ${gatedHead.slice(0, 12)}; merge again to check the new head`;
 }

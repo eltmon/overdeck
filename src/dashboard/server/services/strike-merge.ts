@@ -17,8 +17,8 @@ import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 
 import { extractPrefix } from '../../../lib/issue-id.js';
-import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import type { StrikeMergeRequest, TriggerMergeResult } from '../routes/workspaces/merge-strike.js';
+import { getProjectPath } from './project-path.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -34,14 +34,12 @@ export type BuildStrikeMergeRequestResult =
   | { ok: false; status: 404 | 409; error: string };
 
 /**
- * The first lookup `getProjectPath(undefined, prefix)` makes for `triggerMerge`
- * (`${prefix}-1`), read from the registry directly so this service does not
- * import the workspaces route module. A strike workspace exists only under a
- * registered project; an unregistered prefix answers 404.
+ * The project path exactly as `triggerMerge` resolves it, so the workspace
+ * this builds is the one `validateStrikeMergeRequest` compares against
+ * (PAN-4750 review: the repo-prefix fallback included).
  */
 async function defaultResolveProjectPath(issueId: string): Promise<string | null> {
-  const prefix = extractPrefix(issueId) ?? issueId.split('-')[0];
-  return resolveProjectFromIssueSync(`${prefix}-1`)?.projectPath ?? null;
+  return getProjectPath(undefined, extractPrefix(issueId) ?? issueId.split('-')[0]) || null;
 }
 
 async function defaultGit(args: string[], cwd: string): Promise<string> {

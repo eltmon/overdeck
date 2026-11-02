@@ -22,7 +22,7 @@ vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
   getWorkAgentLifecycleState: vi.fn(() => ({ hasLiveTmuxSession: false, canResumeSession: false, canStartFresh: false })),
 }));
 
-const { busyMergeRefusal, forgeMergeGate, mergeHeadPin, requiresHeadApproval } = await import('../merge-strike.js');
+const { busyMergeRefusal, forgeMergeGate, manualMergeHeadMoved, mergeHeadPin, requiresHeadApproval } = await import('../merge-strike.js');
 type TriggerMergeRequest = Parameters<typeof requiresHeadApproval>[0];
 
 const strike = (extra: Partial<Extract<TriggerMergeRequest, { kind: 'strike' }>> = {}): TriggerMergeRequest => ({
@@ -77,9 +77,18 @@ describe('forgeMergeGate approval option (PAN-4750)', () => {
     expect(refusal).toEqual(expect.objectContaining({ success: false, error: 'Cannot merge: latest review requested changes' }));
   });
 
-  it('pins an operator strike to no head, and an automatic strike to its approved head', () => {
-    expect(mergeHeadPin(strike({ operatorStarted: true }), 'bbbbbbbb')).toEqual({});
+  // PAN-4750 review (CodeRabbit): a push to strike/<issue> after the gate
+  // passed must fail the merge, never land code the gate did not judge.
+  it('pins an operator strike to the head it lands, like any manual merge', () => {
+    expect(mergeHeadPin(strike({ operatorStarted: true }), 'aaaaaaaa')).toEqual({ matchHeadCommit: 'aaaaaaaa' });
+    expect(mergeHeadPin(strike({ operatorStarted: true }), null)).toEqual({});
     expect(mergeHeadPin(strike({ expectedHeadSha: 'aaaaaaaa' }), 'bbbbbbbb')).toEqual({ matchHeadCommit: 'bbbbbbbb' });
+  });
+
+  it('refuses an operator strike whose PR head moved after the gate passed', () => {
+    expect(manualMergeHeadMoved(strike({ operatorStarted: true }), 'aaaaaaaa', 'aaaaaaaa')).toBeNull();
+    expect(manualMergeHeadMoved(strike({ operatorStarted: true }), 'aaaaaaaa', 'cccccccc'))
+      .toContain('the PR head moved to cccccccc after the merge gate passed aaaaaaaa');
   });
 });
 
