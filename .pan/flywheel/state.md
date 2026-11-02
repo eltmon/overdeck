@@ -511,3 +511,10 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   planner, started 03:12, was stopped and the workspace kept. HOLD PAN-4774 until
   PAN-4682 AND PAN-4748 merge; its body is being rewritten to run the hardware
   tests on Fly VMs.
+- 2026-11-02 06:15 UTC, operator: hosted services are LIVE (account.overdeck.ai and
+  connect.overdeck.ai; smoke `node scripts/anywhere/smoke-hosted.mjs` passes).
+  PAN-4776 is closed; never start it. Start PAN-4774 as soon as #4796 (PAN-4748) is
+  merged AND deployed. Tell its agent the hosted services are up and that it can sign
+  Fly VMs in with `pan account login` (device flow): it should send the device code to
+  conv-flywheel, and the operator has authorized the Flywheel to approve that code in
+  the browser.
