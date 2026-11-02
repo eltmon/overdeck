@@ -3,7 +3,6 @@ import { realpath, stat } from 'node:fs/promises';
 import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { isCoreSkill } from '../skill-overrides/resolve.js';
 import type { ConversationLaunchContext } from './conversation-launch-context.js';
-import { validateCwdContainment } from './cwd-containment.js';
 
 /** A malformed create request; the route answers 400. */
 export class ConversationCreateInputError extends Error {}
@@ -75,8 +74,11 @@ export async function resolveProjectCwd(
 
 /**
  * The create request's cwd and canonical project key. A `cwd` needs a project
- * and must resolve inside it (the project root included, so a primary checkout
- * stays allowed); the returned cwd is its realpath.
+ * and must be an absolute, existing directory whose realpath is inside the
+ * project's (the project root included, so a primary checkout stays allowed);
+ * the returned cwd is its realpath. The registered project bounds the cwd, so
+ * it need not also lie under this server's home: a Fly machine's server runs
+ * with `HOME=/` and its projects live in `/workspace` (PAN-4734).
  */
 export async function resolveConversationCreateTarget(
   input: { projectKey?: string; cwd?: unknown },
@@ -91,8 +93,9 @@ export async function resolveConversationCreateTarget(
   if ('error' in resolved) throw new ConversationCreateInputError(resolved.error);
   if (!cwd) return { cwd: resolved.cwd, projectKey: resolved.key };
   const outside = new ConversationCreateInputError(`Invalid cwd: must be inside project ${resolved.key}`);
-  if (!(await validateCwdContainment(cwd))) throw outside;
-  const [realCwd, realProject] = await Promise.all([realpath(cwd), realpath(resolved.cwd)]);
+  if (!cwd.startsWith('/')) throw outside;
+  const [realCwd, realProject] = await Promise.all([realpath(cwd).catch(() => null), realpath(resolved.cwd)]);
+  if (realCwd === null || !(await stat(realCwd)).isDirectory()) throw outside;
   if (realCwd !== realProject && !realCwd.startsWith(`${realProject}/`)) throw outside;
   return { cwd: realCwd, projectKey: resolved.key };
 }
