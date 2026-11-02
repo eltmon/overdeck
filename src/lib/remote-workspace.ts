@@ -20,6 +20,7 @@ import type { RemoteWorkspaceMetadata } from './remote/interface.js';
 import type { FlyProvider } from './remote/fly-provider.js';
 import { shellQuote } from './remote/remote-tmux.js';
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssueSync, getIssuePrefix } from './projects.js';
+import { pushFeatureBranch } from './overdeck/feature-branch-push.js';
 
 const execAsync = promisify(exec);
 
@@ -144,6 +145,7 @@ export async function createRemoteWorkspace(
     console.log(`  Branch:    ${chalk.dim(branchName)}`);
     throw new Error('Dry run - not implemented in this module');
   }
+  const localWorkspacePath = join(projectRoot, 'workspaces', `feature-${normalizedId}`);
 
   // Get git remote URL
   let repoUrl = '';
@@ -155,6 +157,16 @@ export async function createRemoteWorkspace(
     repoUrl = stdout.trim();
   } catch {
     throw new Error('Could not determine git remote URL. Make sure you are in a git repository with a remote origin.');
+  }
+
+  // PAN-4683: the VM checks out feature/<id> from origin; push the local branch first
+  // so the planned spec (committed on it) reaches the machine.
+  if (existsSync(join(localWorkspacePath, '.git'))) {
+    if (options.spinner) options.spinner.text = `Pushing ${branchName}...`;
+    const push = await pushFeatureBranch({ cwd: localWorkspacePath, branch: branchName });
+    if (!push.pushed) {
+      throw new Error(`Could not push ${branchName} before creating the remote workspace: ${push.reason}. Push it with: git -C ${localWorkspacePath} push origin HEAD:refs/heads/${branchName}`);
+    }
   }
 
   if (options.spinner) {
@@ -211,7 +223,6 @@ export async function createRemoteWorkspace(
 
     // Step 6: Sync the workspace continue artifact, which is gitignored and does
     // not arrive via the clone.
-    const localWorkspacePath = join(projectRoot, 'workspaces', `feature-${normalizedId}`);
     if (existsSync(localWorkspacePath)) {
       if (options.spinner) {
         options.spinner.text = 'Syncing planning artifacts to VM...';
