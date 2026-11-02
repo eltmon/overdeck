@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4755",
   "created": "2026-11-02T01:00:42.371Z",
-  "updated": "2026-11-02T02:31:08.378Z",
+  "updated": "2026-11-02T02:31:22.622Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -228,6 +228,10 @@
     "effort-segmented.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T02:31:08.377Z"
+    },
+    "effort-segmented.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:31:22.622Z"
     }
   }
 }
