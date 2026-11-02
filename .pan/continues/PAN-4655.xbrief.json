@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4655",
   "created": "2026-11-02T03:52:43.700Z",
-  "updated": "2026-11-02T04:44:21.294Z",
+  "updated": "2026-11-02T04:44:38.053Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "idle-settle-patrol.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T04:44:21.294Z"
+    },
+    "idle-settle-patrol.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:44:38.053Z"
     }
   }
 }
