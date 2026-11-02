@@ -12,8 +12,15 @@
  */
 export const completedPostMerge = new Set<string>();
 export const postMergeInFlight = new Map<string, Promise<void>>();
+/**
+ * PAN-4801: issues whose merge already rolled the merge train. A lifecycle that
+ * failed after the merge was verified runs again on the next door, and must
+ * not roll the train a second time.
+ */
+export const mergeTrainRolled = new Set<string>();
 
 export function resetPostMergeState(issueId: string): void {
   completedPostMerge.delete(issueId);
   postMergeInFlight.delete(issueId);
+  mergeTrainRolled.delete(issueId);
 }

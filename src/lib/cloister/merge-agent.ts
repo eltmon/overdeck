@@ -15,6 +15,7 @@ import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import { enqueueMergedDockerCleanup } from './merged-docker-cleanup-worker.js';
 import {
   completedPostMerge as _completedPostMerge,
+  mergeTrainRolled as _mergeTrainRolled,
   postMergeInFlight as _postMergeInFlight,
 } from './post-merge-guard.js';
 import {
@@ -225,6 +226,7 @@ export async function postMergeLifecycle(
     return inFlight;
   }
 
+  let mergeVerified = false;
   const run = (async () => {
     // Guard 2: closed-out is TERMINAL. Close-out flips the spec to completed/cancelled,
     // clears review status, and closes the tracker issue.
@@ -250,6 +252,7 @@ export async function postMergeLifecycle(
       return;
     }
     console.log(`[merge-agent] Verified merge before lifecycle for ${issueId}: ${mergeVerification.reason}`);
+    mergeVerified = true;
 
     // The one place the merge outcome is known for certain: the forge has been
     // asked and answered "merged". Every merge path — the MERGE door, an
@@ -436,9 +439,30 @@ export async function postMergeLifecycle(
     console.log(`[merge-agent] Post-merge handoff completed for ${issueId}. Awaiting close-out (verify on main).`);
     announceMerge('completed', issueId);
     logActivity('merge_complete', `Merged ${issueId}. Awaiting close-out (verify on main).`);
-  })().finally(() => { _postMergeInFlight.delete(issueId); });
+  })().finally(() => {
+    _postMergeInFlight.delete(issueId);
+    if (mergeVerified) startMergeTrainReconcile(issueId);
+  });
   _postMergeInFlight.set(issueId, run);
   return run;
+}
+
+/**
+ * PAN-4801: roll the merge train once per verified merge. Every merge door
+ * reaches postMergeLifecycle, so this is the one call site; `mergeTrainRolled`
+ * keeps it to once per issue even when a failed lifecycle runs again. It starts after the lifecycle settles (no git
+ * fetch races the lifecycle's own) and is not awaited: the rebases and
+ * re-reviews of N siblings must not hold a merge response or the auto-merge
+ * tick. A no-op unless the merge train is enabled for the project.
+ */
+function startMergeTrainReconcile(issueId: string): void {
+  if (_mergeTrainRolled.has(issueId)) return;
+  _mergeTrainRolled.add(issueId);
+  void import('./merge-train.js')
+    .then(({ runMergeTrainReconcile }) => runMergeTrainReconcile(issueId))
+    .catch((err) => {
+      console.warn(`[merge-train] reconcile after ${issueId} failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
 }
 
 /**

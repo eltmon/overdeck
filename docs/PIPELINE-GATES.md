@@ -935,8 +935,8 @@ other branch.
 An approved PR that turns CONFLICTING with main fails the merge gate on
 its last condition (`PR is not mergeable (state=conflicting)`), so no merge
 door ever reaches the merge executor's conflict step. The pre-review conflict
-gate runs only before review dispatch, and the merge-train reconciler never
-sees a conflicting PR. Before PAN-4384 such a PR sat until someone noticed:
+gate runs only before review dispatch, and the merge-train reconciler leaves
+a conflicting rebase to this patrol (PAN-4801). Before PAN-4384 such a PR sat until someone noticed:
 PR #4317 and PR #4322 sat CONFLICTING and APPROVED for about 13 hours.
 
 **The predicate.** `evaluateConflictRepairGate` in `cloister/merge-gate.ts`

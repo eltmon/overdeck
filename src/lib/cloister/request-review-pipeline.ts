@@ -62,7 +62,7 @@ export type StartRequestReviewOutcome =
   | { started: false; reason: 'dirty-workspace'; error: string };
 
 /** Who asked for the review — journalled as the `review.requested` source. */
-export type RequestReviewSource = 'pan-done' | 'pan-review-request' | 'pan-unpause' | 'webhook' | 'deacon-lite' | 'api' | 'conflict-repair' | 'verification-adoption' | 'remote-reap';
+export type RequestReviewSource = 'pan-done' | 'pan-review-request' | 'pan-unpause' | 'webhook' | 'deacon-lite' | 'api' | 'conflict-repair' | 'verification-adoption' | 'remote-reap' | 'merge-train';
 
 export type RequestReviewStarter = (
   issueId: string,
