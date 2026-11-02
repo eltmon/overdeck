@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4759",
   "created": "2026-11-02T01:10:45.557Z",
-  "updated": "2026-11-02T01:28:15.110Z",
+  "updated": "2026-11-02T01:28:20.153Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-4759",
       "claimedAt": "2026-11-02T01:26:04.189Z",
       "doneAt": "2026-11-02T01:28:15.110Z"
+    },
+    "move-sageox": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4759",
+      "claimedAt": "2026-11-02T01:28:20.153Z"
     }
   }
 }
