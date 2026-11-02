@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4658",
   "created": "2026-11-02T04:25:38.183Z",
-  "updated": "2026-11-02T05:19:11.593Z",
+  "updated": "2026-11-02T05:19:35.907Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "archive-clears-target.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T05:19:11.593Z"
+    },
+    "editor-preview-cite.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:19:35.907Z"
     }
   }
 }
