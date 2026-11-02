@@ -62,5 +62,8 @@
   even for keys the stylesheet lacks: import `styles` and assert `toHaveClass(styles.x)`, but prove
   a rule exists by grep, not by a test. A mutation test that needs `invalidateQueries` to wait must
   mount a `useQuery` observer on that key; with no observer it resolves at once.
+- Playwright `getByRole(..., { name })` is a case-insensitive substring match (testing-library's is
+  whole-string): use `exact: true` for short names like `Yes`, and build e2e fixture timestamps
+  from `Date.now()` (PAN-4757).
 
 <!-- last-verified: 2026-11-01 -->
