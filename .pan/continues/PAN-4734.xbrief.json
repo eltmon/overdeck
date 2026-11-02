@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T14:31:42.713Z",
+  "updated": "2026-11-02T14:32:30.687Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-02T14:31:38.969Z"
     },
     "wi3-push-daemon-workdir": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4734",
-      "claimedAt": "2026-11-02T14:31:42.713Z"
+      "claimedAt": "2026-11-02T14:31:42.713Z",
+      "doneAt": "2026-11-02T14:32:30.687Z"
     }
   }
 }
