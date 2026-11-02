@@ -13,9 +13,19 @@ import { listLinks } from '../../../lib/anywhere/link-store.js';
 import { FLY_MACHINE_ERROR_STATUS, FlyMachineError } from '../../../lib/anywhere/fly/provision.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { ERROR_STATUS, handleMachinesUnlink, notifyLinksChanged } from '../routes/machines.js';
-import type { FleetTarget } from './fleet-target.js';
 import { addFlyMachine, type AddFlyMachineInput, type AddFlyMachineResult } from './fly-machine-service.js';
 import { MachineLinkError } from './machine-link-service.js';
+
+/**
+ * A structural subtype of `fleet-target.ts`'s `FleetTarget` (the `self: false`
+ * and refusal variants only). Defined here rather than imported, so this
+ * module does not import `fleet-target.ts`: that file imports this one for
+ * `startFly`, and an import in both directions would be a new circular
+ * dependency (`npm run lint:circular`).
+ */
+type FlyFleetTarget =
+  | { ok: true; self: false; link: MachineLink; environmentId: string; label: string; reason: string; discard: () => Promise<void> }
+  | { ok: false; status: number; body: Record<string, unknown> };
 
 /** What a fleet route knows about a spawn that may run on a new Fly machine (PAN-4743). */
 export interface FlySpawn {
@@ -52,10 +62,10 @@ const defaultFlyTargetDeps = (): FlyTargetDeps => ({
   warn: (message) => console.warn(`[fleet-fly] ${message}`),
 });
 
-const refuse = (status: number, code: string, error: string, extra: Record<string, unknown> = {}): FleetTarget =>
+const refuse = (status: number, code: string, error: string, extra: Record<string, unknown> = {}): FlyFleetTarget =>
   ({ ok: false, status, body: { code, error, ...extra } });
 
-export async function startFlyTarget(request: FlyTargetRequest, deps: FlyTargetDeps = defaultFlyTargetDeps()): Promise<FleetTarget> {
+export async function startFlyTarget(request: FlyTargetRequest, deps: FlyTargetDeps = defaultFlyTargetDeps()): Promise<FlyFleetTarget> {
   if (!request.mayCreate) return refuse(403, 'fly-needs-admin', 'Starting a Fly machine needs an admin credential.');
   if (!request.projectKey) return refuse(400, 'fly-needs-project', 'Fly (new VM) needs a project: the new machine clones it.');
   if (request.gitOrigin === null) return refuse(409, 'project-has-no-origin', `Only GitHub projects can run on a Fly machine; ${request.projectKey} has no github_repo.`);

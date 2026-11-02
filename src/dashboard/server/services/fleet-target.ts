@@ -10,7 +10,8 @@
  * - a link's label or environment id ⇒ that link, which must be online (else
  *   503 `machine-offline`); an explicit label is honored even when the machine
  *   is reserved or saturated, but `needs` is still checked (409 `needs-unmet`);
- * - `fly` ⇒ 400 `fly-unavailable` (PAN-4652);
+ * - `fly` ⇒ a route that passes a spawn context (PAN-4743) calls the Fly
+ *   target door; without one, 400 `fly-unavailable`;
  * - anything else ⇒ 404 `unknown-machine`.
  */
 import type { LoadSample, PlacementAnswer } from '@overdeck/contracts';
@@ -21,9 +22,14 @@ import { choosePlacement, noMachineFits, type PlacementCandidate } from '../../.
 import { listMachineProjects } from '../../../lib/anywhere/project-origin.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { currentLinkSupervisor } from './anywhere-boot.js';
+import type { FlySpawn, FlyTargetRequest } from './fleet-fly-target.js';
+import { startFlyTarget } from './fleet-fly-target.js';
 import { currentLinkedProjects } from './linked-projects-sync.js';
 import { connectingStatusSource, type LinkStatusSource } from './machine-link-service.js';
 import { sampleMachineLoad } from './machine-load.js';
+
+/** PAN-4743 D-4743-6: the server sentence when `fly` is asked for outside a conversation spawn. */
+export const FLY_CONVERSATIONS_ONLY = 'Fly (new VM) starts conversations only. To run this elsewhere, link a Fly machine with pan machines add-fly --project <key> and name it with --machine fly-<id>.';
 
 export interface FleetTargetDeps {
   self: () => Promise<{ environmentId: string; label: string }>;
@@ -33,6 +39,8 @@ export interface FleetTargetDeps {
   selfProfile: () => MachineProfile | null;
   selfProjectOrigins: () => Promise<string[]>;
   linkProjectOrigins: (environmentId: string) => string[];
+  /** The Fly target door (PAN-4743): starts a new Fly machine for a spawn. */
+  startFly: (request: FlyTargetRequest) => Promise<FleetTarget>;
 }
 
 export const defaultFleetTargetDeps = (): FleetTargetDeps => ({
@@ -47,6 +55,7 @@ export const defaultFleetTargetDeps = (): FleetTargetDeps => ({
   selfProjectOrigins: async () => (await listMachineProjects()).flatMap((project) => (project.gitOrigin ? [project.gitOrigin] : [])),
   linkProjectOrigins: (environmentId) =>
     (currentLinkedProjects()?.projectsFor(environmentId) ?? []).flatMap((project) => (project.gitOrigin ? [project.gitOrigin] : [])),
+  startFly: (request) => startFlyTarget(request),
 });
 
 export type FleetTarget =
@@ -100,9 +109,13 @@ export async function resolveTargetMachine(
   gitOrigin: string | null,
   needs: readonly string[],
   deps: FleetTargetDeps = defaultFleetTargetDeps(),
+  spawn?: FlySpawn,
 ): Promise<FleetTarget> {
   const wanted = machine?.trim() ?? '';
-  if (wanted.toLowerCase() === 'fly') return refuse(400, 'fly-unavailable', 'Fly (new VM) needs PAN-4652');
+  if (wanted.toLowerCase() === 'fly') {
+    if (!spawn) return refuse(400, 'fly-unavailable', FLY_CONVERSATIONS_ONLY);
+    return deps.startFly({ ...spawn, gitOrigin, needs });
+  }
   if (wanted.toLowerCase() === 'auto') {
     const { candidates, links } = await placementCandidates(deps);
     const answer = choosePlacement({ candidates, gitOrigin, needs });

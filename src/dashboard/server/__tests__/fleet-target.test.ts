@@ -6,7 +6,7 @@ import type { MachineLink } from '../../../lib/anywhere/link-store.js';
 import { refuseFleetRequest } from '../routes/machines-fleet.js';
 import { handleFleetPlacement } from '../routes/fleet-work.js';
 import { readJsonResponse } from '../routes/machines-work.js';
-import { type FleetTargetDeps, resolveTargetMachine } from '../services/fleet-target.js';
+import { FLY_CONVERSATIONS_ONLY, type FleetTargetDeps, resolveTargetMachine } from '../services/fleet-target.js';
 import { jsonResponse } from '../http-helpers.js';
 
 const GIB = 2 ** 30;
@@ -18,6 +18,7 @@ const link = (label: string, overrides: Partial<MachineLink> = {}) => ({ id: `li
 
 function deps(overrides: Partial<FleetTargetDeps> = {}, live: Record<string, { state: string; load?: LoadSample | null; tags?: string[]; placement?: 'auto' | 'on-request' }> = {}) {
   const selfLoad = vi.fn(async () => sample(30, 8, 3));
+  const startFly = vi.fn(async () => ({ ok: true as const, self: false as const, link: link('fly-m1'), environmentId: 'env-fly-m1', label: 'fly-m1', reason: 'Fly (new VM) → fly-m1 (iad)' }));
   const value: FleetTargetDeps = {
     self: async () => ({ environmentId: 'env-laptop', label: 'laptop' }),
     links: async () => [link('desk'), link('lab'), link('old', { revokedAt: '2026-10-01T00:00:00.000Z' })],
@@ -26,14 +27,26 @@ function deps(overrides: Partial<FleetTargetDeps> = {}, live: Record<string, { s
     selfProfile: () => ({ tags: ['linux'], placement: 'auto' }),
     selfProjectOrigins: async () => ['github.com/eltmon/overdeck'],
     linkProjectOrigins: () => ['github.com/eltmon/overdeck'],
+    startFly,
     ...overrides,
   };
-  return { value, selfLoad };
+  return { value, selfLoad, startFly };
 }
 
 describe('resolveTargetMachine (D-4651-10)', () => {
-  it("ac8: 'fly' answers 400 fly-unavailable", async () => {
-    expect(await resolveTargetMachine('fly', null, [], deps().value)).toEqual({ ok: false, status: 400, body: { code: 'fly-unavailable', error: 'Fly (new VM) needs PAN-4652' } });
+  it('ac8: no spawn context answers 400 fly-unavailable and never calls startFly', async () => {
+    const d = deps();
+    expect(await resolveTargetMachine('fly', null, [], d.value)).toEqual({ ok: false, status: 400, body: { code: 'fly-unavailable', error: FLY_CONVERSATIONS_ONLY } });
+    expect(d.startFly).not.toHaveBeenCalled();
+  });
+
+  it('ac8: a spawn context calls startFly with the spawn, gitOrigin and needs, and returns its target unchanged', async () => {
+    const d = deps();
+    const spawn = { projectKey: 'overdeck', mayCreate: true };
+    const target = await resolveTargetMachine('FLY', 'github.com/eltmon/overdeck', ['docker'], d.value, spawn);
+    expect(d.startFly).toHaveBeenCalledTimes(1);
+    expect(d.startFly).toHaveBeenCalledWith({ projectKey: 'overdeck', mayCreate: true, gitOrigin: 'github.com/eltmon/overdeck', needs: ['docker'] });
+    expect(target).toMatchObject({ ok: true, self: false, label: 'fly-m1' });
   });
 
   it('ac8: an offline label answers 503 machine-offline; an unknown or revoked one 404 unknown-machine', async () => {
