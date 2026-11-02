@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4653",
   "created": "2026-11-02T03:31:51.838Z",
-  "updated": "2026-11-02T04:28:31.347Z",
+  "updated": "2026-11-02T04:28:49.412Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "cli-verbs.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T04:28:31.347Z"
+    },
+    "menu-override.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:28:49.412Z"
     }
   }
 }
