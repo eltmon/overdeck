@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T18:19:48.612Z",
+  "updated": "2026-11-02T18:20:06.211Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -226,6 +226,10 @@
     "auto-merge-hold.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T18:19:48.611Z"
+    },
+    "auto-merge-hold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:20:06.210Z"
     }
   }
 }
