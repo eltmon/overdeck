@@ -4,17 +4,17 @@
     "created": "2026-11-02T06:12:20Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4660: Duplicate-and-edit color theme editor in Settings > Appearance",
-    "updated": "2026-11-02T06:12:35.190Z"
+    "updated": "2026-11-02T06:13:53.138Z"
   },
   "plan": {
     "id": "pan-4660",
     "title": "Duplicate-and-edit color theme editor in Settings > Appearance",
-    "status": "proposed",
+    "status": "running",
     "uid": "1230081f-5745-47e0-9a79-c4c02c1f7d97",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T06:12:20Z",
-    "updated": "2026-11-02T06:12:35.190Z",
+    "updated": "2026-11-02T06:13:53.138Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4660",
@@ -783,5 +783,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
