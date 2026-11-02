@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T14:59:53.942Z",
+  "updated": "2026-11-02T15:00:09.950Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -212,6 +212,10 @@
     "docs-fly-new-vm.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T14:59:53.942Z"
+    },
+    "live-uat-fly.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T15:00:09.950Z"
     }
   }
 }
