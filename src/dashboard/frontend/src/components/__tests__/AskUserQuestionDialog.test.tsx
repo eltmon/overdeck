@@ -459,3 +459,41 @@ describe('AskUserQuestionDialog consequences and layout', () => {
     expect(screen.getByText(/asked 13m ago/)).toBeInTheDocument();
   });
 });
+
+describe('AskUserQuestionDialog needs-you tone and footer', () => {
+  function renderTone() {
+    const onDismiss = vi.fn();
+    const result = render(
+      <AskUserQuestionDialog subject={{ id: 'agent-pan-1', pendingAskUserQuestion }} isOpen onSubmit={vi.fn()} onDismiss={onDismiss} />,
+    );
+    return { ...result, onDismiss };
+  }
+
+  it('uses the needs-you warning tone on the panel', () => {
+    const { container } = renderTone();
+
+    expect(screen.getByRole('dialog')).toHaveClass('border-warning/40');
+    expect(container.ownerDocument.querySelector('.border-primary\\/30')).toBeNull();
+  });
+
+  it('the footer has a single Send action and no Minimize button', () => {
+    const { onDismiss } = renderTone();
+
+    const footer = screen.getByTestId('send-helper').parentElement as HTMLElement;
+    const footerButtons = footer.querySelectorAll('button');
+    expect(footerButtons).toHaveLength(1);
+    expect(footerButtons[0]).toHaveTextContent('Send Answer');
+    expect(screen.getAllByRole('button', { name: 'Minimize' })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Minimize' }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('Send helper text explains the disabled state', () => {
+    renderTone();
+
+    expect(screen.getByTestId('send-helper')).toHaveTextContent('Choose an option or write a note.');
+    fireEvent.click(screen.getByRole('radio', { name: /Option A/ }));
+    expect(screen.getByTestId('send-helper')).toHaveTextContent('Send delivers your answer to the agent, which then continues.');
+  });
+});

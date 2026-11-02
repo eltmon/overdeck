@@ -233,11 +233,11 @@ export function AskUserQuestionDialog({
         aria-labelledby={titleId}
         aria-describedby={`${questionIdBase}-0`}
         onKeyDown={handlePanelKeyDown}
-        className="w-full max-w-2xl overflow-hidden rounded-xl border border-primary/30 bg-card shadow-2xl"
+        className="w-full max-w-2xl overflow-hidden rounded-xl border border-warning/40 bg-card shadow-2xl"
       >
         <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-          <div className="rounded-full bg-primary/15 p-2">
-            <MessageCircleQuestion className="h-5 w-5 text-primary" />
+          <div className="rounded-full bg-warning/15 p-2">
+            <MessageCircleQuestion className="h-5 w-5 text-warning" />
           </div>
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="truncate text-lg font-semibold text-foreground">{displayName}</h2>
@@ -268,7 +268,7 @@ export function AskUserQuestionDialog({
             return (
               <div key={`q-${qIdx}`} className="space-y-2">
                 {q.header ? (
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{q.header}</p>
+                  <p className="eyebrow">{q.header}</p>
                 ) : null}
                 <div
                   id={`${questionIdBase}-${qIdx}`}
@@ -326,7 +326,7 @@ export function AskUserQuestionDialog({
 
           {!isCodexApproval && (
             <div className="space-y-1">
-              <label htmlFor={noteId} className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <label htmlFor={noteId} className="eyebrow block">
                 Add a note (optional)
               </label>
               <textarea
@@ -342,16 +342,12 @@ export function AskUserQuestionDialog({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-border bg-card/40 px-5 py-4">
-          <button
-            type="button"
-            onClick={onDismiss}
-            disabled={isSubmitting}
-            title="Keeps the question in the activity feed's “Needs you” list — click it there to reopen"
-            className={`rounded-md border border-border bg-popover px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-card disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING}`}
-          >
-            Minimize
-          </button>
+        <div className="flex items-center gap-3 border-t border-border bg-card/40 px-5 py-4">
+          <p data-testid="send-helper" className="min-w-0 flex-1 text-xs text-muted-foreground">
+            {canSubmit
+              ? 'Send delivers your answer to the agent, which then continues.'
+              : 'Choose an option or write a note.'}
+          </p>
           <button
             type="button"
             onClick={handleSubmit}
