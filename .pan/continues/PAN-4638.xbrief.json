@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-02T00:01:26.815Z",
+  "updated": "2026-11-02T00:01:48.824Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -272,6 +272,10 @@
       "claimedBy": "agent-pan-4638",
       "claimedAt": "2026-11-02T00:00:04.016Z",
       "doneAt": "2026-11-02T00:01:26.815Z"
+    },
+    "docs-remote-lanes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T00:01:48.824Z"
     }
   }
 }
