@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T23:42:38.828Z",
+  "updated": "2026-11-02T23:42:54.068Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,10 @@
     "ac1-two-dashboards.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T23:42:38.828Z"
+    },
+    "ac1-two-dashboards.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:42:54.067Z"
     }
   }
 }
