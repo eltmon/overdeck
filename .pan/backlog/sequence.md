@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T12:29:21.179191Z · model: claude-opus-5-5 · open: 858_
+_Last sequenced: 2026-11-02T12:30:57.714099Z · model: claude-opus-5-5 · open: 856_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -229,7 +229,6 @@ _Last sequenced: 2026-11-02T12:29:21.179191Z · model: claude-opus-5-5 · open: 
 | 221 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 222 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 223 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 224 | PAN-4748 | M | low | ok |  |  | Fly API uses flyctl's stored token, which expires unrefreshed: loops, clone poll and rollback destroy 403; VMs leak and bill. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
 | 228 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
@@ -862,7 +861,6 @@ _Last sequenced: 2026-11-02T12:29:21.179191Z · model: claude-opus-5-5 · open: 
 | 871 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 880 | PAN-4805 | S | high | ok |  |  | Merged; verifying on main. e2e isolated-dashboard fixture now takes a free OS port. Close-out only, not pickable. |
 
 ## Rationale detail
 
@@ -1193,10 +1191,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T12:29:21.179191Z",
+  "generatedAt": "2026-11-02T12:30:57.714099Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 858,
+  "openCount": 856,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11857,32 +11855,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4748",
-      "rank": 224,
-      "size": "M",
-      "importance": "low",
-      "score": 5,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fly API uses flyctl's stored token, which expires unrefreshed: loops, clone poll and rollback destroy 403; VMs leak and bill.",
-      "rationale": "New issue: a lapsed ~/.fly/config.yml token silently stops Fly heartbeats, sweeps and Codex sync and leaks billing VMs on rollback, so it ranks above the Fly-track cluster (272-312) whose live checks it breaks.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4805",
-      "rank": 880,
-      "size": "S",
-      "importance": "high",
-      "score": 5,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merged; verifying on main. e2e isolated-dashboard fixture now takes a free OS port. Close-out only, not pickable.",
-      "rationale": "New issue whose fix already merged (verifying-on-main), so it sits at the tail; the substrate label keeps importance at high.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13040,13 +13012,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-4748",
-      "to": "PAN-4734",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
     },
     {
       "from": "PAN-4747",
