@@ -189,13 +189,7 @@ export class ChannelSocket extends Duplex {
     this.clearIdle();
     this.idleMs = ms > 0 ? ms : 0;
     if (callback) this.once('timeout', callback);
-    if (this.idleMs > 0) {
-      this.idleTimer = setTimeout(() => {
-        this.idleTimer = null;
-        this.emit('timeout');
-      }, this.idleMs);
-      this.idleTimer.unref();
-    }
+    if (this.idleMs > 0) this.armIdle();
     return this;
   }
 
@@ -219,8 +213,18 @@ export class ChannelSocket extends Duplex {
     return this;
   }
 
+  /** Like `net.Socket`, traffic after a `'timeout'` arms the timer again (PAN-4740). */
   private touch(): void {
-    this.idleTimer?.refresh();
+    if (this.idleTimer) this.idleTimer.refresh();
+    else if (this.idleMs > 0 && !this.destroyed) this.armIdle();
+  }
+
+  private armIdle(): void {
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      this.emit('timeout');
+    }, this.idleMs);
+    this.idleTimer.unref();
   }
 
   private clearIdle(): void {
