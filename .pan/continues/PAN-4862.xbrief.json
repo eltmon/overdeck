@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4862",
   "created": "2026-11-02T23:48:40.343Z",
-  "updated": "2026-11-02T23:50:31.382Z",
+  "updated": "2026-11-02T23:50:37.516Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4862",
       "claimedAt": "2026-11-02T23:48:40.343Z",
       "doneAt": "2026-11-02T23:50:31.382Z"
+    },
+    "relay-ice-wire": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4862",
+      "claimedAt": "2026-11-02T23:50:37.516Z"
     }
   }
 }
