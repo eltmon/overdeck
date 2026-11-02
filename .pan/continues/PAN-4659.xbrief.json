@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4659",
   "created": "2026-11-02T05:46:59.538Z",
-  "updated": "2026-11-02T06:24:22.974Z",
+  "updated": "2026-11-02T06:24:38.866Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "zip-reader.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T06:24:22.973Z"
+    },
+    "zip-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:24:38.865Z"
     }
   }
 }
