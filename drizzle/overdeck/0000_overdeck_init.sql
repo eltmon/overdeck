@@ -175,6 +175,7 @@ CREATE TABLE `conversations` (
 	`settled_at` integer,
 	`settle_reason` text,
 	`snoozed_until` integer,
+	`auto_settle_override` text,
 	`started_by_environment_id` text,
 	FOREIGN KEY (`handoff_target_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`cleared_to_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,

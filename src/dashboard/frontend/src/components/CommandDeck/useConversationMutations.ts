@@ -77,6 +77,7 @@ export interface TriageUpdateInput {
   settled?: boolean;
   settleReason?: 'manual' | 'merge' | 'idle';
   snoozedUntil?: string | null;
+  autoSettleOverride?: 'on' | 'off' | 'inherit';
 }
 
 interface TriageState {
@@ -204,6 +205,8 @@ export interface ConversationMutations {
   triage: (opts: { updates: TriageUpdateInput[]; label: string }) => void;
   /** Pops the newest undo entry and replays its priors. Returns false when the stack is empty. */
   undoLastTriage: () => boolean;
+  /** PAN-4653: set one conversation's auto-settle-on-merge override (no undo entry). */
+  setAutoSettleOverride: (opts: { name: string; override: 'on' | 'off' | 'inherit' }) => void;
   openForkModal: (conv: Conversation, options?: { mode?: ForkModeOption; focus?: string }) => void;
   submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent', summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent', projectKey?: string, handoffExtras?: { skills?: string[]; packs?: string[]; hold?: boolean; fresh?: boolean }) => void;
   forkTarget: Conversation | null;
@@ -492,6 +495,31 @@ export function useConversationMutations(
   // `.mutate` stable; retitleVersion is a dependency so isRetitlePending
   // re-evaluates after pending changes, and pendingArchiveNames /
   // pendingStopNames are dependencies so isArchivePending / isStopPending do too.
+  // PAN-4653 D10: the override is a preference, not a triage move — no undo entry, no success toast.
+  const autoSettleOverrideMutation = useMutation({
+    mutationFn: ({ name, override }: { name: string; override: 'on' | 'off' | 'inherit' }) =>
+      postTriageUpdates([{ name, autoSettleOverride: override }]),
+    onMutate: async ({ name, override }) => {
+      await queryClient.cancelQueries({ queryKey: ['conversations'] });
+      const current = queryClient.getQueryData<Conversation[]>(['conversations']) ?? [];
+      const prior = current.find((c) => c.name === name)?.autoSettleOverride ?? 'inherit';
+      queryClient.setQueryData<Conversation[]>(['conversations'], (old) =>
+        old?.map((c) => (c.name === name ? { ...c, autoSettleOverride: override } : c)) ?? [],
+      );
+      return { name, prior };
+    },
+    onError: (err: Error, _vars, ctx) => {
+      if (ctx) {
+        queryClient.setQueryData<Conversation[]>(['conversations'], (old) =>
+          old?.map((c) => (c.name === ctx.name ? { ...c, autoSettleOverride: ctx.prior } : c)) ?? [],
+        );
+      }
+      toast.error(err.message, { duration: 6000 });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
   const archiveMutate = archiveMutation.mutate;
   const stopMutate = stopMutation.mutate;
   const renameMutate = renameMutation.mutate;
@@ -501,6 +529,7 @@ export function useConversationMutations(
   const linkPullRequestMutate = linkPullRequestMutation.mutate;
   const unlinkPullRequestMutate = unlinkPullRequestMutation.mutate;
   const triageMutate = triageMutation.mutate;
+  const autoSettleOverrideMutate = autoSettleOverrideMutation.mutate;
   const isForkPending = summaryForkMutation.isPending;
   return useMemo<ConversationMutations>(() => ({
     archive: (name, options) => {
@@ -537,6 +566,7 @@ export function useConversationMutations(
       });
       return true;
     },
+    setAutoSettleOverride: (opts) => autoSettleOverrideMutate(opts),
     openForkModal,
     submitFork,
     forkTarget,
@@ -544,5 +574,5 @@ export function useConversationMutations(
     forkTargetFocus,
     closeForkModal: () => { setForkTarget(null); setForkTargetMode(undefined); setForkTargetFocus(undefined); },
     isForkPending,
-  }), [archiveMutate, pendingArchiveNames, queryClient, stopMutate, pendingStopNames, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, triageMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, retitleVersion]);
+  }), [archiveMutate, pendingArchiveNames, queryClient, stopMutate, pendingStopNames, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, triageMutate, autoSettleOverrideMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, retitleVersion]);
 }

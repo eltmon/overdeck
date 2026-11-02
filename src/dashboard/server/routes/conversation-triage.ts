@@ -1,8 +1,13 @@
-/** PAN-4639 WI-2: the triage write door — POST /api/conversations/triage. */
+/**
+ * PAN-4639 WI-2: the triage write door — POST /api/conversations/triage.
+ * PAN-4653: GET/POST /api/conversations/auto-settle-on-merge read and write the
+ * global auto-settle-on-merge setting.
+ */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { applyTriageUpdate, parseTriageUpdates } from '../../../lib/overdeck/conversation-triage-store.js';
+import { isConversationsAutoSettleOnMerge, setConversationsAutoSettleOnMerge } from '../../../lib/overdeck/control-settings.js';
 import { getConversationByName } from '../../../lib/overdeck/conversations.js';
 import { invalidateConversationListEnrichmentCache } from '../../../lib/overdeck/conversation-list.js';
 import { validateOrigin } from './origin-validation.js';
@@ -58,4 +63,33 @@ const postConversationTriageRoute = HttpRouter.add(
   }),
 );
 
-export const conversationTriageRouteLayer = Layer.mergeAll(postConversationTriageRoute);
+const getAutoSettleOnMergeRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/auto-settle-on-merge',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    return jsonResponse({ enabled: isConversationsAutoSettleOnMerge() });
+  }),
+);
+
+const postAutoSettleOnMergeRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/auto-settle-on-merge',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    const body = yield* readJsonBody;
+    if (typeof body['enabled'] !== 'boolean') return jsonResponse({ error: 'enabled must be a boolean' }, { status: 400 });
+    setConversationsAutoSettleOnMerge(body['enabled']);
+    return jsonResponse({ enabled: isConversationsAutoSettleOnMerge() });
+  }),
+);
+
+export const conversationTriageRouteLayer = Layer.mergeAll(
+  postConversationTriageRoute,
+  getAutoSettleOnMergeRoute,
+  postAutoSettleOnMergeRoute,
+);

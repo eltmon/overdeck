@@ -4,16 +4,22 @@ import { getOverdeckDatabase } from './infra.js';
 export const SETTLE_REASONS = ['manual', 'merge', 'idle'] as const;
 export type SettleReason = (typeof SETTLE_REASONS)[number];
 
+export const AUTO_SETTLE_OVERRIDES = ['on', 'off', 'inherit'] as const;
+export type AutoSettleOverride = (typeof AUTO_SETTLE_OVERRIDES)[number];
+
 export interface ConversationTriage {
   settledAt: string | null;
   settleReason: SettleReason | null;
   snoozedUntil: string | null;
+  /** PAN-4653: per-conversation auto-settle-on-merge override. */
+  autoSettleOverride: AutoSettleOverride;
 }
 
 export const EMPTY_CONVERSATION_TRIAGE: ConversationTriage = {
   settledAt: null,
   settleReason: null,
   snoozedUntil: null,
+  autoSettleOverride: 'inherit',
 };
 
 export interface TriageUpdate {
@@ -21,16 +27,22 @@ export interface TriageUpdate {
   settled?: boolean;
   settleReason?: SettleReason;
   snoozedUntil?: string | null;
+  autoSettleOverride?: AutoSettleOverride;
 }
 
 interface TriageRow {
   settled_at: number | null;
   settle_reason: string | null;
   snoozed_until: number | null;
+  auto_settle_override: string | null;
 }
 
 function isSettleReason(value: unknown): value is SettleReason {
   return typeof value === 'string' && (SETTLE_REASONS as readonly string[]).includes(value);
+}
+
+function isAutoSettleOverride(value: unknown): value is AutoSettleOverride {
+  return typeof value === 'string' && (AUTO_SETTLE_OVERRIDES as readonly string[]).includes(value);
 }
 
 function rowToTriage(row: TriageRow): ConversationTriage {
@@ -38,6 +50,8 @@ function rowToTriage(row: TriageRow): ConversationTriage {
     settledAt: row.settled_at !== null ? new Date(row.settled_at).toISOString() : null,
     settleReason: row.settled_at !== null ? (isSettleReason(row.settle_reason) ? row.settle_reason : 'manual') : null,
     snoozedUntil: row.snoozed_until !== null ? new Date(row.snoozed_until).toISOString() : null,
+    autoSettleOverride:
+      row.auto_settle_override === 'on' || row.auto_settle_override === 'off' ? row.auto_settle_override : 'inherit',
   };
 }
 
@@ -47,7 +61,7 @@ export function listConversationTriage(names: readonly string[]): Map<string, Co
   if (names.length === 0) return byName;
   const placeholders = names.map(() => '?').join(', ');
   const rows = getOverdeckDatabase()
-    .prepare(`SELECT name, settled_at, settle_reason, snoozed_until FROM conversations WHERE name IN (${placeholders})`)
+    .prepare(`SELECT name, settled_at, settle_reason, snoozed_until, auto_settle_override FROM conversations WHERE name IN (${placeholders})`)
     .all<TriageRow & { name: string }>(...names);
   for (const row of rows) byName.set(row.name, rowToTriage(row));
   return byName;
@@ -55,7 +69,7 @@ export function listConversationTriage(names: readonly string[]): Map<string, Co
 
 export function getConversationTriage(name: string): ConversationTriage | null {
   const row = getOverdeckDatabase()
-    .prepare('SELECT settled_at, settle_reason, snoozed_until FROM conversations WHERE name = ?')
+    .prepare('SELECT settled_at, settle_reason, snoozed_until, auto_settle_override FROM conversations WHERE name = ?')
     .get<TriageRow>(name);
   if (!row) return null;
   return rowToTriage(row);
@@ -94,6 +108,19 @@ export function unsnoozeConversation(name: string): boolean {
   return result.changes > 0;
 }
 
+/** PAN-4653: 'inherit' stores NULL. False when no row. */
+export function setAutoSettleOverride(name: string, override: AutoSettleOverride): boolean {
+  const result = getOverdeckDatabase()
+    .prepare('UPDATE conversations SET auto_settle_override = ? WHERE name = ?')
+    .run(override === 'inherit' ? null : override, name);
+  return result.changes > 0;
+}
+
+/** PAN-4653 D4: whether the merge sweep settles a conversation. */
+export function autoSettlesOnMerge(override: AutoSettleOverride, globalEnabled: boolean): boolean {
+  return override === 'inherit' ? globalEnabled : override === 'on';
+}
+
 /** Parse and validate a request body per the PRD API contract. */
 export function parseTriageUpdates(body: unknown): { ok: true; updates: TriageUpdate[] } | { ok: false; error: string } {
   if (typeof body !== 'object' || body === null || !('updates' in body)) {
@@ -107,12 +134,15 @@ export function parseTriageUpdates(body: unknown): { ok: true; updates: TriageUp
   const parsed: TriageUpdate[] = [];
   for (const entry of updates) {
     if (typeof entry !== 'object' || entry === null) return { ok: false, error: 'each update must be an object' };
-    const { name, settled, settleReason, snoozedUntil } = entry as Record<string, unknown>;
+    const { name, settled, settleReason, snoozedUntil, autoSettleOverride } = entry as Record<string, unknown>;
 
     if (typeof name !== 'string' || name.trim() === '') return { ok: false, error: 'each update requires a non-empty name' };
     if (settled !== undefined && typeof settled !== 'boolean') return { ok: false, error: 'settled must be a boolean' };
     if (settleReason !== undefined && !isSettleReason(settleReason)) {
       return { ok: false, error: 'settleReason must be manual, merge, or idle' };
+    }
+    if (autoSettleOverride !== undefined && !isAutoSettleOverride(autoSettleOverride)) {
+      return { ok: false, error: 'autoSettleOverride must be on, off, or inherit' };
     }
 
     let parsedSnoozedUntil: string | null | undefined;
@@ -129,8 +159,8 @@ export function parseTriageUpdates(body: unknown): { ok: true; updates: TriageUp
     if (settled === true && parsedSnoozedUntil !== null && parsedSnoozedUntil !== undefined) {
       return { ok: false, error: 'settled cannot be combined with a non-null snoozedUntil' };
     }
-    if (settled === undefined && parsedSnoozedUntil === undefined) {
-      return { ok: false, error: 'each update requires settled or snoozedUntil' };
+    if (settled === undefined && parsedSnoozedUntil === undefined && autoSettleOverride === undefined) {
+      return { ok: false, error: 'each update requires settled, snoozedUntil, or autoSettleOverride' };
     }
 
     parsed.push({
@@ -138,6 +168,7 @@ export function parseTriageUpdates(body: unknown): { ok: true; updates: TriageUp
       ...(settled !== undefined ? { settled } : {}),
       ...(settleReason !== undefined ? { settleReason } : {}),
       ...(parsedSnoozedUntil !== undefined ? { snoozedUntil: parsedSnoozedUntil } : {}),
+      ...(autoSettleOverride !== undefined ? { autoSettleOverride } : {}),
     });
   }
   return { ok: true, updates: parsed };
@@ -161,6 +192,8 @@ export function applyTriageUpdate(update: TriageUpdate, nowMs: number = Date.now
       : unsettleConversation(update.name);
     touched = touched || result;
   }
+
+  if (update.autoSettleOverride !== undefined) touched = setAutoSettleOverride(update.name, update.autoSettleOverride) || touched;
 
   if (!touched) return null;
   return getConversationTriage(update.name);

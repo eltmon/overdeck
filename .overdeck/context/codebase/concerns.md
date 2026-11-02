@@ -393,11 +393,6 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly and f
   Background work from a route uses `void work().catch((err) => console.error(...))`
   (`routes/hooks.ts`, `routes/resources/snapshot.ts`); use `Effect.forkDetach` only
   where the work must stay inside the Effect runtime.
-- PR sync auto-archive liveness is tmux-only: `listLiveConversationSessions` in
-  `services/pull-request-sync-service.ts` runs `tmux list-sessions`, but
-  conversations launch through the terminal-backend door (Herdr default,
-  PAN-3921). With `conversations.auto_archive_on_merge` on under Herdr, every
-  conversation reads as not live. Use `getBackendPanes()` + `paneAgentKey`.
 - TanStack `rowVirtualizer.measure()` (virtual-core 3.17.11) clears cached sizes
   but re-reads no element; a row whose height did not change gets no
   ResizeObserver callback, and `resizeItem` caches only a changed size. So in
