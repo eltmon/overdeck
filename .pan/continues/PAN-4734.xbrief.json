@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T16:53:31.226Z",
+  "updated": "2026-11-02T16:53:50.182Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -153,6 +153,10 @@
     "wi5-remote-prompt-workspace-path.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T16:53:31.226Z"
+    },
+    "wi6-fly-conversation-cwd-and-workspace.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:53:50.182Z"
     }
   }
 }
