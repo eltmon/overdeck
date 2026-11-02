@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 873_
+_Last sequenced: 2026-11-02T04:21:22.093225Z · model: claude-opus-5-5 · open: 873_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -596,7 +596,7 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 585 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
 | 586 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
 | 587 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 588 | PAN-1485 | M | medium | needs-refinement |  |  | Idle auto-archive (warn 7d, archive 10d); the archive-after-idle part is now split into #4655 as undoable idle auto-settle. |
+| 588 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
 | 589 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 590 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
 | 591 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
@@ -1208,7 +1208,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T04:19:26.563674Z",
+  "generatedAt": "2026-11-02T04:21:22.093225Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 873,
@@ -8611,13 +8611,13 @@ New this pass. The deployment gate's queue message is unusually good — it name
     {
       "issue": "PAN-1485",
       "rank": 588,
-      "size": "M",
+      "size": "S",
       "importance": "medium",
-      "score": 36,
+      "score": 32,
       "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Idle auto-archive (warn 7d, archive 10d); the archive-after-idle part is now split into #4655 as undoable idle auto-settle.",
-      "rationale": "Rank unchanged; stays needs-refinement because new PAN-4655 supersedes its archive-after-idle part, so what remains of this issue must be rescoped or closed.",
+      "why": "Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call.",
+      "rationale": "Rank unchanged; a 2026-11-02 comment confirms PAN-4655 delivers idle auto-settle, so only day-10 archive and favorite clearing remain (size M→S, score trimmed), still needs-refinement pending the operator close decision.",
       "gate": "auto",
       "planning": "auto"
     },
