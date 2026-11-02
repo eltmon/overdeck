@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T16:51:29.761Z",
+  "updated": "2026-11-02T16:51:45.908Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -125,6 +125,10 @@
     "wi2-loops-skip-linked.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T16:51:29.760Z"
+    },
+    "wi3-push-daemon-workdir.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:51:45.907Z"
     }
   }
 }
