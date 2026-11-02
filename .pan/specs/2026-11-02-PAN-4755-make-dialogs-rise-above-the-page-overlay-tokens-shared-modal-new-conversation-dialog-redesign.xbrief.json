@@ -4,17 +4,17 @@
     "created": "2026-11-02T00:50:41Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4755: Make dialogs rise above the page: overlay tokens, shared Modal, New conversation dialog redesign",
-    "updated": "2026-11-02T00:58:49.794Z"
+    "updated": "2026-11-02T01:00:23.152Z"
   },
   "plan": {
     "id": "pan-4755",
     "title": "Make dialogs rise above the page: overlay tokens, shared Modal, New conversation dialog redesign",
-    "status": "proposed",
+    "status": "running",
     "uid": "c2b37c04-2def-489a-b48f-a4999dae1c7d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T00:50:41Z",
-    "updated": "2026-11-02T00:58:49.794Z",
+    "updated": "2026-11-02T01:00:23.152Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4755",
@@ -1360,5 +1360,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
