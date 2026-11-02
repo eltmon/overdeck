@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4827",
   "created": "2026-11-02T16:36:08.290Z",
-  "updated": "2026-11-02T18:31:54.889Z",
+  "updated": "2026-11-02T18:40:54.854Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,9 +64,10 @@
       "doneAt": "2026-11-02T18:31:47.485Z"
     },
     "tier-invariant-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4827",
-      "claimedAt": "2026-11-02T18:31:54.889Z"
+      "claimedAt": "2026-11-02T18:31:54.889Z",
+      "doneAt": "2026-11-02T18:40:54.854Z"
     }
   }
 }
