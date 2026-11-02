@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T17:30:41.942Z",
+  "updated": "2026-11-02T17:31:26.131Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,10 @@
     "live-install-probe.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T17:20:05.903Z"
+    },
+    "issue-pipeline-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:26.131Z"
     }
   }
 }
