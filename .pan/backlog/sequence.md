@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T16:41:41.819871Z · model: claude-opus-5-5 · open: 875_
+_Last sequenced: 2026-11-02T16:43:33.816861Z · model: claude-opus-5-5 · open: 874_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -282,7 +282,6 @@ _Last sequenced: 2026-11-02T16:41:41.819871Z · model: claude-opus-5-5 · open: 
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
 | 276 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
-| 277 | PAN-4832 | XS | low | ok |  |  | Throwaway in-pipeline vehicle for the PAN-4696 Fly smoke; PR closes unmerged; never a Flywheel pickup. |
 | 278 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
 | 278 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
 | 279 | PAN-4817 | S | medium | ok |  | PAN-4778 | Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification. |
@@ -1210,10 +1209,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T16:41:41.819871Z",
+  "generatedAt": "2026-11-02T16:43:33.816861Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 875,
+  "openCount": 874,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -4733,19 +4732,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked.",
       "rationale": "Moved up from rank 277 into the vacated PAN-4743 slot: its only dependency PAN-4743 closed as completed on 2026-11-02, so startFlyTarget exists and lane provisioning can start.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4832",
-      "rank": 277,
-      "size": "XS",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Throwaway in-pipeline vehicle for the PAN-4696 Fly smoke; PR closes unmerged; never a Flywheel pickup.",
-      "rationale": "New in-pipeline issue, pinned at the free rank 277 next to PAN-4696, which it exists to exercise. Its body says the PR closes unmerged and the Flywheel must not start it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13489,13 +13475,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "confidence": 0.9
     },
     {
-      "from": "PAN-4832",
-      "to": "PAN-4696",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4827",
       "to": "PAN-4844",
       "type": "informs",
@@ -13795,13 +13774,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.9
-    },
-    {
-      "from": "PAN-4832",
-      "to": "PAN-4847",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     }
   ]
 }
