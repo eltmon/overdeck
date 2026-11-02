@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T14:56:09.532Z",
+  "updated": "2026-11-02T14:56:24.737Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "cli-fly-refusal.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T14:56:09.532Z"
+    },
+    "cli-fly-refusal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:56:24.736Z"
     }
   }
 }
