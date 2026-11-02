@@ -94,3 +94,72 @@ fields each adapter fills in — see their type definitions in `adapters.ts`.
 | `mountExtras` | Plugin-root-relative files or directories the mount copies next to `skills/` | `pstack` |
 | `optIn` | Skill names that are opt-in: the pack toggle never turns them on | `mattpocock`, `sageox`, `gstack`, `pstack` |
 | `disclosure` | One-line statement of what leaves the machine, shown on the pack row | `sageox`, `gstack` |
+
+## Adding a known pack
+
+1. Add a `KNOWN_PACKS` entry in `adapters.ts`.
+2. Choose an adapter.
+3. Set `optIn` for every skill that writes files Overdeck owns, or reaches
+   paid, cloud, or push actions.
+4. Set `ref` only when a fixed commit is the right default.
+5. Set `pluginRoot`, `skillsRoot`, or `mountExtras` as needed.
+6. Add a `disclosure` if anything leaves the machine.
+7. If the pack is shown in the dashboard, update its `ADD_COMMAND` literal
+   (`src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx`).
+8. Add tests in `src/lib/skill-packs/__tests__/adapters.test.ts` and
+   `sources.test.ts`.
+9. Add a catalog row and a `### <pack>` section to
+   [features/skill-packs.mdx](../features/skill-packs.mdx).
+10. Add a row to the fork table if the pack comes from a fork.
+
+## Writing a new adapter
+
+1. Extend `PackAdapterId` in `adapters.ts`.
+2. Extend the `ADAPTERS` list in `sources.ts` and the `--adapter` check in
+   `src/cli/commands/skills.ts`.
+3. Implement the manifest read in `adapters.ts`.
+4. If the mount must change file contents, add a `MountTransform` in
+   `mount.ts` and bump `MOUNT_FORMAT_VERSION`.
+5. If the adapter runs code, follow the `render.ts`/`browser.ts` pattern:
+   only CLI write paths render or build; a launch only checks readiness.
+6. Add tests.
+
+## Invariants
+
+- A launch never touches the network (`launch.ts` header comment;
+  `resolveLaunchPackSelection` reads the cache only).
+- Mounts are content-addressed and immutable: `mountHash` in `mount.ts`
+  names the mount, and building renames it into place.
+- Mount contents are copies, never symlinks; the per-launch link is the only
+  symlink. The render and the browser build write only under
+  `~/.overdeck/packs/<id>/`; skills invoked later may write project
+  `.gstack/`, `/tmp/browse-*` and bun's transpiler cache, as
+  [features/skill-packs.mdx](../features/skill-packs.mdx) says.
+- No repository can self-register a pack; only `addPack` (`sources.ts`)
+  writes the registry.
+- Removal under the agents dir goes through
+  `src/lib/agents/state-dir-removal.ts` (`removeCodexPluginCaches`), enforced
+  by `npm run lint:agent-dir-removal` (`scripts/guard-agent-dir-removal.sh`).
+- `adapters.ts`, `sources.ts`, `mount.ts`, and `deft.ts` never import
+  `src/lib/skill-overrides/` (see each file's header comment).
+- `launcher-lines.ts` is a leaf module (imports nothing from
+  `src/lib/skill-overrides/store.ts`), so `src/lib/launcher-generator.ts`
+  never reaches the override store through it.
+
+## Hidden launch step
+
+`pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>]
+[--conversation <tmuxSession>] [--codex-home <dir>] [--plugin-link <path>]`
+(`src/cli/commands/skills.ts:632-637`).
+
+## Tests
+
+| Part | Test file |
+|---|---|
+| Pack adapters, sources, browser sources, mount, render, browser, gstack, Deft | `src/lib/skill-packs/__tests__/{adapters,sources,sources-browser,mount,render,browser,gstack,deft}.test.ts` |
+| Skill override resolution, store, launch, conversation flags | `src/lib/skill-overrides/__tests__/{resolve,store,launch,conversation-flags}.test.ts` |
+| CLI: skills, pack browser, SageOx doctor check | `src/cli/commands/__tests__/{skills,skills-pack-browser,doctor-sageox}.test.ts` |
+| Dashboard skill-overrides route | `src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts` |
+| Dashboard skill packs UI | `src/dashboard/frontend/src/components/skills/SkillPacksSection.test.tsx` |
+| SageOx | `src/lib/sageox/__tests__/*.test.ts` |
+| Deft | `src/lib/deft/__tests__/*.test.ts` |
