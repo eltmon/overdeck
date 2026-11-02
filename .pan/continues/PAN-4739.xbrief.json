@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4739",
   "created": "2026-11-02T06:14:09.782Z",
-  "updated": "2026-11-02T06:42:08.692Z",
+  "updated": "2026-11-02T06:42:25.586Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,10 @@
     "patrol-door-confirm.ac5": {
       "status": "completed",
       "doneAt": "2026-11-02T06:42:08.692Z"
+    },
+    "list-repair-door-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:42:25.585Z"
     }
   }
 }
