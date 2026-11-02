@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4755",
   "created": "2026-11-02T01:00:42.371Z",
-  "updated": "2026-11-02T02:24:05.684Z",
+  "updated": "2026-11-02T02:24:46.719Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "overlay-tokens.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T02:24:05.684Z"
+    },
+    "overlay-tokens.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:24:46.719Z"
     }
   }
 }
