@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4660",
   "created": "2026-11-02T06:14:17.395Z",
-  "updated": "2026-11-02T06:18:07.642Z",
+  "updated": "2026-11-02T06:22:43.431Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-02T06:18:00.114Z"
     },
     "w2-route-put": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4660",
-      "claimedAt": "2026-11-02T06:18:07.641Z"
+      "claimedAt": "2026-11-02T06:18:07.641Z",
+      "doneAt": "2026-11-02T06:22:43.430Z"
     }
   }
 }
