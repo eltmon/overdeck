@@ -15,7 +15,30 @@ A skill pack lets you try a third-party skill collection for one project, one is
 
 ## Quickstart
 
+```bash
+pan skills pack add mattpocock --ref v1.2.3          # preview, then: Trust this commit? [y/N]
+pan skills list --project myapp                      # pack skills show as off
+pan skills set --pack mattpocock on --project myapp  # turn the pack on for one project
+# start an agent or conversation in myapp, then type: /mattpocock:grilling
+pan skills set --pack mattpocock inherit --project myapp   # turn it off again
+pan skills pack remove mattpocock                    # unregister and delete the cache
+```
+
+Changes apply at the next launch; a running agent keeps the skills it launched with. See [When pack changes apply](#when-pack-changes-apply).
+
 ## Pack catalog
+
+| id | Upstream | Source Overdeck uses | Adapter | Skills (default / opt-in) | Runs pack code? | Notes |
+|---|---|---|---|---|---|---|
+| `mattpocock` | `mattpocock/skills` | fork `eltmon/skills`, `--ref v1.2.3` (`6acc160`) | `claude-plugin` | 24 / 1 | No. 2 template scripts are copied, never run by Overdeck | `--ref` required |
+| `pstack` | poteto's pstack in `cursor/plugins` | fork `eltmon/plugins` at `ae5650f` (default ref) | `claude-plugin`, plugin root `harness/pstack/claude-code` | 51 / 7 | No | `agents/` not applied |
+| `gstack` | `garrytan/gstack` | fork `eltmon/gstack`, `--ref main` (pack mode) | `gstack-runtime` | 22 / 14 | Yes: `bash setup --pack-root …` at add, update and sync; skill scripts when you invoke a skill | needs bun; upstream commits fail the pack-mode check |
+| gstack browser runtime | `garrytan/gstack` | the same render | part of `gstack-runtime` | 9 / 9 (browser / browser-opt-in) | Yes: `bun install`, five compiled binaries, Chromium download (about 1 GB on disk) | second consent: `pan skills pack browser gstack` |
+| `deft` | `deftai/directive` | fork `eltmon/directive`, `--ref <ref>` (default branch `master`) | `deft-readonly` | 7 / 0 | No | host notice in every mounted skill |
+| `sageox` | `sageox/ox` | fork `eltmon/ox`, `--ref overdeck/host-managed` | `plain`, skills root `extensions/skills` | 15 / 9 | No pack code; Overdeck-added hooks run the `ox` you build from the fork | Claude Code only; uploads are a second opt-in |
+| any git repo (example `impeccable`) | `pbakaus/impeccable` | the url you pass, `--ref skill-v4.7.0` | detected: `claude-plugin` (has `.claude-plugin/plugin.json`), else `plain` | 1 / 0 | No | `pan skills pack add impeccable https://github.com/pbakaus/impeccable --ref skill-v4.7.0` |
+
+Counts are at the commit in the Source column. The add and update preview shows the counts for your commit. Each pack has its own section under [Packs](#packs).
 
 ## How packs turn on and off
 
