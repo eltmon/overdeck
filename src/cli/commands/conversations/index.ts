@@ -14,6 +14,7 @@ import { embedAction } from './embed.js';
 import { jsonlAction } from './jsonl.js';
 import { moveAction } from './move.js';
 import { autoArchiveOnMergeAction, linkPrAction, prsAction, unlinkPrAction } from './pull-requests.js';
+import { autoSettleIdleDaysAction } from './auto-settle.js';
 import {
   scheduleAddAction,
   scheduleListAction,
@@ -156,6 +157,10 @@ export function registerConversationsCommands(program: Command): void {
     .command('auto-archive-on-merge [value]')
     .description('Show or set (on|off) archiving operator conversations once all their linked PRs are merged or closed (default off)')
     .action((value?: string) => autoArchiveOnMergeAction(value));
+  conversations
+    .command('auto-settle-idle-days [days]')
+    .description('Show or set how many days without activity before an operator conversation is settled (0 = off, default 3)')
+    .action((days?: string) => autoSettleIdleDaysAction(days));
 
   // ── schedules (PAN-4640) ────────────────────────────────────────────────────
   const schedule = conversations

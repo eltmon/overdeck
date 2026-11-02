@@ -36,6 +36,7 @@ pan conversations link-pr <query> <url|#42|owner/repo#42> [--source agent|manual
 pan conversations unlink-pr <query> <url|#42|owner/repo#42>
 pan conversations prs <query> [--json]
 pan conversations auto-archive-on-merge [on|off]
+pan conversations auto-settle-idle-days [days]
 pan conversations schedule add <conv> (--cron <expr> | --hourly | --daily <HH:MM> | --weekdays <HH:MM> | --weekly "<day> HH:MM") (--prompt <text> | --prompt-file <path>) [--tz <zone>] [--paused] [--json]
 pan conversations schedule list [conv] [--json]
 pan conversations schedule pause <id>
@@ -92,6 +93,11 @@ pan conversations enrich [ids...] [--tier <n>] [--deep] [--full] [--upgrade] [--
   `auto-archive-on-merge` (default off) archives an operator conversation once
   all its linked PRs are merged or closed; never agent conversations, never a
   live session.
+- **`auto-settle-idle-days [days]`** (PAN-4655, default 3, `0` = off) — the
+  primary dashboard settles an operator conversation (reason `idle`) after that
+  many days with no transcript activity, operator message or resume; never
+  agent conversations, snoozed ones, or ones waiting on you. Unsettling
+  restarts the clock. Works with the dashboard down.
 - **`schedule`** (PAN-4640) runs a prompt in a conversation on a recurring
   schedule. `<conv>` accepts `self` (also `.`, `current`, `me`) for the
   conversation you are running in, a conversation number, a name, or a unique
