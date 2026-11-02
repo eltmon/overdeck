@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T17:08:47.110787Z · model: claude-opus-5-5 · open: 874_
+_Last sequenced: 2026-11-02T17:14:44.269809Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -879,6 +879,7 @@ _Last sequenced: 2026-11-02T17:08:47.110787Z · model: claude-opus-5-5 · open: 
 | 878 | PAN-4841 | M | medium | ok |  | PAN-4774 | Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases. |
 | 879 | PAN-4839 | S | low | ok |  | PAN-4774, PAN-4838 | Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838 and PAN-4774. |
 | 880 | PAN-4842 | S | medium | ok |  | PAN-4774, PAN-4837 | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
+| 881 | PAN-4851 | S | low | needs-refinement |  | PAN-4820 | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 
 ## Rationale detail
 
@@ -1209,10 +1210,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T17:08:47.110787Z",
+  "generatedAt": "2026-11-02T17:14:44.269809Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 874,
+  "openCount": 875,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12164,6 +12165,21 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "New issue split from PAN-4820 at the operator's request; its design (WI-15 to WI-29) lives in the PAN-4820 PRD and it is explicitly blocked by PAN-4820, so it sits in the free slot just after its blocker.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4851",
+      "rank": 881,
+      "size": "S",
+      "importance": "low",
+      "score": 15,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4820"
+      ],
+      "why": "Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them",
+      "rationale": "New issue: an undecided low-priority question that the operator parked explicitly, so it ranks at the bottom of the backlog until they decide.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13783,6 +13799,20 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4820",
+      "to": "PAN-4851",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4849",
+      "to": "PAN-4851",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
