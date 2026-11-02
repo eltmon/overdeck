@@ -4,17 +4,17 @@
     "created": "2026-11-02T03:20:15Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4748: Fly API calls use flyctl's stored token, which goes stale until flyctl runs: loops, clone poll and rollback destroy get 403",
-    "updated": "2026-11-02T03:22:33.225Z"
+    "updated": "2026-11-02T03:23:22.693Z"
   },
   "plan": {
     "id": "pan-4748",
     "title": "Fly API calls use flyctl's stored token, which goes stale until flyctl runs: loops, clone poll and rollback destroy get 403",
-    "status": "proposed",
+    "status": "running",
     "uid": "22bde1cc-9a8d-404f-b7c7-2faf507d7591",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T03:20:15Z",
-    "updated": "2026-11-02T03:22:33.225Z",
+    "updated": "2026-11-02T03:23:22.693Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4748",
@@ -610,5 +610,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
