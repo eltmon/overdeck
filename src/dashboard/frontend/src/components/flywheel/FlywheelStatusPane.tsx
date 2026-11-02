@@ -170,6 +170,11 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
                         <StatusBadge tone="neutral" testId={`flywheel-tracker-unknown-${row.issueId}`}>tracker unknown</StatusBadge>
                       </span>
                     )}
+                    {row.strike && (
+                      <span className="mt-0.5 block">
+                        <StatusBadge tone="neutral" testId={`flywheel-strike-${row.issueId}`}>strike</StatusBadge>
+                      </span>
+                    )}
                   </td>
                   <td className="py-1.5 pr-2">
                     <span className="text-muted-foreground">{row.state}</span>
