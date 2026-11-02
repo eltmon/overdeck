@@ -6,6 +6,7 @@ import type { EditorId } from '@overdeck/contracts';
 
 const mockSpawn = vi.fn((..._args: unknown[]) => ({ unref: vi.fn() }));
 const mockExecAsync = vi.fn();
+const mockAccess = vi.fn();
 
 vi.mock('node:child_process', () => ({
   spawn: (...args: unknown[]) => mockSpawn(...args),
@@ -15,6 +16,10 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('node:util', () => ({
   promisify: () => mockExecAsync,
+}));
+
+vi.mock('node:fs/promises', () => ({
+  access: (...args: unknown[]) => mockAccess(...args),
 }));
 
 describe('PanOpen service', () => {
@@ -125,6 +130,86 @@ describe('PanOpen service', () => {
 
       const editors = await Effect.runPromise(program);
       expect(editors).toEqual([]);
+    });
+  });
+
+  describe('resolveAvailableBrowsers', () => {
+    const originalPlatform = process.platform;
+    const setPlatform = (platform: NodeJS.Platform) => {
+      Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+    };
+
+    afterEach(() => {
+      setPlatform(originalPlatform);
+    });
+
+    it('detects installed browsers on Linux', async () => {
+      setPlatform('linux');
+      mockExecAsync.mockImplementation(async (cmd: string) => {
+        if (cmd.includes('google-chrome')) return { stdout: '/usr/bin/google-chrome' };
+        if (cmd.includes('firefox')) return { stdout: '/usr/bin/firefox' };
+        if (cmd.includes('xdg-open')) return { stdout: '/usr/bin/xdg-open' };
+        throw new Error('not found');
+      });
+
+      const { PanOpen, PanOpenLive } = await import('../open.js');
+      const program = Effect.gen(function* () {
+        const svc = yield* PanOpen;
+        return yield* svc.getAvailableBrowsers();
+      }).pipe(Effect.provide(PanOpenLive));
+
+      const browsers = await Effect.runPromise(program);
+      expect(browsers).toEqual(['default-browser', 'chrome', 'firefox']);
+    });
+
+    it('detects Chromium via the chromium-browser fallback command', async () => {
+      setPlatform('linux');
+      mockExecAsync.mockImplementation(async (cmd: string) => {
+        if (cmd.includes('chromium-browser')) return { stdout: '/usr/bin/chromium-browser' };
+        throw new Error('not found');
+      });
+
+      const { PanOpen, PanOpenLive } = await import('../open.js');
+      const program = Effect.gen(function* () {
+        const svc = yield* PanOpen;
+        return yield* svc.getAvailableBrowsers();
+      }).pipe(Effect.provide(PanOpenLive));
+
+      const browsers = await Effect.runPromise(program);
+      expect(browsers).toContain('chromium');
+      expect(browsers).not.toContain('default-browser');
+    });
+
+    it('detects installed browsers on macOS via /Applications', async () => {
+      setPlatform('darwin');
+      mockExecAsync.mockResolvedValue({ stdout: '' });
+      mockAccess.mockImplementation(async (path: string) => {
+        if (path === '/Applications/Firefox.app') return undefined;
+        throw new Error('not found');
+      });
+
+      const { PanOpen, PanOpenLive } = await import('../open.js');
+      const program = Effect.gen(function* () {
+        const svc = yield* PanOpen;
+        return yield* svc.getAvailableBrowsers();
+      }).pipe(Effect.provide(PanOpenLive));
+
+      const browsers = await Effect.runPromise(program);
+      expect(browsers).toEqual(['default-browser', 'firefox']);
+    });
+
+    it('only detects default-browser on Windows', async () => {
+      setPlatform('win32');
+      mockExecAsync.mockResolvedValue({ stdout: '' });
+
+      const { PanOpen, PanOpenLive } = await import('../open.js');
+      const program = Effect.gen(function* () {
+        const svc = yield* PanOpen;
+        return yield* svc.getAvailableBrowsers();
+      }).pipe(Effect.provide(PanOpenLive));
+
+      const browsers = await Effect.runPromise(program);
+      expect(browsers).toEqual(['default-browser']);
     });
   });
 
