@@ -4,17 +4,17 @@
     "created": "2026-11-02T03:15:46Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4682: Fly remote: default image registry.fly.io/pan-workspace:latest does not exist",
-    "updated": "2026-11-02T03:18:58.140Z"
+    "updated": "2026-11-02T03:19:48.784Z"
   },
   "plan": {
     "id": "pan-4682",
     "title": "Fly remote: default image registry.fly.io/pan-workspace:latest does not exist",
-    "status": "proposed",
+    "status": "running",
     "uid": "bc1ccf46-6e72-4d16-b7a9-5939bc41e06d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T03:15:46Z",
-    "updated": "2026-11-02T03:18:58.140Z",
+    "updated": "2026-11-02T03:19:48.784Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4682",
@@ -389,5 +389,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
