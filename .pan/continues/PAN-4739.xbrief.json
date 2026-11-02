@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4739",
   "created": "2026-11-02T06:14:09.782Z",
-  "updated": "2026-11-02T06:43:35.497Z",
+  "updated": "2026-11-02T06:43:51.888Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "repro-checkpoint.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T06:43:35.497Z"
+    },
+    "docs-liveness-confirm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:43:51.887Z"
     }
   }
 }
