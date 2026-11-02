@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4767",
   "created": "2026-11-02T02:20:34.096Z",
-  "updated": "2026-11-02T02:35:51.796Z",
+  "updated": "2026-11-02T02:49:20.192Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,10 @@
       "claimedBy": "agent-pan-4767",
       "claimedAt": "2026-11-02T02:34:53.812Z",
       "doneAt": "2026-11-02T02:35:51.796Z"
+    },
+    "split-styleguide-route-its.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:49:20.192Z"
     }
   }
 }
