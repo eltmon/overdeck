@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4748",
+  "created": "2026-11-02T03:23:38.611Z",
+  "updated": "2026-11-02T03:23:38.611Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fly-token-source": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4748",
+      "claimedAt": "2026-11-02T03:23:38.611Z"
+    }
+  }
+}
