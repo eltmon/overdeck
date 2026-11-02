@@ -169,6 +169,7 @@ export function operatorDecisionAsPendingQuestion(d: OperatorDecision): {
   timestamp: string;
   questions: Array<{
     question: string;
+    context?: string;
     header: string;
     multiSelect: boolean;
     options: Array<{ label: string; description: string }>;
@@ -178,7 +179,8 @@ export function operatorDecisionAsPendingQuestion(d: OperatorDecision): {
     toolId: `${OPERATOR_DECISION_TOOL_ID_PREFIX}${d.questionId}`,
     timestamp: d.askedAt,
     questions: [{
-      question: d.context ? `${d.question}\n\n${d.context}` : d.question,
+      question: d.question,
+      ...(d.context ? { context: d.context } : {}),
       header: 'Decision',
       multiSelect: false,
       options: d.options.map((label) => ({ label, description: '' })),

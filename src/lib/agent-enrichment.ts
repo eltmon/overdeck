@@ -44,7 +44,7 @@ const execAsync = promisify(exec)
 export interface TurnEndAssessment { kind: string; confidence: number; needsAnswer: boolean; model: string }
 
 export interface QuestionOption { label: string; description: string }
-export interface Question { question: string; header: string; options: QuestionOption[]; multiSelect: boolean }
+export interface Question { question: string; context?: string; header: string; options: QuestionOption[]; multiSelect: boolean }
 export interface PendingQuestion { toolId: string; timestamp: string; questions: Question[] }
 
 /**
@@ -76,6 +76,7 @@ export interface PendingAskUserQuestionSnapshot {
   askedAt: string
   questions: Array<{
     question: string
+    context?: string
     header?: string
     multiSelect?: boolean
     options: Array<{ label: string; description?: string }>
@@ -661,6 +662,7 @@ function toPendingAskUserQuestion(q: PendingQuestion): PendingAskUserQuestionSna
     askedAt: q.timestamp,
     questions: q.questions.map(question => ({
       question: question.question,
+      ...(question.context ? { context: question.context } : {}),
       header: question.header,
       multiSelect: question.multiSelect,
       options: question.options.map(o => ({ label: o.label, description: o.description })),

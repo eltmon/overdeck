@@ -123,11 +123,23 @@ describe('operatorDecisionAsPendingQuestion', () => {
     expect(isOperatorDecisionToolId('toolu_123')).toBe(false);
     expect(pending.timestamp).toBe(decision.askedAt);
     expect(pending.questions).toEqual([{
-      question: 'Rotate the leaked token?\n\nPush protection blocked the branch.',
+      question: 'Rotate the leaked token?',
+      context: 'Push protection blocked the branch.',
       header: 'Decision',
       multiSelect: false,
       options: [{ label: 'Yes', description: '' }, { label: 'No', description: '' }],
     }]);
+  });
+
+  it('omits the context key when the decision has no context', () => {
+    const pending = operatorDecisionAsPendingQuestion(ask());
+    expect(pending.questions[0]).toEqual({
+      question: 'Rotate the leaked token?',
+      header: 'Decision',
+      multiSelect: false,
+      options: [{ label: 'Yes', description: '' }, { label: 'No', description: '' }],
+    });
+    expect(pending.questions[0]).not.toHaveProperty('context');
   });
 });
 
