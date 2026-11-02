@@ -528,3 +528,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Three close-outs (PAN-4748, 4810, 4813) failed "no pull request found on the forge" for merged PRs, each the first close-out after a pan reload; all passed on immediate retry. dod-gate.ts:302-305 maps any fetchIssuePullRequest error to null, so a failed forge read is reported as absence, and the error response is cached. Filed PAN-4821 and started it via pan start.
 - PAN-4810 shipped (#4814): verification now moves the workspace to the PR head before syncing main, re-decides the adopted-PR checklist skip at the checklist step, and a feedback-only continues file is not a plan. PAN-4803 closed as covered by #4802.
 - Heartbeat now uses ScheduleWakeup (~1000s): the background sleep heartbeat was reaped once under host memory pressure, which silently stopped the loop.
+
+## 2026-11-02 16:30Z — operator hold: PAN-4823 native phone app epic
+- HOLD all 15 children (4828 4829 4830 4831 4833 4834 4835 4836 4843 4837 4838 4839 4840 4841 4842): never pan start any until PAN-4774 (Anywhere release acceptance) passes AND the release ships.
+- After release, start in PRD build order (.pan/drafts/pan-4823.md): wave 1 = 4828, 4831, 4833; wave 2 = 4829, 4835; wave 3 = 4834, 4830, 4836, 4843; wave 4 = 4837; wave 5 = 4838, 4840, 4839.
+- PAN-4841 (store/console setup) and PAN-4842 (docs) are orchestrator-driven: never start them.
