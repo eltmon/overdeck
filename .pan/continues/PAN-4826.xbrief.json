@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4826",
   "created": "2026-11-02T16:31:08.878Z",
-  "updated": "2026-11-02T16:57:49.413Z",
+  "updated": "2026-11-02T16:57:58.747Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4826",
       "claimedAt": "2026-11-02T16:52:21.453Z",
       "doneAt": "2026-11-02T16:57:49.412Z"
+    },
+    "rosalind-astra-law-cost": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T16:57:58.747Z"
     }
   }
 }
