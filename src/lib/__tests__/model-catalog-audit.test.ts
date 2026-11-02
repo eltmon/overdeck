@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS, getModelEffortLevels } from '../model-capabilities.js';
+import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS, getModelEffortLevels, resolveModelId } from '../model-capabilities.js';
 import { getProviderForModel, PROVIDERS } from '../providers.js';
 import { apiLaunchModelId } from '../model-context-windows.js';
 import { getClaudeCodeContextPolicyForModel } from '../agents/provider-env.js';
+import { getPricing } from '../cost.js';
 import type { EffortLevel } from '../model-capability-types.js';
 import { ModelId } from '../settings.js';
 
@@ -80,5 +81,14 @@ describe('September model catalog no-loss audit', () => {
     const capability = MODEL_CAPABILITIES['claude-opus-5-5'];
     expect(capability.maxOutputTokens).toBe(128000);
     expect(capability.effortLevels).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
+  });
+
+  it('retires claude-sonnet-4-5 from new selections while it still migrates and resolves (Anthropic retires it 2026-11-30)', () => {
+    expect(PROVIDERS.anthropic.models).not.toContain('claude-sonnet-4-5');
+    expect(MODEL_DEPRECATIONS['claude-sonnet-4-5']).toBe('claude-sonnet-4-6');
+    expect(resolveModelId('claude-sonnet-4-5')).toBe('claude-sonnet-4-6');
+    expect(getProviderForModel('claude-sonnet-4-5').name).toBe('anthropic');
+    expect(Object.hasOwn(MODEL_CAPABILITIES, 'claude-sonnet-4-5')).toBe(true);
+    expect(getPricing('anthropic', 'claude-sonnet-4-5')?.inputPer1k).toBe(0.003);
   });
 });
