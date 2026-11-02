@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T14:56:52.591Z",
+  "updated": "2026-11-02T14:58:01.319Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -87,9 +87,10 @@
       "doneAt": "2026-11-02T14:56:48.216Z"
     },
     "wi13-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4734",
-      "claimedAt": "2026-11-02T14:56:52.591Z"
+      "claimedAt": "2026-11-02T14:56:52.591Z",
+      "doneAt": "2026-11-02T14:58:01.319Z"
     }
   }
 }
