@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4759",
   "created": "2026-11-02T01:10:45.557Z",
-  "updated": "2026-11-02T02:06:34.467Z",
+  "updated": "2026-11-02T02:06:49.535Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -350,6 +350,10 @@
     "devdoc-map-flow.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T02:06:34.467Z"
+    },
+    "devdoc-howto-invariants.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:06:49.535Z"
     }
   }
 }
