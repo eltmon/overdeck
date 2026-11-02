@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T00:51:11.202712Z · model: claude-opus-5-5 · open: 868_
+_Last sequenced: 2026-11-02T00:53:46.593557Z · model: claude-opus-5-5 · open: 870_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -574,6 +574,7 @@ _Last sequenced: 2026-11-02T00:51:11.202712Z · model: claude-opus-5-5 · open: 
 | 564 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
 | 565 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
 | 566 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
+| 567 | PAN-4759 | M | medium | ok |  |  | In-pipeline: skill packs get their own docs page, a pan skills CLI page, a fork runbook and docs/SKILL-PACKS.md developer guide. |
 | 568 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 569 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
 | 570 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
@@ -673,6 +674,7 @@ _Last sequenced: 2026-11-02T00:51:11.202712Z · model: claude-opus-5-5 · open: 
 | 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 670 | PAN-4760 | S | low | ok |  | PAN-4638 | Live 3-machine gauntlet check moved out of PAN-4638; needs its release, pan reload, a linked laptop rig and Fly setup by the operator. |
 | 672 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
 | 673 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
 | 674 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
@@ -1203,10 +1205,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T00:51:11.202712Z",
+  "generatedAt": "2026-11-02T00:53:46.593557Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 868,
+  "openCount": 870,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12022,6 +12024,34 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "New issue filed 2026-11-02 and already in the pipeline, so it is pinned at the free rank 324 slot and no other node moves. The substrate-improvement label sets a high-importance floor because a flaky e2e job turns main CI red; the body names the failing line and a clear fix direction, so the condition is ok.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4759",
+      "rank": 567,
+      "size": "M",
+      "importance": "medium",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: skill packs get their own docs page, a pan skills CLI page, a fork runbook and docs/SKILL-PACKS.md developer guide.",
+      "rationale": "New issue filed 2026-11-02 and already in the pipeline, so it is pinned at the free rank 567 slot and no other node moves. It is a fully specified documentation task with decided deliverables and mechanical acceptance criteria, so its condition is ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4760",
+      "rank": 670,
+      "size": "S",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4638"
+      ],
+      "why": "Live 3-machine gauntlet check moved out of PAN-4638; needs its release, pan reload, a linked laptop rig and Fly setup by the operator.",
+      "rationale": "New follow-up to PAN-4638 holding the live check that could not run before merge. It ranks just after PAN-4638 because it needs that PR released and reloaded plus operator setup of the rig and Fly, so it cannot be picked up autonomously yet.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13298,6 +13328,48 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4638",
+      "to": "PAN-4760",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4738",
+      "to": "PAN-4760",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4739",
+      "to": "PAN-4760",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4740",
+      "to": "PAN-4760",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4741",
+      "to": "PAN-4760",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4759",
+      "to": "PAN-1357",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.5
     }
   ]
 }
