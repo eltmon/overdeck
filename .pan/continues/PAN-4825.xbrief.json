@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4825",
   "created": "2026-11-02T16:35:14.732Z",
-  "updated": "2026-11-02T16:55:06.089Z",
+  "updated": "2026-11-02T16:55:07.602Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4825",
       "claimedAt": "2026-11-02T16:52:11.378Z",
       "doneAt": "2026-11-02T16:55:06.089Z"
+    },
+    "xai-grok-47-43": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T16:55:07.602Z"
     }
   }
 }
