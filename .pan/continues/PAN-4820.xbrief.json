@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T17:55:33.386Z",
+  "updated": "2026-11-02T17:55:40.717Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,11 @@
     "merge-guard-core.ac5": {
       "status": "completed",
       "doneAt": "2026-11-02T17:55:33.385Z"
+    },
+    "merge-gate-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T17:55:40.717Z"
     }
   }
 }
