@@ -4,17 +4,17 @@
     "created": "2026-11-02T15:33:16Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4722: Fleet Update all runs npm install --global on machines set up with pan connect (runtime install)",
-    "updated": "2026-11-02T15:35:57.932Z"
+    "updated": "2026-11-02T15:36:53.914Z"
   },
   "plan": {
     "id": "pan-4722",
     "title": "Fleet Update all runs npm install --global on machines set up with pan connect (runtime install)",
-    "status": "proposed",
+    "status": "running",
     "uid": "773f7c1f-dd93-4583-a0d6-cf612930f379",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T15:33:16Z",
-    "updated": "2026-11-02T15:35:57.932Z",
+    "updated": "2026-11-02T15:36:53.914Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4722",
@@ -463,5 +463,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
