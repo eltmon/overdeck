@@ -680,3 +680,105 @@ gpt-6.1-sol --message "List the top-level files and stop."`): 22:57:08 to 23:04:
 | Codex sign-in sync (D-3) | Every tick printed no action: home and VM held the same sign-in (identical SHA-256 before and after), so nothing was pushed or pulled. Home's `~/.codex/auth.json` was never rewritten. |
 | O4: Pull here | The first pull failed at `adopt` (`wip-failed`): the test home's checkout was an empty git repository without the snapshot's base commits, a test-setup artifact. With the checkout replaced by a shared clone of the repository, the second pull finished `done` (online mode) as `20261101-aa9b`, a home Codex conversation on `gpt-6.1-sol`; the VM copy read `ended`. |
 | O3: unlink | `pan machines unlink fly-8576656cd2d548` destroyed the machine in 5 s, emptied `fly-machines.json`, and left `fly machines list -a pan-workspaces` empty. |
+
+## Live verification (PAN-4734)
+
+`pan start --remote` work agents were tested live on 2026-11-02, before merge, against
+app `pan-workspaces` (region `iad`), on the throwaway issue
+[#4819](https://github.com/eltmon/overdeck/issues/4819) (one plan item: add a line to a
+scratch file). The operator approved the spend and chose to stop at review: each
+hand-off's PR ([#4822](https://github.com/eltmon/overdeck/pull/4822),
+[#4845](https://github.com/eltmon/overdeck/pull/4845)) and the issue were closed
+without merging, and the review the reap requested was stopped.
+
+**Setup.** A test home dashboard from this branch's `dist/` (peer mode,
+`OVERDECK_DISABLE_DEACON=1`, `OVERDECK_ANYWHERE_SUPERVISOR=1`,
+`OVERDECK_TERMINAL_BACKEND=tmux`, its own `OVERDECK_HOME` and tmux socket, port 3941),
+the CLI from the same `dist/`, and a shell loop writing the host heartbeat in place of
+the deacon's `heartbeatFlyMachines`. The reap ran as `pan admin remote reap --issue
+PAN-4819` for the same reason. The VM ran a test image,
+`registry.fly.io/pan-workspaces:pan-4734`: the `pan-workspace` image with this
+branch's packed `@overdeck/core` 0.72.0. That is required, because provisioning pins
+the VM's `pan` to home's version and the published 0.72.0 lacks this branch's VM-side
+code (run 3 failed with `pan serve`: `unknown option '--no-open'`).
+
+### Bugs the check found and fixed
+
+1. **A Fly machine refused the work agent's `cwd`** (run 4, commit `ef9c35049b5`).
+   `POST /api/conversations` checked a caller's `cwd` with `validateCwdContainment`,
+   which requires it to lie under the server's home directory. A Fly machine's
+   `pan serve` runs with `HOME=/` and keeps projects in `/workspace`, so the issue
+   worktree was refused with 400 `Invalid cwd`, although D-3 relies on it. The create
+   path now requires an absolute, existing directory inside the registered project.
+2. **Every Fly machine's deacon killed its own server ten minutes after boot**
+   (run 6, commit `1eb0c1ea9f9`). This bug predates PAN-4734 and affects every
+   PAN-4652 Fly machine. The orphan dashboard reaper assumed it ran inside the live
+   server, so it spared only `process.pid`; it runs in the deacon child, so the live
+   server is `process.ppid`. On home, the `lsof` port-owner guard still protected the
+   server, but the Fly image has no `lsof`. So at the reaper's ten-minute tick the
+   VM's server got SIGTERM, the link went offline and linked conversations stopped
+   streaming home (the agent itself kept working under tmux). PAN-4652's live runs
+   all ended within three minutes, so they never reached the first reap. The reaper
+   now also spares its parent.
+3. **The remote work agent ran `pan done` instead of creating `REMOTE_DONE`**
+   (run 6, commit `fb4ee4ce60c`). The REMOTE prompt also carried the unconditional
+   "NEVER stop working without calling `pan done`" mandate. On a legacy raw-tmux VM
+   `pan done` fails (no server), so agents fell back to the sentinel; a linked Fly
+   machine has a server, so `pan done` started a review on the VM that nobody
+   receives, and the sentinel never appeared. The REMOTE prompt now forbids
+   `pan done`, `pan review request` and `/rebase-and-submit` and names the sentinel in
+   every completion mandate.
+
+### Test-setup hazards (not product bugs)
+
+- `remote-state.json` lives under `homedir()/.overdeck/agents`, not `OVERDECK_HOME`.
+  A test home that keeps the real `HOME` writes its agent state into the real home,
+  where the host's deacon reaps it with its own code. Run 1 was aborted and cleaned
+  up for this; later runs used a separate `HOME` with links to the real credentials.
+- The host deacon's orphan reaper kills any host `node … dist/dashboard/server.js`
+  older than 120 s that is not the port owner, including a deliberate peer test
+  dashboard (run 2 died mid-provisioning). Later runs started the peer server
+  through a symlink whose path does not match.
+- A failed provisioning rolled back cleanly every time it was reached (runs 3, 4
+  and 5): the machine was destroyed, the record removed and remote-state saved
+  `error` (FR-13).
+
+### Run 6 and run 7
+
+**Run 6** (machine `683dd41ec45508`, image without fixes 2 and 3): provisioned and
+linked at 15:54:00 (9 min), conversation `20261102-5538` started at 15:54:40, the CLI
+printed the `/conv/@<env>/<name>` URL and the tracker update ran. D-6 held:
+`tmux -L overdeck has-session -t conv-20261102-5538` succeeded on the VM. The VM
+server died at 15:56:02 (bug 2) and the agent ran `pan done` (bug 3). A `pan tell`
+sent at 16:04:56 reached the transcript, and the agent created `REMOTE_DONE` at
+16:05:02; the reap handed off at 16:05:39 (37 s), opened #4822, copied the session
+JSONL (1/1) and destroyed the machine, link and record.
+
+**Run 7** (machine `890d41a6271d08`, image with all three fixes): start at 16:14:23,
+linked at 16:23:55, conversation `20261102-3940` at 16:24:55.
+
+| Check | Result |
+|---|---|
+| O1: transcript live at home | The home conversation page showed the conversation with the `on fly-890d41a6271d08` chip, `active`, the streamed work prompt and "Working for 54s" (Playwright screenshot, isolated browser context); the list row carried the same chip. The transcript first appeared about three minutes after the start, while Claude Code ingested the pasted prompt. |
+| O2: issue tree row | `GET /api/issues/resource-allocated` listed PAN-4819 with sources `branch`, `conversation`, `remote-agent` and the linked row `{ id: -1, name: "@<env>/<name>", origin: "linked" }` (run 6); the tree renders it as `href="/conv/@<env>/<name>"` (unit-tested in `FeatureItem.linkedConversation.test.tsx`). |
+| O3: `pan tell` and output view | Run 6: `pan tell agent-pan-4819` reached the transcript; `GET /api/agents/agent-pan-4819/output` returned the same pane text as a direct `capture-pane -t conv-…` on socket `overdeck`. |
+| Server survives the reaper | At 16:27:07 the VM server was 11 min 53 s old, health 200, no SIGTERM in its log. |
+| Agent signals `REMOTE_DONE` itself | `REMOTE_DONE` appeared at 16:34:01 with no `pan tell`; the transcript had no `pan done` or `pan review request` command, and the VM server logged no review request. |
+| O4: reap and teardown | The reap handed off at 16:35:00 (59 s after the sentinel), opened #4845, destroyed the machine through `destroyAndForgetFlyMachine`, removed the link and record, saved remote-state `stopped` and requested review; `fly machines list -a pan-workspaces` was empty. |
+
+Recorded, not fixed here:
+
+- The home link to the VM flapped while the agent worked: `Secure channel … did not
+  open within 2500 ms` every minute or two, with the VM server healthy. Each failure
+  cleared on the next request (compare PAN-4740).
+- A `pan tell` sent while Claude Code is still ingesting its first, large prompt is
+  lost (run 6, 15:55:01); the same message sent once the agent was idle arrived.
+- The reap's session-JSONL copy (`fly ssh sftp`) copied 1/1 in run 6 and 0/1 in
+  run 7; the pane capture and hand-off were unaffected.
+- Resuming a conversation or switching its model still applies the home check to
+  its stored `cwd` (`handleConversationResume`, `handleConversationSwitchModel`), so
+  either can answer 400 on a Fly machine.
+- Provisioning took between 2 and 9.5 minutes across the runs.
+- The deleted throwaway branch `feature/pan-4819` reappeared on origin once between
+  runs 6 and 7 with the run-6 agent's commits; GitHub's events API showed no push
+  for it, and the source was not found.
