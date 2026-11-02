@@ -1,0 +1,259 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T05:06:45Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4738: Fly machine: first conversation message lost to Claude Code's 'Make auto mode your default' startup dialog",
+    "updated": "2026-11-02T05:11:37.348Z"
+  },
+  "plan": {
+    "id": "pan-4738",
+    "title": "Fly machine: first conversation message lost to Claude Code's 'Make auto mode your default' startup dialog",
+    "status": "running",
+    "uid": "3f9b7fac-2e00-462a-a527-82abeb6bc2fc",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T05:06:45Z",
+    "updated": "2026-11-02T05:11:37.348Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4738",
+        "label": "PAN-4738",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4738.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4792",
+        "label": "Follow-up: paste guard misses unnumbered selects",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "fly",
+      "remote",
+      "claude-code",
+      "conversations",
+      "readiness"
+    ],
+    "narratives": {
+      "Problem": "On a fresh Fly VM, Claude Code shows its one-shot 'Make auto mode your default permission mode?' dialog at launch, because Overdeck writes a non-auto permissions.defaultMode into the VM's user settings and the VM's ~/.claude.json never records the dialog as seen. waitForClaudeReady (src/lib/overdeck/claude-readiness.ts) treats any visible '❯' as the composer, and the dialog's select cursor is also '❯', so the first conversation message is pasted into the dialog and lost.",
+      "Proposal": "WI-1: FlyProvider.configureClaudeCode adds data[\"hasSeenAutoDefaultNudge\"] = True to the ~/.claude.json patch it already sends (key verified in the Claude Code 2.1.293 and 2.1.316 binaries). WI-2 (defense in depth for a dialog already on screen during the readiness window; a dialog that mounts after the composer's ❯ first appears is the paste guard's case, #4792): waitForClaudeReady does not count a '❯' while the dialog's exact title is on screen; if the dialog is still there at the 30 s deadline and the harness is alive, it throws an error naming the dialog, so the conversation start records a spawn error and sends nothing. WI-3: docs/fly-provider.md and docs/TERMINAL-BACKENDS.md describe both. Full detail, before/after code and named tests are in .pan/drafts/PAN-4738.md.",
+      "NonGoals": "- Teaching paneHasBlockingChoiceMenu (src/lib/pane-choice-menu.ts) to recognize unnumbered select menus; filed as #4792.\n- Pre-answering or detecting other Claude Code nudges (effort nudge, fullscreen upsell, newer-model offer).\n- Writing hasSeenAutoDefaultNudge into the operator's local ~/.claude.json from preTrustDirectory.\n- Pinning the Claude Code version in docker/pan-workspace/Dockerfile.\n- Changing readiness for resumed conversations (mode 'respawn' uses the ready signal).\n- Any change to buildClaudeUserSettings or the VM's settings.json content."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Do both fixes the issue lists: pre-answer the dialog on Fly VMs and make the readiness wait refuse it.",
+        "rationale": "The pre-answer removes the cause with a key verified in both shipped Claude Code versions; the readiness guard turns any future appearance (other host, renamed key) into a visible spawn error instead of a silently lost message. The two touch different files and are small."
+      },
+      {
+        "summary": "Use the key hasSeenAutoDefaultNudge in ~/.claude.json.",
+        "rationale": "The eligibility function in the 2.1.316 image binary (rgo) and the 2.1.293 host binary (vAr) returns null when o.hasSeenAutoDefaultNudge is set, and the dialog's resolver saves that key through Ae, the same global-config writer that sets hasCompletedOnboarding. The candidate keys in the issue comment (hasSeenAutoDefaultNotice and others) do not gate this dialog."
+      },
+      {
+        "summary": "Change Fly VMs only; leave local preTrustDirectory alone.",
+        "rationale": "The dialog requires a non-auto userSettings defaultMode. Overdeck writes one only on Fly VMs; the operator's local user settings have none. A Fly VM's config is Overdeck-managed, like the bypass disclaimer it already pre-answers; the operator's own config is not."
+      },
+      {
+        "summary": "Detect the dialog by its exact title, not by composer structure.",
+        "rationale": "An idle composer, captured on 2026-11-02, renders '❯' + NBSP + placeholder text, so a bare-'❯' check would break every spawn. The title is a fixed string in the binary, and the readiness wait runs before any conversation output exists, so a false match is not realistic."
+      },
+      {
+        "summary": "Keep polling while the dialog shows and fail only at the 30 s deadline.",
+        "rationale": "An operator watching the terminal can answer within the window and the first message still lands. Claude Code's stopRuntimeOnStartFailure is false, so after the spawn error the session stays open to answer."
+      },
+      {
+        "summary": "Test the WI-1 VM payload by decoding the base64 script, without running Python.",
+        "rationale": "Tests must not read .ts source (lint:source-introspection), and CI has a Windows matrix, so a python3 dependency is avoided."
+      }
+    ],
+    "metadata": {
+      "docsJustification": "Item docs-fly-and-readiness updates docs/fly-provider.md and docs/TERMINAL-BACKENDS.md.",
+      "canonicalFilename": "2026-11-02-PAN-4738-fly-machine-first-conversation-message-lost-to-claude-code-s-make-auto-mode-your-default-startup-dialog.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "fly-preanswer-auto-default-nudge",
+        "title": "Pre-answer the auto-default nudge in the Fly VM's ~/.claude.json",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T05:06:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4738",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/remote/fly-provider.ts",
+            "src/lib/remote/__tests__/fly-provider-configure-claude.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/remote/__tests__/fly-provider-configure-claude.test.ts src/lib/__tests__/remote-settings-no-leak.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fly-provider-configure-claude.test.ts and remote-settings-no-leak.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/lib/remote/fly-provider.ts, method configureClaudeCode, add the line data[\"hasSeenAutoDefaultNudge\"] = True to the onboardingScript Python text, directly after the line data[\"${BYPASS_PERMISSION_MODE}ModeAccepted\"] = True, and extend the comment above onboardingScript with the PAN-4738 reason (the PRD gives the text). Do not add any 'bypassPermissions' string literal. Add src/lib/remote/__tests__/fly-provider-configure-claude.test.ts: spy FlyProvider.prototype.sshImpl (cast through unknown) to resolve { stdout: '', stderr: '', exitCode: 0 }, call new FlyProvider({ apiToken: 'test' }).configureClaudeCode('vm-1'), find the captured command ending in '| base64 -d | python3', base64-decode the text between \"echo '\" and the next \"'\", and assert the decoded script contains data[\"hasSeenAutoDefaultNudge\"] = True and data[\"hasCompletedOnboarding\"] = True, with the nudge line after the json.load(f) line. Restore mocks in afterEach."
+        },
+        "items": [
+          {
+            "id": "fly-preanswer-auto-default-nudge.ac1",
+            "title": "Given configureClaudeCode('vm-1') runs with sshImpl stubbed, when the test decodes the base64 Python payload sent to the VM, then the decoded script contains data[\"hasSeenAutoDefaultNudge\"] = True after the json.load(f) line, and npx vitest run src/lib/remote/__tests__/fly-provider-configure-claude.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-preanswer-auto-default-nudge.ac2",
+            "title": "npx vitest run src/lib/__tests__/remote-settings-no-leak.test.ts passes, and grep -n \"'bypassPermissions'\\|\\\"bypassPermissions\\\"\" src/lib/remote/fly-provider.ts prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readiness-refuses-auto-default-nudge",
+        "title": "Claude Code readiness does not count a ❯ while the auto-default nudge is on screen",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T05:06:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4738",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/overdeck/claude-readiness.ts",
+            "src/lib/overdeck/__tests__/claude-readiness-startup-dialog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/claude-readiness-startup-dialog.test.ts src/lib/overdeck/__tests__/claude-readiness-herdr.test.ts src/lib/overdeck/__tests__/conversation-runtime-readiness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three readiness test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. In src/lib/overdeck/claude-readiness.ts add const BLOCKING_STARTUP_DIALOG_TITLES = ['Make auto mode your default permission mode?'] as const and function blockingStartupDialogTitle(paneText): string | null (first title the text includes, else null). In waitForClaudeReady change the ready check to capture.includes('❯') && !blockingStartupDialogTitle(capture). At the deadline, after the existing probeHarnessExit throw, if blockingStartupDialogTitle(output) is non-null throw new Error naming the title in double quotes and containing 'Answer the dialog in the conversation's terminal, then send the message again.'; otherwise keep the existing console.warn. Update the function's doc comment. Add src/lib/overdeck/__tests__/claude-readiness-startup-dialog.test.ts copying the Herdr-host mock setup and fake timers of claude-readiness-herdr.test.ts, with the NUDGE_PANE and COMPOSER_PANE fixtures and the three named tests from the PRD. Attach each rejection expectation before advancing timers."
+        },
+        "items": [
+          {
+            "id": "readiness-refuses-auto-default-nudge.ac1",
+            "title": "Given the visible pane always shows the nudge title and a ❯ option row and the harness is alive, when 31 s of fake time pass, then waitForClaudeReady rejects with a message containing 'Make auto mode your default permission mode?' and 'send the message again' (test 'does not report ready while the auto-default nudge has focus')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-refuses-auto-default-nudge.ac2",
+            "title": "Given the pane shows the nudge for two polls and then the idle composer row ('❯' + NBSP + 'Try \"edit index.ts to...\"'), when 2 s of fake time pass, then waitForClaudeReady resolves (test 'resolves once the nudge is answered and the composer shows')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-refuses-auto-default-nudge.ac3",
+            "title": "Given the pane shows the nudge and the liveness probe answers no-session, when the deadline passes, then the rejection message is 'The conversation process exited before it was ready…' (exit errors keep precedence), and the existing claude-readiness-herdr.test.ts and conversation-runtime-readiness.test.ts pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-fly-and-readiness",
+        "title": "Document the pre-answered nudge and the readiness refusal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T05:06:45Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4738",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/fly-provider.md",
+            "docs/TERMINAL-BACKENDS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n hasSeenAutoDefaultNudge docs/fly-provider.md",
+            "grep -n 'startup dialog' docs/TERMINAL-BACKENDS.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one line",
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. (1) docs/fly-provider.md: replace the sentence starting 'Claude Code is also configured for autonomous operation:' with the PRD's text naming every pre-answered ~/.claude.json key, including hasSeenAutoDefaultNudge and the PAN-4738 reason. (2) docs/fly-provider.md, section 'Live verification (PAN-4652)', list 'Recorded, not fixed here': change the #4738 bullet so it contains the words 'fixed by PAN-4738' (VM pre-answers the dialog; readiness no longer takes the dialog for the composer). (3) docs/TERMINAL-BACKENDS.md: in the paragraph containing 'Readiness reads the pane through `readAgentPaneText`', add the PRD's sentence about waitForClaudeReady ignoring a ❯ while a known blocking startup dialog title is on screen and failing the start with a spawn error naming the dialog at the 30 s deadline. Locate edits by these quoted anchors, not line numbers."
+        },
+        "items": [
+          {
+            "id": "docs-fly-and-readiness.ac1",
+            "title": "grep -n hasSeenAutoDefaultNudge docs/fly-provider.md prints a line in the Credential Sync section that names the 'Make auto mode your default permission mode?' dialog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fly-and-readiness.ac2",
+            "title": "grep -n '4738' docs/fly-provider.md prints a line in the PAN-4652 'Recorded, not fixed here' list that contains 'fixed by PAN-4738', and that list shows no #4738 bullet describing the dialog as still open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fly-and-readiness.ac3",
+            "title": "grep -n 'startup dialog' docs/TERMINAL-BACKENDS.md prints a sentence stating that waitForClaudeReady fails the conversation start with a spawn error naming the dialog when it is still on screen at the 30 s deadline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}

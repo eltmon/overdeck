@@ -1,5 +1,6 @@
 # Concerns / hazards
 
+Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bullets 2026-11-02).
 Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly and feature-branch-push bullets 2026-11-01).
 
 - **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
@@ -131,6 +132,15 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly and f
   or every ephemeral watchdog would stop its machine); the reap runs in
   `deacon-lite.ts` via `remote-reap-routine.ts` (behind the freeze). The reap acts
   only on positive evidence: a failed exec is `indeterminate`, never a crash.
+- **Fresh Claude Code state shows startup dialogs that eat the first message** — every
+  Fly VM starts with an empty `~/.claude.json` (exec shell `HOME=/`). Each dialog
+  Claude Code can show at launch must be pre-answered in
+  `FlyProvider.configureClaudeCode` (onboarding, `/workspace` trust,
+  `bypassPermissionsModeAccepted`, and since PAN-4738 `hasSeenAutoDefaultNudge`).
+  Verify a key in the image's `claude.exe` (`grep -a`), never in a host config. A
+  dialog's select cursor is the same `❯` the composer shows, and unnumbered selects
+  escape `paneHasBlockingChoiceMenu`, so `waitForClaudeReady` matches known
+  dialog titles instead.
   With no `FLY_API_TOKEN` (or `remote.fly.api_token_env` variable), `createFlyApiClient()`
   sends flyctl's stored `~/.fly/config.yml` token through a `FlyTokenSource`
   (`src/lib/remote/fly-token.ts`, PAN-4748): `FlyApiClient.request()` re-reads the token
