@@ -130,3 +130,70 @@ describe('AskUserQuestionDialog markdown', () => {
     expect(screen.queryByText('tried A')).toBeNull();
   });
 });
+
+describe('AskUserQuestionDialog accessibility', () => {
+  const subject: AskUserQuestionSubject = {
+    id: 'agent-pan-1',
+    issueId: 'PAN-1',
+    issueTitle: 'Fix widget',
+    pendingAskUserQuestion: {
+      toolUseId: 'operator-decision:q1',
+      askedAt: '2026-11-01T12:00:00.000Z',
+      questions: [{ question: 'Rotate the leaked token?', options: [{ label: 'Yes' }, { label: 'No' }] }],
+    },
+  };
+
+  function renderOpen(isOpen = true) {
+    return render(<AskUserQuestionDialog subject={subject} isOpen={isOpen} onSubmit={vi.fn()} onDismiss={vi.fn()} />);
+  }
+
+  function focusables(dialog: HTMLElement): HTMLElement[] {
+    return Array.from(dialog.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+    ));
+  }
+
+  it('has dialog semantics', () => {
+    renderOpen();
+
+    const dialog = screen.getByRole('dialog', { name: 'PAN-1 — Fix widget' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAccessibleDescription('Rotate the leaked token?');
+  });
+
+  it('focuses the first option on open', () => {
+    renderOpen();
+
+    expect(document.activeElement).toBe(screen.getByText('Yes').closest('button'));
+  });
+
+  it('Tab from the last focusable wraps to the first', () => {
+    renderOpen();
+    fireEvent.click(screen.getByText('Yes'));
+    const dialog = screen.getByRole('dialog');
+    const all = focusables(dialog);
+    const last = all[all.length - 1];
+    expect(last).toBe(screen.getByRole('button', { name: /Send Answer/ }));
+    last.focus();
+
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(document.activeElement).toBe(all[0]);
+
+    fireEvent.keyDown(all[0], { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+
+  it('restores focus to the opener on close', () => {
+    const opener = document.createElement('button');
+    opener.textContent = 'Open question';
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const { rerender } = renderOpen();
+    expect(document.activeElement).not.toBe(opener);
+
+    rerender(<AskUserQuestionDialog subject={subject} isOpen={false} onSubmit={vi.fn()} onDismiss={vi.fn()} />);
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
+  });
+});

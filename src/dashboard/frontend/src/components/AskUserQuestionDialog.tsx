@@ -14,7 +14,7 @@
  * a normal user message. The dialog delivers that message via the standard
  * `deliverAgentMessage` pipeline.
  */
-import { useState } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { Loader2, MessageCircleQuestion, Minus } from 'lucide-react'
 import { formatIssueRef } from '../lib/issueLabel'
 import { ChatMarkdown } from './chat/ChatMarkdown'
@@ -48,6 +48,9 @@ export interface AskUserQuestionSubject {
     }>
   } | null
 }
+
+/** Elements the Tab trap cycles through inside the dialog panel. */
+const FOCUSABLE_SELECTOR = 'button:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 
 interface AskUserQuestionDialogProps {
   subject: AskUserQuestionSubject | null
@@ -86,7 +89,27 @@ export function AskUserQuestionDialog({
     setCustomText('')
   }
 
-  if (!isOpen || !agent || !pending || questions.length === 0) return null
+  const panelRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+  const descriptionId = useId()
+  const isVisible = isOpen && !!agent && !!pending && questions.length > 0
+
+  // PAN-4754 FR-8 — move focus into the dialog on open (the selected option,
+  // else the first option) and hand it back to the opener on close. Keyed on
+  // the question too, so a new question arriving while open refocuses.
+  useEffect(() => {
+    if (!isVisible) return
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const panel = panelRef.current
+    const initial = panel?.querySelector<HTMLElement>('[data-dialog-option][data-selected="true"]')
+      ?? panel?.querySelector<HTMLElement>('[data-dialog-option]')
+    initial?.focus()
+    return () => {
+      if (opener?.isConnected) opener.focus()
+    }
+  }, [isVisible, questionKey])
+
+  if (!isVisible) return null
 
   const issueRef = formatIssueRef(agent.issueId, agent.issueTitle)
   const displayName = issueRef ?? (agent.title?.trim() || agent.id)
@@ -107,6 +130,22 @@ export function AskUserQuestionDialog({
     }
   }
 
+  // Tab and Shift+Tab wrap at the panel's last and first focusable elements.
+  const handlePanelKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key !== 'Tab' || !panelRef.current) return
+    const focusables = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+    if (focusables.length === 0) return
+    const first = focusables[0]
+    const last = focusables[focusables.length - 1]
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+
   return (
     // Clicking the backdrop minimizes (not answers) — the question stays
     // recoverable via the "Needs you" list so navigation is never trapped.
@@ -114,13 +153,21 @@ export function AskUserQuestionDialog({
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget && !isSubmitting) onDismiss() }}
     >
-      <div className="w-full max-w-2xl overflow-hidden rounded-xl border border-primary/30 bg-card shadow-2xl">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        onKeyDown={handlePanelKeyDown}
+        className="w-full max-w-2xl overflow-hidden rounded-xl border border-primary/30 bg-card shadow-2xl"
+      >
         <div className="flex items-center gap-3 border-b border-border px-5 py-4">
           <div className="rounded-full bg-primary/15 p-2">
             <MessageCircleQuestion className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-lg font-semibold text-foreground">{displayName}</h2>
+            <h2 id={titleId} className="truncate text-lg font-semibold text-foreground">{displayName}</h2>
             <p className="text-sm text-muted-foreground">
               {agent.kindLabel ?? 'Agent'} is waiting for an operator answer.
             </p>
@@ -159,7 +206,10 @@ export function AskUserQuestionDialog({
               {q.header ? (
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{q.header}</p>
               ) : null}
-              <div className="text-sm text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+              <div
+                id={qIdx === 0 ? descriptionId : undefined}
+                className="text-sm text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+              >
                 <ChatMarkdown text={q.question} cwd={undefined} />
               </div>
               <div className="space-y-1">
@@ -169,6 +219,8 @@ export function AskUserQuestionDialog({
                     <button
                       key={`q-${qIdx}-opt-${oIdx}`}
                       type="button"
+                      data-dialog-option=""
+                      data-selected={isSelected ? 'true' : undefined}
                       onClick={() => {
                         setSelections((prev) => {
                           const next = [...prev]
