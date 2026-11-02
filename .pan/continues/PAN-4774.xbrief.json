@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T23:44:40.809Z",
+  "updated": "2026-11-02T23:44:56.160Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,10 @@
     "ci-run-ac1-test.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T23:44:40.809Z"
+    },
+    "ci-run-ac1-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:44:56.160Z"
     }
   }
 }
