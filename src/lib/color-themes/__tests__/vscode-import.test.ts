@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ColorThemeImportError, mapVsCodeTheme } from '../vscode-import.js';
+import { ColorThemeImportError, mapVsCodeTheme, mapVsCodeThemeObject, parseVsCodeThemeText } from '../vscode-import.js';
 
 function fixture(name: string): string {
   return readFileSync(join(__dirname, 'fixtures', name), 'utf8');
@@ -109,5 +109,28 @@ describe('mapVsCodeTheme', () => {
   it('falls back to the file name when name is absent', () => {
     const { theme } = mapVsCodeTheme(JSON.stringify({ type: 'dark' }), 'My Theme.json');
     expect(theme.name).toBe('My Theme');
+  });
+
+  it('strips a leading UTF-8 BOM before parsing', () => {
+    const { theme } = mapVsCodeTheme('\uFEFF{"name":"B","type":"dark"}', 'b.json');
+    expect(theme.name).toBe('B');
+  });
+});
+
+describe('mapVsCodeThemeObject', () => {
+  it('maps an already-parsed object without include or tokenColors warnings', () => {
+    const { theme, warnings } = mapVsCodeThemeObject(
+      { name: 'X', type: 'light', colors: { 'editor.background': '#ffffff' }, tokenColors: [] },
+      'x.json',
+    );
+    expect(theme.type).toBe('light');
+    expect(warnings.filter((w) => w.includes('include') || w.includes('tokenColors'))).toEqual([]);
+  });
+});
+
+describe('parseVsCodeThemeText', () => {
+  it('returns the parsed object and rejects non-object JSON', () => {
+    expect(parseVsCodeThemeText('{"name":"P", /* c */ }')).toEqual({ name: 'P' });
+    expect(() => parseVsCodeThemeText('[1]')).toThrow(ColorThemeImportError);
   });
 });
