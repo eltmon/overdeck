@@ -962,3 +962,9 @@ linked row with the stand-in's parent, run, key, role, critic link and home's pr
 so the Command Deck tree nests it under its orchestrator and the Awareness rail counts it
 in the run card, with no frontend change.
 
+Live check, 2026-11-01: the three-machine run (orchestrator and builders on the desktop,
+critics on a Fly machine and the laptop) did not run before merge: no laptop or Fly machine
+was linked to the desktop, and the desktop dashboard runs `main`, which has no lane doors
+until this lands. Fallback per the plan: the two-machine smoke on this branch (two local
+servers, A as home and B as the laptop) passed `lane-remote`, `lane-report`, `lane-nest`
+and `lane-reap`. The Fly half waits for the operator's sign-off after merge.
