@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4658",
   "created": "2026-11-02T04:25:38.183Z",
-  "updated": "2026-11-02T05:22:32.781Z",
+  "updated": "2026-11-02T05:22:50.215Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -194,6 +194,10 @@
     "ci-subset.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T05:22:32.780Z"
+    },
+    "ci-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:22:50.215Z"
     }
   }
 }
