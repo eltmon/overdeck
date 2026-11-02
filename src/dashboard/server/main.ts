@@ -74,8 +74,7 @@ import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backen
 import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { startConversationRescanScheduler, stopConversationRescanScheduler } from './services/conversation-rescan-scheduler.js';
-import { startPullRequestSyncService, stopPullRequestSyncService } from './services/pull-request-sync-service.js';
-import { startConversationScheduleService, stopConversationScheduleService } from './services/conversation-schedule-service.js';
+import { startConversationSweeps, stopConversationSweeps } from './services/conversation-sweeps.js';
 import { startVaultService, stopVaultService } from './services/vault-service.js';
 import { startVaultBrowseService } from './services/vault-browse-service.js';
 import { startGitHubQuotaSampler } from '../../lib/github-quota/sampler.js';
@@ -595,18 +594,9 @@ console.log(conversationSearchWatcher
 startConversationRescanScheduler();
 console.log('[overdeck] Conversation rescan scheduler started (boot pass + 6h interval)');
 
-// PAN-3822: link PRs to conversations by branch and refresh their snapshots.
-// Writes overdeck.db, so a peer dashboard never runs it.
-if (!isPeerDashboard) {
-  startPullRequestSyncService();
-  console.log('[pr-sync] started (boot +30s, 60s sweep)');
-}
-// PAN-4640: fire due conversation schedules. Writes overdeck.db and resumes
-// sessions, so a peer dashboard never runs it.
-if (!isPeerDashboard) {
-  startConversationScheduleService();
-  console.log('[schedules] started (boot +30s, 60s sweep)');
-}
+// PAN-3822 PR sync, PAN-4640 schedules, PAN-4655 idle-settle: they write
+// overdeck.db, so a peer dashboard never runs them.
+if (!isPeerDashboard) startConversationSweeps();
 // PAN-4436 D-12: OVERDECK_VAULT_IN_PEER=1 is for isolated UAT fixtures that own a throwaway home.
 if (!isPeerDashboard || process.env.OVERDECK_VAULT_IN_PEER === '1') {
   startVaultBrowseService();
@@ -812,8 +802,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   await stopConversationRescanScheduler();
   await stopVaultService().catch((err) => console.warn('[vault] shutdown failed:', err));
-  stopPullRequestSyncService();
-  stopConversationScheduleService();
+  stopConversationSweeps();
   stopGitHubQuotaSampler();
   stopGitHubQuotaPublisher();
   stopGitHubQuotaTelemetry();

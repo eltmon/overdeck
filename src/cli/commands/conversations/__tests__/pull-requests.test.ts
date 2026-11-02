@@ -275,8 +275,8 @@ describe('registerConversationsCommands', () => {
     expect(args('prs')).toEqual(['query']);
     expect(args('auto-settle-on-merge')).toEqual(['value']);
     expect(args('auto-settle')).toEqual(['query', 'value']);
-    // The PAN-3822 auto-archive verb is gone; only the two auto-settle verbs remain.
+    // The PAN-3822 auto-archive verb is gone; only the auto-settle verbs remain (PAN-4653, PAN-4655).
     expect(conversations?.commands.map((command) => command.name()).filter((name) => name.startsWith('auto-')))
-      .toEqual(['auto-settle-on-merge', 'auto-settle']);
+      .toEqual(['auto-settle-on-merge', 'auto-settle', 'auto-settle-idle-days']);
   });
 });

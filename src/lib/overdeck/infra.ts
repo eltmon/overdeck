@@ -166,6 +166,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `snoozed_until` integer');
   // PAN-4653: per-conversation auto-settle-on-merge override ('on' | 'off'; NULL = inherit the global setting).
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `auto_settle_override` text');
+  // PAN-4655: the idle clock restart point (unsettle / unsnooze), read by the idle-settle sweep.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `idle_reset_at` integer');
   // PAN-4651 D-4651-1: the linked machine (environment id) that started this row through a work door; null = started here.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `started_by_environment_id` text');
 }

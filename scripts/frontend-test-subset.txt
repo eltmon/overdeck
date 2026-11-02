@@ -65,6 +65,7 @@ src/components/Settings/anywhere/__tests__/TailscalePeersPanel.test.tsx
 src/components/Settings/anywhere/__tests__/TailscalePhoneQr.test.tsx
 src/components/Settings/anywhere/__tests__/TailscaleSetupDialog.test.tsx
 src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx
+src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
 src/components/Settings/sections/__tests__/CloseOutSection.test.tsx
 src/components/Settings/sections/__tests__/TelemetrySection.test.tsx
