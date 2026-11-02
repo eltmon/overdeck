@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { FlyMachineRecord } from '../../../../src/lib/anywhere/fly/machine-store.js';
-import { FlyApiError } from '../../../../src/lib/remote/fly-api.js';
+import { FlyApiError, flyTokenRejectedMessage } from '../../../../src/lib/remote/fly-api.js';
 import {
   _resetFlyMachineLoopsForTests,
   type FlyCodexSyncDeps,
@@ -87,6 +87,16 @@ describe('heartbeatFlyMachines (PAN-4652 WI-11)', () => {
     expect(lines[0]).toBe('refreshed host heartbeat on fly-m1');
     expect(lines[1]).toMatch(/^failed to refresh host heartbeat on fly-m2: exit 1 read-only file system/);
     expect(lines[2]).toMatch(/^failed to refresh host heartbeat on fly-m3: Fly API error 503/);
+  });
+
+  it('prints Fly token rejected for a 403 (PAN-4748)', async () => {
+    const { api, deps } = harness([record()]);
+    const error = new FlyApiError('Fly API error 403', 403, '{"error":"unauthorized"}');
+    api.execCommand.mockRejectedValueOnce(error);
+
+    const lines = await heartbeatFlyMachines(deps);
+
+    expect(lines).toEqual([`failed to refresh host heartbeat on fly-m1: ${flyTokenRejectedMessage(error)}`]);
   });
 });
 
@@ -187,6 +197,18 @@ describe('sweepFlyMachines (PAN-4652 WI-11)', () => {
     expect(deps.removeLink).not.toHaveBeenCalled();
     expect(deps.removeRecord).not.toHaveBeenCalled();
   });
+
+  it('keeps the record and prints could not check … Fly token rejected on a 403 from getMachine (PAN-4748)', async () => {
+    const error = new FlyApiError('Fly API error 403', 403, '{"error":"unauthorized"}');
+    const { api, deps } = harness([record()], { getMachineError: error });
+
+    const lines = await sweepFlyMachines(deps);
+
+    expect(lines).toEqual([`could not check fly-m1: ${flyTokenRejectedMessage(error)}`]);
+    expect(api.destroyMachine).not.toHaveBeenCalled();
+    expect(deps.removeLink).not.toHaveBeenCalled();
+    expect(deps.removeRecord).not.toHaveBeenCalled();
+  });
 });
 
 describe('syncFlyCodexAuth (PAN-4296 WI-7)', () => {
@@ -268,6 +290,13 @@ describe('syncFlyCodexAuth (PAN-4296 WI-7)', () => {
       expect(scripts()).toHaveLength(1);
       expect(deps.writeHomeAuth).not.toHaveBeenCalled();
     }
+  });
+
+  it('prints Fly token rejected instead of did not answer on a 403 (PAN-4748)', async () => {
+    const error = new FlyApiError('Fly API error 403', 403, '{"error":"unauthorized"}');
+    const { deps } = sync([ready()], error);
+    expect(await syncFlyCodexAuth(deps)).toEqual([`Codex sign-in sync skipped on fly-m1: ${flyTokenRejectedMessage(error)}`]);
+    expect(deps.writeHomeAuth).not.toHaveBeenCalled();
   });
 
   it('runs nothing beyond the read when both sides hold the same sign-in', async () => {
