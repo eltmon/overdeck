@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4827",
   "created": "2026-11-02T16:36:08.290Z",
-  "updated": "2026-11-02T18:59:19.063Z",
+  "updated": "2026-11-02T18:59:34.471Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "dashscope-retire-tier-ids.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T18:59:19.063Z"
+    },
+    "dashscope-retire-tier-ids.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:59:34.471Z"
     }
   }
 }
