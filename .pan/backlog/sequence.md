@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T16:22:30.325480Z · model: claude-opus-5-5 · open: 859_
+_Last sequenced: 2026-11-02T16:23:18.931183Z · model: claude-opus-5-5 · open: 858_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -280,8 +280,7 @@ _Last sequenced: 2026-11-02T16:22:30.325480Z · model: claude-opus-5-5 · open: 
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
-| 276 | PAN-4743 | M | medium | ok |  |  | Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; PAN-4651 merged, so this is now unblocked. |
-| 277 | PAN-4811 | M | medium | ok |  | PAN-4743 | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; split out of PAN-4743, which must land its Fly target door first. |
+| 276 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
 | 278 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
 | 278 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
 | 279 | PAN-4817 | S | medium | ok |  | PAN-4778 | Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification. |
@@ -1194,10 +1193,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T16:22:30.325480Z",
+  "generatedAt": "2026-11-02T16:23:18.931183Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 859,
+  "openCount": 858,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -4654,30 +4653,15 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
-      "issue": "PAN-4743",
+      "issue": "PAN-4811",
       "rank": 276,
       "size": "M",
       "importance": "medium",
-      "score": 50,
+      "score": 48,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; PAN-4651 merged, so this is now unblocked.",
-      "rationale": "Moved up from rank 324 into the vacated PAN-4651 slot: its only dependency PAN-4651 closed as completed on 2026-11-01, so it is next in the Anywhere queue.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4811",
-      "rank": 277,
-      "size": "M",
-      "importance": "medium",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4743"
-      ],
-      "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; split out of PAN-4743, which must land its Fly target door first.",
-      "rationale": "New issue filed 2026-11-02: PAN-4743's plan ships Fly (new VM) for conversations only, so lane provisioning and the per-run VM cap move here. It needs startFlyTarget from in-pipeline PAN-4743, so it takes the free rank 277 directly behind it with no other node moving.",
+      "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked.",
+      "rationale": "Moved up from rank 277 into the vacated PAN-4743 slot: its only dependency PAN-4743 closed as completed on 2026-11-02, so startFlyTarget exists and lane provisioning can start.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13089,13 +13073,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4743",
-      "to": "PAN-4811",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-4811",
