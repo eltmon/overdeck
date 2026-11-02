@@ -108,7 +108,23 @@ To wait for a background task or a Monitor you started, end your turn — its no
 When you need an operator decision before you can continue (a blocking question), raise it with:
 
 ```bash
-pan ask <ISSUE-ID> "<the question, with the facts the operator needs>" --option "<choice 1>" --option "<choice 2>" --context "<what you already tried>"
+pan ask <ISSUE-ID> "<one or two sentences: the decision you need>" \
+  --option "<short label>" --option "<short label>" \
+  --context $'- <fact the operator needs>\n- <what you already tried>\n- **<label>:** <what happens if they pick it>'
+```
+
+The dashboard renders the question and the context as markdown, in separate blocks. Write them so the operator can scan them:
+
+- The question states the decision in one or two plain sentences. Do not put facts in it.
+- `--context` carries the facts as a short bullet list, one fact per bullet. Use real newlines: `$'...\n...'` in bash, or build the text in a variable first.
+- Option labels are a few words each. Explain each option's consequence in the context, under a bullet that starts with the label in bold.
+
+Example:
+
+```bash
+pan ask PAN-4638 "The live check cannot run until this branch is merged and released. How should I close out?" \
+  --option "Close out now, rig + Fly" --option "Close out now, rig only" --option "Hold until after merge" \
+  --context $'- Both the rig and a Fly VM install the published npm version, so neither can run this branch.\n- The rig answers over SSH but has no Overdeck installed.\n- **Close out now, rig + Fly:** I cancel the two live-check criteria and run pan done; the check runs after release.\n- **Close out now, rig only:** same, but skip Fly.\n- **Hold until after merge:** the issue stays open and you run the check yourself.'
 ```
 
 `pan ask` writes the request to the issue's pipeline journal. The dashboard shows it in Needs-you, with TTS and a desktop notification when they are enabled. God View and the Command Deck mark the issue "needs you" instead of idle. The operator's answer arrives as a normal message in this session. After you run it, stop and wait. Do not also post an issue comment or `pan tell` the flywheel for the same question. If the answer reaches you another way, or the question no longer matters, run `pan ask <ISSUE-ID> --withdraw`. If a message arrives that does not answer your question, run `pan ask` again.
