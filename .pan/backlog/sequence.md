@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T17:45:09.574170Z · model: claude-opus-5-5 · open: 877_
+_Last sequenced: 2026-11-02T17:48:31.593766Z · model: claude-opus-5-5 · open: 876_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -274,7 +274,6 @@ _Last sequenced: 2026-11-02T17:45:09.574170Z · model: claude-opus-5-5 · open: 
 | 266 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 267 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 268 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 269 | PAN-4696 | XS | medium | ok |  |  | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
 | 272 | PAN-4820 | XL | medium | ok |  |  | Run one issue on Deft Directive pipeline (hidden temp install, merge guard, native dashboard view, switch back); decisions made |
@@ -1212,10 +1211,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T17:45:09.574170Z",
+  "generatedAt": "2026-11-02T17:48:31.593766Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 877,
+  "openCount": 876,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -4635,19 +4634,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "condition": "ok",
       "dependsOn": [],
       "why": "pan tell contradicts itself on dead ohmypi sessions",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4696",
-      "rank": 269,
-      "size": "XS",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build.",
-      "rationale": "Rank 275->269: PAN-4295 merged, so this post-merge smoke on the deployed build is unblocked and actionable now.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13817,13 +13803,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.8
-    },
-    {
-      "from": "PAN-4847",
-      "to": "PAN-4696",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4820",
