@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4777",
   "created": "2026-11-02T04:11:59.143Z",
-  "updated": "2026-11-02T04:34:27.201Z",
+  "updated": "2026-11-02T04:35:35.311Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-02T04:34:18.161Z"
     },
     "fly-doc-clone-and-rollback": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4777",
-      "claimedAt": "2026-11-02T04:34:27.201Z"
+      "claimedAt": "2026-11-02T04:34:27.201Z",
+      "doneAt": "2026-11-02T04:35:35.310Z"
     }
   }
 }
