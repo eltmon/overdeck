@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4805",
   "created": "2026-11-02T06:47:26.972Z",
-  "updated": "2026-11-02T07:03:14.503Z",
+  "updated": "2026-11-02T07:03:36.132Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
     "health-pid-match.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T07:03:14.503Z"
+    },
+    "boot-retry-eaddrinuse.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:03:36.131Z"
     }
   }
 }
