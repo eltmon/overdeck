@@ -4,17 +4,17 @@
     "created": "2026-11-02T03:32:26Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4683: pan start --remote re-plans an already-planned issue (looks for the spec only on the primary checkout)",
-    "updated": "2026-11-02T03:40:56.917Z"
+    "updated": "2026-11-02T03:42:08.264Z"
   },
   "plan": {
     "id": "pan-4683",
     "title": "pan start --remote re-plans an already-planned issue (looks for the spec only on the primary checkout)",
-    "status": "proposed",
+    "status": "running",
     "uid": "597a7147-6b29-482a-92ac-d62f5a46296f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T03:32:26Z",
-    "updated": "2026-11-02T03:40:56.917Z",
+    "updated": "2026-11-02T03:42:08.264Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4683",
@@ -653,5 +653,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
