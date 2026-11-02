@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-02T00:51:44.020Z",
+  "updated": "2026-11-02T00:51:46.058Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -310,6 +310,9 @@
       "doneAt": "2026-11-02T00:05:24.261Z"
     },
     "live-three-machine-run.ac1": {
+      "status": "cancelled"
+    },
+    "live-three-machine-run.ac2": {
       "status": "cancelled"
     }
   },
