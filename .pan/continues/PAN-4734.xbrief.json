@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T16:57:25.006Z",
+  "updated": "2026-11-02T16:57:43.398Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -205,6 +205,10 @@
     "wi8-work-door-route.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T16:57:25.006Z"
+    },
+    "wi9-cli-start-remote.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:57:43.398Z"
     }
   }
 }
