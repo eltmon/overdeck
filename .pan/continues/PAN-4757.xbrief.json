@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4757",
   "created": "2026-11-02T00:54:16.802Z",
-  "updated": "2026-11-02T01:02:32.414Z",
+  "updated": "2026-11-02T01:02:34.320Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -45,6 +45,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4757",
       "claimedAt": "2026-11-02T01:02:32.414Z"
+    },
+    "docs-playwright-name-match.ac3": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4757",
+      "claimedAt": "2026-11-02T01:02:34.320Z"
     }
   }
 }
