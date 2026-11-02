@@ -6,7 +6,13 @@ const mocks = vi.hoisted(() => ({
   commands: [] as string[],
   // Answers to successive polls of /tmp/pan-clone.exit; '' means still cloning.
   cloneExits: [] as string[],
+  // ssh commands containing one of these substrings reject with
+  // `exec failed: <substring>` — checked before any other ssh behavior.
+  sshFailures: [] as string[],
   deleteVm: vi.fn(),
+  // When set, deleteVm still records the call but rejects with this error.
+  deleteVmError: null as Error | null,
+  configureClaudeCode: vi.fn(),
   exec: vi.fn(),
   saveWorkspaceMetadata: vi.fn(),
   writeRemoteFile: vi.fn(),
@@ -26,6 +32,10 @@ vi.mock('../../src/lib/remote/index.js', () => ({
     createVm: (name: string) => Effect.succeed({ name, status: 'running', machineId: 'm1' }),
     ssh: (_vm: string, command: string) => {
       mocks.commands.push(command);
+      const failure = mocks.sshFailures.find((substring) => command.includes(substring));
+      if (failure) {
+        return Effect.fail(new Error(`exec failed: ${failure}`));
+      }
       if (command.includes('cat /tmp/pan-clone.exit')) {
         const code = mocks.cloneExits.shift() ?? '0';
         return Effect.succeed(code === ''
@@ -39,11 +49,11 @@ vi.mock('../../src/lib/remote/index.js', () => ({
     },
     deleteVm: () => {
       mocks.deleteVm();
-      return Effect.succeed(undefined);
+      return mocks.deleteVmError ? Effect.fail(mocks.deleteVmError) : Effect.succeed(undefined);
     },
     exposePort: () => Effect.succeed(''),
     syncAllCredentials: vi.fn().mockResolvedValue(undefined),
-    configureClaudeCode: vi.fn().mockResolvedValue(undefined),
+    configureClaudeCode: mocks.configureClaudeCode,
     copySkillsToVm: vi.fn().mockResolvedValue(undefined),
     getAppName: () => 'overdeck-test',
   }),
@@ -87,8 +97,11 @@ describe('createRemoteWorkspace', () => {
     vi.useFakeTimers();
     mocks.commands.length = 0;
     mocks.cloneExits.length = 0;
+    mocks.sshFailures.length = 0;
+    mocks.deleteVmError = null;
     mocks.deleteVm.mockReset();
     mocks.saveWorkspaceMetadata.mockReset();
+    mocks.configureClaudeCode.mockReset().mockResolvedValue(undefined);
     mocks.exec.mockReset().mockImplementation((_cmd: string, _opts: unknown, cb: (err: Error | null, out: unknown) => void) => {
       cb(null, { stdout: `${mocks.origin}\n`, stderr: '' });
     });
@@ -130,6 +143,49 @@ describe('createRemoteWorkspace', () => {
     mocks.cloneExits.push('128');
 
     await expect(create('PAN-4295')).rejects.toThrow('Failed to clone: fatal: repository not found');
+    expect(mocks.deleteVm).toHaveBeenCalledTimes(1);
+    expect(mocks.saveWorkspaceMetadata).not.toHaveBeenCalled();
+  });
+
+  it('deletes the VM when the clone start exec rejects', async () => {
+    mocks.sshFailures.push('setsid nohup');
+
+    await expect(create('PAN-4295')).rejects.toThrow('exec failed: setsid nohup');
+    expect(mocks.deleteVm).toHaveBeenCalledTimes(1);
+    expect(mocks.saveWorkspaceMetadata).not.toHaveBeenCalled();
+  });
+
+  it('deletes the VM when the clone log tail rejects', async () => {
+    mocks.cloneExits.push('128');
+    mocks.sshFailures.push('tail -5 /tmp/pan-clone.log');
+
+    await expect(create('PAN-4295')).rejects.toThrow('exec failed: tail -5');
+    expect(mocks.deleteVm).toHaveBeenCalledTimes(1);
+    expect(mocks.saveWorkspaceMetadata).not.toHaveBeenCalled();
+  });
+
+  it('deletes the VM when a later creation step rejects', async () => {
+    mocks.configureClaudeCode.mockRejectedValueOnce(new Error('configure failed'));
+
+    await expect(create('PAN-4295')).rejects.toThrow('configure failed');
+    expect(mocks.deleteVm).toHaveBeenCalledTimes(1);
+    expect(mocks.saveWorkspaceMetadata).not.toHaveBeenCalled();
+  });
+
+  it('deletes the VM when the branch checkout exec rejects', async () => {
+    mocks.sshFailures.push('git checkout');
+
+    await expect(create('PAN-4295')).rejects.toThrow('exec failed: git checkout');
+    expect(mocks.deleteVm).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the VM and the destroy command when the rollback delete fails', async () => {
+    mocks.sshFailures.push('setsid nohup');
+    mocks.deleteVmError = new Error('403 Forbidden');
+
+    await expect(create('PAN-4295')).rejects.toThrow(
+      /exec failed: setsid nohup.*pan-pan-4295-ws.*m1.*403 Forbidden.*fly machines destroy m1 -a overdeck-test --force/s,
+    );
     expect(mocks.deleteVm).toHaveBeenCalledTimes(1);
     expect(mocks.saveWorkspaceMetadata).not.toHaveBeenCalled();
   });

@@ -252,4 +252,61 @@ describe('closeConversationPanes (archived conversations must not leave tabs)', 
     const persisted = JSON.parse(localStorage.getItem('pan-panes:cold-workspace') ?? '[]') as WorkspacePane[]
     expect(persisted.map((p) => p.paneId)).toEqual(['h', 'b'])
   })
+
+  it('clears citeConversationName from a hydrated editor pane targeting the archived conversation, but keeps the pane open', () => {
+    const store = usePanesStore.getState()
+    store.ensureHome(WS)
+    const editorId = store.addPane(WS, {
+      paneType: 'editor',
+      label: 'a.md',
+      editorFilePath: '/repo/a.md',
+      citeConversationName: 'conv-archived',
+    })
+
+    closeConversationPanes('conv-archived')
+
+    const editor = panes(WS).find((p) => p.paneId === editorId)
+    expect(editor).toBeDefined()
+    expect(editor?.citeConversationName).toBeUndefined()
+  })
+
+  it('leaves an editor pane targeting a different conversation untouched', () => {
+    const store = usePanesStore.getState()
+    store.ensureHome(WS)
+    const editorId = store.addPane(WS, {
+      paneType: 'editor',
+      label: 'a.md',
+      editorFilePath: '/repo/a.md',
+      citeConversationName: 'conv-other',
+    })
+
+    closeConversationPanes('conv-archived')
+
+    const editor = panes(WS).find((p) => p.paneId === editorId)
+    expect(editor?.citeConversationName).toBe('conv-other')
+  })
+
+  it('rewrites a cold persisted editor pane without citeConversationName, keeping the pane', () => {
+    localStorage.setItem(
+      'pan-panes:cold-workspace',
+      JSON.stringify([
+        { paneId: 'h', paneType: 'home', label: 'Home', createdAt: 1, isPermanent: true },
+        {
+          paneId: 'e',
+          paneType: 'editor',
+          label: 'a.md',
+          createdAt: 2,
+          editorFilePath: '/repo/a.md',
+          citeConversationName: 'conv-archived',
+        },
+      ]),
+    )
+
+    closeConversationPanes('conv-archived')
+
+    const persisted = JSON.parse(localStorage.getItem('pan-panes:cold-workspace') ?? '[]') as WorkspacePane[]
+    expect(persisted.map((p) => p.paneId)).toEqual(['h', 'e'])
+    const editor = persisted.find((p) => p.paneId === 'e')
+    expect(editor).not.toHaveProperty('citeConversationName')
+  })
 })

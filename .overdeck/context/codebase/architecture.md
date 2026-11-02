@@ -182,7 +182,10 @@ agent shows a row only when a `state.json` exists (dashboard spawn or after the
 reap). Remote agents have no local tmux session — never assume tmux discovery
 covers them. PAN-4652 adds **Fly machines**: Fly VMs that run `pan serve` and
 are linked from home (`src/lib/anywhere/fly/`, `services/fly-machine-service.ts`,
-`pan machines add-fly`); PAN-4734 moves work agents onto that path.
+`pan machines add-fly`); PAN-4734 moves work agents onto that path. The default
+image is `registry.fly.io/<app>:latest` (`defaultFlyImage()` in `fly-provider.ts`,
+used by both `FlyProvider` and `provisionFlyMachine`), because the Fly registry is
+app-scoped (PAN-4682).
 
 ## Dashboard Agents page (`/agents`)
 
@@ -264,6 +267,22 @@ Deacon child, because the delivery and resume doors live there (60 s, skips peer
 dashboards, a frozen Deacon and `OVERDECK_DISABLE_SCHEDULED_MESSAGES=1`). Reset
 times come from `conversation-usage-limit.ts` and `limit-reset-text.ts`.
 
+## Conversation triage: settle and snooze (PAN-4639)
+
+`conversations.settled_at` / `settle_reason` (`manual` | `merge` | `idle`) /
+`snoozed_until` (epoch ms) are read and written only through
+`src/lib/overdeck/conversation-triage-store.ts`; the write route is
+`POST /api/conversations/triage` (`routes/conversation-triage.ts`). Settling is
+display-only: the session keeps running. An expired snooze is not cleared
+server-side; the client derives Inbox from `snoozed_until <= now`. Sections
+(Needs you / Inbox / Snoozed / Settled) are a pure client rule decided on the
+tree root (`CommandDeck/conversation-triage.ts` `sectionOf`, nesting from
+`conversation-tree.ts` `displayParentId`). Automatic settling: on merge is
+PAN-4653; on idle is PAN-4655 (`src/lib/overdeck/conversation-idle-settle.ts`,
+run by `services/conversation-idle-settle-service.ts`; unsettle and unsnooze
+write `idle_reset_at` to restart the clock; setting
+`conversations.auto_settle_idle_days`, default 3).
+
 ## Dashboard auth (verified 2026-11-01)
 
 No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`; PAN-4645 linked machines, `kind: 'machine'`, which resolve only inside a secure channel whose proved key matches the record: `resolveDashboardCredential(headers, channel)`, channel marker from `channel-peer.ts`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). PAN-4645 adds the secure channel: `channel-listener.ts` demuxes a `0x00` first byte on the dashboard port (and `/ws/link`) into a Noise channel handed to the HTTP server; `channel` requests are never loopback; `/ws/rpc` gets a scope-restricted RPC group for non-admin credentials (`ws-rpc-auth.ts`); `require_token_mint` is on whenever remote access exists (`remote-access/config.ts`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.
@@ -282,4 +301,4 @@ Owner side: `routes/machines-work.ts` (the `/api/machines/work/*` doors: convers
 
 Gauntlet lanes across machines (PAN-4638): home keeps the run rules in `src/lib/lanes/launch.ts` (`deps.remote` / `resolveMachine`) over `src/lib/lanes/lane-rows.ts` (`listAllLaneRows`: local lane rows plus stand-ins, cwd key `<environmentId>:<cwd>`) and `src/lib/lanes/remote-lanes.ts` (the stand-in store `~/.overdeck/remote-lanes/<name>/{lane,mirror,archived}.json` and the `lane-link.json` critic sidecar); `routes/lanes.ts` resolves `machine` and adds `POST /api/lanes/:name/stop` and the remote reap; `services/remote-lane-follower.ts` mirrors the owner's status and reports. Owner side: `routes/machines-work-lanes.ts` (`/api/machines/work/lanes`, `…/:name/status`, `…/:name/reap`) runs `src/lib/lanes/owner-launch.ts` (`launchOwnedLane`). Views, pairing (by name) and waits: `src/lib/lanes/views.ts`, `pairing.ts`, `wait.ts`; nesting: `src/lib/overdeck/linked-conversations-merge.ts` (`remoteLanes`). CLI: `cli/commands/lane.ts`. Docs: `reference/lanes.mdx` "Lanes on other machines", `docs/ANYWHERE-ARCHITECTURE.md` "Gauntlet lanes across machines".
 
-<!-- last-verified: 2026-11-02 (PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759) -->
+<!-- last-verified: 2026-11-02 (PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759, PAN-4682, PAN-4655) -->

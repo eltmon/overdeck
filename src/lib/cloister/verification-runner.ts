@@ -47,6 +47,7 @@ import { postVerificationCheckRun } from './verification-check-run.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { appendPipelineEntry } from './pipeline-journal.js';
 import { resolveIssueFeedbackTarget } from './feedback-target.js';
+import { withAdoptedPlanChecklistSkip } from './adopted-plan-checklist.js';
 import { messageAgent } from '../agents.js';
 import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveWorkspaceRepoRoots } from '../project-repos.js';
@@ -988,7 +989,10 @@ export function runVerificationForIssue(
   logPrefix: string,
   options: VerificationRunnerOptions = {},
 ): Effect.Effect<VerificationRunnerOutcome> {
-  return process.env.OVERDECK_VERIFICATION_WORKER === '1'
-    ? Effect.promise(() => runVerificationForIssueInProcess(issueId, workspacePath, workspaceInfo, logPrefix, options))
-    : Effect.promise(() => runSupervisedVerification(issueId, workspacePath, workspaceInfo, logPrefix, options));
+  return Effect.promise(async () => {
+    const resolved = await withAdoptedPlanChecklistSkip(workspacePath, options);
+    return process.env.OVERDECK_VERIFICATION_WORKER === '1'
+      ? runVerificationForIssueInProcess(issueId, workspacePath, workspaceInfo, logPrefix, resolved)
+      : runSupervisedVerification(issueId, workspacePath, workspaceInfo, logPrefix, resolved);
+  });
 }

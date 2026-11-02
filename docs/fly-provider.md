@@ -29,7 +29,8 @@ endpoint; port tunnelling uses `fly proxy`.
   brew install flyctl
   ```
 
-- **pan-workspace Docker image** built and pushed to `registry.fly.io` (see [Building the Image](#building-the-pan-workspace-image))
+- **Workspace image** built from `docker/pan-workspace/Dockerfile` and pushed to
+  `registry.fly.io/<app>:latest` (see [Building the Image](#building-the-pan-workspace-image))
 
 ---
 
@@ -57,12 +58,17 @@ endpoint; port tunnelling uses `fly proxy`.
    ```
 
    Overdeck will:
+   - Push the local `feature/<id>` branch to origin when a local workspace exists, so the planned spec reaches the machine; creation stops with an error and creates no machine if that push is rejected
    - Create a Fly Machine in your configured app
    - Wait up to 120 s for it to reach `started`
    - Sync Claude Code and GitHub credentials from your local machine
    - Clone the repository over HTTPS into `/workspace` and check out the feature branch
    - Configure Claude Code and copy your local skills
    - Save workspace metadata to `~/.overdeck/workspaces/<id>.yaml`
+   - If any step after the machine is created fails, delete the machine before reporting the error
+
+   Only committed work reaches the machine: uncommitted changes in the local
+   workspace are not pushed.
 
    No SSH private key is copied to the VM. Git authenticates over HTTPS with the
    synced `gh` token.
@@ -113,9 +119,9 @@ vm_size = "shared-cpu-2x"
 # Memory in MB allocated to each machine
 vm_memory = 1024
 
-# Docker image that every workspace machine runs.
-# Must be pushed to registry.fly.io before use.
-image = "registry.fly.io/pan-workspace:latest"
+# Docker image that every workspace machine runs. Optional: the default is
+# registry.fly.io/<app>:latest, because the Fly registry is app-scoped.
+# image = "registry.fly.io/pan-workspaces:latest"
 
 # Stop the machine when the agent becomes idle
 auto_stop = true
@@ -141,7 +147,7 @@ auto_stop_timeout = 300
 | `remote.fly.region` | `"iad"` | Default region for machine placement |
 | `remote.fly.vm_size` | `"shared-cpu-2x"` | Fly Machine CPU/size preset |
 | `remote.fly.vm_memory` | `1024` | Machine memory in MB |
-| `remote.fly.image` | `"registry.fly.io/pan-workspace:latest"` | Workspace container image |
+| `remote.fly.image` | `"registry.fly.io/<app>:latest"` | Workspace container image (default follows `remote.fly.app`) |
 | `remote.fly.auto_stop` | `true` | Stop machine when agent is idle |
 | `remote.fly.auto_stop_timeout` | `300` | Idle timeout in seconds |
 | `remote.fly.api_token_env` | `"FLY_API_TOKEN"` | Environment variable name for the API token |
@@ -181,15 +187,17 @@ reinstalls home's exact version anyway when the VM's differs.
 fly auth docker
 
 # Build the image (from the repo root)
-docker build -t registry.fly.io/pan-workspace:latest \
+docker build -t registry.fly.io/pan-workspaces:latest \
   -f docker/pan-workspace/Dockerfile .
 
 # Push to Fly's private registry
-docker push registry.fly.io/pan-workspace:latest
+docker push registry.fly.io/pan-workspaces:latest
 ```
 
-The image tag must match `remote.fly.image` in your config. If you tag a new version,
-update the config and recreate workspaces to pick it up.
+Replace `pan-workspaces` with your `[remote.fly] app` when you changed it.
+
+The pushed reference must equal the effective image: `[remote.fly] image` when set,
+else `registry.fly.io/<app>:latest`.
 
 > The Fly app (`pan-workspaces` by default) must exist before you can push to its
 > registry. `pan remote setup` or `pan workspace create --remote` will create the app
@@ -425,9 +433,12 @@ throws `Fly API token not found`.
 commands immediately fail.
 
 **Fix:**
+0. If `[remote.fly] image` is `registry.fly.io/pan-workspace:latest` (written by
+   `pan remote setup` before PAN-4682), delete that line: the repository does not exist,
+   and the default `registry.fly.io/<app>:latest` does.
 1. Confirm the image exists: `fly status -a pan-workspaces` → check machine image ref.
 2. Rebuild and push the image (see [Building the Image](#building-the-pan-workspace-image)).
-3. Verify the `image` value in `[remote.fly]` matches the pushed tag exactly.
+3. Verify the effective image (see Build and push) matches the pushed tag exactly.
 
 ---
 
@@ -441,10 +452,19 @@ non-zero exit codes from the exec API.
   and retry.
 - **Image missing required tools** — ensure the Dockerfile installs git, python3, curl,
   and base64. Rebuild and push.
-- **Fly API exec timeout** — individual exec calls default to 60 s. Long-running
-  operations (e.g., `git clone` on a large repo) may time out. The clone step will
-  delete the machine and surface the error; re-run after increasing `vm_memory` if the
-  OOM killer is the cause.
+- **Fly API exec timeout** — each exec call has a 60 s deadline. The clone does not
+  run inside one exec: it starts detached (`setsid nohup`), writes its output to
+  `/tmp/pan-clone.log` and its exit code to `/tmp/pan-clone.exit`, and Overdeck polls
+  every 5 s for up to 20 min. If the clone exits non-zero, the machine is deleted and
+  the error shows the last 5 lines of the log. If it does not finish in 20 min, the
+  error is `clone did not finish within 20 min`. Re-run after increasing `vm_memory`
+  if the OOM killer is the cause.
+- **Creation fails after the machine exists** — any failure after the machine is
+  created (credential sync, clone, branch checkout, Claude Code setup, skills copy,
+  compose) deletes the machine before the error is shown. If that delete also fails
+  (for example an expired Fly token answering 403, #4748), the error names the
+  machine and prints the command to remove it by hand:
+  `fly machines destroy <machine-id> -a <app> --force`.
 
 ---
 
@@ -486,8 +506,8 @@ deadline ([#4685](https://github.com/eltmon/overdeck/issues/4685), now cloned in
 the background), Claude Code refusing bypass mode as root (`IS_SANDBOX=1`), and
 the first-run Bypass Permissions disclaimer (`bypassPermissionsModeAccepted`).
 It also filed [#4682](https://github.com/eltmon/overdeck/issues/4682) (the
-default image name does not exist; set `[remote.fly] image =
-"registry.fly.io/pan-workspaces:latest"`) and
+default image name did not exist; fixed by PAN-4682, which derives it from
+the app) and
 [#4683](https://github.com/eltmon/overdeck/issues/4683) (`pan start --remote`
 re-plans a planned issue, and the post-planning auto-start runs locally).
 

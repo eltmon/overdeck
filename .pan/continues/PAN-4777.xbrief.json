@@ -1,0 +1,53 @@
+{
+  "version": "1",
+  "issueId": "PAN-4777",
+  "created": "2026-11-02T04:11:59.143Z",
+  "updated": "2026-11-02T04:39:15.208Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "rollback-vm-on-create-failure": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4777",
+      "claimedAt": "2026-11-02T04:11:59.143Z",
+      "doneAt": "2026-11-02T04:34:18.161Z"
+    },
+    "fly-doc-clone-and-rollback": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4777",
+      "claimedAt": "2026-11-02T04:34:27.201Z",
+      "doneAt": "2026-11-02T04:35:35.310Z"
+    },
+    "rollback-vm-on-create-failure.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:37:23.014Z"
+    },
+    "rollback-vm-on-create-failure.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:37:41.150Z"
+    },
+    "rollback-vm-on-create-failure.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:38:00.206Z"
+    },
+    "rollback-vm-on-create-failure.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:38:18.450Z"
+    },
+    "fly-doc-clone-and-rollback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:38:36.165Z"
+    },
+    "fly-doc-clone-and-rollback.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:38:56.770Z"
+    },
+    "fly-doc-clone-and-rollback.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:39:15.208Z"
+    }
+  }
+}

@@ -8,6 +8,7 @@ import {
   claimAutoSpawnConsentForWorkStart,
   completeAutoSpawnConsentClaim,
   readAutoSpawnConsentWorkModel,
+  readAutoSpawnConsentWorkspaceLocation,
   readAutoSpawnOnFinalizeFlagAsync,
   withAutoSpawnConsentClaim,
   writeAutoSpawnOnFinalizeFlag,
@@ -190,5 +191,49 @@ describe('auto-spawn consent claims', () => {
     writeFileSync(autoSpawnOnFinalizeFlagPath(issueId), JSON.stringify({ autoSpawnOnFinalize: true }));
     const legacyClaim = await claimAutoSpawnConsentForWorkStart(issueId);
     expect(legacyClaim?.workModel).toBeUndefined();
+  });
+  // PAN-4683: the planning request's location travels to the post-planning start.
+  describe('workspaceLocation', () => {
+    it('returns the stored location', async () => {
+      await writeAutoSpawnOnFinalizeFlag(issueId, true, { workspaceLocation: 'remote' });
+
+      await expect(readAutoSpawnConsentWorkspaceLocation(issueId)).resolves.toBe('remote');
+    });
+
+    it('preserves the location across a new generation, and clears it on request', async () => {
+      await writeAutoSpawnOnFinalizeFlag(issueId, true, { workModel: 'k3', workspaceLocation: 'remote' });
+
+      await writeAutoSpawnOnFinalizeFlag(issueId, true);
+      await expect(readAutoSpawnConsentWorkspaceLocation(issueId)).resolves.toBe('remote');
+      await expect(readAutoSpawnConsentWorkModel(issueId)).resolves.toBe('k3');
+
+      await writeAutoSpawnOnFinalizeFlag(issueId, true, { workspaceLocation: null });
+      await expect(readAutoSpawnConsentWorkspaceLocation(issueId)).resolves.toBeUndefined();
+      await expect(readAutoSpawnConsentWorkModel(issueId)).resolves.toBe('k3');
+    });
+
+    it('stops returning the location once the claim is spent', async () => {
+      await writeAutoSpawnOnFinalizeFlag(issueId, true, { workspaceLocation: 'remote' });
+      const claim = await claimAutoSpawnConsentForWorkStart(issueId);
+      if (!claim) throw new Error('expected a claim');
+      await expect(readAutoSpawnConsentWorkspaceLocation(issueId)).resolves.toBe('remote');
+
+      await completeAutoSpawnConsentClaim(claim);
+
+      await expect(readAutoSpawnConsentWorkspaceLocation(issueId)).resolves.toBeUndefined();
+    });
+
+    it('ignores a stored location that is not local or remote', async () => {
+      await writeAutoSpawnOnFinalizeFlag(issueId, true);
+      writeFileSync(autoSpawnOnFinalizeFlagPath(issueId), JSON.stringify({
+        version: 2,
+        generation: 'g1',
+        status: 'granted',
+        workspaceLocation: 'moon',
+        updatedAt: new Date().toISOString(),
+      }));
+
+      await expect(readAutoSpawnConsentWorkspaceLocation(issueId)).resolves.toBeUndefined();
+    });
   });
 });

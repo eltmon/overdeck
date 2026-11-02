@@ -35,7 +35,9 @@ pan conversations pending <conv> [--json]
 pan conversations link-pr <query> <url|#42|owner/repo#42> [--source agent|manual]
 pan conversations unlink-pr <query> <url|#42|owner/repo#42>
 pan conversations prs <query> [--json]
-pan conversations auto-archive-on-merge [on|off]
+pan conversations auto-settle-on-merge [on|off]
+pan conversations auto-settle <query> [on|off|inherit]
+pan conversations auto-settle-idle-days [days]
 pan conversations schedule add <conv> (--cron <expr> | --hourly | --daily <HH:MM> | --weekdays <HH:MM> | --weekly "<day> HH:MM") (--prompt <text> | --prompt-file <path>) [--tz <zone>] [--paused] [--json]
 pan conversations schedule list [conv] [--json]
 pan conversations schedule pause <id>
@@ -89,9 +91,15 @@ pan conversations enrich [ids...] [--tier <n>] [--deep] [--full] [--upgrade] [--
   own only for a conversation in a linked git worktree, or an agent
   conversation, never one in the primary checkout. Unlinking hides the PR from
   branch detection too. Works with the dashboard down (writes the link directly).
-  `auto-archive-on-merge` (default off) archives an operator conversation once
-  all its linked PRs are merged or closed; never agent conversations, never a
-  live session.
+  `auto-settle-on-merge` (default on) settles a conversation once all its
+  linked PRs are merged or closed — it never archives or stops anything and
+  never touches agent conversations; `auto-settle <query>` sets one
+  conversation's override (`inherit` follows the global setting).
+- **`auto-settle-idle-days [days]`** (PAN-4655, default 3, `0` = off) — the
+  primary dashboard settles an operator conversation (reason `idle`) after that
+  many days with no transcript activity, operator message or resume; never
+  agent conversations, snoozed ones, or ones waiting on you. Unsettling
+  restarts the clock. Works with the dashboard down.
 - **`schedule`** (PAN-4640) runs a prompt in a conversation on a recurring
   schedule. `<conv>` accepts `self` (also `.`, `current`, `me`) for the
   conversation you are running in, a conversation number, a name, or a unique

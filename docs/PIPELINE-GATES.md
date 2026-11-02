@@ -50,7 +50,12 @@ runs these steps in order. Each step that fails returns early with the named
 11. Run the acceptance-criteria check on the xBRIEF (`getXBriefACStatus`) —
     `failedCheck: vbrief-conflicts` or `vbrief-ac`.
 12. Run the plan checklist check (`checkIncompletePlanItems`) —
-    `failedCheck: incomplete-plan-items`.
+    `failedCheck: incomplete-plan-items`. It is skipped (`skipPlanChecklist`)
+    for a strike merge, and for an adopted PR workspace whose journal has
+    `workspace.adopted` when no xBRIEF resolves for the issue (PAN-4786).
+    `runVerificationForIssue` decides this from workspace state on every run,
+    so retries and merge verification get the same answer. An adopted
+    workspace whose issue has an xBRIEF still runs the check.
 13. Run the empty-changeset guard, which catches a changeset that touched only
     `.pan/` task state — `failedCheck: empty-changeset`.
 14. On a full pass: post a success check run, lift any verification-stuck
@@ -508,7 +513,10 @@ worker already ran:
   instead of starting a fresh worker, provided the head is the same or synced
   head (above), the options match, and the outcome is not `error`. A result is
   consumed at most once, so a second request on the same head is a real
-  re-run and still counts against the attempt budget.
+  re-run and still counts against the attempt budget. A live worker is joined
+  under the same rule: same head and same options. A live worker running with
+  other options (for example `skipPlanChecklist`, PAN-4786) is stopped and a
+  fresh worker starts.
 - **Boot re-attaches.** On boot the primary dashboard
   (`cloister/verification-boot-adoption.ts`) re-enters the review-request door,
   with source `verification-adoption`, for every `request-review` worker that
@@ -1592,6 +1600,10 @@ else: it was never verified or reviewed, and nobody was told. Now the
 webhook (`handlePullRequest` in `src/lib/webhook-handlers.ts`) hands that PR
 to `adoptPrAndStartReview` (`cloister/pr-adoption-review.ts`), which adopts
 the branch into a pipeline workspace and then starts the review.
+
+An adopted PR usually has no xBRIEF, so verification skips the plan checklist
+for it (PAN-4786) and still runs typecheck, lint and tests; the review judges
+the PR against the issue's acceptance criteria. See step 12 above.
 
 Adoption (`cloister/pr-workspace-adoption.ts`) takes only the exact branch
 `feature/<issue>` (case-sensitive) and only at the head the PR reports. A
