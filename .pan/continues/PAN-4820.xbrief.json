@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T18:35:02.172Z",
+  "updated": "2026-11-02T18:35:18.938Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -284,6 +284,10 @@
     "switch-use-back.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T18:35:02.171Z"
+    },
+    "switch-use-back.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:35:18.938Z"
     }
   }
 }
