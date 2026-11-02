@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4813",
   "created": "2026-11-02T13:36:08.209Z",
-  "updated": "2026-11-02T14:03:14.695Z",
+  "updated": "2026-11-02T14:06:33.907Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-02T14:03:05.210Z"
     },
     "claude-endpoint-routing": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4813",
-      "claimedAt": "2026-11-02T14:03:14.695Z"
+      "claimedAt": "2026-11-02T14:03:14.695Z",
+      "doneAt": "2026-11-02T14:06:33.907Z"
     }
   }
 }
