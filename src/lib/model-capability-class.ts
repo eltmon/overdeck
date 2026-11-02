@@ -76,6 +76,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'openai/gpt-oss-120b': 'workhorse',
   'qwen-qwq-32b': 'workhorse',
   'llama3.3-70b': 'workhorse',
+  'gpt-oss-120b': 'workhorse',
   'llama3.1-70b': 'workhorse',
   'codestral-latest': 'workhorse',
   'ql-swift-8b': 'workhorse',

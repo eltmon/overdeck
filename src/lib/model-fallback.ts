@@ -125,6 +125,9 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'openai/gpt-oss-120b': 'groq',
   'openai/gpt-oss-20b': 'groq',
 
+  // Cerebras models
+  'gpt-oss-120b': 'cerebras',
+
   // QuantumLlama models (synthetic benchmark provider, PAN-3252)
   'ql-reason-70b': 'quantumllama',
   'ql-swift-8b': 'quantumllama',
@@ -227,6 +230,9 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // Groq → Anthropic
   'openai/gpt-oss-120b': 'claude-sonnet-5-5',
   'openai/gpt-oss-20b': 'claude-haiku-4-5',
+
+  // Cerebras → Anthropic
+  'gpt-oss-120b': 'claude-sonnet-5-5',
 
   // QuantumLlama → Anthropic (synthetic benchmark provider, PAN-3252)
   'ql-reason-70b': 'claude-sonnet-5-5', // Flagship reasoning → Sonnet

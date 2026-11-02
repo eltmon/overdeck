@@ -46,4 +46,10 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   'qwen-qwq-32b': 'openai/gpt-oss-120b',
   'llama-3.1-8b-instant': 'openai/gpt-oss-20b',
   'gemma2-9b-it': 'openai/gpt-oss-20b',
+  // Cerebras — deprecated (inference-docs.cerebras.ai/support/deprecation). llama-3.3-70b is
+  // Cerebras's real id; Overdeck carried llama3.3-70b.
+  'llama3.3-70b': 'gpt-oss-120b',
+  'llama-3.3-70b': 'gpt-oss-120b',
+  'llama3.1-70b': 'gpt-oss-120b',
+  'llama3.1-8b': 'gpt-oss-120b',
 };

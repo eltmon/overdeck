@@ -159,6 +159,12 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'openai/gpt-oss-20b' as ModelId, name: 'GPT OSS 20B (131K context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.1875, capabilities: ['code', 'fast', 'cost-efficient'], description: 'Small OpenAI open-weight model on Groq. 131K context, $0.075/M in, $0.30/M out.' },
     ],
   },
+  cerebras: {
+    name: 'Cerebras',
+    models: [
+      { id: 'gpt-oss-120b' as ModelId, name: 'GPT OSS 120B (131K context)', icon: Zap, tier: 'balanced', costPer1MTokens: 0.55, capabilities: ['reasoning', 'code', 'fast'], description: 'OpenAI open-weight model on Cerebras. 131K context and 40K output on the paid tier, $0.35/M in, $0.75/M out.' },
+    ],
+  },
   quantumllama: {
     name: 'QuantumLlama',
     models: [

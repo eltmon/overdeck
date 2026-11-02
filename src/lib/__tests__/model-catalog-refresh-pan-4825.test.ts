@@ -74,3 +74,21 @@ describe('Groq gpt-oss replaces the shut-down Llama, QwQ and Gemma ids', () => {
     expectNoRetiredSlots('groq');
   });
 });
+
+describe('Cerebras gpt-oss-120b replaces every deprecated Llama id', () => {
+  it('registers gpt-oss-120b under cerebras, not openai', () => {
+    expectRegistered('gpt-oss-120b', 'cerebras');
+    expect(getModelProvider('gpt-oss-120b')).toBe('cerebras');
+  });
+
+  it.each(['llama3.3-70b', 'llama-3.3-70b', 'llama3.1-70b', 'llama3.1-8b'])('retires %s to gpt-oss-120b', (id) => {
+    expectRetired(id, 'gpt-oss-120b', 'cerebras');
+    expect(getProviderForModel(id).name).toBe('cerebras');
+  });
+
+  it('launches every tier and the haiku slot on gpt-oss-120b', () => {
+    expect(PROVIDERS.cerebras.haikuModel).toBe('gpt-oss-120b');
+    expect(PROVIDERS.cerebras.tierModels).toEqual({ opus: 'gpt-oss-120b', sonnet: 'gpt-oss-120b', haiku: 'gpt-oss-120b' });
+    expectNoRetiredSlots('cerebras');
+  });
+});

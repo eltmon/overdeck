@@ -25,9 +25,10 @@ describe('providers-ohmypi: new omp-routable providers in registry', () => {
   });
 
   it('getProviderForModel resolves a cerebras model to the cerebras provider', () => {
-    const p = getProviderForModel('llama3.3-70b');
+    const p = getProviderForModel('gpt-oss-120b');
     expect(p.name).toBe('cerebras');
     expect(p.defaultHarness).toBe('ohmypi');
+    expect(getProviderForModel('llama3.3-70b').name).toBe('cerebras');
   });
 
   it('getProviderForModel resolves a mistral model to the mistral provider', () => {

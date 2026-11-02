@@ -276,9 +276,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'direct',
     defaultHarness: 'ohmypi',
     authType: 'static',
-    models: ['llama3.3-70b', 'llama3.1-70b', 'llama3.1-8b'],
-    haikuModel: 'llama3.1-8b',
-    tierModels: { opus: 'llama3.3-70b', sonnet: 'llama3.1-70b', haiku: 'llama3.1-8b' },
+    models: ['gpt-oss-120b'],
+    haikuModel: 'gpt-oss-120b',
+    tierModels: { opus: 'gpt-oss-120b', sonnet: 'gpt-oss-120b', haiku: 'gpt-oss-120b' },
     tested: false,
     description: 'Route via omp using CEREBRAS_API_KEY. Hardware-accelerated inference on Cerebras wafer-scale chips.',
   },
@@ -520,7 +520,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check Cerebras models
-  if (['llama3.3-70b', 'llama3.1-70b', 'llama3.1-8b'].includes(modelId)) {
+  if (['gpt-oss-120b', 'llama3.3-70b', 'llama-3.3-70b', 'llama3.1-70b', 'llama3.1-8b'].includes(modelId)) {
     return PROVIDERS.cerebras;
   }
 
