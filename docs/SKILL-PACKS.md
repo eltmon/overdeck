@@ -61,8 +61,10 @@ switch one issue onto Deft Directive's pipeline. The install snapshot is
 `<worktree>/.overdeck/deft-install.json`; the exclude file is
 `<git-dir>/info/overdeck-deft-exclude`; the run summary is
 `<worktree>/.overdeck/deft-run-summary.jsonl`. The lift wraps
-`rebaseFeatureBranch` (`src/lib/cloister/merge-rebase.ts`) and each repo sync in
-`syncMainAcrossWorkspaceRepos` (`src/lib/cloister/sync-main-workspace.ts`).
+`rebaseFeatureBranch` (`src/lib/cloister/merge-rebase.ts`), each repo sync in
+`syncMainAcrossWorkspaceRepos` (`src/lib/cloister/sync-main-workspace.ts`), and
+the merge train's sibling rebase and force-push (`rebaseSibling` in
+`src/lib/cloister/merge-train-deps.ts`).
 The merge gate (`evaluateIssueMergeGate`, `src/lib/cloister/merge-gate.ts`)
 waives approval at head for a Deft issue and runs `deftMergeGuardForIssue`;
 `forgeMergeGate` raises the drift decision, and the forge-merge route runs the
