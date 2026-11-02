@@ -16,7 +16,9 @@
  */
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { Check, Loader2, MessageCircleQuestion, Minus } from 'lucide-react'
+import { liftOptionConsequences } from '../lib/decisionContext'
 import { formatIssueRef } from '../lib/issueLabel'
+import { formatRelativeTime } from '../lib/formatRelativeTime'
 import { ChatMarkdown } from './chat/ChatMarkdown'
 import { bucketCount, capture } from '../lib/telemetry'
 
@@ -115,6 +117,15 @@ export function AskUserQuestionDialog({
       if (opener?.isConnected) opener.focus()
     }
   }, [isVisible, questionKey])
+
+  // The header's "asked <age>" re-renders once a minute while open.
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    if (!isVisible) return
+    setNow(new Date())
+    const timer = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(timer)
+  }, [isVisible])
 
   if (!isVisible) return null
 
@@ -230,8 +241,8 @@ export function AskUserQuestionDialog({
           </div>
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="truncate text-lg font-semibold text-foreground">{displayName}</h2>
-            <p className="text-sm text-muted-foreground">
-              {agent.kindLabel ?? 'Agent'} is waiting for an operator answer.
+            <p className="truncate text-sm text-muted-foreground">
+              <span className="font-mono">{agent.id}</span> · asked {formatRelativeTime(pending.askedAt, now)}
             </p>
           </div>
           <button
@@ -247,77 +258,71 @@ export function AskUserQuestionDialog({
         </div>
 
         <div className="space-y-4 px-5 py-4 max-h-[60vh] overflow-y-auto">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{agent.kindLabel ?? 'Subject'}</p>
-              <p className="font-mono text-sm text-foreground">{agent.id}</p>
-              {agent.title ? (
-                <p className="mt-1 text-sm font-medium text-foreground">{agent.title}</p>
-              ) : null}
-            </div>
-            {issueRef ? (
-              <div>
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Issue</p>
-                <p className="font-mono text-sm text-foreground">{issueRef}</p>
-              </div>
-            ) : null}
-          </div>
-
-          {questions.map((q, qIdx) => (
-            <div key={`q-${qIdx}`} className="space-y-2">
-              {q.header ? (
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{q.header}</p>
-              ) : null}
-              <div
-                id={`${questionIdBase}-${qIdx}`}
-                className="text-sm text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
-              >
-                <ChatMarkdown text={q.question} cwd={undefined} />
-              </div>
-              <div
-                role={q.multiSelect ? 'group' : 'radiogroup'}
-                aria-labelledby={`${questionIdBase}-${qIdx}`}
-                className="space-y-1"
-              >
-                {q.options.map((opt, oIdx) => {
-                  const isSelected = selections[qIdx]?.includes(opt.label) ?? false
-                  return (
-                    <button
-                      key={`q-${qIdx}-opt-${oIdx}`}
-                      type="button"
-                      role={q.multiSelect ? 'checkbox' : 'radio'}
-                      aria-checked={isSelected}
-                      data-dialog-option=""
-                      data-selected={isSelected ? 'true' : undefined}
-                      onClick={() => chooseOption(qIdx, opt.label)}
-                      disabled={isSubmitting}
-                      className={`flex w-full items-start gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING} ${
-                        isSelected
-                          ? 'border-primary bg-primary/10 text-foreground'
-                          : 'border-border bg-background/40 text-foreground hover:bg-background/80'
-                      }`}
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="font-medium">{opt.label}</span>
-                        {opt.description ? (
-                          <span className="ml-2 text-xs text-muted-foreground">{opt.description}</span>
-                        ) : null}
-                      </span>
-                      {isSelected ? <Check aria-hidden="true" data-testid="option-check" className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> : null}
-                    </button>
-                  )
-                })}
-              </div>
-              {q.context ? (
-                <div className="space-y-1">
-                  <p className="eyebrow">{"Agent's notes"}</p>
-                  <div className="border-l-2 border-border pl-3 text-sm text-muted-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                    <ChatMarkdown text={q.context} cwd={undefined} />
-                  </div>
+          {questions.map((q, qIdx) => {
+            // FR-12 — a `- **<label>:** <text>` context line shows under its
+            // option, for options that carry no description of their own.
+            const { consequences, remainingContext } = liftOptionConsequences(
+              q.context,
+              q.options.filter((o) => !o.description).map((o) => o.label),
+            )
+            return (
+              <div key={`q-${qIdx}`} className="space-y-2">
+                {q.header ? (
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{q.header}</p>
+                ) : null}
+                <div
+                  id={`${questionIdBase}-${qIdx}`}
+                  className="text-sm text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+                >
+                  <ChatMarkdown text={q.question} cwd={undefined} />
                 </div>
-              ) : null}
-            </div>
-          ))}
+                <div
+                  role={q.multiSelect ? 'group' : 'radiogroup'}
+                  aria-labelledby={`${questionIdBase}-${qIdx}`}
+                  className="space-y-1"
+                >
+                  {q.options.map((opt, oIdx) => {
+                    const isSelected = selections[qIdx]?.includes(opt.label) ?? false
+                    return (
+                      <button
+                        key={`q-${qIdx}-opt-${oIdx}`}
+                        type="button"
+                        role={q.multiSelect ? 'checkbox' : 'radio'}
+                        aria-checked={isSelected}
+                        data-dialog-option=""
+                        data-selected={isSelected ? 'true' : undefined}
+                        onClick={() => chooseOption(qIdx, opt.label)}
+                        disabled={isSubmitting}
+                        className={`flex w-full items-start gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING} ${
+                          isSelected
+                            ? 'border-primary bg-primary/10 text-foreground'
+                            : 'border-border bg-background/40 text-foreground hover:bg-background/80'
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-medium line-clamp-2" title={opt.label}>{opt.label}</span>
+                          {opt.description || consequences[opt.label] ? (
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              {opt.description || consequences[opt.label]}
+                            </span>
+                          ) : null}
+                        </span>
+                        {isSelected ? <Check aria-hidden="true" data-testid="option-check" className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> : null}
+                      </button>
+                    )
+                  })}
+                </div>
+                {remainingContext ? (
+                  <div className="space-y-1">
+                    <p className="eyebrow">{"Agent's notes"}</p>
+                    <div className="border-l-2 border-border pl-3 text-sm text-muted-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                      <ChatMarkdown text={remainingContext} cwd={undefined} />
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
 
           {!isCodexApproval && (
             <div className="space-y-1">

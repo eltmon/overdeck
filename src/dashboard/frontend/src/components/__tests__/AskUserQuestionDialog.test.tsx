@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   AskUserQuestionDialog,
@@ -29,23 +29,25 @@ function renderDialog(subject: AskUserQuestionSubject) {
 }
 
 describe('AskUserQuestionDialog issue reference', () => {
-  it('renders the issue identifier and title in the header and Issue cell', () => {
+  it('renders the issue identifier and title in the header', () => {
     renderDialog({ id: 'agent-pan-1', issueId: 'PAN-1', issueTitle: 'Fix widget' });
 
-    expect(screen.getAllByText('PAN-1 — Fix widget')).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'PAN-1 — Fix widget' })).toBeInTheDocument();
+    expect(screen.getAllByText('PAN-1 — Fix widget')).toHaveLength(1);
   });
 
   it('renders the issue identifier alone when the issue title is missing', () => {
     renderDialog({ id: 'agent-pan-1', issueId: 'PAN-1', issueTitle: null });
 
-    expect(screen.getAllByText('PAN-1')).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'PAN-1' })).toBeInTheDocument();
     expect(screen.queryByText('Unknown')).toBeNull();
   });
 
-  it('omits the Issue cell when unbound and falls back to the subject title', () => {
+  it('falls back to the subject title when unbound and renders no metadata grid', () => {
     renderDialog({ id: 'conv-1', title: 'Conversation title' });
 
-    expect(screen.getAllByText('Conversation title')).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'Conversation title' })).toBeInTheDocument();
+    expect(screen.getAllByText('Conversation title')).toHaveLength(1);
     expect(screen.queryByText('Issue')).toBeNull();
     expect(screen.queryByText('Unknown')).toBeNull();
   });
@@ -380,5 +382,80 @@ describe('AskUserQuestionDialog keyboard shortcuts', () => {
     } finally {
       document.removeEventListener('keydown', listener);
     }
+  });
+});
+
+describe('AskUserQuestionDialog consequences and layout', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function renderDecision(context: string, askedAt = '2026-11-01T12:00:00.000Z') {
+    return render(
+      <AskUserQuestionDialog
+        subject={{
+          id: 'agent-pan-1',
+          issueId: 'PAN-1',
+          pendingAskUserQuestion: {
+            toolUseId: 'operator-decision:q1',
+            askedAt,
+            questions: [{
+              question: 'How should I close out?',
+              context,
+              options: [{ label: 'Option A' }, { label: 'Option B', description: 'Its own description.' }],
+            }],
+          },
+        }}
+        isOpen
+        onSubmit={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+  }
+
+  it('shows a lifted consequence under its option and not in the notes block', () => {
+    renderDecision('- A plain fact.\n- **Option A:** runs the check later');
+
+    const optionA = screen.getByRole('radio', { name: /Option A/ });
+    expect(optionA).toHaveTextContent('runs the check later');
+    const notes = screen.getByText("Agent's notes").parentElement as HTMLElement;
+    expect(notes).toHaveTextContent('A plain fact.');
+    expect(notes).not.toHaveTextContent('runs the check later');
+  });
+
+  it('keeps an option description over a consequence line for that option', () => {
+    renderDecision('- **Option B:** lifted text');
+
+    expect(screen.getByRole('radio', { name: /Option B/ })).toHaveTextContent('Its own description.');
+    expect(screen.getByRole('radio', { name: /Option B/ })).not.toHaveTextContent('lifted text');
+    expect(screen.getByText("Agent's notes").parentElement).toHaveTextContent('lifted text');
+  });
+
+  it('renders no notes block when every context line was lifted', () => {
+    renderDecision('- **Option A:** runs the check later');
+
+    expect(screen.queryByText("Agent's notes")).toBeNull();
+  });
+
+  it('options render before the notes block', () => {
+    renderDecision('- A plain fact.');
+
+    const firstOption = screen.getByRole('radio', { name: /Option A/ });
+    const notes = screen.getByText("Agent's notes");
+    expect(firstOption.compareDocumentPosition(notes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText('Issue')).toBeNull();
+  });
+
+  it('shows how long the agent has been waiting', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-01T12:12:00.000Z'));
+    renderDecision('- A plain fact.', '2026-11-01T12:00:00.000Z');
+
+    expect(screen.getByText(/asked 12m ago/)).toHaveTextContent('agent-pan-1 · asked 12m ago');
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(screen.getByText(/asked 13m ago/)).toBeInTheDocument();
   });
 });
