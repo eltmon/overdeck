@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PanRpcError, WS_METHODS } from '@overdeck/contracts'
 import { EditorPane } from './EditorPane'
+import { useStageDeck, type StageDeckContextValue } from '../StageDeckContext'
 import type { StageContext } from '../types'
 import type { WorkspacePane } from '../../../lib/panesStore'
 
@@ -348,5 +349,111 @@ describe('editor pane survives the Stage self-heal effect', () => {
     // addPane makes the new pane active, so EditorPane mounted and started its
     // load already — wait for it to settle instead of leaving a dangling promise.
     await waitFor(() => expect(wsTransportMock.readFileAtPath).toHaveBeenCalledWith({ path: '/repo/docs/flywheel-brief.md' }))
+  })
+})
+
+// PAN-4658 pane-cite-target — StageDeckContextValue.openOrFocusEditorPane now
+// takes an optional citeConversationName, and the deck also exposes
+// openOrFocusAgentPane. DeckProbe captures useStageDeck() so tests can drive
+// the deck API directly; the HOME pane (and DeckProbe with it) unmounts as
+// soon as an editor or agent pane becomes active, so calls happen inside
+// act() against the previously-captured reference, not via rendered buttons.
+describe('StageDeckContext — citeConversationName and openOrFocusAgentPane', () => {
+  async function mountDeck(): Promise<{ captured: StageDeckContextValue }> {
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'body', lang: 'markdown', mtimeMs: 1, totalLines: 1, writable: true })
+
+    const [{ Stage }, { usePanesStore }, { useTerminalStateStore }, reactQuery] = await Promise.all([
+      import('../index'),
+      import('../../../lib/panesStore'),
+      import('../../terminal/terminalStateStore'),
+      import('@tanstack/react-query'),
+    ])
+
+    localStorage.clear()
+    usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} })
+    useTerminalStateStore.setState({ terminalStateByThreadId: {} })
+
+    const DECK = 'overdeck'
+    const ref: { captured: StageDeckContextValue | null } = { captured: null }
+
+    function DeckProbe() {
+      ref.captured = useStageDeck()
+      return null
+    }
+
+    const qc = new reactQuery.QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <reactQuery.QueryClientProvider client={qc}>
+        <Stage
+          deckKey={DECK}
+          renderHome={() => <DeckProbe />}
+          renderIssue={(issueId: string) => <div data-testid="issue-overview">{issueId}</div>}
+        />
+      </reactQuery.QueryClientProvider>,
+    )
+
+    if (!ref.captured) throw new Error('DeckProbe did not capture useStageDeck()')
+    return { captured: ref.captured }
+  }
+
+  function panesOf(usePanesStore: typeof import('../../../lib/panesStore').usePanesStore, deck = 'overdeck') {
+    return usePanesStore.getState().panesByWorkspace[deck] ?? []
+  }
+
+  it('opening a new file with a cite target creates an editor pane with citeConversationName', async () => {
+    const { usePanesStore } = await import('../../../lib/panesStore')
+    const { captured } = await mountDeck()
+
+    act(() => captured.openOrFocusEditorPane('/repo/a.md', 'a.md', 'conv-a'))
+
+    const editors = panesOf(usePanesStore).filter((p) => p.paneType === 'editor')
+    expect(editors).toHaveLength(1)
+    expect(editors[0]!.citeConversationName).toBe('conv-a')
+  })
+
+  it('reopening the same file with a different target updates that one pane', async () => {
+    const { usePanesStore } = await import('../../../lib/panesStore')
+    const { captured } = await mountDeck()
+
+    act(() => captured.openOrFocusEditorPane('/repo/a.md', 'a.md', 'conv-a'))
+    act(() => captured.openOrFocusEditorPane('/repo/a.md', 'a.md', 'conv-b'))
+
+    const editors = panesOf(usePanesStore).filter((p) => p.paneType === 'editor')
+    expect(editors).toHaveLength(1)
+    expect(editors[0]!.citeConversationName).toBe('conv-b')
+  })
+
+  it('reopening with null keeps the existing target', async () => {
+    const { usePanesStore } = await import('../../../lib/panesStore')
+    const { captured } = await mountDeck()
+
+    act(() => captured.openOrFocusEditorPane('/repo/a.md', 'a.md', 'conv-b'))
+    act(() => captured.openOrFocusEditorPane('/repo/a.md', 'a.md', null))
+
+    const editors = panesOf(usePanesStore).filter((p) => p.paneType === 'editor')
+    expect(editors).toHaveLength(1)
+    expect(editors[0]!.citeConversationName).toBe('conv-b')
+  })
+
+  it('a first open with null creates a pane with no citeConversationName field', async () => {
+    const { usePanesStore } = await import('../../../lib/panesStore')
+    const { captured } = await mountDeck()
+
+    act(() => captured.openOrFocusEditorPane('/repo/a.md', 'a.md', null))
+
+    const editors = panesOf(usePanesStore).filter((p) => p.paneType === 'editor')
+    expect(editors).toHaveLength(1)
+    expect(editors[0]).not.toHaveProperty('citeConversationName')
+  })
+
+  it('openOrFocusAgentPane adds an agent pane for the conversation', async () => {
+    const { usePanesStore } = await import('../../../lib/panesStore')
+    const { captured } = await mountDeck()
+
+    act(() => captured.openOrFocusAgentPane('conv-a', 'Agent'))
+
+    const agents = panesOf(usePanesStore).filter((p) => p.paneType === 'agent')
+    expect(agents).toHaveLength(1)
+    expect(agents[0]!.conversationId).toBe('conv-a')
   })
 })

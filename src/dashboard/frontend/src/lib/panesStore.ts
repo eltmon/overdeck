@@ -60,6 +60,9 @@ export interface WorkspacePane {
   browserInitialUrl?: string
   // editor pane (PAN-3260) — absolute path of the file being edited
   editorFilePath?: string
+  // editor pane (PAN-4658) — the conversation whose composer receives citations
+  // from this pane's Preview; absent = Preview offers no Cite.
+  citeConversationName?: string
 }
 
 /** Fields a caller supplies when opening a pane; paneId/createdAt are generated. */
