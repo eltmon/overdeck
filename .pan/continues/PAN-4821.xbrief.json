@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4821",
   "created": "2026-11-02T16:00:29.674Z",
-  "updated": "2026-11-02T17:14:15.505Z",
+  "updated": "2026-11-02T17:15:47.271Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,10 @@
       "claimedBy": "agent-pan-4821",
       "claimedAt": "2026-11-02T17:03:23.644Z",
       "doneAt": "2026-11-02T17:14:15.505Z"
+    },
+    "wi1-no-error-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:15:47.270Z"
     }
   }
 }
