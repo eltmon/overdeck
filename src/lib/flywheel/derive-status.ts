@@ -24,6 +24,7 @@ import { join } from 'node:path';
 import type {
   BackendPane,
   DerivedIssueState,
+  DerivedPrState,
   FlywheelAgentSummary,
   FlywheelConversationSummary,
   FlywheelDerivedStatus,
@@ -34,7 +35,7 @@ import type {
 } from '@overdeck/contracts';
 
 import type { LegacyConversation } from '../overdeck/conversations.js';
-import type { TrackerIssueFacts } from '../overdeck/derived-issue-state.js';
+import type { LoadedPr, TrackerIssueFacts } from '../overdeck/derived-issue-state.js';
 import type { PipelineJournalEntry } from '../cloister/pipeline-journal.js';
 import {
   FLYWHEEL_CONVERSATION_SESSION,
@@ -69,6 +70,8 @@ export interface DeriveFlywheelStatusDeps {
     opts: { issues: Readonly<Record<string, TrackerIssueFacts | null>>; panes: readonly BackendPane[] },
   ) => Promise<Map<string, DerivedIssueState>>;
   lastJournal?: (workspacePath: string) => PipelineJournalEntry | null | Promise<PipelineJournalEntry | null>;
+  /** The issue's open `strike/<id>` PR; null when none is open (PAN-4752). */
+  readStrikePr?: (projectPath: string, issueId: string) => DerivedPrState | null | Promise<DerivedPrState | null>;
   policies?: () => FlywheelPolicies | Promise<FlywheelPolicies>;
   runningBook?: (panDir: string) => FlywheelOrderBookSummary | null | Promise<FlywheelOrderBookSummary | null>;
   now?: () => number;
@@ -172,6 +175,25 @@ function paneIsLive(pane: BackendPane): boolean {
 async function defaultLastJournal(workspacePath: string): Promise<PipelineJournalEntry | null> {
   const { lastPipelineEntry } = await import('../cloister/pipeline-journal.js');
   return lastPipelineEntry(workspacePath);
+}
+
+/**
+ * The open PR among those on one strike head, highest number first (PAN-4752).
+ * `pan strike` reuses `strike/<id>` on every run, so a merged or closed PR on
+ * that head may belong to an earlier strike: it never counts.
+ */
+export function selectOpenStrikePr(prs: readonly (LoadedPr | null)[]): DerivedPrState | null {
+  const open = prs.filter((pr): pr is LoadedPr => pr !== null && !pr.merged).sort((a, b) => b.number - a.number)[0];
+  return open ? { url: open.url, number: open.number, reviewState: open.reviewState, checks: open.checks, mergeable: open.mergeable } : null;
+}
+
+async function defaultReadStrikePr(projectPath: string, issueId: string): Promise<DerivedPrState | null> {
+  const m = await import('../overdeck/derived-issue-state.js');
+  const branch = `strike/${issueId.toLowerCase()}`;
+  const prs = m.forgeForProject(projectPath) === 'gitlab'
+    ? (await m.listRepoMergeRequests(projectPath)).filter((row) => row.source_branch === branch).map(m.mrFromGlabRow)
+    : (await m.listRepoPullRequests(projectPath)).filter((row) => row.headRefName === branch).map(m.prFromGhRow);
+  return selectOpenStrikePr(prs);
 }
 
 async function defaultPolicies(): Promise<FlywheelPolicies> {
@@ -326,12 +348,22 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
     const issue = issues[id] ?? null;
     // A tick-only id has no workspace, so it has no journal of its own.
     const entry = candidate.workspacePath ? await lastJournal(candidate.workspacePath) : null;
+    // A strike row with no feature-branch PR carries its open strike PR as
+    // `row.pr`; tracker state wins, so a closed issue stays closed even with
+    // an open strike PR (D7, PAN-4752).
+    const strikePr = candidate.strike && !derived?.pr
+      ? await (deps.readStrikePr ?? defaultReadStrikePr)(projectRoot, id)
+      : null;
+    const state = strikePr && derived?.state !== 'closed'
+      ? strikePr.reviewState === 'changes-requested' ? 'changes-requested' : 'in-review'
+      : derived?.state ?? 'backlog';
+    const attention = strikePr && derived?.attention === 'work-not-started' ? undefined : derived?.attention;
     return {
       issueId: candidate.issueId,
       title: issue?.title ?? null,
-      state: derived?.state ?? 'backlog',
-      ...(derived?.attention ? { attention: derived.attention } : {}),
-      ...(derived?.pr ? { pr: derived.pr } : {}),
+      state,
+      ...(attention ? { attention } : {}),
+      ...(derived?.pr ? { pr: derived.pr } : strikePr ? { pr: strikePr } : {}),
       ...(issue ? {} : { trackerUnknown: true as const }),
       ...(candidate.strike ? { strike: true as const } : {}),
       liveAgents: livePanesByIssue.get(id)?.length ?? 0,

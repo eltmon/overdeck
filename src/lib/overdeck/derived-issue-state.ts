@@ -446,7 +446,7 @@ async function readPrWithGh(_issueId: string, projectPath: string, branch: strin
 
 // ─── GitLab ──────────────────────────────────────────────────────────────────
 
-interface GlabMrRow {
+export interface GlabMrRow {
   iid?: number;
   web_url?: string;
   state?: string;
@@ -493,7 +493,7 @@ export function mrFromGlabRow(row: GlabMrRow): LoadedPr | null {
   };
 }
 
-async function listRepoMergeRequests(projectPath: string): Promise<readonly GlabMrRow[]> {
+export async function listRepoMergeRequests(projectPath: string): Promise<readonly GlabMrRow[]> {
   return cachedRepoMergeRequests(projectPath, async () => {
     try {
       const { stdout } = await execFileAsync('glab', [
