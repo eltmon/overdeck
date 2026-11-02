@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bullet 2026-11-01).
+Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bullets 2026-11-02).
 
 - **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
   ohmypi/prime-agent + Anthropic + subscription auth (plus the model/harness pairing
@@ -131,6 +131,15 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   or every ephemeral watchdog would stop its machine); the reap runs in
   `deacon-lite.ts` via `remote-reap-routine.ts` (behind the freeze). The reap acts
   only on positive evidence: a failed exec is `indeterminate`, never a crash.
+- **Fresh Claude Code state shows startup dialogs that eat the first message** — every
+  Fly VM starts with an empty `~/.claude.json` (exec shell `HOME=/`). Each dialog
+  Claude Code can show at launch must be pre-answered in
+  `FlyProvider.configureClaudeCode` (onboarding, `/workspace` trust,
+  `bypassPermissionsModeAccepted`, and since PAN-4738 `hasSeenAutoDefaultNudge`).
+  Verify a key in the image's `claude.exe` (`grep -a`), never in a host config. A
+  dialog's select cursor is the same `❯` the composer shows, and unnumbered selects
+  escape `paneHasBlockingChoiceMenu`, so `waitForClaudeReady` matches known
+  dialog titles instead.
 - **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
   `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts` now holds only
   merge detection (`isBranchMerged`, squash-aware via the merged PR). `closeOut()` reads
@@ -527,4 +536,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   `.mintignore` excludes. `npm run lint:docs` catches `$` in prose and `<` before a
   digit, not `<word>` in prose. Until PAN-4779 lands, scope a docs change's link check
   to its own pages and compare the rest against this baseline.
-<!-- last-verified: 2026-11-01 -->
+<!-- last-verified: 2026-11-02 -->

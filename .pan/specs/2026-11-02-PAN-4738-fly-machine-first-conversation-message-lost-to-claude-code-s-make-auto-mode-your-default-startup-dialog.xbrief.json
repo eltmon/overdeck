@@ -4,17 +4,17 @@
     "created": "2026-11-02T05:06:45Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4738: Fly machine: first conversation message lost to Claude Code's 'Make auto mode your default' startup dialog",
-    "updated": "2026-11-02T05:10:30.961Z"
+    "updated": "2026-11-02T05:11:37.348Z"
   },
   "plan": {
     "id": "pan-4738",
     "title": "Fly machine: first conversation message lost to Claude Code's 'Make auto mode your default' startup dialog",
-    "status": "proposed",
+    "status": "running",
     "uid": "3f9b7fac-2e00-462a-a527-82abeb6bc2fc",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T05:06:45Z",
-    "updated": "2026-11-02T05:10:30.961Z",
+    "updated": "2026-11-02T05:11:37.348Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4738",
@@ -255,5 +255,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
