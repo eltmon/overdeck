@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4759",
   "created": "2026-11-02T01:10:45.557Z",
-  "updated": "2026-11-02T02:03:11.963Z",
+  "updated": "2026-11-02T02:03:27.515Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -302,6 +302,10 @@
     "troubleshooting-stub.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T02:03:11.962Z"
+    },
+    "troubleshooting-stub.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:03:27.514Z"
     }
   }
 }
