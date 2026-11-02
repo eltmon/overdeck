@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T15:41:53.012427Z · model: claude-opus-5-5 · open: 859_
+_Last sequenced: 2026-11-02T15:43:18.520612Z · model: claude-opus-5-5 · open: 859_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -275,6 +275,7 @@ _Last sequenced: 2026-11-02T15:41:53.012427Z · model: claude-opus-5-5 · open: 
 | 269 | PAN-4696 | XS | medium | ok |  |  | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 272 | PAN-4820 | XL | medium | ok |  |  | Run one issue on Deft Directive pipeline (hidden temp install, merge guard, native dashboard view, switch back); decisions made |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
@@ -314,7 +315,6 @@ _Last sequenced: 2026-11-02T15:41:53.012427Z · model: claude-opus-5-5 · open: 
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
 | 311 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
-| 312 | PAN-4740 | S | medium | ok |  |  | Pooled link channel reused after the Fly proxy closes the idle socket: first request fails with 'socket hang up', retry works. |
 | 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
@@ -1194,7 +1194,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T15:41:53.012427Z",
+  "generatedAt": "2026-11-02T15:43:18.520612Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 859,
@@ -1252,6 +1252,19 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
+      "issue": "PAN-4810",
+      "rank": 5,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Verification merges main into a stale workspace, never the PR head; handoff-pushed PRs verify the wrong tree and never reach review",
+      "rationale": "New since the prior run. Verification syncs main into the workspace without first moving it to origin/<branch>, so any PR whose commits arrive from a handoff worktree, a train sibling rebase or a suggestion commit is verified on a stale tree and silently never dispatched to review; three PRs (PAN-4772, PAN-4785, PAN-4801) stalled five hours on it. It is substrate pipeline machinery with a concrete fix direction, so it ranks in the critical top tier beside the merge-train and adoption fixes it unblocks. Labeled needs-handoff (TENET-10): supervised handoff only.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4803",
       "rank": 6,
       "size": "M",
@@ -1289,6 +1302,19 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched",
       "rationale": "New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4813",
+      "rank": 9,
+      "size": "M",
+      "importance": "medium",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add Kimi K3.1 Pro + Highspeed on Claude Code, kimi-code and ACP routes; already in pipeline, so pinned near the top.",
+      "rationale": "New issue that entered the pipeline before this pass (live workspace feature-pan-4813), so it is pinned rather than ranked. It takes the free rank-9 slot so no other node moves. The PRD is complete with verified ids and decisions; the only open point is the native-alias checkpoint in WI-4, which has a stated fallback.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4619,6 +4645,19 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
+      "issue": "PAN-4820",
+      "rank": 272,
+      "size": "XL",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Run one issue on Deft Directive pipeline (hidden temp install, merge guard, native dashboard view, switch back); decisions made",
+      "rationale": "New issue: XL operator-owned Deft feature with decisions and fallback checkpoints recorded; placed in the open gap after the Deft dashboard controls (PAN-4426) since it builds on the same src/lib/deft surface and is feature work, not substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2237",
       "rank": 273,
       "size": "S",
@@ -4669,6 +4708,21 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
+      "issue": "PAN-4811",
+      "rank": 277,
+      "size": "M",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4743"
+      ],
+      "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; split out of PAN-4743, which must land its Fly target door first.",
+      "rationale": "New issue filed 2026-11-02: PAN-4743's plan ships Fly (new VM) for conversations only, so lane provisioning and the per-run VM cap move here. It needs startFlyTarget from in-pipeline PAN-4743, so it takes the free rank 277 directly behind it with no other node moving.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4756",
       "rank": 278,
       "size": "L",
@@ -4691,6 +4745,21 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image.",
       "rationale": "New, found while planning PAN-4682; sits next to it because both fix the Fly image path, and until it ships Fly VMs miss the #4652/#4296 Dockerfile changes. Workflow edits need an SSH push and the secret needs an operator.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4817",
+      "rank": 279,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4778"
+      ],
+      "why": "Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification.",
+      "rationale": "New issue filed 2026-11-02 during PAN-4743's live verification: registry.fly.io/pan-workspaces:latest is the June image, so pan serve rejects --no-open and provisioning rolls the VM back. It is the visible symptom of PAN-4778 (the image CI never publishes), so it takes the free rank 279 directly behind PAN-4778 with no other node moving; a one-off manual image push can clear it sooner, but that needs operator Fly credentials.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5068,19 +5137,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "condition": "ok",
       "dependsOn": [],
       "why": "enhancement(security): API key at-rest hardening",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4740",
-      "rank": 312,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Pooled link channel reused after the Fly proxy closes the idle socket: first request fails with 'socket hang up', retry works.",
-      "rationale": "New bug from the PAN-4652 live check; a retry succeeds, so impact is a flaky first request after idle rather than lost work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11834,62 +11890,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-4810",
-      "rank": 5,
-      "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Verification merges main into a stale workspace, never the PR head; handoff-pushed PRs verify the wrong tree and never reach review",
-      "rationale": "New since the prior run. Verification syncs main into the workspace without first moving it to origin/<branch>, so any PR whose commits arrive from a handoff worktree, a train sibling rebase or a suggestion commit is verified on a stale tree and silently never dispatched to review; three PRs (PAN-4772, PAN-4785, PAN-4801) stalled five hours on it. It is substrate pipeline machinery with a concrete fix direction, so it ranks in the critical top tier beside the merge-train and adoption fixes it unblocks. Labeled needs-handoff (TENET-10): supervised handoff only.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4811",
-      "rank": 277,
-      "size": "M",
-      "importance": "medium",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4743"
-      ],
-      "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; split out of PAN-4743, which must land its Fly target door first.",
-      "rationale": "New issue filed 2026-11-02: PAN-4743's plan ships Fly (new VM) for conversations only, so lane provisioning and the per-run VM cap move here. It needs startFlyTarget from in-pipeline PAN-4743, so it takes the free rank 277 directly behind it with no other node moving.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4813",
-      "rank": 9,
-      "size": "M",
-      "importance": "medium",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add Kimi K3.1 Pro + Highspeed on Claude Code, kimi-code and ACP routes; already in pipeline, so pinned near the top.",
-      "rationale": "New issue that entered the pipeline before this pass (live workspace feature-pan-4813), so it is pinned rather than ranked. It takes the free rank-9 slot so no other node moves. The PRD is complete with verified ids and decisions; the only open point is the native-alias checkpoint in WI-4, which has a stated fallback.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4817",
-      "rank": 279,
-      "size": "S",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4778"
-      ],
-      "why": "Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification.",
-      "rationale": "New issue filed 2026-11-02 during PAN-4743's live verification: registry.fly.io/pan-workspaces:latest is the June image, so pan serve rejects --no-open and provisioning rolls the VM back. It is the visible symptom of PAN-4778 (the image CI never publishes), so it takes the free rank 279 directly behind PAN-4778 with no other node moving; a one-off manual image push can clear it sooner, but that needs operator Fly credentials.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4819",
       "rank": 874,
       "size": "XS",
@@ -13048,13 +13048,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "confidence": 1
     },
     {
-      "from": "PAN-4740",
-      "to": "PAN-4741",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-4705",
       "to": "PAN-4746",
       "type": "informs",
@@ -13088,13 +13081,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4740",
-      "to": "PAN-4760",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
     },
     {
       "from": "PAN-4741",
@@ -13165,6 +13151,13 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-4426",
+      "to": "PAN-4820",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
