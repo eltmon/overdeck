@@ -781,7 +781,19 @@ train), the dashboard Merge button, the auto-merge executor and the merge
 train's merge-next (all through `triggerMerge`), the per-project merge
 queue, and the auto-merge scheduler (#3983,
 `dashboard/server/services/auto-merge-scheduler.ts`), which asks it before it
-schedules a ready, opted-in PR on the merge-train reconciler tick.
+schedules a ready, opted-in PR on the merge-train reconciler tick. When the
+gate refuses a GitHub PR whose approval is stale (GitHub still says approved,
+but no approval names the current head, because the author pushed after the
+review), the scheduler asks the guarded review door once for that head
+(PAN-4772, `stale-approval-rereview.ts`; journal entry
+`review.stale-approval-rerequested`). Only a door answer that started a review,
+or found one running, latches the head; any other answer (a refusal,
+`already-passed`, `tests-requeued`) is asked again on the next tick. It asks
+nothing while a review is already running. Every completed pass keeps each candidate's skip reason
+(`auto-merge-skip-reasons.ts`), served as `notScheduled` on
+`GET /api/merge-train/auto-merge/pending` and shown on the Flywheel page's
+Pending auto-merges card as "Not scheduled: <reason>". A reason is logged only
+when it changes.
 Auto-merge eligibility applies the same rule. Nothing is stored; each input is
 read when the question is asked. The PR is merge-ready when, in order:
 
@@ -1559,6 +1571,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
+| `review.stale-approval-rerequested` | `dashboard/server/services/stale-approval-rereview.ts`, when the auto-merge scheduler asked the guarded review door for a head whose approval is stale, once per head, written only when the door answered `started` or `already-running` (`data.head`, `data.outcome`, PAN-4772) |
 | `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered, with `data.staleApproval: true` when the approval stood at an older head (PAN-4467) |
 | `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
 | `blocked.declared` | `pan task block <issue> <item> --on <ref>...` (source `pan-task-block`), with `data.item` and canonical `data.blockers` |
@@ -1664,19 +1677,31 @@ entry is `workspace.adoption-failed`. It carries
 `needs-you` and `api-error` still outrank it. Once a workspace exists, a
 later `review.requested` in its journal clears it. The fix has two forms. When another worktree holds the branch:
 "PR #<n> (<branch>) is checked out in <path>, so Overdeck cannot create the
-pipeline workspace … run `git -C <project> worktree remove <path>`, then
+pipeline workspace … Push any unpushed commits on <branch>, run
+`git -C <path> switch --detach` (the branch and the worktree stay), then
 `pan review request <ID>`." Otherwise: "PR #<n> (<branch>) was opened outside
 a pipeline workspace … Run `pan review request <ID>` to adopt the branch into
 a workspace and start verification." Each refusal is also announced once on
-the activity stream. The webhook calls `refreshIssuePullRequestStateNow` on
+the activity stream, and (PAN-4785) commented on the PR once per reason and
+head in a process, under the marker
+`<!-- overdeck-adoption-refused reason=<reason> sha=<head> -->`. A refusal
+that leaves no workspace is not journaled: the journal lives in the workspace
+and is never recreated for a refusal, so the PR comment is its durable record. The webhook calls `refreshIssuePullRequestStateNow` on
 `opened`, `reopened`, `ready_for_review` and `closed`, so the cached PR
 listing does not hide a just-opened PR for five minutes.
 
 `pan review request` adopts too. The `/api/review/:issueId/request` route
 asks `answerMissingWorkspace` right after it reads the derived state, before
 the approved-head force and nudge shortcuts and `requestReviewGuarded`. With
-no workspace and an open pipeline-branch PR it starts adoption in the
-background and answers 202. A forge failure answers 503, never "no PR". With
+no workspace and an open pipeline-branch PR it first runs the adoption
+preflight (PAN-4785, `preflightPrAdoption`): the checks that need no network
+(pipeline branch, known head, owning non-polyrepo project, and the branch not
+checked out in another worktree). When the preflight refuses, the route
+answers 409 with the reason as `error`, the fix as `hint`, and `reason` and
+`worktreePath`, so `pan review request` exits 1 naming the worktree instead of
+reporting "queued". Otherwise it starts adoption in the background and answers
+202. Adoption runs the same preflight first, so a branch held elsewhere is
+refused before any fetch. A forge failure answers 503, never "no PR". With
 no PR it answers 400 with a hint to run `pan start` or
 `pan workspace create`. A merged issue skips the check.
 

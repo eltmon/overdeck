@@ -70,7 +70,8 @@ export function prOutsidePipelineFix(input: {
   const id = input.issueId.toUpperCase();
   const branch = pipelineBranchFor(input.issueId);
   if (input.worktreePath) {
-    return `PR #${input.prNumber} (${branch}) is checked out in ${input.worktreePath}, so Overdeck cannot create the pipeline workspace and nothing has verified or reviewed it. When the session working there is finished, run \`git -C ${input.projectPath} worktree remove ${input.worktreePath}\`, then \`pan review request ${id}\`.`;
+    // PAN-4785: detaching releases the branch and keeps the worktree and its files.
+    return `PR #${input.prNumber} (${branch}) is checked out in ${input.worktreePath}, so Overdeck cannot create the pipeline workspace and nothing has verified or reviewed it. Push any unpushed commits on ${branch}, run \`git -C ${input.worktreePath} switch --detach\` (the branch and the worktree stay), then \`pan review request ${id}\`.`;
   }
   return `PR #${input.prNumber} (${branch}) was opened outside a pipeline workspace and nothing has verified or reviewed it. Run \`pan review request ${id}\` to adopt the branch into a workspace and start verification.`;
 }

@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T12:30:57.714099Z · model: claude-opus-5-5 · open: 856_
+_Last sequenced: 2026-11-02T13:44:30.101602Z · model: claude-opus-5-5 · open: 857_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,15 +9,16 @@ _Last sequenced: 2026-11-02T12:30:57.714099Z · model: claude-opus-5-5 · open: 
 | 2 | PAN-4801 | M | critical | ok |  |  | Merge train never rebases approved siblings after a merge (reconcile hook unwired), so each merge strands siblings conflicting. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
+| 5 | PAN-4810 | M | critical | ok |  |  | Verification merges main into a stale workspace, never the PR head; handoff-pushed PRs verify the wrong tree and never reach review |
 | 6 | PAN-4803 | M | high | ok |  | PAN-4801 | After PAN-4801, carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
+| 9 | PAN-4813 | M | medium | ok |  |  | Add Kimi K3.1 Pro + Highspeed on Claude Code, kimi-code and ACP routes; already in pipeline, so pinned near the top. |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 10 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 11 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 12 | PAN-4669 | S | critical | ok |  |  | Herdr hosts: idle-stack reaper checks tmux only, so it stops server/frontend containers of every live agent after 10m; needs-handoff |
 | 13 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
-| 13 | PAN-4772 | M | high | ok |  |  | Push after approval leaves PR stale-approved and silently unscheduled; auto re-request review per head, show skip reasons. Handoff. |
 | 14 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 15 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 16 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
@@ -27,7 +28,6 @@ _Last sequenced: 2026-11-02T12:30:57.714099Z · model: claude-opus-5-5 · open: 
 | 19 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 20 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 21 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
-| 21 | PAN-4785 | M | high | ok |  |  | pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff. |
 | 22 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 23 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 24 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
@@ -279,6 +279,7 @@ _Last sequenced: 2026-11-02T12:30:57.714099Z · model: claude-opus-5-5 · open: 
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
 | 276 | PAN-4743 | M | medium | ok |  |  | Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; PAN-4651 merged, so this is now unblocked. |
+| 277 | PAN-4811 | M | medium | ok |  | PAN-4743 | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; split out of PAN-4743, which must land its Fly target door first. |
 | 278 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
 | 278 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
@@ -880,6 +881,10 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 
 Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
 
+### PAN-4810 (rank 5)
+
+New since the prior run. Verification syncs main into the workspace without first moving it to origin/<branch>, so any PR whose commits arrive from a handoff worktree, a train sibling rebase or a suggestion commit is verified on a stale tree and silently never dispatched to review; three PRs (PAN-4772, PAN-4785, PAN-4801) stalled five hours on it. It is substrate pipeline machinery with a concrete fix direction, so it ranks in the critical top tier beside the merge-train and adoption fixes it unblocks. Labeled needs-handoff (TENET-10): supervised handoff only.
+
 ### PAN-4803 (rank 6)
 
 New substrate follow-up to PAN-4801: once siblings are rebased after each merge, PAN-4772 re-requests review for every one, so review load grows quadratically. Carrying the approval when git patch-id is unchanged removes that cost. It takes the free rank 6, after its PAN-4801 dependency; needs-handoff (TENET-10) because it touches merge-gate trust.
@@ -891,6 +896,10 @@ Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as 
 ### PAN-4690 (rank 8)
 
 New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).
+
+### PAN-4813 (rank 9)
+
+New issue that entered the pipeline before this pass (live workspace feature-pan-4813), so it is pinned rather than ranked. It takes the free rank-9 slot so no other node moves. The PRD is complete with verified ids and decisions; the only open point is the native-alias checkpoint in WI-4, which has a stated fallback.
 
 ### PAN-4554 (rank 10)
 
@@ -911,10 +920,6 @@ New since the prior run: on the default Herdr backend the idle-stack reaper deci
 ### PAN-4547 (rank 13)
 
 Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by hand. With false DoD refusals fixed by PAN-4543, auto close-out only needs a patrol on the existing verify-on-main path and live settings. High because unclosed issues distort every pipeline view.
-
-### PAN-4772 (rank 13)
-
-New substrate issue: merge-gate.ts already computes staleApproval but nothing acts on it, and the auto-merge scheduler discards its skip reasons, so approved green PRs (PAN-4759) stall unseen until the Flywheel finds them by hand. It shares rank 13 with no other node moving; needs-handoff (TENET-10) means a supervised strike, not an autonomous pickup.
 
 ### PAN-4511 (rank 14)
 
@@ -951,10 +956,6 @@ New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network
 ### PAN-4705 (rank 21)
 
 New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.
-
-### PAN-4785 (rank 21)
-
-New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.
 
 ### PAN-4746 (rank 22)
 
@@ -1191,10 +1192,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T12:30:57.714099Z",
+  "generatedAt": "2026-11-02T13:44:30.101602Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 856,
+  "openCount": 857,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1355,19 +1356,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-4772",
-      "rank": 13,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Push after approval leaves PR stale-approved and silently unscheduled; auto re-request review per head, show skip reasons. Handoff.",
-      "rationale": "New substrate issue: merge-gate.ts already computes staleApproval but nothing acts on it, and the auto-merge scheduler discards its skip reasons, so approved green PRs (PAN-4759) stall unseen until the Flywheel finds them by hand. It shares rank 13 with no other node moving; needs-handoff (TENET-10) means a supervised strike, not an autonomous pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4511",
       "rank": 14,
       "size": "S",
@@ -1481,19 +1469,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards.",
       "rationale": "New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4785",
-      "rank": 21,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff.",
-      "rationale": "New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11855,6 +11830,47 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4810",
+      "rank": 5,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Verification merges main into a stale workspace, never the PR head; handoff-pushed PRs verify the wrong tree and never reach review",
+      "rationale": "New since the prior run. Verification syncs main into the workspace without first moving it to origin/<branch>, so any PR whose commits arrive from a handoff worktree, a train sibling rebase or a suggestion commit is verified on a stale tree and silently never dispatched to review; three PRs (PAN-4772, PAN-4785, PAN-4801) stalled five hours on it. It is substrate pipeline machinery with a concrete fix direction, so it ranks in the critical top tier beside the merge-train and adoption fixes it unblocks. Labeled needs-handoff (TENET-10): supervised handoff only.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4811",
+      "rank": 277,
+      "size": "M",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4743"
+      ],
+      "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; split out of PAN-4743, which must land its Fly target door first.",
+      "rationale": "New issue filed 2026-11-02: PAN-4743's plan ships Fly (new VM) for conversations only, so lane provisioning and the per-run VM cap move here. It needs startFlyTarget from in-pipeline PAN-4743, so it takes the free rank 277 directly behind it with no other node moving.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4813",
+      "rank": 9,
+      "size": "M",
+      "importance": "medium",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add Kimi K3.1 Pro + Highspeed on Claude Code, kimi-code and ACP routes; already in pipeline, so pinned near the top.",
+      "rationale": "New issue that entered the pipeline before this pass (live workspace feature-pan-4813), so it is pinned rather than ranked. It takes the free rank-9 slot so no other node moves. The PRD is complete with verified ids and decisions; the only open point is the native-alias checkpoint in WI-4, which has a stated fallback.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13056,32 +13072,11 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "confidence": 0.7
     },
     {
-      "from": "PAN-4772",
-      "to": "PAN-4773",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-4671",
       "to": "PAN-4773",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4702",
-      "to": "PAN-4772",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4785",
-      "to": "PAN-4636",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
     },
     {
       "from": "PAN-4801",
@@ -13091,32 +13086,32 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "confidence": 1
     },
     {
-      "from": "PAN-4772",
-      "to": "PAN-4803",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4772",
-      "to": "PAN-4785",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4801",
-      "to": "PAN-4772",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-4702",
       "to": "PAN-4803",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4810",
+      "to": "PAN-4801",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4743",
+      "to": "PAN-4811",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4811",
+      "to": "PAN-4638",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }

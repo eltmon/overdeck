@@ -63,7 +63,8 @@ describe('prOutsidePipelineFix', () => {
   it('names the blocking worktree and the exact commands when a worktree holds the branch', () => {
     const fix = prOutsidePipelineFix({ issueId: 'pan-1', prNumber: 7, projectPath: '/repo', worktreePath: '/home/me/hoff' });
     expect(fix).toContain('PR #7 (feature/pan-1) is checked out in /home/me/hoff');
-    expect(fix).toContain('`git -C /repo worktree remove /home/me/hoff`');
+    expect(fix).toContain('`git -C /home/me/hoff switch --detach`');
+    expect(fix).not.toContain('worktree remove');
     expect(fix).toContain('`pan review request PAN-1`');
   });
 

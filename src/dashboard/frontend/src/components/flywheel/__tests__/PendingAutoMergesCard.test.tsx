@@ -29,7 +29,7 @@ describe('PendingAutoMergesCard (PAN-3964 FR-11)', () => {
   });
 
   it('is hidden when nothing is pending', async () => {
-    const fetchMock = stubFetch((url) => (url === '/api/merge-train/auto-merge/pending' ? Response.json([entry({ status: 'cancelled' })]) : undefined));
+    const fetchMock = stubFetch((url) => (url === '/api/merge-train/auto-merge/pending' ? Response.json({ pending: [entry({ status: 'cancelled' })], notScheduled: [] }) : undefined));
     const { container } = renderWithQuery(<PendingAutoMergesCard />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/merge-train/auto-merge/pending'));
     expect(container).toBeEmptyDOMElement();
@@ -37,7 +37,7 @@ describe('PendingAutoMergesCard (PAN-3964 FR-11)', () => {
 
   it('renders the countdown and cancels through DELETE, then refetches', async () => {
     const fetchMock = stubFetch((url, init) => {
-      if (url === '/api/merge-train/auto-merge/pending') return Response.json([entry()]);
+      if (url === '/api/merge-train/auto-merge/pending') return Response.json({ pending: [entry()], notScheduled: [] });
       if (url === '/api/merge-train/auto-merge/PAN-1' && init?.method === 'DELETE') return Response.json({ success: true });
       return undefined;
     });
@@ -55,10 +55,35 @@ describe('PendingAutoMergesCard (PAN-3964 FR-11)', () => {
   });
 
   it('disables Cancel while the entry is merging', async () => {
-    stubFetch((url) => (url === '/api/merge-train/auto-merge/pending' ? Response.json([entry({ status: 'merging' })]) : undefined));
+    stubFetch((url) => (url === '/api/merge-train/auto-merge/pending' ? Response.json({ pending: [entry({ status: 'merging' })], notScheduled: [] }) : undefined));
     renderWithQuery(<PendingAutoMergesCard />);
     await screen.findByTestId('pending-auto-merge-PAN-1');
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     expect(screen.getByTestId('pending-auto-merge-PAN-1')).toHaveTextContent('merging…');
+  });
+
+  it('shows why the scheduler left a ready-looking PR unscheduled (PAN-4772)', async () => {
+    stubFetch((url) => (url === '/api/merge-train/auto-merge/pending'
+      ? Response.json({
+        pending: [],
+        notScheduled: [{
+          issueId: 'PAN-4759', projectKey: 'overdeck', head: '697a05f8', at: '2026-11-02T02:45:00.000Z',
+          reason: 'PR is not approved at PR HEAD 697a05f8; approval is stale at 697a05f8; review re-requested (started)',
+        }],
+      })
+      : undefined));
+    const onNavigateIssue = vi.fn();
+    renderWithQuery(<PendingAutoMergesCard onNavigateIssue={onNavigateIssue} />);
+    const row = await screen.findByTestId('not-scheduled-auto-merge-PAN-4759');
+    expect(row).toHaveTextContent('Not scheduled: PR is not approved at PR HEAD 697a05f8; approval is stale at 697a05f8; review re-requested (started)');
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'PAN-4759' }));
+    expect(onNavigateIssue).toHaveBeenCalledWith('PAN-4759');
+  });
+
+  it('still reads a server that answers the bare cooldown queue', async () => {
+    stubFetch((url) => (url === '/api/merge-train/auto-merge/pending' ? Response.json([entry()]) : undefined));
+    renderWithQuery(<PendingAutoMergesCard />);
+    expect(await screen.findByTestId('pending-auto-merge-PAN-1')).toHaveTextContent('PR #77');
   });
 });
