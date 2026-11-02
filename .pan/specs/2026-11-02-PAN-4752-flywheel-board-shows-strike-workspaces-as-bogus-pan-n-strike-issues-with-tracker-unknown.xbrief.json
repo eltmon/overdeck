@@ -4,17 +4,17 @@
     "created": "2026-11-02T00:08:19Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4752: Flywheel board shows strike workspaces as bogus PAN-<n>-STRIKE issues with 'tracker unknown'",
-    "updated": "2026-11-02T00:17:43.588Z"
+    "updated": "2026-11-02T00:18:38.849Z"
   },
   "plan": {
     "id": "pan-4752",
     "title": "Flywheel board shows strike workspaces as bogus PAN-<n>-STRIKE issues with 'tracker unknown'",
-    "status": "proposed",
+    "status": "running",
     "uid": "0fe67da0-085f-4912-9fa8-84ca1cd492fd",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T00:08:19Z",
-    "updated": "2026-11-02T00:17:43.588Z",
+    "updated": "2026-11-02T00:18:38.849Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4752",
@@ -481,5 +481,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
