@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T14:43:06.781Z",
+  "updated": "2026-11-02T14:43:30.053Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-02T14:37:07.509Z"
     },
     "wi7-fly-work-agent-service": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4734",
-      "claimedAt": "2026-11-02T14:43:06.781Z"
+      "claimedAt": "2026-11-02T14:43:06.781Z",
+      "doneAt": "2026-11-02T14:43:30.053Z"
     }
   }
 }
