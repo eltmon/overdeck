@@ -506,3 +506,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   - LAST, after the Fly items merge: 4774 (release acceptance AC-1..15).
   - t3code parity, any time: 4653, 4655, 4657, 4658, 4659, 4660.
   - Watch PAN-4710: a planned issue with no work agent needs `pan start` again.
+- 2026-11-02 03:20 UTC, queue change from the operator: do NOT start PAN-4776. The
+  operator is deploying services/account and services/connect themselves. Its
+  planner, started 03:12, was stopped and the workspace kept. HOLD PAN-4774 until
+  PAN-4682 AND PAN-4748 merge; its body is being rewritten to run the hardware
+  tests on Fly VMs.
