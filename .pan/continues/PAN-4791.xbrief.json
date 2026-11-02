@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4791",
   "created": "2026-11-02T05:13:53.260Z",
-  "updated": "2026-11-02T05:15:25.120Z",
+  "updated": "2026-11-02T05:15:37.332Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4791",
       "claimedAt": "2026-11-02T05:13:53.260Z",
       "doneAt": "2026-11-02T05:15:25.120Z"
+    },
+    "wi2-recovery-text": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4791",
+      "claimedAt": "2026-11-02T05:15:37.332Z"
     }
   }
 }
