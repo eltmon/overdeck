@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4659",
   "created": "2026-11-02T05:46:59.538Z",
-  "updated": "2026-11-02T06:20:00.356Z",
+  "updated": "2026-11-02T06:20:18.093Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
     "mapper-split.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T06:20:00.356Z"
+    },
+    "mapper-split.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:20:18.093Z"
     }
   }
 }
