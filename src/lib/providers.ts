@@ -57,9 +57,17 @@ export function getKimiAnthropicBaseUrl(apiKey: string): string {
     : KIMI_PLATFORM_BASE_URL;
 }
 
-/** Translate configured Kimi tiers only for the coding endpoint. */
+/** Platform-endpoint ids for models whose coding-endpoint id is shorter. */
+export const KIMI_PLATFORM_MODEL_IDS: Readonly<Record<string, string>> = {
+  'k3.1-pro': 'kimi-k3.1-pro',
+  'k3.1-pro-highspeed': 'kimi-k3.1-pro-highspeed',
+};
+
+/** Translate a Kimi model id to the id the selected Anthropic-compatible endpoint expects. */
 export function resolveKimiModelForEndpoint(model: string, baseUrl: string): string {
-  if (baseUrl.replace(/\/$/, '') !== KIMI_CODING_BASE_URL) return model;
+  const endpoint = baseUrl.replace(/\/$/, '');
+  if (endpoint === KIMI_PLATFORM_BASE_URL) return KIMI_PLATFORM_MODEL_IDS[model] ?? model;
+  if (endpoint !== KIMI_CODING_BASE_URL) return model;
   if (model === 'k3') return 'k3-256k';
   return model === 'kimi-k2.7-code' ? 'kimi-for-coding' : model;
 }
