@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4754",
   "created": "2026-11-02T00:55:26.468Z",
-  "updated": "2026-11-02T01:47:21.714Z",
+  "updated": "2026-11-02T01:47:36.680Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
     "work-md-guidance.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T01:47:21.714Z"
+    },
+    "docs-pipeline-gates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:47:36.680Z"
     }
   }
 }
