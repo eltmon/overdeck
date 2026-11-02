@@ -96,25 +96,39 @@ export async function pickPort({ probe = probeFreePort, exclude = [] }: PickPort
   throw new Error(`pickPort: no usable free port after ${MAX_PORT_PROBES} probes`);
 }
 
-async function waitForHealth(baseUrl: string, child: ChildProcess, logPath: string): Promise<void> {
-  const deadline = Date.now() + BOOT_TIMEOUT_MS;
+export interface HealthWaitChild {
+  readonly pid?: number;
+  readonly exitCode: number | null;
+}
+
+export async function waitForHealth(
+  baseUrl: string,
+  child: HealthWaitChild,
+  opts: { logPath?: string; timeoutMs?: number; pollMs?: number } = {},
+): Promise<void> {
+  const { logPath, timeoutMs = BOOT_TIMEOUT_MS, pollMs = 500 } = opts;
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
       throw new Error(
-        `Fixture dashboard exited early (code ${child.exitCode}).\n${readLog(logPath)}`,
+        `Fixture dashboard exited early (code ${child.exitCode}).\n${logPath ? readLog(logPath) : ''}`,
       );
     }
     try {
       const response = await fetch(`${baseUrl}/api/health`, {
         signal: AbortSignal.timeout(2_000),
       });
-      if (response.ok) return;
+      if (response.ok) {
+        const body = (await response.json()) as { pid?: unknown };
+        // Another process may hold this port (the probe released it before spawn).
+        if (body.pid === child.pid) return;
+      }
     } catch {
-      // Not listening yet.
+      // Not listening yet, or not JSON.
     }
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, pollMs));
   }
-  throw new Error(`Fixture dashboard did not become healthy.\n${readLog(logPath)}`);
+  throw new Error(`Fixture dashboard did not become healthy.\n${logPath ? readLog(logPath) : ''}`);
 }
 
 function readLog(logPath: string): string {
@@ -173,7 +187,7 @@ export async function startIsolatedDashboard(opts: IsolatedDashboardOptions = {}
   };
 
   try {
-    await waitForHealth(baseUrl, child, logPath);
+    await waitForHealth(baseUrl, child, { logPath });
   } catch (err) {
     // Surface the server's own output; a boot failure is otherwise mute.
     // eslint-disable-next-line no-console
