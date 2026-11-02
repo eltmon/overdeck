@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T17:38:42.976Z",
+  "updated": "2026-11-02T17:39:00.762Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,10 @@
     "install-and-hide.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T17:38:42.975Z"
+    },
+    "install-and-hide.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:39:00.762Z"
     }
   }
 }
