@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4661",
   "created": "2026-11-02T03:25:40.567Z",
-  "updated": "2026-11-02T03:36:36.867Z",
+  "updated": "2026-11-02T03:37:08.100Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4661",
       "claimedAt": "2026-11-02T03:25:40.567Z",
       "doneAt": "2026-11-02T03:36:36.866Z"
+    },
+    "mobile-pipeline-list": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4661",
+      "claimedAt": "2026-11-02T03:37:08.100Z"
     }
   }
 }
