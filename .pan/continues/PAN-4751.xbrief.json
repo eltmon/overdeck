@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4751",
   "created": "2026-11-02T00:16:08.781Z",
-  "updated": "2026-11-02T01:06:33.383Z",
+  "updated": "2026-11-02T01:06:42.698Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4751",
       "claimedAt": "2026-11-02T00:47:50.900Z",
       "doneAt": "2026-11-02T01:06:33.382Z"
+    },
+    "flywheel-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4751",
+      "claimedAt": "2026-11-02T01:06:42.698Z"
     }
   }
 }
