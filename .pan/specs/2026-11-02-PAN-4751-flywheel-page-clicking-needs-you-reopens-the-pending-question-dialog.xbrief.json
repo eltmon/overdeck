@@ -4,17 +4,17 @@
     "created": "2026-11-02T00:08:57Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4751: Flywheel page: clicking NEEDS YOU reopens the pending question dialog",
-    "updated": "2026-11-02T00:15:04.453Z"
+    "updated": "2026-11-02T00:15:55.586Z"
   },
   "plan": {
     "id": "pan-4751",
     "title": "Flywheel page: clicking NEEDS YOU reopens the pending question dialog",
-    "status": "proposed",
+    "status": "running",
     "uid": "218e4bf2-00fe-4121-97aa-dd73064139b6",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T00:08:57Z",
-    "updated": "2026-11-02T00:15:04.453Z",
+    "updated": "2026-11-02T00:15:55.586Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4751",
@@ -485,5 +485,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
