@@ -66,6 +66,14 @@ describe('September model catalog no-loss audit', () => {
     expect(modelSupportsEffortSync('kimi-code/kimi-for-coding', 'high')).toBe(true);
   });
 
+  it('registers the K3.1 Pro and K3.1 Pro Highspeed ids at the 1M context tier', () => {
+    const k3EffortLevels = MODEL_CAPABILITIES['k3[1m]'].effortLevels;
+    for (const id of ['k3.1-pro', 'k3.1-pro-highspeed', 'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed']) {
+      expect(MODEL_CAPABILITIES[id].contextWindow).toBe(1048576);
+      expect(MODEL_CAPABILITIES[id].effortLevels).toEqual(k3EffortLevels);
+    }
+  });
+
   it('records the published Opus 5.5 output and effort limits', () => {
     const capability = MODEL_CAPABILITIES['claude-opus-5-5'];
     expect(capability.maxOutputTokens).toBe(128000);

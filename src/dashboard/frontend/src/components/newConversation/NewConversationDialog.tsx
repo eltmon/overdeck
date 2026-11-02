@@ -130,6 +130,8 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
     const next = projects?.find((p) => p.key === key);
     setProjectKey(next ? next.key : null);
     setCwd(next?.path ?? '');
+    // PAN-4743: Fly (new VM) needs a project; clearing it resets the choice to this machine.
+    if (!next && machine.machine === 'fly') setMachine(THIS_MACHINE);
   };
 
   const submit = async (event: FormEvent) => {
@@ -184,12 +186,14 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
       onClose={onClose}
       dismissible={!submitting}
       onSubmit={submit}
-      pinned={error ? <p role="alert" className={styles.error}>{error}</p> : null}
+      pinned={error
+        ? <p role="alert" className={styles.error}>{error}</p>
+        : (submitting && machine.machine === 'fly' ? <p role="status" className={styles.summary}>Starting a Fly machine. This takes a few minutes.</p> : null)}
       footer={<>
         <p className={styles.summary} data-component="new-conversation-summary">{footerSummary}</p>
         <button type="button" className={styles.button} onClick={onClose} disabled={submitting}>Cancel</button>
         <button type="submit" className={styles.primaryButton} aria-label="Create conversation" disabled={submitting}>
-          {submitting ? 'Creating…' : 'Create'}
+          {submitting ? (machine.machine === 'fly' ? 'Starting…' : 'Creating…') : 'Create'}
         </button>
       </>}
     >
@@ -212,7 +216,7 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
             <ChevronDown size={14} className={styles.chev} />
           </div>
 
-          <MachineField value={machine} onChange={setMachine} />
+          <MachineField value={machine} onChange={setMachine} hasProject={projectKey !== null} />
 
           <label htmlFor={cwdId} className={styles.label}>Working directory</label>
           <div className={styles.field}>

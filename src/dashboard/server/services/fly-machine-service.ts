@@ -2,8 +2,8 @@
  * Fly machines (PAN-4652 WI-8, FR-8, FR-12, FR-13).
  *
  * `addFlyMachine()` is the one door that starts a Fly VM as a linked machine:
- * the CLI and `POST /api/machines/fly` call it today, and the Machine field and
- * `--machine fly` (#4651) will call it too. It refuses early (remote disabled,
+ * the CLI and `POST /api/machines/fly` call it, and the fleet conversation route
+ * calls it for Fly (new VM) through `startFlyTarget` (PAN-4743). It refuses early (remote disabled,
  * no Fly token, a harness that cannot run on a Fly machine, the spend cap)
  * before any VM exists. A Codex request is also checked at home first
  * (PAN-4296 D-5): it needs an OpenAI model, the Codex harness policy must

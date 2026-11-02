@@ -522,7 +522,12 @@ state (D-3).
   `UpdateManager` (`check()`, `install()`, poll), then restarts through
   `restartDashboardDetached()`, the same function `POST /api/system/restart-dashboard`
   uses, so it claims the restart gate and never waits on the approval banner. Development
-  and desktop installs skip the Overdeck component.
+  and desktop installs skip the Overdeck component. A machine set up with `pan connect`
+  also reports `npm-global`. `getUpdateManager()` passes `runtimeHome` when
+  `isRuntimePackageRoot(packageRoot, OVERDECK_HOME)`, and `UpdateManager.install()` then
+  installs through `ensureDurableRuntime()` into `<OVERDECK_HOME>/runtime` instead of
+  `npm install --global` (PAN-4722). `pan sync` runs through `panCliInvocation`, and a
+  sync failure after a good install still moves to `ready`, so the restart happens.
 - **Older peers (D-11).** There is no capability flag and no protocol bump: a `404` from
   `GET /api/versions/self` means the peer predates fleet updates, and its row names the
   version and command to install. In practice an older peer answers
@@ -568,6 +573,8 @@ service, lingering, then one pairing link (`.pan/drafts/PAN-4656.md`).
   `user/<uid>`; a changed plist is booted out first. The agent starts at login only. `pan up`
   on a Mac with the agent loaded does not start a second supervisor.
 
+Update all, the update dialog and `pan update` reinstall into the same runtime (PAN-4722).
+
 ## Fly machines (PAN-4652)
 
 A Fly machine is a Fly.io VM that runs `pan serve` and is linked one way from home
@@ -597,6 +604,8 @@ runs Claude Code in raw tmux and no Overdeck server. User-facing pages: the
 | Heartbeat, sweep and Codex sign-in sync loops | `src/lib/remote/fly-machine-loops.ts` (registered in `src/lib/cloister/hygiene-scheduler.ts`) |
 | Credential refresh | `src/lib/remote/remote-credential-refresh.ts` (Fly machine names join the remote agents' VMs) |
 | Spend cap | `checkRemoteSpendCap` in `src/lib/remote/remote-agents.ts` counts Fly machine records |
+| The Fly target door: `startFlyTarget`, `FlySpawn`, `FLY_MACHINE_TAGS` (PAN-4743) | `src/dashboard/server/services/fleet-fly-target.ts` |
+| The Add-a-Fly-machine dialog (Settings → Anywhere → Machines) | `src/dashboard/frontend/src/components/Settings/anywhere/AddFlyMachineDialog.tsx` |
 
 ### Decisions
 
@@ -978,7 +987,14 @@ keeps each peer's last values. `choosePlacement` (`anywhere/placement.ts`, pure)
 offline/unsupported, `no project`, `no <tag>`, `CPU saturated`, then `reserved` (unless
 only reserved machines have the needed tag), and scores by lowest PSI, most memory, fewest
 working agents, this machine, label. `services/fleet-target.ts` resolves every fleet
-spawn's `machine` (self, `auto`, a link label or id, `fly` refused until #4652).
+spawn's `machine` (self, `auto`, a link label or id, `fly`). `fly` calls the Fly target door
+(`services/fleet-fly-target.ts`, `startFlyTarget`) when the route passes a spawn context
+(`FlySpawn`: `projectKey`, `harness?`, `model?`, `mayCreate`); without one it answers 400
+`fly-unavailable`. Only `POST /api/fleet/conversations` passes a spawn — `mayCreateFly` on
+`FleetCaller`, true only for an admin credential (PAN-4743 D-4743-4); workers, issue starts
+and lanes pass none, so `fly` there always refuses. `auto` falls back to the Fly target door
+too, when nothing else fits, the spawn and git origin are set, `needs` stays within
+`FLY_MACHINE_TAGS` (`linux`, `docker`) and `remote.auto_fly` is `true`.
 `OVERDECK_TEST_FORCE_CPU_SATURATED=1` is the smoke hook, read only by `machine-load.ts`.
 
 ### Projects, Needs-You and search across machines (D-4651-11 … D-4651-16)

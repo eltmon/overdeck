@@ -9,11 +9,15 @@
  * `OVERDECK_CONNECT_REEXEC=1` so every path it writes agrees.
  *
  * Async only: npm runs through `execFile` with a 600 s timeout.
+ *
+ * Update all and `pan update` reinstall into this same runtime when the
+ * running package root is inside it (PAN-4722, `isRuntimePackageRoot`).
  */
 
 import { execFile } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { access, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 export const CONNECT_REEXEC_ENV = 'OVERDECK_CONNECT_REEXEC';
@@ -72,6 +76,25 @@ function runtimePrefix(overdeckHome: string): string {
 
 export function runtimePackageRoot(overdeckHome: string): string {
   return join(runtimePrefix(overdeckHome), 'node_modules', '@overdeck', 'core');
+}
+
+/** `path` with symlinks resolved, or just normalized when it does not exist. */
+function canonicalPath(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+/**
+ * True when `root` is the package `pan connect` installed into
+ * `<overdeckHome>/runtime` (PAN-4722): updates must go there, not to the
+ * global npm prefix. Sync because its callers are sync; it is one realpath,
+ * not a child process.
+ */
+export function isRuntimePackageRoot(root: string, overdeckHome: string): boolean {
+  return canonicalPath(root) === canonicalPath(runtimePackageRoot(overdeckHome));
 }
 
 /** Installed version at the runtime root, or null. */

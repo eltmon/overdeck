@@ -394,7 +394,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(36); // 12 Anthropic + 11 OpenAI + 6 Google + 7 Kimi
+      expect(models.length).toBe(40); // 12 Anthropic + 11 OpenAI + 6 Google + 11 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -529,6 +529,13 @@ describe('model-fallback', () => {
       expect(hasModelCapability('k3[1m]')).toBe(true);
       expect(getModelCapability('k3').contextWindow).toBe(262144);
       expect(getModelCapability('k3[1m]').contextWindow).toBe(1048576);
+    });
+
+    it('K3.1 Pro model ids are recognized as kimi provider models and fall back to Sonnet', () => {
+      expect(getModelProvider('k3.1-pro' as ModelId)).toBe('kimi');
+      expect(getModelProvider('k3.1-pro-highspeed' as ModelId)).toBe('kimi');
+      expect(getFallbackModel('k3.1-pro' as ModelId, PROVIDER_FALLBACK)).toBe('claude-sonnet-5-5');
+      expect(getFallbackModel('k3.1-pro-highspeed' as ModelId, PROVIDER_FALLBACK)).toBe('claude-sonnet-5-5');
     });
 
     it('glm-5.2 is recognized as zai provider', () => {

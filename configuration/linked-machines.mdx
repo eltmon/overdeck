@@ -127,6 +127,12 @@ pan machines add-fly --project overdeck --message "Fix the flaky retry test"
 pan machines add-fly --project overdeck --harness codex --model gpt-6.1-sol --message "Fix the flaky retry test"
 ```
 
+Settings → Anywhere → Machines has the same door as a dialog: **Add a Fly machine**, next to
+**Add an SSH machine**. It takes an optional project and, under Advanced, an optional
+region; it has no message, harness or model field, because it only links the machine — start
+a conversation on it from the new-conversation dialog's **Fly (new VM)** choice (see
+[Start work on another machine](#start-work-on-another-machine)) or with `--message` above.
+
 This one command, which takes a few minutes:
 
 1. Starts a Fly VM from the `pan-workspace` image and makes its `pan` version equal this
@@ -428,9 +434,10 @@ its command.
    with npm into the same prefix. A failure in one CLI does not stop the next; the row
    shows the command's output.
 3. **Update Overdeck last** on a machine where it was installed with
-   `npm install -g @overdeck/core`, then restart that machine's dashboard. A repository
-   checkout (`pan reload` deployments) or the desktop app keeps its Overdeck and still
-   updates the CLIs.
+   `npm install -g @overdeck/core` or set up with `pan connect` (the update goes into
+   `~/.overdeck/runtime` with `npm install --prefix`, no `sudo`), then restart that
+   machine's dashboard. A repository checkout (`pan reload` deployments) or the desktop
+   app keeps its Overdeck and still updates the CLIs.
 
 Each version shows `before → after` once it changed. Update all always installs the
 latest version; it never lets anyone pick a version.
@@ -453,8 +460,15 @@ operator-level link.
 ## Start work on another machine
 
 The new-conversation dialog has a **Machine** field: **This machine** (the default),
-**Auto**, each online linked machine by label, and **Fly (new VM)**, shown disabled until
-Fly machines arrive. The CLI takes the same choice:
+**Auto**, each online linked machine by label, and **Fly (new VM)**. **Fly (new VM)** is
+enabled once the dialog has a project (it needs one to clone) and needs an admin
+credential; choosing it starts a new Fly machine, clones the project, runs the conversation
+there and takes a few minutes — the dialog shows "Starting a Fly machine." while it works.
+The machine is destroyed, like any Fly machine, once no conversation on it has been active
+for `[remote.fly] machine_idle_minutes` (see [Lifetime and cost](#lifetime-and-cost)). The
+CLI takes the same per-machine choice for a conversation, but `--machine fly` refuses on
+`pan start`, `pan worker run` and `pan lane start` (see [Fly machines](#fly-machines) and
+[`pan machines add-fly`](/cli/machines#add-fly)):
 
 ```bash
 pan start PAN-123 --machine desk
@@ -465,9 +479,7 @@ pan lane start --run hotel --key 663 --role builder --brief b.md --machine auto
 A conversation or agent started on another machine runs there and is listed on both
 machines. The other machine must have a project for the same repository (the same
 `github_repo` or `gitlab_repo`); if it does not, the error names the command that adds it
-(see [Projects across machines](#projects-across-machines)). Lanes on other machines arrive
-with PAN-4638: `pan lane start --machine` launches here when the choice is this machine and
-refuses otherwise.
+(see [Projects across machines](#projects-across-machines)).
 
 Work started this way is **link-started**: the other machine records which machine asked
 for it. An agent on your machine may then message and stop that work, and only that work.
@@ -515,6 +527,17 @@ anywhere:
 `--needs docker,gpu` (and the dialog's **Needs** field when **Auto** is chosen) limits Auto to
 machines with every listed tag. The Machines list (`pan machines list`, Settings → Anywhere →
 Machines) shows each machine's load and tags.
+
+For a **conversation**, when nothing fits, `remote.auto_fly = true` lets Auto create a Fly
+machine instead of answering "no machine fits" — only when the project is on GitHub and
+`needs` stays within what a Fly machine can have (`linux`, `docker`). It is off by default,
+and it never applies to a worker, an issue start or a lane:
+
+```toml
+# ~/.overdeck/config.toml
+[remote]
+auto_fly = true
+```
 
 ### Gauntlet lanes
 

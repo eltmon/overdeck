@@ -12,6 +12,11 @@
  * Stand-in waits read `remote.json`: `running` is alive, `exited` / `stopped`
  * are confirmed dead, and an owner that cannot be reached is alive with no idle
  * age, so a sleeping desktop delays the report but never fails the wait.
+ *
+ * `--machine fly` refuses here (PAN-4743 D-4743-1): a worker needs its issue
+ * workspace, which a new VM never has. `pan start <id> --machine fly` never
+ * reaches this check: `issueCommand` turns it into `--remote`, which starts the
+ * work agent on a new Fly machine (PAN-4734). `FLY_CLI_REFUSAL` names both.
  */
 import type { PlacementAnswer, PlacementRejection } from '@overdeck/contracts';
 
@@ -65,13 +70,16 @@ export type MachineTarget =
   | { kind: 'remote'; machine: string; label: string; reason: string | null }
   | { kind: 'error'; message: string };
 
+/** PAN-4743 D-4743-6: `--machine fly` refuses for work agents and workers. */
+export const FLY_CLI_REFUSAL = '--machine fly starts a new Fly machine for a conversation only: use Fly (new VM) in the new-conversation dialog, or pan machines add-fly --project <key> --message <text>. For a work agent on a new Fly machine, run pan start <id> --remote.';
+
 export async function resolveMachineFlag(
   machine: string,
   needs: readonly string[],
   gitOrigin: string | null,
   deps: Pick<RemoteWorkerCliDeps, 'call'>,
 ): Promise<MachineTarget> {
-  if (machine.toLowerCase() === 'fly') return { kind: 'error', message: 'Fly (new VM) needs PAN-4652' };
+  if (machine.toLowerCase() === 'fly') return { kind: 'error', message: FLY_CLI_REFUSAL };
   if (machine.toLowerCase() === 'auto') {
     const answer = await deps.call('/api/fleet/placement', { method: 'POST', body: { gitOrigin, needs } });
     if (answer.status !== 200) return { kind: 'error', message: `Placement failed: ${errorOf(answer.json, answer.status)}` };

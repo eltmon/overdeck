@@ -13,7 +13,9 @@
  * 3. Score: lowest CPU PSI avg10 (unknown after any number), then most
  *    available memory (unknown last), then fewest working agents, then this
  *    machine, then label ascending.
- * Fly is never a candidate (no Fly machines exist until PAN-4652).
+ * Fly is never a candidate here: a Fly (new VM) fallback runs separately,
+ * after this answers no-fit, only for a conversation spawn with
+ * `remote.auto_fly` on (PAN-4743, `fleet-target.ts`'s auto branch).
  */
 import type { LinkState, LoadSample, MachinePlacementMode, PlacementAnswer, PlacementRejection } from '@overdeck/contracts';
 

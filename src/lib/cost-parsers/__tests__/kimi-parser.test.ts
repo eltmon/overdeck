@@ -17,6 +17,21 @@ describe('bareKimiModel', () => {
   });
 });
 
+describe('K3.1 Pro pricing rows', () => {
+  it('prices the coding-endpoint and platform ids at $2/M input, $10/M output', () => {
+    expect(getPricing('custom', bareKimiModel('kimi-code/k3.1-pro'))!.inputPer1k * 1000).toBe(2);
+    expect(getPricing('custom', 'kimi-k3.1-pro')!.inputPer1k).toBe(0.002);
+  });
+
+  it('prices Highspeed at double the input/output rate', () => {
+    expect(getPricing('custom', 'k3.1-pro-highspeed')!.outputPer1k).toBe(0.02);
+  });
+
+  it('leaves K3 pricing unchanged', () => {
+    expect(getPricing('custom', 'k3')!.inputPer1k).toBe(0.003);
+  });
+});
+
 describe('parseKimiSession (PAN-1837 wi8b, against the pinned wi-fixture)', () => {
   it('ac1: produces a non-empty normalized summary whose turn count matches the fixture (2 turns)', () => {
     const usage = parseKimiSession(FIXTURE_PATH);

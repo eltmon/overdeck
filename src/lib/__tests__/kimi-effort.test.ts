@@ -14,7 +14,7 @@ describe('managed Kimi effort', () => {
       maxContextTokens: contextWindow,
     });
   });
-  it.each(['k3', 'k3-256k', 'k3[1m]', 'kimi-code/k3', 'kimi-code/k3-256k'])(
+  it.each(['k3', 'k3-256k', 'k3[1m]', 'kimi-code/k3', 'kimi-code/k3-256k', 'k3.1-pro', 'k3.1-pro-highspeed', 'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed'])(
     'requires a resolved effort for %s', (model) => {
       expect(() => resolveKimiNativeEffort(model, undefined)).toThrow('requires a resolved effort level');
     },
@@ -31,7 +31,12 @@ describe('managed Kimi effort', () => {
   );
 
   it('rejects an unknown K3 effort rather than silently using the CLI default', () => {
-    expect(() => resolveKimiNativeEffort('k3', 'invalid')).toThrow('Invalid Kimi K3 effort');
+    expect(() => resolveKimiNativeEffort('k3', 'invalid')).toThrow('Invalid Kimi K3/K3.1 effort');
+  });
+
+  it('translates K3.1 effort the same way as K3', () => {
+    expect(resolveKimiNativeEffort('kimi-code/k3.1-pro', 'medium')).toBe('high');
+    expect(resolveKimiNativeEffort('k3.1-pro-highspeed', 'xhigh')).toBe('max');
   });
 
   it.each(['kimi-k2.7-code', 'kimi-for-coding', 'kimi-code/kimi-for-coding', 'kimi-code/kimi-for-coding-highspeed'])(

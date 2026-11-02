@@ -190,6 +190,8 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `PR #${data.prNumber ?? '?'} at ${shortSha(data.headSha)}`;
     case 'workspace.adoption-failed':
       return `${data.reason ?? 'failed'}${typeof data.detail === 'string' ? ` — ${data.detail}` : ''}`;
+    case 'workspace.synced-to-pr-head':
+      return `${data.repo ? `${data.repo}: ` : ''}${shortSha(data.from)} → PR head ${shortSha(data.to)} (${data.mode ?? 'moved'})`;
     default:
       return '';
   }

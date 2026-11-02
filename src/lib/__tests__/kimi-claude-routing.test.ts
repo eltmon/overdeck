@@ -66,3 +66,26 @@ describe('Claude Code K2.7 endpoint routing', () => {
     expect(script).toContain("kimi -m 'kimi-code/kimi-for-coding'");
   });
 });
+
+describe('Claude Code K3.1 endpoint routing', () => {
+  beforeEach(() => {
+    delete process.env.OVERDECK_TEST_HARNESS_COMMAND;
+  });
+
+  it.each([
+    ['sk-kimi-test', 'k3.1-pro', 'k3.1-pro'],
+    ['sk-platform-test', 'k3.1-pro', 'kimi-k3.1-pro'],
+    ['sk-kimi-test', 'k3.1-pro-highspeed', 'k3.1-pro-highspeed'],
+    ['sk-platform-test', 'k3.1-pro-highspeed', 'kimi-k3.1-pro-highspeed'],
+  ])('resolves %s + %s to the wire id %s', async (apiKey, canonical, wire) => {
+    routing.apiKey = apiKey;
+    const baseCommand = await getAgentRuntimeBaseCommand(canonical);
+    expect(baseCommand).toContain(`--model '${wire}'`);
+    const script = generateLauncherScript({
+      role: 'work', workingDir: '/workspace', harness: 'claude-code', model: canonical, baseCommand,
+    });
+    const launchedIds = [...script.matchAll(/--model '([^']+)'/g)].map((match) => match[1]);
+    expect(launchedIds.length).toBeGreaterThan(0);
+    expect(launchedIds.every((model) => model === wire)).toBe(true);
+  });
+});

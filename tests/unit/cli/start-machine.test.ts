@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { startOnMachine, type StartMachineDeps } from '../../../src/cli/commands/start-machine.js';
 import type { IssueOptions } from '../../../src/cli/commands/start-options.js';
+import { FLY_CLI_REFUSAL } from '../../../src/cli/commands/worker-remote.js';
 
 function makeDeps(answers: { placement?: unknown; unpushed?: boolean; workspace?: string | null } = {}) {
   const out: string[] = [];
@@ -57,11 +58,12 @@ describe('pan start --machine (PAN-4651 WI-14)', () => {
     expect(auto.err).toEqual(['Auto → laptop (CPU pressure 1%, 8 GB free, 0 agents)']);
   });
 
-  it('ac14: --machine fly prints the PAN-4652 refusal and exits 1', async () => {
-    const { deps, err } = makeDeps();
+  it('ac1 (PAN-4743): --machine fly prints FLY_CLI_REFUSAL, exits 1 and never calls the dashboard', async () => {
+    const { deps, err, calls } = makeDeps();
     expect(await startOnMachine('PAN-7', options({ machine: 'fly' }), deps)).toBe(true);
-    expect(err).toEqual(['Fly (new VM) needs PAN-4652']);
+    expect(err).toEqual([FLY_CLI_REFUSAL]);
     expect(deps.exit).toHaveBeenCalledWith(1);
+    expect(calls).toEqual([]);
   });
 
   it('refuses unpushed workspace commits and an Auto with nothing that fits', async () => {

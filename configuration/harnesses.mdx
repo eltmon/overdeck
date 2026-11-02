@@ -439,14 +439,17 @@ requires the installed `kimi` binary and its own `kimi login` — not
 `config.apiKeys.kimi`.
 
 Migration note for existing model pins: the native CLI's own catalog only
-exposes `kimi-code/k3`, `kimi-code/k3-256k`, `kimi-code/kimi-for-coding`, and
-`kimi-code/kimi-for-coding-highspeed`. A role pinned to the claude-code-routed
+exposes `kimi-code/k3`, `kimi-code/k3-256k`, `kimi-code/kimi-for-coding`,
+`kimi-code/kimi-for-coding-highspeed`, `kimi-code/k3.1-pro`, and
+`kimi-code/k3.1-pro-highspeed`. A role pinned to the claude-code-routed
 `k3` or `k3[1m]` id is remapped automatically to the matching native alias
 (`kimi-code/k3-256k` and `kimi-code/k3` respectively — the context-window
 sizes, not the bare-string names, decide the mapping). A role pinned to
-`kimi-k2.7-code`, `kimi-k2.6`, `kimi-k2.5`, `kimi-k2`, or `K2.6-code-preview`
-has no native equivalent and fails loudly at spawn with the list of valid
-native aliases, rather than silently launching the wrong model.
+`k3.1-pro` or `k3.1-pro-highspeed` is remapped to the same-named `kimi-code/`
+alias. A role pinned to `kimi-k2.7-code`, `kimi-k2.6`, `kimi-k2.5`, `kimi-k2`,
+or `K2.6-code-preview` has no native equivalent and fails loudly at spawn with
+the list of valid native aliases, rather than silently launching the wrong
+model.
 
 To opt back out to `claude-code` or `acp`, override the provider's harness in
 `~/.overdeck/config.yaml`:
@@ -467,6 +470,9 @@ route, and the row label states the harness it spawns:
 | `Kimi K3 (256K) — Claude Code` | `k3` | Claude Code against Kimi's Anthropic-compatibility endpoint |
 | `Kimi K3 (1M) — Kimi Code CLI` | `kimi-code/k3` | the native `kimi` binary directly |
 | `Kimi K3 (1M) — ACP (Kimi Code)` | `kimi-code/k3` | the native `kimi` binary over ACP |
+| `Kimi K3.1 Pro (1M) — Claude Code` | `k3.1-pro` | Claude Code against Kimi's Anthropic-compatibility endpoint |
+| `Kimi K3.1 Pro (1M) — Kimi Code CLI` | `kimi-code/k3.1-pro` | the native `kimi` binary directly |
+| `Kimi K3.1 Pro (1M) — ACP (Kimi Code)` | `kimi-code/k3.1-pro` | the native `kimi` binary over ACP |
 
 Clicking a row sets model and harness together, and the spawn honors the pick
 as an explicit harness choice (policy-gated and fail-loud) — the row launches
@@ -474,11 +480,18 @@ what it says, regardless of the `providers.kimi.harness` default above.
 
 The two id spaces are not interchangeable. `kimi-code/*` ids exist only in the
 native CLI's catalog, so `canUseHarness` blocks them on every harness except
-`kimi-code` and `acp`; bare ids (`k3`, `k3[1m]`, `kimi-k2.7-code`) work on
-every Kimi route because they translate into the native catalog. Effort levels
-follow the route: native rows offer the kimi binary's real `low` / `high` /
-`max` (what its in-session `/effort` shows), while Claude Code rows offer the
-full five-level slider.
+`kimi-code` and `acp`; bare ids (`k3`, `k3[1m]`, `kimi-k2.7-code`, `k3.1-pro`,
+`k3.1-pro-highspeed`) work on every Kimi route because they translate into the
+native catalog. Effort levels follow the route: native rows offer the kimi
+binary's real `low` / `high` / `max` (what its in-session `/effort` shows),
+while Claude Code rows offer the full five-level slider.
+
+On the Claude Code route, a `sk-kimi-` key sends `k3.1-pro` (or
+`k3.1-pro-highspeed`) unchanged to the coding endpoint; any other key sends
+`kimi-k3.1-pro` (or `kimi-k3.1-pro-highspeed`) to the Moonshot platform
+endpoint. K3.1 has one 1,048,576-token tier — there is no 256K variant.
+Highspeed needs a Kimi Code Allegretto (Pro) plan or higher and uses about 2x
+quota.
 
 Runtime adapter is `src/lib/runtimes/kimi-code.ts`; the per-agent
 `kimi-session-id` file (captured post-launch, since Kimi generates its own
@@ -1150,8 +1163,8 @@ Subscription usage allowances are not API token prices. A larger window can cons
 | Codex (TUI) | `model_reasoning_effort` in the agent's `CODEX_HOME/config.toml` | low | medium | high | xhigh | max on models that advertise it |
 | Codex (app-server) | host `--effort` at launch, per-turn `effort`, live `set-effort` | same as Codex TUI | | | | |
 | OpenCode | ACP `setConfigOption("effort", …)`; model variants pass through | low | medium | high | xhigh | max (only levels/variants the model exposes) |
-| Kimi K3 (ACP) | ACP `thinking` option | low | high | high | max | max |
-| Kimi K3 (native) | `KIMI_MODEL_THINKING_EFFORT` env per process | low | high | high | max | max |
+| Kimi K3 / K3.1 (ACP) | ACP `thinking` option | low | high | high | max | max |
+| Kimi K3 / K3.1 (native) | `KIMI_MODEL_THINKING_EFFORT` env per process | low | high | high | max | max |
 | Pi (`omp`) | `--thinking <level>`; live `set_thinking_level` | low | medium | high | xhigh | xhigh |
 | Muse Code | `--reasoning-effort <level>` | low | medium | high | xhigh | xhigh |
 | Prime Agent | `--thinking <level>` (1:1) | low | medium | high | xhigh | max |

@@ -113,8 +113,9 @@ compatibility as automatic support.
 | **Grok CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
 | **Google Gemini CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
 
-Kimi K3 supports Low, High, and Max effort through both native CLI and ACP.
-Overdeck initializes managed K3 sessions at High unless another effort was
+Kimi K3 and K3.1 Pro (`k3.1-pro`, `k3.1-pro-highspeed`) support Low, High, and
+Max effort through both native CLI and ACP. Overdeck initializes managed K3
+sessions at High unless another effort was
 selected. Native launches use the per-process `KIMI_MODEL_THINKING_EFFORT`
 override; ACP sets the session's `thinking` option after selecting the model.
 Overdeck does not edit the shared Kimi configuration. Saved Medium maps to High,
