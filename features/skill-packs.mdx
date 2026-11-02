@@ -1,0 +1,34 @@
+---
+title: Skill Packs
+description: Pin third-party skill repositories to a commit and turn them on per project, issue or conversation
+---
+
+# Skill Packs
+
+## What a skill pack is
+
+A **skill pack** is a third-party git repository of skills, such as [eltmon/skills](https://github.com/eltmon/skills), a fork of [mattpocock/skills](https://github.com/mattpocock/skills). Overdeck pins each pack to one commit you approve, caches that commit, and mounts the pack skills you turn on into each launch through the harness's own plugin system. Pack skills are never copied into `~/.claude/skills` or `~/.agents/skills`, so they cannot collide with Overdeck's own skills or leak into sessions you start outside Overdeck.
+
+Operators also call skill packs **skill bundles**; these docs use "skill pack."
+
+A skill pack lets you try a third-party skill collection for one project, one issue, or one conversation without installing it for every session on the machine. The pack stays pinned to one commit, so the skills inside it do not change under you until you choose to update. When you are done, `pan skills pack remove <id>` deletes the cached commit and every mount. See [Skills](/features/skills) for the native, per-skill on/off levels that pack skills share.
+
+## Quickstart
+
+## Pack catalog
+
+## How packs turn on and off
+
+## Trust and safety
+
+## Pinning, updates and forks
+
+## Packs
+
+## Where state lives and when changes apply
+
+## Troubleshooting
+
+## Terminology: skill packs and skill bundles
+
+Skill packs are the built feature described on this page. [Template Conversations](/reference/template-conversations) describes a separate, unbuilt proposal (PAN-1357, `pan bundle`) that also uses the words "skill bundle." Per-conversation skill values (PAN-4486), set in the **New conversation with options…** dialog or by `pan handoff --skill/--pack`, already cover part of that proposal: a conversation can turn on pack skills for itself. See [Template Conversations](/reference/template-conversations) and [Conversations](/features/conversations).

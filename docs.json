@@ -104,6 +104,7 @@
               "features/specialists",
               "features/cloister",
               "features/skills",
+              "features/skill-packs",
               "features/workspaces",
               "features/convoys",
               "features/swarm",

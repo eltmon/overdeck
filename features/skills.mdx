@@ -281,8 +281,6 @@ Overrides do not apply to other harnesses, to remote (Fly) launches, or to sessi
 
 ## Skill packs
 
-A **skill pack** is a third-party git repository of skills, such as [eltmon/skills](https://github.com/eltmon/skills), a fork of [mattpocock/skills](https://github.com/mattpocock/skills). Overdeck pins each pack to one commit you approve, caches that commit, and mounts the pack skills you turn on into each launch through the harness's own plugin system. Pack skills are never copied into `~/.claude/skills` or `~/.agents/skills`, so they cannot collide with Overdeck's own skills or leak into sessions you start outside Overdeck.
-
 ### Adding a pack
 
 ```bash
