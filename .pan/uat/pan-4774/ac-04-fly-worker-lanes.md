@@ -65,6 +65,7 @@ Each lane was a real Claude Code (Sonnet 5.5) session that wrote its report and 
 - `pan machines unlink fly-80ee65ec0672d8` and `pan machines unlink fly-8dd71efe052318` → "Destroyed the Fly machine behind …"; `fly machines list -a pan-workspaces` → "No machines are available"; `fly volumes list -a pan-workspaces` → empty; home's link list → `[]`.
 - Root conversation `20261102-7200` stopped (`{"success":true}`).
 - D-15 teardown: `pan project remove pan4774-anywhere-smoke` ("✓ Removed project"; no workspace record existed), then `/home/eltmon/Projects/pan4774-anywhere-smoke` and `/home/eltmon/Projects/pan4774-anywhere-smoke-lanes` deleted.
+- `pan projects list` afterwards lists no `pan4774-anywhere-smoke` (`pan projects list | grep -ci pan4774` → `0`).
 - `~/.overdeck/config.toml` `[remote] enabled` restored to `false`.
 - The image tag `registry.fly.io/pan-workspaces:pan-4774` stays for the remaining Fly items.
 

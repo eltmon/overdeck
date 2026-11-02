@@ -14,7 +14,18 @@ ls: cannot access '/sbin/init': No such file or directory
 no-systemctl
 ```
 
-A Fly machine boots Fly's own init as PID 1, so systemd cannot run as PID 1 and no systemd user manager or lingering exists. As WI-16 directs, the D-7 systemd image was not built; the run records how far `connect` gets and files [#4863](https://github.com/eltmon/overdeck/issues/4863) "Run AC-10 on a real VPS". The D-7 Dockerfile is in the release checklist for that run.
+A Fly machine boots Fly's own init as PID 1, so systemd cannot run as PID 1 and no systemd user manager or lingering exists. As WI-16 directs, the D-7 systemd image was not built; the run records how far `connect` gets and files [#4863](https://github.com/eltmon/overdeck/issues/4863) "Run AC-10 on a real VPS". The D-7 Dockerfile, written from the decision and never built (Fly cannot run it), is kept for the real-VPS run:
+
+```dockerfile
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y systemd systemd-sysv openssh-server curl ca-certificates \
+ && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs \
+ && useradd -m -s /bin/bash vps && mkdir -p /var/lib/systemd \
+ && ln -s /home/.linger /var/lib/systemd/linger
+CMD ["/sbin/init"]
+```
+
+`Linger=yes` and the `fly machine restart` step were not reached (no systemd).
 
 ## How far `connect` got
 
