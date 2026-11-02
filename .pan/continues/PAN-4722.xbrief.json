@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4722",
   "created": "2026-11-02T15:37:17.298Z",
-  "updated": "2026-11-02T15:50:26.763Z",
+  "updated": "2026-11-02T15:50:31.493Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4722",
       "claimedAt": "2026-11-02T15:47:36.760Z",
       "doneAt": "2026-11-02T15:50:26.763Z"
+    },
+    "dashboard-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4722",
+      "claimedAt": "2026-11-02T15:50:31.493Z"
     }
   }
 }
