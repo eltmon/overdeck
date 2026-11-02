@@ -64,6 +64,7 @@ endpoint; port tunnelling uses `fly proxy`.
    - Clone the repository over HTTPS into `/workspace` and check out the feature branch
    - Configure Claude Code and copy your local skills
    - Save workspace metadata to `~/.overdeck/workspaces/<id>.yaml`
+   - If any step after the machine is created fails, delete the machine before reporting the error
 
    No SSH private key is copied to the VM. Git authenticates over HTTPS with the
    synced `gh` token.
@@ -447,10 +448,19 @@ non-zero exit codes from the exec API.
   and retry.
 - **Image missing required tools** — ensure the Dockerfile installs git, python3, curl,
   and base64. Rebuild and push.
-- **Fly API exec timeout** — individual exec calls default to 60 s. Long-running
-  operations (e.g., `git clone` on a large repo) may time out. The clone step will
-  delete the machine and surface the error; re-run after increasing `vm_memory` if the
-  OOM killer is the cause.
+- **Fly API exec timeout** — each exec call has a 60 s deadline. The clone does not
+  run inside one exec: it starts detached (`setsid nohup`), writes its output to
+  `/tmp/pan-clone.log` and its exit code to `/tmp/pan-clone.exit`, and Overdeck polls
+  every 5 s for up to 20 min. If the clone exits non-zero, the machine is deleted and
+  the error shows the last 5 lines of the log. If it does not finish in 20 min, the
+  error is `clone did not finish within 20 min`. Re-run after increasing `vm_memory`
+  if the OOM killer is the cause.
+- **Creation fails after the machine exists** — any failure after the machine is
+  created (credential sync, clone, branch checkout, Claude Code setup, skills copy,
+  compose) deletes the machine before the error is shown. If that delete also fails
+  (for example an expired Fly token answering 403, #4748), the error names the
+  machine and prints the command to remove it by hand:
+  `fly machines destroy <machine-id> -a <app> --force`.
 
 ---
 
