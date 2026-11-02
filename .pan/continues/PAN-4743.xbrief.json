@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T13:25:07.453Z",
+  "updated": "2026-11-02T13:30:48.546Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-02T13:25:02.290Z"
     },
     "auto-fly-fallback": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4743",
-      "claimedAt": "2026-11-02T13:25:07.453Z"
+      "claimedAt": "2026-11-02T13:25:07.453Z",
+      "doneAt": "2026-11-02T13:30:48.545Z"
     }
   }
 }
