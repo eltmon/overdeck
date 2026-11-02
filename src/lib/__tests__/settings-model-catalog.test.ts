@@ -49,9 +49,11 @@ const geminiArgon = {
 const kimiK31AdditionIds = new Set(['k3.1-pro', 'k3.1-pro-highspeed', 'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed']);
 // MiMo V2.5 Pro / V2.5 were retired 2026-10-21; the V2.6 series replaces them (PAN-4825).
 const mimoV26Ids = ['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed'];
+// MiniMax M3.1 Flash is an addition after the fixture was captured (PAN-4825).
+const minimaxM31FlashId = 'MiniMax-M3.1-Flash';
 const expectedPreviousCatalog = { ...previousCatalog, mimo: [] };
 
-function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }>; kimi: Array<{ id: string }>; mimo: Array<{ id: string }> }>(catalog: T): T {
+function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }>; kimi: Array<{ id: string }>; mimo: Array<{ id: string }>; minimax: Array<{ id: string }> }>(catalog: T): T {
   return {
     ...catalog,
     anthropic: catalog.anthropic.filter((model) => ![opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
@@ -60,6 +62,7 @@ function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Arr
     meta: catalog.meta.filter((model) => model.id !== museWonderId),
     kimi: catalog.kimi.filter((model) => !kimiK31AdditionIds.has(model.id)),
     mimo: catalog.mimo.filter((model) => !mimoV26Ids.includes(model.id)),
+    minimax: catalog.minimax.filter((model) => model.id !== minimaxM31FlashId),
   };
 }
 
@@ -91,6 +94,10 @@ describe('model catalog no-loss audit', () => {
     expect(k31ProHighspeed?.harness).toBe('claude-code');
     expect(k31ProNative?.harness).toBe('kimi-code');
     expect(k31ProHighspeedNative?.harness).toBe('kimi-code');
+  });
+
+  it('lists MiniMax M3.1 Flash with its 1M context label', () => {
+    expect(getAvailableModelsApi().minimax.find((model) => model.id === minimaxM31FlashId)?.name).toBe('MiniMax M3.1 Flash (1M context)');
   });
 
   it('lists exactly the MiMo V2.6 series and no retired V2.5 id', () => {

@@ -164,6 +164,8 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'custom', model: 'MiniMax-M2.7', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
   { provider: 'custom', model: 'MiniMax-M2.7-highspeed', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
   { provider: 'custom', model: 'MiniMax-M3', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
+  // MiniMax M3.1 Flash (platform.minimax.io/docs/guides/pricing): $0.15/M in, $0.60/M out, $0.015/M cache read
+  { provider: 'custom', model: 'MiniMax-M3.1-Flash', inputPer1k: 0.00015, outputPer1k: 0.0006, cacheReadPer1k: 0.000015, currency: 'USD' },
   // Xiaomi MiMo V2.6 (mimo.mi.com/docs/en-US/price/pay-as-you-go, real-time)
   { provider: 'custom', model: 'mimo-v2.6-pro', inputPer1k: 0.000435, outputPer1k: 0.00087, cacheReadPer1k: 0.0000036, currency: 'USD' },
   { provider: 'custom', model: 'mimo-v2.6-flash', inputPer1k: 0.00014, outputPer1k: 0.00028, cacheReadPer1k: 0.0000028, currency: 'USD' },

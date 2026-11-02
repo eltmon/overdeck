@@ -141,7 +141,7 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   // MiniMax models
   'minimax-m2.7': { apiModel: 'minimax-m2.7' },
   'minimax-m2.7-highspeed': { apiModel: 'minimax-m2.7-highspeed' },
-  'MiniMax-M3': { apiModel: 'MiniMax-M3' },
+  'MiniMax-M3': { apiModel: 'MiniMax-M3' }, 'MiniMax-M3.1-Flash': { apiModel: 'MiniMax-M3.1-Flash' },
   // Z.AI models
   'glm-5.2': { apiModel: 'glm-5.2' },
   'glm-5.1': { apiModel: 'glm-5.1' },

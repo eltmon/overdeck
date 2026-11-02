@@ -165,7 +165,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: 'https://api.minimax.io/anthropic',
     authType: 'static',
-    models: ['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3'],
+    models: ['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3', 'MiniMax-M3.1-Flash'],
     haikuModel: 'minimax-m2.7-highspeed',
     tierModels: { opus: 'MiniMax-M3', sonnet: 'minimax-m2.7', haiku: 'minimax-m2.7-highspeed' },
     tested: true,
@@ -489,7 +489,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check MiniMax models
-  if (['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3'].includes(modelId)) {
+  if (['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3', 'MiniMax-M3.1-Flash'].includes(modelId)) {
     return PROVIDERS.minimax;
   }
 

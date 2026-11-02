@@ -111,3 +111,13 @@ describe('xAI Grok 4.7 and 4.3', () => {
     expect(PROVIDERS.xai.tierModels).toEqual({ opus: 'grok-build-0.1', sonnet: 'grok-build-0.1', haiku: 'grok-build-0.1' });
   });
 });
+
+describe('MiniMax M3.1 Flash', () => {
+  it('registers MiniMax-M3.1-Flash under minimax and keeps the live M2.7 tier slots', () => {
+    expectRegistered('MiniMax-M3.1-Flash', 'minimax');
+    expect(getModelProvider('MiniMax-M3.1-Flash')).toBe('minimax');
+    // Official MiniMax pages show no M2.7 retirement notice (checked 2026-11-02), so M2.7 stays live.
+    expect(PROVIDERS.minimax.tierModels).toEqual({ opus: 'MiniMax-M3', sonnet: 'minimax-m2.7', haiku: 'minimax-m2.7-highspeed' });
+    expectNoRetiredSlots('minimax');
+  });
+});

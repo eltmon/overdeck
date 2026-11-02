@@ -116,6 +116,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
     name: 'MiniMax',
     models: [
       { id: 'MiniMax-M3' as ModelId, name: 'M3 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'MSA architecture, 1M context, top-tier coding, native multimodal' },
+      { id: 'MiniMax-M3.1-Flash' as ModelId, name: 'M3.1 Flash (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.375, capabilities: ['code', 'agentic', 'fast', 'large-context'], description: 'Multimodal coding model with tunable thinking depth. 1M context, $0.15/M in, $0.60/M out.' },
       { id: 'minimax-m2.7-highspeed' as ModelId, name: 'M2.7 Highspeed (204.8K context)', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 100 tps, 204K context, $0.06/M blended' },
       { id: 'minimax-m2.7' as ModelId, name: 'M2.7 (204.8K context)', icon: Layers, tier: 'balanced', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 10B active params, 204K context' },
     ],

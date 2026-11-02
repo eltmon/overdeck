@@ -307,7 +307,7 @@ describe('settings', () => {
 
       const available = getAvailableModels(settings);
 
-      expect(available.minimax).toEqual(['MiniMax-M3', 'minimax-m2.7', 'minimax-m2.7-highspeed']);
+      expect(available.minimax).toEqual(['MiniMax-M3', 'MiniMax-M3.1-Flash', 'minimax-m2.7', 'minimax-m2.7-highspeed']);
     });
 
     it('should return Kimi models when API key is configured', async () => {

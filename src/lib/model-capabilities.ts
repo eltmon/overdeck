@@ -950,7 +950,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'MiniMax-M3',
     provider: 'minimax',
     displayName: 'MiniMax M3',
-    costPer1MTokens: 1.5, // Same $0.30/M in / $1.20/M out blended as M2.7; confirm at launch
+    costPer1MTokens: 1.5, // $0.30/M in / $1.20/M out / $0.06/M cache read at ≤512K input (Standard)
     contextWindow: 1000000, // 1M context via MSA architecture
     skills: {
       'code-generation': 93, // Top-tier coding; MSA architecture for scalable context
@@ -965,7 +965,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 80,
       'context-length': 100, // 1M context
     },
-    notes: 'MSA (MiniMax Sparse Attention), 1M context, native multimodal, top-tier coding/agentic. Same pricing as M2.7.',
+    notes: 'MSA (MiniMax Sparse Attention), 1M context, native multimodal, top-tier coding/agentic. Above 512K input tokens: $0.60/M in, $2.40/M out, $0.12/M cache read (platform.minimax.io/docs/guides/pricing).',
   },
 
   // Z.AI models

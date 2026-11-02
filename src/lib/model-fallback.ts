@@ -91,6 +91,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'minimax-m2.7': 'minimax',
   'minimax-m2.7-highspeed': 'minimax',
   'MiniMax-M3': 'minimax',
+  'MiniMax-M3.1-Flash': 'minimax',
 
   // Z.AI models
   'glm-5.3': 'zai',
@@ -202,6 +203,7 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'minimax-m2.7': 'claude-sonnet-5-5', // Near-Opus performance → Sonnet
   'minimax-m2.7-highspeed': 'claude-sonnet-5-5', // Same quality, faster → Sonnet
   'MiniMax-M3': 'claude-sonnet-5-5', // Top-tier coding → Sonnet
+  'MiniMax-M3.1-Flash': 'claude-sonnet-5-5',
 
   // Z.AI → Anthropic
   'glm-5.2': 'claude-sonnet-5-5', // Current GLM flagship → Sonnet

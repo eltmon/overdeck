@@ -64,6 +64,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'kimi-code/kimi-for-coding-highspeed': 'workhorse',
   'minimax-m2.7': 'workhorse',
   'minimax-m2.7-highspeed': 'workhorse',
+  'MiniMax-M3.1-Flash': 'workhorse',
   'glm-4.7': 'workhorse',
   'mimo-v2.5': 'workhorse',
   'mimo-v2.6-flash': 'workhorse',

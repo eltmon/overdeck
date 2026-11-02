@@ -39,7 +39,7 @@ export type GoogleModel = 'gemini-4-argon' | 'gemini-3.8-flash' | 'gemini-3.5-fl
 export type KimiModel = 'k3.1-pro' | 'k3.1-pro-highspeed' | 'k3' | 'k3[1m]' | 'kimi-k2.7-code' | 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2'
   | 'kimi-code/k3.1-pro' | 'kimi-code/k3.1-pro-highspeed'
   | 'kimi-code/k3' | 'kimi-code/k3-256k' | 'kimi-code/kimi-for-coding' | 'kimi-code/kimi-for-coding-highspeed';
-export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3';
+export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3' | 'MiniMax-M3.1-Flash';
 export type ZAIModel = 'glm-5.3' | 'glm-5.2' | 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
 // Retired 2026-10-21 (mimo-v2.5-pro, mimo-v2.5) — kept for MODEL_DEPRECATIONS and historical rows.
 export type MimoModel = 'mimo-v2.6-pro' | 'mimo-v2.6-flash' | 'mimo-v2.6-pro-ultraspeed' | 'mimo-v2.5-pro' | 'mimo-v2.5';
@@ -228,7 +228,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     : [];
 
   const minimaxModels: MiniMaxModel[] = settings.api_keys.minimax
-    ? ['MiniMax-M3', 'minimax-m2.7', 'minimax-m2.7-highspeed']
+    ? ['MiniMax-M3', 'MiniMax-M3.1-Flash', 'minimax-m2.7', 'minimax-m2.7-highspeed']
     : [];
 
   const mimoModels: MimoModel[] = settings.api_keys.mimo
