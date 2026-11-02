@@ -30,15 +30,51 @@ see [cli/skills-commands.mdx](../cli/skills-commands.mdx).
 | File | Responsibility |
 |---|---|
 | `resolve.ts` | `CORE_SKILLS`, `resolvePackSkill`, `resolvePackToggle`, `resolveSkillStates` |
-| `store.ts` | `setSkillOverride`, `listSkillStates`, `loadSkillOverrideLayers`, `issueSkillOverridesPath` |
+| `store.ts` | `setSkillOverride`, `setIssuePipeline`, `listSkillStates`, `loadSkillOverrideLayers`, `issueSkillOverridesPath` |
+| `issue-file.ts` | Reads of the issue file (`skills:`, `packs:`, `pipeline:`): `readIssueOverrides`, `readIssuePipelineField`; split from `store.ts` so `deft/issue-pipeline.ts` avoids the store's write-side imports |
 | `catalog.ts` | `listSkillCatalog`, `listPackCatalog`, `readInstalledClaudePluginNames` |
 | `launch.ts` | `resolveLaunchPackSelection`, `applyClaudePacks`, `applyCodexPacks`, `applyDeftForLaunch`, `claudeSkillSettingsJson` |
-| `launcher-lines.ts` | `launcherSkillOverrideLines`, `skillPackLinkPath`, `claudeSkillOverrideLaunch`, `codexSkillOverrideLines` (leaf module) |
+| `launcher-lines.ts` | `launcherSkillOverrideLines`, `deftEnvReadLine`, `skillPackLinkPath`, `claudeSkillOverrideLaunch`, `codexSkillOverrideLines` (leaf module) |
 | `conversation-flags.ts` | `expandConversationSkillFlags`, `resolveConversationSkillFlags` |
+
+### `src/lib/deft/` — per-issue Deft pipeline (PAN-4820)
+
+| File | Responsibility |
+|---|---|
+| `issue-pipeline.ts` | `readIssuePipeline`, `isDeftPipelineIssue`: the issue file's `pipeline: deft` key; errors read as Overdeck |
+| `install-snapshot.ts` | `DeftInstallSnapshot`, `readDeftSnapshot`, `writeDeftSnapshot`, `touchedDeftDir` |
+| `install.ts` | `installDeftIntoWorktree`, `runDirectiveInstall` (npm/pnpm launcher, or `bun add` plus runtime setup for Bun), `deftExcludeFilePath` |
+| `uninstall.ts` | `removeDeftInstall`: exact undo from the snapshot |
+| `lift.ts` | `withDeftInstallLifted`, `DeftLiftError` |
+| `archive.ts` | `planDeftArchive`, `saveDeftState`, `isDeftArchiveCurrent`, `isNativeDirectiveProject` |
+| `merge-guard.ts` | `evaluateDeftMergeGuard`, `deftMergeGuardForIssue`, `detectDrift`, `raiseDeftDriftDecision` |
+| `policy.ts` | `readDeftPolicy`, `requireHumanMergeOf`, `deftAutoMergeHold` |
+| `role-refusal.ts` | `assertRoleRunsOnPipeline`, `DeftPipelineRoleRefusedError` |
+| `kickoff.ts` | `buildDeftWorkAgentPrompt`, `DeftNotInstalledError` (template `src/lib/cloister/prompts/work-deft.md`) |
+| `switch.ts` | `useDeftPipeline`, `backToOverdeck` |
+| `state-reader.ts` | Planned in PAN-4849: parses Directive's state files for the dashboard. Not in this tree yet. |
+
+### Deft pipeline
+
+`pan skills deft use|back|save|show` (`src/cli/commands/skills-deft-pipeline.ts`)
+switch one issue onto Deft Directive's pipeline. The install snapshot is
+`<worktree>/.overdeck/deft-install.json`; the exclude file is
+`<git-dir>/info/overdeck-deft-exclude`; the run summary is
+`<worktree>/.overdeck/deft-run-summary.jsonl`. The lift wraps
+`rebaseFeatureBranch` (`src/lib/cloister/merge-rebase.ts`) and each repo sync in
+`syncMainAcrossWorkspaceRepos` (`src/lib/cloister/sync-main-workspace.ts`).
+The merge gate (`evaluateIssueMergeGate`, `src/lib/cloister/merge-gate.ts`)
+waives approval at head for a Deft issue and runs `deftMergeGuardForIssue`;
+`forgeMergeGate` raises the drift decision, and the forge-merge route runs the
+guard itself. `startRequestReviewPipeline`, `spawnReviewRoleForIssueBody` and
+`spawnRun` keep Overdeck review and test agents off Deft issues; the derived
+state treats `deftPipeline` as approved; the auto-merge schedule route,
+scheduler and executor apply `deftAutoMergeHold`. User guide:
+`features/skill-packs.mdx`, "Running an issue on Deft".
 
 ### Other files
 
-`src/cli/commands/skills.ts`, `src/cli/commands/skills-deft.ts`,
+`src/cli/commands/skills.ts`, `src/cli/commands/skills-deft.ts`, `src/cli/commands/skills-deft-pipeline.ts`,
 `src/dashboard/server/routes/misc/skill-overrides.ts`,
 `src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx`,
 `src/lib/sageox/`, `src/lib/deft/`.

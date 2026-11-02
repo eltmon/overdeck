@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added: Deft pipeline per issue
+
+- `pan skills deft use <ISSUE>` runs one issue on Deft Directive's own pipeline: Overdeck installs Directive into that issue's worktree and hides every deposited file from git, so the PR never carries it. Bun projects get the runtime through `bun add` and Directive's own setup step (PAN-4820).
+- The work agent gets a Deft kickoff (Deft's build, pre-PR and review-cycle skills); Overdeck runs no review, test or verification agents for the issue, and `pan sync-main` lifts the hidden install around the merge (PAN-4820).
+- The merge gate waives the approval at head for a Deft issue, so its PR reaches awaiting merge, and adds a merge guard that refuses install paths, drifted hidden files, and a stale `.pan/deft/<ISSUE>/` state archive (PAN-4820).
+- Auto-merge holds a Deft issue whose Deft policy requires a human merge (PAN-4820).
+- `pan skills deft save|show|back <ISSUE>`: commit the state archive, inspect the install and merge-guard verdict, and switch back with an exact undo (PAN-4820).
+
 ### Added: Overdeck Anywhere
 
 The public, per-release changelog is [`changelog.mdx`](changelog.mdx). Session Vault (`pan vault`) and device pairing (`pan pair`, `pan devices`) were released in v0.64.0. Merged since then:
