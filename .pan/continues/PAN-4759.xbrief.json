@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4759",
   "created": "2026-11-02T01:10:45.557Z",
-  "updated": "2026-11-02T01:55:06.763Z",
+  "updated": "2026-11-02T01:55:24.430Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,10 @@
     "trust-model.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T01:55:06.763Z"
+    },
+    "trust-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:55:24.429Z"
     }
   }
 }
