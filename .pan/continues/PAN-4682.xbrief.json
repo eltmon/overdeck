@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4682",
   "created": "2026-11-02T03:20:08.527Z",
-  "updated": "2026-11-02T03:35:32.893Z",
+  "updated": "2026-11-02T03:35:52.256Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "remote-setup-omit-image.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T03:35:32.891Z"
+    },
+    "add-fly-image-help.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:35:52.255Z"
     }
   }
 }
