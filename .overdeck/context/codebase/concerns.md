@@ -583,4 +583,8 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   the patrol now confirms through it before ending a row. On the Fly VM the census
   disagreed because tmux without a UTF-8 locale prints `-F` tabs as `_`: any new
   multi-field `-F` reader must pass `-u` (see `listAllPaneRecords` in `src/lib/tmux.ts`).
+- **DoD gate: a failed forge read is not absence** (PAN-4821) — `fetchIssuePullRequest` returns
+  `{ pr: null }` for "no PR" and `{ pr: null, error }` for a failed read. The DoD verdict rows must keep
+  them apart: absence may be waived (strike path, tracker-closed settlement), a failed read may not.
+  Never cache an `error` response in the PR-tab cache, and never collapse a read error to `null`.
 <!-- last-verified: 2026-11-02 -->

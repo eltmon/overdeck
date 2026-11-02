@@ -4,17 +4,17 @@
     "created": "2026-11-02T15:51:17Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4821: Close-out reports 'no pull request found' when the forge PR read fails transiently (dod-gate maps every lookup error to null)",
-    "updated": "2026-11-02T15:58:49.977Z"
+    "updated": "2026-11-02T15:59:52.932Z"
   },
   "plan": {
     "id": "pan-4821",
     "title": "Close-out reports 'no pull request found' when the forge PR read fails transiently (dod-gate maps every lookup error to null)",
-    "status": "proposed",
+    "status": "running",
     "uid": "0d2f7a4d-498b-4246-9876-43b04c048ed8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T15:51:17Z",
-    "updated": "2026-11-02T15:58:49.977Z",
+    "updated": "2026-11-02T15:59:52.932Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4821",
@@ -409,5 +409,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
