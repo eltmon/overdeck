@@ -131,6 +131,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly and f
   or every ephemeral watchdog would stop its machine); the reap runs in
   `deacon-lite.ts` via `remote-reap-routine.ts` (behind the freeze). The reap acts
   only on positive evidence: a failed exec is `indeterminate`, never a crash.
+  With no `FLY_API_TOKEN` (or `remote.fly.api_token_env` variable), `createFlyApiClient()`
+  sends flyctl's stored `~/.fly/config.yml` token through a `FlyTokenSource`
+  (`src/lib/remote/fly-token.ts`, PAN-4748): `FlyApiClient.request()` re-reads the token
+  per call and, on a 401/403, runs `flyctl auth token` once (process-wide single-flight,
+  60s cooldown on failure) and retries. `pollUntil` rethrows a rejection that survives
+  the retry as `FlyMachineError('fly-token-rejected')` instead of counting it as "not
+  finished"; the heartbeat/sweep/Codex-sync loop lines, `pan machines unlink`/rollback,
+  and `pan doctor`'s `Fly token` row all report it as `Fly token rejected`.
 - **A workspace's `feature/<id>` branch tracks `origin/main`** (`branch.<b>.merge =
   refs/heads/main`), so a bare `git push` from a workspace fails ("upstream branch
   does not match") and `pushPlanArtifacts` (`overdeck/plan-artifact-commit.ts`)
@@ -535,4 +543,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly and f
   `.mintignore` excludes. `npm run lint:docs` catches `$` in prose and `<` before a
   digit, not `<word>` in prose. Until PAN-4779 lands, scope a docs change's link check
   to its own pages and compare the rest against this baseline.
-<!-- last-verified: 2026-11-01 -->
+<!-- last-verified: 2026-11-02 -->

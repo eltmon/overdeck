@@ -25,6 +25,9 @@
  * With no matching record no routine constructs a Fly client (NFR-1). Calls go
  * by the record's app and machine id through the API client (D-11). The idle
  * clock lives in memory: after a deacon restart the window starts again.
+ *
+ * A rejected Fly token (PAN-4748) is reported per machine as `Fly token
+ * rejected`; the sweep keeps the record rather than destroying it.
  */
 import { readFile } from 'node:fs/promises';
 
@@ -38,7 +41,7 @@ import { getNativeCodexAuthPath } from '../codex-auth.js';
 import { loadConfig } from '../config.js';
 import { listLinkedConversations } from '../overdeck/linked-conversations.js';
 import type { FlyApiClient } from './fly-api.js';
-import { FlyApiError } from './fly-api.js';
+import { FlyApiError, flyTokenRejectedMessage, isFlyAuthError } from './fly-api.js';
 import { REMOTE_HOST_HEARTBEAT_PATH } from './remote-agents.js';
 import { REMOTE_PAN_DIR } from './remote-tmux.js';
 
@@ -108,13 +111,18 @@ export async function heartbeatFlyMachines(overrides: Partial<FlyMachineLoopDeps
         ? `refreshed host heartbeat on ${record.label}`
         : `failed to refresh host heartbeat on ${record.label}: exit ${result.exit_code} ${result.stderr.trim()}`);
     } catch (error) {
-      lines.push(`failed to refresh host heartbeat on ${record.label}: ${(error as Error).message}`);
+      lines.push(isFlyAuthError(error)
+        ? `failed to refresh host heartbeat on ${record.label}: ${flyTokenRejectedMessage(error)}`
+        : `failed to refresh host heartbeat on ${record.label}: ${(error as Error).message}`);
     }
   }
   return lines;
 }
 
-/** Why a linked record should go now, or null to keep it. Throws nothing; an indeterminate API answer keeps it. */
+/**
+ * Why a linked record should go now, or null to keep it. Throws only a
+ * rejected Fly token (PAN-4748); any other indeterminate API answer keeps it.
+ */
 async function reasonToRemove(
   record: FlyMachineRecord,
   api: LoopApi,
@@ -127,6 +135,7 @@ async function reasonToRemove(
     if (GONE_STATES.has(machine.state)) return `machine ${machine.state}`;
   } catch (error) {
     if (error instanceof FlyApiError && error.statusCode === 404) return 'machine gone (404)';
+    if (isFlyAuthError(error)) throw error;
     return null;
   }
 
@@ -156,15 +165,26 @@ export async function sweepFlyMachines(overrides: Partial<FlyMachineLoopDeps> = 
   const lines: string[] = [];
 
   for (const record of records) {
-    const reason = record.linkId === null
-      ? (deps.now() - Date.parse(record.createdAt) >= UNLINKED_LIMIT_MS ? 'provisioning never linked it' : null)
-      : await reasonToRemove(record, api, deps, idleMs, conversations);
+    let reason: string | null;
+    if (record.linkId === null) {
+      reason = deps.now() - Date.parse(record.createdAt) >= UNLINKED_LIMIT_MS ? 'provisioning never linked it' : null;
+    } else {
+      try {
+        reason = await reasonToRemove(record, api, deps, idleMs, conversations);
+      } catch (error) {
+        if (!isFlyAuthError(error)) throw error;
+        lines.push(`could not check ${record.label}: ${flyTokenRejectedMessage(error)}`);
+        continue;
+      }
+    }
     if (reason === null) continue;
 
     try {
       await destroyFlyVm(record.appName, record.machineId, { api });
     } catch (error) {
-      lines.push(`could not destroy ${record.label} (${reason}): ${(error as Error).message}; will retry`);
+      lines.push(isFlyAuthError(error)
+        ? `could not destroy ${record.label} (${reason}): ${flyTokenRejectedMessage(error)}; will retry`
+        : `could not destroy ${record.label} (${reason}): ${(error as Error).message}; will retry`);
       continue;
     }
     if (record.linkId !== null) await deps.removeLink(record.linkId);
@@ -219,7 +239,9 @@ export async function syncFlyCodexAuth(overrides: Partial<FlyCodexSyncDeps> = {}
       api.execCommand(record.appName, record.machineId, ['/bin/sh', '-c', command], timeoutSeconds);
     const read = await readVmCodexAuth(exec, path);
     if (read.state === 'indeterminate') {
-      lines.push(`Codex sign-in sync skipped on ${record.label}: the Fly machine did not answer`);
+      lines.push(read.tokenRejected
+        ? `Codex sign-in sync skipped on ${record.label}: ${flyTokenRejectedMessage(read.tokenRejected)}`
+        : `Codex sign-in sync skipped on ${record.label}: the Fly machine did not answer`);
       continue;
     }
     const vm = read.state === 'present' ? parseCodexAuthSnapshot(read.raw) : null;
