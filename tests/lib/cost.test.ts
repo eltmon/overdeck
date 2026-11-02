@@ -235,6 +235,17 @@ describe('cost module', () => {
       expect(pricing?.outputPer1k).toBe(0.180);
       expect(pricing?.cacheReadPer1k).toBeUndefined();
     });
+
+    it.each([
+      ['gpt-6-rosalind', 0.015, 0.0015, 0.075],
+      ['gpt-6-astra-law', 0.010, 0.001, 0.050],
+    ] as const)('prices %s through its own exact row', (model, input, cached, output) => {
+      const pricing = getPricing('openai', model);
+      expect(pricing?.model).toBe(model);
+      expect(pricing?.inputPer1k).toBe(input);
+      expect(pricing?.cacheReadPer1k).toBe(cached);
+      expect(pricing?.outputPer1k).toBe(output);
+    });
   });
 
   describe('calculateCost - Standard Calculation', () => {

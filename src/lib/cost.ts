@@ -129,6 +129,10 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'openai', model: 'gpt-6.1-sol', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0001, currency: 'USD' },
   // gpt-6.1-terra per developers.openai.com/api/docs/models/gpt-6.1-terra (2026-10-26)
   { provider: 'openai', model: 'gpt-6.1-terra', inputPer1k: 0.001, outputPer1k: 0.005, cacheReadPer1k: 0.00005, currency: 'USD' },
+  // gpt-6-rosalind / gpt-6-astra-law per developers.openai.com/api/docs/pricing (checked 2026-11-02).
+  // Rosalind's >272K tier ($30/$3/$112.50) is not modeled, same as the GPT-5.6/6 rows. Astra for Law is promotional through at least 2026-12-31.
+  { provider: 'openai', model: 'gpt-6-rosalind', inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-6-astra-law', inputPer1k: 0.010, outputPer1k: 0.050, cacheReadPer1k: 0.001, currency: 'USD' },
   // gpt-6-sol / gpt-6-luna per developers.openai.com/api/docs/models/gpt-6-sol and /gpt-6-luna (2026-09-22)
   { provider: 'openai', model: 'gpt-6-sol', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0002, currency: 'USD' },
   { provider: 'openai', model: 'gpt-6-luna', inputPer1k: 0.0001, outputPer1k: 0.0005, cacheReadPer1k: 0.00001, currency: 'USD' },
