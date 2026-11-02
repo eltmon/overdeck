@@ -167,16 +167,14 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'custom', model: 'MiniMax-M2.7', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
   { provider: 'custom', model: 'MiniMax-M2.7-highspeed', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
   { provider: 'custom', model: 'MiniMax-M3', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
-  // Z.AI (GLM) — PAN-1935: previously absent, so pi-harness GLM agents recorded $0 cost.
-  // GLM-5.x: $1.4/M in, $4.4/M out (docs.z.ai/guides/overview/pricing). cacheRead set to
-  // ~7% of input to approximate Z.AI's context-cache discount — verify upstream and refine.
+  // Z.AI GLM, verified 2026-11-02 against docs.z.ai/guides/overview/pricing (cached-input storage is limited-time free).
   { provider: 'custom', model: 'glm-5.3-flashx', inputPer1k: 0.00037, outputPer1k: 0.00125, cacheReadPer1k: 0.000075, currency: 'USD' },
   { provider: 'custom', model: 'glm-5.3-flash', inputPer1k: 0.00015, outputPer1k: 0.0005, cacheReadPer1k: 0.00003, currency: 'USD' },
-  { provider: 'custom', model: 'glm-5.2', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.0001, currency: 'USD' },
-  { provider: 'custom', model: 'glm-5.1', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.0001, currency: 'USD' },
-  // GLM-4.7: approximate in/out split of the $1.5/M blended average — verify upstream.
-  { provider: 'custom', model: 'glm-4.7', inputPer1k: 0.0005, outputPer1k: 0.002, cacheReadPer1k: 0.00005, currency: 'USD' },
-  { provider: 'custom', model: 'glm-4.7-flash', inputPer1k: 0.0001, outputPer1k: 0.0005, currency: 'USD' },
+  { provider: 'custom', model: 'glm-5.3', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.00026, currency: 'USD' },
+  { provider: 'custom', model: 'glm-5.2', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.00026, currency: 'USD' },
+  { provider: 'custom', model: 'glm-5.1', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.00026, currency: 'USD' },
+  { provider: 'custom', model: 'glm-4.7-flash', inputPer1k: 0, outputPer1k: 0, currency: 'USD' }, // free tier
+  { provider: 'custom', model: 'glm-4.7', inputPer1k: 0.0006, outputPer1k: 0.0022, cacheReadPer1k: 0.00011, currency: 'USD' },
   // Alibaba DashScope Qwen, Singapore (ap-southeast-1), verified 2026-11-02 against
   // alibabacloud.com/help/en/model-studio/model-pricing. The pi reconciler maps dashscope → custom.
   // qwen3.7-plus: ≤256K-input rate, shown as a limited-time 20% discount; 256K–1M input is $1.20/$4.80.

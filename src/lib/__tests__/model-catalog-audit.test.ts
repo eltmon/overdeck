@@ -147,4 +147,9 @@ describe('November 2026 Gemini, Qwen and GLM refresh (PAN-4827)', () => {
       expect(MODEL_CAPABILITIES[id].supportsImages).toBe(true);
     }
   });
+
+  it('corrects the glm-4.7 and glm-4.7-flash capability costs', () => {
+    expect(MODEL_CAPABILITIES['glm-4.7'].costPer1MTokens).toBe(1.4);
+    expect(MODEL_CAPABILITIES['glm-4.7-flash'].costPer1MTokens).toBe(0);
+  });
 });

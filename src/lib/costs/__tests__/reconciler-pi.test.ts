@@ -38,6 +38,13 @@ describe('PAN-1935: pi-harness cost capture', () => {
       expect(getPricing('custom', 'glm-5.1')).not.toBeNull();
       expect(getPricing('custom', 'glm-4.7')).not.toBeNull();
     });
+
+    it('prices glm-5.3 and the corrected glm-5.2/glm-4.7 rates (PAN-4827)', () => {
+      expect(getPricing('custom', 'glm-5.3')).toMatchObject({ inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.00026 });
+      expect(getPricing('custom', 'glm-5.2')).toMatchObject({ cacheReadPer1k: 0.00026 });
+      expect(getPricing('custom', 'glm-4.7')).toMatchObject({ inputPer1k: 0.0006, outputPer1k: 0.0022 });
+      expect(getPricing('custom', 'glm-4.7-flash')).toMatchObject({ inputPer1k: 0, outputPer1k: 0 });
+    });
   });
 
   describe('extractPiCostEvents parses the pi transcript shape', () => {

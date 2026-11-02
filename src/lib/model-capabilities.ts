@@ -1037,7 +1037,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'glm-4.7',
     provider: 'zai',
     displayName: 'GLM-4.7 (deprecated)',
-    costPer1MTokens: 1.5,
+    costPer1MTokens: 1.4,
     contextWindow: 200000,
     skills: {
       'code-generation': 88,
@@ -1059,7 +1059,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'glm-4.7-flash',
     provider: 'zai',
     displayName: 'GLM-4.7 Flash (deprecated)',
-    costPer1MTokens: 0.3,
+    costPer1MTokens: 0,
     contextWindow: 200000,
     skills: {
       'code-generation': 78,
