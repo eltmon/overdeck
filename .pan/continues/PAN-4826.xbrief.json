@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4826",
   "created": "2026-11-02T16:31:08.878Z",
-  "updated": "2026-11-02T16:36:01.206Z",
+  "updated": "2026-11-02T16:36:08.556Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4826",
       "claimedAt": "2026-11-02T16:33:24.619Z",
       "doneAt": "2026-11-02T16:36:01.206Z"
+    },
+    "openai-picker-reprice": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T16:36:08.556Z"
     }
   }
 }
