@@ -540,3 +540,6 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Order (per each issue's Depends-on): PAN-4473 -> PAN-4474 -> PAN-4475; then PAN-4476, PAN-4477, PAN-4479, PAN-4480 in parallel; then PAN-4478 (needs 4476); PAN-4482 last (needs all).
 - PAN-4481 (hosted web join page): HOLD for an operator decision; start only when the operator gives the answer.
 - 2026-11-02 operator decision: PAN-4481 (hosted web join page) = BUILD IT. Hold released: queue it after PAN-4475 with slices 4476/4477/4479/4480 (still only after the Anywhere release ships). Conflict rule: PAN-4481 and phone-app PAN-4831 both touch services/account/src/pkce.ts, so never run them at the same time; start whichever comes second only after the first has merged.
+
+## 2026-11-02 20:32Z — Fly queue done; PAN-4774 started
+- All Anywhere Fly prerequisites merged and deployed (build 194adf91f96). Started PAN-4774 (release acceptance run); the operator's hosted-services and `pan account login` device-flow note was posted as an issue comment and sent to the planner. When the agent sends a device code, the Flywheel approves it (operator-authorized). PAN-4823 phone-app and Shared Sessions slices stay held until PAN-4774 passes and the release ships.
