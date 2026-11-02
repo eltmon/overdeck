@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4722",
   "created": "2026-11-02T15:37:17.298Z",
-  "updated": "2026-11-02T15:58:20.354Z",
+  "updated": "2026-11-02T16:00:42.557Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
       "claimedBy": "agent-pan-4722",
       "claimedAt": "2026-11-02T15:56:33.131Z",
       "doneAt": "2026-11-02T15:58:20.354Z"
+    },
+    "runtime-detect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:00:42.557Z"
     }
   }
 }
