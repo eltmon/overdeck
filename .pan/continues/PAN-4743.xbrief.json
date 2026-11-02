@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T14:52:57.384Z",
+  "updated": "2026-11-02T14:53:11.357Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "fly-target-door.ac5": {
       "status": "completed",
       "doneAt": "2026-11-02T14:52:57.383Z"
+    },
+    "resolver-fly-branch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:53:11.357Z"
     }
   }
 }
