@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { effectiveTerminalPalette, type ColorTheme, type TerminalPalette } from '@overdeck/contracts';
 import { uiTokenStyles } from '../../../lib/uiTokenStyles';
-import { ensureSyntaxTheme, highlight, syntaxThemeName } from '../../../lib/syntaxTheme';
+import { ensureSyntaxTheme, highlight } from '../../../lib/syntaxTheme';
 
 const ANSI_KEYS: Array<keyof TerminalPalette> = [
   'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white',
@@ -67,11 +67,10 @@ function UiPreview({ theme }: { theme: ColorTheme }) {
 
 function CodePreview({ theme }: { theme: ColorTheme }) {
   const [html, setHtml] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
-    timerRef.current = setTimeout(() => {
+    const timer = setTimeout(() => {
       void ensureSyntaxTheme(theme).then((name) => highlight(SAMPLE, 'ts', name)).then((result) => {
         if (!cancelled) setHtml(result);
       }).catch(() => { /* registration or highlighting failed; keep the plain-text fallback */ });
@@ -79,13 +78,14 @@ function CodePreview({ theme }: { theme: ColorTheme }) {
 
     return () => {
       cancelled = true;
-      clearTimeout(timerRef.current);
+      clearTimeout(timer);
     };
   }, [theme]);
 
   return (
     <div data-testid="color-theme-preview-code" className="mt-2 text-xs">
       {html !== null
+        // eslint-disable-next-line react/no-danger
         ? <div dangerouslySetInnerHTML={{ __html: html }} />
         : <pre className="whitespace-pre-wrap">{SAMPLE}</pre>}
     </div>
@@ -98,7 +98,7 @@ export function ColorThemeEditorPreview({ theme }: { theme: ColorTheme }) {
     <div className="space-y-2" data-testid="color-theme-editor-preview">
       <TerminalPreview theme={theme} />
       <UiPreview theme={theme} />
-      <CodePreview key={syntaxThemeName(theme)} theme={theme} />
+      <CodePreview theme={theme} />
     </div>
   );
 }
