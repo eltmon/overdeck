@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4752",
   "created": "2026-11-02T00:18:49.972Z",
-  "updated": "2026-11-02T00:35:01.063Z",
+  "updated": "2026-11-02T00:36:35.933Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-02T00:34:53.004Z"
     },
     "pane-strike-badge": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4752",
-      "claimedAt": "2026-11-02T00:35:01.062Z"
+      "claimedAt": "2026-11-02T00:35:01.062Z",
+      "doneAt": "2026-11-02T00:36:35.933Z"
     }
   }
 }
