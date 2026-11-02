@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4638",
   "created": "2026-11-01T22:48:41.855Z",
-  "updated": "2026-11-02T00:51:46.058Z",
+  "updated": "2026-11-02T00:51:47.949Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -301,7 +301,7 @@
       "doneAt": "2026-11-02T00:02:27.961Z"
     },
     "live-three-machine-run": {
-      "status": "blocked",
+      "status": "cancelled",
       "claimedBy": "agent-pan-4638",
       "claimedAt": "2026-11-02T00:04:36.263Z"
     },
