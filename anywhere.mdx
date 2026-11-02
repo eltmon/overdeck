@@ -175,41 +175,77 @@ consists of hosted services.
     from any of your machines and continue one from any saved version.
     [PAN-2609](https://github.com/eltmon/overdeck/issues/2609)
   </Step>
-  <Step title="One Overdeck server per machine">
-    **Partly shipped. Free, open source.**
+  <Step title="One Overdeck server per machine, linked">
+    **Shipped (next release). Free, open source.**
 
-    Shipped: machine identity, pairing and device sessions. Planned: a list of your machines
-    with an environment switcher, advertised endpoints, then SSH hosts and remote servers.
+    Each machine runs its own Overdeck server with its own identity, and your machines link
+    over an end-to-end encrypted channel on any route: LAN, Tailscale, a direct connection or
+    the relay. Add SSH hosts, fresh servers with `pan connect` and Fly VMs as machines. The
+    desktop app opens any of your machines' dashboards with no local server, and **Update all**
+    keeps them on one version. Conversations and work move between them: remote control,
+    **Pull here**, delegation and **Auto** placement. See
+    [Linked machines](/configuration/linked-machines).
     [PAN-3762](https://github.com/eltmon/overdeck/issues/3762),
-    [PAN-4402](https://github.com/eltmon/overdeck/issues/4402),
+    [PAN-4645](https://github.com/eltmon/overdeck/issues/4645),
     [PAN-4403](https://github.com/eltmon/overdeck/issues/4403),
-    [PAN-3863](https://github.com/eltmon/overdeck/issues/3863),
-    [PAN-4404](https://github.com/eltmon/overdeck/issues/4404)
+    [PAN-4404](https://github.com/eltmon/overdeck/issues/4404),
+    [PAN-4656](https://github.com/eltmon/overdeck/issues/4656),
+    [PAN-4402](https://github.com/eltmon/overdeck/issues/4402),
+    [PAN-4650](https://github.com/eltmon/overdeck/issues/4650),
+    [PAN-4651](https://github.com/eltmon/overdeck/issues/4651),
+    [PAN-4654](https://github.com/eltmon/overdeck/issues/4654)
   </Step>
   <Step title="Notifications, remote access and a mobile web app">
-    **Planned. Free, open source.**
+    **Shipped (next release). Free, open source.**
 
-    Needs-you notifications sent to a notification service you configure, remote dashboard
-    access through a tunnel you control, and a mobile web app.
+    Needs-you notifications are sent from your own machine with Web Push, encrypted so the
+    push service cannot read them, with ntfy as an option. Remote access goes through
+    Tailscale Serve, which Overdeck installs and sets up for you, instead of a tunnel. The
+    phone app is an installable web app reached over Tailscale. See
+    [Push notifications](/configuration/push-notifications),
+    [Tailscale](/configuration/tailscale) and [Phone](/configuration/phone).
     [PAN-2354](https://github.com/eltmon/overdeck/issues/2354),
-    [PAN-2352](https://github.com/eltmon/overdeck/issues/2352),
-    [PAN-2355](https://github.com/eltmon/overdeck/issues/2355)
+    [PAN-2355](https://github.com/eltmon/overdeck/issues/2355),
+    [PAN-1254](https://github.com/eltmon/overdeck/issues/1254)
   </Step>
-  <Step title="Remote agent workspaces on Fly.io">
-    **Planned. Free, open source; you pay Fly directly.**
+  <Step title="Fly VMs as machines">
+    **Shipped (next release). Free, open source; you pay Fly directly.**
 
-    Remote agent workspaces on Fly.io that you run yourself.
-    [PAN-1775](https://github.com/eltmon/overdeck/issues/1775),
-    [PAN-1676](https://github.com/eltmon/overdeck/issues/1676)
+    `pan machines add-fly` starts a Fly.io VM that runs Overdeck and links to your machine,
+    so it runs conversations and gauntlet lanes like any other linked machine. See
+    [Fly machines](/configuration/linked-machines#fly-machines).
+    [PAN-4652](https://github.com/eltmon/overdeck/issues/4652),
+    [PAN-4638](https://github.com/eltmon/overdeck/issues/4638)
+
+    Still planned: Fly work agents as linked conversations on the VM's server
+    ([PAN-4734](https://github.com/eltmon/overdeck/issues/4734)), and moving a workspace between
+    your machine and Fly ([PAN-1676](https://github.com/eltmon/overdeck/issues/1676)).
+  </Step>
+  <Step title="Webhook triggers and the MCP server">
+    **Shipped (next release). Free, open source.**
+
+    Webhook triggers start or message a conversation when a service such as GitHub or Stripe
+    posts to it, published through Tailscale Funnel or held by the directory inbox while a
+    machine is offline. The MCP server lets an MCP client read and message your conversations
+    on every linked machine. See [Webhook triggers](/configuration/triggers) and
+    [MCP server](/configuration/mcp).
+    [PAN-4648](https://github.com/eltmon/overdeck/issues/4648),
+    [PAN-4649](https://github.com/eltmon/overdeck/issues/4649)
+
+    Still planned: the Hermes external-agent bridge
+    ([PAN-2353](https://github.com/eltmon/overdeck/issues/2353)).
   </Step>
   <Step title="Hosted services on overdeck.ai">
-    **Account service and directory built (invite-only); the rest planned. This is the paid plan above.**
+    **Account service, directory, relay add-on and webhook inbox built (next release,
+    invite-only); billing, the hosted vault and shared sessions planned. This is the paid plan
+    above.**
 
-    An account, the subscription, the hosted Session Vault, the directory with direct
-    connections, the relay add-on and the webhook inbox (built, in the next release), then
-    shared sessions. The account service is built and invite-only: testers are added by the
-    operator, and the hosted vault cap is 5 GB per tester. A machine signs in with
-    [`pan account login`](/cli/account), which runs once per machine and is optional.
+    The account service, the directory with direct connections, the relay add-on and the
+    webhook inbox are built and ship in the next release. overdeck.ai accounts are invite-only:
+    testers are added by the operator. A machine signs in with
+    [`pan account login`](/cli/account), which runs once per machine and is optional. Still
+    planned: billing, the hosted Session Vault and shared sessions. The share service for
+    shared sessions is built, but the dashboard cannot share a session yet.
 
     The server code for these services is published in
     [`services/`](https://github.com/eltmon/overdeck/tree/main/services) under the
@@ -217,10 +253,12 @@ consists of hosted services.
     modify and self-host it, but not offer it as a competing commercial service, and each
     release becomes MIT two years after it ships. Everything else in Overdeck stays MIT.
     [PAN-4293](https://github.com/eltmon/overdeck/issues/4293),
+    [PAN-2356](https://github.com/eltmon/overdeck/issues/2356),
+    [PAN-4330](https://github.com/eltmon/overdeck/issues/4330),
     [PAN-4294](https://github.com/eltmon/overdeck/issues/4294),
     [PAN-4297](https://github.com/eltmon/overdeck/issues/4297),
-    [PAN-2356](https://github.com/eltmon/overdeck/issues/2356),
-    [PAN-658](https://github.com/eltmon/overdeck/issues/658)
+    [PAN-658](https://github.com/eltmon/overdeck/issues/658),
+    [PAN-4473](https://github.com/eltmon/overdeck/issues/4473)
   </Step>
   <Step title="Hosted agent capacity">
     **Planned. Billed separately by usage.**
