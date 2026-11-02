@@ -598,7 +598,7 @@ describe('generateLauncherScript', () => {
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --issue 'PAN-824' --plugin-link '<OVERDECK_HOME>/launch/plan-abc/skill-packs')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       if [ -d '<OVERDECK_HOME>/launch/plan-abc/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='<OVERDECK_HOME>/launch/plan-abc/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi
-      if [ -f '<OVERDECK_HOME>/launch/plan-abc/deft.env' ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; esac; done < '<OVERDECK_HOME>/launch/plan-abc/deft.env'; fi
+      if [ -f '<OVERDECK_HOME>/launch/plan-abc/deft.env' ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; DEFT_RUN_SUMMARY_PATH=overdeck) export DEFT_RUN_SUMMARY_PATH='/workspace/project/.overdeck/deft-run-summary.jsonl' ;; esac; done < '<OVERDECK_HOME>/launch/plan-abc/deft.env'; fi
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       trap '' HUP
@@ -920,7 +920,7 @@ describe('generateLauncherScript', () => {
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --issue 'PAN-824' --plugin-link '<OVERDECK_HOME>/launch/spec-123/skill-packs')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       if [ -d '<OVERDECK_HOME>/launch/spec-123/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='<OVERDECK_HOME>/launch/spec-123/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi
-      if [ -f '<OVERDECK_HOME>/launch/spec-123/deft.env' ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; esac; done < '<OVERDECK_HOME>/launch/spec-123/deft.env'; fi
+      if [ -f '<OVERDECK_HOME>/launch/spec-123/deft.env' ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; DEFT_RUN_SUMMARY_PATH=overdeck) export DEFT_RUN_SUMMARY_PATH='/workspace/project/.overdeck/deft-run-summary.jsonl' ;; esac; done < '<OVERDECK_HOME>/launch/spec-123/deft.env'; fi
       cd -- '/workspace/project'
       unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
@@ -1028,7 +1028,7 @@ describe('generateLauncherScript', () => {
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --plugin-link '<OVERDECK_HOME>/launch/sess-xyz/skill-packs')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       if [ -d '<OVERDECK_HOME>/launch/sess-xyz/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='<OVERDECK_HOME>/launch/sess-xyz/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi
-      if [ -f '<OVERDECK_HOME>/launch/sess-xyz/deft.env' ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; esac; done < '<OVERDECK_HOME>/launch/sess-xyz/deft.env'; fi
+      if [ -f '<OVERDECK_HOME>/launch/sess-xyz/deft.env' ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; DEFT_RUN_SUMMARY_PATH=overdeck) export DEFT_RUN_SUMMARY_PATH='/workspace/project/.overdeck/deft-run-summary.jsonl' ;; esac; done < '<OVERDECK_HOME>/launch/sess-xyz/deft.env'; fi
       cd -- '/workspace/project'
       unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
@@ -1110,7 +1110,7 @@ describe('generateLauncherScript', () => {
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --issue 'PAN-824' --plugin-link '<OVERDECK_HOME>/launch/sess-conv/skill-packs')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       if [ -d '<OVERDECK_HOME>/launch/sess-conv/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='<OVERDECK_HOME>/launch/sess-conv/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi
-      if [ -f '<OVERDECK_HOME>/launch/sess-conv/deft.env' ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; esac; done < '<OVERDECK_HOME>/launch/sess-conv/deft.env'; fi
+      if [ -f '<OVERDECK_HOME>/launch/sess-conv/deft.env' ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; DEFT_RUN_SUMMARY_PATH=overdeck) export DEFT_RUN_SUMMARY_PATH='/workspace/project/.overdeck/deft-run-summary.jsonl' ;; esac; done < '<OVERDECK_HOME>/launch/sess-conv/deft.env'; fi
       cd -- '/workspace/project'
       trap '' HUP
       set -m
@@ -1658,7 +1658,7 @@ describe('generateLauncherWrapper', () => {
           `if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --plugin-link '${tempHome}/launch/sess-abc/skill-packs')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi`,
           `case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac`,
           `if [ -d '${tempHome}/launch/sess-abc/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='${tempHome}/launch/sess-abc/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi`,
-          `if [ -f '${tempHome}/launch/sess-abc/deft.env' ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; esac; done < '${tempHome}/launch/sess-abc/deft.env'; fi`,
+          `if [ -f '${tempHome}/launch/sess-abc/deft.env' ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; DEFT_RUN_SUMMARY_PATH=overdeck) export DEFT_RUN_SUMMARY_PATH='/workspace/project/.overdeck/deft-run-summary.jsonl' ;; esac; done < '${tempHome}/launch/sess-abc/deft.env'; fi`,
           "cd -- '/workspace/project'",
           'set -m',
           "claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} ${PAN_SKILL_PLUGIN_DIR:+--plugin-dir \"$PAN_SKILL_PLUGIN_DIR\"} --session-id 'sess-abc'",
@@ -2302,7 +2302,7 @@ describe('generateLauncherScript — skill overrides (PAN-3942)', () => {
       `pan skills launch-settings --harness codex --cwd '/workspace/project' --codex-home "$CODEX_HOME" || echo "[launcher] WARNING: skill overrides not applied" >&2`,
     );
     const deftIndex = lines.indexOf(
-      `if [ -f "$CODEX_HOME/overdeck-deft.env" ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; esac; done < "$CODEX_HOME/overdeck-deft.env"; fi`,
+      `if [ -f "$CODEX_HOME/overdeck-deft.env" ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; DEFT_RUN_SUMMARY_PATH=overdeck) export DEFT_RUN_SUMMARY_PATH='/workspace/project/.overdeck/deft-run-summary.jsonl' ;; esac; done < "$CODEX_HOME/overdeck-deft.env"; fi`,
     );
     const codexIndex = lines.findIndex(line => /\bcodex exec\b/.test(line));
     expect(exportIndex).toBeGreaterThan(-1);
