@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS, getModelEffortLevels } from '../model-capabilities.js';
+import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS, getModelEffortLevels, resolveModelId } from '../model-capabilities.js';
 import { getProviderForModel, PROVIDERS } from '../providers.js';
 import { apiLaunchModelId } from '../model-context-windows.js';
 import { getClaudeCodeContextPolicyForModel } from '../agents/provider-env.js';
@@ -48,6 +48,7 @@ describe('September model catalog no-loss audit', () => {
     ['qwen3.7-plus', 'dashscope', 1000000],
     ['qwen3.8-flash', 'dashscope', 1000000],
     ['mimo-v2.5', 'mimo', 1048576],
+    ['gemini-3.1-flash-lite', 'google', 1048576],
   ] as const)('registers %s with the intended context and provider', (id, provider, contextWindow) => {
     expect(MODEL_CAPABILITIES[id].contextWindow).toBe(contextWindow);
     expect(getProviderForModel(id).name).toBe(provider);
@@ -78,5 +79,19 @@ describe('September model catalog no-loss audit', () => {
     const capability = MODEL_CAPABILITIES['claude-opus-5-5'];
     expect(capability.maxOutputTokens).toBe(128000);
     expect(capability.effortLevels).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
+  });
+});
+
+describe('November 2026 Gemini, Qwen and GLM refresh (PAN-4827)', () => {
+  it('retires gemini-3.1-flash-lite-preview to the GA id', () => {
+    const id = 'gemini-3.1-flash-lite-preview';
+    const target = 'gemini-3.1-flash-lite';
+    expect(MODEL_DEPRECATIONS[id]).toBe(target);
+    expect(resolveModelId(id)).toBe(target);
+    expect(Object.hasOwn(MODEL_DEPRECATIONS, target)).toBe(false);
+    expect(PROVIDERS.google.models).toContain(target);
+    expect(PROVIDERS.google.models).not.toContain(id);
+    expect(Object.hasOwn(MODEL_CAPABILITIES, id)).toBe(true);
+    expect(PROVIDERS.google.tierModels.haiku).toBe(target);
   });
 });

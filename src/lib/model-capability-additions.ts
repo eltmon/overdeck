@@ -165,6 +165,29 @@ export const AUDITED_MODEL_ADDITIONS = {
     notes: 'Stable Google model. 1,048,576 input tokens and 65,536 maximum output tokens; verified September 2026.',
   },
 
+  'gemini-3.1-flash-lite': {
+    model: 'gemini-3.1-flash-lite',
+    provider: 'google',
+    displayName: 'Gemini 3.1 Flash Lite',
+    costPer1MTokens: 0.875,
+    contextWindow: 1048576,
+    maxOutputTokens: 65536,
+    skills: {
+      'code-generation': 72,
+      'code-review': 68,
+      debugging: 65,
+      planning: 60,
+      documentation: 70,
+      testing: 65,
+      security: 52,
+      performance: 62,
+      synthesis: 68,
+      speed: 98, // Most cost-efficient
+      'context-length': 100,
+    },
+    notes: 'Stable Google model (GA successor of gemini-3.1-flash-lite-preview). 1,048,576 input tokens, 65,536 output. $0.25/M input, $1.50/M output, $0.025/M cached (text). Google shuts it down 2027-05-07; replacement gemini-3.5-flash-lite. Verified 2026-11-02.',
+  },
+
   'glm-5.3': {
     model: 'glm-5.3',
     provider: 'zai',

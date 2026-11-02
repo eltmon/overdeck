@@ -772,7 +772,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   'gemini-3.1-flash-lite-preview': {
     model: 'gemini-3.1-flash-lite-preview',
     provider: 'google',
-    displayName: 'Gemini 3.1 Flash Lite',
+    displayName: 'Gemini 3.1 Flash Lite Preview (deprecated)',
     costPer1MTokens: 0.9, // $0.25 in / $1.50 out
     contextWindow: 1000000,
     skills: {
@@ -788,7 +788,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 98, // Most cost-efficient
       'context-length': 100,
     },
-    notes: 'Most cost-efficient Google model. Great for high-volume, latency-sensitive workloads.',
+    notes: 'Shut down 2026-05-25; migrates to gemini-3.1-flash-lite. Row kept for historical pricing.',
   },
 
   // Legacy Google IDs — deprecated aliases kept for backward compat with saved configs

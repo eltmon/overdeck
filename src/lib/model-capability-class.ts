@@ -82,6 +82,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'gpt-6-luna': 'small',
   'gpt-5.6-luna[372k]': 'small',
   'gemini-3.1-flash-lite-preview': 'small',
+  'gemini-3.1-flash-lite': 'small',
   'gemini-3.5-flash-lite': 'small',
   'glm-4.7-flash': 'small',
   'ql-nano-1b': 'small',

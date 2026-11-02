@@ -27,6 +27,9 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   'gemini-3-flash': 'gemini-3-flash-preview',
   'gemini-2.5-pro': 'gemini-3.1-pro-preview',
   'gemini-2.5-flash': 'gemini-3-flash-preview',
+  // Shut down 2026-05-25 (ai.google.dev/gemini-api/docs/deprecations). The GA id itself
+  // is scheduled to shut down 2027-05-07 → gemini-3.5-flash-lite.
+  'gemini-3.1-flash-lite-preview': 'gemini-3.1-flash-lite',
   // Kimi deprecated — K2.5/K2.6 generation retired 2026-07-30; the CLI catalog
   // never carried these ids, so no native harness could launch them. They remap
   // to the closest-priced live coding model, not the $9 K3 flagship.

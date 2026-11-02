@@ -16,9 +16,9 @@ describe('providers', () => {
       GEMINI_API_KEY: 'AIza-test',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'gemini-3.1-pro-preview',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'gemini-3-flash-preview',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gemini-3.1-flash-lite-preview',
-      ANTHROPIC_SMALL_FAST_MODEL: 'gemini-3.1-flash-lite-preview',
-      CLAUDE_CODE_SUBAGENT_MODEL: 'gemini-3.1-flash-lite-preview',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gemini-3.1-flash-lite',
+      ANTHROPIC_SMALL_FAST_MODEL: 'gemini-3.1-flash-lite',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'gemini-3.1-flash-lite',
     });
   });
 

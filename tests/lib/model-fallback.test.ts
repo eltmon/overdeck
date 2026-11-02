@@ -153,10 +153,11 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3.1-pro-preview');
       expect(models).toContain('gemini-3-flash-preview');
       expect(models).toContain('gemini-3.1-flash-lite-preview');
+      expect(models).toContain('gemini-3.1-flash-lite');
       expect(models).toContain('gemini-3-pro-preview'); // legacy
       expect(models).toContain('gemini-2.5-pro'); // legacy
       expect(models).toContain('gemini-2.5-flash'); // legacy
-      expect(models).toHaveLength(9);
+      expect(models).toHaveLength(10);
     });
 
     it('should return all Nous Portal models', () => {
@@ -423,7 +424,8 @@ describe('model-fallback', () => {
 
       expect(models).toContain('gemini-3.1-pro-preview');
       expect(models).toContain('gemini-3-flash-preview');
-      expect(models).toContain('gemini-3.1-flash-lite-preview');
+      expect(models).not.toContain('gemini-3.1-flash-lite-preview');
+      expect(models).toContain('gemini-3.1-flash-lite');
       expect(models).not.toContain('gemini-2.5-pro');
       expect(models).not.toContain('gemini-2.5-flash');
       expect(models.length).toBe(18); // 12 Anthropic + 6 current Google

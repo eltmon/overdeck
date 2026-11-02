@@ -88,7 +88,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'gemini-3.8-flash' as ModelId, name: 'Gemini 3.8 Flash (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 5.25, capabilities: ['reasoning', 'large-context', 'code'], description: 'Current model; see provider documentation for availability and pricing.' },
       { id: 'gemini-3.1-pro-preview' as ModelId, name: 'Gemini 3.1 Pro (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 7, capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship, 1M context, strong agentic coding' },
       { id: 'gemini-3.5-flash-lite' as ModelId, name: 'Gemini 3.5 Flash Lite (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 1.4, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
-      { id: 'gemini-3.1-flash-lite-preview' as ModelId, name: 'Gemini 3.1 Flash Lite (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.9, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Most cost-efficient Google model' },
+      { id: 'gemini-3.1-flash-lite' as ModelId, name: 'Gemini 3.1 Flash Lite (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.875, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'GA successor of the 3.1 Flash Lite preview. $0.25/$1.50 per MTok. Google shuts it down 2027-05-07 (replacement: 3.5 Flash Lite).' },
     ],
   },
   kimi: {
