@@ -9,7 +9,7 @@ const ANSI_KEYS: Array<keyof TerminalPalette> = [
   'brightBlack', 'brightRed', 'brightGreen', 'brightYellow', 'brightBlue', 'brightMagenta', 'brightCyan', 'brightWhite',
 ];
 
-const UI_KEYS: Array<keyof NonNullable<ColorTheme['ui']>> = ['background', 'surface', 'border', 'foreground', 'muted', 'accent'];
+const UI_KEYS: Array<keyof NonNullable<ColorTheme['ui']>> = ['background', 'surface', 'overlay', 'border', 'foreground', 'muted', 'accent'];
 
 const SAMPLE_CODE = 'function greet(name: string) {\n  return `Hello, ${name}!`;\n}';
 

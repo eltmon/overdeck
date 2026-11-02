@@ -40,13 +40,15 @@ const TERMINAL_PALETTE_KEYS: ReadonlyArray<keyof TerminalPalette> = [
 export interface ColorThemeUi {
   background?: string
   surface?: string
+  /** Modal/dialog surface (PAN-4755). */
+  overlay?: string
   border?: string
   foreground?: string
   muted?: string
   accent?: string
 }
 
-const UI_KEYS: ReadonlyArray<keyof ColorThemeUi> = ["background", "surface", "border", "foreground", "muted", "accent"]
+const UI_KEYS: ReadonlyArray<keyof ColorThemeUi> = ["background", "surface", "overlay", "border", "foreground", "muted", "accent"]
 
 export interface TokenColorSettings {
   foreground?: string
