@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4722",
   "created": "2026-11-02T15:37:17.298Z",
-  "updated": "2026-11-02T15:42:34.342Z",
+  "updated": "2026-11-02T15:47:32.207Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-02T15:42:13.150Z"
     },
     "install-target": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4722",
-      "claimedAt": "2026-11-02T15:42:34.341Z"
+      "claimedAt": "2026-11-02T15:42:34.341Z",
+      "doneAt": "2026-11-02T15:47:32.207Z"
     }
   }
 }
