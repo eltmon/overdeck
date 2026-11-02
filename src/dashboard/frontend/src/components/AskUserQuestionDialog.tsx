@@ -15,7 +15,7 @@
  * `deliverAgentMessage` pipeline.
  */
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
-import { Loader2, MessageCircleQuestion, Minus } from 'lucide-react'
+import { Check, Loader2, MessageCircleQuestion, Minus } from 'lucide-react'
 import { formatIssueRef } from '../lib/issueLabel'
 import { ChatMarkdown } from './chat/ChatMarkdown'
 import { bucketCount, capture } from '../lib/telemetry'
@@ -52,6 +52,9 @@ export interface AskUserQuestionSubject {
 /** Elements the Tab trap cycles through inside the dialog panel. */
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 
+/** Visible keyboard focus ring shared by every control in the dialog (FR-10). */
+const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+
 interface AskUserQuestionDialogProps {
   subject: AskUserQuestionSubject | null
   isOpen: boolean
@@ -74,8 +77,9 @@ export function AskUserQuestionDialog({
   // option (delivered as a keystroke), not free text, so the custom-answer box
   // is hidden for them.
   const isCodexApproval = pending?.toolUseId?.startsWith('codex-approval:') ?? false
-  // One selected label per question, initialized empty so we can validate.
-  const [selections, setSelections] = useState<string[]>(() => questions.map(() => ''))
+  // The chosen labels per question: at most one for single-choice questions,
+  // any number for multiSelect ones. Empty until the operator picks.
+  const [selections, setSelections] = useState<string[][]>(() => questions.map(() => []))
   const [customText, setCustomText] = useState('')
   // App keeps this dialog mounted across questions, so reset the answer state
   // whenever a different question arrives. Stale selections from an earlier
@@ -85,13 +89,16 @@ export function AskUserQuestionDialog({
   const [answeredKey, setAnsweredKey] = useState(questionKey)
   if (answeredKey !== questionKey) {
     setAnsweredKey(questionKey)
-    setSelections(questions.map(() => ''))
+    setSelections(questions.map(() => []))
     setCustomText('')
   }
 
   const panelRef = useRef<HTMLDivElement>(null)
+  const noteId = useId()
   const titleId = useId()
-  const descriptionId = useId()
+  // Each question's text gets `${questionIdBase}-<index>`; the first one also
+  // describes the dialog.
+  const questionIdBase = useId()
   const isVisible = isOpen && !!agent && !!pending && questions.length > 0
 
   // PAN-4754 FR-8 — move focus into the dialog on open (the selected option,
@@ -113,7 +120,25 @@ export function AskUserQuestionDialog({
 
   const issueRef = formatIssueRef(agent.issueId, agent.issueTitle)
   const displayName = issueRef ?? (agent.title?.trim() || agent.id)
-  const allSelected = selections.length === questions.length && selections.every((s) => s.length > 0)
+  const allSelected = selections.length === questions.length && selections.every((chosen) => chosen.length > 0)
+  // A multiSelect answer lists the chosen labels in option order.
+  const answerFor = (qIdx: number): string =>
+    questions[qIdx].options.map((o) => o.label).filter((label) => selections[qIdx]?.includes(label)).join(', ')
+
+  // Single-choice picks replace the choice; multiSelect picks toggle it.
+  const chooseOption = (qIdx: number, label: string): void => {
+    setSelections((prev) => {
+      const next = [...prev]
+      const chosen = next[qIdx] ?? []
+      if (questions[qIdx]?.multiSelect) {
+        next[qIdx] = chosen.includes(label) ? chosen.filter((l) => l !== label) : [...chosen, label]
+      } else {
+        next[qIdx] = [label]
+      }
+      return next
+    })
+    setCustomText('')
+  }
   const canSubmit = allSelected || customText.trim().length > 0
 
   const handleSubmit = (): void => {
@@ -126,7 +151,7 @@ export function AskUserQuestionDialog({
     if (isCustom) {
       onSubmit([customText.trim()])
     } else if (allSelected) {
-      onSubmit(selections)
+      onSubmit(questions.map((_, qIdx) => answerFor(qIdx)))
     }
   }
 
@@ -158,7 +183,7 @@ export function AskUserQuestionDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={descriptionId}
+        aria-describedby={`${questionIdBase}-0`}
         onKeyDown={handlePanelKeyDown}
         className="w-full max-w-2xl overflow-hidden rounded-xl border border-primary/30 bg-card shadow-2xl"
       >
@@ -178,7 +203,7 @@ export function AskUserQuestionDialog({
             disabled={isSubmitting}
             title="Minimize — keeps the question in the activity feed's “Needs you” list"
             aria-label="Minimize"
-            className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            className={`shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING}`}
           >
             <Minus className="h-4 w-4" />
           </button>
@@ -207,39 +232,41 @@ export function AskUserQuestionDialog({
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{q.header}</p>
               ) : null}
               <div
-                id={qIdx === 0 ? descriptionId : undefined}
+                id={`${questionIdBase}-${qIdx}`}
                 className="text-sm text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
               >
                 <ChatMarkdown text={q.question} cwd={undefined} />
               </div>
-              <div className="space-y-1">
+              <div
+                role={q.multiSelect ? 'group' : 'radiogroup'}
+                aria-labelledby={`${questionIdBase}-${qIdx}`}
+                className="space-y-1"
+              >
                 {q.options.map((opt, oIdx) => {
-                  const isSelected = selections[qIdx] === opt.label
+                  const isSelected = selections[qIdx]?.includes(opt.label) ?? false
                   return (
                     <button
                       key={`q-${qIdx}-opt-${oIdx}`}
                       type="button"
+                      role={q.multiSelect ? 'checkbox' : 'radio'}
+                      aria-checked={isSelected}
                       data-dialog-option=""
                       data-selected={isSelected ? 'true' : undefined}
-                      onClick={() => {
-                        setSelections((prev) => {
-                          const next = [...prev]
-                          next[qIdx] = opt.label
-                          return next
-                        })
-                        setCustomText('')
-                      }}
+                      onClick={() => chooseOption(qIdx, opt.label)}
                       disabled={isSubmitting}
-                      className={`w-full rounded-md border px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                      className={`flex w-full items-start gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING} ${
                         isSelected
                           ? 'border-primary bg-primary/10 text-foreground'
                           : 'border-border bg-background/40 text-foreground hover:bg-background/80'
                       }`}
                     >
-                      <span className="font-medium">{opt.label}</span>
-                      {opt.description ? (
-                        <span className="ml-2 text-xs text-muted-foreground">{opt.description}</span>
-                      ) : null}
+                      <span className="min-w-0 flex-1">
+                        <span className="font-medium">{opt.label}</span>
+                        {opt.description ? (
+                          <span className="ml-2 text-xs text-muted-foreground">{opt.description}</span>
+                        ) : null}
+                      </span>
+                      {isSelected ? <Check aria-hidden="true" data-testid="option-check" className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> : null}
                     </button>
                   )
                 })}
@@ -257,21 +284,22 @@ export function AskUserQuestionDialog({
 
           {!isCodexApproval && (
             <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <label htmlFor={noteId} className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Or type a custom answer
-              </p>
+              </label>
               <textarea
+                id={noteId}
                 value={customText}
                 onChange={(e) => {
                   setCustomText(e.target.value)
                   if (e.target.value.length > 0) {
-                    setSelections(questions.map(() => ''))
+                    setSelections(questions.map(() => []))
                   }
                 }}
                 disabled={isSubmitting}
                 rows={2}
                 placeholder="Free-form prose response — submitted instead of any clicked option."
-                className="w-full rounded-md border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                className={`w-full rounded-md border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground ${FOCUS_RING} disabled:cursor-not-allowed disabled:opacity-60`}
               />
             </div>
           )}
@@ -283,7 +311,7 @@ export function AskUserQuestionDialog({
             onClick={onDismiss}
             disabled={isSubmitting}
             title="Keeps the question in the activity feed's “Needs you” list — click it there to reopen"
-            className="rounded-md border border-border bg-popover px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-card disabled:cursor-not-allowed disabled:opacity-60"
+            className={`rounded-md border border-border bg-popover px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-card disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING}`}
           >
             Minimize
           </button>
@@ -291,7 +319,7 @@ export function AskUserQuestionDialog({
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting || !canSubmit}
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className={`inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING}`}
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             Send Answer

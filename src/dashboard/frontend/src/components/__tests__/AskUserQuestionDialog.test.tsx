@@ -119,7 +119,7 @@ describe('AskUserQuestionDialog markdown', () => {
     expect(screen.getByText('Pick a path.').closest('div')).not.toHaveTextContent('tried A');
     const notesLabel = screen.getByText("Agent's notes");
     expect(notesLabel.parentElement).toHaveTextContent('tried A');
-    const lastOption = screen.getByRole('button', { name: 'No' });
+    const lastOption = screen.getByRole('radio', { name: 'No' });
     expect(lastOption.compareDocumentPosition(notesLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -195,5 +195,72 @@ describe('AskUserQuestionDialog accessibility', () => {
     rerender(<AskUserQuestionDialog subject={subject} isOpen={false} onSubmit={vi.fn()} onDismiss={vi.fn()} />);
     expect(document.activeElement).toBe(opener);
     opener.remove();
+  });
+});
+
+describe('AskUserQuestionDialog option semantics', () => {
+  function renderWith(question: { question: string; multiSelect?: boolean; options: Array<{ label: string }> }) {
+    const onSubmit = vi.fn();
+    render(
+      <AskUserQuestionDialog
+        subject={{
+          id: 'agent-pan-1',
+          pendingAskUserQuestion: {
+            toolUseId: 'toolu_semantics',
+            askedAt: '2026-11-01T12:00:00.000Z',
+            questions: [question],
+          },
+        }}
+        isOpen
+        onSubmit={onSubmit}
+        onDismiss={vi.fn()}
+      />,
+    );
+    return onSubmit;
+  }
+
+  it('single-choice options are radios with aria-checked', () => {
+    renderWith({ question: 'Pick one?', options: [{ label: 'A' }, { label: 'B' }] });
+
+    const group = screen.getByRole('radiogroup');
+    const [a, b] = screen.getAllByRole('radio');
+    expect(group).toContainElement(a);
+    expect(a).toHaveAttribute('aria-checked', 'false');
+
+    fireEvent.click(a);
+    expect(a).toHaveAttribute('aria-checked', 'true');
+    expect(a.querySelector('[data-testid="option-check"]')).not.toBeNull();
+
+    fireEvent.click(b);
+    expect(a).toHaveAttribute('aria-checked', 'false');
+    expect(a.querySelector('[data-testid="option-check"]')).toBeNull();
+    expect(b).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('multiSelect options toggle and submit joined labels', () => {
+    const onSubmit = renderWith({
+      question: 'Pick any?',
+      multiSelect: true,
+      options: [{ label: 'A' }, { label: 'B' }, { label: 'C' }],
+    });
+
+    expect(screen.getByRole('group')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'C' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'A' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'B' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'B' }));
+    expect(screen.getByRole('checkbox', { name: 'B' })).toHaveAttribute('aria-checked', 'false');
+
+    fireEvent.click(screen.getByRole('button', { name: /Send Answer/ }));
+    expect(onSubmit).toHaveBeenCalledWith(['A, C']);
+  });
+
+  it('the note box has an accessible label and every option has a focus ring', () => {
+    renderWith({ question: 'Pick one?', options: [{ label: 'A' }, { label: 'B' }] });
+
+    expect(screen.getByLabelText(/custom answer/i).tagName).toBe('TEXTAREA');
+    for (const option of screen.getAllByRole('radio')) {
+      expect(option).toHaveClass('focus-visible:ring-2');
+    }
   });
 });
