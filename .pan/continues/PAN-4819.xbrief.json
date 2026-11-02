@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4819",
+  "created": "2026-11-02T16:32:04.348Z",
+  "updated": "2026-11-02T16:32:04.348Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-scratch-line": {
+      "status": "in_progress",
+      "claimedBy": "conv-20261102-3940",
+      "claimedAt": "2026-11-02T16:32:04.348Z"
+    }
+  }
+}
