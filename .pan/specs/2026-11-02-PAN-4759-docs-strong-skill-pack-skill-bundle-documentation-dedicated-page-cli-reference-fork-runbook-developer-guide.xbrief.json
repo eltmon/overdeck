@@ -4,17 +4,17 @@
     "created": "2026-11-02T01:04:53Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4759: Docs: strong skill pack (\"skill bundle\") documentation — dedicated page, CLI reference, fork runbook, developer guide",
-    "updated": "2026-11-02T01:08:34.810Z"
+    "updated": "2026-11-02T01:10:18.990Z"
   },
   "plan": {
     "id": "pan-4759",
     "title": "Docs: strong skill pack (\"skill bundle\") documentation — dedicated page, CLI reference, fork runbook, developer guide",
-    "status": "proposed",
+    "status": "running",
     "uid": "6c691e3d-7309-492d-8ae3-19b186671d6c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-02T01:04:53Z",
-    "updated": "2026-11-02T01:08:34.810Z",
+    "updated": "2026-11-02T01:10:18.990Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4759",
@@ -1468,5 +1468,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
