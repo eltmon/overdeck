@@ -175,13 +175,13 @@ Agents may run `wrangler dev --local`, `wrangler d1 migrations apply overdeck-ac
 
 Operator-only. No agent runs any of the commands below; the custom-domain route in `wrangler.jsonc` creates the `account.overdeck.ai` DNS record in the Cloudflare zone on first deploy (the apex stays on Vercel). Before starting, confirm the bundle builds with no credentials: `npm --prefix services/account run build:dry` exits 0.
 
-1. Create a GitHub OAuth App (GitHub → Settings → Developer settings → OAuth Apps): homepage `https://account.overdeck.ai`, authorization callback URL `https://account.overdeck.ai/auth/github/callback`. Note the client id and generate a client secret.
-2. `cd services/account && npx wrangler login` (opens the browser for the Cloudflare account that owns the `overdeck.ai` zone).
+1. Create a GitHub OAuth App (GitHub → Settings → Developer settings → OAuth Apps): homepage `https://account.overdeck.ai`, authorization callback URL `https://account.overdeck.ai/auth/github/callback`. Leave **Enable Device Flow** off: `pan account login` runs this service's own device flow, which uses GitHub's ordinary web callback. Note the client id and generate a client secret.
+2. `cd services/account && npx wrangler login` (opens the browser for the Cloudflare account that owns the `overdeck.ai` zone). On an account that has never had a Worker, open **Workers & Pages** in the Cloudflare dashboard once first: that creates the account's `workers.dev` subdomain, without which `wrangler deploy` fails with code 10063.
 3. `npx wrangler d1 create overdeck-account`, paste the printed `database_id` into `wrangler.jsonc` (replacing the all-zero placeholder), and commit that change.
 4. `npx wrangler d1 migrations apply overdeck-account --remote` (applies `migrations/0001_init.sql` to the production database).
-5. `npx wrangler secret put GITHUB_CLIENT_ID`, then `npx wrangler secret put GITHUB_CLIENT_SECRET`, then `npx wrangler secret put OWNER_GITHUB_ID` (your numeric GitHub id, from `https://api.github.com/users/<login>` → `id`).
+5. `npx wrangler secret put GITHUB_CLIENT_ID` (it reads the value from stdin, so `printf %s <value> | npx wrangler secret put …` works too), then `npx wrangler secret put GITHUB_CLIENT_SECRET`, then `npx wrangler secret put OWNER_GITHUB_ID` (your numeric GitHub id, from `https://api.github.com/users/<login>` → `id`).
 6. `npx wrangler deploy` (uploads the Worker, binds D1, registers the hourly cron and the `account.overdeck.ai` custom domain).
-7. Smoke test: `curl -s https://account.overdeck.ai/healthz` shows `"configured":true`; open `https://account.overdeck.ai/admin`, sign in with GitHub as the owner, add one tester by username, and have them sign in.
+7. Smoke test: `curl -s https://account.overdeck.ai/healthz` shows `"configured":true` (after the connect Worker is deployed too, `node scripts/anywhere/smoke-hosted.mjs` checks both services and starts one device sign-in); `pan account login` then `pan account status` shows your GitHub login; open `https://account.overdeck.ai/admin`, sign in with GitHub as the owner, add one tester by username, and have them sign in.
 8. Rollback: `npx wrangler rollback` returns to the previous Worker version (the D1 schema is additive and stays).
 
 ## Client
