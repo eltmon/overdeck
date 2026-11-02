@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T18:36:01.525Z",
+  "updated": "2026-11-02T18:38:49.902Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -298,9 +298,10 @@
       "doneAt": "2026-11-02T18:35:55.203Z"
     },
     "cli-skills-deft-pipeline": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4820",
-      "claimedAt": "2026-11-02T18:36:01.524Z"
+      "claimedAt": "2026-11-02T18:36:01.524Z",
+      "doneAt": "2026-11-02T18:38:49.902Z"
     }
   }
 }
