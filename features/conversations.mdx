@@ -282,6 +282,36 @@ Cite is offered only when the conversation has a composer: it does not appear
 while the conversation shows the resume bar, is a read-only vault copy, was
 cleared into another conversation, or is still forking.
 
+### Citing a markdown file
+
+When you open a markdown file from a file chip in a conversation, the editor
+tab remembers that conversation as its origin. In the tab's **Preview**,
+select text and click **Cite** (or press `C`) exactly as you would on a
+reply. The citation becomes a chip in that origin conversation's composer,
+labeled with the file name, and a toast confirms **Citation added** with an
+**Open conversation** action that jumps back to it.
+
+Cite is not offered in **Edit** — only in **Preview** — and not while the
+file has unsaved changes (save first; the agent reads the file from disk, not
+your draft). It is also not offered for a tab opened from somewhere other
+than a conversation, since there is nowhere for the citation to go. Opening
+the same file from a different conversation moves the tab's citations to
+that conversation.
+
+On send, file citations go out in their own block per file, after any reply
+notes:
+
+```
+Notes on `/repo/docs/guide.md`:
+1. > Step two
+   > is wrong
+   Swap the order
+2. > Done.
+```
+
+The quote is the rendered Preview text, so markdown symbols (`**`, `#`, link
+URLs) are not included.
+
 ## Bookmarks
 
 Click the icon beside an assistant or user message to bookmark it, using its

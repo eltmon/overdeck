@@ -588,8 +588,14 @@ door that does not exist; a real record read door would be a separate change.
   (`formatCitationBlock`/`composePromptWithCitations`) — client-side only, identical
   for every harness, no server route changed. `lib/composerCitations.ts` persists
   each conversation's pending list to `localStorage` under `conv-citations:<name>`;
-  `PendingCitation.source` is a discriminated union (`{ kind: 'message'; messageId;
-  role }` today) shared with #2685's future preview-element kind. `components/chat/
+  `PendingCitation.source` is a discriminated union — `{ kind: 'message'; messageId;
+  role }` for a reply quote, or `{ kind: 'file'; path }` (an absolute path) for a
+  quote taken from the editor Preview (PAN-4658). File citations serialize as one
+  ``Notes on `<path>`:`` block per path, after the reply-notes block
+  (`fileCitationHeader`/`formatCitationBlock`). The editor Preview cites through
+  `CiteSelectionLayer`'s `resolve` prop (`fileSelectionResolver(path)`) instead of
+  the default message resolver — see `docs/MARKDOWN-EDITOR-PANE.md`'s "Citing from
+  the Preview" section. `components/chat/
   citations/` holds the selection toolbar (`CiteSelectionToolbar.tsx`), the chips
   strip (`CitationChips.tsx`), and the best-effort quote highlight
   (`citationHighlight.ts`, the CSS Custom Highlight API). Rows opt in via
