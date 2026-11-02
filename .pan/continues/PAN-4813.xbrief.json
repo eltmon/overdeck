@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4813",
   "created": "2026-11-02T13:36:08.209Z",
-  "updated": "2026-11-02T14:22:24.883Z",
+  "updated": "2026-11-02T14:22:38.166Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "settings-catalog-rows.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T14:22:24.882Z"
+    },
+    "settings-catalog-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:22:38.166Z"
     }
   }
 }
