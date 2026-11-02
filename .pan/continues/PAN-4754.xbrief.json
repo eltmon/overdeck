@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4754",
   "created": "2026-11-02T00:55:26.468Z",
-  "updated": "2026-11-02T01:40:16.625Z",
+  "updated": "2026-11-02T01:43:24.296Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
       "claimedBy": "agent-pan-4754",
       "claimedAt": "2026-11-02T01:37:47.760Z",
       "doneAt": "2026-11-02T01:40:16.625Z"
+    },
+    "context-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:43:24.296Z"
     }
   }
 }
