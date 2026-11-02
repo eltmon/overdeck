@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T14:45:47.164Z",
+  "updated": "2026-11-02T14:45:52.011Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-4734",
       "claimedAt": "2026-11-02T14:43:33.596Z",
       "doneAt": "2026-11-02T14:45:47.164Z"
+    },
+    "wi8-work-door-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:45:52.010Z"
     }
   }
 }
