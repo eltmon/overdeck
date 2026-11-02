@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T14:52:29.592Z",
+  "updated": "2026-11-02T14:52:42.828Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "fly-target-door.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T14:52:29.592Z"
+    },
+    "fly-target-door.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:52:42.827Z"
     }
   }
 }
