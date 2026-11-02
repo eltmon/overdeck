@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T12:28:08.712038Z · model: claude-opus-5-5 · open: 860_
+_Last sequenced: 2026-11-02T12:29:21.179191Z · model: claude-opus-5-5 · open: 858_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -819,9 +819,7 @@ _Last sequenced: 2026-11-02T12:28:08.712038Z · model: claude-opus-5-5 · open: 
 | 824 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 825 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 826 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 828 | PAN-4659 | M | low | ok |  |  | Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, #4644 base theme import merged, now unblocked. |
 | 829 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 831 | PAN-4660 | M | low | ok |  |  | Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, #4644 base theme import merged, now unblocked. |
 | 832 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
 | 834 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
@@ -1195,10 +1193,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T12:28:08.712038Z",
+  "generatedAt": "2026-11-02T12:29:21.179191Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 860,
+  "openCount": 858,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11329,19 +11327,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-4660",
-      "rank": 831,
-      "size": "M",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, #4644 base theme import merged, now unblocked.",
-      "rationale": "Rank held: dependency PAN-4644 closed as completed on 2026-11-01, so this is unblocked; still low-impact cosmetic work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3321",
       "rank": 832,
       "size": "XS",
@@ -11870,19 +11855,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       ],
       "why": "Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work.",
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4659",
-      "rank": 828,
-      "size": "M",
-      "importance": "low",
-      "score": 5,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, #4644 base theme import merged, now unblocked.",
-      "rationale": "Rank held: dependency PAN-4644 closed as completed on 2026-11-01, so this is unblocked; still low-impact cosmetic work.",
       "gate": "auto",
       "planning": "auto"
     },
