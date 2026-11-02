@@ -1,13 +1,17 @@
 ---
 title: "Overdeck Anywhere: plans and pricing"
 sidebarTitle: "Plans and pricing"
-description: "What Overdeck Anywhere is, what has shipped, what stays free and open source, the planned paid plan, and how we arrived at its price."
+description: "What Overdeck Anywhere is, what has shipped, what stays free and open source, the paid plan, and how we arrived at its price."
 ---
 
 <Note>
-Session Vault and device pairing are available today and free. The hosted services and
-every price on this page are **planned**: nothing here can be bought yet. We publish the
-prices now, with the reasoning, so you can see how we got there and tell us where we are wrong.
+Everything Anywhere does on your own machines is free and open source. Session Vault and
+device pairing shipped in v0.64.0. Linked machines, Tailscale setup, the phone app, push
+notifications, webhook triggers and the MCP server ship in the next release. overdeck.ai
+accounts are invite-only for now, and nothing on this page can be bought yet: the paid tiers
+are available to invite-allowlisted accounts until billing
+([PAN-4294](https://github.com/eltmon/overdeck/issues/4294)) ships. We publish the prices now,
+with the reasoning, so you can see how we got there and tell us where we are wrong.
 </Note>
 
 Overdeck runs on your own machine. Your agents, workspaces and conversations live there.
@@ -41,25 +45,27 @@ The plan lives in the Overdeck Anywhere epic,
 
     - No account needed
     - Linked machines over LAN, Tailscale, SSH and Fly
-    - Unlimited storage on your own backend
-    - All of Session Vault Phase A
+    - Webhook triggers over Tailscale Funnel, push notifications to your phone, and the MCP server
+    - Session Vault on your own git remote or directory: all of Phase A, with unlimited storage
   </Card>
   <Card title="Free account" icon="cloud">
     <div style={{ fontSize: '1.75rem', fontWeight: 600, lineHeight: 1.2, margin: '0.25rem 0' }}>&#36;0</div>
     Sign in to overdeck.ai.
 
+    - Everything in Self-hosted
     - The directory and direct connections for up to 3 machines
-    - 1 GB of hosted vault storage, on 2 machines
+    - 1 GB of hosted vault storage, synced on 2 machines, when the hosted vault ships (planned)
     - End-to-end encrypted
+    - Invite-only for now
   </Card>
   <Card title="Anywhere" icon="globe">
     <div style={{ fontSize: '1.75rem', fontWeight: 600, lineHeight: 1.2, margin: '0.25rem 0' }}>&#36;8 / month</div>
     Billed &#36;96 a year, or &#36;10 month-to-month.
 
-    - 100 GB of hosted vault storage
     - Unlimited machines in the directory
     - The webhook inbox, which holds events for 24 hours while a machine is offline
-    - Hosted agent compute is billed separately by usage
+    - 100 GB of hosted vault storage, when the hosted vault ships
+    - Hosted agent compute, when it ships, is billed separately by usage
   </Card>
   <Card title="Anywhere, founding price" icon="star">
     <div style={{ fontSize: '1.75rem', fontWeight: 600, lineHeight: 1.2, margin: '0.25rem 0' }}>&#36;60 / year</div>
@@ -72,13 +78,18 @@ The plan lives in the Overdeck Anywhere epic,
   </Card>
 </CardGroup>
 
-**Relay add-on:** +&#36;3 a month or +&#36;30 a year on the Anywhere subscription, billed in the
-same charge. When two of your machines find no direct path, the relay connects them, still
-end-to-end encrypted. It includes 50 GB of relay traffic a month; at 50 GB the relay stops until
-the next month, and an extra 50 GB is a one-time &#36;3 purchase. There is no per-gigabyte billing.
+**Relay add-on:** +&#36;3 a month or +&#36;30 a year on the Anywhere subscription (&#36;13 a month
+or &#36;126 a year in all), billed in the same charge. When two of your machines find no direct
+path, the relay connects them, still end-to-end encrypted. It includes 50 GB of relay traffic a
+month; at 50 GB the relay stops until the next month, and an extra 50 GB is a one-time &#36;3
+purchase. There is no per-gigabyte billing.
 
-**Extra storage:** +&#36;3 a month or +&#36;30 a year per 100 GB, for the few who pass 100 GB and
-prefer not to prune old records.
+**Availability:** until billing ([PAN-4294](https://github.com/eltmon/overdeck/issues/4294))
+ships, the paid tiers (Anywhere and the relay add-on) are available to invite-allowlisted
+accounts, and nothing can be bought.
+
+**Extra storage:** +&#36;3 a month or +&#36;30 a year per 100 GB of hosted vault, for the few who
+pass 100 GB and prefer not to prune old records.
 
 **Team:** not at launch. A team plan needs a key-sharing design first (see
 [why there is no team plan yet](#how-we-arrived-at-these-prices)).
@@ -109,8 +120,10 @@ to add one.
 - **All of Session Vault Phase A**: the `pan vault` commands, the git and directory
   backends, end-to-end encryption, full version history, and resume from any saved
   version. Your vault can be as large as your own backend allows.
-- **Per-machine servers, federation and SSH hosts.** Connecting your own machines to each
-  other needs no account and no subscription.
+- **Linked machines, SSH machines, Fly machines and Tailscale setup.** Connecting your own
+  machines to each other needs no account and no subscription.
+- **Webhook triggers over Tailscale Funnel, push notifications and the MCP server.** They run
+  on your machine and need no overdeck.ai account.
 - **Leaving.** When the hosted vault launches, `pan vault migrate` (planned) will copy
   every record out of it to a backend you run, whether or not your subscription is active.
 </Check>
