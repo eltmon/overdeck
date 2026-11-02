@@ -115,7 +115,12 @@ Broadsheet vs. browser default under Ledger), and the background treatment
 corner wash via a new `--wash` token — not a retargeted `--accent`, which
 stays the hover-surface token in both themes). New tokens: `--primary-ink`
 (text-safe accent), `--body-foreground`/`--faint-foreground` (rounding
-`--foreground`/`--muted-foreground` out to a four-tier ramp), `--wash`, a
+`--foreground`/`--muted-foreground` out to a four-tier ramp), `--wash`,
+`--surface-overlay`/`--surface-overlay-field`/`--border-overlay`/`--overlay-scrim`
+(PAN-4755 — the modal panel's own surface/field/border/scrim, lighter than
+`--background` in both modes and never the same values as
+`--popover`/`--card`; modal dialogs build on `components/shared/Modal.tsx`,
+never hand-roll a backdrop or read `--popover` for a dialog panel), a
 `--type-size-*`/`--type-leading-*`/`--type-tracking-*` vocabulary (defined,
 not yet adopted by components), and `--ease-*`/`--duration-*` motion tokens
 (same — defined, not yet wired into existing animations). `--font-mono-ui`

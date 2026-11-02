@@ -97,6 +97,10 @@ export function mapVsCodeTheme(text: string, fileName: string): { theme: ColorTh
   if (editorBackground !== undefined) ui.background = editorBackground;
   const sideBarBackground = stringAt(colors, 'sideBar.background');
   if (sideBarBackground !== undefined) ui.surface = sideBarBackground;
+  const overlayBackground = stringAt(colors, 'quickInput.background') ?? stringAt(colors, 'editorWidget.background');
+  if (overlayBackground !== undefined) {
+    ui.overlay = /^#[0-9a-f]{3,8}$/i.test(overlayBackground) ? toOpaqueHex(overlayBackground) : overlayBackground;
+  }
   const panelBorder = stringAt(colors, 'panel.border');
   if (panelBorder !== undefined) ui.border = panelBorder;
   const uiForeground = editorForeground ?? stringAt(colors, 'foreground');

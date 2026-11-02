@@ -57,6 +57,16 @@ describe("normalizeColorTheme", () => {
     expect(result.theme).toEqual({ id: "minimal", builtin: false, name: "Minimal", type: "light" })
     expect(result.warnings).toEqual([])
   })
+
+  it("keeps a valid ui.overlay and warns on none", () => {
+    const result = normalizeColorTheme(
+      { name: "Test", type: "dark", ui: { overlay: "#141821" } },
+      "test",
+    )
+    if ("errors" in result) throw new Error("expected a theme")
+    expect(result.theme.ui?.overlay).toBe("#141821")
+    expect(result.warnings.some((w) => w.includes("unknown ui key"))).toBe(false)
+  })
 })
 
 describe("effectiveTerminalPalette", () => {

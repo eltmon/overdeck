@@ -597,7 +597,21 @@ Level 1 (Sidebar):  bg-card           — slightly lighter
 Level 2 (Cards):    bg-card           — same as sidebar (lifted by context)
 Level 3 (Popover):  bg-popover        — same value, but uses shadow for floating elements
 Level 4 (Hover):    bg-accent         — subtle highlight (4% overlay)
+Level 5 (Overlay):  --surface-overlay — modal panels; lighter than --background in both modes
 ```
+
+#### Overlay tokens (PAN-4755)
+
+The Modal primitive (`components/shared/Modal.tsx`) reads a dedicated four-token set rather than `--popover`, so a dialog panel stays visually distinct from menus and popovers:
+
+| Token | Broadsheet light | Broadsheet dark | Read by |
+|---|---|---|---|
+| `--surface-overlay` | `hsl(40 18% 99.3%)` | `hsl(30 3% 18.5%)` | Modal panel background |
+| `--surface-overlay-field` | `hsl(30 10% 96.8%)` | `hsl(0 0% 14.5%)` | Inset form fields inside a modal |
+| `--border-overlay` | `hsl(30 5% 82%)` | `hsl(30 3% 27%)` | Modal panel and field borders |
+| `--overlay-scrim` | `hsl(35 14% 9% / 0.44)` | `hsl(0 0% 0% / 0.56)` | The backdrop behind the modal |
+
+Ledger restates its existing look by reference (`--surface-overlay: var(--popover)`, `--surface-overlay-field: var(--background)`, `--border-overlay: var(--border)`); it does not get new values. `--popover` and `--card` are unaffected — menus and popovers keep using them.
 
 ### When to Use Shadows
 
@@ -905,39 +919,50 @@ RULE: Pick ONE pattern per context. Don't mix dots + badges + colored text
 
 This doctrine applies dashboard-wide under either theme; it is not a Broadsheet-only pattern. `NewProjectModal.tsx` and `NewWorkspaceModal.tsx` (PAN-3330) predate this rule — the New Workspace flow's page migration is PAN-3411, and migrating `NewProjectModal` to a routed page is tracked as [PAN-3469](https://github.com/eltmon/overdeck/issues/3469), not something this guide lets you silently skip.
 
-For dialogs that remain modals (confirmations, short forms), the recipe is unchanged in both themes:
+For dialogs that remain modals (confirmations, short forms), build on the shared **Modal primitive** (`components/shared/Modal.tsx`, PAN-4755) rather than hand-rolling a backdrop:
+
+```tsx
+import { Modal } from '../shared/Modal';
+
+<Modal
+  title="…"
+  description="…"             // optional, sets aria-describedby
+  onClose={onClose}
+  dismissible={!submitting}   // false disables Escape, scrim click and the close button
+  onSubmit={submit}           // optional — when set, the panel is a <form>
+  pinned={error ? <p role="alert">…</p> : null}  // non-scrolling slot above the footer
+  footer={<>…</>}
+>
+  {/* scrolling body content */}
+</Modal>
+```
+
+Surfaces and chrome:
 
 ```
-Backdrop:
-  fixed inset-0 bg-black/32 backdrop-blur-sm
-  z-50
+Scrim:    --overlay-scrim
+Panel:    --surface-overlay background, --border-overlay border,
+          10px border-radius, --shadow-overlay box-shadow
+          max-width: 600px, centered on viewport (never anchored to a trigger element)
+Fields:   --surface-overlay-field background inside the panel (inputs, selects, inset rows)
 
-Panel:
-  bg-popover text-popover-foreground
-  rounded-2xl border border-border
-  shadow-lg/5
-  max-w-lg mx-auto  (CENTERED on viewport — never anchored to trigger element)
-  p-6
+Bottom sheet (viewport width < 600px):
+  Panel aligned to the viewport bottom, full width, top corners rounded, no bottom border
 
-Animation:
-  Enter: scale-[0.98] opacity-0  →  scale-100 opacity-100
-  Exit:  scale-100 opacity-100   →  scale-[0.98] opacity-0
-  Duration: 200ms ease-in-out
+Entrance animation:
+  Scrim:  fade,  160ms
+  Panel:  rise (opacity + translateY), 220ms
+  Easing: cubic-bezier(.16, 1, .3, 1)
+  Disabled entirely under prefers-reduced-motion: reduce
 
-Nested dialogs:
-  Each nesting level scales down by 10%:
-  scale-[calc(1-0.1*var(--nested-dialogs))]
-
-Header:
-  flex items-center gap-3 mb-4
-  Icon (if present): size-10 rounded-xl bg-primary/10 text-primary
-  Title: font-body text-lg font-medium
-  Description: text-sm text-muted-foreground
-
-Footer:
-  flex justify-end gap-2 mt-6
-  Primary action on right, cancel on left
+Behavior:
+  Escape and a scrim click call onClose, unless dismissible={false}
+  Focus moves into the dialog on open (first focusable body control, else the panel)
+    and returns to the previously focused element on close
+  Tab is trapped inside the dialog; the close button is part of the cycle
 ```
+
+`NewConversationDialog` is the first adopter. Every other existing modal keeps its current hand-rolled markup until it migrates onto `Modal` in a follow-up — do not retrofit a dialog you are not already touching.
 
 ### Inputs
 
@@ -962,6 +987,8 @@ Labels:
   text-xs font-medium text-muted-foreground
   mb-1.5 (6px above input)
 ```
+
+Inside a Modal panel, inputs use the overlay field style instead: `--surface-overlay-field` background, `--border-overlay` border, 32px height, 6px radius, a `--primary` focus ring (`components/shared/Modal.tsx` and its callers, PAN-4755).
 
 ### Tooltips
 
@@ -990,6 +1017,8 @@ Thumb:
   Size: 20px (default), 16px (small)
   Translate on check
 ```
+
+In a modal's option rows (e.g. the New Conversation dialog's Context section), the whole row is a `role="switch"` button labelled by `aria-labelledby`/`aria-describedby`, with the consequence text written next to it rather than left to a separate hint (PAN-4755).
 
 ### Select / Dropdown
 
@@ -1519,7 +1548,7 @@ SIGNALS:       success/warning/destructive/info + signal-review/signal-cost — 
 BADGE BG:      badge-bg-{signal} (8% color-mix) + badge-border-{signal} (32%) — formula identical both themes
 CARDS:         rounded-2xl border border-border bg-card p-6
 BUTTONS:       rounded-lg h-9 px-3 text-sm font-medium
-DIALOGS:       rounded-2xl bg-popover shadow-lg centered on viewport
+DIALOGS:       components/shared/Modal.tsx — --surface-overlay, --border-overlay, 10px radius, shadow-overlay, centered on viewport, bottom sheet under 600px
 RADIUS:        --radius = 10px (Ledger) / 6px (Broadsheet) — scale is sm=r-4 md=r-2 lg=r xl=r+4 2xl=r+8 3xl=r+12 4xl=r+16, computed off --radius so it now differs per theme (§6, F-7)
 SHADOWS:       shadow-sm/md/lg/xl (override Tailwind stock) + shadow-card/floating/overlay, theme- and dark-mode-scoped (§5, F-4) — no longer the invisible stock Tailwind shadows
 THEME:         ui.theme = ledger | broadsheet (default), data-theme attribute, Settings → Appearance

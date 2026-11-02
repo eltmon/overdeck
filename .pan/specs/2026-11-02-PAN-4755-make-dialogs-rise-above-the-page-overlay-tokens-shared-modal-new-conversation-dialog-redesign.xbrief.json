@@ -1,0 +1,1364 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T00:50:41Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4755: Make dialogs rise above the page: overlay tokens, shared Modal, New conversation dialog redesign",
+    "updated": "2026-11-02T01:00:23.152Z"
+  },
+  "plan": {
+    "id": "pan-4755",
+    "title": "Make dialogs rise above the page: overlay tokens, shared Modal, New conversation dialog redesign",
+    "status": "running",
+    "uid": "c2b37c04-2def-489a-b48f-a4999dae1c7d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T00:50:41Z",
+    "updated": "2026-11-02T01:00:23.152Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4755",
+        "label": "PAN-4755",
+        "type": "issue"
+      },
+      {
+        "uri": "design/style-guide/mockups/new-conversation-dialog.html",
+        "label": "Approved mockup (Proposed variant)",
+        "type": "design"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4755.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "design-system",
+      "modal",
+      "theming",
+      "accessibility"
+    ],
+    "metadata": {
+      "sizeJustification": "Operator-approved single issue (mockup approved 2026-11-01) whose acceptance criteria span tokens, the Modal primitive, the dialog and the theme-import mapping. About 29 files across 7 path-subsystems, but code lives in three (src/dashboard, src/lib, packages/contracts); the others are docs (design/style-guide, sync-sources/dev-skills, configuration/appearance.mdx) and the CI frontend test list (scripts/frontend-test-subset.txt). Items are already decomposed into 17 small commits; splitting FR-4 into a sibling issue would leave this issue's import acceptance criterion unmet.",
+      "canonicalFilename": "2026-11-02-PAN-4755-make-dialogs-rise-above-the-page-overlay-tokens-shared-modal-new-conversation-dialog-redesign.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The New conversation dialog (NewConversationDialog.tsx, PAN-4486) is darker than the page under Broadsheet light because .dialog reads --popover (hsl(30 8% 94.5%)) over --background (hsl(0 0% 96.5%)); it has no box-shadow; imported VS Code themes set --popover from sideBar.background; and its flex rows with nowrap labels start every control at a different x while the First message field falls below the viewport.",
+      "Proposal": "Add four overlay tokens (--surface-overlay, --surface-overlay-field, --border-overlay, --overlay-scrim) under the four-scope contract; add a shared, portaled Modal primitive (scrim, raised panel with --shadow-overlay, header/body/pinned/footer slots, Escape/scrim dismissal, focus in/return, Tab trap, entrance motion, bottom sheet under 600px); rebuild NewConversationDialog on it as five sections on a 124px label grid with a segmented effort control, context switches, a collapsed skills summary and a live footer summary; map VS Code quickInput.background (fallback editorWidget.background) to a new ui.overlay key that applyUiTokens applies, deriving an overlay from ui.background otherwise; document the tokens, the primitive and the mapping. Every open choice is decided in the PRD (.pan/drafts/PAN-4755.md, Decisions D1-D17).",
+      "NonGoals": "- Migrating the other ~45 bespoke dialogs onto Modal (follow-up issue)\n- Changing --popover, --card, menus, popovers, tooltips or picker dropdown surfaces\n- An exit animation, body scroll lock, or inert/aria-hidden on the app behind the Modal\n- Arrow-key or roving-tabindex navigation in the effort radiogroup\n- Changing the picker trigger focus style for other ModelSelect/HarnessSelect callers\n- A committed Playwright e2e spec for the dialog (browser checks are test-role UAT)\n- Stripping alpha from a hand-edited ui.overlay in a theme JSON file\n- Renaming the 'New conversation with options…' entries in NewConversationSplitButton.tsx and CommandPalette.tsx\n- Any .dark or [data-theme] selector in a CSS module, or any component branch on theme"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Modal h2 and section h3 use font-weight 600; labels, option labels, buttons and segments use 500 (mockup's 620/550 dropped)",
+        "rationale": "NFR-2 limits weights to the Broadsheet tiers: headings 500-600, UI 400-500; 620 is display-tier only."
+      },
+      {
+        "summary": "Drop the mockup's .dark-only segmented background and the #d97757 harness glyph color",
+        "rationale": "NFR-2 forbids theme-branched component CSS and decorative color; the checked segment uses --surface-overlay plus --shadow-sm and a 1px --border-overlay ring in every mode."
+      },
+      {
+        "summary": "Modal renders through createPortal to document.body, z-index 100",
+        "rationale": "A primitive meant for ~45 future dialogs must cover the viewport even when its caller sits inside an overflow:hidden or transformed container."
+      },
+      {
+        "summary": "Modal takes an optional onSubmit and renders the panel as a <form> when set",
+        "rationale": "Keeps the dialog's submit button in the footer slot working as type=submit without form= id plumbing."
+      },
+      {
+        "summary": "Escape is a React onKeyDown on the panel (tabIndex -1), not a window listener",
+        "rationale": "IssuePickerField stops Escape propagation while its list is open; a React-tree handler preserves that behavior inside a portal."
+      },
+      {
+        "summary": "Hand-rolled focus trap: wrap Tab/Shift+Tab at the ends, initial focus on the first body control, restore the previously focused element on unmount",
+        "rationale": "No focus-trap or dialog library is a dependency of the frontend; adding one for a single primitive is unwarranted."
+      },
+      {
+        "summary": "dismissible={false} also disables the close button; the dialog passes dismissible={!submitting}",
+        "rationale": "Matches today's behavior where Close, Cancel and Escape are all inert while a create is in flight."
+      },
+      {
+        "summary": "No :root/.dark rows for the overlay tokens; module CSS reads them with fallbacks (var(--surface-overlay, var(--popover)) etc.)",
+        "rationale": "Leaves the existing Ledger no-loss parse test untouched while still rendering a sane panel if data-theme is ever absent."
+      },
+      {
+        "summary": "ModelSelect/HarnessSelect gain an optional labelId prop and the trigger reads --picker-bg/-border/-radius/-height/-font-size with today's values as fallbacks",
+        "rationale": "The 124px label grid needs the dialog's own label in column 1 and the overlay field look, without changing ForkModal, ModelHarnessPicker or sidebar rendering."
+      },
+      {
+        "summary": "Skills summary data comes from an exported useConversationSkillGroups hook plus a pure summarizeSkills; the field stays mounted inside <div hidden> while collapsed",
+        "rationale": "Shares one React Query cache entry and keeps the field's existing prune-on-context-change effect running while collapsed."
+      },
+      {
+        "summary": "Effort radios are plain tabbable buttons with data-default on the default level; no arrow-key handling",
+        "rationale": "Matches the existing Inherit/On/Off radiogroup pattern in ConversationSkillsField."
+      },
+      {
+        "summary": "Footer summary is one plain string joined by ' · ': raw model id, HARNESS_OPTIONS label, effort (omitted when unsupported, '…' while resolving), project key or 'No project'",
+        "rationale": "The issue names the four parts but not the unresolved/unsupported cases; a plain string keeps tests and screen readers simple."
+      },
+      {
+        "summary": "VS Code import passes the overlay color through toOpaqueHex",
+        "rationale": "A translucent modal surface would show the page through the dialog."
+      },
+      {
+        "summary": "The issue's Playwright checks become test-role UAT ACs; the token-level checks are a committed postcss parse-and-assert test",
+        "rationale": "happy-dom cannot compute color-mix or the cascade; a new committed browser spec would add a heavy harness for one dialog."
+      },
+      {
+        "summary": "Keep FR-4 in this issue under plan.metadata.sizeJustification instead of filing a sibling",
+        "rationale": "The operator approved the issue as one unit with an import acceptance criterion; the code spans three subsystems and the rest are docs."
+      },
+      {
+        "summary": "ColorThemeImportPreview's local UI_KEYS list also gains 'overlay'",
+        "rationale": "Without it the import preview silently omits the new swatch."
+      },
+      {
+        "summary": "Concurrent edits to scripts/frontend-test-subset.txt get no DAG edge",
+        "rationale": ".gitattributes marks the file merge=union and the runner dedupes, so parallel additions merge cleanly."
+      }
+    ],
+    "items": [
+      {
+        "id": "overlay-tokens",
+        "title": "Add the four overlay tokens to index.css under the four-scope contract",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/index.css",
+            "src/dashboard/frontend/src/__tests__/overlay-tokens.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/__tests__/overlay-tokens.test.ts src/__tests__/index-css-theme-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "overlay-tokens.test.ts and index-css-theme-scopes.test.ts pass with 0 failures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Insert the PAN-4755 overlay region (exact CSS in the PRD) immediately after the closing brace of the `.dark[data-theme=\"broadsheet\"], .dark [data-theme=\"broadsheet\"]` shadow block that contains `--shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.45)` (index.css line ~773) and before the `/* ─── F-9: motion vocabulary` comment. Write src/__tests__/overlay-tokens.test.ts as a postcss parse-and-assert test modeled on state-tokens-contrast.test.ts, resolving one var() hop within the same selector for Ledger. Add the test path to scripts/frontend-test-subset.txt in sorted position. Do not add :root or .dark rows."
+        },
+        "items": [
+          {
+            "id": "overlay-tokens.ac1",
+            "title": "Given index.css, when overlay-tokens.test.ts parses it, then each of the six contract selectors declares --surface-overlay, --surface-overlay-field, --border-overlay and --overlay-scrim with the exact FR-1 string and the test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overlay-tokens.ac2",
+            "title": "The test asserts and passes that Broadsheet --surface-overlay has higher relative luminance than --background in both [data-theme=\"broadsheet\"] and .dark [data-theme=\"broadsheet\"]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overlay-tokens.ac3",
+            "title": "The test asserts and passes that --foreground and --muted-foreground reach at least 4.5:1 contrast on --surface-overlay and --surface-overlay-field in all four theme scopes, with Ledger var() values resolved to the same selector's declaration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overlay-tokens.ac4",
+            "title": "scripts/frontend-test-subset.txt lists src/__tests__/overlay-tokens.test.ts and index-css-theme-scopes.test.ts still passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "modal-primitive",
+        "title": "Add the shared portaled Modal primitive with its tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "dialog-shell",
+            "dialog-sections",
+            "effort-segmented",
+            "context-switches",
+            "skills-collapse",
+            "footer-summary",
+            "docs-style-guide"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/shared/Modal.tsx",
+            "src/dashboard/frontend/src/components/shared/Modal.module.css",
+            "src/dashboard/frontend/src/components/shared/__tests__/Modal.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/shared/__tests__/Modal.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "Modal.test.tsx passes all ten named tests",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 with decisions D3-D10. Implement `Modal` with the exact `ModalProps` API from the PRD (title, description, onClose, dismissible=true, onSubmit, pinned, footer, children), rendered via createPortal to document.body: scrim div (data-component=\"modal-scrim\") → panel (form when onSubmit else div; role=dialog, aria-modal, aria-labelledby, aria-describedby only with a description, tabIndex -1, data-component=\"modal\") → header (h2 title, optional p description, Close button with lucide X, disabled when not dismissible) → scrolling body → optional pinned → optional footer. Escape via React onKeyDown on the panel; scrim closes only when mousedown and click both land on the scrim; initial focus = first focusable in the body (excluding [hidden] subtrees) else the panel; restore the previously focused element on unmount; Tab/Shift+Tab wrap at the ends. Use the PRD's Modal.module.css verbatim (overlay tokens with fallbacks, --shadow-overlay, 160ms/220ms cubic-bezier(.16,1,.3,1) entrance, prefers-reduced-motion off, bottom sheet at max-width 600px). Write the nine named tests; happy-dom only supports asserting the Tab wrap cases. Add the test path to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "modal-primitive.ac1",
+            "title": "Given a Modal with title and description, getByRole('dialog', { name: title }) returns it with aria-modal=\"true\" and the description as its accessible description, and the dialog element is not a descendant of the render container (portaled to document.body)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modal-primitive.ac2",
+            "title": "When Escape is pressed, or a mousedown and click both land on [data-component=\"modal-scrim\"], the Modal closes by calling onClose once; a click inside the panel and an Escape whose child handler stopped propagation leave it open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modal-primitive.ac3",
+            "title": "With dismissible={false}, Escape and scrim click do not call onClose and the Close button renders disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modal-primitive.ac4",
+            "title": "On mount focus moves to the first body control; on unmount focus returns to the previously focused trigger; Tab from the last control focuses the first and Shift+Tab from the first focuses the last",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modal-primitive.ac5",
+            "title": "With onSubmit set the panel renders as a <form> and a type=submit footer button calls onSubmit; grep finds `box-shadow: var(--shadow-overlay)` and `prefers-reduced-motion` in Modal.module.css and the test path in scripts/frontend-test-subset.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "picker-label-id",
+        "title": "Let ModelSelect and HarnessSelect take an external labelId and overlay field variables",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.module.css",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.render.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/shared/ModelPicker/ModelPicker.render.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "ModelPicker.render.test.tsx passes including the three new labelId tests",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 / D11. Add optional `labelId?: string` to ModelSelect (ModelPicker.tsx line ~238) and HarnessSelect (line ~321). When set, return only the `.pickerWrap` subtree (no `.field` wrapper, no `.fieldLabel` span) and give the trigger button `id={buttonId}` (useId) and `aria-labelledby={`${labelId} ${buttonId}`}`. When unset, output is unchanged. In ModelPicker.module.css `.pickerBtn`, read `var(--picker-bg, var(--muted))`, `var(--picker-border, var(--border))`, `var(--picker-radius, 4px)`, `min-height: var(--picker-height, auto)`, `var(--picker-font-size, 12px)`. Add three render tests and add ModelPicker.render.test.tsx to scripts/frontend-test-subset.txt (it is not listed today)."
+        },
+        "items": [
+          {
+            "id": "picker-label-id.ac1",
+            "title": "Given <span id=\"ext\">Model</span> and <ModelSelect labelId=\"ext\">, the render returns a trigger button whose accessible name starts with 'Model ' and no built-in 'Model' label element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-label-id.ac2",
+            "title": "HarnessSelect with labelId renders the same way (named by the external label, no built-in label)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-label-id.ac3",
+            "title": "ModelSelect without labelId still renders its own label text, and .pickerBtn falls back to --muted, --border, 4px radius and 12px font when the --picker-* variables are unset (grep-checkable fallbacks)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-summary-data",
+        "title": "Export useConversationSkillGroups and summarizeSkills from ConversationSkillsField",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/ConversationSkillsField.tsx",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/ConversationSkillsField.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/ConversationSkillsField.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "ConversationSkillsField.test.tsx passes including the summarizeSkills test",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 / D12. Export `SkillGroup`, `useConversationSkillGroups(projectKey?, issueId?)` (the existing useQuery with key ['new-conversation-skills', projectKey ?? '', issueId ?? '']) and pure `summarizeSkills(groups, overrides) → { on, total, overrides }` exactly as in the PRD. The field switches to the hook; no other field behavior changes. Add the summarizeSkills test."
+        },
+        "items": [
+          {
+            "id": "skills-summary-data.ac1",
+            "title": "summarizeSkills returns on = rows whose override (when present) or inherited enabled is true, total = all rows across groups, overrides = number of override keys; the test covers an Off override on an enabled row and an On override on a disabled row and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-summary-data.ac2",
+            "title": "ConversationSkillsField resolves its skill groups through useConversationSkillGroups instead of an inline useQuery, and the existing ConversationSkillsField tests still pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-field-restyle",
+        "title": "Restyle the skills field to the overlay field and pack-list look",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/ConversationSkillsField.module.css",
+            "src/dashboard/frontend/src/components/newConversation/ConversationSkillsField.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/ConversationSkillsField.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "ConversationSkillsField.test.tsx passes unchanged",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Wrap the filter input with a lucide Search lead icon; restyle .filter, .list, .groupHeader, .groupCount, .row, .description, .choices/.choice/.choiceSelected to the mockup's .input/.packs/.pack/.skill/.tri values with overlay-token fallbacks as specified; add the max-width 600px rule hiding .inherited. No behavior change; no .dark selectors."
+        },
+        "items": [
+          {
+            "id": "skills-field-restyle.ac1",
+            "title": "The filter renders inside a wrapper with a Search icon lead and the existing ConversationSkillsField tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-field-restyle.ac2",
+            "title": "grep of ConversationSkillsField.module.css returns --surface-overlay-field and --border-overlay lines (each with a var() fallback) and returns no '.dark' or 'data-theme' selector",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-field-restyle.ac3",
+            "title": "The selected Inherit/On/Off choice applies background var(--foreground) and color var(--surface-overlay, var(--popover)), and a max-width 600px media query hides .inherited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-picker-restyle",
+        "title": "Restyle the linked-issue picker to the overlay field look with a search icon",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/IssuePickerField.tsx",
+            "src/dashboard/frontend/src/components/newConversation/IssuePickerField.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/IssuePickerField.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "IssuePickerField.test.tsx passes unchanged",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add a lucide Search (14) lead icon span (aria-hidden) before the combobox input; restyle .input (32px, overlay-field background, border-overlay, radius 6px, 13px, left padding 31px, primary focus ring, muted placeholder at opacity 1), .list (surface-overlay, border-overlay, radius 6px, --shadow-floating) and .selected to the same box as .input. No behavior change."
+        },
+        "items": [
+          {
+            "id": "issue-picker-restyle.ac1",
+            "title": "The picker renders a Search icon lead before the 'Link to an issue' combobox and IssuePickerField.test.tsx passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-picker-restyle.ac2",
+            "title": "grep of IssuePickerField.module.css returns height: 32px, var(--surface-overlay-field and var(--border-overlay in the .input and .selected rules, and the empty-input hint text renders in var(--muted-foreground)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-shell",
+        "title": "Move NewConversationDialog onto Modal with the new title, description, pinned error and footer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.module.css",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/NewConversationDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/NewConversationDialog.test.tsx src/components/newConversation/__tests__/MachineField.test.tsx src/components/newConversation/__tests__/NewConversationSplitButton.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "the three newConversation test files pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Replace the hand-built backdrop/form/header/footer and the window Escape listener with <Modal title=\"New conversation\" description=\"These choices apply to this conversation only. Your sidebar defaults stay the same.\" onClose dismissible={!submitting} onSubmit={submit} pinned={error alert} footer={Cancel + Create}> wrapping the existing body controls unchanged. Remove obsolete .backdrop/.dialog/.header/.title/.iconButton/.footer CSS and the X import; restyle .error/.button/.primaryButton per the PRD. Update tests to the new accessible name; add 'shows the error above the footer' and 'Escape does nothing while submitting'. Do not edit NewConversationSplitButton.tsx or CommandPalette.tsx. If eslint (no-misused-promises) rejects passing the async submit to Modal onSubmit, pass `(event) => { void submit(event); }` instead."
+        },
+        "items": [
+          {
+            "id": "dialog-shell.ac1",
+            "title": "Opening the dialog renders getByRole('dialog', { name: 'New conversation' }) with accessible description 'These choices apply to this conversation only. Your sidebar defaults stay the same.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-shell.ac2",
+            "title": "After a failed POST the role=alert error renders inside [data-component=\"modal\"] outside the scrolling body (pinned slot) and the dialog stays open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-shell.ac3",
+            "title": "Escape closes the dialog when idle and does nothing while a create request is pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-shell.ac4",
+            "title": "The FR-5 test still passes: after create, no sidebar model/harness/effort/context localStorage key is written; NewConversationSplitButton still renders 'New conversation with options…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-sections",
+        "title": "Lay the dialog out as five sections on a 124px label grid with overlay field styles",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "effort-segmented",
+            "context-switches",
+            "skills-collapse",
+            "footer-summary"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.module.css",
+            "src/dashboard/frontend/src/components/newConversation/MachineField.tsx",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/NewConversationDialog.test.tsx",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/MachineField.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/NewConversationDialog.test.tsx src/components/newConversation/__tests__/MachineField.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "NewConversationDialog.test.tsx and MachineField.test.tsx pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Restructure the body into five <section aria-labelledby> blocks with h3 headings in order Where it runs, Agent, Task (with 'Both optional' aside), Context, Skills. The first three use .grid (124px label column + minmax(0,1fr)) with label/control pairs as direct grid children: Project native select + ChevronDown; MachineField (now a fragment of label + .field select, plus Needs label + input when Auto); Working directory input with Folder lead in --font-mono-ui; Model and Harness via <span id> labels and the new labelId prop; Effort label + existing select (aria-labelledby); Linked issue span label + IssuePickerField; First message full-width label + textarea with placeholder 'Sent as soon as the conversation starts'. Context and Skills keep their current controls in this item. Use the PRD's CSS block verbatim (grid sets the --picker-* variables; max-width 600px stacks labels). Remove .row/.control/.group once unreferenced. Add the 'renders five sections in order' and placeholder tests."
+        },
+        "items": [
+          {
+            "id": "dialog-sections.ac1",
+            "title": "The dialog renders five level-3 headings in order: 'Where it runs', 'Agent', one starting with 'Task' that contains 'Both optional', 'Context', 'Skills', each labelling its section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-sections.ac2",
+            "title": "The dialog renders the Project, Machine, Working directory, Model, Harness, Effort, Linked issue and First message labels as direct children of .grid; grep returns grid-template-columns: 124px minmax(0, 1fr) and a max-width 600px rule that collapses the grid to one column",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-sections.ac3",
+            "title": "The First message textarea displays the hint text 'Sent as soon as the conversation starts', and grep returns var(--muted-foreground) for field hint text and var(--font-mono-ui) for the working directory input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-sections.ac4",
+            "title": "The existing preset-project, cwd-only-when-different, POST-every-field and MachineField tests still pass through getByLabelText, and the POST payload preserves every field it sent before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-segmented",
+        "title": "Replace the effort select with a segmented radiogroup that marks the default",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.module.css",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/NewConversationDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/NewConversationDialog.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "NewConversationDialog.test.tsx passes including the radiogroup tests",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 / D13. Render <div role=\"radiogroup\" aria-labelledby={effortLabelId}> with one <button type=\"button\" role=\"radio\" aria-checked={effort === level}> per effortLevelsFor(model) level; the resolved default level carries data-default=\"true\" and an aria-hidden 3px dot. Clicking sets effort and effortTouched. Keep the 'Default: <effort> (<source>)' hint plus clamped suffix beside it and the 'Not supported by this model' state. CSS per PRD (no .dark rule; checked = --surface-overlay + --shadow-sm + 1px --border-overlay ring). Rewrite the effort tests and the POST/FR-5 tests to click radios."
+        },
+        "items": [
+          {
+            "id": "effort-segmented.ac1",
+            "title": "After the default resolves to high, getByRole('radiogroup', { name: 'Effort' }) contains a radio 'high' with aria-checked=\"true\" and data-default=\"true\", and the hint renders 'Default: high (default)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-segmented.ac2",
+            "title": "While the effort-default request is pending every effort radio renders aria-checked=\"false\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-segmented.ac3",
+            "title": "Clicking radio 'xhigh' then Create sends effort 'xhigh' in the POST body; picking 'max' then switching to a model without 'max' falls back to the default 'high' checked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-segmented.ac4",
+            "title": "A model with no effort levels renders 'Not supported by this model' and no radiogroup, and the POST omits effort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-switches",
+        "title": "Turn the context checkboxes into labelled switch rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.module.css",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/NewConversationDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/NewConversationDialog.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "NewConversationDialog.test.tsx passes including the switch tests",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Replace the <fieldset> and checkboxes with .option rows: label span (id) in weight 500, a <button role=\"switch\" aria-checked aria-labelledby aria-describedby> on the right, and the existing description copy underneath. Skip CLAUDE.md renders only for harness === 'claude-code', with a 'Claude Code' tag span outside the labelled span and <code> around ~/.claude/CLAUDE.md and CLAUDE_CODE_DISABLE_CLAUDE_MDS. CSS from mockup lines 228-245 (no .dark rule). Update tests to query switches."
+        },
+        "items": [
+          {
+            "id": "context-switches.ac1",
+            "title": "getByRole('switch', { name: 'No context' }) renders with aria-checked=\"false\", flips to \"true\" on click, and the POST then sends bareContext: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-switches.ac2",
+            "title": "A switch named exactly 'Skip CLAUDE.md' renders for claude-code with a 'Claude Code' tag, and is absent after choosing the codex harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-switches.ac3",
+            "title": "Each switch returns its existing description copy as its accessible description, and the dialog renders no checkbox input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-collapse",
+        "title": "Collapse the Skills section to a summary line with a Customize/Done toggle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.module.css",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/NewConversationDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/NewConversationDialog.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "NewConversationDialog.test.tsx passes including the skills summary tests",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 / D12. Call useConversationSkillGroups in the dialog; render '<on> of <total> skills on' plus '· inherited from project and global settings, no overrides' or '· N override(s) in this conversation' (singular for 1), 'Loading skills…' / 'Skills unavailable' before data; a Customize/Done button (aria-expanded, aria-controls) only when data loaded; the ConversationSkillsField stays mounted inside <div id hidden={!skillsOpen}>. Initial skillsOpen = any override exists. Update the POST test to click Customize first; add the three skills tests."
+        },
+        "items": [
+          {
+            "id": "skills-collapse.ac1",
+            "title": "With one inherited-on skill and no overrides, the Skills section renders '1 of 1 skills on' and '· inherited from project and global settings, no overrides', and the 'Filter skills' textbox is not exposed (inside a hidden element)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-collapse.ac2",
+            "title": "Clicking Customize renders the skills field and relabels the button 'Done' with aria-expanded=\"true\"; setting grilling Off updates the line to '0 of 1 skills on' and '· 1 override in this conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-collapse.ac3",
+            "title": "When the dialog opens, it sends exactly one /api/skills/overrides request although both the dialog and the skills field read the skill groups",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "footer-summary",
+        "title": "Show a live model · harness · effort · project summary in the footer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.module.css",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/NewConversationDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/NewConversationDialog.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "NewConversationDialog.test.tsx passes including the footer summary test",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12 / D14. Import HARNESS_OPTIONS from ../shared/ModelPicker and render <p className={styles.summary} data-component=\"new-conversation-summary\"> as the first footer child: [model, harness label, effort, project key or 'No project'].join(' · '), with effort = effort ?? effortDefault?.effort ?? '…' and omitted when the model has no effort levels. CSS: --font-mono-ui 11.5px muted, ellipsis; hidden at max-width 600px. Add HARNESS_OPTIONS to the test's vi.mock('../../shared/ModelPicker') factory or the dialog throws under test."
+        },
+        "items": [
+          {
+            "id": "footer-summary.ac1",
+            "title": "With the overdeck preset, opus model, claude-code harness and resolved default high, [data-component=\"new-conversation-summary\"] renders 'claude-opus-5-5 · Claude Code · high · overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "footer-summary.ac2",
+            "title": "Clicking radio 'low' updates the summary to contain '· low ·', choosing 'No project' makes it end with '· No project', and the Haiku model omits the effort segment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "footer-summary.ac3",
+            "title": "grep of NewConversationDialog.module.css returns font-family var(--font-mono-ui) on .summary and a max-width 600px media query that hides .summary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contracts-overlay-key",
+        "title": "Add the optional ui.overlay key to the color theme contract and import preview",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "api",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/color-theme.ts",
+            "packages/contracts/src/__tests__/color-theme.test.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/ColorThemeImportPreview.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/color-theme.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "color-theme.test.ts passes including the ui.overlay test",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. Add `overlay?: string` (doc comment `/** Modal/dialog surface (PAN-4755). */`) to ColorThemeUi and 'overlay' to UI_KEYS after 'surface' in packages/contracts/src/color-theme.ts. Add 'overlay' after 'surface' in ColorThemeImportPreview.tsx's local UI_KEYS (line 12). Add the normalizer test. If root `npm run typecheck` later reports a stale contracts type, run `npm run build:contracts` first."
+        },
+        "items": [
+          {
+            "id": "contracts-overlay-key.ac1",
+            "title": "normalizeColorTheme accepts ui.overlay '#141821', returns theme.ui.overlay === '#141821' and emits no 'unknown ui key' warning (test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-overlay-key.ac2",
+            "title": "ColorThemeImportPreview's UI_KEYS includes 'overlay', so a previewed theme with ui.overlay renders an overlay swatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vscode-import-overlay",
+        "title": "Map quickInput.background (fallback editorWidget.background) to ui.overlay on VS Code import",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/color-themes/vscode-import.ts",
+            "src/lib/color-themes/__tests__/vscode-import.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/color-themes/__tests__/vscode-import.test.ts"
+          ],
+          "expected_outputs": [
+            "vscode-import.test.ts passes including the four overlay tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14 / D15. After the sideBar.background mapping in mapVsCodeTheme: overlay = stringAt(colors, 'quickInput.background') ?? stringAt(colors, 'editorWidget.background'); when it matches /^#[0-9a-f]{3,8}$/i set ui.overlay = toOpaqueHex(overlay) (import from @overdeck/contracts), otherwise pass the raw string so normalizeColorTheme drops it with its warning. Add the four named tests (ayu-dark fallback → '#141821'; inline JSON preferring quickInput; '#20242ccc' → '#20242c'; neither key → unset)."
+        },
+        "items": [
+          {
+            "id": "vscode-import-overlay.ac1",
+            "title": "Importing the ayu-dark fixture (no quickInput.background) returns theme.ui.overlay === '#141821' from editorWidget.background",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vscode-import-overlay.ac2",
+            "title": "A theme defining both keys returns ui.overlay from quickInput.background, and '#20242ccc' is returned opaque as '#20242c'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vscode-import-overlay.ac3",
+            "title": "A theme defining neither key returns no ui.overlay and the existing vscode-import tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "apply-overlay-tokens",
+        "title": "Apply the overlay tokens from the active color theme in applyUiTokens",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/useColorTheme.ts",
+            "src/dashboard/frontend/src/hooks/__tests__/useColorTheme.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/hooks/__tests__/useColorTheme.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "useColorTheme.test.ts passes including the four overlay tests and the extended ac3",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15. Add '--surface-overlay', '--surface-overlay-field', '--border-overlay', '--overlay-scrim' to ALL_UI_PROPS. In applyUiTokens: ui.overlay → --surface-overlay; else with ui.background → 'color-mix(in srgb, var(--background), white 70%)' for theme.type 'light' and 'color-mix(in srgb, var(--background), var(--foreground) 6%)' for 'dark'; ui.background → --surface-overlay-field 'var(--background)'; ui.border → --border-overlay. --overlay-scrim is only cleared, never set. Add the four tests and extend ac3's cleared-prop list."
+        },
+        "items": [
+          {
+            "id": "apply-overlay-tokens.ac1",
+            "title": "A theme with ui.overlay '#141821' applies --surface-overlay '#141821' on <html>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apply-overlay-tokens.ac2",
+            "title": "A light theme with only ui.background applies --surface-overlay 'color-mix(in srgb, var(--background), white 70%)'; a dark one applies 'color-mix(in srgb, var(--background), var(--foreground) 6%)'; both apply --surface-overlay-field 'var(--background)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apply-overlay-tokens.ac3",
+            "title": "ui.border applies --border-overlay, and switching to a theme without a ui group removes all four overlay props from <html>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-style-guide",
+        "title": "Document the overlay tokens and the Modal primitive in the style guide and its skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "design/style-guide/STYLE-GUIDE.md",
+            "sync-sources/dev-skills/pan-style-guide/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n -- '--surface-overlay-field' design/style-guide/STYLE-GUIDE.md sync-sources/dev-skills/pan-style-guide/SKILL.md",
+            "grep -n 'components/shared/Modal.tsx' design/style-guide/STYLE-GUIDE.md sync-sources/dev-skills/pan-style-guide/SKILL.md"
+          ],
+          "expected_outputs": [
+            "both greps print at least one line per file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16. STYLE-GUIDE.md §5: add the Level 5 overlay line and an 'Overlay tokens (PAN-4755)' table with the FR-1 values. §8 Dialogs / Modals: keep the Page-Not-Modal doctrine; REPLACE the old recipe block (bg-popover, rounded-2xl, shadow-lg/5, p-6) with the Modal primitive description (import path, props, tokens, 10px radius, --shadow-overlay, 600px max width, bottom sheet under 600px, entrance timings, reduced motion, Escape/scrim/focus/Tab behavior, NewConversationDialog as first adopter). §8 Inputs and Switches: one line each pointing at the overlay field style and the role=switch row. SKILL.md: add the four tokens beside --shadow-overlay and the rule 'Modal dialogs build on components/shared/Modal.tsx; never hand-roll a backdrop or read --popover for a dialog panel.' Run `pan sync` is not required (dev-skills ship on install)."
+        },
+        "items": [
+          {
+            "id": "docs-style-guide.ac1",
+            "title": "STYLE-GUIDE.md §5 contains --surface-overlay, --surface-overlay-field, --border-overlay and --overlay-scrim with their Broadsheet light/dark and Ledger values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-style-guide.ac2",
+            "title": "STYLE-GUIDE.md §8 Dialogs / Modals no longer contains 'rounded-2xl' or 'shadow-lg/5' and describes components/shared/Modal.tsx with its props, scrim/panel tokens, bottom sheet under 600px and focus/Escape behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-style-guide.ac3",
+            "title": "pan-style-guide SKILL.md names the four overlay tokens and the rule that modal dialogs build on components/shared/Modal.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-appearance",
+        "title": "Document the ui.overlay import mapping in configuration/appearance.mdx",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/appearance.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'quickInput.background' configuration/appearance.mdx",
+            "grep -n '7 keys' configuration/appearance.mdx"
+          ],
+          "expected_outputs": [
+            "both greps print one line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17. Add the table row '| `quickInput.background`, else `editorWidget.background` | `ui.overlay` (alpha dropped) |' to 'Importing a VS Code theme'; change '...6 keys, each optional' to '...7 keys, each optional' in the on-disk shape; change 'background/surface/border/foreground/muted/accent' to 'background/surface/overlay/border/foreground/muted/accent' in 'What color themes never change'; add one sentence that a theme without ui.overlay but with ui.background gets a derived dialog surface (toward white for light themes, toward the foreground for dark themes)."
+        },
+        "items": [
+          {
+            "id": "docs-appearance.ac1",
+            "title": "appearance.mdx's VS Code import table contains a row that maps `quickInput.background`, else `editorWidget.background`, to `ui.overlay` with the alpha channel dropped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-appearance.ac2",
+            "title": "appearance.mdx's on-disk shape contains '7 keys, each optional', and the page contains a sentence stating that a theme with ui.background but no ui.overlay gets a derived dialog surface",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-browser-checks",
+        "title": "Verify the redesigned dialog in a real browser in light, dark and 360px",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:50:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4755",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
+            "src/dashboard/frontend/src/components/shared/Modal.module.css"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/shared/__tests__/Modal.test.tsx src/components/newConversation/__tests__/NewConversationDialog.test.tsx src/__tests__/overlay-tokens.test.ts"
+          ],
+          "expected_outputs": [
+            "build completes without errors",
+            "the three test files pass",
+            "Playwright evaluation in an isolated browser profile reports the AC values below"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD AC-14 / D16. Run the built dashboard (or Vite dev) and drive it with Playwright in an isolated browser profile (never another agent's session). Open the dialog via the New conversation split button's 'New conversation with options…' entry under Broadsheet light, Broadsheet dark, and a 360px-wide viewport. Evaluate the ACs below and save screenshots under .tmp/pan-4755/ (gitignored). Fix any mismatch in the scoped files and commit the fix with this item's Item trailer. If nothing needs fixing, close the item with `git commit --allow-empty` carrying the Item trailer and a body that lists each measured value (luminances, box-shadow, scrollWidth/clientWidth, control x coordinates)."
+        },
+        "items": [
+          {
+            "id": "uat-browser-checks.ac1",
+            "title": "Under Broadsheet light and Broadsheet dark, the opened [data-component=\"modal\"] renders a computed background-color with higher luminance than the page's computed --background and a box-shadow other than 'none'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-browser-checks.ac2",
+            "title": "At 360px viewport width the page renders no horizontal scroll (document.documentElement.scrollWidth <= clientWidth), the panel's bottom edge equals the viewport bottom, and [data-component=\"new-conversation-summary\"] renders with display none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-browser-checks.ac3",
+            "title": "At desktop width the Project, Machine, Working directory, Model, Harness and Effort controls share one left x coordinate (within 1px), and the error alert after a forced failed create renders above the footer without scrolling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "modal-primitive",
+        "to": "dialog-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-shell",
+        "to": "dialog-sections",
+        "type": "blocks"
+      },
+      {
+        "from": "picker-label-id",
+        "to": "dialog-sections",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-sections",
+        "to": "effort-segmented",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-segmented",
+        "to": "context-switches",
+        "type": "blocks"
+      },
+      {
+        "from": "context-switches",
+        "to": "skills-collapse",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-summary-data",
+        "to": "skills-collapse",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-summary-data",
+        "to": "skills-field-restyle",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-collapse",
+        "to": "footer-summary",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-overlay-key",
+        "to": "vscode-import-overlay",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-overlay-key",
+        "to": "apply-overlay-tokens",
+        "type": "blocks"
+      },
+      {
+        "from": "overlay-tokens",
+        "to": "docs-style-guide",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-primitive",
+        "to": "docs-style-guide",
+        "type": "blocks"
+      },
+      {
+        "from": "vscode-import-overlay",
+        "to": "docs-appearance",
+        "type": "blocks"
+      },
+      {
+        "from": "apply-overlay-tokens",
+        "to": "docs-appearance",
+        "type": "blocks"
+      },
+      {
+        "from": "overlay-tokens",
+        "to": "uat-browser-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "footer-summary",
+        "to": "uat-browser-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-field-restyle",
+        "to": "uat-browser-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-picker-restyle",
+        "to": "uat-browser-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "apply-overlay-tokens",
+        "to": "uat-browser-checks",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

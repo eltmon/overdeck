@@ -26,6 +26,35 @@ describe('mapVsCodeTheme', () => {
     expect(theme.ui?.accent).toBe('#e6b450');
   });
 
+  it('maps editorWidget.background to ui.overlay when quickInput.background is absent', () => {
+    const { theme } = mapVsCodeTheme(fixture('ayu-dark.jsonc'), 'ayu-dark.jsonc');
+    expect(theme.ui?.overlay).toBe('#141821');
+  });
+
+  it('prefers quickInput.background over editorWidget.background', () => {
+    const { theme } = mapVsCodeTheme(
+      JSON.stringify({ type: 'dark', colors: { 'quickInput.background': '#202020', 'editorWidget.background': '#303030' } }),
+      'inline.json',
+    );
+    expect(theme.ui?.overlay).toBe('#202020');
+  });
+
+  it('drops the alpha channel from the overlay color', () => {
+    const { theme } = mapVsCodeTheme(
+      JSON.stringify({ type: 'dark', colors: { 'quickInput.background': '#20242ccc' } }),
+      'inline.json',
+    );
+    expect(theme.ui?.overlay).toBe('#20242c');
+  });
+
+  it('leaves ui.overlay unset when neither key exists', () => {
+    const { theme } = mapVsCodeTheme(
+      JSON.stringify({ type: 'dark', colors: { 'editor.background': '#000000' } }),
+      'inline.json',
+    );
+    expect(theme.ui?.overlay).toBeUndefined();
+  });
+
   it('maps the Ayu Light fixture to type light', () => {
     const { theme } = mapVsCodeTheme(fixture('ayu-light.jsonc'), 'ayu-light.jsonc');
     expect(theme.type).toBe('light');

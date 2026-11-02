@@ -5,7 +5,9 @@
  * Auto reveals a Needs input: comma-separated capability tags every candidate
  * must have. Machine labels are muted text, never a badge.
  */
+import { useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { ChevronDown } from 'lucide-react';
 
 import { loadMachines, MACHINES_QUERY_KEY } from '../Settings/anywhere/machinesApi';
 import styles from './NewConversationDialog.module.css';
@@ -27,14 +29,17 @@ export function MachineField({ value, onChange }: { value: MachineChoice; onChan
   const { data } = useQuery({ queryKey: MACHINES_QUERY_KEY, queryFn: loadMachines, staleTime: 15_000 });
   const links = (data?.links ?? []).filter((link) => link.state === 'online' && link.hidden !== true);
   const selfLabel = data?.self.label;
+  const machineId = useId();
+  const needsId = useId();
 
   return (
     <>
-      <label className={styles.row}>
-        <span className={styles.label}>Machine</span>
+      <label htmlFor={machineId} className={styles.label}>Machine</label>
+      <div className={styles.field}>
         <select
+          id={machineId}
           aria-label="Machine"
-          className={styles.control}
+          className={styles.select}
           value={value.machine}
           onChange={(event) => onChange({ machine: event.target.value, needs: event.target.value === 'auto' ? value.needs : '' })}
         >
@@ -43,18 +48,22 @@ export function MachineField({ value, onChange }: { value: MachineChoice; onChan
           {links.map((link) => <option key={link.id} value={link.environmentId}>{link.label}</option>)}
           <option value="fly" disabled title="Needs PAN-4652">Fly (new VM)</option>
         </select>
-      </label>
+        <ChevronDown size={14} className={styles.chev} />
+      </div>
       {value.machine === 'auto' && (
-        <label className={styles.row}>
-          <span className={styles.label}>Needs</span>
-          <input
-            aria-label="Needs"
-            className={styles.control}
-            placeholder="docker, gpu"
-            value={value.needs}
-            onChange={(event) => onChange({ ...value, needs: event.target.value })}
-          />
-        </label>
+        <>
+          <label htmlFor={needsId} className={styles.label}>Needs</label>
+          <div className={styles.field}>
+            <input
+              id={needsId}
+              aria-label="Needs"
+              className={styles.input}
+              placeholder="docker, gpu"
+              value={value.needs}
+              onChange={(event) => onChange({ ...value, needs: event.target.value })}
+            />
+          </div>
+        </>
       )}
     </>
   );
