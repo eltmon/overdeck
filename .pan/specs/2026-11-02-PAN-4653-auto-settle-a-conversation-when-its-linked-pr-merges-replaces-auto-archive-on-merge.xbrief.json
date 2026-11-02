@@ -4,17 +4,17 @@
     "created": "2026-11-01T22:30:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4653: Auto-settle a conversation when its linked PR merges (replaces auto-archive on merge)",
-    "updated": "2026-11-02T03:30:26.764Z"
+    "updated": "2026-11-02T03:31:37.519Z"
   },
   "plan": {
     "id": "pan-4653",
     "title": "Auto-settle a conversation when its linked PR merges (replaces auto-archive on merge)",
-    "status": "proposed",
+    "status": "running",
     "uid": "8e6e4ea0-a50a-4c12-91a2-fb1f699f3141",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-01T22:30:00.000Z",
-    "updated": "2026-11-02T03:30:26.764Z",
+    "updated": "2026-11-02T03:31:37.519Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4653",
@@ -684,5 +684,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
