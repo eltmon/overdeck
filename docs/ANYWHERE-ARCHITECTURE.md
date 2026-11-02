@@ -12,8 +12,11 @@ routes, two-screen approval and the webhook inbox (sections below; the Worker is
 
 ## Running the two-machine smoke
 
-The live check for this layer is a script, not a CI job (D-4645-22): it binds two
-LAN-visible ports for a few seconds and needs a built tree.
+AC-1 of the release criteria runs in CI as
+`tests/integration/anywhere/two-machine-ac1.slow.test.ts` (the `test-e2e` job, PAN-4774): two
+peer dashboards on free ports with a fake `claude`. The full smoke below stays a script (it binds
+two LAN-visible ports and needs a built tree). The whole release run, AC-1 to AC-15, is in the
+[release checklist](ANYWHERE-RELEASE-CHECKLIST.md).
 
 ```bash
 npm run build
@@ -50,6 +53,7 @@ step, each named in the output:
 | `kill B` | after `SIGKILL`, A shows the link offline within 30 s |
 | `restart B` | A shows it online again within 60 s |
 | `no-http` | the proxy capture starts with the channel preamble byte `0x00` and contains no `HTTP/1.1` |
+| `hold` | (`--hold`, #4774) keeps both servers and B's dev server up, prints the `HOLD` line and waits for `SIGINT` or `SIGTERM` |
 | `stop` | both servers stopped; nothing outside `.tmp/anywhere-a|b` touched |
 
 The servers run with `HOME=<home>/fakehome`, `PATH=<home>/npm/bin:/usr/local/bin:/usr/bin:/bin`
