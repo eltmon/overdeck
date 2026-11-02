@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   deleteVm: vi.fn(),
   // When set, deleteVm still records the call but rejects with this error.
   deleteVmError: null as Error | null,
+  tier: 'ephemeral' as 'ephemeral' | 'durable',
   configureClaudeCode: vi.fn(),
   exec: vi.fn(),
   saveWorkspaceMetadata: vi.fn(),
@@ -56,6 +57,7 @@ vi.mock('../../src/lib/remote/index.js', () => ({
     configureClaudeCode: mocks.configureClaudeCode,
     copySkillsToVm: vi.fn().mockResolvedValue(undefined),
     getAppName: () => 'overdeck-test',
+    getResiliencyTier: () => mocks.tier,
   }),
 }));
 
@@ -99,6 +101,7 @@ describe('createRemoteWorkspace', () => {
     mocks.cloneExits.length = 0;
     mocks.sshFailures.length = 0;
     mocks.deleteVmError = null;
+    mocks.tier = 'ephemeral';
     mocks.deleteVm.mockReset();
     mocks.saveWorkspaceMetadata.mockReset();
     mocks.configureClaudeCode.mockReset().mockResolvedValue(undefined);
@@ -186,6 +189,32 @@ describe('createRemoteWorkspace', () => {
     await expect(create('PAN-4295')).rejects.toThrow(
       /exec failed: setsid nohup.*pan-pan-4295-ws.*m1.*403 Forbidden.*fly machines destroy m1 -a overdeck-test --force/s,
     );
+    expect(mocks.deleteVm).toHaveBeenCalledTimes(1);
+    expect(mocks.saveWorkspaceMetadata).not.toHaveBeenCalled();
+  });
+
+  it('names the durable volume and the volume commands when the rollback delete fails on the durable tier', async () => {
+    mocks.tier = 'durable';
+    mocks.sshFailures.push('setsid nohup');
+    mocks.deleteVmError = new Error('403 Forbidden');
+
+    await expect(create('PAN-4295')).rejects.toThrow(
+      /fly machines destroy m1 -a overdeck-test --force.*fly volumes list -a overdeck-test.*pan-pan-4295-ws-workspace.*fly volumes destroy <volume-id> -a overdeck-test --yes/s,
+    );
+    expect(mocks.deleteVm).toHaveBeenCalledTimes(1);
+    expect(mocks.saveWorkspaceMetadata).not.toHaveBeenCalled();
+  });
+
+  it('omits volume commands from the recovery text on the ephemeral tier', async () => {
+    mocks.sshFailures.push('setsid nohup');
+    mocks.deleteVmError = new Error('403 Forbidden');
+
+    try {
+      await create('PAN-4295');
+      throw new Error('expected create to reject');
+    } catch (error) {
+      expect(error instanceof Error ? error.message : String(error)).not.toContain('fly volumes');
+    }
     expect(mocks.deleteVm).toHaveBeenCalledTimes(1);
     expect(mocks.saveWorkspaceMetadata).not.toHaveBeenCalled();
   });
