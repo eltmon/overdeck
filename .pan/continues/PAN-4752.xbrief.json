@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4752",
   "created": "2026-11-02T00:18:49.972Z",
-  "updated": "2026-11-02T00:38:24.857Z",
+  "updated": "2026-11-02T00:41:28.958Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-02T00:38:18.611Z"
     },
     "docs-flywheel-strike": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4752",
-      "claimedAt": "2026-11-02T00:38:24.857Z"
+      "claimedAt": "2026-11-02T00:38:24.857Z",
+      "doneAt": "2026-11-02T00:41:28.957Z"
     }
   }
 }
