@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4751",
   "created": "2026-11-02T00:16:08.781Z",
-  "updated": "2026-11-02T00:26:34.656Z",
+  "updated": "2026-11-02T00:26:50.527Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4751",
       "claimedAt": "2026-11-02T00:23:53.355Z",
       "doneAt": "2026-11-02T00:26:34.656Z"
+    },
+    "conversation-pane-jump": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4751",
+      "claimedAt": "2026-11-02T00:26:50.527Z"
     }
   }
 }
