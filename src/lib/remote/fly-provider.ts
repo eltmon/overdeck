@@ -584,6 +584,10 @@ export class FlyProvider implements RemoteProvider {
     // hang at the "do you trust this folder?" dialog on first launch, and
     // pre-acknowledge the Bypass Permissions disclaimer (default "No, exit"),
     // as preTrustDirectory() does for local workspaces (PAN-4295 smoke test).
+    // Also dismiss the one-shot "Make auto mode your default permission mode?"
+    // nudge: settings.json below always sets a non-auto defaultMode, so an
+    // eligible account sees it on every fresh VM and it swallows the first
+    // message (PAN-4738). Key verified in Claude Code 2.1.293 and 2.1.316.
     const onboardingScript = `
 import json, os
 path = os.path.expanduser("~/.claude.json")
@@ -594,6 +598,7 @@ if os.path.exists(path):
 data["hasCompletedOnboarding"] = True
 data["lastOnboardingVersion"] = "2.0.50"
 data["${BYPASS_PERMISSION_MODE}ModeAccepted"] = True
+data["hasSeenAutoDefaultNudge"] = True
 projects = data.setdefault("projects", {})
 ws = projects.setdefault("/workspace", {})
 ws["hasTrustDialogAccepted"] = True
