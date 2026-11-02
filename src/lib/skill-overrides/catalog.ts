@@ -20,6 +20,7 @@ import {
   type PackAdapterId,
   type PackManifest,
 } from '../skill-packs/adapters.js';
+import { isBrowserReady } from '../skill-packs/browser.js';
 import { isRenderReady } from '../skill-packs/render.js';
 import { listPacks, packExtractDir, packRenderDir } from '../skill-packs/sources.js';
 
@@ -90,6 +91,8 @@ export interface PackCatalogEntry {
   cached: boolean;
   /** Null when the pack is not cached (or its manifest cannot be read). */
   manifest: PackManifest | null;
+  /** gstack-runtime: 'off' (no consent), 'ready', or 'missing' (consent recorded, runtime not built). PAN-4730. */
+  browser?: 'off' | 'ready' | 'missing';
 }
 
 async function isDirectory(path: string): Promise<boolean> {
@@ -112,6 +115,15 @@ export async function listPackCatalog(): Promise<PackCatalogEntry[]> {
       // A runtime pack mounts from its render, so it is usable only once the render is ready (PAN-4727).
       const cached =
         extracted && (adapter !== 'gstack-runtime' || (await isRenderReady(packRenderDir(entry.id, entry.commit))));
+      // Consent is stored, readiness is derived from the trusted commit's render (PAN-4730 D8).
+      const browser =
+        adapter !== 'gstack-runtime'
+          ? undefined
+          : !entry.browser
+            ? 'off'
+            : (await isBrowserReady(packRenderDir(entry.id, entry.commit)))
+              ? 'ready'
+              : 'missing';
       let manifest: PackManifest | null = null;
       if (cached) {
         try {
@@ -119,12 +131,22 @@ export async function listPackCatalog(): Promise<PackCatalogEntry[]> {
             optIn: known?.optIn ?? [],
             skillsRoot: known?.skillsRoot,
             pluginRoot: known?.pluginRoot,
+            browser: browser === 'ready',
           });
         } catch {
           manifest = null;
         }
       }
-      return { id: entry.id, url: entry.url, ref: entry.ref, commit: entry.commit, adapter, cached, manifest };
+      return {
+        id: entry.id,
+        url: entry.url,
+        ref: entry.ref,
+        commit: entry.commit,
+        adapter,
+        cached,
+        manifest,
+        ...(browser ? { browser } : {}),
+      };
     }),
   );
 }

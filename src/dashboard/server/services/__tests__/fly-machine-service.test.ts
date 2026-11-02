@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MachineLinkView } from '@overdeck/contracts';
 
 import { _resetFlyMachineStoreForTests, _settleFlyMachineWritesForTests, listFlyMachines, upsertFlyMachine } from '../../../../lib/anywhere/fly/machine-store.js';
-import type { FlyCreatedMachine, FlyProvisionResult } from '../../../../lib/anywhere/fly/provision.js';
+import { type FlyCreatedMachine, FlyMachineError, type FlyProvisionResult } from '../../../../lib/anywhere/fly/provision.js';
 import type { MachineLink } from '../../../../lib/anywhere/link-store.js';
 import { _resetFlyMachineServiceForTests, addFlyMachine, type FlyMachineServiceDeps, removeFlyMachineForLink, startFlyConversation } from '../fly-machine-service.js';
 import { MachineLinkError } from '../machine-link-service.js';
@@ -29,7 +29,9 @@ const VM: FlyProvisionResult = {
   docker: true,
   pairingCode: `odp_${'ab'.repeat(32)}`,
   routeUrl: 'wss://overdeck-ws.fly.dev/ws/link?fly-instance=148e21ea7e1689',
+  codexAuthPath: null,
 };
+const HOME_CODEX = { binary: '/usr/bin/codex', version: '0.166.0', authRaw: '{}' };
 const LINK = { id: 'link-1', environmentId: ENV_ID, label: 'fly-148e21ea7e1689' } as MachineLink;
 const VIEW = { id: 'link-1', environmentId: ENV_ID, label: 'fly-148e21ea7e1689' } as MachineLinkView;
 
@@ -54,6 +56,8 @@ function fakes(overrides: Partial<FlyMachineServiceDeps> = {}) {
     newId: () => 'rec-1',
     now: () => '2026-11-01T00:00:00.000Z',
     log: () => undefined,
+    checkCodexPolicy: vi.fn(async () => ({ allowed: true })),
+    homeCodex: vi.fn(async () => HOME_CODEX),
     ...overrides,
   };
   return deps;
@@ -87,7 +91,7 @@ describe('addFlyMachine (PAN-4652 WI-8)', () => {
     expect(result.link).toBe(VIEW);
     expect(await listFlyMachines()).toEqual([{
       id: 'rec-1', linkId: 'link-1', environmentId: ENV_ID, machineId: VM.machineId, machineName: VM.machineName,
-      appName: 'overdeck-ws', region: 'iad', label: 'fly-148e21ea7e1689', projectKey: 'overdeck', docker: true,
+      appName: 'overdeck-ws', region: 'iad', label: 'fly-148e21ea7e1689', projectKey: 'overdeck', docker: true, codexAuthPath: null,
       createdAt: '2026-11-01T00:00:00.000Z',
     }]);
     expect(result.record.linkId).toBe('link-1');
@@ -98,7 +102,7 @@ describe('addFlyMachine (PAN-4652 WI-8)', () => {
   it.each([
     ['remote-disabled', { loadConfig: vi.fn(async () => ({ remote: { enabled: false } })) }, {}],
     ['no-fly-token', { hasFlyToken: vi.fn(() => false) }, {}],
-    ['harness-unsupported', {}, { harness: 'codex' }],
+    ['harness-unsupported', {}, { harness: 'ohmypi' }],
     ['bad-request', {}, { message: 'hello' }],
     ['cap-reached', { checkCap: vi.fn(() => ({ allowed: false, message: 'Remote agent cap reached: 2/2' })) }, {}],
   ] as const)('refuses with %s before creating any machine', async (code, overrides, input) => {
@@ -129,6 +133,87 @@ describe('addFlyMachine (PAN-4652 WI-8)', () => {
     expect(deps.destroy).toHaveBeenCalledTimes(1);
     expect(deps.removeLink).toHaveBeenCalledWith('link-1');
     expect(await listFlyMachines()).toEqual([]);
+  });
+});
+
+describe('Codex on a Fly machine (PAN-4296 WI-5)', () => {
+  const refusedBeforeProvision = async (deps: ReturnType<typeof fakes>) => {
+    expect(deps.provision).not.toHaveBeenCalled();
+    expect(await listFlyMachines()).toEqual([]);
+  };
+
+  it('refuses a Codex request without a model with bad-request', async () => {
+    const deps = fakes();
+    await expect(addFlyMachine({ harness: 'codex', projectKey: 'overdeck', message: 'hi' }, deps))
+      .rejects.toMatchObject({ code: 'bad-request', message: expect.stringContaining('--model') });
+    await refusedBeforeProvision(deps);
+  });
+
+  it('refuses a Codex request with an unknown model id as bad-request', async () => {
+    const deps = fakes();
+    const error = await addFlyMachine({ harness: 'codex', model: 'gpt-6.1-sl' }, deps).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(FlyMachineError);
+    expect(error).toMatchObject({ code: 'bad-request', message: expect.stringContaining('Unknown model "gpt-6.1-sl"'), detail: { harness: 'codex', model: 'gpt-6.1-sl' } });
+    expect(deps.checkCodexPolicy).not.toHaveBeenCalled();
+    await refusedBeforeProvision(deps);
+  });
+
+  it('refuses a Codex request with a non-OpenAI model', async () => {
+    const deps = fakes();
+    await expect(addFlyMachine({ harness: 'codex', model: 'claude-opus-5-5' }, deps)).rejects.toMatchObject({ code: 'harness-unsupported' });
+    expect(deps.checkCodexPolicy).not.toHaveBeenCalled();
+    await refusedBeforeProvision(deps);
+  });
+
+  it('refuses with the policy reason when the Codex policy denies the model', async () => {
+    const deps = fakes({ checkCodexPolicy: vi.fn(async () => ({ allowed: false, reason: 'gpt-6.1-sol needs Codex CLI 0.170.0 or newer' })) });
+    await expect(addFlyMachine({ harness: 'codex', model: 'gpt-6.1-sol' }, deps))
+      .rejects.toMatchObject({ code: 'harness-unsupported', message: 'gpt-6.1-sol needs Codex CLI 0.170.0 or newer' });
+    expect(deps.checkCodexPolicy).toHaveBeenCalledWith('gpt-6.1-sol');
+    await refusedBeforeProvision(deps);
+  });
+
+  it('refuses with credentials-failed when home has no usable Codex', async () => {
+    const deps = fakes({ homeCodex: vi.fn(async () => null) });
+    await expect(addFlyMachine({ harness: 'codex', model: 'gpt-6.1-sol' }, deps))
+      .rejects.toMatchObject({ code: 'credentials-failed', message: expect.stringContaining('codex login') });
+    await refusedBeforeProvision(deps);
+  });
+
+  it('refuses another harness with the D-11 text', async () => {
+    const deps = fakes();
+    await expect(addFlyMachine({ harness: 'ohmypi' }, deps))
+      .rejects.toMatchObject({ code: 'harness-unsupported', message: 'Fly machines run Claude Code and Codex conversations; ohmypi is not supported.' });
+    await refusedBeforeProvision(deps);
+  });
+
+  it('adds no Codex or provider check to a Claude Code request', async () => {
+    const deps = fakes({ homeCodex: vi.fn(async () => null) });
+    await addFlyMachine({ projectKey: 'overdeck', message: 'hi', model: 'gpt-6.1-sol' }, deps);
+    expect(deps.checkCodexPolicy).not.toHaveBeenCalled();
+    expect(deps.homeCodex).not.toHaveBeenCalled();
+    expect(deps.provision).toHaveBeenCalledWith(expect.objectContaining({ harness: 'claude-code' }), expect.any(Function));
+    expect(deps.linkFetch).toHaveBeenCalledWith(ENV_ID, '/api/conversations', expect.objectContaining({ body: expect.objectContaining({ harness: 'claude-code' }) }));
+  });
+
+  it('provisions for Codex, records the sign-in path and starts a Codex conversation', async () => {
+    const codexVm = { ...VM, codexAuthPath: '/.codex/auth.json' };
+    const deps = fakes({
+      provision: vi.fn(async (_input: unknown, onCreated: (machine: FlyCreatedMachine) => Promise<void>) => {
+        await onCreated(codexVm);
+        return codexVm;
+      }),
+    });
+    const result = await addFlyMachine({ harness: 'codex', model: 'gpt-6.1-sol', projectKey: 'overdeck', message: 'List the files' }, deps);
+
+    expect(deps.provision).toHaveBeenCalledWith({ region: undefined, image: undefined, harness: 'codex' }, expect.any(Function));
+    expect(result.record.codexAuthPath).toBe('/.codex/auth.json');
+    expect(await listFlyMachines()).toEqual([expect.objectContaining({ codexAuthPath: '/.codex/auth.json' })]);
+    expect(deps.linkFetch).toHaveBeenCalledWith(ENV_ID, '/api/conversations', {
+      method: 'POST',
+      actor: 'operator',
+      body: { message: 'List the files', projectKey: 'overdeck', harness: 'codex', model: 'gpt-6.1-sol', effort: undefined },
+    });
   });
 });
 
@@ -182,7 +267,7 @@ describe('removeFlyMachineForLink (PAN-4652 WI-8)', () => {
   beforeEach(async () => {
     await upsertFlyMachine({
       id: 'rec-1', linkId: 'link-1', environmentId: ENV_ID, machineId: VM.machineId, machineName: VM.machineName,
-      appName: 'overdeck-ws', region: 'iad', label: VM.label, projectKey: null, docker: false, createdAt: '2026-11-01T00:00:00.000Z',
+      appName: 'overdeck-ws', region: 'iad', label: VM.label, projectKey: null, docker: false, codexAuthPath: null, createdAt: '2026-11-01T00:00:00.000Z',
     });
   });
 

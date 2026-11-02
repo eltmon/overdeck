@@ -4,10 +4,13 @@
  * `addFlyMachine()` is the one door that starts a Fly VM as a linked machine:
  * the CLI and `POST /api/machines/fly` call it today, and the Machine field and
  * `--machine fly` (#4651) will call it too. It refuses early (remote disabled,
- * no Fly token, a harness other than Claude Code, the spend cap) before any VM
- * exists, provisions the VM (`provisionFlyMachine`), writes a provisional
- * record, links home → VM one way over the public route (D-2, D-3), then
- * patches the record with the link.
+ * no Fly token, a harness that cannot run on a Fly machine, the spend cap)
+ * before any VM exists. A Codex request is also checked at home first
+ * (PAN-4296 D-5): it needs an OpenAI model, the Codex harness policy must
+ * allow it, and home needs a Codex CLI with a valid sign-in. Then it
+ * provisions the VM (`provisionFlyMachine`), writes a provisional record,
+ * links home → VM one way over the public route (D-2, D-3), then patches the
+ * record with the link and the VM's Codex sign-in path.
  *
  * The record is written the moment the VM exists, before any step that can fail
  * after it. Any failure destroys the VM, removes the link if one was made and
@@ -21,9 +24,9 @@
  * for the unlink hook.
  *
  * With `projectKey` it clones that project onto the VM (`ensureFlyProject`,
- * FR-9); with `message` it then starts a Claude Code conversation there through
- * the link (`startFlyConversation`, FR-10) and returns its `/conv/@<env>/<name>`
- * path. The clone runs after linking, so by the time the conversation request
+ * FR-9); with `message` it then starts a Claude Code or Codex conversation
+ * there through the link (`startFlyConversation`, FR-10) and returns its
+ * `/conv/@<env>/<name>` path. The clone runs after linking, so by the time the conversation request
  * goes out the supervisor has long had the link online.
  *
  * `removeFlyMachineForLink()` is the unlink hook: it destroys the VM unless
@@ -44,9 +47,18 @@ import {
   updateFlyMachine,
   upsertFlyMachine,
 } from '../../../lib/anywhere/fly/machine-store.js';
+import { type HomeCodexState, NO_HOME_CODEX_MESSAGE, readHomeCodexState } from '../../../lib/anywhere/fly/codex-auth.js';
 import { ensureFlyProject } from '../../../lib/anywhere/fly/project.js';
-import { destroyFlyVm, type FlyCreatedMachine, FlyMachineError, type FlyProvisionResult, provisionFlyMachine } from '../../../lib/anywhere/fly/provision.js';
+import {
+  destroyFlyVm,
+  type FlyCreatedMachine,
+  FlyMachineError,
+  type FlyMachineHarness,
+  type FlyProvisionResult,
+  provisionFlyMachine,
+} from '../../../lib/anywhere/fly/provision.js';
 import { loadConfig, type RemoteConfig } from '../../../lib/config.js';
+import { getProviderForModel, UnknownModelError } from '../../../lib/providers.js';
 import { createFlyApiClient } from '../../../lib/remote/fly-api.js';
 import { checkRemoteSpendCap } from '../../../lib/remote/remote-agents.js';
 import { createMachineLink, MachineLinkError } from './machine-link-service.js';
@@ -83,7 +95,7 @@ export interface FlyMachineServiceDeps {
   /** The spend cap, counting `pending` adds that passed it but have no record yet. */
   checkCap: (config: { remote?: RemoteConfig }, pending: number) => { allowed: boolean; message?: string };
   /** `onCreated` runs as soon as the VM exists, before any step that can fail after it. */
-  provision: (input: { region?: string; image?: string }, onCreated: (machine: FlyCreatedMachine) => Promise<void>) => Promise<FlyProvisionResult>;
+  provision: (input: { region?: string; image?: string; harness: FlyMachineHarness }, onCreated: (machine: FlyCreatedMachine) => Promise<void>) => Promise<FlyProvisionResult>;
   destroy: (appName: string, machineId: string) => Promise<void>;
   createMachineLink: (input: Parameters<typeof createMachineLink>[0]) => Promise<{ link: MachineLink; view: MachineLinkView }>;
   removeLink: (id: string) => Promise<unknown>;
@@ -98,6 +110,21 @@ export interface FlyMachineServiceDeps {
   newId: () => string;
   now: () => string;
   log: (message: string) => void;
+  /** `canUseHarness('codex', model, …)` with home's auth mode and Codex policy context (D-5). */
+  checkCodexPolicy: (model: string) => Promise<{ allowed: boolean; reason?: string }>;
+  /** Home's Codex binary, version and valid sign-in, or null (D-2). */
+  homeCodex: () => Promise<HomeCodexState | null>;
+}
+
+/** D-10: these modules reach `app-server-manager.js` and its `ws`, so they load only when a Codex request asks. */
+async function checkCodexPolicy(model: string): Promise<{ allowed: boolean; reason?: string }> {
+  const [{ getProviderAuthMode }, { resolveCodexPolicyContext }, { canUseHarness }] = await Promise.all([
+    import('../../../lib/agents/runtime-command.js'),
+    import('../../../lib/codex/policy-context.js'),
+    import('../../../lib/harness-policy.js'),
+  ]);
+  const authMode = await getProviderAuthMode(model);
+  return canUseHarness('codex', model, authMode, await resolveCodexPolicyContext('codex', model, authMode));
 }
 
 const defaultDeps: Omit<FlyMachineServiceDeps, 'notifyLinksChanged'> = {
@@ -124,6 +151,8 @@ const defaultDeps: Omit<FlyMachineServiceDeps, 'notifyLinksChanged'> = {
   newId: randomUUID,
   now: () => new Date().toISOString(),
   log: (message) => console.warn(`[fly-machines] ${message}`),
+  checkCodexPolicy,
+  homeCodex: () => readHomeCodexState(),
 };
 
 /**
@@ -139,8 +168,8 @@ function publicIpHint(appName: string): string {
   return `Home could not reach the Fly machine at ${appName}.fly.dev. If this app has no public IPs yet, run once: fly ips allocate-v4 --shared -a ${appName} && fly ips allocate-v6 -a ${appName}`;
 }
 
-/** The early refusals: nothing is created when any of these fires. */
-async function refuseEarly(input: AddFlyMachineInput, deps: FlyMachineServiceDeps): Promise<void> {
+/** The early refusals: nothing is created when any of these fires. Returns the harness to provision for. */
+async function refuseEarly(input: AddFlyMachineInput, deps: FlyMachineServiceDeps): Promise<FlyMachineHarness> {
   const config = await deps.loadConfig();
   if (config.remote?.enabled !== true) {
     throw new FlyMachineError('remote-disabled', 'Fly machines need remote.enabled: true in the Overdeck config.');
@@ -150,14 +179,39 @@ async function refuseEarly(input: AddFlyMachineInput, deps: FlyMachineServiceDep
   }
   const harness = input.harness === undefined ? undefined : normalizeHarnessName(input.harness);
   if (harness === null || (harness !== undefined && !getHarnessBehavior(harness).capabilities.runsOnFlyMachine)) {
-    throw new FlyMachineError('harness-unsupported', `Fly machines run Claude Code only; ${input.harness} is not supported yet (#4296).`, { harness: input.harness });
+    throw new FlyMachineError('harness-unsupported', `Fly machines run Claude Code and Codex conversations; ${input.harness} is not supported.`, { harness: input.harness });
   }
+  const codex = harness === 'codex';
+  if (codex) await refuseCodex(input.model, deps);
   if (input.message !== undefined && !input.projectKey) {
     throw new FlyMachineError('bad-request', 'A message needs a project: pass projectKey (--project) with it.');
   }
   const cap = deps.checkCap(config, pendingProvisions);
   if (!cap.allowed) throw new FlyMachineError('cap-reached', cap.message ?? 'The remote spend cap is reached.');
   pendingProvisions += 1;
+  return codex ? 'codex' : 'claude-code';
+}
+
+/** D-5: a Codex request is checked at home, since D-2 pins the VM's Codex to home's version. */
+async function refuseCodex(model: string | undefined, deps: FlyMachineServiceDeps): Promise<void> {
+  if (!model) {
+    throw new FlyMachineError('bad-request', 'A Codex conversation needs a model: pass --model with an OpenAI model id.');
+  }
+  let provider: string;
+  try {
+    provider = getProviderForModel(model).name;
+  } catch (error) {
+    if (!(error instanceof UnknownModelError)) throw error;
+    throw new FlyMachineError('bad-request', `${error.message} Pass --model with an OpenAI model id.`, { harness: 'codex', model });
+  }
+  if (provider !== 'openai') {
+    throw new FlyMachineError('harness-unsupported', `The codex harness runs OpenAI models; ${model} is not one. Pass --model with an OpenAI model id.`, { harness: 'codex', model });
+  }
+  const policy = await deps.checkCodexPolicy(model);
+  if (!policy.allowed) {
+    throw new FlyMachineError('harness-unsupported', policy.reason ?? `The codex harness cannot run ${model} here.`, { harness: 'codex', model });
+  }
+  if ((await deps.homeCodex()) === null) throw new FlyMachineError('credentials-failed', NO_HOME_CODEX_MESSAGE);
 }
 
 export async function addFlyMachine(
@@ -165,7 +219,7 @@ export async function addFlyMachine(
   overrides: Partial<FlyMachineServiceDeps> & Pick<FlyMachineServiceDeps, 'notifyLinksChanged'>,
 ): Promise<AddFlyMachineResult> {
   const deps: FlyMachineServiceDeps = { ...defaultDeps, ...overrides };
-  await refuseEarly(input, deps);
+  const harness = await refuseEarly(input, deps);
   // The reserved cap slot is released once the record exists (it counts from then on) or on failure.
   let reserved = true;
   const release = (): void => {
@@ -173,18 +227,23 @@ export async function addFlyMachine(
     reserved = false;
   };
   try {
-    return await provisionAndLink(input, deps, release);
+    return await provisionAndLink(input, harness, deps, release);
   } finally {
     release();
   }
 }
 
-async function provisionAndLink(input: AddFlyMachineInput, deps: FlyMachineServiceDeps, release: () => void): Promise<AddFlyMachineResult> {
+async function provisionAndLink(
+  input: AddFlyMachineInput,
+  harness: FlyMachineHarness,
+  deps: FlyMachineServiceDeps,
+  release: () => void,
+): Promise<AddFlyMachineResult> {
   const recordId = deps.newId();
   let machine: FlyCreatedMachine | null = null;
   let vm: FlyProvisionResult;
   try {
-    vm = await deps.provision({ region: input.region, image: input.image }, async (createdMachine) => {
+    vm = await deps.provision({ region: input.region, image: input.image, harness }, async (createdMachine) => {
       machine = createdMachine;
       await deps.upsertRecord({
         id: recordId,
@@ -197,6 +256,7 @@ async function provisionAndLink(input: AddFlyMachineInput, deps: FlyMachineServi
         label: `fly-${createdMachine.machineId}`,
         projectKey: input.projectKey ?? null,
         docker: false,
+        codexAuthPath: null,
         createdAt: deps.now(),
       });
       release(); // the record counts toward the cap from here on
@@ -224,7 +284,7 @@ async function provisionAndLink(input: AddFlyMachineInput, deps: FlyMachineServi
     }
     linkId = created.link.id;
 
-    const record = await deps.updateRecord(recordId, { linkId, environmentId: created.link.environmentId, docker: vm.docker });
+    const record = await deps.updateRecord(recordId, { linkId, environmentId: created.link.environmentId, docker: vm.docker, codexAuthPath: vm.codexAuthPath });
     if (!record) throw new Error(`The Fly machine record ${recordId} disappeared while linking`);
     deps.notifyLinksChanged();
 
@@ -234,6 +294,7 @@ async function provisionAndLink(input: AddFlyMachineInput, deps: FlyMachineServi
     const conversation = await startFlyConversation(created.link, {
       message: input.message,
       projectKey: input.projectKey,
+      harness,
       model: input.model,
       effort: input.effort,
     }, deps);
@@ -244,13 +305,13 @@ async function provisionAndLink(input: AddFlyMachineInput, deps: FlyMachineServi
   }
 }
 
-/** Start a Claude Code conversation on the linked VM, acting as the operator (FR-10). */
+/** Start a Claude Code or Codex conversation on the linked VM, acting as the operator (FR-10, PAN-4296 FR-8). */
 export async function startFlyConversation(
   link: Pick<MachineLink, 'environmentId'>,
-  input: { message: string; projectKey: string; model?: string; effort?: string },
+  input: { message: string; projectKey: string; harness?: FlyMachineHarness; model?: string; effort?: string },
   deps: Pick<FlyMachineServiceDeps, 'linkFetch'> = defaultDeps,
 ): Promise<FlyConversation> {
-  const body = { message: input.message, projectKey: input.projectKey, harness: 'claude-code', model: input.model, effort: input.effort };
+  const body = { message: input.message, projectKey: input.projectKey, harness: input.harness ?? 'claude-code', model: input.model, effort: input.effort };
   let response: { status: number; json: unknown };
   try {
     response = await deps.linkFetch(link.environmentId, '/api/conversations', { method: 'POST', actor: 'operator', body });

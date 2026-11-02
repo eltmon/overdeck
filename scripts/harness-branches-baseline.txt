@@ -25,6 +25,7 @@
 8 src/dashboard/server/routes/agents/spawn-issue.ts
 1 src/dashboard/server/services/agent-directory.ts
 1 src/dashboard/server/services/conversation-lifecycle.ts
+1 src/dashboard/server/services/fly-machine-service.ts
 2 src/dashboard/server/services/vault-continue.ts
 2 src/dashboard/server/services/vault-settle-poller.ts
 2 src/dashboard/server/ws-rpc.ts
@@ -44,6 +45,8 @@
 26 src/lib/agents/spawn.ts
 1 src/lib/agents/supervisor-channels.ts
 1 src/lib/agents/termination.ts
+1 src/lib/anywhere/fly/codex-auth.ts
+1 src/lib/anywhere/fly/provision.ts
 1 src/lib/codex-auth.ts
 1 src/lib/codex/policy-context.ts
 8 src/lib/config-yaml/merge.ts

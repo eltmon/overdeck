@@ -1,12 +1,12 @@
 /**
  * `pan machines add-fly` (PAN-4652 WI-13, FR-11).
  *
- *   pan machines add-fly [--project <key>] [--message <text>] [--model <id>]
- *     [--effort <level>] [--region <code>] [--image <ref>] [--json]
+ *   pan machines add-fly [--project <key>] [--message <text>] [--harness <name>]
+ *     [--model <id>] [--effort <level>] [--region <code>] [--image <ref>] [--json]
  *
  * Asks the running dashboard (`POST /api/machines/fly`) to start a Fly VM that
  * runs `pan serve`, link it one way from here, and optionally clone a project
- * and start a Claude Code conversation on it. The dashboard does the whole flow
+ * and start a Claude Code or Codex conversation on it (`--harness`, PAN-4296). The dashboard does the whole flow
  * in one request, 3–10 minutes with a clone (D-13). Node's global fetch gives
  * up on response headers after 300 s, so this verb sends the request with
  * `node:http`, which waits as long as the dashboard takes.
@@ -18,6 +18,7 @@ import { fail, NEEDS_PAN_UP, NOT_RUNNING } from './machines-call.js';
 export interface AddFlyOptions {
   project?: string;
   message?: string;
+  harness?: string;
   model?: string;
   effort?: string;
   region?: string;
@@ -27,7 +28,7 @@ export interface AddFlyOptions {
 
 interface AddFlyResponse {
   link: { label: string };
-  record: { label: string; region: string; docker: boolean; appName: string };
+  record: { label: string; region: string; docker: boolean; appName: string; codexAuthPath: string | null };
   conversation?: { environmentId: string; name: string; path: string };
 }
 
@@ -81,6 +82,7 @@ export async function runMachinesAddFly(options: AddFlyOptions): Promise<void> {
   const body: Record<string, unknown> = {};
   if (options.project) body.projectKey = options.project;
   if (options.message !== undefined) body.message = options.message;
+  if (options.harness) body.harness = options.harness;
   if (options.model) body.model = options.model;
   if (options.effort) body.effort = options.effort;
   if (options.region) body.region = options.region;
@@ -103,7 +105,7 @@ export async function runMachinesAddFly(options: AddFlyOptions): Promise<void> {
     console.log(JSON.stringify(result));
     return;
   }
-  console.log(`Linked ${result.record.label} (Fly app ${result.record.appName}, region ${result.record.region}; docker: ${result.record.docker ? 'yes' : 'no'})`);
+  console.log(`Linked ${result.record.label} (Fly app ${result.record.appName}, region ${result.record.region}; docker: ${result.record.docker ? 'yes' : 'no'}; codex: ${result.record.codexAuthPath ? 'yes' : 'no'})`);
   if (result.conversation) console.log(`Open: ${base}${result.conversation.path}`);
   console.log('`pan machines list` shows its state; `pan machines unlink` destroys it.');
 }
@@ -111,10 +113,11 @@ export async function runMachinesAddFly(options: AddFlyOptions): Promise<void> {
 export function registerMachinesFlyCommands(machines: Command): void {
   machines
     .command('add-fly')
-    .description('Start a Fly.io VM that runs Overdeck, link it from here, and optionally start a Claude Code conversation on it')
+    .description('Start a Fly.io VM that runs Overdeck, link it from here, and optionally start a Claude Code or Codex conversation on it')
     .option('--project <key>', 'Clone this project onto the VM (GitHub projects only)')
-    .option('--message <text>', 'Start a Claude Code conversation with this first message (needs --project)')
-    .option('--model <id>', 'Model for the conversation')
+    .option('--message <text>', 'Start a conversation with this first message (needs --project)')
+    .option('--harness <name>', 'Harness for the conversation: claude-code (default) or codex')
+    .option('--model <id>', 'Model for the conversation (required with --harness codex)')
     .option('--effort <level>', 'Reasoning effort for the conversation')
     .option('--region <code>', 'Fly region (default: remote.fly.region, else iad)')
     .option('--image <ref>', 'Image (default: remote.fly.image, else registry.fly.io/pan-workspace:latest)')

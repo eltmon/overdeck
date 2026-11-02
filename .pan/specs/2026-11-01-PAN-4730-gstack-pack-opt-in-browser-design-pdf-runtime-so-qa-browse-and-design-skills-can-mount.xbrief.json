@@ -1,0 +1,1426 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T20:17:56Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4730: gstack pack: opt-in browser/design/PDF runtime so qa, browse and design skills can mount",
+    "updated": "2026-11-01T20:48:09.475Z"
+  },
+  "plan": {
+    "id": "pan-4730",
+    "title": "gstack pack: opt-in browser/design/PDF runtime so qa, browse and design skills can mount",
+    "status": "running",
+    "uid": "311049f3-297f-44c2-9f69-b894e4f7028d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-01T20:17:56Z",
+    "updated": "2026-11-01T20:48:09.475Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4730",
+        "label": "PAN-4730",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4727",
+        "label": "PAN-4727",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "skill-packs",
+      "gstack",
+      "browser",
+      "fork"
+    ],
+    "metadata": {
+      "sizeJustification": "40 files_scope entries: 19 are in a different repository (the eltmon/gstack fork, prefixed gstack-fork/, including its test ratchet registries), and 21 are Overdeck files, of which 8 are test files, 3 are docs and 1 is the live checkpoint doc; the Overdeck source surface is 9 files in src/lib/skill-packs, src/lib/skill-overrides and src/cli/commands. The fork's --pack-browser contract and the Overdeck consent flow must ship together for the live acceptance run, and a sibling issue in this tracker could not carry a PR for another repo (same shape as PAN-4727).",
+      "canonicalFilename": "2026-11-01-PAN-4730-gstack-pack-opt-in-browser-design-pdf-runtime-so-qa-browse-and-design-skills-can-mount.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-4727 mounts gstack through a network-free pack mode, so the 21 skills that call gstack's compiled browse, design and make-pdf binaries ($B/$D/$P) are classified needs-binary and never mount; the operator wanted qa to work. A naive build (scripts/build.sh, setup) re-renders skills with the ~/.claude install root, writes ~/.gstack and ~/.cache/ms-playwright, and lets skills self-install.",
+      "Proposal": "Fork (eltmon/gstack, branch overdeck/pack-browser): a separately invoked setup --pack-browser R --pack-browser-cache C step that runs bun install --production --frozen-lockfile, the five bun build --compile lines and bun x playwright install chromium with caches under C, plus markers and a pack env helper so compiled binaries, the daemon and gstack-browser-ensure find the state root and Chromium without launch env, guards so a render never self-installs, and a ~/.gstack doc rewrite. Overdeck: a second consent (pan skills pack browser gstack on|off, add --browser) recorded as browser: true in the registry, readiness derived from R/.gstack-pack-browser.json, update/sync rebuild, catalog/launch mount the new browser (9) and browser-opt-in (9) classes only when ready, daemon reporting on remove/off, docs, and an isolated live run of /gstack:qa-only.",
+      "NonGoals": "- Running gstack's scripts/build.sh, CSO, build-node-server.sh, font installs, --with-deps or any system package install\n- Mounting open-gstack-browser, pair-agent, setup-browser-cookies or any PAN-4727 excluded skill\n- Setting any gstack or Playwright env var in Overdeck launches (markers only)\n- Killing browse daemons or deleting project .gstack/ dirs or /tmp/browse-* files\n- Garbage-collecting old Chromium revisions inside packs/gstack/browser/playwright\n- Dashboard UI for the browser runtime\n- A Codex-specific build or Windows support for the browser step\n- Merging the fork PR or any contact with garrytan/gstack\n- Building browser runtime during catalog reads or launches"
+    },
+    "autoDecisions": [
+      {
+        "summary": "A1: Build the browser runtime inside the existing render R, with bun cache and Chromium in ~/.overdeck/packs/gstack/browser/",
+        "rationale": "Rendered skills already resolve $B/$D/$P to R/<tool>/dist/<bin>, so no new path rewrite is needed, and every byte stays under packs/gstack so remove leaves nothing."
+      },
+      {
+        "summary": "A2: The fork step runs the compile lines directly and never scripts/build.sh",
+        "rationale": "build.sh re-renders every skill for all hosts without the install root (gstack-host-renders.sh selects all in R), which would undo the pack render."
+      },
+      {
+        "summary": "A3: canary is browser-opt-in although the fork reads it as monitoring-only",
+        "rationale": "The issue body names canary with the deploy skills as opt-in; the issue is the authoritative input."
+      },
+      {
+        "summary": "A4: open-gstack-browser, pair-agent and setup-browser-cookies are excluded, not opt-in",
+        "rationale": "They read the operator's real browser cookies and keychain, expose the browser through an ngrok tunnel, or write ~/.gstack and ~/.codex outside the pack, which breaks the issue's clean-removal requirement."
+      },
+      {
+        "summary": "A5: Consent is stored as browser: true in skills.packs.gstack; readiness is derived from R/.gstack-pack-browser.json",
+        "rationale": "Consent is an operator decision like the trusted commit; built state is derivable, and Overdeck stores no status it can derive."
+      },
+      {
+        "summary": "A6: Markers and a fork pack env helper instead of Overdeck launch env",
+        "rationale": "PAN-4727 chose markers (D2) and lists launch env vars as a non-goal; markers also work for hand-run binaries and every harness."
+      },
+      {
+        "summary": "A7: CLI is a new verb pan skills pack browser <id> [on|off] plus add --browser with a second confirmation",
+        "rationale": "updatePack returns early for an unchanged commit, so a flag on update cannot enable the runtime for an already-added pack; the issue asks for a separately consented step."
+      },
+      {
+        "summary": "A8: browser off deletes and re-renders the trusted render and deletes the browser cache",
+        "rationale": "Re-rendering is offline and fast and is the only way to leave R identical in kind to a fresh add without ~572 MB of node_modules."
+      },
+      {
+        "summary": "A9: The consent preview lists direct production dependencies plus a lockfile line and the Chromium line",
+        "rationale": "Satisfies 'every download listed' at the level the operator can review; the full transitive list is the frozen bun.lock, which the line names."
+      },
+      {
+        "summary": "A10: Browse daemons are reported with a kill command on remove and off, never killed",
+        "rationale": "Matches PAN-4727 D9 (print, never delete project files) and the repo invariant that runaway processes are surfaced, not killed; the daemon exits after 30 idle minutes."
+      }
+    ],
+    "items": [
+      {
+        "id": "fork-pack-env",
+        "title": "Fork: pack env helper so compiled binaries and the daemon find the state root and Chromium",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4730",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "gstack-fork/lib/pack-env.ts",
+            "gstack-fork/lib/pack-env-apply.ts",
+            "gstack-fork/browse/src/cli.ts",
+            "gstack-fork/design/src/cli.ts",
+            "gstack-fork/make-pdf/src/cli.ts",
+            "gstack-fork/design/src/auth.ts",
+            "gstack-fork/browse/src/project-slug.ts",
+            "gstack-fork/test/pack-env.test.ts",
+            "gstack-fork/test/free-seed-ratchet.test.ts",
+            "gstack-fork/test/test-free-shards.test.ts",
+            ".pan/drafts/PAN-4730-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd $HOME/Projects/gstack && bun test test/pack-env.test.ts test/state-root-parity.test.ts test/state-root-ratchet.test.ts test/free-seed-ratchet.test.ts test/test-free-shards.test.ts test/free-fixtures.test.ts"
+          ],
+          "expected_outputs": [
+            "bun test reports 0 fail for every listed file"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-7",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "fork-render-guards",
+            "fork-pack-browser-test",
+            "gstack-browser-live"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-F1. In the fork clone (branch overdeck/pack-browser from origin/main 1b778f78; check the clone is clean first, never stash) add lib/pack-env.ts with packRootFor and applyPackEnv plus the side-effect module lib/pack-env-apply.ts, make import '../../lib/pack-env-apply' the FIRST import line of the browse, design and make-pdf CLIs (module-level resolveStateRoot calls such as browse/src/security-classifier.ts:48 run at import time, so a later call statement is too late; grep the import graphs as the PRD checkpoint says), point design/src/auth.ts configPath at resolveStateRoot(), make project-slug.ts prefer the pack's own bin/gstack-slug, add test/pack-env.test.ts including a bun build --compile probe, commit in the fork, and record the fork SHA and test line in the checkpoint doc with Item: fork-pack-env."
+        },
+        "items": [
+          {
+            "id": "fork-pack-env.ac1",
+            "title": "Given a temp render holding .gstack-pack.json, .gstack-pack-state-root and .gstack-pack-browsers-path, applyPackEnv({}, root) returns root and sets GSTACK_STATE_ROOT, PLAYWRIGHT_BROWSERS_PATH and BUN_RUNTIME_TRANSPILER_CACHE_PATH=0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-env.ac2",
+            "title": "When GSTACK_STATE_ROOT is already set, applyPackEnv preserves the preset value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-env.ac3",
+            "title": "A bun build --compile probe at <R>/browse/dist/probe, whose second import computes resolveStateRoot() at load time, prints the state root S when run with env -i and an empty HOME, and HOME contains no files afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-env.ac4",
+            "title": "design/src/auth.ts configPath returns a path under resolveStateRoot() and bun test test/state-root-ratchet.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-env.ac5",
+            "title": "The checkpoint doc contains a '## Fork: pack env' section with the fork commit SHA and the bun test summary line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-render-guards",
+        "title": "Fork: pack renders never install themselves (browser-ensure and plain setup refuse)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "gstack-fork/bin/gstack-browser-ensure*",
+            "gstack-fork/setup*",
+            "gstack-fork/test/pack-browser-guards.test.ts",
+            "gstack-fork/test/free-seed-ratchet.test.ts",
+            "gstack-fork/test/test-free-shards.test.ts",
+            ".pan/drafts/PAN-4730-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd $HOME/Projects/gstack && bun test test/pack-browser-guards.test.ts test/setup-help.test.ts test/free-seed-ratchet.test.ts test/test-free-shards.test.ts test/free-fixtures.test.ts"
+          ],
+          "expected_outputs": [
+            "bun test reports 0 fail"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-F2. In bin/gstack-browser-ensure detect a pack render (.gstack-pack.json at ROOT), export PLAYWRIGHT_BROWSERS_PATH from the browsers marker and BUN_RUNTIME_TRANSPILER_CACHE_PATH=0 when unset, and replace both install branches with fail 'pack browser runtime not built' / 'pan skills pack browser gstack on'. In setup, exit 2 with the host-managed message when run without --pack-* flags inside a render. Add test/pack-browser-guards.test.ts, commit in the fork, record SHA in the checkpoint doc with Item: fork-render-guards. The globs gstack-fork/setup* and gstack-fork/bin/gstack-browser-ensure* mean only the files setup and bin/gstack-browser-ensure; never edit setup.ps1."
+        },
+        "items": [
+          {
+            "id": "fork-render-guards.ac1",
+            "title": "Given a fake render with stub bun and node that fail, gstack-browser-ensure prints 'BROWSER_UNAVAILABLE pack browser runtime not built', exits 1, and the stub log contains no install call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-render-guards.ac2",
+            "title": "Outside a render, gstack-browser-ensure --check preserves today's message 'playwright is not installed under'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-render-guards.ac3",
+            "title": "bash R/setup inside a real pack render exits 2 with 'this is a host-managed pack render' and the temp HOME tree stays empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-render-guards.ac4",
+            "title": "The checkpoint doc contains a '## Fork: render guards' section with the fork SHA and test summary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-render-gstack-paths",
+        "title": "Fork: pack render rewrites literal ~/.gstack paths in skill docs to the state root",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "gstack-fork/scripts/pack-render.sh",
+            "gstack-fork/test/pack-mode.test.ts",
+            ".pan/drafts/PAN-4730-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd $HOME/Projects/gstack && bun test test/pack-mode.test.ts"
+          ],
+          "expected_outputs": [
+            "bun test reports 0 fail"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-F3. After the install-root check in scripts/pack-render.sh, rewrite ${HOME}/.gstack/, $HOME/.gstack/ and ~/.gstack/ (in that order) to $S/ in every R/*/SKILL.md and R/*/sections/*.md, extend test/pack-mode.test.ts with the token assertions, commit in the fork, record SHA in the checkpoint doc with Item: fork-render-gstack-paths."
+        },
+        "items": [
+          {
+            "id": "fork-render-gstack-paths.ac1",
+            "title": "After bash setup --pack-root R --pack-state-root S, grep returns no match for '~/.gstack/', '$HOME/.gstack/' or '${HOME}/.gstack/' in any R/*/SKILL.md or R/*/sections/*.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-render-gstack-paths.ac2",
+            "title": "R/design-shotgun/SKILL.md contains '<S>/projects/' after the render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-render-gstack-paths.ac3",
+            "title": "The checkpoint doc contains a '## Fork: ~/.gstack rewrite' section with the fork SHA and the bun test summary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-pack-browser-step",
+        "title": "Fork: setup --pack-browser builds the browser runtime into a pack render",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-4730",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "gstack-fork/setup*",
+            "gstack-fork/scripts/pack-browser.sh",
+            "gstack-fork/pack-mode.json",
+            "gstack-fork/docs/pack-mode.md",
+            ".pan/drafts/PAN-4730-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd $HOME/Projects/gstack && bash setup --help | grep -c pack-browser",
+            "cd $HOME/Projects/gstack && cat pack-mode.json"
+          ],
+          "expected_outputs": [
+            "grep prints 1 or more",
+            "pack-mode.json shows \"packBrowser\": 1"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "fork-pack-browser-test",
+            "gstack-browser-runner",
+            "gstack-browser-live"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-F4 and section 5. Add --pack-browser and --pack-browser-cache to setup's parser, help and typo list, dispatch to new scripts/pack-browser.sh after the render guard, refuse --pack-root with --pack-browser together, implement the eleven steps of PRD section 5 exactly (never scripts/build.sh, never --lockfile-only, bun floor check, cleanup trap), set pack-mode.json to {\"packMode\": 1, \"packBrowser\": 1}, add the '## Pack browser' section to docs/pack-mode.md, commit in the fork and record SHA with Item: fork-pack-browser-step. The glob gstack-fork/setup* means only the file setup; never edit setup.ps1."
+        },
+        "items": [
+          {
+            "id": "fork-pack-browser-step.ac1",
+            "title": "bash setup --help in the fork clone prints --pack-browser and --pack-browser-cache",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-browser-step.ac2",
+            "title": "pack-mode.json contains {\"packMode\": 1, \"packBrowser\": 1}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-browser-step.ac3",
+            "title": "bash setup --pack-root R --pack-browser R exits 2 with 'run --pack-root and --pack-browser separately'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-browser-step.ac4",
+            "title": "docs/pack-mode.md contains a '## Pack browser' section that lists the npm registry and Playwright CDN downloads and states that scripts/build.sh is never run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-pack-browser-test",
+        "title": "Fork: stub-bun test proves the browser step's commands, env and cleanup",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "gstack-fork/test/pack-browser.test.ts",
+            "gstack-fork/test/free-seed-ratchet.test.ts",
+            "gstack-fork/test/test-free-shards.test.ts",
+            ".pan/drafts/PAN-4730-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd $HOME/Projects/gstack && bun test test/pack-browser.test.ts test/free-seed-ratchet.test.ts test/test-free-shards.test.ts test/free-fixtures.test.ts"
+          ],
+          "expected_outputs": [
+            "bun test reports 0 fail"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-F5. Write test/pack-browser.test.ts: render a real pack offline, then run setup --pack-browser with a stub bun (logs argv and env, fakes outputs) and stub node (prints RENDER_OK); cover the success order and env, the bun floor refusal, playwright failure cleanup, unready render and relative path exits; register the new file where the free-test ratchets require; commit in the fork and record SHA with Item: fork-pack-browser-test."
+        },
+        "items": [
+          {
+            "id": "fork-pack-browser-test.ac1",
+            "title": "The success case records install --production --frozen-lockfile, run vendor:xterm, five build --compile lines and x playwright install chromium in that order, each with BUN_INSTALL_CACHE_DIR=<C>/bun-cache, and never --lockfile-only or run build",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-browser-test.ac2",
+            "title": "When the stub reports bun 1.3.2 the step exits 1 and R contains no node_modules and no browser marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-browser-test.ac3",
+            "title": "When the stub fails on x playwright the step exits non-zero, removes R/node_modules, the five binaries and both browser markers, and preserves R/.gstack-pack.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-browser-test.ac4",
+            "title": "After the success case the temp HOME tree is empty and R/test-audit/SKILL.md still contains R/bin/gstack-skill-start",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-publish",
+        "title": "Fork: push overdeck/pack-browser and open the PR inside eltmon/gstack",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-4730-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh pr view --repo eltmon/gstack overdeck/pack-browser --json baseRefName,headRefName,state,isCrossRepository"
+          ],
+          "expected_outputs": [
+            "state OPEN, baseRefName main, isCrossRepository false"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-F6. Push the fork branch, open the PR with gh pr create --repo eltmon/gstack --base main --head overdeck/pack-browser (verify the --repo flag before running; never touch garrytan/*), verify with gh pr view, record the PR URL and the pack-browser SHA in the checkpoint doc with Item: fork-publish. Do not merge."
+        },
+        "items": [
+          {
+            "id": "fork-publish.ac1",
+            "title": "gh pr view --repo eltmon/gstack overdeck/pack-browser returns state OPEN, base main and isCrossRepository false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-publish.ac2",
+            "title": "The checkpoint doc records the PR URL and a 40-hex pack-browser SHA under '## Fork: publish'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-browser-classes",
+        "title": "Skill map: browser and browser-opt-in classes replace needs-binary",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4730",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/gstack.ts",
+            "src/lib/skill-packs/__tests__/gstack.test.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/gstack.test.ts src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "expected_outputs": [
+            "gstack.test.ts and adapters.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "gstack-browser-manifest",
+            "gstack-browser-launch",
+            "gstack-browser-docs"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-O1 and section 6. Change GstackSkillClass to default | opt-in | browser | browser-opt-in | excluded, reclassify the 21 needs-binary skills per section 6 (9 browser, 9 browser-opt-in, 3 newly excluded), add GSTACK_BROWSER_SKILLS, GSTACK_BROWSER_OPT_IN_SKILLS, GSTACK_BROWSER_MARKER, GSTACK_PACK_BROWSER_VERSION, GSTACK_BROWSER_NEEDED, set GSTACK_RENDER_VERSION to 3, move GSTACK_SKILL_MAP_VERIFIED_AT to 1b778f78, extend GSTACK_DISCLOSURE, update tests. Also change the existing assertion in src/lib/skill-packs/__tests__/adapters.test.ts (expect(GSTACK_SKILL_MAP['qa']!.class).toBe('needs-binary')) to 'browser' so that file stays green before the adapter item lands."
+        },
+        "items": [
+          {
+            "id": "gstack-browser-classes.ac1",
+            "title": "The test asserts class sizes 22 default, 14 opt-in, 9 browser, 9 browser-opt-in, 9 excluded and it passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-classes.ac2",
+            "title": "GSTACK_BROWSER_SKILLS contains 18 names including qa and ship, and GSTACK_BROWSER_OPT_IN_SKILLS contains ship, land-and-deploy, canary and design-review but not qa",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-classes.ac3",
+            "title": "classifyGstackSkill('pair-agent') returns class excluded and the string needs-binary no longer appears in gstack.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-classes.ac4",
+            "title": "gstack.ts contains GSTACK_RENDER_VERSION = 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-browser-manifest",
+        "title": "Adapter: readPackManifest mounts browser skills only with browser: true",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-O2. Add opts.browser to readPackManifest; gstackSkillDirs mounts GSTACK_BROWSER_SKILLS too when browser is true, and gives unmounted browser-class skills the reason GSTACK_BROWSER_NEEDED; the gstack opt-in set unions GSTACK_OPT_IN_SKILLS and GSTACK_BROWSER_OPT_IN_SKILLS; extend the fixture with qa, ship and pair-agent and test both modes."
+        },
+        "items": [
+          {
+            "id": "gstack-browser-manifest.ac1",
+            "title": "Without browser, readPackManifest returns qa and ship in excluded with reason 'Needs the browser runtime: pan skills pack browser gstack on'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-manifest.ac2",
+            "title": "With browser: true, readPackManifest returns qa mounted with optIn false and ship mounted with optIn true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-manifest.ac3",
+            "title": "With browser: true, pair-agent stays in excluded with its own reason and projectMutatingSkills contains ship",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-browser-runner",
+        "title": "browser.ts: build runner, readiness check and download list for the browser step",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/browser.ts",
+            "src/lib/skill-packs/__tests__/browser.test.ts",
+            "src/lib/skill-packs/render.ts",
+            "src/lib/skill-packs/__tests__/render.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/browser.test.ts src/lib/skill-packs/__tests__/render.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "browser.test.ts and render.test.ts pass",
+            "lint:circular reports no cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-O3. Create src/lib/skill-packs/browser.ts importing only node:* and ./gstack.js with BrowserError, isBrowserReady, assertBrowserBuildable (D12 then bun check), browserCommand, browserDownloads (D13 lines from package.json) and buildBrowserRuntime (execFile bash setup --pack-browser R --pack-browser-cache C with cwd = extraction, 30 minute timeout, stderr tail on failure); test with fake setup scripts in temp dirs. Also make render.ts gcPackRenders treat an unregistered id's browser/ dir like render/ and state/ (age-checked, removed, counted in removedStates)."
+        },
+        "items": [
+          {
+            "id": "gstack-browser-runner.ac1",
+            "title": "Given a fake setup that writes .gstack-pack-browser.json, buildBrowserRuntime resolves and isBrowserReady returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-runner.ac2",
+            "title": "Given a fake setup that exits 3, buildBrowserRuntime throws BrowserError containing the fake's stderr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-runner.ac3",
+            "title": "Given pack-mode.json without packBrowser, assertBrowserBuildable throws the D12 message and the fake setup's sentinel file is never created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-runner.ac4",
+            "title": "browserDownloads returns playwright@^1.62.1 from a fixture package.json and ends with the Chromium line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-runner.ac5",
+            "title": "gcPackRenders removes an old unregistered id's browser/ dir and returns it in removedStates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-browser-registry",
+        "title": "Registry: browser: true consent field and packBrowserDir helper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "expected_outputs": [
+            "sources.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-12",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-O4. Add browser?: true to PackRegistryEntry, read it in toEntry (only boolean true counts, other values are ignored without dropping the entry), write it in writePackEntry when set, and add packBrowserDir(id) returning packs/<id>/browser; add round-trip tests."
+        },
+        "items": [
+          {
+            "id": "gstack-browser-registry.ac1",
+            "title": "writePackEntry with browser: true persists 'browser: true' under skills.packs.<id> and getPack returns browser: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-registry.ac2",
+            "title": "Given an entry with browser: 'yes', listPacks returns the entry without the browser field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-registry.ac3",
+            "title": "packBrowserDir('gstack') returns a path ending in packs/gstack/browser",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-browser-enable",
+        "title": "sources.ts: enablePackBrowser and disablePackBrowser flows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-packs/__tests__/sources-browser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/sources-browser.test.ts"
+          ],
+          "expected_outputs": [
+            "sources-browser.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-13",
+            "NFR-4"
+          ],
+          "readinessReason": "Runs after its sources.ts predecessors through blocks edges; its tests live in a new file no ready sibling touches."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-O5. Add PackPreview.browser, enablePackBrowser (require gstack-runtime and a ready render, short-circuit when already on and ready, assert buildable before consent, preview with manifest read browser: true plus command/downloads/writes, build after consent, then write browser: true) and disablePackBrowser (clear browser, rm -rf the trusted render and re-render it, rm -rf packBrowserDir); map BrowserError to PackSourceError('render'); test with the local bare-repo fixture and fake setup."
+        },
+        "items": [
+          {
+            "id": "gstack-browser-enable.ac1",
+            "title": "When confirm returns false, enablePackBrowser leaves the registry without browser and creates no browser marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-enable.ac2",
+            "title": "When confirm returns true, enablePackBrowser creates the browser marker and persists browser: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-enable.ac3",
+            "title": "When the fake browser step exits 1, enablePackBrowser throws a render PackSourceError and the registry is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-enable.ac4",
+            "title": "When pack-mode.json lacks packBrowser, enablePackBrowser rejects with the D12 message before confirm is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-enable.ac5",
+            "title": "disablePackBrowser removes browser from the registry, deletes packs/gstack/browser, and the trusted render is ready again without a browser marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-browser-update-sync",
+        "title": "sources.ts: update and sync rebuild the browser runtime when consent is recorded",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-packs/__tests__/sources-browser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/sources-browser.test.ts src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-O6. In updatePack, when entry.browser, assert the new commit is buildable before consent and add preview.browser; after consent render, build the browser runtime (unless ready) and only then write the registry. In syncPack, when entry.browser and the trusted render's browser runtime is not ready, build it with no prompt. Add tests."
+        },
+        "items": [
+          {
+            "id": "gstack-browser-update-sync.ac1",
+            "title": "With browser: true, updatePack to a second commit creates that commit's browser marker and moves the trusted commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-update-sync.ac2",
+            "title": "When the browser step fails during update, updatePack throws and the trusted commit is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-update-sync.ac3",
+            "title": "syncPack rebuilds R/.gstack-pack-browser.json after it was deleted when browser is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-update-sync.ac4",
+            "title": "syncPack never runs the browser step when browser is unset (sentinel file absent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-browser-launch",
+        "title": "Catalog and launch: mount browser skills when ready, warn when consent has no runtime",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/catalog.ts",
+            "src/lib/skill-overrides/launch.ts",
+            "src/lib/skill-overrides/__tests__/launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/launch.test.ts"
+          ],
+          "expected_outputs": [
+            "launch.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-O7. Add PackCatalogEntry.browser ('off' | 'ready' | 'missing') computed from the registry flag and isBrowserReady on the trusted render, pass browser: browser === 'ready' to readPackManifest, and in resolveLaunchPackSelection warn '[launcher] WARNING: gstack browser runtime not built; run pan skills pack sync <id>' when the state is missing and the pack resolves on; extend the gstack launch fixtures."
+        },
+        "items": [
+          {
+            "id": "gstack-browser-launch.ac1",
+            "title": "Given consent and a ready browser marker with the pack on, the mount contains plugins/gstack/skills/qa/SKILL.md and not ship",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-launch.ac2",
+            "title": "Given the same plus gstack/ship on, the mount contains ship",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-launch.ac3",
+            "title": "Given consent without a browser marker, the mount has no qa and the launch warnings contain 'gstack browser runtime not built'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-launch.ac4",
+            "title": "Given a browser marker but no consent, the mount has no qa and no browser warning is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-browser-cli",
+        "title": "CLI: pan skills pack browser <id> [on|off] and add --browser",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/skills-pack-browser.ts",
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills-pack-browser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/skills-pack-browser.test.ts src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11",
+            "FR-13",
+            "NFR-4"
+          ],
+          "readinessReason": "Touches only the new skills-pack-browser.ts, its new test file and skills.ts, which no other ready item edits at the same time; gstack-daemon-report follows through a blocks edge."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-O8. Create src/cli/commands/skills-pack-browser.ts with printBrowserPreview, skillsPackBrowserCommand and a daemonLines stub; export packConfirm (with an optional question) and failOnPackError from skills.ts; print browser rows from printPackPreview when preview.browser is set; add --browser to pack add (runs the on flow after a successful add with its own confirmation) and register 'pack browser <id> [state]' with --yes; test with hoisted mocks in a new test file."
+        },
+        "items": [
+          {
+            "id": "gstack-browser-cli.ac1",
+            "title": "pan skills pack browser gstack prints Runs, Writes and every Downloads line on its own line with no '…' elision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-cli.ac2",
+            "title": "In a non-TTY without --yes the command prints 'Not written:' and the mocked buildBrowserRuntime/enablePackBrowser build is never reached",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-cli.ac3",
+            "title": "pan skills pack add gstack <url> --ref <sha> --browser --yes calls addPack and then enablePackBrowser",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-cli.ac4",
+            "title": "pan skills pack browser gstack off calls disablePackBrowser and prints 'Browser runtime for gstack is off'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-cli.ac5",
+            "title": "pan skills pack browser gstack maybe prints 'state must be on or off' and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-daemon-report",
+        "title": "CLI: remove and browser off report live browse daemons without killing them",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/skills-pack-browser.ts",
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills-pack-browser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/skills-pack-browser.test.ts"
+          ],
+          "expected_outputs": [
+            "skills-pack-browser.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-15",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-O9. Implementation checkpoint: confirm the pid field name in the fork's browse.json (browse/src/config.ts, cli.ts); fallback per the PRD if none. Implement daemonLines() over registered projects' .gstack/browse.json, printing a kill command for each live pid (process.kill(pid, 0) only, never another signal), and call it from skillsPackRemoveCommand for runtime packs and from the off path; test with a live and a dead pid."
+        },
+        "items": [
+          {
+            "id": "gstack-daemon-report.ac1",
+            "title": "Given a project whose .gstack/browse.json names a live pid, remove prints 'Browse daemon still running in <project>: pid <n> — stop with: kill <n>' and the process survives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-daemon-report.ac2",
+            "title": "Given a dead pid in browse.json, no daemon line is printed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-daemon-report.ac3",
+            "title": "browser off prints the same daemon lines after its off message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-browser-docs",
+        "title": "Docs: browser runtime in features/skills.mdx, CHANGELOG, USAGE and the codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skills.mdx",
+            "CHANGELOG.md",
+            "docs/USAGE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'pan skills pack browser' features/skills.mdx",
+            "grep -c needs-binary features/skills.mdx",
+            "grep -c PAN-4730 CHANGELOG.md",
+            "grep -c 'pack browser' docs/USAGE.md"
+          ],
+          "expected_outputs": [
+            "3 or more",
+            "0",
+            "1 or more",
+            "1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-O10. Update features/skills.mdx ### gstack (intro, preview excerpt, new '#### Browser, design and PDF skills', class table with browser and browser-opt-in rows and three new excluded names, state section with daemon and /tmp files, removal section with daemon report, Limits without the PAN-4730 bullet plus the new limits), the 'Where pack state is stored' row, the CHANGELOG Unreleased gstack entry, and the docs/USAGE.md pack command list."
+        },
+        "items": [
+          {
+            "id": "gstack-browser-docs.ac1",
+            "title": "features/skills.mdx contains a '#### Browser, design and PDF skills' heading and 'pan skills pack browser gstack off'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-docs.ac2",
+            "title": "features/skills.mdx contains no 'needs-binary' and its class table shows browser and browser-opt-in rows naming qa and ship",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-docs.ac3",
+            "title": "CHANGELOG.md Unreleased contains a bullet with 'pan skills pack browser gstack' and PAN-4730",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-docs.ac4",
+            "title": "docs/USAGE.md contains 'pan skills pack browser <id> [on|off] [--yes]'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-browser-live",
+        "title": "Live acceptance: real browser build, qa-only run, off and remove in an isolated home",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T20:17:56Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "test",
+          "issueLabel": "pan-4730",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-4730-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f .pan/drafts/PAN-4730-live-checkpoint.md && grep -c '## Live acceptance' .pan/drafts/PAN-4730-live-checkpoint.md"
+          ],
+          "expected_outputs": [
+            "1"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4730.md WI-O11. With this workspace's build and OVERDECK_HOME=/tmp/pan-4730-live/overdeck-home, add gstack at the pack-browser SHA with --browser --yes, record bun pm untrusted, turn the pack on for a scratch project, run /gstack:qa-only through claude -p against a local http.server page, stop the daemon, compare before/after snapshots of ~/.claude/settings.json, ~/.cache/ms-playwright, ~/.bun and ~/.gstack, then run browser off and remove, recording every command and output in the checkpoint doc. Escalate with pan tell if blocked."
+        },
+        "items": [
+          {
+            "id": "gstack-browser-live.ac1",
+            "title": "The checkpoint doc shows the add with --browser printing the browser preview including playwright@^1.62.1 and creating render/<sha>/.gstack-pack-browser.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-live.ac2",
+            "title": "The checkpoint doc shows launch-settings listing qa, qa-only and browse but not ship or pair-agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-live.ac3",
+            "title": "The checkpoint doc shows the qa-only run producing a result event with is_error false, BROWSER_OK, and a report file under packs/gstack/state/projects/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-live.ac4",
+            "title": "The checkpoint doc shows an empty diff of the before/after snapshots and ~/.gstack still absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-browser-live.ac5",
+            "title": "The checkpoint doc shows that after browser off and remove, find $OVERDECK_HOME -path '*gstack*' prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fork-pack-env",
+        "to": "fork-render-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-render-guards",
+        "to": "fork-render-gstack-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-render-gstack-paths",
+        "to": "fork-pack-browser-step",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-render-guards",
+        "to": "fork-pack-browser-step",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-pack-browser-step",
+        "to": "fork-pack-browser-test",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-render-guards",
+        "to": "fork-pack-browser-test",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-pack-browser-test",
+        "to": "fork-publish",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-pack-env",
+        "to": "fork-publish",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-classes",
+        "to": "gstack-browser-manifest",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-classes",
+        "to": "gstack-browser-runner",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-manifest",
+        "to": "gstack-browser-enable",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-runner",
+        "to": "gstack-browser-enable",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-registry",
+        "to": "gstack-browser-enable",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-enable",
+        "to": "gstack-browser-update-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-manifest",
+        "to": "gstack-browser-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-runner",
+        "to": "gstack-browser-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-registry",
+        "to": "gstack-browser-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-enable",
+        "to": "gstack-browser-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-update-sync",
+        "to": "gstack-browser-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-cli",
+        "to": "gstack-daemon-report",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-cli",
+        "to": "gstack-browser-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-daemon-report",
+        "to": "gstack-browser-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-classes",
+        "to": "gstack-browser-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-publish",
+        "to": "gstack-browser-live",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-launch",
+        "to": "gstack-browser-live",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-docs",
+        "to": "gstack-browser-live",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-daemon-report",
+        "to": "gstack-browser-live",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-browser-update-sync",
+        "to": "gstack-browser-live",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

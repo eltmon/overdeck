@@ -11,9 +11,15 @@
  * Steps, in order: ensure the app; create the machine with the D-3 proxy
  * service; wait for `started`; make `pan --version` equal home's (D-7); write
  * the `fly-<machineId>` identity (D-6); sync credentials and configure Claude
- * Code; start dockerd when the image has it (D-8); start `pan serve` with the
- * D-4 env and wait for /api/health; install the heartbeat watchdog; read a
- * pairing code from `pan pair --json` (D-1); build the route URL.
+ * Code; prepare Codex (PAN-4296 step 6b: pin `codex --version` to home's and
+ * push home's Codex sign-in); start dockerd when the image has it (D-8); start
+ * `pan serve` with the D-4 env and wait for /api/health; install the heartbeat
+ * watchdog; read a pairing code from `pan pair --json` (D-1); build the route URL.
+ *
+ * Credentials are required per harness (PAN-4296 FR-5): Claude Code credentials
+ * only for a `claude-code` machine, a usable Codex sign-in only for a `codex`
+ * one. Codex is prepared whenever home can, so a Claude-first machine can take
+ * a Codex conversation later; for `claude-code` a Codex miss is only logged.
  *
  * A failure after the machine exists destroys it before rethrowing: the caller
  * never learns a machine id it could clean up. The Fly API client is used
@@ -34,47 +40,13 @@ import type { FlyProvider } from '../../remote/fly-provider.js';
 import { createFlyProviderFromConfig } from '../../remote/index.js';
 import { generateEphemeralWatchdogScript, REMOTE_HOST_HEARTBEAT_PATH, writeRemoteFile } from '../../remote/remote-agents.js';
 import { REMOTE_PAN_DIR, shellQuote } from '../../remote/remote-tmux.js';
+import { type HomeCodexState, prepareFlyCodex, readHomeCodexState } from './codex-auth.js';
+import { detached, FlyMachineError, INSTALL_POLL, pollUntil } from './provision-shared.js';
 
-export type FlyMachineErrorCode =
-  | 'bad-request'
-  | 'credentials-failed'
-  | 'remote-disabled'
-  | 'no-fly-token'
-  | 'cap-reached'
-  | 'harness-unsupported'
-  | 'version-mismatch'
-  | 'server-not-ready'
-  | 'pairing-failed'
-  | 'unreachable'
-  | 'project-failed'
-  | 'conversation-failed';
+export { detached, FLY_MACHINE_ERROR_STATUS, FlyMachineError, type FlyMachineErrorCode, pollUntil } from './provision-shared.js';
 
-/** HTTP status of each Fly machine error. */
-export const FLY_MACHINE_ERROR_STATUS: Record<FlyMachineErrorCode, number> = {
-  'bad-request': 400,
-  'credentials-failed': 424,
-  'remote-disabled': 409,
-  'no-fly-token': 424,
-  'cap-reached': 409,
-  'harness-unsupported': 400,
-  'version-mismatch': 409,
-  'server-not-ready': 502,
-  'pairing-failed': 502,
-  'unreachable': 502,
-  'project-failed': 502,
-  'conversation-failed': 502,
-};
-
-export class FlyMachineError extends Error {
-  constructor(
-    readonly code: FlyMachineErrorCode,
-    message: string,
-    readonly detail: Record<string, unknown> = {},
-  ) {
-    super(message);
-    this.name = 'FlyMachineError';
-  }
-}
+/** The harness a Fly machine is started for (PAN-4296). */
+export type FlyMachineHarness = 'claude-code' | 'codex';
 
 /** Port `pan serve` listens on inside the VM; the Fly proxy forwards 443 to it (D-3). */
 const FLY_MACHINE_SERVE_PORT = 3011;
@@ -97,7 +69,6 @@ const DEFAULT_REGION = 'iad';
 const DEFAULT_SIZE = 'shared-cpu-2x';
 const DEFAULT_IMAGE = 'registry.fly.io/pan-workspace:latest';
 
-const INSTALL_POLL = { intervalMs: 5_000, limitMs: 5 * 60_000 };
 const DOCKER_POLL = { intervalMs: 2_000, limitMs: 60_000 };
 const HEALTH_POLL = { intervalMs: 2_000, limitMs: 120_000 };
 
@@ -117,6 +88,8 @@ export interface FlyProvisionDeps {
   /** The 8 hex characters of `overdeck-machine-<hex>`. */
   machineSuffix: () => string;
   log: (message: string) => void;
+  /** Home's Codex binary, version and valid sign-in, or null (PAN-4296 D-2). */
+  homeCodex: () => Promise<HomeCodexState | null>;
 }
 
 export interface FlyProvisionResult {
@@ -129,6 +102,8 @@ export interface FlyProvisionResult {
   docker: boolean;
   pairingCode: string;
   routeUrl: `wss://${string}`;
+  /** `$HOME/.codex/auth.json` on the VM when Codex was prepared; null otherwise. */
+  codexAuthPath: string | null;
 }
 
 async function readHomeVersion(): Promise<string> {
@@ -165,22 +140,8 @@ async function resolveDeps(overrides: Partial<FlyProvisionDeps>): Promise<FlyPro
     newId: overrides.newId ?? randomUUID,
     machineSuffix: overrides.machineSuffix ?? (() => randomBytes(4).toString('hex')),
     log: overrides.log ?? ((message) => console.warn(`[fly-machines] ${message}`)),
+    homeCodex: overrides.homeCodex ?? (() => readHomeCodexState()),
   };
-}
-
-/** Probe every `intervalMs` until it returns true or `limitMs` passes. A throwing probe counts as false. */
-export async function pollUntil(deps: Pick<FlyProvisionDeps, 'now' | 'sleep'>, poll: { intervalMs: number; limitMs: number }, probe: () => Promise<boolean>): Promise<boolean> {
-  const deadline = deps.now() + poll.limitMs;
-  for (;;) {
-    if (await probe().catch(() => false)) return true;
-    if (deps.now() + poll.intervalMs > deadline) return false;
-    await deps.sleep(poll.intervalMs);
-  }
-}
-
-/** Run `script` detached on the VM so it outlives the 60 s exec deadline. */
-export function detached(script: string): string {
-  return `setsid nohup sh -c ${shellQuote(script)} > /dev/null 2>&1 < /dev/null &`;
 }
 
 /** Destroy a Fly machine. A 404 means it is already gone. */
@@ -203,7 +164,7 @@ export interface FlyCreatedMachine {
 }
 
 export async function provisionFlyMachine(
-  input: { region?: string; image?: string },
+  input: { region?: string; image?: string; harness?: FlyMachineHarness },
   overrides: Partial<FlyProvisionDeps> = {},
   hooks: {
     /** Called once the machine exists, so the caller can record it before any later step can fail. */
@@ -234,7 +195,7 @@ export async function provisionFlyMachine(
 
   try {
     await hooks.onCreated?.({ machineId, machineName, appName, region });
-    return await prepareMachine(deps, { appName, machineId, machineName, region });
+    return await prepareMachine(deps, { appName, machineId, machineName, region }, input.harness ?? 'claude-code');
   } catch (error) {
     await destroyFlyVm(appName, machineId, deps).catch((destroyError: unknown) => {
       deps.log(`Could not destroy ${machineId} after a failed provision: ${(destroyError as Error).message}`);
@@ -246,6 +207,7 @@ export async function provisionFlyMachine(
 async function prepareMachine(
   deps: FlyProvisionDeps,
   vm: { appName: string; machineId: string; machineName: string; region: string },
+  harness: FlyMachineHarness,
 ): Promise<FlyProvisionResult> {
   const { appName, machineId, machineName } = vm;
   const exec = (command: string): Promise<FlyExecResult> =>
@@ -290,14 +252,25 @@ async function prepareMachine(
   await deps.writeRemoteFile(machineName, identityPath, `${JSON.stringify(identity, null, 2)}\n`);
   await run(`chmod 600 ${shellQuote(identityPath)}`, 'Protecting the identity file');
 
-  // 6. Credentials and Claude Code settings. Without Claude credentials the VM cannot
-  // run a conversation, so that fails here; a missing GitHub token fails only a later clone.
+  // 6. Credentials and Claude Code settings. Without Claude credentials a Claude Code
+  // machine cannot run its conversation, so that fails here; a Codex machine only logs
+  // it (FR-5). A missing GitHub token fails only a later clone.
   const synced = await deps.syncAllCredentials(machineName);
   if (!synced.claude) {
-    throw new FlyMachineError('credentials-failed', `Could not copy Claude Code credentials to Fly machine ${machineId}: this machine has no ~/.claude/.credentials.json, or the copy failed. Log in to Claude Code here, then try again.`);
+    if (harness === 'claude-code') {
+      throw new FlyMachineError('credentials-failed', `Could not copy Claude Code credentials to Fly machine ${machineId}: this machine has no ~/.claude/.credentials.json, or the copy failed. Log in to Claude Code here, then try again.`);
+    }
+    deps.log(`Could not copy Claude Code credentials to Fly machine ${machineId}; Claude Code conversations there will fail`);
   }
   if (!synced.github) deps.log(`Could not copy GitHub auth to Fly machine ${machineId}; cloning a private repository there will fail`);
   await deps.configureClaudeCode(machineName);
+
+  // 6b. Codex (PAN-4296 D-2, D-4, D-6): fatal only for a Codex machine.
+  const codexAuthPath = await prepareFlyCodex(
+    (command, timeoutSeconds) => deps.api.execCommand(appName, machineId, ['/bin/sh', '-c', command], timeoutSeconds),
+    deps,
+    { harness, machineId },
+  );
 
   // 7. Docker when the image has it (D-8). A failure is logged, never fatal.
   let docker = false;
@@ -331,7 +304,7 @@ async function prepareMachine(
 
   // 11. Route.
   const routeUrl = `wss://${appName}.fly.dev/ws/link?${FLY_INSTANCE_PARAM}=${machineId}` as const;
-  return { machineId, machineName, appName, region: vm.region, label, environmentId, docker, pairingCode, routeUrl };
+  return { machineId, machineName, appName, region: vm.region, label, environmentId, docker, pairingCode, routeUrl, codexAuthPath };
 }
 
 /** The `credential` of the last JSON line `pan pair --json` printed, or null. */

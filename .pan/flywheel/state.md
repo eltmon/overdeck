@@ -471,3 +471,22 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   `ps -eo pid,args | grep "[n]ode .*bin/pan reload"`), then start the new one,
   and read the new log's first lines to confirm it started (2026-11-01 tick 98
   missed PAN-4727 this way until tick 102).
+- 2026-11-01 23:58 UTC: the auto-merge scheduler (`auto-merge-scheduler.ts`,
+  rows in overdeck.db `pending_auto_merges`) already merges approved, green,
+  non-strike PRs after a 5-minute cancel window, and re-schedules when the PR
+  head changes. Flywheel merge-door merges race it (PAN-4296: countdown reset,
+  then "merged" mid-countdown; the row settled as `blocked: PR is already
+  merged`). Going forward: let the scheduler merge; Flywheel only cancels
+  (`pan merge cancel <id>`) to hold for unanswered CodeRabbit findings, and
+  clears blockers. Strike PRs (`strike/<id>`) are excluded on purpose
+  (PAN-3973): the operator merges them.
+- 2026-11-02 00:20 UTC: strike PRs have been unmergeable through Overdeck since
+  #4066 / PAN-4384 (Sept 25-29). `merge-gate.ts:136` requires head approval for
+  every door, strikes included, and the operator authors strikes, so they cannot
+  self-approve. Filed PAN-4750 (needs-handoff, merge route). Until it lands,
+  strike PRs merge on GitHub by the operator. The Flywheel board's
+  `PAN-<n>-STRIKE` rows are a parse artifact of `feature-pan-<n>-strike`
+  dirs (PAN-4752).
+- Operator 2026-11-02: roles.flywheel.maxAgents 4 -> 8; auto_pickup_backlog stays
+  OFF. "Nothing pickable" means no ready+released backlog items, which is
+  different from an empty pipeline. Say so explicitly when reporting.

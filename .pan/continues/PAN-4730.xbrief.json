@@ -1,0 +1,394 @@
+{
+  "version": "1",
+  "issueId": "PAN-4730",
+  "created": "2026-11-01T20:48:21.313Z",
+  "updated": "2026-11-01T22:18:46.919Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T22:14Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T22:14:03.695Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T22:18:46.919Z"
+    }
+  ],
+  "items": {
+    "fork-pack-env": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T20:48:21.313Z",
+      "doneAt": "2026-11-01T20:52:42.743Z"
+    },
+    "fork-render-guards": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T20:54:51.670Z",
+      "doneAt": "2026-11-01T20:57:10.494Z"
+    },
+    "fork-render-gstack-paths": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T20:57:24.282Z",
+      "doneAt": "2026-11-01T20:58:29.727Z"
+    },
+    "fork-pack-browser-step": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T20:58:36.556Z",
+      "doneAt": "2026-11-01T21:01:39.646Z"
+    },
+    "fork-pack-browser-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:01:44.211Z",
+      "doneAt": "2026-11-01T21:03:49.786Z"
+    },
+    "fork-publish": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:03:56.327Z",
+      "doneAt": "2026-11-01T21:04:36.539Z"
+    },
+    "gstack-browser-classes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:04:41.732Z",
+      "doneAt": "2026-11-01T21:05:59.672Z"
+    },
+    "gstack-browser-manifest": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:06:04.998Z",
+      "doneAt": "2026-11-01T21:07:12.510Z"
+    },
+    "gstack-browser-runner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:07:17.528Z",
+      "doneAt": "2026-11-01T21:08:53.784Z"
+    },
+    "gstack-browser-registry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:08:59.189Z",
+      "doneAt": "2026-11-01T21:09:48.815Z"
+    },
+    "gstack-browser-enable": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:09:53.540Z",
+      "doneAt": "2026-11-01T21:12:09.739Z"
+    },
+    "gstack-browser-update-sync": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:12:26.270Z",
+      "doneAt": "2026-11-01T21:13:10.827Z"
+    },
+    "gstack-browser-launch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:13:16.064Z",
+      "doneAt": "2026-11-01T21:18:10.353Z"
+    },
+    "gstack-browser-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:18:15.816Z",
+      "doneAt": "2026-11-01T21:21:53.683Z"
+    },
+    "gstack-daemon-report": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:21:59.239Z",
+      "doneAt": "2026-11-01T21:23:14.738Z"
+    },
+    "gstack-browser-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:23:19.841Z",
+      "doneAt": "2026-11-01T21:24:37.209Z"
+    },
+    "gstack-browser-live": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4730",
+      "claimedAt": "2026-11-01T21:24:52.278Z",
+      "doneAt": "2026-11-01T21:40:21.227Z"
+    },
+    "fork-pack-env.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:53:16.108Z"
+    },
+    "fork-pack-env.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:53:29.480Z"
+    },
+    "fork-pack-env.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:53:42.637Z"
+    },
+    "fork-pack-env.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:53:55.072Z"
+    },
+    "fork-pack-env.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:54:07.818Z"
+    },
+    "fork-render-guards.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:54:20.555Z"
+    },
+    "fork-render-guards.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:54:33.314Z"
+    },
+    "fork-render-guards.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:54:46.131Z"
+    },
+    "fork-render-guards.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:55:00.728Z"
+    },
+    "fork-render-gstack-paths.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:55:14.676Z"
+    },
+    "fork-render-gstack-paths.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:55:28.983Z"
+    },
+    "fork-render-gstack-paths.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:55:43.729Z"
+    },
+    "fork-pack-browser-step.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:55:59.320Z"
+    },
+    "fork-pack-browser-step.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:56:15.287Z"
+    },
+    "fork-pack-browser-step.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:56:29.759Z"
+    },
+    "fork-pack-browser-step.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:56:44.213Z"
+    },
+    "fork-pack-browser-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:56:58.206Z"
+    },
+    "fork-pack-browser-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:57:11.551Z"
+    },
+    "fork-pack-browser-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:57:25.948Z"
+    },
+    "fork-pack-browser-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:57:40.131Z"
+    },
+    "fork-publish.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:57:54.718Z"
+    },
+    "fork-publish.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:58:08.267Z"
+    },
+    "gstack-browser-classes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:58:22.249Z"
+    },
+    "gstack-browser-classes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:58:35.842Z"
+    },
+    "gstack-browser-classes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:58:49.445Z"
+    },
+    "gstack-browser-classes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:59:02.938Z"
+    },
+    "gstack-browser-manifest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:59:16.898Z"
+    },
+    "gstack-browser-manifest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:59:30.618Z"
+    },
+    "gstack-browser-manifest.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:59:42.260Z"
+    },
+    "gstack-browser-runner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T21:59:54.396Z"
+    },
+    "gstack-browser-runner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:00:07.145Z"
+    },
+    "gstack-browser-runner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:00:22.431Z"
+    },
+    "gstack-browser-runner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:00:37.644Z"
+    },
+    "gstack-browser-runner.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:00:52.721Z"
+    },
+    "gstack-browser-registry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:01:08.515Z"
+    },
+    "gstack-browser-registry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:01:24.079Z"
+    },
+    "gstack-browser-registry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:01:38.269Z"
+    },
+    "gstack-browser-enable.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:01:52.313Z"
+    },
+    "gstack-browser-enable.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:02:06.128Z"
+    },
+    "gstack-browser-enable.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:02:20.261Z"
+    },
+    "gstack-browser-enable.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:02:34.725Z"
+    },
+    "gstack-browser-enable.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:02:50.135Z"
+    },
+    "gstack-browser-update-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:03:07.149Z"
+    },
+    "gstack-browser-update-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:03:24.849Z"
+    },
+    "gstack-browser-update-sync.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:03:42.817Z"
+    },
+    "gstack-browser-update-sync.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:04:00.140Z"
+    },
+    "gstack-browser-launch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:04:14.297Z"
+    },
+    "gstack-browser-launch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:04:26.991Z"
+    },
+    "gstack-browser-launch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:04:42.267Z"
+    },
+    "gstack-browser-launch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:04:57.162Z"
+    },
+    "gstack-browser-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:05:11.735Z"
+    },
+    "gstack-browser-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:05:26.166Z"
+    },
+    "gstack-browser-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:05:41.152Z"
+    },
+    "gstack-browser-cli.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:05:55.884Z"
+    },
+    "gstack-browser-cli.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:06:10.987Z"
+    },
+    "gstack-daemon-report.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:06:25.526Z"
+    },
+    "gstack-daemon-report.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:06:39.786Z"
+    },
+    "gstack-browser-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:06:54.446Z"
+    },
+    "gstack-browser-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:07:09.469Z"
+    },
+    "gstack-browser-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:07:24.355Z"
+    },
+    "gstack-browser-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:07:39.163Z"
+    },
+    "gstack-browser-live.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:07:53.714Z"
+    },
+    "gstack-browser-live.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:08:07.565Z"
+    },
+    "gstack-browser-live.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:08:22.115Z"
+    },
+    "gstack-browser-live.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T22:08:36.498Z"
+    },
+    "gstack-daemon-report.ac1": {
+      "status": "cancelled"
+    },
+    "gstack-browser-live.ac4": {
+      "status": "cancelled"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

@@ -1,8 +1,8 @@
 /**
  * Skill pack sources (PAN-4334): the pack registry and the pack cache paths.
  *
- * - registry: `~/.overdeck/config.yaml` → `skills.packs.<id>: { url, ref, commit, adapter? }`
- *   (the trusted commit is an operator decision, so it is stored)
+ * - registry: `~/.overdeck/config.yaml` → `skills.packs.<id>: { url, ref, commit, adapter?, browser? }`
+ *   (the trusted commit and the browser-runtime consent are operator decisions, so they are stored)
  * - cache:    `~/.overdeck/packs/<id>/` (derived; deletable at any time)
  *
  * Server-reachable: every fs and git call is async. Nothing here imports
@@ -25,6 +25,14 @@ import {
   type PackAdapterId,
   type PackManifest,
 } from './adapters.js';
+import {
+  assertBrowserBuildable,
+  BrowserError,
+  browserCommand,
+  browserDownloads,
+  buildBrowserRuntime,
+  isBrowserReady,
+} from './browser.js';
 import { assertRenderable, isRenderReady, RenderError, renderCommand, renderRuntimePack } from './render.js';
 
 export const PACK_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
@@ -40,6 +48,8 @@ export interface PackRegistryEntry {
   ref: string;
   commit: string;
   adapter?: PackAdapterId;
+  /** gstack-runtime only: the operator trusted the browser runtime (PAN-4730). */
+  browser?: true;
 }
 
 function assertPackId(id: string): void {
@@ -79,6 +89,11 @@ export function packStateDir(id: string): string {
   return join(packCacheDir(id), 'state');
 }
 
+/** A runtime pack's browser cache (bun package cache and Chromium), shared across commits; removed with the pack. */
+export function packBrowserDir(id: string): string {
+  return join(packCacheDir(id), 'browser');
+}
+
 async function readTextOrEmpty(path: string): Promise<string> {
   try {
     return await readFile(path, 'utf8');
@@ -90,11 +105,19 @@ async function readTextOrEmpty(path: string): Promise<string> {
 
 function toEntry(id: string, raw: unknown): PackRegistryEntry | null {
   if (!PACK_ID_PATTERN.test(id) || !raw || typeof raw !== 'object') return null;
-  const { url, ref, commit, adapter } = raw as Record<string, unknown>;
+  const { url, ref, commit, adapter, browser } = raw as Record<string, unknown>;
   if (typeof url !== 'string' || !url || typeof ref !== 'string' || !ref) return null;
   if (typeof commit !== 'string' || !COMMIT_PATTERN.test(commit)) return null;
   if (adapter !== undefined && !ADAPTERS.includes(adapter as PackAdapterId)) return null;
-  return { id, url, ref, commit, ...(adapter ? { adapter: adapter as PackAdapterId } : {}) };
+  // Only `browser: true` records consent; any other value is ignored, not a malformed entry.
+  return {
+    id,
+    url,
+    ref,
+    commit,
+    ...(adapter ? { adapter: adapter as PackAdapterId } : {}),
+    ...(browser === true ? { browser: true as const } : {}),
+  };
 }
 
 /** Registered packs sorted by id; malformed entries are skipped. */
@@ -173,6 +196,7 @@ export async function writePackEntry(entry: PackRegistryEntry): Promise<void> {
     ref: entry.ref,
     commit: entry.commit,
     ...(entry.adapter ? { adapter: entry.adapter } : {}),
+    ...(entry.browser === true ? { browser: true } : {}),
   };
   await editGlobalConfig((doc) => {
     doc.setIn(['skills', 'packs', entry.id], doc.createNode(value));
@@ -366,6 +390,8 @@ export interface PackPreview {
   diff?: { added: string[]; removed: string[]; changed: string[]; newCapabilities: string[] };
   /** Runtime packs: the render command trusting runs once, with `cwd` = the extraction. */
   runtime?: { command: string[] };
+  /** gstack browser runtime (PAN-4730): the build command, every download, and every path it writes. */
+  browser?: { command: string[]; downloads: string[]; writes: string[] };
 }
 
 export type ConfirmPack = (preview: PackPreview) => Promise<boolean>;
@@ -388,12 +414,13 @@ async function packAdapter(id: string, dir: string, explicit?: PackAdapterId): P
 
 const pluginRootOf = (id: string): string | undefined => KNOWN_PACKS[id]?.pluginRoot;
 
-async function manifestAt(id: string, dir: string, adapter: PackAdapterId): Promise<PackManifest> {
+async function manifestAt(id: string, dir: string, adapter: PackAdapterId, browser = false): Promise<PackManifest> {
   return gitStep(id, () =>
     readPackManifest(dir, adapter, {
       optIn: KNOWN_PACKS[id]?.optIn ?? [],
       skillsRoot: KNOWN_PACKS[id]?.skillsRoot,
       pluginRoot: pluginRootOf(id),
+      browser,
     }),
   );
 }
@@ -402,7 +429,7 @@ async function renderStep<T>(step: () => Promise<T>): Promise<T> {
   try {
     return await step();
   } catch (error) {
-    if (error instanceof RenderError) throw new PackSourceError('render', error.message);
+    if (error instanceof RenderError || error instanceof BrowserError) throw new PackSourceError('render', error.message);
     throw error;
   }
 }
@@ -418,6 +445,33 @@ async function renderPack(id: string, dir: string, commit: string): Promise<void
   const renderDir = packRenderDir(id, commit);
   if (await isRenderReady(renderDir)) return;
   await renderStep(() => renderRuntimePack({ extractDir: dir, commit, renderDir, stateDir: packStateDir(id) }));
+}
+
+/** Before consent: the commit has the browser step and bun is on PATH; returns what trusting runs, downloads and writes. */
+async function browserPreview(id: string, dir: string, commit: string): Promise<NonNullable<PackPreview['browser']>> {
+  await renderStep(() => assertBrowserBuildable(dir, commit));
+  const renderDir = packRenderDir(id, commit);
+  const cacheDir = packBrowserDir(id);
+  return {
+    command: browserCommand(renderDir, cacheDir),
+    downloads: await browserDownloads(dir),
+    writes: [
+      `${renderDir}/node_modules`,
+      `${renderDir}/browse/dist`,
+      `${renderDir}/design/dist`,
+      `${renderDir}/make-pdf/dist`,
+      `${cacheDir}/bun-cache`,
+      `${cacheDir}/playwright`,
+      `${cacheDir}/xdg-cache`,
+    ],
+  };
+}
+
+/** After consent: build the browser runtime into the commit's ready render. */
+async function buildPackBrowser(id: string, dir: string, commit: string): Promise<void> {
+  await renderStep(() =>
+    buildBrowserRuntime({ extractDir: dir, commit, renderDir: packRenderDir(id, commit), cacheDir: packBrowserDir(id) }),
+  );
 }
 
 async function requirePack(id: string): Promise<PackRegistryEntry> {
@@ -469,6 +523,8 @@ export async function addPack(
  * Fetch the pack's ref (or a new one), preview the difference from the
  * trusted commit, and move the trusted commit only when `confirm` resolves
  * true. Nothing is asked or written when the commit and ref are unchanged.
+ * With browser consent recorded, the new commit's browser runtime is built too,
+ * and the commit moves only when both the render and the build succeed.
  */
 export async function updatePack(
   id: string,
@@ -484,8 +540,10 @@ export async function updatePack(
   const dir = await gitStep(id, () => extractCommit(id, commit, pluginRootOf(id)));
   const oldDir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
   const adapter = await packAdapter(id, dir, entry.adapter);
-  const manifest = await manifestAt(id, dir, adapter);
-  const oldManifest = await manifestAt(id, oldDir, adapter);
+  // With browser consent recorded, both sides list the browser skills that mount.
+  const browser = adapter === 'gstack-runtime' && entry.browser === true;
+  const manifest = await manifestAt(id, dir, adapter, browser);
+  const oldManifest = await manifestAt(id, oldDir, adapter, browser);
 
   const oldByName = new Map(oldManifest.skills.map((skill) => [skill.name, skill]));
   const newNames = new Set(manifest.skills.map((skill) => skill.name));
@@ -517,10 +575,75 @@ export async function updatePack(
   // Checked only when there is something to move to, so an up-to-date pack needs no bun.
   const runtime = adapter === 'gstack-runtime' ? await runtimePreview(id, dir, commit) : undefined;
   if (runtime) preview.runtime = runtime;
+  // PAN-4730 D10: consent is recorded, so the new commit's browser runtime joins the same preview and confirmation.
+  if (browser) preview.browser = await browserPreview(id, dir, commit);
   if (!(await confirm(preview))) return { written: false, preview };
   if (runtime) await renderPack(id, dir, commit);
+  if (browser && !(await isBrowserReady(packRenderDir(id, commit)))) await buildPackBrowser(id, dir, commit);
   await writePackEntry({ ...entry, ref, commit });
   return { written: true, preview };
+}
+
+async function requireBrowserPack(id: string): Promise<PackRegistryEntry> {
+  const entry = await requirePack(id);
+  if ((entry.adapter ?? KNOWN_PACKS[id]?.adapter) !== 'gstack-runtime') {
+    throw new PackSourceError('bad-id', `pack ${id} has no browser runtime`);
+  }
+  return entry;
+}
+
+/**
+ * PAN-4730 D8/D10: preview the browser runtime for the trusted commit's ready
+ * render and build it only when `confirm` resolves true; record consent
+ * (`browser: true`) only after the build succeeded. Nothing is asked when
+ * consent is recorded and the runtime is ready.
+ */
+export async function enablePackBrowser(
+  id: string,
+  confirm: ConfirmPack,
+): Promise<{ written: boolean; preview?: PackPreview; alreadyOn?: boolean }> {
+  const entry = await requireBrowserPack(id);
+  const dir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
+  const renderDir = packRenderDir(id, entry.commit);
+  if (!(await isRenderReady(renderDir))) {
+    throw new PackSourceError('render', `pack ${id} is not rendered; run pan skills pack sync ${id}`);
+  }
+  if (entry.browser && (await isBrowserReady(renderDir))) return { written: false, alreadyOn: true };
+  const browser = await browserPreview(id, dir, entry.commit);
+  const preview: PackPreview = {
+    id,
+    url: entry.url,
+    ref: entry.ref,
+    commit: entry.commit,
+    adapter: 'gstack-runtime',
+    manifest: await manifestAt(id, dir, 'gstack-runtime', true),
+    browser,
+  };
+  if (!(await confirm(preview))) return { written: false, preview };
+  await buildPackBrowser(id, dir, entry.commit);
+  await writePackEntry({ ...entry, browser: true });
+  return { written: true, preview };
+}
+
+/**
+ * PAN-4730 D11: clear the consent, render the trusted commit again without the
+ * browser runtime, and delete the browser cache. Browse daemons are left
+ * running (the CLI reports them).
+ */
+export async function disablePackBrowser(id: string): Promise<{ changed: boolean; renderDir: string; cacheDir: string }> {
+  const entry = await requireBrowserPack(id);
+  const renderDir = packRenderDir(id, entry.commit);
+  const changed = entry.browser === true || (await isBrowserReady(renderDir));
+  if (entry.browser) {
+    const { url, ref, commit, adapter } = entry;
+    await writePackEntry({ id, url, ref, commit, ...(adapter ? { adapter } : {}) });
+  }
+  const dir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
+  await rm(renderDir, { recursive: true, force: true });
+  await renderPack(id, dir, entry.commit);
+  const cacheDir = packBrowserDir(id);
+  await rm(cacheDir, { recursive: true, force: true });
+  return { changed, renderDir, cacheDir };
 }
 
 /**
@@ -537,7 +660,7 @@ export async function removePack(id: string): Promise<{ removed: boolean }> {
 
 /**
  * Re-fetch a registered pack and make sure its trusted commit is extracted, and for a runtime pack
- * rendered. Never moves the commit.
+ * rendered (and, with browser consent, its browser runtime built). Never moves the commit.
  */
 export async function syncPack(id: string): Promise<{ commit: string; dir: string }> {
   const entry = await requirePack(id);
@@ -546,6 +669,10 @@ export async function syncPack(id: string): Promise<{ commit: string; dir: strin
     await resolveRef(id, entry.commit);
     return extractCommit(id, entry.commit, pluginRootOf(id));
   });
-  if ((entry.adapter ?? KNOWN_PACKS[id]?.adapter) === 'gstack-runtime') await renderPack(id, dir, entry.commit);
+  if ((entry.adapter ?? KNOWN_PACKS[id]?.adapter) === 'gstack-runtime') {
+    await renderPack(id, dir, entry.commit);
+    // PAN-4730 D8: consent is recorded, so sync builds a missing browser runtime without asking.
+    if (entry.browser && !(await isBrowserReady(packRenderDir(id, entry.commit)))) await buildPackBrowser(id, dir, entry.commit);
+  }
   return { commit: entry.commit, dir };
 }
