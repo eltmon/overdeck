@@ -154,6 +154,8 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `${data.reviewer ?? 'reviewer'} needs you — ${data.reason ?? 'stalled again'} (pane ${data.paneState ?? '?'})`;
     case 'review.dispatch-failed':
       return `${data.reviewer ?? 'reviewer'} never started — ${data.error ?? 'kickoff failed'}; request review again once fixed`;
+    case 'review.approval-carried':
+      return `approval carried ${shortSha(data.from)} → ${shortSha(data.to)} (patch unchanged by the merge-train rebase)`;
     case 'uat.verdict':
       return `${data.status ?? 'unknown'}${typeof data.anchor === 'string' ? ` head=${shortSha(data.anchor)}` : ''}`;
     case 'feedback.delivered':

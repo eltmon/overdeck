@@ -296,8 +296,11 @@ repository read-only to bypass a real stranded branch.
 
 ## After another feature merges
 
-A merge does not rebase sibling branches. When another merge (or a direct
-push to `main`) makes an approved PR conflict, the forge reports it
+With the merge train enabled, a merge rebases the project's approved sibling
+branches onto the new main and re-reviews them (see "The merge-train roll"
+below). A rebase that conflicts is left to the conflict-repair patrol. When
+another merge (or a direct push to `main`) makes an approved PR conflict, the
+forge reports it
 non-mergeable and the merge gate refuses it. The conflict-repair patrol
 (PAN-4384) finds it within one 60-second tick and sends the issue's work agent
 one repair per PR head: run `pan sync-main <id>`, resolve the conflict, push,
@@ -329,6 +332,54 @@ An agent that parked an item with `pan task block <issue> <item> --on <ref>...`
 gets one `BLOCKERS MERGED` message within about two minutes of the last of
 those issues or PRs merging. See
 [Blocker wake](PIPELINE-GATES.md#blocker-wake-pan-4451).
+
+### The merge-train roll (PAN-4801)
+
+After a verified merge, `postMergeLifecycle` starts the merge-train reconcile
+(`runMergeTrainReconcile` in
+[`src/lib/cloister/merge-train.ts`](../src/lib/cloister/merge-train.ts)) once,
+when the lifecycle settles. Every merge door reaches `postMergeLifecycle`: the
+Merge button, the auto-merge executor and the merge queue (all through
+`triggerMerge`), the merge specialist's report, UAT batch promotion and the
+`pull_request` webhook. Its once-per-issue guards make this the single call
+site. The reconcile is not awaited, so a merge response and the auto-merge tick
+never wait for sibling rebases. It is a no-op unless the merge train is
+enabled (`merge_train.enabled`, or `merge_train: enabled|disabled` per project
+in `projects.yaml`).
+
+The reconcile
+([`merge-train-deps.ts`](../src/lib/cloister/merge-train-deps.ts)) works
+through the merged issue's own project only:
+
+1. **Siblings.** An in-flight issue with an open PR is a sibling when the merge
+   gate passes it, or when it is approved at its head, open, not a draft, has
+   no changes requested, no failed UAT and no red checks, whatever the cached
+   `mergeable` flag says. Right after a merge GitHub still reports a
+   just-conflicted PR as mergeable, or has not computed it yet.
+2. **Rebase.** The workspace must be on `feature/<issue>`, have no uncommitted
+   changes to tracked files, and have the PR head checked out. When main has
+   new commits, the branch is rebased onto `origin/main` and pushed with a lease
+   on the PR head. A workspace in any other state, or a failed push, is an
+   `error` outcome; a failed push also restores the workspace to the PR head.
+3. **Approval carry or re-review.** A rebase moves the head, so the old
+   approval no longer stands at it. When the rebase was clean and the PR's own
+   patch is unchanged (`git patch-id --stable` of the merge-base..head diff is
+   the same before and after), the approval is carried: an approving review
+   pinned to the new head (the reviews API's `commit_id`, or a
+   `<!-- overdeck-verdict: APPROVED sha=<new head> -->` marker when GitHub
+   refuses a self-review) is posted, and the workspace journal records
+   `review.approval-carried` with both heads. The merge gate accepts it at the
+   new head; CI still re-runs there, so checks stay authoritative. A changed
+   patch-id, a head that moved again, a non-GitHub forge or a refused post
+   falls back to a re-review through the guarded review door (source
+   `merge-train`).
+4. **Conflicts.** A rebase that conflicts is aborted and left to the
+   conflict-repair patrol ([PIPELINE-GATES.md](PIPELINE-GATES.md), "Conflict
+   repair"), which messages the issue's work agent once per conflicting head.
+
+Each run logs `[merge-train] reconciled N sibling(s) after <ISSUE>` with one
+`<ISSUE>=unaffected|approval-carried|rebased|conflict|error` entry per sibling, including runs
+with no siblings.
 
 ## Stash Discipline
 

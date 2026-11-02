@@ -50,6 +50,13 @@ export interface PostReviewVerdictInput {
    * proves nothing, and the verdict guard never refuses on it.
    */
   reviewedHead?: string | null;
+  /**
+   * PAN-4801: post the review on exactly this commit (the reviews API's
+   * `commit_id`), and refuse when the PR head is not it. `gh pr review`
+   * reviews whatever the head is when it runs, so a push in between would be
+   * approved unseen.
+   */
+  pinHead?: string;
 }
 
 /** The head sha when it is the reviewed commit, else null. */
@@ -120,6 +127,13 @@ async function appTokenEnv(deps: PostReviewVerdictDeps): Promise<NodeJS.ProcessE
   }
 }
 
+/** The reviews API's `event` for each verdict (PAN-4801 pinned reviews). */
+const REVIEW_EVENTS: Record<ReviewVerdict, string> = {
+  approve: 'APPROVE',
+  'request-changes': 'REQUEST_CHANGES',
+  comment: 'COMMENT',
+};
+
 function markerFor(verdict: ReviewVerdict): MarkerVerdict | null {
   if (verdict === 'approve') return 'APPROVED';
   if (verdict === 'request-changes') return 'CHANGES_REQUESTED';
@@ -161,13 +175,23 @@ export async function postReviewVerdict(
       : input.verdict === 'request-changes'
         ? '--request-changes'
         : '--comment';
+    const pin = input.pinHead?.toLowerCase();
+    if (pin && facts.headSha?.toLowerCase() !== pin) {
+      return {
+        posted: false,
+        reason: `PR head is ${facts.headSha?.slice(0, 12) ?? 'unknown'}, not the pinned head ${pin.slice(0, 12)}`,
+      };
+    }
     const runGh = deps.runGh ?? defaultRunGh;
     const env = await appTokenEnv(deps);
     const options: RunGhOptions = env ? { env } : {};
     try {
-      await runGh([
-        'pr', 'review', String(ref.number), '--repo', repo, flag, '--body', input.body,
-      ], options);
+      await runGh(pin
+        ? [
+          'api', '--method', 'POST', `repos/${repo}/pulls/${ref.number}/reviews`,
+          '-f', `event=${REVIEW_EVENTS[input.verdict]}`, '-f', `commit_id=${pin}`, '-f', `body=${input.body}`,
+        ]
+        : ['pr', 'review', String(ref.number), '--repo', repo, flag, '--body', input.body], options);
     } catch (cause) {
       const message = errorText(cause);
       const marker = markerFor(input.verdict);

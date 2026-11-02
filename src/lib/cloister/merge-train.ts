@@ -1,7 +1,8 @@
 /**
  * Merge-train entry point (PAN-1691, PAN-1696).
  *
- * Called from the post-merge path after a feature lands on main. Gated by the
+ * Called once per merge from `postMergeLifecycle` (merge-agent.ts), which every
+ * merge door reaches (PAN-4801), after a feature lands on main. Gated by the
  * default-off `merge_train.enabled` flag (or per-project override in projects.yaml)
  * — when off this is a no-op, so nothing git-mutating runs until an operator
  * deliberately enables it.
@@ -46,5 +47,10 @@ export async function runMergeTrainReconcile(
   if (!enabledCheck()) return [];
 
   const deps = opts.deps ?? (await import('./merge-train-deps.js')).buildRealReconcileDeps();
-  return reconcileStaleSiblings(mergedIssueId, deps);
+  const outcomes = await reconcileStaleSiblings(mergedIssueId, deps);
+  // PAN-4801: logged on every enabled run, including one with no siblings, so
+  // the log tells a run that found nothing from a run that never happened.
+  const detail = outcomes.map((o) => `${o.issueId}=${o.result}`).join(', ');
+  console.log(`[merge-train] reconciled ${outcomes.length} sibling(s) after ${mergedIssueId}${detail ? `: ${detail}` : ''}`);
+  return outcomes;
 }
