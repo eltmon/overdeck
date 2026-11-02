@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4657",
   "created": "2026-11-02T03:48:30.667Z",
-  "updated": "2026-11-02T05:36:02.943Z",
+  "updated": "2026-11-02T05:36:22.054Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "badge-enrichment.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T05:36:02.943Z"
+    },
+    "routes-notify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:36:22.053Z"
     }
   }
 }
