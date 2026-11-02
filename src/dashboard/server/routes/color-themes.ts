@@ -5,12 +5,13 @@
  *   PUT  /api/color-themes/selection         — body { mode, id }
  *   POST /api/color-themes/import/preview    — body { fileName, contentBase64 }; writes nothing
  *   POST /api/color-themes                  — body { theme }
+ *   PUT  /api/color-themes/:id               — body { theme }; overwrites a user theme in place
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { slugifyThemeId, type ColorThemeType } from '@overdeck/contracts';
 
-import { getColorTheme, listColorThemes, saveColorTheme } from '../../../lib/color-themes/store.js';
+import { getColorTheme, listColorThemes, saveColorTheme, updateColorTheme } from '../../../lib/color-themes/store.js';
 import { resolveColorThemeSelection } from '../../../lib/color-themes/selection.js';
 import { saveColorThemeSelection } from '../../../lib/color-themes/selection-write.js';
 import { ColorThemeImportError, mapVsCodeTheme } from '../../../lib/color-themes/vscode-import.js';
@@ -125,9 +126,34 @@ const postColorThemeRoute = HttpRouter.add(
   })),
 );
 
+const putColorThemeRoute = HttpRouter.add(
+  'PUT',
+  '/api/color-themes/:id',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const body = yield* readJsonBody;
+
+    return yield* Effect.promise(async () => {
+      const { theme } = (body ?? {}) as { theme?: unknown };
+      const result = await updateColorTheme(id, theme);
+      switch (result.kind) {
+        case 'builtin': return jsonResponse({ error: 'built-in themes are read-only; duplicate it instead' }, { status: 403 });
+        case 'invalid-id': return jsonResponse({ error: 'invalid theme id' }, { status: 400 });
+        case 'not-found': return jsonResponse({ error: `no user theme with id "${id}"` }, { status: 404 });
+        case 'invalid': return jsonResponse({ errors: result.errors }, { status: 400 });
+        case 'saved': return jsonResponse({ theme: result.theme });
+      }
+    });
+  })),
+);
+
 export const colorThemesRouteLayer = Layer.mergeAll(
   getColorThemesRoute,
   putColorThemeSelectionRoute,
   postColorThemeImportPreviewRoute,
   postColorThemeRoute,
+  putColorThemeRoute,
 );
