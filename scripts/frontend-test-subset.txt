@@ -43,6 +43,7 @@ src/components/GodView/confluence/__tests__/rail-link.test.tsx
 src/components/GodView/confluence/__tests__/useConfluenceData.test.ts
 src/components/HealthDashboard.test.tsx
 src/components/IssueActionMenu/__tests__/useIssueActions.render-count.test.tsx
+src/components/Settings/__tests__/ColorThemeEditorPreview.test.tsx
 src/components/Settings/__tests__/ColorThemeImportPreview.test.tsx
 src/components/Settings/__tests__/ColorThemeSection.test.tsx
 src/components/Settings/__tests__/ModelPresetsBar.test.tsx
