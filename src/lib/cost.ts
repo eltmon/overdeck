@@ -175,6 +175,14 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // Moonshot Kimi K2.7 Code (platform.moonshot.ai/docs/pricing/chat):
   // $0.95/M in (cache-miss), $4.00/M out, $0.19/M in (cache-hit). PAN-1935.
   { provider: 'custom', model: 'kimi-k2.7-code', inputPer1k: 0.00095, outputPer1k: 0.004, cacheReadPer1k: 0.00019, currency: 'USD' },
+  // Kimi K3.1 Pro (coding id + platform id; bareKimiModel() strips 'kimi-code/'):
+  // $2/M cache-miss input, $10/M output, $0.20/M cache-hit, $2/M 5m cache write.
+  // Highspeed: $4/M input, $20/M output, $0.20/M cache-hit. Source was third-party;
+  // verify against https://platform.moonshot.ai/docs/pricing.
+  { provider: 'custom', model: 'k3.1-pro', inputPer1k: 0.002, outputPer1k: 0.01, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.002, currency: 'USD' },
+  { provider: 'custom', model: 'k3.1-pro-highspeed', inputPer1k: 0.004, outputPer1k: 0.02, cacheReadPer1k: 0.0002, currency: 'USD' },
+  { provider: 'custom', model: 'kimi-k3.1-pro', inputPer1k: 0.002, outputPer1k: 0.01, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.002, currency: 'USD' },
+  { provider: 'custom', model: 'kimi-k3.1-pro-highspeed', inputPer1k: 0.004, outputPer1k: 0.02, cacheReadPer1k: 0.0002, currency: 'USD' },
   // Kimi K3 coding endpoint aliases: $3/M cache-miss input, $15/M output,
   // $0.30/M cache-hit input. Both aliases share pricing; only context differs.
   { provider: 'custom', model: 'k3', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, currency: 'USD' },

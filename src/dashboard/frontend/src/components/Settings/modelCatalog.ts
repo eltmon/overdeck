@@ -94,6 +94,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
+      { id: 'k3.1-pro' as ModelId, name: 'Kimi K3.1 Pro (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi flagship coding model (Oct 2026). Post-trained K3, always-thinking, 1,048,576-token context.' },
+      { id: 'k3.1-pro-highspeed' as ModelId, name: 'Kimi K3.1 Pro Highspeed (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 12, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'K3.1 Pro at 2-3x inference speed and 2x price. Needs a Kimi Code Allegretto (Pro) plan or higher.' },
       { id: 'k3' as ModelId, name: 'Kimi K3 (256K context)', icon: Gem, tier: 'premium', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi flagship coding model (July 2026). Always-thinking 2.8T MoE, 256K context.' },
       { id: 'k3[1m]' as ModelId, name: 'Kimi K3 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi K3 coding endpoint with the full 1,048,576-token context window.' },
       { id: 'kimi-k2.7-code' as ModelId, name: 'Kimi K2.7 Code (256K context)', icon: Layers, tier: 'premium', costPer1MTokens: 2.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding-first flagship (June 2026). 1T MoE, multimodal, 262K context.' },

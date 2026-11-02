@@ -72,6 +72,7 @@ export function expandHarnessRows<T extends RowBase>(models: T[]): T[] {
  */
 export function pickerEffortLevels(modelId: string): readonly string[] | undefined {
   if (modelId.startsWith('kimi-code/kimi-for-coding')) return [];
+  // Covers K3 (kimi-code/k3, k3-256k) and K3.1 (kimi-code/k3.1-pro*): all native low/high/max.
   if (modelId.startsWith('kimi-code/k3')) return KIMI_NATIVE_EFFORT_LEVELS;
   return undefined;
 }
