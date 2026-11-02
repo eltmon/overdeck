@@ -16,9 +16,11 @@ const MAX_MATCHES = 20;
 export interface IssuePickerFieldProps {
   value: string | null;
   onChange: (id: string | null) => void;
+  /** When set, ties the combobox's accessible name to an external label via aria-labelledby. */
+  labelId?: string;
 }
 
-export function IssuePickerField({ value, onChange }: IssuePickerFieldProps) {
+export function IssuePickerField({ value, onChange, labelId }: IssuePickerFieldProps) {
   const issues = useDashboardStore(selectIssues) as Issue[];
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
@@ -75,6 +77,7 @@ export function IssuePickerField({ value, onChange }: IssuePickerFieldProps) {
         type="text"
         role="combobox"
         aria-label="Link to an issue"
+        aria-labelledby={labelId}
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"

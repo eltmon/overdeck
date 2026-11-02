@@ -193,7 +193,7 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
         </button>
       </>}
     >
-      <section aria-labelledby={whereHeadingId}>
+      <section className={styles.section} aria-labelledby={whereHeadingId}>
         <h3 id={whereHeadingId} className={styles.sectionTitle}>Where it runs</h3>
         <div className={styles.grid}>
           <label htmlFor={projectId} className={styles.label}>Project</label>
@@ -230,7 +230,7 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
         </div>
       </section>
 
-      <section aria-labelledby={agentHeadingId}>
+      <section className={styles.section} aria-labelledby={agentHeadingId}>
         <h3 id={agentHeadingId} className={styles.sectionTitle}>Agent</h3>
         <div className={styles.grid}>
           <span id={modelLabelId} className={styles.label}>Model</span>
@@ -274,11 +274,11 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
         </div>
       </section>
 
-      <section aria-labelledby={taskHeadingId}>
+      <section className={styles.section} aria-labelledby={taskHeadingId}>
         <h3 id={taskHeadingId} className={styles.sectionTitle}>Task<span className={styles.aside}>Both optional</span></h3>
         <div className={styles.grid}>
           <span id={issueLabelId} className={styles.label}>Linked issue</span>
-          <IssuePickerField value={issueId} onChange={setIssueId} />
+          <IssuePickerField value={issueId} onChange={setIssueId} labelId={issueLabelId} />
 
           <label htmlFor={messageId} className={cn(styles.label, styles.full)}>First message</label>
           <textarea
@@ -292,7 +292,7 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
         </div>
       </section>
 
-      <section aria-labelledby={contextHeadingId}>
+      <section className={styles.section} aria-labelledby={contextHeadingId}>
         <h3 id={contextHeadingId} className={styles.sectionTitle}>Context</h3>
         <div className={styles.option}>
           <span className={styles.optionLabel}><span id={bareLabelId}>No context</span></span>
@@ -331,7 +331,7 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
         )}
       </section>
 
-      <section aria-labelledby={skillsHeadingId}>
+      <section className={styles.section} aria-labelledby={skillsHeadingId}>
         <h3 id={skillsHeadingId} className={styles.sectionTitle}>Skills</h3>
         <div className={styles.skillsSummary}>
           <p className={styles.skillsText}>
@@ -344,7 +344,7 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
               </span>
             </>}
           </p>
-          {skillsSummary !== null && (
+          {(skillsSummary !== null || skillsQuery.isError) && (
             <button
               type="button"
               className={styles.linkButton}

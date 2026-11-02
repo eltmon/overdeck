@@ -43,6 +43,7 @@ vi.mock('../../chat/ModelPicker', () => ({
 import { useDashboardStore } from '../../../lib/store';
 import { NewConversationDialogHost } from '../NewConversationDialog';
 import { openNewConversationDialog, useNewConversationDialogStore } from '../newConversationDialogStore';
+import styles from '../NewConversationDialog.module.css';
 
 const PROJECTS = [
   { key: 'overdeck', name: 'Overdeck', path: '/home/me/Projects/overdeck' },
@@ -119,6 +120,9 @@ describe('NewConversationDialog', () => {
       'Skills',
     ]);
     expect(headings[2]?.textContent).toContain('Both optional');
+    for (const heading of headings) {
+      expect(heading.closest('section')).toHaveClass(styles.section);
+    }
   });
 
   it('the First message placeholder reads "Sent as soon as the conversation starts"', async () => {
@@ -126,6 +130,12 @@ describe('NewConversationDialog', () => {
     renderHost();
     await screen.findByRole('dialog');
     expect(screen.getByLabelText('First message')).toHaveAttribute('placeholder', 'Sent as soon as the conversation starts');
+  });
+
+  it('the linked-issue combobox is named by the Linked issue section label', async () => {
+    act(() => openNewConversationDialog());
+    renderHost();
+    expect(await screen.findByRole('combobox', { name: 'Linked issue' })).toBeTruthy();
   });
 
   it('shows the resolved default effort with its source', async () => {
@@ -199,7 +209,7 @@ describe('NewConversationDialog', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^Personal/ }));
     const skills = screen.getByRole('radiogroup', { name: 'grilling' });
     fireEvent.click(within(skills).getByRole('radio', { name: 'Off' }));
-    const picker = screen.getByRole('combobox', { name: 'Link to an issue' });
+    const picker = screen.getByRole('combobox', { name: 'Linked issue' });
     fireEvent.change(picker, { target: { value: 'PAN-1' } });
     fireEvent.keyDown(picker, { key: 'Enter' });
     fireEvent.change(screen.getByLabelText('First message'), { target: { value: '  hello  ' } });
@@ -228,6 +238,24 @@ describe('NewConversationDialog', () => {
     await screen.findByText('1 of 1 skills on');
     expect(screen.getByText('· inherited from project and global settings, no overrides')).toBeTruthy();
     expect(screen.queryByRole('textbox', { name: 'Filter skills' })).toBeNull();
+  });
+
+  it('Customize is reachable and reveals the inline error when the skills fetch fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/registered-projects') return { ok: true, status: 200, json: async () => PROJECTS };
+      if (url.startsWith('/api/effort/default')) {
+        return { ok: true, status: 200, json: async () => ({ effort: 'high', source: 'default', requested: 'high', clamped: false }) };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    }));
+    act(() => openNewConversationDialog());
+    renderHost();
+    const customize = await screen.findByRole('button', { name: 'Customize' });
+    const panel = document.getElementById(customize.getAttribute('aria-controls') ?? '');
+    expect(panel).toHaveAttribute('hidden');
+    fireEvent.click(customize);
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(panel).not.toHaveAttribute('hidden');
   });
 
   it('Customize reveals the skills field and the summary counts the override', async () => {
