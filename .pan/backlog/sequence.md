@@ -1,12 +1,15 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T23:56:36.855211Z · model: claude-opus-5-5 · open: 861_
+_Last sequenced: 2026-11-02T00:04:55.325895Z · model: claude-opus-5-5 · open: 864_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 2 | PAN-4752 | S | high | ok |  |  | In-pipeline: Flywheel board shows strike workspaces as bogus PAN-<n>-STRIKE ids; map to base issue in derive-status. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
+| 4 | PAN-4751 | S | medium | ok |  |  | In-pipeline: make the Flywheel NEEDS YOU banner reopen the pending AskUserQuestion dialog or jump to the conversation. |
+| 5 | PAN-4750 | M | critical | ok |  |  | Strike merge door requires head approval strikes never get; 5 green strike PRs unmergeable. needs-handoff (TENET-10). |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
@@ -873,9 +876,21 @@ _Last sequenced: 2026-11-01T23:56:36.855211Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
+### PAN-4752 (rank 2)
+
+New in-pipeline issue pinned near the top. It is a small substrate fix in src/lib/flywheel/derive-status.ts that stops strike workspaces from appearing as unknown tracker issues on the Flywheel board, which misleads the loop and the operator about what is in flight.
+
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
+
+### PAN-4751 (rank 4)
+
+New in-pipeline issue pinned near the top per the never-re-rank rule. It is a contained frontend enhancement that reuses the existing AskUserQuestion dialog and pending-question read model, so it carries low risk and a clear component-test acceptance.
+
+### PAN-4750 (rank 5)
+
+New substrate issue that blocks every strike PR from merging through Overdeck since #4066: the strike door reuses the feature merge gate with requireApprovalAtHead, and the operator cannot approve their own PR. Five green strike PRs are stuck today, so it ranks critical near the top; it is labeled needs-handoff, so pickup must be a supervised handoff rather than autonomous.
 
 ### PAN-4733 (rank 7)
 
@@ -1177,18 +1192,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
-### PAN-3100 (rank 81)
-
-New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
-
-### PAN-4213 (rank 82)
-
-Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
-
-### PAN-3096 (rank 83)
-
-New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1196,10 +1199,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T23:56:36.855211Z",
+  "generatedAt": "2026-11-02T00:04:55.325895Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 861,
+  "openCount": 864,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11921,6 +11924,45 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "rationale": "New issue: the restart lock let a second reload into a generation slot mid-build; no bad build went live, so it sits just below the Fly token bug and near the reload cluster (PAN-3508 at 206).",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4752",
+      "rank": 2,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: Flywheel board shows strike workspaces as bogus PAN-<n>-STRIKE ids; map to base issue in derive-status.",
+      "rationale": "New in-pipeline issue pinned near the top. It is a small substrate fix in src/lib/flywheel/derive-status.ts that stops strike workspaces from appearing as unknown tracker issues on the Flywheel board, which misleads the loop and the operator about what is in flight.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4751",
+      "rank": 4,
+      "size": "S",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: make the Flywheel NEEDS YOU banner reopen the pending AskUserQuestion dialog or jump to the conversation.",
+      "rationale": "New in-pipeline issue pinned near the top per the never-re-rank rule. It is a contained frontend enhancement that reuses the existing AskUserQuestion dialog and pending-question read model, so it carries low risk and a clear component-test acceptance.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4750",
+      "rank": 5,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Strike merge door requires head approval strikes never get; 5 green strike PRs unmergeable. needs-handoff (TENET-10).",
+      "rationale": "New substrate issue that blocks every strike PR from merging through Overdeck since #4066: the strike door reuses the feature merge gate with requireApprovalAtHead, and the operator cannot approve their own PR. Five green strike PRs are stuck today, so it ranks critical near the top; it is labeled needs-handoff, so pickup must be a supervised handoff rather than autonomous.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13204,6 +13246,13 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4750",
+      "to": "PAN-4752",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
