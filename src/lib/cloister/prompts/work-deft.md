@@ -20,9 +20,9 @@ Use the `deft-directive-build` skill. Your scope xBRIEF lives in `xbrief/active/
 
 Run `deft-directive-pre-pr` before you push. Open the PR with `gh pr create` from `{{BRANCH_NAME}}`. After the PR is open, if the repository has a bot reviewer that `deft-directive-review-cycle` supports (Greptile today), run that skill until it exits. Otherwise stop. Never merge: a person merges through Overdeck.
 
-Run `pan skills deft save {{ISSUE_ID}}` and commit its output before you open the PR and after every scope change.
+Run `pan skills deft save {{ISSUE_ID}}` before you open the PR and after every scope change. It commits the archive itself.
 
-Deft's install files are hidden from git. Never `git add -f` them. These tracked files are hidden and your edits to them will not be committed: {{HIDDEN_PATHS}}. If you need to change one, ask the operator with `pan ask`.
+Deft's install files are hidden from git. Never `git add -f` them. These tracked files are hidden and your edits to them will not be committed: {{HIDDEN_PATHS}}. If you need to change one, ask the operator with `pan ask`. A dependency change (adding, removing or upgrading a package, which rewrites `package.json` and the lockfile) needs the issue switched back to Overdeck first.
 
 Overdeck does not run review or test agents for this issue.
 

@@ -10,10 +10,24 @@
  * is neither a native Directive project nor carrying a temporary install
  * refuses, so the operator runs `pan skills deft use` first.
  */
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { renderPrompt } from '../cloister/prompts.js';
 import { isNativeDirectiveProject } from './archive.js';
 import { readDeftSnapshot } from './install-snapshot.js';
+
+const execFileAsync = promisify(execFile);
+
+/** The workspace's checked-out branch, else the conventional `feature/<issue>`. */
+async function currentBranch(workspacePath: string, issueIdLower: string): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync('git', ['branch', '--show-current'], { cwd: workspacePath });
+    return stdout.trim() || `feature/${issueIdLower}`;
+  } catch {
+    return `feature/${issueIdLower}`;
+  }
+}
 
 export class DeftNotInstalledError extends Error {
   constructor(issueId: string) {
@@ -34,7 +48,7 @@ export async function buildDeftWorkAgentPrompt(ctx: { issueId: string; workspace
       ISSUE_ID: issueId,
       ISSUE_ID_LOWER: issueIdLower,
       WORKSPACE_PATH: ctx.workspacePath,
-      BRANCH_NAME: `feature/${issueIdLower}`,
+      BRANCH_NAME: await currentBranch(ctx.workspacePath, issueIdLower),
       HIDDEN_PATHS: hidden.length > 0 ? hidden.join(', ') : 'none',
     },
   }));
