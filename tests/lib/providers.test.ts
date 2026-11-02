@@ -168,11 +168,11 @@ describe('providers', () => {
       ANTHROPIC_BASE_URL: 'http://127.0.0.1:12436/dashscope',
       ANTHROPIC_AUTH_TOKEN: 'sk-test',
       DASHSCOPE_API_KEY: 'sk-test',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'qwen3-max',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'qwen3-coder-plus',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'qwen3-plus',
-      ANTHROPIC_SMALL_FAST_MODEL: 'qwen3-plus',
-      CLAUDE_CODE_SUBAGENT_MODEL: 'qwen3-plus',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'qwen3.8-max',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'qwen3.7-plus',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'qwen3.8-flash',
+      ANTHROPIC_SMALL_FAST_MODEL: 'qwen3.8-flash',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'qwen3.8-flash',
     });
   });
 

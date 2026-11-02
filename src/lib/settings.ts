@@ -236,7 +236,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     : [];
 
   const dashscopeModels: DashScopeModel[] = settings.api_keys.dashscope
-    ? ['qwen3.7-plus', 'qwen3.8-flash', 'qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max']
+    ? ['qwen3.7-plus', 'qwen3.8-flash', 'qwen3.7-max', 'qwen3.8-max']
     : [];
 
   const xaiModels: GrokModel[] = settings.api_keys.xai

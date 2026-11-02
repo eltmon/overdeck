@@ -1165,7 +1165,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   'qwen3-max': {
     model: 'qwen3-max',
     provider: 'dashscope',
-    displayName: 'Qwen3 Max (DashScope)',
+    displayName: 'Qwen3 Max (deprecated)',
     costPer1MTokens: 0,
     contextWindow: 262144,
     skills: {
@@ -1181,13 +1181,13 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 72,
       'context-length': 98,
     },
-    notes: 'Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+    notes: 'Snapshots deprecated by Alibaba 2026-10-10 and absent from the Singapore price list; migrates to qwen3.7-max. Row kept for history.',
   },
 
   'qwen3-coder-plus': {
     model: 'qwen3-coder-plus',
     provider: 'dashscope',
-    displayName: 'Qwen3 Coder Plus (DashScope)',
+    displayName: 'Qwen3 Coder Plus (deprecated)',
     costPer1MTokens: 0,
     contextWindow: 262144,
     skills: {
@@ -1203,13 +1203,13 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 74,
       'context-length': 98,
     },
-    notes: 'Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+    notes: 'Deprecated by Alibaba 2026-10-10; migrates to qwen3.7-plus. No published Singapore price; row kept for history.',
   },
 
   'qwen3-plus': {
     model: 'qwen3-plus',
     provider: 'dashscope',
-    displayName: 'Qwen3 Plus (DashScope)',
+    displayName: 'Qwen3 Plus (deprecated)',
     costPer1MTokens: 0,
     contextWindow: 131072,
     skills: {
@@ -1225,7 +1225,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 82,
       'context-length': 96,
     },
-    notes: 'Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+    notes: 'Never a DashScope id (the real id is qwen-plus); migrates to qwen3.8-flash. Row kept for history.',
   },
 
   'qwen3.7-max': {

@@ -300,6 +300,17 @@ describe('settings', () => {
       ]);
     });
 
+    it('should return DashScope models when API key is configured', async () => {
+      const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
+
+      const settings = getDefaultSettings();
+      settings.api_keys.dashscope = 'sk-test';
+
+      const available = getAvailableModels(settings);
+
+      expect(available.dashscope).toEqual(['qwen3.7-plus', 'qwen3.8-flash', 'qwen3.7-max', 'qwen3.8-max']);
+    });
+
     it('should return MiniMax models when API key is configured', async () => {
       const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
 

@@ -31,6 +31,9 @@ describe('provisionOhmypiProviderForModel', () => {
     const ids = dashscope.models.map((m: { id: string }) => m.id);
     expect(ids).toContain('qwen3.8-max');
     expect(ids).toContain('qwen3.7-max');
+    expect(ids).not.toContain('qwen3-coder-plus');
+    expect(ids).not.toContain('qwen3-max');
+    expect(ids).not.toContain('qwen3-plus');
   });
 
   it('provisions new Gemini models absent from the installed bundled catalog', () => {

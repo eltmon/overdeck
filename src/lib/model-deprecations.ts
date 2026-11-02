@@ -40,4 +40,10 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   // Z.AI deprecated
   'glm-4.7': 'glm-5.1',
   'glm-4.7-flash': 'glm-5.1',
+  // Alibaba DashScope, Singapore endpoint (Model Studio deprecation notices 1949/1950, 2026-10-10).
+  // qwen3-coder-plus → qwen3.7-plus; the qwen3-max snapshots → qwen3.7-max, and the bare alias
+  // is absent from the Singapore price list. qwen3-plus was never a DashScope id (operator mapping).
+  'qwen3-coder-plus': 'qwen3.7-plus',
+  'qwen3-max': 'qwen3.7-max',
+  'qwen3-plus': 'qwen3.8-flash',
 };

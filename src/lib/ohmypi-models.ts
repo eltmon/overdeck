@@ -64,9 +64,6 @@ function ompProviderDef(providerName: string): OmpProviderDef | undefined {
   const models: OmpModelDef[] = [
     { id: 'qwen3.7-plus', name: 'Qwen3.7 Plus', contextWindow: 1000000, maxTokens: 131072, cost: { input: 0.4, output: 1.6, cacheRead: 0.08, cacheWrite: 0 } },
     { id: 'qwen3.8-flash', name: 'Qwen3.8 Flash', contextWindow: 1000000, maxTokens: 131072, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
-    { id: 'qwen3-max', name: 'Qwen3 Max', contextWindow: 262144, maxTokens: 65536, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
-    { id: 'qwen3-coder-plus', name: 'Qwen3 Coder Plus', contextWindow: 262144, maxTokens: 65536, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
-    { id: 'qwen3-plus', name: 'Qwen3 Plus', contextWindow: 131072, maxTokens: 32768, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
     { id: 'qwen3.7-max', name: 'Qwen3.7 Max', contextWindow: 262144, maxTokens: 65536, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
     { id: 'qwen3.8-max', name: 'Qwen3.8 Max', contextWindow: 1048576, maxTokens: 131072, cost: { input: 2, output: 6, cacheRead: 0, cacheWrite: 0 } },
   ].map((m) => ({ ...m, reasoning: true, supportsTools: true }));

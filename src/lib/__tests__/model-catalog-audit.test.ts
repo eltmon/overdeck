@@ -107,4 +107,22 @@ describe('November 2026 Gemini, Qwen and GLM refresh (PAN-4827)', () => {
     expect(MODEL_CAPABILITIES['gemini-3.8-flash'].costPer1MTokens).toBe(2.25);
     expect(MODEL_CAPABILITIES['gemini-3-flash-preview'].costPer1MTokens).toBe(1.75);
   });
+
+  it.each([
+    ['qwen3-coder-plus', 'qwen3.7-plus'],
+    ['qwen3-max', 'qwen3.7-max'],
+    ['qwen3-plus', 'qwen3.8-flash'],
+  ] as const)('retires %s to %s', (id, target) => {
+    expect(MODEL_DEPRECATIONS[id]).toBe(target);
+    expect(resolveModelId(id)).toBe(target);
+    expect(Object.hasOwn(MODEL_DEPRECATIONS, target)).toBe(false);
+    expect(PROVIDERS.dashscope.models).toContain(target);
+    expect(PROVIDERS.dashscope.models).not.toContain(id);
+    expect(Object.hasOwn(MODEL_CAPABILITIES, id)).toBe(true);
+  });
+
+  it('sets the DashScope tiers to the live ids', () => {
+    expect(PROVIDERS.dashscope.tierModels).toEqual({ opus: 'qwen3.8-max', sonnet: 'qwen3.7-plus', haiku: 'qwen3.8-flash' });
+    expect(PROVIDERS.dashscope.haikuModel).toBe('qwen3.8-flash');
+  });
 });

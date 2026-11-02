@@ -137,9 +137,6 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   dashscope: {
     name: 'Alibaba DashScope',
     models: [
-      { id: 'qwen3-max' as ModelId, name: 'Qwen3 Max (256K context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship reasoning model.' },
-      { id: 'qwen3-coder-plus' as ModelId, name: 'Qwen3 Coder Plus (256K context)', icon: FlaskConical, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope coding-specialist model.' },
-      { id: 'qwen3-plus' as ModelId, name: 'Qwen3 Plus (131.072K context)', icon: Sparkles, tier: 'balanced', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope balanced Qwen3 model.' },
       { id: 'qwen3.7-max' as ModelId, name: 'Qwen3.7 Max (256K context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.7 Max model.' },
       { id: 'qwen3.7-plus' as ModelId, name: 'Qwen3.7 Plus (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 1, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
       { id: 'qwen3.8-flash' as ModelId, name: 'Qwen3.8 Flash (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
