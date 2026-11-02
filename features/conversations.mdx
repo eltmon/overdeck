@@ -812,10 +812,29 @@ Shift-click and `Cmd`/`Ctrl`-click select multiple rows; with a selection
 active, a bulk bar above the list offers Settle, Unsettle, and Snooze for
 every selected conversation in one action.
 
-Auto-settle — settling a conversation automatically when its pull request
-merges, or when it has been idle for a while — is tracked separately:
-on merge in [PAN-4653](https://github.com/eltmon/overdeck/issues/4653), and
-on idle in [PAN-4655](https://github.com/eltmon/overdeck/issues/4655).
+### Settling idle conversations automatically
+
+The primary dashboard settles an operator conversation that has had no
+activity for 3 days, the default. Activity is a new message in the
+conversation's transcript, from you or from the agent, or a resume. Opening
+or reading a conversation without resuming it does not count.
+
+Some conversations are never settled this way: agent conversations, snoozed
+conversations, conversations waiting on you (an open question, plan approval,
+or permission prompt), and conversations continued on another machine. A
+conversation with lanes or a successor is judged as one group, by the newest
+activity anywhere in it, and only the top-level row is settled.
+
+Unsettling or unsnoozing a conversation restarts the count, and so does the
+end of a snooze. The check runs about every 15 minutes and does nothing while
+the Deacon is frozen. After an upgrade, the first check settles every
+conversation that has already been idle that long; **Unsettle** brings any of
+them back.
+
+Change the number of days in **Settings → Conversations → Auto-settle idle
+conversations**, or with `pan conv auto-settle-idle-days <days>`. `0` turns
+it off. Settling a conversation automatically when its pull request merges is
+tracked in [PAN-4653](https://github.com/eltmon/overdeck/issues/4653).
 
 ## Stopping or archiving a conversation
 
