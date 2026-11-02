@@ -4,10 +4,10 @@ Picker context labels describe the configured session budget. They are not a cla
 
 | Models | Configured tokens | Evidence and constraints |
 | --- | ---: | --- |
-| GPT-6 Astra, Sol, Luna; GPT-6.1 Sol, Terra; GPT-5.6 Sol, Terra, Luna | 272,000 | Installed Codex catalog default (GPT-6 Sol/Luna: Codex 0.157.1 catalog, 272,000 default / 872,000 max; GPT-6.1 Sol: Codex 0.159.0 catalog, 272,000 default / 872,000 max; GPT-6.1 Terra: Codex 0.159.0 catalog, 500,000 default / 872,000 max, pinned to 272,000); explicit managed `model_context_window` pin. |
+| GPT-6 Astra, Sol, Luna, Rosalind, Astra for Law; GPT-6.1 Sol, Terra; GPT-5.6 Sol, Terra, Luna | 272,000 | Installed Codex catalog default (GPT-6 Sol/Luna: Codex 0.157.1 catalog, 272,000 default / 872,000 max; GPT-6.1 Sol: Codex 0.159.0 catalog, 272,000 default / 872,000 max; GPT-6.1 Terra: Codex 0.159.0 catalog, 500,000 default / 872,000 max, pinned to 272,000); explicit managed `model_context_window` pin. GPT-6 Rosalind / Astra for Law: model pages unpublished (404, 2026-11-02); 272,000 is the Codex harness pin. |
 | GPT-5.6 `[372k]` choices | 372,000 | Explicit opt-in; launch strips the Overdeck suffix while retaining the larger configuration. |
 | Fable 5.1, Fable 5, Opus 5.5/5/4.8/4.7, Sonnet 5.5/5, Haiku 5.5 | 1,000,000 | Native 1M models. Claude account restrictions or a disabled-1M setting can reduce this. |
-| Opus 4.6, Sonnet 4.6, Haiku 4.5 | 200,000 | Conservative managed budget; older extended-context entitlements vary by plan. |
+| Opus 4.6, Sonnet 4.6, Haiku 4.5 | 200,000 | Claude Code runs bare Opus 4.6 and Sonnet 4.6 at 200K; their 1M API window needs the plan-gated [1m] variant (Sonnet 4.6 [1m] uses usage credits on every subscription plan). Haiku 4.5 is 200K natively. |
 | Gemini 4 Argon | 1,048,576 | Window shared by input, thinking and output; 65,536 max output per stream (32,768 non-streaming). Provisioned into the omp registry; Pi passes the id through its google provider. |
 | Gemini 3.8 Flash, 3.5 Flash Lite | 1,048,576 | Google input limit; 65,536 max output. New models provisioned into the omp registry. |
 | GLM 5.3 / 5.2 | 1,000,000 | 128K max output. GLM 5.3 accepts Low/High/Max and always reasons. |
@@ -44,6 +44,8 @@ Kimi's bare Overdeck `k3` historically denotes the smaller window. It now transl
 
 ## Sources
 
+- [OpenAI API pricing](https://developers.openai.com/api/docs/pricing), checked 2026-11-02: `gpt-6-rosalind` $15/M input, $1.50/M cached, $75/M output (>272K: $30/$3/$112.50), trusted-access only; `gpt-6-astra-law` $10/$1/$50, promotional through at least 2026-12-31; `gpt-5.6-sol` $4/$0.40/$20, promotional through at least 2026-11-21 with no post-promo rate published.
+- [Claude model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations): `claude-sonnet-4-5` retires 2026-11-30 (Anthropic recommends `claude-sonnet-5-5`; Overdeck migrates saved selections to `claude-sonnet-4-6`).
 - [OpenAI Astra API model](https://developers.openai.com/api/docs/models/gpt-6-astra)
 - [OpenAI GPT-6 Sol API model](https://developers.openai.com/api/docs/models/gpt-6-sol): `gpt-6-sol`, 1.05M context, 128K maximum output, $2/M input, $0.20/M cached input, $10/M output; >272K input bills 2x input / 1.5x output.
 - [OpenAI GPT-6.1 Sol API model](https://developers.openai.com/api/docs/models/gpt-6.1-sol): `gpt-6.1-sol`, 1.05M context, 128K maximum output, $2/M input, $0.10/M cached input, $10/M output; >272K input bills 2x input / 1.5x output.
