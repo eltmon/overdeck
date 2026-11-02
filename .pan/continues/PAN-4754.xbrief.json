@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4754",
   "created": "2026-11-02T00:55:26.468Z",
-  "updated": "2026-11-02T01:51:28.716Z",
+  "updated": "2026-11-02T01:51:43.860Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,10 @@
     "dialog-option-semantics.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T01:51:28.716Z"
+    },
+    "dialog-option-semantics.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:51:43.860Z"
     }
   }
 }
