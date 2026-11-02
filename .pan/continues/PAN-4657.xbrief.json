@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4657",
   "created": "2026-11-02T03:48:30.667Z",
-  "updated": "2026-11-02T05:38:15.114Z",
+  "updated": "2026-11-02T05:38:34.422Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "sweep-resurface.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T05:38:15.113Z"
+    },
+    "badge-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:38:34.422Z"
     }
   }
 }
