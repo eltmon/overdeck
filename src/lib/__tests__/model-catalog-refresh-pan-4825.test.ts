@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getPricing } from '../cost.js';
 import { MODEL_CAPABILITY_CLASSES } from '../model-capability-class.js';
-import { hasModelCapability, resolveModelId } from '../model-capabilities.js';
+import { getModelEffortLevels, hasModelCapability, resolveModelId } from '../model-capabilities.js';
 import { MODEL_DEPRECATIONS } from '../model-deprecations.js';
 import { getModelProvider, isOpenRouterModel } from '../model-fallback.js';
 import { getProviderForModel, PROVIDERS, type ProviderName } from '../providers.js';
@@ -119,5 +119,13 @@ describe('MiniMax M3.1 Flash', () => {
     // Official MiniMax pages show no M2.7 retirement notice (checked 2026-11-02), so M2.7 stays live.
     expect(PROVIDERS.minimax.tierModels).toEqual({ opus: 'MiniMax-M3', sonnet: 'minimax-m2.7', haiku: 'minimax-m2.7-highspeed' });
     expectNoRetiredSlots('minimax');
+  });
+});
+
+describe('Muse max effort', () => {
+  it('lists max for Muse Wonder and Muse Spark 1.3 but not the Contributor tier', () => {
+    expect(getModelEffortLevels('muse-wonder-1.0')).toContain('max');
+    expect(getModelEffortLevels('muse-spark-1.3')).toContain('max');
+    expect(getModelEffortLevels('muse-spark-1.3-contributor')).not.toContain('max');
   });
 });

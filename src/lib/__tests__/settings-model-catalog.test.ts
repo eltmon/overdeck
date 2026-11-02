@@ -51,7 +51,12 @@ const kimiK31AdditionIds = new Set(['k3.1-pro', 'k3.1-pro-highspeed', 'kimi-code
 const mimoV26Ids = ['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed'];
 // MiniMax M3.1 Flash is an addition after the fixture was captured (PAN-4825).
 const minimaxM31FlashId = 'MiniMax-M3.1-Flash';
-const expectedPreviousCatalog = { ...previousCatalog, mimo: [] };
+// Meta's reasoning docs list max for muse-spark-1.3 but not for -contributor (PAN-4825).
+const expectedPreviousCatalog = {
+  ...previousCatalog,
+  mimo: [],
+  meta: previousCatalog.meta.map((model: { id: string }) => (model.id === 'muse-spark-1.3' ? { ...model, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] } : model)),
+};
 
 function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }>; kimi: Array<{ id: string }>; mimo: Array<{ id: string }>; minimax: Array<{ id: string }> }>(catalog: T): T {
   return {
