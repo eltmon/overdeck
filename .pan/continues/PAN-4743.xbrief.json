@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T13:55:15.154Z",
+  "updated": "2026-11-02T13:55:21.304Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-4743",
       "claimedAt": "2026-11-02T13:48:48.128Z",
       "doneAt": "2026-11-02T13:55:15.154Z"
+    },
+    "add-fly-button": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:55:21.303Z"
     }
   }
 }
