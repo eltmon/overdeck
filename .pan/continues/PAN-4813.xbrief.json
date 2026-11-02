@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4813",
   "created": "2026-11-02T13:36:08.209Z",
-  "updated": "2026-11-02T14:19:16.337Z",
+  "updated": "2026-11-02T14:19:30.006Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "provider-native-aliases.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T14:19:16.336Z"
+    },
+    "provider-native-aliases.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:19:30.006Z"
     }
   }
 }
