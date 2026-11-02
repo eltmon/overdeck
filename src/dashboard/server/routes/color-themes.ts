@@ -3,7 +3,7 @@
  *
  *   GET  /api/color-themes                  — { themes, selection: { light, dark }, warnings }
  *   PUT  /api/color-themes/selection         — body { mode, id }
- *   POST /api/color-themes/import/preview    — body { fileName, contentBase64 }; writes nothing
+ *   POST /api/color-themes/import/preview    — body { fileName (.json | .vsix), contentBase64 }; writes nothing
  *   POST /api/color-themes                  — body { theme }
  */
 import { Effect, Layer } from 'effect';
@@ -14,6 +14,7 @@ import { getColorTheme, listColorThemes, saveColorTheme } from '../../../lib/col
 import { resolveColorThemeSelection } from '../../../lib/color-themes/selection.js';
 import { saveColorThemeSelection } from '../../../lib/color-themes/selection-write.js';
 import { ColorThemeImportError, mapVsCodeTheme } from '../../../lib/color-themes/vscode-import.js';
+import { importVsixThemes } from '../../../lib/color-themes/vsix-import.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
@@ -78,9 +79,10 @@ const postColorThemeImportPreviewRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
       const { fileName, contentBase64 } = (body ?? {}) as { fileName?: unknown; contentBase64?: unknown };
-      if (typeof fileName !== 'string' || !/\.json$/i.test(fileName)) {
+      const isVsix = typeof fileName === 'string' && /\.vsix$/i.test(fileName);
+      if (typeof fileName !== 'string' || (!isVsix && !/\.json$/i.test(fileName))) {
         return jsonResponse(
-          { error: 'Only VS Code theme .json files are supported; .vsix import is tracked in #4659' },
+          { error: 'Only VS Code theme .json files and .vsix extension packages are supported' },
           { status: 400 },
         );
       }
@@ -88,10 +90,14 @@ const postColorThemeImportPreviewRoute = HttpRouter.add(
         return jsonResponse({ error: 'contentBase64 is required' }, { status: 400 });
       }
       const decoded = Buffer.from(contentBase64, 'base64');
-      if (decoded.byteLength > MAX_IMPORT_BYTES) {
-        return jsonResponse({ error: 'theme file exceeds the 2 MB import limit' }, { status: 413 });
-      }
       try {
+        if (isVsix) {
+          const { themes, warnings } = await importVsixThemes(decoded, fileName);
+          return jsonResponse({ themes: themes.map((theme) => ({ ...theme, id: slugifyThemeId(theme.name) })), warnings });
+        }
+        if (decoded.byteLength > MAX_IMPORT_BYTES) {
+          return jsonResponse({ error: 'theme file exceeds the 2 MB import limit' }, { status: 413 });
+        }
         const { theme, warnings } = mapVsCodeTheme(decoded.toString('utf8'), fileName);
         const proposedId = slugifyThemeId(theme.name);
         return jsonResponse({ themes: [{ ...theme, id: proposedId }], warnings });
