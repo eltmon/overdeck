@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T14:54:50.987Z",
+  "updated": "2026-11-02T14:55:04.898Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "auto-fly-fallback.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T14:54:50.987Z"
+    },
+    "fleet-conversation-fly.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:55:04.897Z"
     }
   }
 }
