@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T22:49:48.637798Z · model: claude-opus-5-5 · open: 875_
+_Last sequenced: 2026-11-02T23:02:46.208163Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -178,7 +178,7 @@ _Last sequenced: 2026-11-02T22:49:48.637798Z · model: claude-opus-5-5 · open: 
 | 172 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 173 | PAN-4634 | M | medium | needs-refinement |  |  | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
 | 174 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 175 | PAN-4827 | M | high | ok |  |  | Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices |
+| 175 | PAN-4862 | M | high | ok |  |  | werift keeps only the first (UDP) TURN URL, so the Anywhere relay never connects when UDP is blocked; fails PAN-4774 AC-3. |
 | 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 177 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
 | 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
@@ -1210,7 +1210,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T22:49:48.637798Z",
+  "generatedAt": "2026-11-02T23:02:46.208163Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 875,
@@ -3451,15 +3451,15 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "isEpic": true
     },
     {
-      "issue": "PAN-4827",
+      "issue": "PAN-4862",
       "rank": 175,
       "size": "M",
       "importance": "high",
-      "score": 70,
+      "score": 72,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices",
-      "rationale": "New issue from the 2026-11-02 catalog audit: Google's haiku tier and all three DashScope tiers point at shut-down or never-real ids, so Claude Code subagents on those providers fail, and several Qwen rows carry $0 placeholder prices. It is a well-specified provider bug fix, not substrate, so it takes the free rank 175 among high-importance fixes. Its AC1 test asserts no provider's tierModels is in MODEL_DEPRECATIONS, which cannot pass until PAN-4825 retires the MiMo/Groq/Cerebras tier ids, so it depends on PAN-4825.",
+      "why": "werift keeps only the first (UDP) TURN URL, so the Anywhere relay never connects when UDP is blocked; fails PAN-4774 AC-3.",
+      "rationale": "New bug found by the live Overdeck Anywhere release acceptance run (in-pipeline PAN-4774, AC-3 and the relay half of AC-2): werift 0.25.1 parseIceServers keeps only the first TURN URL, and Cloudflare lists the UDP one first, so the rtc+turn:// route cannot reach TURN over TCP or TLS on networks that block UDP, which is the case the relay exists for. It blocks an in-pipeline release gate, so it takes the free rank 175 vacated by closed PAN-4827. The fix (order turns:/transport=tcp first for the relay route, or retry with a TCP/TLS URL) is well scoped; the second observation (pair checks failing with UDP open) is not root-caused and may need its own issue.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3475,6 +3475,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "Cost-bleed circuit breaker — progress-aware, always-on guard against runaway spend; the one real guard the epic authorizes. Updated since the prior run (comment/label activity); body substance unchanged, rank held. Note: its costBleedMonitor is described as a deacon patrol — deacon-lite is the new home. Blocker PAN-2466 closed since the prior run; dependsOn pruned.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-4847",
+      "rank": 177,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open.",
+      "rationale": "New issue placed in the open rank-177 slot: a silent pipeline stall (review never requested after Fly reap) that also blocks PAN-4696 FR-2; root cause is an unidentified background writer of .overdeck/context/codebase/concerns.md plus an over-strict porcelain dirty check in requestReviewThroughRoute.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1042",
@@ -4047,6 +4060,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4861",
+      "rank": 224,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Removing a managed SSH machine kills only the dashboard pid; the pan up supervisor restarts it. Found in PAN-4774 AC-6.",
+      "rationale": "New bug found during the PAN-4774 Anywhere acceptance run (AC-6): stopLocked in the SSH helper signals only the dashboard pid, so the supervisor restarts it and the deleted launch marker leaves a server no later remove can stop. It is a small, well-evidenced fix that makes the remove dialog's promise true, so it takes free rank 224 beside its sibling acceptance bugs PAN-4860 and PAN-4859 without moving any other node.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3510",
       "rank": 225,
       "size": "S",
@@ -4068,6 +4094,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback",
       "rationale": "New issue: an observation follow-up to in-pipeline PAN-4614; ranked mid-tier because it only matters if GitHub ignores union, and any fallback touches the merge gate's trust boundary and needs its own plan.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4860",
+      "rank": 227,
+      "size": "S",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Project create proposes issue prefixes with digits (ABC123X) that parseIssueId rejects, so no issue resolves. Found in PAN-4774 AC-4.",
+      "rationale": "New bug found during the PAN-4774 Anywhere acceptance run: create.ts proposes and validates prefixes with digits while parseIssueId accepts letters only, so any project key containing a digit gets an unusable prefix. It is a small, well-specified correctness fix in the shared project-create core, so it takes free rank 227 ahead of the similar PAN-4859 without moving any other node.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4581,6 +4620,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4859",
+      "rank": 269,
+      "size": "S",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Open in editor on an SSH-host machine opens ssh-remote+127.0.0.1 (local forward); use the SSH record destination. Blocks AC-15 W-CONV9.",
+      "rationale": "New bug found by the in-pipeline Anywhere release acceptance run (PAN-4774, AC-15 / W-CONV9): sshHostFor reads the hostname of the SSH route, which is the local port forward, so Open in editor targets the local machine instead of the SSH host. The fix is small and well specified (look up SshMachineRecord.destination by link id, check the Remote-SSH authority form for user and port, add an open-remote unit test). It takes the free rank 269, just ahead of PAN-4774, because the release checklist item cannot pass on an SSH-linked machine until it lands.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2243",
       "rank": 270,
       "size": "S",
@@ -4642,6 +4694,21 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4849",
+      "rank": 275,
+      "size": "XL",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4820"
+      ],
+      "why": "Part B of PAN-4820: Deft state surfaces, review-cycle view and Run on Deft switch in the dashboard; blocked by PAN-4820",
+      "rationale": "New issue split from PAN-4820 at the operator's request; its design (WI-15 to WI-29) lives in the PAN-4820 PRD and it is explicitly blocked by PAN-4820, so it sits in the free slot just after its blocker.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4811",
       "rank": 276,
       "size": "M",
@@ -4651,6 +4718,21 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked.",
       "rationale": "Moved up from rank 277 into the vacated PAN-4743 slot: its only dependency PAN-4743 closed as completed on 2026-11-02, so startFlyTarget exists and lane provisioning can start.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4852",
+      "rank": 277,
+      "size": "L",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4820"
+      ],
+      "why": "SageOx core: transient per-project binding, Overdeck-built ox, Codex launches, fork rebase; in pipeline, waits on PAN-4820 merge",
+      "rationale": "New in-pipeline issue, pinned in the free rank after the Deft part-B work: it reuses PAN-4820's worktree hide module and merge guard and states work starts after PAN-4820 merges, so it ranks just behind that cluster as decided feature work, not substrate.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4875,6 +4957,21 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "condition": "ok",
       "dependsOn": [],
       "why": "work agents hang on Claude Code settings-file protection when editing .claude/**",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4853",
+      "rank": 294,
+      "size": "M",
+      "importance": "low",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4852"
+      ],
+      "why": "SageOx dashboard views (session tab, context trace, project panel); blocked by PAN-4852; session-to-issue mapping is a checkpoint",
+      "rationale": "New issue: dashboard read-only views over SageOx files, explicitly blocked by PAN-4852 part A, so it sits right after part A with lower importance as UI follow-up.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12070,34 +12167,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4847",
-      "rank": 177,
-      "size": "S",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open.",
-      "rationale": "New issue placed in the open rank-177 slot: a silent pipeline stall (review never requested after Fly reap) that also blocks PAN-4696 FR-2; root cause is an unidentified background writer of .overdeck/context/codebase/concerns.md plus an over-strict porcelain dirty check in requestReviewThroughRoute.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4849",
-      "rank": 275,
-      "size": "XL",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4820"
-      ],
-      "why": "Part B of PAN-4820: Deft state surfaces, review-cycle view and Run on Deft switch in the dashboard; blocked by PAN-4820",
-      "rationale": "New issue split from PAN-4820 at the operator's request; its design (WI-15 to WI-29) lives in the PAN-4820 PRD and it is explicitly blocked by PAN-4820, so it sits in the free slot just after its blocker.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4851",
       "rank": 881,
       "size": "S",
@@ -12109,75 +12178,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       ],
       "why": "Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them",
       "rationale": "New issue: an undecided low-priority question that the operator parked explicitly, so it ranks at the bottom of the backlog until they decide.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4852",
-      "rank": 277,
-      "size": "L",
-      "importance": "medium",
-      "score": 54,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4820"
-      ],
-      "why": "SageOx core: transient per-project binding, Overdeck-built ox, Codex launches, fork rebase; in pipeline, waits on PAN-4820 merge",
-      "rationale": "New in-pipeline issue, pinned in the free rank after the Deft part-B work: it reuses PAN-4820's worktree hide module and merge guard and states work starts after PAN-4820 merges, so it ranks just behind that cluster as decided feature work, not substrate.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4853",
-      "rank": 294,
-      "size": "M",
-      "importance": "low",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4852"
-      ],
-      "why": "SageOx dashboard views (session tab, context trace, project panel); blocked by PAN-4852; session-to-issue mapping is a checkpoint",
-      "rationale": "New issue: dashboard read-only views over SageOx files, explicitly blocked by PAN-4852 part A, so it sits right after part A with lower importance as UI follow-up.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4859",
-      "rank": 269,
-      "size": "S",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Open in editor on an SSH-host machine opens ssh-remote+127.0.0.1 (local forward); use the SSH record destination. Blocks AC-15 W-CONV9.",
-      "rationale": "New bug found by the in-pipeline Anywhere release acceptance run (PAN-4774, AC-15 / W-CONV9): sshHostFor reads the hostname of the SSH route, which is the local port forward, so Open in editor targets the local machine instead of the SSH host. The fix is small and well specified (look up SshMachineRecord.destination by link id, check the Remote-SSH authority form for user and port, add an open-remote unit test). It takes the free rank 269, just ahead of PAN-4774, because the release checklist item cannot pass on an SSH-linked machine until it lands.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4860",
-      "rank": 227,
-      "size": "S",
-      "importance": "medium",
-      "score": 54,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Project create proposes issue prefixes with digits (ABC123X) that parseIssueId rejects, so no issue resolves. Found in PAN-4774 AC-4.",
-      "rationale": "New bug found during the PAN-4774 Anywhere acceptance run: create.ts proposes and validates prefixes with digits while parseIssueId accepts letters only, so any project key containing a digit gets an unusable prefix. It is a small, well-specified correctness fix in the shared project-create core, so it takes free rank 227 ahead of the similar PAN-4859 without moving any other node.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4861",
-      "rank": 224,
-      "size": "S",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Removing a managed SSH machine kills only the dashboard pid; the pan up supervisor restarts it. Found in PAN-4774 AC-6.",
-      "rationale": "New bug found during the PAN-4774 Anywhere acceptance run (AC-6): stopLocked in the SSH helper signals only the dashboard pid, so the supervisor restarts it and the deleted launch marker leaves a server no later remove can stop. It is a small, well-evidenced fix that makes the remove dialog's promise true, so it takes free rank 224 beside its sibling acceptance bugs PAN-4860 and PAN-4859 without moving any other node.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13465,13 +13465,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 0.9
     },
     {
-      "from": "PAN-4827",
-      "to": "PAN-4844",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4823",
       "to": "PAN-4833",
       "type": "contains",
@@ -13820,6 +13813,20 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4862",
+      "to": "PAN-4774",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-4862",
+      "to": "PAN-4482",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
