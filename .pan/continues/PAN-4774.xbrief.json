@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T21:00:13.410Z",
+  "updated": "2026-11-02T21:03:56.112Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "adopt-skip-saved-cwd-hook": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4774",
-      "claimedAt": "2026-11-02T21:00:13.410Z"
+      "claimedAt": "2026-11-02T21:00:13.410Z",
+      "doneAt": "2026-11-02T21:03:56.111Z"
     }
   }
 }
