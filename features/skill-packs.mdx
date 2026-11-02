@@ -106,6 +106,35 @@ pan skills pack update mattpocock --ref v1.3.0
 
 `update` prints the preview again with the skills added, removed, and changed since the trusted commit, plus any capabilities that are new. It moves the trusted commit only after you confirm. `pan skills pack list` shows when the ref has moved (`update available`); `--offline` skips that network check.
 
+### Fork-first policy
+
+Known packs come from operator-controlled forks under `github.com/eltmon/`. A fork lets the operator decide when upstream changes arrive, and it is the only place Overdeck-specific changes land (gstack pack mode, the `ox` host-managed mode). No agent opens issues, pull requests or comments on an upstream repository, or pushes to one; upstreaming fork changes is the operator's call. `eltmon/plugins` is identical to `cursor/plugins` and exists only for pinning control. `eltmon/gstack` carries pack mode and drifts from upstream quickly.
+
+### Syncing a fork
+
+| Fork | Upstream | Carries changes? | Sync | Then |
+|---|---|---|---|---|
+| `eltmon/skills` | `mattpocock/skills` | No | `gh repo sync eltmon/skills`; for a tag, push the upstream tag to the fork from a fork clone (`git fetch upstream --tags`, `git push origin <tag>`) | `pan skills pack update mattpocock --ref <tag>` |
+| `eltmon/plugins` | `cursor/plugins` | No | `gh repo sync eltmon/plugins` | `pan skills pack update pstack --ref <commit>` |
+| `eltmon/directive` | `deftai/directive` | No | `gh repo sync eltmon/directive` (default branch `master`) | `pan skills pack update deft --ref <ref>`, then `pan skills deft status` |
+| `eltmon/gstack` | `garrytan/gstack` | Yes: pack mode | merge in a fork clone, see below | `pan skills pack update gstack` |
+| `eltmon/ox` | `sageox/ox` | Yes: host-managed mode | rebase `overdeck/host-managed` in a fork clone; branch ledger in [docs/SAGEOX-FORK.md](https://github.com/eltmon/overdeck/blob/main/docs/SAGEOX-FORK.md) | rebuild `ox` at the new commit, `ox host-contract --json`, `pan skills pack update sageox --ref overdeck/host-managed`, `pan doctor` |
+
+Never run `gh repo sync --force` on `eltmon/gstack` or `eltmon/ox`; it hard-resets the branch and deletes the fork's own commits.
+
+### Syncing the gstack fork
+
+1. In a clone of `eltmon/gstack` with an `upstream` remote for `garrytan/gstack` (fetch only), run `git fetch upstream` and create a branch from `origin/main`.
+2. `git merge upstream/main` and resolve conflicts, keeping pack mode.
+3. Run the pack-mode tests: `bun test test/pack-mode.test.ts test/pack-browser.test.ts test/pack-browser-guards.test.ts test/pack-env.test.ts test/state-root-parity.test.ts`.
+4. Check that a render writes nothing to `HOME`: make three empty temporary directories (home, render, state), run `HOME=<home> bash setup --pack-root <render> --pack-state-root <state>` from the clone, then `ls -A <home>` must print nothing.
+5. Push the branch and open a pull request inside the fork: `gh pr create --repo eltmon/gstack --base main`. Merge it.
+6. `pan skills pack update gstack`. The preview shows added, removed and changed skills. A skill the new commit adds is not mounted until the skill map in `src/lib/skill-packs/gstack.ts` is reviewed (see [docs/SKILL-PACKS.md](https://github.com/eltmon/overdeck/blob/main/docs/SKILL-PACKS.md)).
+
+### When upstream is fine
+
+Any url works, and pinning already protects you: the trusted commit does not move until you confirm an update. Registering `mattpocock` from `https://github.com/mattpocock/skills` or `pstack` from `https://github.com/cursor/plugins` works the same way. gstack and SageOx need their forks: upstream gstack commits fail the pack-mode check, and the `sageox` pack needs an `ox` built from `eltmon/ox`.
+
 ## Packs
 
 ## Where state lives and when changes apply
