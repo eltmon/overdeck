@@ -243,7 +243,12 @@ function smokeTmuxSocket(home) {
 
 /** Kill the smoke-only tmux servers (they hold worker panes); absent servers are fine. */
 async function killSmokeTmux() {
-  if (LIVE_CLAUDE) return;
+  // --live-claude: the servers' tmux sockets are named from OVERDECK_HOME, so match the
+  // config file under the smoke's short home links instead of a socket name.
+  if (LIVE_CLAUDE) {
+    await execFileAsync('pkill', ['-f', '/tmp/pan4650-smoke-[ab]/tmux/overdeck.tmux.conf']).catch(() => undefined);
+    return;
+  }
   await Promise.all(['pan-smoke-a', 'pan-smoke-b'].map((socket) => execFileAsync('tmux', ['-L', socket, 'kill-server']).catch(() => undefined)));
 }
 
