@@ -228,3 +228,68 @@ describe('PUT /api/color-themes/selection (PAN-4644 ac3)', () => {
     return dir;
   }
 });
+
+describe('PUT /api/color-themes/:id (PAN-4660)', () => {
+  it('answers 403 for a built-in id and writes nothing', async () => {
+    const res = await call('PUT', '/api/color-themes/overdeck-dark', asInternal, {
+      theme: { name: 'Custom', type: 'dark' },
+    });
+    expect(res.status).toBe(403);
+
+    const files = await readdir(join(home, 'themes')).catch(() => []);
+    expect(files).not.toContain('overdeck-dark.json');
+  });
+
+  it('answers 404 for an id with no user theme file', async () => {
+    const res = await call('PUT', '/api/color-themes/nope', asInternal, {
+      theme: { name: 'Custom', type: 'dark' },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('round trip: duplicate a built-in, then overwrite it in place', async () => {
+    const saveRes = await call('POST', '/api/color-themes', asInternal, {
+      theme: { name: 'Overdeck Dark copy', type: 'dark', terminal: { background: '#1a1a2e' } },
+    });
+    expect(saveRes.status).toBe(200);
+    expect(saveRes.json.theme.id).toBe('overdeck-dark-copy');
+
+    const putRes = await call('PUT', '/api/color-themes/overdeck-dark-copy', asInternal, {
+      theme: { name: 'Overdeck Dark copy', type: 'dark', terminal: { background: '#000000' } },
+    });
+    expect(putRes.status).toBe(200);
+    expect(putRes.json.theme.terminal.background).toBe('#000000');
+
+    const listRes = await call('GET', '/api/color-themes', {});
+    const matches = listRes.json.themes.filter((t: { id: string }) => t.id === 'overdeck-dark-copy');
+    expect(matches).toHaveLength(1);
+    expect(matches[0].terminal.background).toBe('#000000');
+  });
+
+  it('rejects an unauthenticated request and leaves the existing file unchanged', async () => {
+    const themesDir = await mkThemesDir();
+    const original = JSON.stringify({ name: 'Ayu Dark', type: 'dark' });
+    await writeFile(join(themesDir, 'ayu-dark.json'), original, 'utf8');
+
+    const res = await call('PUT', '/api/color-themes/ayu-dark', {}, {
+      theme: { name: 'Ayu Dark', type: 'dark', terminal: { background: '#000000' } },
+    });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+
+    const onDisk = await readFile(join(themesDir, 'ayu-dark.json'), 'utf8');
+    expect(onDisk).toBe(original);
+  });
+
+  it('the static /api/color-themes/selection route still wins over the :id route', async () => {
+    const res = await call('PUT', '/api/color-themes/selection', asInternal, { mode: 'dark', id: 'overdeck-dark' });
+    expect(res.status).toBe(200);
+    expect(res.json.selection).toEqual({ light: 'overdeck-light', dark: 'overdeck-dark' });
+  });
+
+  async function mkThemesDir(): Promise<string> {
+    const dir = join(home, 'themes');
+    await mkdir(dir, { recursive: true });
+    return dir;
+  }
+});

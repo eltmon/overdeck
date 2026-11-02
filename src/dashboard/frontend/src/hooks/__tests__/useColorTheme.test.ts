@@ -252,4 +252,50 @@ describe('useColorTheme', () => {
     const putCall = fetchControl.fetchMock.mock.calls.find(([, init]) => (init as RequestInit)?.method === 'PUT');
     expect(JSON.parse(String((putCall?.[1] as RequestInit).body))).toEqual({ mode: 'dark', id: 'ayu-dark' });
   });
+
+  it('updateTheme re-applies the selected theme without a reload', async () => {
+    const darkX = theme({ id: 'dark-x', type: 'dark', ui: { background: '#10141c' } });
+    useColorTheme.setState({
+      themes: [darkX],
+      selection: { light: 'overdeck-light', dark: 'dark-x' },
+      active: { light: BUILTIN_COLOR_THEMES['overdeck-light'], dark: darkX },
+    });
+
+    const updated = theme({
+      id: 'dark-x', type: 'dark',
+      ui: { background: '#222222' },
+      terminal: { background: '#111111' },
+    });
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'PUT' && url === '/api/color-themes/dark-x') {
+        return Response.json({ theme: updated });
+      }
+      if (method === 'GET' && url === '/api/color-themes') {
+        return Response.json({ themes: [updated], selection: { light: 'overdeck-light', dark: 'dark-x' }, warnings: [] });
+      }
+      return undefined;
+    });
+
+    const { result } = renderHook(() => useColorTheme());
+    await act(async () => {
+      await result.current.updateTheme('dark-x', { name: 'dark-x', type: 'dark', ui: { background: '#222222' }, terminal: { background: '#111111' } });
+    });
+
+    expect(document.documentElement.style.getPropertyValue('--background')).toBe('#222222');
+    expect(useColorTheme.getState().terminalPalette('dark').background).toBe('#111111');
+  });
+
+  it('updateTheme throws the server error and does not refetch on 403', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'PUT' && url === '/api/color-themes/overdeck-dark') {
+        return Response.json({ error: 'built-in themes are read-only; duplicate it instead' }, { status: 403 });
+      }
+      return undefined;
+    });
+
+    const { result } = renderHook(() => useColorTheme());
+    await expect(act(async () => {
+      await result.current.updateTheme('overdeck-dark', { name: 'Overdeck Dark', type: 'dark' });
+    })).rejects.toThrow('built-in themes are read-only; duplicate it instead');
+  });
 });

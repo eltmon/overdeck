@@ -71,12 +71,13 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   without remounting it when the selection changes. A new tmux session's `window-style`
   background is stamped from `resolveTerminalBackground()`
   (`src/lib/color-themes/terminal-background.ts`), which falls back to `TERMINAL_BG`
-  on any error. Four routes under `src/dashboard/server/routes/color-themes.ts` serve
+  on any error. Five routes under `src/dashboard/server/routes/color-themes.ts` serve
   the feature: `GET /api/color-themes`, `PUT /api/color-themes/selection`,
-  `POST /api/color-themes/import/preview`, and `POST /api/color-themes`. The import preview
-  accepts a single theme `.json` or a `.vsix` package; `.vsix` archives are read in memory by
-  `src/lib/color-themes/zip-reader.ts` (stored and deflated entries only) and mapped by
-  `vsix-import.ts` (PAN-4659). See
+  `POST /api/color-themes/import/preview`, `POST /api/color-themes`, and
+  `PUT /api/color-themes/:id` (in-place overwrite of a user theme; built-ins refused
+  with 403). The import preview accepts a single theme `.json` or a `.vsix` package;
+  `.vsix` archives are read in memory by `src/lib/color-themes/zip-reader.ts` (stored
+  and deflated entries only) and mapped by `vsix-import.ts` (PAN-4659). See
   [appearance.mdx](../configuration/appearance.mdx) "Color themes" for the operator-facing
   picture.
 - Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
