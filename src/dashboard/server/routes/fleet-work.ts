@@ -10,8 +10,11 @@
  * - `POST /api/fleet/conversations { machine?, needs?, projectKey?, message, model?, harness?, effort?, issueId? }`
  *   → this machine: `handleConversationCreate`; another machine: its
  *   conversation work door with the local project's git origin slug, then one
- *   linked-list fetch so the new row lists at once. Answers 201
- *   `{ conversation: '<name>' | '@<env>/<name>', machine: { environmentId, label, self }, reason }`.
+ *   linked-list fetch so the new row lists at once. `machine: "fly"` creates a
+ *   Fly machine for an admin caller (PAN-4743) through a spawn context passed
+ *   to `resolveTarget`; a non-201 work-door answer discards it unless the
+ *   answer is 503 `machine-unreachable`, which leaves the VM to the idle sweep.
+ *   Answers 201 `{ conversation: '<name>' | '@<env>/<name>', machine: { environmentId, label, self }, reason }`.
  *
  * - `POST /api/fleet/workers { machine, needs?, issueId, prompt, model?, harness?, effort?, readOnly?, name?, parentId? }`
  *   → this machine: `startWorker`; another machine: a stand-in directory with
@@ -52,6 +55,7 @@ import { getProjectSync, resolveProjectFromIssue } from '../../../lib/projects.j
 import { channelOfRequest } from '../channel-peer.js';
 import { jsonResponse } from '../http-helpers.js';
 import { actorForSender, SENDER_HEADER } from '../linked-conversation-proxy.js';
+import type { FlySpawn } from '../services/fleet-fly-target.js';
 import { defaultFleetTargetDeps, type FleetTarget, type FleetTargetDeps, placeAuto, resolveTargetMachine } from '../services/fleet-target.js';
 import { currentLinkedConversationsSync } from '../services/linked-conversations-sync.js';
 import { currentRemoteWorkerFollower } from '../services/remote-worker-follower.js';
@@ -91,21 +95,24 @@ export async function handleFleetPlacement(raw: unknown, deps: FleetTargetDeps =
 export interface FleetCaller {
   actor: LinkActorInit;
   ceiling?: AccessTokenScope[];
+  /** The caller holds an admin credential (PAN-4743 D-4743-4): may create a Fly machine. */
+  mayCreateFly?: boolean;
 }
 
 export function fleetCaller(credential: DashboardCredential | null, sender: string | undefined): FleetCaller | null {
+  const mayCreateFly = credential !== null && credentialScopes(credential).includes('admin');
   if (credential?.kind === 'token') {
-    return { actor: 'operator', ceiling: credentialScopes(credential).filter((scope): scope is AccessTokenScope => scope !== 'admin') as AccessTokenScope[] };
+    return { actor: 'operator', ceiling: credentialScopes(credential).filter((scope): scope is AccessTokenScope => scope !== 'admin') as AccessTokenScope[], mayCreateFly };
   }
   const actor = actorForSender(sender);
-  return actor === null ? null : { actor };
+  return actor === null ? null : { actor, mayCreateFly };
 }
 
 /** A work door gets this long to create the conversation or worker on the owner. */
 export const WORK_DOOR_TIMEOUT_MS = 30_000;
 
 export interface FleetSpawnDeps {
-  resolveTarget: (machine: string | undefined, gitOrigin: string | null, needs: readonly string[]) => Promise<FleetTarget>;
+  resolveTarget: (machine: string | undefined, gitOrigin: string | null, needs: readonly string[], spawn?: FlySpawn) => Promise<FleetTarget>;
   projectOrigin: (projectKey: string) => { gitOrigin: string | null } | null;
   thisLabel: () => Promise<string>;
   createLocal: (body: Record<string, unknown>) => Promise<{ status: number; body: unknown }>;
@@ -125,7 +132,7 @@ async function defaultCreateLocal(body: Record<string, unknown>): Promise<{ stat
 }
 
 export const defaultFleetSpawnDeps = (): FleetSpawnDeps => ({
-  resolveTarget: (machine, gitOrigin, needs) => resolveTargetMachine(machine, gitOrigin, needs),
+  resolveTarget: (machine, gitOrigin, needs, spawn) => resolveTargetMachine(machine, gitOrigin, needs, defaultFleetTargetDeps(), spawn),
   projectOrigin: (projectKey) => {
     const project = getProjectSync(projectKey);
     return project ? { gitOrigin: gitOriginOf(project) } : null;
@@ -201,7 +208,8 @@ export async function handleFleetConversation(raw: unknown, caller: FleetCaller,
   if (projectKey && !project) return jsonResponse({ code: 'unknown-project', error: `No project ${projectKey} on this machine` }, { status: 404 });
   const gitOrigin = project?.gitOrigin ?? null;
 
-  const target = await deps.resolveTarget(machine, gitOrigin, needs);
+  const spawn: FlySpawn = { projectKey: projectKey ?? null, harness: options.harness, model: options.model, mayCreate: caller.mayCreateFly === true };
+  const target = await deps.resolveTarget(machine, gitOrigin, needs, spawn);
   if (!target.ok) return jsonResponse(target.body, { status: target.status });
   const message = body['message'];
   if (target.self) {
@@ -216,6 +224,15 @@ export async function handleFleetConversation(raw: unknown, caller: FleetCaller,
   const answer = await postWorkDoor(deps, target.link, '/api/machines/work/conversations', { ...options, message, gitOrigin }, caller);
   const name = (answer.json as { name?: unknown } | null)?.name;
   if (answer.status !== 201 || typeof name !== 'string') {
+    // D-4743-7: the VM may still be starting the conversation, so a 503 machine-unreachable
+    // (the 30 s WORK_DOOR_TIMEOUT_MS, or a hang-up) keeps it and names it instead of discarding.
+    if (target.discard && answer.status === 503 && (answer.json as { code?: unknown } | null)?.code === 'machine-unreachable') {
+      return jsonResponse({
+        code: 'machine-unreachable',
+        error: `${target.label} (new Fly machine) did not answer in time; it is still linked. Open it from the conversation list, or remove it with pan machines unlink ${target.label}.`,
+      }, { status: 503 });
+    }
+    await target.discard?.();
     return ownerRefusal(answer.status, answer.json, target.link, { thisLabel: await deps.thisLabel(), projectKey: projectKey ?? null });
   }
   await deps.refreshLinked(target.link).catch(() => undefined);

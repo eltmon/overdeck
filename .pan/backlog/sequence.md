@@ -1,19 +1,16 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T15:35:00.363141Z · model: claude-opus-5-5 · open: 859_
+_Last sequenced: 2026-11-02T16:05:38.784543Z · model: claude-opus-5-5 · open: 855_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 2 | PAN-4801 | M | critical | ok |  |  | Merge train never rebases approved siblings after a merge (reconcile hook unwired), so each merge strands siblings conflicting. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
-| 5 | PAN-4810 | M | critical | ok |  |  | Verification merges main into a stale workspace, never the PR head; handoff-pushed PRs verify the wrong tree and never reach review |
-| 6 | PAN-4803 | M | high | ok |  | PAN-4801 | After PAN-4801, carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews. |
+| 6 | PAN-4821 | S | high | ok |  |  | Close-out says no PR found when the forge read fails transiently; dod-gate maps every lookup error to null and caches it. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
-| 9 | PAN-4813 | M | medium | ok |  |  | Add Kimi K3.1 Pro + Highspeed on Claude Code, kimi-code and ACP routes; already in pipeline, so pinned near the top. |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 10 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 11 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
@@ -275,6 +272,7 @@ _Last sequenced: 2026-11-02T15:35:00.363141Z · model: claude-opus-5-5 · open: 
 | 269 | PAN-4696 | XS | medium | ok |  |  | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 272 | PAN-4820 | XL | medium | ok |  |  | Run one issue on Deft Directive pipeline (hidden temp install, merge guard, native dashboard view, switch back); decisions made |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
@@ -314,7 +312,6 @@ _Last sequenced: 2026-11-02T15:35:00.363141Z · model: claude-opus-5-5 · open: 
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
 | 311 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
-| 312 | PAN-4740 | S | medium | ok |  |  | Pooled link channel reused after the Fly proxy closes the idle socket: first request fails with 'socket hang up', retry works. |
 | 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
@@ -496,7 +493,6 @@ _Last sequenced: 2026-11-02T15:35:00.363141Z · model: claude-opus-5-5 · open: 
 | 493 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
 | 494 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
 | 495 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 496 | PAN-4741 | S | low | ok |  |  | Fly machine advertises unreachable private 172.19.x lan routes ranked before its public route; every reconnect probes dead routes first. |
 | 497 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
 | 498 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
 | 499 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
@@ -871,10 +867,6 @@ _Last sequenced: 2026-11-02T15:35:00.363141Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
-### PAN-4801 (rank 2)
-
-New substrate bug in the merge path, PR in review: runMergeTrainReconcile is only reachable from firePostMergeLifecycle, which no merge door calls, so every merge leaves approved siblings conflicting until the Flywheel relays merge-main by hand (three times on 2026-11-02). It takes the free rank 2 because it throttles every multi-PR merge day. It carries needs-handoff (TENET-10), so it runs as a supervised strike.
-
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -883,13 +875,9 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 
 Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
 
-### PAN-4810 (rank 5)
+### PAN-4821 (rank 6)
 
-New since the prior run. Verification syncs main into the workspace without first moving it to origin/<branch>, so any PR whose commits arrive from a handoff worktree, a train sibling rebase or a suggestion commit is verified on a stale tree and silently never dispatched to review; three PRs (PAN-4772, PAN-4785, PAN-4801) stalled five hours on it. It is substrate pipeline machinery with a concrete fix direction, so it ranks in the critical top tier beside the merge-train and adoption fixes it unblocks. Labeled needs-handoff (TENET-10): supervised handoff only.
-
-### PAN-4803 (rank 6)
-
-New substrate follow-up to PAN-4801: once siblings are rebased after each merge, PAN-4772 re-requests review for every one, so review load grows quadratically. Carrying the approval when git patch-id is unchanged removes that cost. It takes the free rank 6, after its PAN-4801 dependency; needs-handoff (TENET-10) because it touches merge-gate trust.
+New in-pipeline substrate bug: pan close --force failed three times on 2026-11-02 for merged PRs because readPullRequest in dod-gate.ts turns any forge lookup error into "no PR" and fetchIssuePullRequest caches the error. The fix is small and well-specified (typed read-failure row, one retry, no error caching, log the cause). It takes rank 6, freed when PAN-4803 closed, so no other node moves.
 
 ### PAN-4733 (rank 7)
 
@@ -898,10 +886,6 @@ Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as 
 ### PAN-4690 (rank 8)
 
 New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).
-
-### PAN-4813 (rank 9)
-
-New issue that entered the pipeline before this pass (live workspace feature-pan-4813), so it is pinned rather than ranked. It takes the free rank-9 slot so no other node moves. The PRD is complete with verified ids and decisions; the only open point is the native-alias checkpoint in WI-4, which has a stated fallback.
 
 ### PAN-4554 (rank 10)
 
@@ -1187,6 +1171,18 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
+### PAN-3205 (rank 78)
+
+New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
+
+### PAN-3118 (rank 79)
+
+Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
+
+### PAN-3106 (rank 80)
+
+New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1194,10 +1190,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T15:35:00.363141Z",
+  "generatedAt": "2026-11-02T16:05:38.784543Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 859,
+  "openCount": 855,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1209,19 +1205,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4801",
-      "rank": 2,
-      "size": "M",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merge train never rebases approved siblings after a merge (reconcile hook unwired), so each merge strands siblings conflicting.",
-      "rationale": "New substrate bug in the merge path, PR in review: runMergeTrainReconcile is only reachable from firePostMergeLifecycle, which no merge door calls, so every merge leaves approved siblings conflicting until the Flywheel relays merge-main by hand (three times on 2026-11-02). It takes the free rank 2 because it throttles every multi-PR merge day. It carries needs-handoff (TENET-10), so it runs as a supervised strike.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1248,21 +1231,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails.",
       "rationale": "Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4803",
-      "rank": 6,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4801"
-      ],
-      "why": "After PAN-4801, carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews.",
-      "rationale": "New substrate follow-up to PAN-4801: once siblings are rebased after each merge, PAN-4772 re-requests review for every one, so review load grows quadratically. Carrying the approval when git patch-id is unchanged removes that cost. It takes the free rank 6, after its PAN-4801 dependency; needs-handoff (TENET-10) because it touches merge-gate trust.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4619,6 +4587,19 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
+      "issue": "PAN-4820",
+      "rank": 272,
+      "size": "XL",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Run one issue on Deft Directive pipeline (hidden temp install, merge guard, native dashboard view, switch back); decisions made",
+      "rationale": "New issue: XL operator-owned Deft feature with decisions and fallback checkpoints recorded; placed in the open gap after the Deft dashboard controls (PAN-4426) since it builds on the same src/lib/deft surface and is feature work, not substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2237",
       "rank": 273,
       "size": "S",
@@ -4669,6 +4650,21 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
+      "issue": "PAN-4811",
+      "rank": 277,
+      "size": "M",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4743"
+      ],
+      "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; split out of PAN-4743, which must land its Fly target door first.",
+      "rationale": "New issue filed 2026-11-02: PAN-4743's plan ships Fly (new VM) for conversations only, so lane provisioning and the per-run VM cap move here. It needs startFlyTarget from in-pipeline PAN-4743, so it takes the free rank 277 directly behind it with no other node moving.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4756",
       "rank": 278,
       "size": "L",
@@ -4691,6 +4687,21 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image.",
       "rationale": "New, found while planning PAN-4682; sits next to it because both fix the Fly image path, and until it ships Fly VMs miss the #4652/#4296 Dockerfile changes. Workflow edits need an SSH push and the secret needs an operator.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4817",
+      "rank": 279,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4778"
+      ],
+      "why": "Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification.",
+      "rationale": "New issue filed 2026-11-02 during PAN-4743's live verification: registry.fly.io/pan-workspaces:latest is the June image, so pan serve rejects --no-open and provisioning rolls the VM back. It is the visible symptom of PAN-4778 (the image CI never publishes), so it takes the free rank 279 directly behind PAN-4778 with no other node moving; a one-off manual image push can clear it sooner, but that needs operator Fly credentials.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5068,19 +5079,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "condition": "ok",
       "dependsOn": [],
       "why": "enhancement(security): API key at-rest hardening",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4740",
-      "rank": 312,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Pooled link channel reused after the Fly proxy closes the idle socket: first request fails with 'socket hang up', retry works.",
-      "rationale": "New bug from the PAN-4652 live check; a retry succeeds, so impact is a flaky first request after idle rather than lost work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7324,18 +7322,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items",
       "rationale": "New this run: medium/48 — Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4741",
-      "rank": 496,
-      "size": "S",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fly machine advertises unreachable private 172.19.x lan routes ranked before its public route; every reconnect probes dead routes first.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11834,62 +11820,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-4810",
-      "rank": 5,
-      "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Verification merges main into a stale workspace, never the PR head; handoff-pushed PRs verify the wrong tree and never reach review",
-      "rationale": "New since the prior run. Verification syncs main into the workspace without first moving it to origin/<branch>, so any PR whose commits arrive from a handoff worktree, a train sibling rebase or a suggestion commit is verified on a stale tree and silently never dispatched to review; three PRs (PAN-4772, PAN-4785, PAN-4801) stalled five hours on it. It is substrate pipeline machinery with a concrete fix direction, so it ranks in the critical top tier beside the merge-train and adoption fixes it unblocks. Labeled needs-handoff (TENET-10): supervised handoff only.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4811",
-      "rank": 277,
-      "size": "M",
-      "importance": "medium",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4743"
-      ],
-      "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; split out of PAN-4743, which must land its Fly target door first.",
-      "rationale": "New issue filed 2026-11-02: PAN-4743's plan ships Fly (new VM) for conversations only, so lane provisioning and the per-run VM cap move here. It needs startFlyTarget from in-pipeline PAN-4743, so it takes the free rank 277 directly behind it with no other node moving.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4813",
-      "rank": 9,
-      "size": "M",
-      "importance": "medium",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add Kimi K3.1 Pro + Highspeed on Claude Code, kimi-code and ACP routes; already in pipeline, so pinned near the top.",
-      "rationale": "New issue that entered the pipeline before this pass (live workspace feature-pan-4813), so it is pinned rather than ranked. It takes the free rank-9 slot so no other node moves. The PRD is complete with verified ids and decisions; the only open point is the native-alias checkpoint in WI-4, which has a stated fallback.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4817",
-      "rank": 279,
-      "size": "S",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4778"
-      ],
-      "why": "Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification.",
-      "rationale": "New issue filed 2026-11-02 during PAN-4743's live verification: registry.fly.io/pan-workspaces:latest is the June image, so pan serve rejects --no-open and provisioning rolls the VM back. It is the visible symptom of PAN-4778 (the image CI never publishes), so it takes the free rank 279 directly behind PAN-4778 with no other node moving; a one-off manual image push can clear it sooner, but that needs operator Fly credentials.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4819",
       "rank": 874,
       "size": "XS",
@@ -11901,6 +11831,19 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       ],
       "why": "Operator-run throwaway for the PAN-4734 live Fly check; closed without merging. Not Flywheel work, so it sits at the bottom.",
       "rationale": "New issue filed 2026-11-02 as the WI-14 live checkpoint for PAN-4734 (pan start --remote on Fly). It carries no product value and is closed unmerged once the check is recorded, so it takes the free bottom rank and no other node moves.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4821",
+      "rank": 6,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Close-out says no PR found when the forge read fails transiently; dod-gate maps every lookup error to null and caches it.",
+      "rationale": "New in-pipeline substrate bug: pan close --force failed three times on 2026-11-02 for merged PRs because readPullRequest in dod-gate.ts turns any forge lookup error into \"no PR\" and fetchIssuePullRequest caches the error. The fix is small and well-specified (typed read-failure row, one retry, no error caching, log the cause). It takes rank 6, freed when PAN-4803 closed, so no other node moves.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13048,13 +12991,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "confidence": 1
     },
     {
-      "from": "PAN-4740",
-      "to": "PAN-4741",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-4705",
       "to": "PAN-4746",
       "type": "informs",
@@ -13090,43 +13026,8 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "confidence": 1
     },
     {
-      "from": "PAN-4740",
-      "to": "PAN-4760",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4741",
-      "to": "PAN-4760",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-4671",
       "to": "PAN-4773",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4801",
-      "to": "PAN-4803",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4702",
-      "to": "PAN-4803",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4810",
-      "to": "PAN-4801",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
@@ -13165,6 +13066,20 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-4426",
+      "to": "PAN-4820",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4821",
+      "to": "PAN-4547",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }

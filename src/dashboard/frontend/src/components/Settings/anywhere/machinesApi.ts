@@ -66,6 +66,20 @@ export async function linkMachine(input: LinkMachineInput): Promise<ApiResult<Ma
   }));
 }
 
+export interface AddFlyMachineResponse {
+  link: MachineLinkView;
+  record: { label: string; appName: string; region: string; docker: boolean };
+}
+
+/** PAN-4743: POST /api/machines/fly, the route `pan machines add-fly` calls (3–10 min with a clone). */
+export async function addFlyMachine(input: { projectKey?: string; region?: string }): Promise<ApiResult<AddFlyMachineResponse>> {
+  return readResult(await fetch('/api/machines/fly', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(input),
+  }));
+}
+
 export async function unlinkMachine(id: string): Promise<ApiResult<{ ok: true; peerNotified: boolean }>> {
   return readResult(await fetch(`/api/machines/${encodeURIComponent(id)}`, {
     method: 'DELETE',

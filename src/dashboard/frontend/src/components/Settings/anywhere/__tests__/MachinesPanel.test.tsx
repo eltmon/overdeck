@@ -210,4 +210,12 @@ describe('MachinesPanel (PAN-4645 WI-20)', () => {
     const devices = document.querySelector('[data-component="anywhere-devices-panel"]')!;
     expect(devices.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it('ac1/ac2 (PAN-4743): Add a Fly machine opens the Add-a-Fly-machine dialog', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<MachinesPanel />);
+    const button = await screen.findByRole('button', { name: 'Add a Fly machine' });
+    await user.click(button);
+    expect(document.querySelector('[data-component="add-fly-machine-dialog"]')).toBeTruthy();
+  });
 });
