@@ -30,7 +30,7 @@
  * is called out here: build first, then run this spec.
  */
 
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -140,12 +140,26 @@ function readLog(logPath: string): string {
 }
 
 /**
- * Boot a dashboard nothing else shares. Always `await stop()` in teardown —
- * a leaked server holds its port and its temp home for the life of the machine.
+ * True when the child's captured output holds the fatal bind error. The
+ * server's transient `HTTP bind failed with EADDRINUSE; retry N/3` warnings
+ * do not match: a child can log one and still bind.
  */
-export async function startIsolatedDashboard(opts: IsolatedDashboardOptions = {}): Promise<IsolatedDashboard> {
-  const home = opts.home ?? mkdtempSync(join(tmpdir(), 'overdeck-e2e-home-'));
-  const port = opts.port ?? (await pickPort());
+export function isAddressInUseOutput(output: string): boolean {
+  return /listen EADDRINUSE: address already in use/.test(output);
+}
+
+class FixtureBootError extends Error {
+  constructor(message: string, readonly output: string, readonly exited: boolean) {
+    super(message);
+  }
+}
+
+/** Boot one child on `port`, failing with a `FixtureBootError` (home kept) on any boot problem. */
+async function bootOnce(
+  home: string,
+  port: number,
+  env: Record<string, string> | undefined,
+): Promise<IsolatedDashboard> {
   const baseUrl = `http://127.0.0.1:${port}`;
   const logPath = join(home, 'server.log');
 
@@ -160,10 +174,12 @@ export async function startIsolatedDashboard(opts: IsolatedDashboardOptions = {}
       OVERDECK_DISABLE_AUTO_MERGE: '1',
       // fix10: never let a UAT host reach a Herdr session.
       OVERDECK_TERMINAL_BACKEND: 'tmux',
-      ...opts.env,
+      ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+
+  const closed = new Promise<void>((done) => child.once('close', () => done()));
 
   const chunks: string[] = [];
   child.stdout?.on('data', (c: Buffer) => chunks.push(c.toString()));
@@ -189,12 +205,43 @@ export async function startIsolatedDashboard(opts: IsolatedDashboardOptions = {}
   try {
     await waitForHealth(baseUrl, child, { logPath });
   } catch (err) {
-    // Surface the server's own output; a boot failure is otherwise mute.
-    // eslint-disable-next-line no-console
-    console.error(chunks.join('').split('\n').slice(-40).join('\n'));
-    await stop();
-    throw err;
+    // Wait for stdio to drain so the captured output is complete before we
+    // read it; `exit` (which sets exitCode) can fire before the last chunk.
+    await Promise.race([closed, new Promise((r) => setTimeout(r, 2_000))]);
+    await stop({ keepHome: true });
+    const exited = child.exitCode !== null || child.signalCode !== null;
+    throw new FixtureBootError(err instanceof Error ? err.message : String(err), chunks.join(''), exited);
   }
 
   return { baseUrl, port, home, stop };
+}
+
+/**
+ * Boot a dashboard nothing else shares. Always `await stop()` in teardown —
+ * a leaked server holds its port and its temp home for the life of the machine.
+ */
+export async function startIsolatedDashboard(opts: IsolatedDashboardOptions = {}): Promise<IsolatedDashboard> {
+  const home = opts.home ?? mkdtempSync(join(tmpdir(), 'overdeck-e2e-home-'));
+  const explicitPort = opts.port !== undefined;
+  const firstPort = opts.port ?? (await pickPort());
+  try {
+    try {
+      return await bootOnce(home, firstPort, opts.env);
+    } catch (err) {
+      // A fresh port only when we chose the first one: an explicit port is a
+      // restart the open page depends on (pan-4279-degraded-mode.spec.ts).
+      const lostPort =
+        err instanceof FixtureBootError && err.exited && isAddressInUseOutput(err.output);
+      if (explicitPort || !lostPort) throw err;
+      return await bootOnce(home, await pickPort({ exclude: [firstPort] }), opts.env);
+    }
+  } catch (err) {
+    if (err instanceof FixtureBootError) {
+      // Surface the server's own output; a boot failure is otherwise mute.
+      // eslint-disable-next-line no-console
+      console.error(err.output.split('\n').slice(-40).join('\n'));
+    }
+    rmSync(home, { recursive: true, force: true });
+    throw err;
+  }
 }
