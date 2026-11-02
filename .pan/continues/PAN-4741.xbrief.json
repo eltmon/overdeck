@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4741",
   "created": "2026-11-02T12:35:33.008Z",
-  "updated": "2026-11-02T12:48:00.974Z",
+  "updated": "2026-11-02T12:48:29.010Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,6 +28,10 @@
     "public-link-only-no-advertise.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T12:48:00.973Z"
+    },
+    "public-link-only-no-advertise.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T12:48:29.010Z"
     }
   }
 }
