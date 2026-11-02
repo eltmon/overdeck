@@ -371,6 +371,10 @@ With no Fly machine record, none calls the Fly API.
 | `syncFlyCodexAuth` | every 60 s | For each linked Fly machine whose record has a `codexAuthPath`, reads the VM's Codex `auth.json` and decides by newest refresh wins: copies a newer same-account VM refresh home (atomic write), otherwise copies home's sign-in to the VM when the two differ. A VM that does not answer is skipped until the next tick. With no such record it makes no Fly API call. | keeps running |
 | `sweepFlyMachines` | every 60 s | Destroys the machine, removes its link and deletes its record when the Fly API reports it `stopped`, `destroyed` or `failed` or answers 404; when no unreleased linked conversation on it has been active for `[remote.fly] machine_idle_minutes` (default 30, 0 disables); or when provisioning never linked it within 30 min. Any other API error leaves it alone. | keeps running |
 
+A rejected Fly token (PAN-4748) shows as `Fly token rejected (<status>)` in each loop's
+line instead of a raw API error; `sweepFlyMachines` keeps the record rather than
+destroying it on one.
+
 The heartbeat and credential refresh run in `src/lib/cloister/hygiene-scheduler.ts`;
 the reap runs last in `runDeaconLite()` through `src/lib/cloister/remote-reap-routine.ts`.
 Before the reap destroys or stops a machine, it copies the session transcripts and
@@ -422,8 +426,26 @@ throws `Fly API token not found`.
 **Fix:**
 1. Verify the token is exported: `echo $FLY_API_TOKEN`
 2. Check token validity: <https://fly.io/user/personal_access_tokens>
-3. Alternatively, authenticate via CLI: `fly auth login` — the provider falls back to
-   the CLI session when no `FLY_API_TOKEN` is set.
+3. Alternatively, authenticate via CLI: `fly auth login` — the provider reads flyctl's
+   stored login (`~/.fly/config.yml`) when no `FLY_API_TOKEN` (or the variable
+   `remote.fly.api_token_env` names) is set.
+
+**Fly token rejected (403)**
+
+Overdeck uses flyctl's stored login when no `FLY_API_TOKEN` is set. That token expires
+quickly, and flyctl refreshes it only when flyctl itself runs. Overdeck now runs `flyctl
+auth token` once after a 401/403 and retries the same request with the refreshed token
+(PAN-4748). If that refresh also fails — flyctl is not installed, or the stored login is
+older than 30 days — every operator-facing surface (the deacon loop lines, `pan machines
+add-fly`/`unlink` errors, and `pan doctor`) says `Fly token rejected`.
+
+**Fix:** run `fly auth login` to refresh the stored login. For a host where nobody runs
+`fly` interactively (a server, a CI runner), mint a long-lived token instead and export it
+as `FLY_API_TOKEN` (for example in `~/.overdeck.env`):
+
+```bash
+fly tokens create deploy -a <app> --expiry <duration>
+```
 
 ---
 

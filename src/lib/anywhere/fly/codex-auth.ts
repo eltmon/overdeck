@@ -26,6 +26,7 @@ import { dirname, join } from 'node:path';
 
 import { classifyNativeCodexAuth, getNativeCodexAuthPath } from '../../codex-auth.js';
 import { resolveHarnessBinary } from '../../harness-binary.js';
+import { isFlyAuthError, type FlyApiError } from '../../remote/fly-api.js';
 import { shellQuote } from '../../remote/remote-tmux.js';
 import { detached, FlyMachineError, type FlyMachineErrorCode, INSTALL_POLL, pollUntil } from './provision-shared.js';
 
@@ -47,7 +48,10 @@ export type CodexAuthSyncAction = 'push' | 'pull' | 'none';
 /** One command on the VM through the Machines exec API. */
 export type FlyExec = (command: string, timeoutSeconds: number) => Promise<{ stdout: string; stderr: string; exit_code: number }>;
 
-export type VmCodexAuthRead = { state: 'present'; raw: string } | { state: 'missing' } | { state: 'indeterminate' };
+export type VmCodexAuthRead =
+  | { state: 'present'; raw: string }
+  | { state: 'missing' }
+  | { state: 'indeterminate'; tokenRejected?: FlyApiError };
 
 export interface HomeCodexState {
   binary: string;
@@ -157,8 +161,8 @@ export async function readVmCodexAuth(exec: FlyExec, path: string): Promise<VmCo
   let result: Awaited<ReturnType<FlyExec>>;
   try {
     result = await exec(`if [ -f ${quoted} ]; then cat ${quoted}; else printf ${MISSING_MARKER}; fi`, READ_TIMEOUT_SECONDS);
-  } catch {
-    return { state: 'indeterminate' };
+  } catch (error) {
+    return isFlyAuthError(error) ? { state: 'indeterminate', tokenRejected: error } : { state: 'indeterminate' };
   }
   if (result.exit_code !== 0) return { state: 'indeterminate' };
   if (result.stdout === MISSING_MARKER) return { state: 'missing' };
