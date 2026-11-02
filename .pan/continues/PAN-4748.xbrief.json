@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4748",
   "created": "2026-11-02T03:23:38.611Z",
-  "updated": "2026-11-02T05:23:51.564Z",
+  "updated": "2026-11-02T05:24:08.845Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "unlink-rollback-token-rejected.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T05:23:51.564Z"
+    },
+    "unlink-rollback-token-rejected.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:24:08.844Z"
     }
   }
 }
