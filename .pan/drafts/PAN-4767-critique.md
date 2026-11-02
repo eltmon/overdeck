@@ -1,0 +1,9 @@
+plan-digest: 1095c2b254f076726dcfc78ea0f0ed244b254b81314f63242ad19bf75e70c13d
+
+## sharpens-framing: Skills import cost remains possible
+
+The CSS exclusion is verified at `tests/e2e/styleguide-conformance.spec.ts:382-395`, but the PRD's broader claim that the redesign cannot affect this test's timing does not follow. The Command Deck statically imports `ProjectSettingsDisclosure` (`src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx:15`), which imports `ProjectSkillsSection` (`ProjectSettingsDisclosure.tsx:6`), which imports `SkillOverridesPanel` (`src/dashboard/frontend/src/components/skills/SkillOverridesSections.tsx:10`). `git show --stat a443ff0619a` shows substantial edits to that panel and related Skills modules. An empty fetch result prevents groups from rendering; it does not remove these modules from Vite's transform and browser parse work. Earlier retries establish a preexisting six-load budget problem, but do not measure the redesign's incremental cost. Narrow the diagnosis to those proven points and describe the incremental JavaScript cost as unmeasured; the proposed split can stay unchanged.
+
+## sharpens-framing: Documentation budget is overgeneralized
+
+WI-2 says browser specs under `tests/e2e/*.spec.ts` run in default unit shards and should keep at most three page loads within a 45-second `it` budget. That budget belongs to this file: `tests/e2e/styleguide-conformance.spec.ts:454,473,502` uses 45,000 ms, while `tests/e2e/merge-train.spec.ts:318,330` and `tests/e2e/issue-tree.spec.ts:319,340` use 60,000 ms, and `tests/e2e/linked-conversation-title-bar.spec.ts:149` uses 120,000 ms. The last file is also excluded from blocking shards by `scripts/flaky-quarantine.txt:10` and `vitest.config.ts:55-57`. Scope the 45-second and three-load guidance to the styleguide spec, or say that each browser test must budget loads against its own timeout. Qualify the shard statement as applying to non-quarantined specs.

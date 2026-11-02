@@ -65,5 +65,9 @@
 - Playwright `getByRole(..., { name })` is a case-insensitive substring match (testing-library's is
   whole-string): use `exact: true` for short names like `Yes`, and build e2e fixture timestamps
   from `Date.now()` (PAN-4757).
+- Browser specs (`tests/e2e/*.spec.ts`: Vite dev server + Chromium) run inside the default unit
+  shards. A fresh-context `page.goto` costs ~5–7 s on a loaded CI runner, so give each route its
+  own `it` and keep an `it` to ≤3 page loads within its 45 s budget (PAN-4767); the serial
+  browser lane is PAN-4733.
 
 <!-- last-verified: 2026-11-01 -->

@@ -1,0 +1,207 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T02:16:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4767: main red: styleguide-conformance spec times out since the Skills page redesign (a443ff0619a, index.css)",
+    "updated": "2026-11-02T02:20:22.839Z"
+  },
+  "plan": {
+    "id": "pan-4767",
+    "title": "main red: styleguide-conformance spec times out since the Skills page redesign (a443ff0619a, index.css)",
+    "status": "running",
+    "uid": "57f1c279-18ae-41b2-833c-419509fbffdf",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T02:16:04Z",
+    "updated": "2026-11-02T02:20:22.839Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4767",
+        "label": "PAN-4767",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4733",
+        "label": "PAN-4733 (structural browser-lane follow-up, out of scope)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "ci",
+      "flaky-test",
+      "e2e",
+      "styleguide",
+      "main-red"
+    ],
+    "narratives": {
+      "Problem": "tests/e2e/styleguide-conformance.spec.ts:417, the six-route it 'renders shared primitives on Pipeline, Board, Command Deck, and Agents routes', timed out at 45 s on both attempts in main CI runs #12510 (a443ff0619a) and #12514 (68258a2c4bd). The issue blames a443ff0619a's index.css, but the spec's styleguide-empty-index-css Vite plugin replaces index.css with a two-rule stub, so that CSS never reaches the test. The real cause: the it opens six routes, each a fresh-context full load of the unbundled Vite dev app (~6-7 s each on a slow CI runner), inside one 45 s budget. Since at least 2026-10-24 it has timed out on the first attempt on every slow runner and passed only on the retry, and the retry time has grown from 35 s to 44 s. #12510 and #12514 are the first runs where the retry also crossed 45 s.",
+      "Proposal": "Split the six-route it into six its, one per route (Pipeline, Board, Command Deck, Agents Live, Agents History, issue drawer), each copying its block's assertions verbatim and keeping the 45_000 per-it budget. No timeout value changes and nothing is quarantined. Document the browser-spec page-load budget in docs/TESTING.md. The structural move of browser specs out of the unit shards stays with PAN-4733.",
+      "NonGoals": "- No change to any timeout value: per-it 45_000, renderPoll { timeout: 10_000, interval: 100 }, beforeAll 30_000\n- No entry in scripts/flaky-quarantine.txt and no .skip, .only or skipIf\n- No edit to src/dashboard/frontend/src/index.css, src/dashboard/frontend/src/components/SkillsList.tsx or src/dashboard/frontend/src/components/skills/*; the Skills page redesign stays as shipped\n- No move or rename of tests/e2e/styleguide-conformance.spec.ts, no tests/e2e/browser/ lane, no vitest.config.ts or .github/workflows change (PAN-4733)\n- No shared BrowserContext, Vite server.warmup, it.each parametrisation or client-side route navigation\n- No change to the other two its in the spec ('agents page opens Live, ...' and 'enforces visual contracts ...')"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Treat the issue's root-cause hypothesis (a443ff0619a's index.css) as disproved and fix the real cause instead of editing CSS or the Skills components.",
+        "rationale": "The spec's styleguide-empty-index-css plugin (spec lines 381-395) replaces index.css with a stub, the Skills panel renders no groups under the spec's {} fetch mock, and CI history shows the same it needing (retry x1) on slow runners since 2026-10-24, before a443ff0619a existed. The issue's acceptance (spec passes, Skills redesign intact) and constraints (no timeout raise, no quarantine) are still met, so this is not a contradiction that requires halting."
+      },
+      {
+        "summary": "Split the six-route it into exactly one it per route, keeping 45_000 on each.",
+        "rationale": "Measured cost is one cold load plus ~6-7 s per route on a slow CI runner. One route per it gives each page load the full 45 s budget the file already uses, names the failing route in the test title, and needs no timeout change. Two routes per it would fit today but leaves less headroom as the app grows."
+      },
+      {
+        "summary": "Do not use a shared browser context or Vite server.warmup.",
+        "rationale": "Measured locally on two pinned cores: a shared context saved ~10% per route and warmup saved ~1 s on the cold load. Neither is needed once the it is split, and both add code."
+      },
+      {
+        "summary": "Leave the structural fix (serial browser lane, file move) to PAN-4733.",
+        "rationale": "PAN-4733 is open and owns moving all four browser specs to tests/e2e/browser/*.slow.test.ts. Doing it here would duplicate and conflict with that plan."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Two files; single-subsystem test change plus one docs bullet.",
+      "canonicalFilename": "2026-11-02-PAN-4767-main-red-styleguide-conformance-spec-times-out-since-the-skills-page-redesign-a443ff0619a-index-css.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "split-styleguide-route-its",
+        "title": "Split the six-route styleguide it into one it per route with a 45 s budget each",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T02:16:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4767",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/e2e/styleguide-conformance.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/e2e/styleguide-conformance.spec.ts --reporter=verbose",
+            "rm -rf /home/eltmon/Projects/overdeck/workspaces/feature-pan-4767/src/dashboard/frontend/node_modules/.vite && taskset -c 0,1 npx vitest run tests/e2e/styleguide-conformance.spec.ts --reporter=verbose",
+            "npm run lint",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports 8 passed tests in tests/e2e/styleguide-conformance.spec.ts",
+            "on the cold two-core run every test line reports under 25000ms",
+            "npm run lint exits 0",
+            "npm run typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Edit only tests/e2e/styleguide-conformance.spec.ts. Replace the it at lines 417-454 (grep anchor: it('renders shared primitives on Pipeline, Board, Command Deck, and Agents routes') with six its, in this order and with these exact titles: 'renders shared primitives on the Pipeline route', 'renders shared primitives on the Board route', 'renders shared primitives on the Command Deck route', 'renders shared primitives on the Agents Live route', 'renders shared primitives on the Agents History route', 'renders the issue drawer action bar on the Pipeline route'. Each new it's body is the matching block of the old it copied verbatim: its openRoute(...) call, every expect.poll(...) line (same locator, same renderPoll, same matcher), the Command Deck getByText('Overdeck', { exact: true }).nth(1).click() line and its '// CommandDeck uses FeatureItem' comment, the drawer's const drawerActionBar line, and its await <name>.context.close(); line. Each new it ends with }, 45_000);. Write six literal its: no helper function, no loop, no it.each. Do not touch renderPoll, beforeAll, afterAll, fixtures, helpers, or the other two its. The PRD (.pan/drafts/PAN-4767.md, WI-1) has the full after-snippet. Repo rules: never add .skip/.only/skipIf; never edit scripts/flaky-quarantine.txt; delete commands use literal paths only; commit with an 'Item: split-styleguide-route-its' trailer; run npx vitest run on this file, npm run lint and npm run typecheck before pan done, never the full npm test."
+        },
+        "items": [
+          {
+            "id": "split-styleguide-route-its.ac1",
+            "title": "Given the edited spec, when grepping tests/e2e/styleguide-conformance.spec.ts, then the old title 'renders shared primitives on Pipeline, Board, Command Deck, and Agents routes' returns 0 matches and each of the six new titles returns exactly 1 match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-styleguide-route-its.ac2",
+            "title": "Given the frontend node_modules/.vite cache is removed, when running taskset -c 0,1 npx vitest run tests/e2e/styleguide-conformance.spec.ts --reporter=verbose, then vitest reports 8 passed tests and no test line exceeds 25000ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-styleguide-route-its.ac3",
+            "title": "Given the PR diff, when running git diff origin/main -- tests/e2e/styleguide-conformance.spec.ts, then every it ends with 45_000, renderPoll is unchanged, and the only changed lines are inside the replaced six-route it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-styleguide-route-its.ac4",
+            "title": "Given the PR, when running git diff --name-only origin/main, then it lists no file under src/dashboard/frontend/src/, no scripts/flaky-quarantine.txt, no vitest.config.ts and nothing under .github/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-styleguide-route-its.ac5",
+            "title": "Given the PR's CI run, when reading the test-shard log that runs tests/e2e/styleguide-conformance.spec.ts, then all eight tests in that file are reported as passed and none of the six per-route tests shows (retry x1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-browser-spec-page-load-budget",
+        "title": "Document the browser-spec page-load budget in docs/TESTING.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T02:16:04Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4767",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TESTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'keep an `it` to at most three page loads' docs/TESTING.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep prints exactly one line, which also names PAN-4767 and PAN-4733",
+            "npm run lint exits 0"
+          ],
+          "readiness": "ready",
+          "acJustification": "A one-bullet docs change has two independent observable checks: the bullet's content and its placement.",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In docs/TESTING.md, in the '### `data-testid` Convention' section's **Rules:** list, add one bullet directly after the bullet that starts '- E2E fixture timestamps that the UI renders as relative time'. The bullet text, verbatim: '- Browser specs under `tests/e2e/*.spec.ts` run inside the default unit shards. Each `openRoute()`/`page.goto` in a fresh browser context is a full load of the unbundled Vite dev app, about 5–7 s on a loaded CI runner, so give each route its own `it` and keep an `it` to at most three page loads within its 45 s budget (PAN-4767). Moving these specs to a serial lane is PAN-4733.' Do not edit .overdeck/context/codebase/conventions.md (planning already added the matching line). Commit with an 'Item: docs-browser-spec-page-load-budget' trailer."
+        },
+        "items": [
+          {
+            "id": "docs-browser-spec-page-load-budget.ac1",
+            "title": "Given docs/TESTING.md, when running grep -n 'keep an `it` to at most three page loads' docs/TESTING.md, then it prints exactly one line and that line contains PAN-4767 and PAN-4733",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-browser-spec-page-load-budget.ac2",
+            "title": "Given docs/TESTING.md, when reading the Rules list, then the new bullet renders immediately after the 'E2E fixture timestamps that the UI renders as relative time' bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}
