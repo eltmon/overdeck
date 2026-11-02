@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4739",
+  "created": "2026-11-02T06:14:09.782Z",
+  "updated": "2026-11-02T06:14:09.782Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "patrol-door-confirm": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4739",
+      "claimedAt": "2026-11-02T06:14:09.782Z"
+    }
+  }
+}
