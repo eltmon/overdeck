@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4696",
   "created": "2026-11-02T16:17:12.298Z",
-  "updated": "2026-11-02T16:47:00.651Z",
+  "updated": "2026-11-02T16:47:18.809Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "smoke-launch-remote.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T16:47:00.651Z"
+    },
+    "smoke-launch-remote.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:47:18.809Z"
     }
   }
 }
