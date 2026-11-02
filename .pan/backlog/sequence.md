@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T04:21:22.093225Z · model: claude-opus-5-5 · open: 873_
+_Last sequenced: 2026-11-02T04:23:21.936420Z · model: claude-opus-5-5 · open: 874_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -28,6 +28,7 @@ _Last sequenced: 2026-11-02T04:21:22.093225Z · model: claude-opus-5-5 · open: 
 | 19 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 20 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 21 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
+| 21 | PAN-4785 | M | high | ok |  |  | pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff. |
 | 22 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 23 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 24 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
@@ -973,6 +974,10 @@ New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network
 
 New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.
 
+### PAN-4785 (rank 21)
+
+New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.
+
 ### PAN-4746 (rank 22)
 
 New flaky-test bug: a background membership-snapshot write races the test's teardown rmSync and turned an unrelated PR's CI shard red. Ranked next to PAN-4705, the same leaked-async-work-vs-teardown pattern, because each red shard costs a PR a rerun on the path to merge.
@@ -1197,10 +1202,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
-### PAN-3205 (rank 78)
-
-New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1208,10 +1209,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T04:21:22.093225Z",
+  "generatedAt": "2026-11-02T04:23:21.936420Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 873,
+  "openCount": 874,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12097,6 +12098,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "rationale": "New issue: small, well-scoped docs fix with mechanical ACs; placed in a free medium-tier slot beside comparable XS/S doc hygiene work.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4785",
+      "rank": 21,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff.",
+      "rationale": "New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13422,6 +13436,13 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4785",
+      "to": "PAN-4636",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
