@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4827",
   "created": "2026-11-02T16:36:08.290Z",
-  "updated": "2026-11-02T19:05:19.436Z",
+  "updated": "2026-11-02T19:05:36.494Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -230,6 +230,10 @@
     "settings-route-dead-ids.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T19:05:19.436Z"
+    },
+    "tier-invariant-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:05:36.493Z"
     }
   }
 }
