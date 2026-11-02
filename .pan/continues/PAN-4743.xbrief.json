@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T14:59:04.727Z",
+  "updated": "2026-11-02T14:59:20.709Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,10 @@
     "docs-fly-new-vm.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T14:59:04.727Z"
+    },
+    "docs-fly-new-vm.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:59:20.708Z"
     }
   }
 }
