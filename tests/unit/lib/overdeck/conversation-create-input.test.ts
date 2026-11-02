@@ -1,5 +1,5 @@
 /** PAN-4486: POST /api/conversations request-body parsing. */
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -92,6 +92,24 @@ describe('resolveConversationCreateTarget (PAN-4486)', () => {
     ['a relative path', () => 'packages/web'],
   ])('rejects %s', async (_label, cwd) => {
     await expect(resolveConversationCreateTarget({ projectKey: 'myapp', cwd: cwd() }, '/default'))
+      .rejects.toThrow('Invalid cwd: must be inside project myapp');
+  });
+
+  it('accepts a cwd inside a project outside this server\'s home, as on a Fly machine (PAN-4734)', async () => {
+    const home = state.home;
+    state.home = realpathSync(mkdtempSync(join(tmpdir(), 'create-input-other-home-')));
+    try {
+      await expect(resolveConversationCreateTarget({ projectKey: 'myapp', cwd: join(state.project, 'packages', 'web') }, '/default'))
+        .resolves.toEqual({ cwd: join(state.project, 'packages', 'web'), projectKey: 'myapp' });
+    } finally {
+      rmSync(state.home, { recursive: true, force: true });
+      state.home = home;
+    }
+  });
+
+  it('rejects a file inside the project', async () => {
+    writeFileSync(join(state.project, 'README.md'), 'x');
+    await expect(resolveConversationCreateTarget({ projectKey: 'myapp', cwd: join(state.project, 'README.md') }, '/default'))
       .rejects.toThrow('Invalid cwd: must be inside project myapp');
   });
 

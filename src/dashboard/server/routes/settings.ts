@@ -106,7 +106,7 @@ const readJsonBody = Effect.gen(function* () {
 /** Model ID to API model ID mapping */
 export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   // OpenAI models: real OpenAI ids (identity map). Codex sign-in routes through CLIProxy; API key direct.
-  'gpt-6-sol': { apiModel: 'gpt-6-sol' }, 'gpt-6-luna': { apiModel: 'gpt-6-luna' }, 'gpt-6.1-sol': { apiModel: 'gpt-6.1-sol' }, 'gpt-6.1-terra': { apiModel: 'gpt-6.1-terra' },
+  'gpt-6-sol': { apiModel: 'gpt-6-sol' }, 'gpt-6-luna': { apiModel: 'gpt-6-luna' }, 'gpt-6.1-sol': { apiModel: 'gpt-6.1-sol' }, 'gpt-6.1-terra': { apiModel: 'gpt-6.1-terra' }, 'gpt-6-rosalind': { apiModel: 'gpt-6-rosalind' }, 'gpt-6-astra-law': { apiModel: 'gpt-6-astra-law' },
   'gpt-5.6-sol': { apiModel: 'gpt-5.6-sol' },
   'gpt-5.6-terra': { apiModel: 'gpt-5.6-terra' },
   'gpt-5.6-luna': { apiModel: 'gpt-5.6-luna' },
@@ -141,15 +141,15 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   // MiniMax models
   'minimax-m2.7': { apiModel: 'minimax-m2.7' },
   'minimax-m2.7-highspeed': { apiModel: 'minimax-m2.7-highspeed' },
-  'MiniMax-M3': { apiModel: 'MiniMax-M3' },
+  'MiniMax-M3': { apiModel: 'MiniMax-M3' }, 'MiniMax-M3.1-Flash': { apiModel: 'MiniMax-M3.1-Flash' },
   // Z.AI models
   'glm-5.2': { apiModel: 'glm-5.2' },
   'glm-5.1': { apiModel: 'glm-5.1' },
   'glm-4.7': { apiModel: 'glm-4.7' },
   'glm-4.7-flash': { apiModel: 'glm-4.7-flash' },
   // MiMo models
-  'mimo-v2.5-pro': { apiModel: 'mimo-v2.5-pro' },
-  'mimo-v2.5': { apiModel: 'mimo-v2.5' },
+  'mimo-v2.6-pro': { apiModel: 'mimo-v2.6-pro' }, 'mimo-v2.6-flash': { apiModel: 'mimo-v2.6-flash' },
+  'mimo-v2.6-pro-ultraspeed': { apiModel: 'mimo-v2.6-pro-ultraspeed' },
   // Nous Portal models
   'qwen/qwen3.6-plus': { apiModel: 'qwen/qwen3.6-plus' },
   // Alibaba DashScope models
@@ -423,7 +423,7 @@ const postTestApiKeyRoute = HttpRouter.add(
         }
 
         case 'mimo': {
-          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'mimo-v2.5-pro') : 'mimo-v2.5-pro';
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'mimo-v2.6-pro') : 'mimo-v2.6-pro';
           try {
             const resp = await fetch('https://token-plan-sgp.xiaomimimo.com/anthropic/v1/messages', {
               method: 'POST',
@@ -672,11 +672,11 @@ const postValidateApiKeyRoute = HttpRouter.add(
             const resp = await fetch('https://token-plan-sgp.xiaomimimo.com/anthropic/v1/messages', {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-              body: JSON.stringify({ model: 'mimo-v2.5-pro', messages: [{ role: 'user', content: 'Hi' }], max_tokens: 1 }),
+              body: JSON.stringify({ model: 'mimo-v2.6-pro', messages: [{ role: 'user', content: 'Hi' }], max_tokens: 1 }),
             });
             if (resp.ok) {
               valid = true;
-              models = ['mimo-v2.5-pro', 'mimo-v2.5'];
+              models = ['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {

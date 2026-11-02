@@ -1,6 +1,5 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bullets 2026-11-02, feature-branch-push bullets 2026-11-01).
 Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, linked-machine pooling and feature-branch-push bullets 2026-11-01/02).
 
 - **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
@@ -132,6 +131,26 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   or every ephemeral watchdog would stop its machine); the reap runs in
   `deacon-lite.ts` via `remote-reap-routine.ts` (behind the freeze). The reap acts
   only on positive evidence: a failed exec is `indeterminate`, never a crash.
+  The deacon child inherits the dashboard's stdout, so its `[deacon-lite]` and
+  `[hygiene-scheduler]` lines land in `~/.overdeck/logs/dashboard.log`, not
+  `deacon.log`. Verified live on the deployed build by PAN-4696 (2026-11-02):
+  the reap and heartbeat loops both fired automatically with no operator
+  command (FR-1, FR-3 passed); PAN-4696's deployed-build check found
+  [#4847](https://github.com/eltmon/overdeck/issues/4847) (automatic reap
+  skips the review request when an unrelated process leaves a tracked
+  workspace file dirty at hand-off).
+- **Remote tmux helpers resolve their target from remote-state** — `getRemoteAgentOutput`,
+  `sendToRemoteAgent(Keyed)`, `killRemoteAgent`, `isRemoteAgentRunning` and the reap's
+  `probeRemoteSession` address `remoteTmuxTarget(agentId)`: a linked work agent's
+  `conv-<name>` on the VM's `overdeck` socket (PAN-4734), else the legacy `agent-<issue>` on
+  home's `getManagedTmuxSocketName()` (`overdeck-<hash>` on a non-default `OVERDECK_HOME`).
+  New code that runs commands in an agent's VM session must use the target, never the agent
+  id. Linked remote-state is also skipped by the spend cap's agent count, the remote heartbeat
+  and the credential refresh (its Fly machine record covers the VM), and the Fly idle sweep
+  never removes a machine hosting a `starting`/`running` linked agent. The legacy VM still
+  disagrees with its prompt about the continue file: `createRemoteWorkspace` writes
+  `/workspace/.pan/continue.json` but the REMOTE prompt names
+  `<workspace>/.overdeck/continue.json`.
 - **Fresh Claude Code state shows startup dialogs that eat the first message** — every
   Fly VM starts with an empty `~/.claude.json` (exec shell `HOME=/`). Each dialog
   Claude Code can show at launch must be pre-answered in
@@ -576,4 +595,8 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   the patrol now confirms through it before ending a row. On the Fly VM the census
   disagreed because tmux without a UTF-8 locale prints `-F` tabs as `_`: any new
   multi-field `-F` reader must pass `-u` (see `listAllPaneRecords` in `src/lib/tmux.ts`).
+- **DoD gate: a failed forge read is not absence** (PAN-4821) — `fetchIssuePullRequest` returns
+  `{ pr: null }` for "no PR" and `{ pr: null, error }` for a failed read. The DoD verdict rows must keep
+  them apart: absence may be waived (strike path, tracker-closed settlement), a failed read may not.
+  Never cache an `error` response in the PR-tab cache, and never collapse a read error to `null`.
 <!-- last-verified: 2026-11-02 -->

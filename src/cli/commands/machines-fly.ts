@@ -39,8 +39,8 @@ export type PostOutcome = { status: number; json: unknown } | { unreachable: str
  * connection that closes before the response completes (a dashboard restart)
  * resolves as unreachable instead of leaving the command waiting forever.
  *
- * Test seam: exported so tests can drive it against a local server; its only
- * production caller is runMachinesAddFly.
+ * Its production callers are runMachinesAddFly and startRemoteWorkAgent
+ * (`pan start --remote`, PAN-4734).
  */
 export async function postWithoutTimeout(base: string, path: string, body: unknown): Promise<PostOutcome> {
   const { ensureInternalToken, INTERNAL_TOKEN_HEADER } = await import('../../lib/internal-token.js');

@@ -84,7 +84,10 @@ export async function refreshClaudeCredentialsForActiveRemoteAgents(
     actions.push(`Fly machine credentials refresh skipped: ${err instanceof Error ? err.message : String(err)}`);
   }
   const targets = [
-    ...activeStates.map((state) => ({ vmName: state.vmName, who: state.issueId.toUpperCase() })),
+    // A linked work agent's VM is a Fly machine and is listed below (PAN-4734 FR-10).
+    ...activeStates
+      .filter((state) => state.linked !== true)
+      .map((state) => ({ vmName: state.vmName, who: state.issueId.toUpperCase() })),
     ...flyMachineNames.map((vmName) => ({ vmName, who: 'Fly machine' })),
   ];
   const activeVmNames = new Set(targets.map((target) => target.vmName));

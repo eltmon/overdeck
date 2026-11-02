@@ -170,7 +170,7 @@ Pi with Anthropic or OpenAI subscription auth requires separate Pi-side auth:
 
 **Test 1: Spawn agent with Anthropic (control)**
 ```bash
-pan start PAN-999 --model claude-sonnet-4-5
+pan start PAN-999 --model claude-sonnet-4-6
 # Verify: Agent spawns normally
 # Verify: No custom env vars set
 ```

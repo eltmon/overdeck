@@ -19,6 +19,7 @@ import { parse } from 'yaml';
 import { Effect, Stream } from 'effect';
 import { getIsolatedPlaywrightMcpConfig } from '../claude-mcp.js';
 import { BYPASS_PERMISSION_MODE, buildClaudeUserSettings } from '../claude-permissions.js';
+import { listFlyMachines } from '../anywhere/fly/machine-store.js';
 import { FlyApiClient, createFlyApiClient, FlyApiError } from './fly-api.js';
 import type { RemoteProvider, VmInfo, VmStatus, ExecResult } from './interface.js';
 import { RemoteError } from './interface.js';
@@ -146,8 +147,10 @@ export class FlyProvider implements RemoteProvider {
   }
 
   /**
-   * Resolve vmName to {appName, machineId} by scanning workspace metadata.
-   * Falls back to listing machines in the app.
+   * Resolve vmName to {appName, machineId} by scanning workspace metadata,
+   * then the Fly machine records (a linked work agent's vmName is its Fly
+   * machine's name, in the app it was provisioned in — PAN-4734). Falls back
+   * to listing machines in the app.
    *
    * Internal helper: returns a Promise because all of its callers compose it
    * inside other Effect-wrapped operations.
@@ -168,6 +171,10 @@ export class FlyProvider implements RemoteProvider {
         }
       }
     }
+
+    // An unreadable store is no answer here; the API listing still is.
+    const record = (await listFlyMachines().catch(() => [])).find((r) => r.machineName === vmName);
+    if (record) return { appName: record.appName, machineId: record.machineId };
 
     // Fallback: search by machine name via API
     const machines = await this.getApi().listMachines(this.config.app);

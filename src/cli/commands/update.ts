@@ -3,17 +3,14 @@
  */
 
 import { exitCli } from '../exit.js';
-import { execFile } from 'child_process';
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { isRuntimePackageRoot } from '../../lib/anywhere/connect-runtime.js';
 import { loadConfigSync } from '../../lib/config.js';
-import { packageRoot } from '../../lib/paths.js';
+import { getOverdeckHome, packageRoot } from '../../lib/paths.js';
 import { syncCommand } from './sync.js';
-import { promisify } from 'util';
-import { UpdateManager } from '../../lib/update-manager.js';
-
-const execFileAsync = promisify(execFile);
+import { installOverdeckPackage, UpdateManager } from '../../lib/update-manager.js';
 
 // Get current installed version
 function getCurrentVersion(): string {
@@ -70,8 +67,10 @@ export async function updateCommand(options: {
   // Perform the update
   console.log(chalk.dim('\nUpdating Overdeck...'));
 
+  const runtimeHome = isRuntimePackageRoot(packageRoot, getOverdeckHome()) ? getOverdeckHome() : null;
+
   try {
-    await execFileAsync('npm', ['install', '--global', `@overdeck/core@${latestVersion}`]);
+    await installOverdeckPackage(latestVersion, runtimeHome);
 
     console.log(chalk.green(`\n✓ Updated to ${latestVersion}`));
     console.log(chalk.dim('Installed package: @overdeck/core'));
@@ -84,15 +83,25 @@ export async function updateCommand(options: {
       await syncCommand({});
     }
 
-    console.log(chalk.dim('\nRestart any running agents to use the new version.'));
+    if (runtimeHome) {
+      console.log(chalk.dim(`\nRestart the dashboard to run it: ${join(runtimeHome, 'runtime', 'node_modules', '.bin', 'pan')} restart --dashboard --now`));
+    } else {
+      console.log(chalk.dim('\nRestart any running agents to use the new version.'));
+    }
   } catch (error) {
     console.error(chalk.red('\nUpdate failed'));
-    console.error(
-      chalk.dim('Try running with sudo: sudo npm install -g @overdeck/core@latest')
-    );
-    console.error(
-      chalk.dim('If you were on overdeck or @eltmon/panctl, rerun the install command above to migrate to @overdeck/core.')
-    );
+    if (runtimeHome) {
+      console.error(
+        chalk.dim(`Install it yourself: npm install --prefix ${join(runtimeHome, 'runtime')} @overdeck/core@latest`)
+      );
+    } else {
+      console.error(
+        chalk.dim('Try running with sudo: sudo npm install -g @overdeck/core@latest')
+      );
+      console.error(
+        chalk.dim('If you were on overdeck or @eltmon/panctl, rerun the install command above to migrate to @overdeck/core.')
+      );
+    }
     return exitCli(1);
   }
 }

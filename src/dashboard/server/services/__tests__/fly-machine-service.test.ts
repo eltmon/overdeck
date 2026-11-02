@@ -225,7 +225,7 @@ describe('project and conversation on the Fly machine (PAN-4652 WI-9)', () => {
 
     expect(deps.ensureProject).toHaveBeenCalledWith({ appName: 'overdeck-ws', machineId: VM.machineId }, 'overdeck');
     expect(deps.notifyLinksChanged.mock.invocationCallOrder[0]).toBeLessThan(deps.ensureProject.mock.invocationCallOrder[0]!);
-    expect(result.conversation).toEqual({ environmentId: ENV_ID, name: 'conv-fly-1', path: `/conv/@${ENV_ID}/conv-fly-1` });
+    expect(result.conversation).toEqual({ environmentId: ENV_ID, name: 'conv-fly-1', path: `/conv/@${ENV_ID}/conv-fly-1`, tmuxSession: 'conv-conv-fly-1' });
   });
 
   it('skips the conversation without a message', async () => {
@@ -246,6 +246,35 @@ describe('project and conversation on the Fly machine (PAN-4652 WI-9)', () => {
       body: { message: 'hi', projectKey: 'overdeck', harness: 'claude-code', model: undefined, effort: 'high' },
     });
     expect(result.path).toBe(`/conv/@${ENV_ID}/conv-fly-1`);
+  });
+
+  it('startFlyConversation sends cwd and issueId and returns the VM tmux session (PAN-4734)', async () => {
+    const linkFetch = vi.fn(async () => ({ status: 201, json: { name: '20261102-1234', tmuxSession: 'conv-20261102-1234' } }));
+    const result = await startFlyConversation(
+      { environmentId: ENV_ID },
+      { message: 'hi', projectKey: 'overdeck', cwd: '/workspace/overdeck/workspaces/feature-pan-1', issueId: 'PAN-1' },
+      { linkFetch },
+    );
+
+    expect(linkFetch).toHaveBeenCalledWith(ENV_ID, '/api/conversations', {
+      method: 'POST',
+      actor: 'operator',
+      body: {
+        message: 'hi', projectKey: 'overdeck', harness: 'claude-code', model: undefined, effort: undefined,
+        cwd: '/workspace/overdeck/workspaces/feature-pan-1', issueId: 'PAN-1',
+      },
+    });
+    expect(result).toEqual({ environmentId: ENV_ID, name: '20261102-1234', path: `/conv/@${ENV_ID}/20261102-1234`, tmuxSession: 'conv-20261102-1234' });
+  });
+
+  it('startFlyConversation omits cwd and issueId when not given', async () => {
+    const linkFetch = vi.fn(async (..._args: unknown[]) => ({ status: 201, json: { name: '20261102-1234' } }));
+    const result = await startFlyConversation({ environmentId: ENV_ID }, { message: 'hi', projectKey: 'overdeck' }, { linkFetch });
+
+    const body = (linkFetch.mock.calls[0]![2] as { body: Record<string, unknown> }).body;
+    expect(body).not.toHaveProperty('cwd');
+    expect(body).not.toHaveProperty('issueId');
+    expect(result.tmuxSession).toBe('conv-20261102-1234');
   });
 
   it('turns a 409 from the VM into conversation-failed carrying the body', async () => {

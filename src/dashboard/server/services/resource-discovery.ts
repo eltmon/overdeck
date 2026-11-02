@@ -75,7 +75,7 @@ export interface ResourceDetails {
   /** Remote (fly.io) work agent for this issue, when one is active (PAN-1676). */
   remoteAgent: { vmName: string; status: string; model: string; startedAt: string } | null;
   /** Non-archived conversations explicitly linked to this issue. */
-  conversations: Array<{ id: number; name: string; title: string | null; status: string }>;
+  conversations: Array<{ id: number; name: string; title: string | null; status: string; origin?: 'linked' }>;
 }
 
 export interface ResourceDetailIdentifiers {
@@ -137,7 +137,7 @@ interface InternalResourceDetails {
   branchAheadOfMain: boolean;
   workspaceMissing: boolean;
   remoteAgent: { vmName: string; status: string; model: string; startedAt: string } | null;
-  conversations: Array<{ id: number; name: string; title: string | null; status: string; tmuxSession: string | null }>;
+  conversations: Array<{ id: number; name: string; title: string | null; status: string; tmuxSession: string | null; origin?: 'linked' }>;
 }
 
 interface MutableResourceIssue {
@@ -259,8 +259,13 @@ function summarizeResourceDetails(details: InternalResourceDetails): ResourceDet
     branchAheadOfMain: details.branchAheadOfMain,
     workspaceMissing: details.workspaceMissing,
     remoteAgent: details.remoteAgent,
-    conversations: details.conversations.map((conv) => ({ id: conv.id, name: conv.name, title: conv.title, status: conv.status })),
+    conversations: details.conversations.map(publicConversation),
   };
+}
+
+/** A conversation row as the dashboard receives it; `origin` only on a linked machine's row. */
+function publicConversation(conv: ResourceDetails['conversations'][number]): ResourceDetails['conversations'][number] {
+  return { id: conv.id, name: conv.name, title: conv.title, status: conv.status, ...(conv.origin ? { origin: conv.origin } : {}) };
 }
 
 function summarizeResourceDetailIdentifiers(details: InternalResourceDetails): ResourceDetailIdentifiers {
@@ -454,6 +459,7 @@ async function computeResourceAllocatedIssues(
     tmuxSessions,
     dockerContainers,
     conversations,
+    linkedConversations,
     remoteAgentStates,
   } = sharedSignals ?? await captureSharedResourceSignals();
   const pullRequests = await loadOpenPullRequests(projects);
@@ -569,6 +575,22 @@ async function computeResourceAllocatedIssues(
       title: conv.title,
       status: conv.status,
       tmuxSession: conv.tmuxSession,
+    });
+  }
+
+  // A linked machine's conversation for an issue — a Fly work agent among
+  // them — lists under that issue and opens /conv/@<env>/<name> (PAN-4734 FR-14).
+  for (const conv of linkedConversations) {
+    const issue = ensureIssue(conv.issueId);
+    if (!issue) continue;
+    issue.resourceSources.add('conversation');
+    issue.resourceDetails.conversations.push({
+      id: conv.id,
+      name: conv.name,
+      title: conv.title,
+      status: conv.status,
+      tmuxSession: null,
+      origin: 'linked',
     });
   }
 
@@ -919,7 +941,7 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
       branchAheadOfMain: issue.resourceDetails.branchAheadOfMain,
       workspaceMissing: issue.resourceDetails.workspaceMissing,
       remoteAgent: issue.resourceDetails.remoteAgent ?? null,
-      conversations: issue.resourceDetails.conversations.map((conv) => ({ id: conv.id, name: conv.name, title: conv.title, status: conv.status })),
+      conversations: issue.resourceDetails.conversations.map(publicConversation),
     },
   }));
 }

@@ -11,6 +11,8 @@ export type OpenAIModel =
   | 'gpt-6-luna'
   | 'gpt-6.1-sol'
   | 'gpt-6.1-terra'
+  | 'gpt-6-rosalind'
+  | 'gpt-6-astra-law'
   | 'gpt-5.6-sol'
   | 'gpt-5.6-terra'
   | 'gpt-5.6-luna'
@@ -39,16 +41,20 @@ export type GoogleModel = 'gemini-4-argon' | 'gemini-3.8-flash' | 'gemini-3.6-fl
 export type KimiModel = 'k3.1-pro' | 'k3.1-pro-highspeed' | 'k3' | 'k3[1m]' | 'kimi-k2.7-code' | 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2'
   | 'kimi-code/k3.1-pro' | 'kimi-code/k3.1-pro-highspeed'
   | 'kimi-code/k3' | 'kimi-code/k3-256k' | 'kimi-code/kimi-for-coding' | 'kimi-code/kimi-for-coding-highspeed';
-export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3';
+export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3' | 'MiniMax-M3.1-Flash';
 export type ZAIModel = 'glm-5.3' | 'glm-5.3-flash' | 'glm-5.3-flashx' | 'glm-5.2' | 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
-export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
+// Retired 2026-10-21 (mimo-v2.5-pro, mimo-v2.5) — kept for MODEL_DEPRECATIONS and historical rows.
+export type MimoModel = 'mimo-v2.6-pro' | 'mimo-v2.6-flash' | 'mimo-v2.6-pro-ultraspeed' | 'mimo-v2.5-pro' | 'mimo-v2.5';
 export type NousModel = 'qwen/qwen3.6-plus';
 export type DashScopeModel = 'qwen3.7-plus' | 'qwen3.8-flash' | 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max' | 'qwen3.8-max';
-export type GrokModel = 'grok-build-0.1';
+export type GrokModel = 'grok-build-0.1' | 'grok-4.7' | 'grok-4.3';
+export type GroqModel = 'openai/gpt-oss-120b' | 'openai/gpt-oss-20b';
+export type CerebrasModel = 'gpt-oss-120b';
+export type MistralModel = 'mistral-large-4-0';
 export type QuantumLlamaModel = 'ql-reason-70b' | 'ql-swift-8b' | 'ql-nano-1b';
 export type OpenCodeModelId = `opencode/${string}` | `opencode-go/${string}`;
 export type MuseModel = 'muse-wonder-1.0' | 'muse-spark-1.3' | 'muse-spark-1.3-contributor';
-export type ModelId = OpenCodeModelId | MuseModel | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | QuantumLlamaModel;
+export type ModelId = OpenCodeModelId | MuseModel | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | GroqModel | CerebrasModel | MistralModel | QuantumLlamaModel;
 
 // Specialist agent types
 export interface SpecialistModels {
@@ -212,7 +218,7 @@ export function getAvailableModels(settings: SettingsConfig): {
   ];
 
   const openaiModels: OpenAIModel[] = settings.api_keys.openai
-    ? ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra']
+    ? ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-rosalind', 'gpt-6-astra-law']
     : [];
 
   const googleModels: GoogleModel[] = settings.api_keys.google
@@ -224,11 +230,11 @@ export function getAvailableModels(settings: SettingsConfig): {
     : [];
 
   const minimaxModels: MiniMaxModel[] = settings.api_keys.minimax
-    ? ['MiniMax-M3', 'minimax-m2.7', 'minimax-m2.7-highspeed']
+    ? ['MiniMax-M3', 'MiniMax-M3.1-Flash', 'minimax-m2.7', 'minimax-m2.7-highspeed']
     : [];
 
   const mimoModels: MimoModel[] = settings.api_keys.mimo
-    ? ['mimo-v2.5-pro', 'mimo-v2.5']
+    ? ['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed']
     : [];
 
   const nousModels: NousModel[] = settings.api_keys.nous
@@ -240,7 +246,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     : [];
 
   const xaiModels: GrokModel[] = settings.api_keys.xai
-    ? ['grok-build-0.1']
+    ? ['grok-build-0.1', 'grok-4.7', 'grok-4.3']
     : [];
 
   const quantumllamaModels: QuantumLlamaModel[] = settings.api_keys.quantumllama

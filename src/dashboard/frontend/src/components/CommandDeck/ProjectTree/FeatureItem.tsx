@@ -21,6 +21,7 @@ import {
 } from '../../IssueActionMenu';
 import { IssuePeek } from '../../issue-detail/IssuePeek';
 import { useConvoDock } from '../../../lib/convoDock';
+import { conversationRouteKey, isLinkedConversation } from '../../../lib/linkedConversation';
 import { useDerivedIssueState } from '../../../lib/store';
 import { resolveFeatureStateBadge } from './featureStateBadge';
 import { StatusDot } from '../StatusDot';
@@ -889,16 +890,16 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                 })}
                 {hasConversations && <div data-section="Conversation rows">{issueConversations.map(conv => (
                   <a
-                    key={`conv-${conv.id}`}
-                    href={`/conv/${conv.id}`}
+                    key={`conv-${conversationRouteKey(conv)}`}
+                    href={`/conv/${conversationRouteKey(conv)}`}
                     className={styles.sessionNode}
-                    data-testid={`conversation-${conv.id}`}
+                    data-testid={`conversation-${conversationRouteKey(conv)}`}
                     title={conv.title ?? conv.name}
                   >
                     <span className={styles.sessionToggleSlot} /><span className={styles.sessionDotSlot} /><span className={styles.sessionIconSlot}><MessageSquare size={12} /></span>
                     <span className={styles.sessionLabel}>{conv.title || 'Conversation'}</span>
                     <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${conv.status}`] ?? ''}`}>{conv.status}</span>
-                    <span className={styles.sessionModel}>#{conv.id}</span>
+                    <span className={styles.sessionModel}>{isLinkedConversation(conv) ? 'linked' : `#${conv.id}`}</span>
                   </a>
                 ))}</div>}
               </>

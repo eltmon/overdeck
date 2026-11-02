@@ -137,11 +137,11 @@ describe('providers', () => {
       ANTHROPIC_AUTH_TOKEN: 'sk-mimo-test',
       MIMO_API_KEY: 'sk-mimo-test',
       API_TIMEOUT_MS: '300000',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'mimo-v2.5-pro',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'mimo-v2.5-pro',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'mimo-v2.5',
-      ANTHROPIC_SMALL_FAST_MODEL: 'mimo-v2.5',
-      CLAUDE_CODE_SUBAGENT_MODEL: 'mimo-v2.5',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'mimo-v2.6-pro',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'mimo-v2.6-pro',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'mimo-v2.6-flash',
+      ANTHROPIC_SMALL_FAST_MODEL: 'mimo-v2.6-flash',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'mimo-v2.6-flash',
     });
   });
 

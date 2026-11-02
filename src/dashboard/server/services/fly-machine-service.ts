@@ -77,6 +77,8 @@ export interface FlyConversation {
   environmentId: string;
   name: string;
   path: string;
+  /** The conversation's tmux session on the VM (PAN-4734). */
+  tmuxSession: string;
 }
 
 export interface AddFlyMachineResult {
@@ -308,21 +310,32 @@ async function provisionAndLink(
 /** Start a Claude Code or Codex conversation on the linked VM, acting as the operator (FR-10, PAN-4296 FR-8). */
 export async function startFlyConversation(
   link: Pick<MachineLink, 'environmentId'>,
-  input: { message: string; projectKey: string; harness?: FlyMachineHarness; model?: string; effort?: string },
+  input: { message: string; projectKey: string; harness?: FlyMachineHarness; model?: string; effort?: string; cwd?: string; issueId?: string },
   deps: Pick<FlyMachineServiceDeps, 'linkFetch'> = defaultDeps,
 ): Promise<FlyConversation> {
-  const body = { message: input.message, projectKey: input.projectKey, harness: input.harness ?? 'claude-code', model: input.model, effort: input.effort };
+  const body = {
+    message: input.message,
+    projectKey: input.projectKey,
+    harness: input.harness ?? 'claude-code',
+    model: input.model,
+    effort: input.effort,
+    // PAN-4734: a linked work agent works in its VM worktree, under its issue.
+    ...(input.cwd ? { cwd: input.cwd } : {}),
+    ...(input.issueId ? { issueId: input.issueId } : {}),
+  };
   let response: { status: number; json: unknown };
   try {
     response = await deps.linkFetch(link.environmentId, '/api/conversations', { method: 'POST', actor: 'operator', body });
   } catch (error) {
     throw new FlyMachineError('conversation-failed', `Could not reach the Fly machine to start the conversation: ${(error as Error).message}`);
   }
-  const name = (response.json as { name?: unknown } | null)?.name;
+  const created = response.json as { name?: unknown; tmuxSession?: unknown } | null;
+  const name = created?.name;
   if (response.status !== 201 || typeof name !== 'string' || !name) {
     throw new FlyMachineError('conversation-failed', `The Fly machine refused the conversation (status ${response.status}).`, { status: response.status, body: response.json });
   }
-  return { environmentId: link.environmentId, name, path: `/conv/@${link.environmentId}/${name}` };
+  const tmuxSession = typeof created?.tmuxSession === 'string' && created.tmuxSession ? created.tmuxSession : `conv-${name}`;
+  return { environmentId: link.environmentId, name, path: `/conv/@${link.environmentId}/${name}`, tmuxSession };
 }
 
 /**

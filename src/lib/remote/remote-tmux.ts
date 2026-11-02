@@ -25,12 +25,19 @@ export function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-export function getRemoteTmuxBaseArgs(): string[] {
-  return ['-L', getManagedTmuxSocketName(), '-f', REMOTE_TMUX_CONFIG_PATH];
+/** PAN-4734: the VM tmux session and socket that hold a remote agent. */
+export interface RemoteTmuxTarget {
+  session: string;
+  /** Absent ⇒ home's managed socket name (legacy remote agents). */
+  socket?: string;
 }
 
-export function buildRemoteTmuxCommand(args: string[]): string {
-  return ['tmux', ...getRemoteTmuxBaseArgs(), ...args].map(shellQuote).join(' ');
+export function getRemoteTmuxBaseArgs(socket?: string): string[] {
+  return ['-L', socket ?? getManagedTmuxSocketName(), '-f', REMOTE_TMUX_CONFIG_PATH];
+}
+
+export function buildRemoteTmuxCommand(args: string[], socket?: string): string {
+  return ['tmux', ...getRemoteTmuxBaseArgs(socket), ...args].map(shellQuote).join(' ');
 }
 
 /** Run a FlyProvider Effect at the async/Promise boundary. */

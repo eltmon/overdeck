@@ -1,8 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ensureDurableRuntime,
   isNpxCacheRoot,
+  isRuntimePackageRoot,
   readRuntimeVersion,
   runtimePackageRoot,
   type ConnectRuntimeDeps,
@@ -35,6 +40,35 @@ describe('isNpxCacheRoot', () => {
     expect(isNpxCacheRoot('/usr/lib/node_modules/@overdeck/core')).toBe(false);
     expect(isNpxCacheRoot('/home/a/Projects/overdeck')).toBe(false);
     expect(isNpxCacheRoot('/home/a/my_npx_tools/overdeck')).toBe(false);
+  });
+});
+
+describe('isRuntimePackageRoot', () => {
+  let tmpDir: string | null = null;
+
+  afterEach(async () => {
+    if (tmpDir) {
+      await rm(tmpDir, { recursive: true, force: true });
+      tmpDir = null;
+    }
+  });
+
+  it('matches the runtime package root and nothing else', () => {
+    expect(isRuntimePackageRoot(ROOT, HOME)).toBe(true);
+    expect(isRuntimePackageRoot('/usr/lib/node_modules/@overdeck/core', HOME)).toBe(false);
+    expect(isRuntimePackageRoot(`${ROOT}/`, HOME)).toBe(true);
+    expect(isRuntimePackageRoot('/home/a/.overdeck/runtime/x/../node_modules/@overdeck/core', HOME)).toBe(true);
+  });
+
+  it('matches through a symlinked OVERDECK_HOME', async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'connect-runtime-'));
+    const real = join(tmpDir, 'real');
+    const link = join(tmpDir, 'link');
+    const root = join(real, 'runtime', 'node_modules', '@overdeck', 'core');
+    await mkdir(root, { recursive: true });
+    await symlink(real, link);
+
+    expect(isRuntimePackageRoot(root, link)).toBe(true);
   });
 });
 

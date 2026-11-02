@@ -35,6 +35,8 @@ describe('September model catalog no-loss audit', () => {
     ['gpt-6-luna', 'openai', 272000],
     ['gpt-6.1-sol', 'openai', 272000],
     ['gpt-6.1-terra', 'openai', 272000],
+    ['gpt-6-rosalind', 'openai', 272000],
+    ['gpt-6-astra-law', 'openai', 272000],
     ['gpt-5.6-sol', 'openai', 272000],
     ['gpt-5.6-terra', 'openai', 272000],
     ['gpt-5.6-luna', 'openai', 272000],
@@ -48,7 +50,7 @@ describe('September model catalog no-loss audit', () => {
     ['glm-5.3', 'zai', 1000000],
     ['qwen3.7-plus', 'dashscope', 1000000],
     ['qwen3.8-flash', 'dashscope', 1000000],
-    ['mimo-v2.5', 'mimo', 1048576],
+    ['mimo-v2.6-pro', 'mimo', 1048576],
     ['gemini-3.1-flash-lite', 'google', 1048576],
     ['gemini-3.6-flash', 'google', 1048576],
     ['qwen3.8-max', 'dashscope', 1000000],
@@ -66,7 +68,7 @@ describe('September model catalog no-loss audit', () => {
   it('preserves K3 context tier across launch translation and hides unsupported K2.7 effort', () => {
     expect(apiLaunchModelId('k3')).toBe('k3-256k');
     expect(apiLaunchModelId('k3[1m]')).toBe('k3[1m]');
-    expect(MODEL_CAPABILITIES['kimi-code/kimi-for-coding'].effortLevels).toEqual([]);
+    expect(MODEL_CAPABILITIES['kimi-code/kimi-for-coding'].effortLevels).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
     expect(MODEL_CAPABILITIES['kimi-code/kimi-for-coding-highspeed'].effortLevels).toEqual([]);
     // Generic role effort remains valid; the native launcher omits unsupported controls.
     expect(modelSupportsEffortSync('kimi-code/kimi-for-coding', 'high')).toBe(true);
@@ -84,6 +86,15 @@ describe('September model catalog no-loss audit', () => {
     const capability = MODEL_CAPABILITIES['claude-opus-5-5'];
     expect(capability.maxOutputTokens).toBe(128000);
     expect(capability.effortLevels).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
+  });
+
+  it('retires claude-sonnet-4-5 from new selections while it still migrates and resolves (Anthropic retires it 2026-11-30)', () => {
+    expect(PROVIDERS.anthropic.models).not.toContain('claude-sonnet-4-5');
+    expect(MODEL_DEPRECATIONS['claude-sonnet-4-5']).toBe('claude-sonnet-4-6');
+    expect(resolveModelId('claude-sonnet-4-5')).toBe('claude-sonnet-4-6');
+    expect(getProviderForModel('claude-sonnet-4-5').name).toBe('anthropic');
+    expect(Object.hasOwn(MODEL_CAPABILITIES, 'claude-sonnet-4-5')).toBe(true);
+    expect(getPricing('anthropic', 'claude-sonnet-4-5')?.inputPer1k).toBe(0.003);
   });
 });
 

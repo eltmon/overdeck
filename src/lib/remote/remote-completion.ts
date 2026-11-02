@@ -20,12 +20,18 @@
  *   6. destroys the fly machine, marks the remote agent state stopped, and
  *      requests review through the guarded review route.
  *
+ * A linked work agent (PAN-4734) runs as a conversation on a Fly machine
+ * linked to home. Its session is the conversation's tmux session, its repo is
+ * its VM worktree (`workdir`), and step 6 destroys the machine, removes its
+ * link and forgets its record instead of deleting a legacy VM and its
+ * workspace metadata.
+ *
  * Invoked every deacon-lite tick and by `pan admin remote reap`.
  */
 
 import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
-import { basename, join } from 'path';
+import { basename, dirname, join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
@@ -37,12 +43,13 @@ import {
   listActiveRemoteAgentStates,
   getRemoteAgentOutput,
   sendToRemoteAgent,
+  remoteTmuxTarget,
 } from './remote-agents.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeam } from '../projects.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { workspaceNeedsSetup } from '../workspace-manager/setup-marker.js';
 import { PAN_DIRNAME, PAN_CONTINUE_FILENAME } from '../pan-dir/index.js';
-import { buildRemoteTmuxCommand, ensureRemoteTmuxContext, runSsh } from './remote-tmux.js';
+import { buildRemoteTmuxCommand, ensureRemoteTmuxContext, runSsh, type RemoteTmuxTarget } from './remote-tmux.js';
 import type { FlyProvider } from './fly-provider.js';
 import type { VmStatus } from './interface.js';
 
@@ -64,11 +71,11 @@ function listReapableRemoteAgents(): string[] {
 type Probe = 'yes' | 'no' | 'unknown';
 
 /** has-session through the remote tmux server; only a clean exec with a known token is evidence. */
-async function probeRemoteSession(fly: FlyProvider, vmName: string, agentId: string): Promise<Probe> {
+async function probeRemoteSession(fly: FlyProvider, vmName: string, target: RemoteTmuxTarget): Promise<Probe> {
   try {
     await ensureRemoteTmuxContext(fly, vmName);
     const r = await runSsh(fly, vmName,
-      `${buildRemoteTmuxCommand(['has-session', '-t', agentId])} 2>/dev/null && echo exists || echo not-found`);
+      `${buildRemoteTmuxCommand(['has-session', '-t', target.session], target.socket)} 2>/dev/null && echo exists || echo not-found`);
     if (r.exitCode !== 0) return 'unknown';
     const out = r.stdout.trim();
     return out === 'exists' ? 'yes' : out === 'not-found' ? 'no' : 'unknown';
@@ -157,13 +164,13 @@ async function captureRemoteForensics(agentId: string, vmName: string, details: 
  * image. Unpushed work on a stopped machine is one restart away from gone
  * (lost live on PAN-1762: ~2h of agent work).
  */
-async function salvageRemoteWork(vmName: string, branch: string, details: string[]): Promise<void> {
+async function salvageRemoteWork(vmName: string, branch: string, details: string[], workdir = '/workspace'): Promise<void> {
   const config = loadConfigSync();
   const fly = createFlyProviderFromConfig(config.remote);
   try {
     const result = await Effect.runPromise(fly.ssh(
       vmName,
-      `cd /workspace && git add -A && (git diff --cached --quiet || git commit -m "wip(remote): salvage checkpoint before machine stop") && git push origin ${branch} 2>&1 | tail -2`
+      `cd ${workdir} && git add -A && (git diff --cached --quiet || git commit -m "wip(remote): salvage checkpoint before machine stop") && git push origin ${branch} 2>&1 | tail -2`
     ));
     if (result.exitCode === 0) {
       details.push(`Salvaged workspace state to origin/${branch}`);
@@ -199,6 +206,20 @@ async function healStaleRemoteAuth(agentId: string, vmName: string, details: str
   } catch (err: any) {
     details.push(`401 heal attempt failed: ${err.message}`);
   }
+}
+
+/**
+ * Destroy a linked work agent's Fly machine, remove its link and forget its
+ * record (PAN-4734 FR-12). A missing record is a machine already gone; a
+ * failed destroy keeps the record, and the sweep retries once the agent's
+ * state is no longer active.
+ */
+async function retireLinkedFlyMachine(flyMachineId: string | undefined): Promise<string> {
+  const { listFlyMachines } = await import('../anywhere/fly/machine-store.js');
+  const record = (await listFlyMachines()).find((r) => r.machineId === flyMachineId);
+  if (!record) return `Fly machine ${flyMachineId ?? '(unknown)'} is already gone`;
+  const { destroyAndForgetFlyMachine } = await import('./fly-machine-loops.js');
+  return (await destroyAndForgetFlyMachine(record, 'work agent handed to review')).line;
 }
 
 /**
@@ -248,10 +269,11 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
         // transient exec failures/429s — one flake here stopped a healthy
         // mid-work machine live (PAN-1762). Retry only while the probe has
         // no answer; a clean "not-found" is evidence and is not retried.
-        session = await probeRemoteSession(fly, vmName, agentId);
+        const target = remoteTmuxTarget(agentId);
+        session = await probeRemoteSession(fly, vmName, target);
         for (let attempt = 1; attempt < 3 && session === 'unknown'; attempt++) {
           await new Promise((r) => setTimeout(r, 5000));
-          session = await probeRemoteSession(fly, vmName, agentId);
+          session = await probeRemoteSession(fly, vmName, target);
         }
         sentinel = await probeDoneSentinel(fly, vmName);
         if (sentinel === 'unknown' || (sentinel === 'no' && session === 'unknown')) {
@@ -302,7 +324,7 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
         }
         // Salvage before stopping: rootfs does not survive a stop→start
         // cycle, so this is the last chance to preserve unpushed work.
-        await salvageRemoteWork(vmName, branch, details);
+        await salvageRemoteWork(vmName, branch, details, remoteState.workdir);
         try {
           await Effect.runPromise(fly.stopVm(vmName));
           details.push(`Stopped machine ${vmName} (rootfs resets on next start — salvage above is the durable copy)`);
@@ -349,15 +371,15 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       }
 
       // 3. Copy continue.json back from the VM (best effort — session record).
+      // A linked agent keeps it in its worktree's .overdeck/ (PAN-4734 FR-12).
+      const [remoteContinue, localContinue] = remoteState.workdir
+        ? [`${remoteState.workdir}/.overdeck/${PAN_CONTINUE_FILENAME}`, join(workspacePath, '.overdeck', PAN_CONTINUE_FILENAME)]
+        : [`/workspace/${PAN_DIRNAME}/${PAN_CONTINUE_FILENAME}`, join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME)];
       try {
         const config = loadConfigSync();
         const fly = createFlyProviderFromConfig(config.remote);
-        mkdirSync(join(workspacePath, PAN_DIRNAME), { recursive: true });
-        await Effect.runPromise(fly.copyFromVm(
-          vmName,
-          `/workspace/${PAN_DIRNAME}/${PAN_CONTINUE_FILENAME}`,
-          join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME),
-        ));
+        mkdirSync(dirname(localContinue), { recursive: true });
+        await Effect.runPromise(fly.copyFromVm(vmName, remoteContinue, localContinue));
         details.push('Copied continue.json back from VM');
       } catch {
         details.push('No continue.json retrieved from VM (skipped)');
@@ -419,14 +441,21 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
           const { killRemoteAgent } = await import('./remote-agents.js');
           await killRemoteAgent(agentId, vmName).catch(() => undefined);
         }
-        await Effect.runPromise(fly.deleteVm(vmName));
-        details.push(`Destroyed machine ${vmName}`);
+        if (remoteState.linked === true) {
+          details.push(await retireLinkedFlyMachine(remoteState.flyMachineId));
+        } else {
+          await Effect.runPromise(fly.deleteVm(vmName));
+          details.push(`Destroyed machine ${vmName}`);
+        }
       } catch (err: any) {
         details.push(`Warning: could not destroy machine: ${err.message}`);
       }
-      const { deleteWorkspaceMetadata } = await import('./workspace-metadata.js');
-      deleteWorkspaceMetadata(issueId);
-      details.push('Removed remote workspace metadata (pipeline is local from here)');
+      // A linked agent has no legacy workspace metadata (pan start --remote refuses one).
+      if (remoteState.linked !== true) {
+        const { deleteWorkspaceMetadata } = await import('./workspace-metadata.js');
+        deleteWorkspaceMetadata(issueId);
+        details.push('Removed remote workspace metadata (pipeline is local from here)');
+      }
       saveRemoteAgentState({ ...remoteState, status: 'stopped', lastActivity: new Date().toISOString() });
 
       // Post-Cut, review starts from POST /api/review/:id/request (what pan done
