@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4805",
   "created": "2026-11-02T06:47:26.972Z",
-  "updated": "2026-11-02T06:58:46.259Z",
+  "updated": "2026-11-02T06:58:56.887Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4805",
       "claimedAt": "2026-11-02T06:56:45.039Z",
       "doneAt": "2026-11-02T06:58:46.259Z"
+    },
+    "docs-testing-fixture-port": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4805",
+      "claimedAt": "2026-11-02T06:58:56.887Z"
     }
   }
 }
