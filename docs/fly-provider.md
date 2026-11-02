@@ -552,6 +552,12 @@ pid 2065725, deacon-lite every 60 s, freeze off), which contains PAN-4295 (`74f4
 PAN-4682 (`a7fdf79133e`), PAN-4683 (`babf86c1b92`) and PAN-4748 (`4d5461bfccd`). No
 `[remote.fly]` image override and no manual branch push were used.
 
+Smoke issue PAN-4832 ([#4832](https://github.com/eltmon/overdeck/issues/4832));
+`pan plan PAN-4832 --auto` then `pan start PAN-4832 --remote` started machine
+`8911151a2e0d98` (`pan-pan-4832-ws`, ephemeral tier, image
+`registry.fly.io/pan-workspaces:latest`) without re-planning and without a
+manual push.
+
 ## Live verification (PAN-4652)
 
 Fly machines were tested live on 2026-11-01, before merge, against app
