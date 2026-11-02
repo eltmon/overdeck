@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4661",
   "created": "2026-11-02T03:25:40.567Z",
-  "updated": "2026-11-02T03:56:52.067Z",
+  "updated": "2026-11-02T04:00:15.923Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
       "claimedBy": "agent-pan-4661",
       "claimedAt": "2026-11-02T03:55:38.319Z",
       "doneAt": "2026-11-02T03:56:52.067Z"
+    },
+    "extract-pipeline-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:00:15.922Z"
     }
   }
 }
