@@ -4,17 +4,17 @@
     "created": "2026-11-02T13:40:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4813: feat(models): support Kimi K3.1 Pro and K3.1 Pro Highspeed",
-    "updated": "2026-11-02T13:33:51.153Z"
+    "updated": "2026-11-02T13:34:48.776Z"
   },
   "plan": {
     "id": "pan-4813",
     "title": "feat(models): support Kimi K3.1 Pro and K3.1 Pro Highspeed",
-    "status": "proposed",
+    "status": "running",
     "uid": "0497d812-ecfc-48a4-a1ff-28c3b5a344d9",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T13:40:00Z",
-    "updated": "2026-11-02T13:33:51.153Z",
+    "updated": "2026-11-02T13:34:48.776Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4813",
@@ -581,5 +581,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
