@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4826",
   "created": "2026-11-02T16:31:08.878Z",
-  "updated": "2026-11-02T17:02:31.277Z",
+  "updated": "2026-11-02T17:02:38.806Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4826",
       "claimedAt": "2026-11-02T16:59:13.860Z",
       "doneAt": "2026-11-02T17:02:31.277Z"
+    },
+    "picker-rows-friendly-names": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T17:02:38.806Z"
     }
   }
 }
