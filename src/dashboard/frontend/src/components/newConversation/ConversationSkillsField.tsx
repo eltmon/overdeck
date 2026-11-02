@@ -28,7 +28,7 @@ interface SkillRow {
   description: string;
 }
 
-interface SkillGroup {
+export interface SkillGroup {
   key: string;
   label: string;
   rows: SkillRow[];
@@ -102,13 +102,30 @@ async function fetchSkillGroups(projectKey?: string, issueId?: string): Promise<
 
 const CHOICES: ReadonlyArray<[boolean | null, string]> = [[null, 'Inherit'], [true, 'On'], [false, 'Off']];
 
-export function ConversationSkillsField({ projectKey, issueId, value, onChange }: ConversationSkillsFieldProps) {
-  const [filter, setFilter] = useState('');
-  const [opened, setOpened] = useState<Record<string, boolean>>({});
-  const query = useQuery({
+/** Shared by the field and the dialog's collapsed summary (PAN-4755 D12); React Query dedupes the fetch. */
+export function useConversationSkillGroups(projectKey?: string, issueId?: string) {
+  return useQuery({
     queryKey: ['new-conversation-skills', projectKey ?? '', issueId ?? ''],
     queryFn: () => fetchSkillGroups(projectKey, issueId),
   });
+}
+
+/** Pure summary of on/total/override counts for the dialog's collapsed skills line (PAN-4755 D12). */
+export function summarizeSkills(
+  groups: readonly SkillGroup[],
+  overrides: Record<string, boolean>,
+): { on: number; total: number; overrides: number } {
+  const rows = groups.flatMap((group) => group.rows);
+  const on = rows.filter((row) =>
+    Object.prototype.hasOwnProperty.call(overrides, row.id) ? overrides[row.id] : row.enabled,
+  ).length;
+  return { on, total: rows.length, overrides: Object.keys(overrides).length };
+}
+
+export function ConversationSkillsField({ projectKey, issueId, value, onChange }: ConversationSkillsFieldProps) {
+  const [filter, setFilter] = useState('');
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
+  const query = useConversationSkillGroups(projectKey, issueId);
   const groups = query.data;
   const rows = useMemo(() => (groups ?? []).flatMap(group => group.rows), [groups]);
 

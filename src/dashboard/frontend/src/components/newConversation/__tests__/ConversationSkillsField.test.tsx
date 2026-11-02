@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ConversationSkillsField, type ConversationSkillsFieldProps } from '../ConversationSkillsField';
+import { ConversationSkillsField, summarizeSkills, type ConversationSkillsFieldProps, type SkillGroup } from '../ConversationSkillsField';
 
 const BODY = {
   project: 'tst',
@@ -217,5 +217,26 @@ describe('ConversationSkillsField', () => {
     fireEvent.click(within(group).getByRole('radio', { name: 'Inherit' }));
     expect(header.getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByRole('radiogroup', { name: 'grilling' })).toBeTruthy();
+  });
+});
+
+describe('summarizeSkills', () => {
+  const groups: SkillGroup[] = [
+    {
+      key: 'project',
+      label: 'Project skills',
+      rows: [
+        { id: 'grilling', enabled: true, source: 'project', description: '' },
+        { id: 'codebase-design', enabled: false, source: 'global', description: '' },
+      ],
+    },
+  ];
+
+  it('counts inherited and overridden states', () => {
+    expect(summarizeSkills(groups, {})).toEqual({ on: 1, total: 2, overrides: 0 });
+    // An override false on an enabled row lowers `on`.
+    expect(summarizeSkills(groups, { grilling: false })).toEqual({ on: 0, total: 2, overrides: 1 });
+    // An override true on a disabled row raises `on`.
+    expect(summarizeSkills(groups, { 'codebase-design': true })).toEqual({ on: 2, total: 2, overrides: 1 });
   });
 });
