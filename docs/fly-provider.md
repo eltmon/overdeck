@@ -545,6 +545,13 @@ The automatic 60 s tick, the `remote-reap` journal source and the heartbeat
 file are checked after deploy in
 [#4696](https://github.com/eltmon/overdeck/issues/4696).
 
+### Post-deploy verification (PAN-4696)
+
+Checked on 2026-11-02 against the deployed build `3d485389776` (deacon child
+pid 2065725, deacon-lite every 60 s, freeze off), which contains PAN-4295 (`74f4da1fb85`),
+PAN-4682 (`a7fdf79133e`), PAN-4683 (`babf86c1b92`) and PAN-4748 (`4d5461bfccd`). No
+`[remote.fly]` image override and no manual branch push were used.
+
 ## Live verification (PAN-4652)
 
 Fly machines were tested live on 2026-11-01, before merge, against app
