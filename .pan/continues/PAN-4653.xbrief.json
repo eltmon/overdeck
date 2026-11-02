@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4653",
   "created": "2026-11-02T03:31:51.838Z",
-  "updated": "2026-11-02T04:24:29.711Z",
+  "updated": "2026-11-02T04:24:49.980Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "setting-routes.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T04:24:29.710Z"
+    },
+    "setting-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:24:49.979Z"
     }
   }
 }
