@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4752",
   "created": "2026-11-02T00:18:49.972Z",
-  "updated": "2026-11-02T00:36:40.537Z",
+  "updated": "2026-11-02T00:38:18.611Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-02T00:36:35.933Z"
     },
     "cli-strike-marker": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4752",
-      "claimedAt": "2026-11-02T00:36:40.537Z"
+      "claimedAt": "2026-11-02T00:36:40.537Z",
+      "doneAt": "2026-11-02T00:38:18.611Z"
     }
   }
 }
