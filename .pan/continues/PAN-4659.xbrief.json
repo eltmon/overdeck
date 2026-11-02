@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4659",
   "created": "2026-11-02T05:46:59.538Z",
-  "updated": "2026-11-02T05:59:34.661Z",
+  "updated": "2026-11-02T06:18:57.848Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
       "claimedBy": "agent-pan-4659",
       "claimedAt": "2026-11-02T05:58:50.635Z",
       "doneAt": "2026-11-02T05:59:34.661Z"
+    },
+    "mapper-split.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:18:57.848Z"
     }
   }
 }
