@@ -2,9 +2,15 @@
   "version": "1",
   "issueId": "PAN-4759",
   "created": "2026-11-02T01:10:45.557Z",
-  "updated": "2026-11-02T02:09:45.148Z",
+  "updated": "2026-11-02T02:10:18.911Z",
   "gitState": {},
-  "decisions": [],
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Documentation-only change (PRD: 'Kind: documentation only. No runtime behavior changes.'); the 'test' keyword matches are prose about running gstack's existing fork tests (bun test test/pack-mode.test.ts ...) and naming existing test files in docs/SKILL-PACKS.md, not a request for new Overdeck tests. The one source edit is a single-line header-comment fix in src/cli/commands/skills.ts:9, already covered by the existing passing suite at sha 48083bd64e592aa3ca40a13c0119cfbfbb897d74 (src/cli/commands/__tests__/skills.test.ts).",
+      "recordedAt": "2026-11-02T02:10:18.911Z"
+    }
+  ],
   "hazards": [],
   "resumePoint": null,
   "sessionHistory": [],
