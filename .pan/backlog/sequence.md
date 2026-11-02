@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T03:10:06.926420Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-02T03:13:49.733101Z · model: claude-opus-5-5 · open: 874_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -237,6 +237,7 @@ _Last sequenced: 2026-11-02T03:10:06.926420Z · model: claude-opus-5-5 · open: 
 | 224 | PAN-4748 | M | high | ok |  |  | Fly API uses flyctl's stored token, which expires unrefreshed: loops, clone poll and rollback destroy 403; VMs leak and bill. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
+| 227 | PAN-4776 | M | high | ok |  |  | In-pipeline: account/connect Workers merged but undeployed, so login, directory and relay fail; dry-run, runbook, smoke script. |
 | 228 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
 | 229 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 230 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -290,6 +291,7 @@ _Last sequenced: 2026-11-02T03:10:06.926420Z · model: claude-opus-5-5 · open: 
 | 278 | PAN-4756 | L | medium | ok |  | PAN-4755 | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755; surface/structure only. Waits for PAN-4755 to land. |
 | 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
+| 280 | PAN-4774 | M | medium | ok |  |  | Run Anywhere release AC-1..15 on integrated main: two-server local test, fixes or filed issues, operator hardware checklist doc. |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
 | 282 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
 | 283 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
@@ -467,6 +469,7 @@ _Last sequenced: 2026-11-02T03:10:06.926420Z · model: claude-opus-5-5 · open: 
 | 455 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 456 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
 | 457 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 458 | PAN-4775 | S | medium | ok |  |  | In-pipeline: anywhere.mdx still labels shipped Anywhere features planned; rewrite shipped table/roadmap and apply OD-3 pricing. |
 | 459 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 460 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 461 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
@@ -1206,10 +1209,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T03:10:06.926420Z",
+  "generatedAt": "2026-11-02T03:13:49.733101Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 871,
+  "openCount": 874,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12069,6 +12072,45 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "rationale": "New substrate issue that replaces five manual Flywheel relays of CodeRabbit findings and stops PRs like #4667/#4716 merging past unanswered threads; it overlaps PAN-4671 (late CodeRabbit comments) so it shares rank 17 to be planned together, and reuses PAN-4772's skip-reason surface. Needs a supervised handoff (TENET-10).",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4776",
+      "rank": 227,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: account/connect Workers merged but undeployed, so login, directory and relay fail; dry-run, runbook, smoke script.",
+      "rationale": "New this pass and already in the pipeline, so it is pinned in the free rank 227 slot. The hosted Workers are the default directory_url, so every Anywhere user hits failures until they deploy; the agent half (dry-run, runbook, smoke test) is well specified and stops at an explicit operator checkpoint.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4774",
+      "rank": 280,
+      "size": "M",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Run Anywhere release AC-1..15 on integrated main: two-server local test, fixes or filed issues, operator hardware checklist doc.",
+      "rationale": "New this pass. It is the end-to-end release check for the merged Anywhere work, so it ranks with the Fly/Anywhere cluster near PAN-4685; AC-11 also needs the hosted services that PAN-4776 prepares.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4775",
+      "rank": 458,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: anywhere.mdx still labels shipped Anywhere features planned; rewrite shipped table/roadmap and apply OD-3 pricing.",
+      "rationale": "New this pass and already in the pipeline, so it is pinned in the free rank 458 slot; a docs-only correction with mechanically checkable criteria.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13380,6 +13422,13 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4776",
+      "to": "PAN-4774",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
