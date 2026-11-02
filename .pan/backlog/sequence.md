@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T16:25:34.692761Z · model: claude-opus-5-5 · open: 862_
+_Last sequenced: 2026-11-02T16:27:16.883607Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -185,6 +185,7 @@ _Last sequenced: 2026-11-02T16:25:34.692761Z · model: claude-opus-5-5 · open: 
 | 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 177 | PAN-4819 | XS | low | ok |  |  | Throwaway in-pipeline issue for PAN-4734 live Fly checkpoint (WI-14); closed without merging once the check is recorded. |
 | 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
+| 179 | PAN-4844 | S | medium | ok |  |  | Claude Code parser prices glm-*/qwen3* as Sonnet 4, ohmypi prices DashScope at $0; route both to custom rows. |
 | 180 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
 | 181 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
 | 182 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
@@ -281,6 +282,7 @@ _Last sequenced: 2026-11-02T16:25:34.692761Z · model: claude-opus-5-5 · open: 
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
 | 276 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
+| 277 | PAN-4832 | XS | low | ok |  |  | Throwaway in-pipeline vehicle for the PAN-4696 Fly smoke; PR closes unmerged; never a Flywheel pickup. |
 | 278 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
 | 278 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
 | 279 | PAN-4817 | S | medium | ok |  | PAN-4778 | Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification. |
@@ -657,7 +659,7 @@ _Last sequenced: 2026-11-02T16:25:34.692761Z · model: claude-opus-5-5 · open: 
 | 657 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 658 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 659 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 660 | PAN-4823 | XL | medium | needs-refinement | ✓ | PAN-4774 | Epic: Capacitor phone client for Anywhere without Tailscale; 4 of 15 children filed (#4828-4831), OD-1 open; after PAN-4774. |
+| 660 | PAN-4823 | XL | medium | needs-refinement | ✓ | PAN-4774 | Epic: Capacitor phone client for Anywhere without Tailscale; all 15 children filed (#4828-4843); OD-1 open; after PAN-4774. |
 | 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
@@ -824,7 +826,11 @@ _Last sequenced: 2026-11-02T16:25:34.692761Z · model: claude-opus-5-5 · open: 
 | 824 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 825 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 826 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 827 | PAN-4833 | M | medium | ok |  | PAN-4774 | Phone app W-WEB1: move noise/wire behind a crypto port into packages/anywhere-channel; browser channel; CP-1. |
+| 828 | PAN-4835 | M | medium | ok |  | PAN-4774, PAN-4828 | Phone app W-MAC1: phone access-token kind, pairing exchange, self-revoke and push-key routes, phone scopes. |
 | 829 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 830 | PAN-4834 | M | medium | ok |  | PAN-4774, PAN-4833 | Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; needs PAN-4833. |
+| 831 | PAN-4836 | S | medium | ok |  | PAN-4774, PAN-4835 | Phone app W-MAC2: "Overdeck app" pairing QR tab in Settings > Anywhere with paired-phone list; needs PAN-4835. |
 | 832 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
 | 834 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
@@ -867,6 +873,13 @@ _Last sequenced: 2026-11-02T16:25:34.692761Z · model: claude-opus-5-5 · open: 
 | 871 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 874 | PAN-4843 | M | medium | ok |  | PAN-4774, PAN-4828, PAN-4835 | Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory. |
+| 875 | PAN-4837 | L | medium | ok |  | PAN-4774, PAN-4834, PAN-4829, PAN-4831, PAN-4835 | Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; CP-3/CP-4. |
+| 876 | PAN-4838 | M | medium | ok |  | PAN-4774, PAN-4837, PAN-4830, PAN-4843 | Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts. |
+| 877 | PAN-4840 | M | medium | ok |  | PAN-4774, PAN-4837, PAN-4830, PAN-4843 | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
+| 878 | PAN-4841 | M | medium | ok |  | PAN-4774 | Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases. |
+| 879 | PAN-4839 | S | low | needs-refinement |  | PAN-4774, PAN-4838 | Phone app W-IOS2: Live Activity, counts only behind phoneApp.liveActivity (off); OD-1 operator call open. |
+| 880 | PAN-4842 | S | medium | ok |  | PAN-4774, PAN-4837 | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 
 ## Rationale detail
 
@@ -1197,10 +1210,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T16:25:34.692761Z",
+  "generatedAt": "2026-11-02T16:27:16.883607Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 862,
+  "openCount": 875,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -3533,6 +3546,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
+      "issue": "PAN-4844",
+      "rank": 179,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Claude Code parser prices glm-*/qwen3* as Sonnet 4, ohmypi prices DashScope at $0; route both to custom rows.",
+      "rationale": "New cost bug found while planning PAN-4827: two parsers mis-route GLM and Qwen models, so cost reports are wrong for those sessions. It is small, self-contained and independent, so it takes the free rank 179 near PAN-4827.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-570",
       "rank": 180,
       "size": "XS",
@@ -4720,6 +4746,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked.",
       "rationale": "Moved up from rank 277 into the vacated PAN-4743 slot: its only dependency PAN-4743 closed as completed on 2026-11-02, so startFlyTarget exists and lane provisioning can start.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4832",
+      "rank": 277,
+      "size": "XS",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Throwaway in-pipeline vehicle for the PAN-4696 Fly smoke; PR closes unmerged; never a Flywheel pickup.",
+      "rationale": "New in-pipeline issue, pinned at the free rank 277 next to PAN-4696, which it exists to exercise. Its body says the PR closes unmerged and the Flywheel must not start it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9358,8 +9397,8 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [
         "PAN-4774"
       ],
-      "why": "Epic: Capacitor phone client for Anywhere without Tailscale; 4 of 15 children filed (#4828-4831), OD-1 open; after PAN-4774.",
-      "rationale": "Rank unchanged at 660, now marked as an epic. Its first four children are filed (PAN-4828 contracts, PAN-4829 directory client role, PAN-4830 APNs/FCM sealed push, PAN-4831 native sign-in redirect), each naming #4823 as its epic, so the epic itself must not be picked; the children are. It stays needs-refinement because 11 work items are still unfiled and OD-1 (Live Activity content) is open, and the whole stream waits for the Anywhere acceptance run (PAN-4774).",
+      "why": "Epic: Capacitor phone client for Anywhere without Tailscale; all 15 children filed (#4828-4843); OD-1 open; after PAN-4774.",
+      "rationale": "Rank unchanged at 660. The remaining eleven children (PAN-4833 to PAN-4843) are now filed, so all 15 PRD work items exist and carry contains edges; the epic itself is never picked. It stays needs-refinement only because operator decision OD-1 (what the Live Activity may show) is open, and the whole tree waits for PAN-4774.",
       "gate": "auto",
       "planning": "auto",
       "isEpic": true
@@ -11412,6 +11451,37 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
+      "issue": "PAN-4833",
+      "rank": 827,
+      "size": "M",
+      "importance": "medium",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774"
+      ],
+      "why": "Phone app W-WEB1: move noise/wire behind a crypto port into packages/anywhere-channel; browser channel; CP-1.",
+      "rationale": "New child of epic PAN-4823 (work item W-WEB1). It is in build step 1 with no sibling dependency, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 827 behind the earlier phone children.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4835",
+      "rank": 828,
+      "size": "M",
+      "importance": "medium",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774",
+        "PAN-4828"
+      ],
+      "why": "Phone app W-MAC1: phone access-token kind, pairing exchange, self-revoke and push-key routes, phone scopes.",
+      "rationale": "New child of epic PAN-4823 (work item W-MAC1). It needs W-CON1 (PAN-4828) per build step 2, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 828 behind the earlier phone children.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3505",
       "rank": 829,
       "size": "XS",
@@ -11421,6 +11491,38 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close",
       "rationale": "Triage: flywheelRunId and the main-push guard both still exist; verify the allowlist bug against current logic. Rank held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4834",
+      "rank": 830,
+      "size": "M",
+      "importance": "medium",
+      "score": 34,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774",
+        "PAN-4833"
+      ],
+      "why": "Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; needs PAN-4833.",
+      "rationale": "New child of epic PAN-4823 (work item W-WEB2). It needs W-WEB1 (PAN-4833) per build step 3, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 830 behind the earlier phone children.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4836",
+      "rank": 831,
+      "size": "S",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774",
+        "PAN-4835"
+      ],
+      "why": "Phone app W-MAC2: \"Overdeck app\" pairing QR tab in Settings > Anywhere with paired-phone list; needs PAN-4835.",
+      "rationale": "New child of epic PAN-4823 (work item W-MAC2). It needs W-MAC1 (PAN-4835) per build step 3, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 831 behind the earlier phone children.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11953,6 +12055,125 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       ],
       "why": "Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work.",
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4843",
+      "rank": 874,
+      "size": "M",
+      "importance": "medium",
+      "score": 32,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774",
+        "PAN-4828",
+        "PAN-4835"
+      ],
+      "why": "Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory.",
+      "rationale": "New child of epic PAN-4823 (work item W-MAC3). It needs W-CON1 (PAN-4828) and W-MAC1 (PAN-4835) per build step 3, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 874 behind the earlier phone children.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4837",
+      "rank": 875,
+      "size": "L",
+      "importance": "medium",
+      "score": 34,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774",
+        "PAN-4834",
+        "PAN-4829",
+        "PAN-4831",
+        "PAN-4835"
+      ],
+      "why": "Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; CP-3/CP-4.",
+      "rationale": "New child of epic PAN-4823 (work item W-APP1). It needs W-WEB2, W-CON2, W-ACC1 and W-MAC1 per build step 4, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 875 behind the earlier phone children.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4838",
+      "rank": 876,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774",
+        "PAN-4837",
+        "PAN-4830",
+        "PAN-4843"
+      ],
+      "why": "Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts.",
+      "rationale": "New child of epic PAN-4823 (work item W-IOS1). It needs W-APP1, W-CON3 and W-MAC3 per build step 5, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 876 behind the earlier phone children.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4840",
+      "rank": 877,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774",
+        "PAN-4837",
+        "PAN-4830",
+        "PAN-4843"
+      ],
+      "why": "Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications.",
+      "rationale": "New child of epic PAN-4823 (work item W-AND1). It needs W-APP1, W-CON3 and W-MAC3 per build step 5, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 877 behind the earlier phone children.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4841",
+      "rank": 878,
+      "size": "M",
+      "importance": "medium",
+      "score": 28,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774"
+      ],
+      "why": "Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases.",
+      "rationale": "New child of epic PAN-4823 (work item W-REL1). It can start steps 1-6 any time, but final builds need W-IOS1 and W-AND1 and account actions need the operator, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 878 behind the earlier phone children.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4839",
+      "rank": 879,
+      "size": "S",
+      "importance": "low",
+      "score": 22,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4774",
+        "PAN-4838"
+      ],
+      "why": "Phone app W-IOS2: Live Activity, counts only behind phoneApp.liveActivity (off); OD-1 operator call open.",
+      "rationale": "New child of epic PAN-4823 (work item W-IOS2). It needs W-IOS1 (PAN-4838) and carries open operator decision OD-1, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 879 behind the earlier phone children.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4842",
+      "rank": 880,
+      "size": "S",
+      "importance": "medium",
+      "score": 26,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4774",
+        "PAN-4837"
+      ],
+      "why": "Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last.",
+      "rationale": "New child of epic PAN-4823 (work item W-DOC). It is written alongside each item and finished last, and its body sequences it after the Anywhere acceptance run (PAN-4774), so it takes the free rank 880 behind the earlier phone children.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13273,6 +13494,307 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4832",
+      "to": "PAN-4696",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4827",
+      "to": "PAN-4844",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4833",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4833",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4835",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4835",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4828",
+      "to": "PAN-4835",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4834",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4834",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4833",
+      "to": "PAN-4834",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4836",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4836",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4835",
+      "to": "PAN-4836",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4843",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4843",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4828",
+      "to": "PAN-4843",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4835",
+      "to": "PAN-4843",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4837",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4837",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4834",
+      "to": "PAN-4837",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4829",
+      "to": "PAN-4837",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4831",
+      "to": "PAN-4837",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4835",
+      "to": "PAN-4837",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4838",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4838",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4837",
+      "to": "PAN-4838",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4830",
+      "to": "PAN-4838",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4843",
+      "to": "PAN-4838",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4840",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4840",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4837",
+      "to": "PAN-4840",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4830",
+      "to": "PAN-4840",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4843",
+      "to": "PAN-4840",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4841",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4841",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4839",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4839",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4838",
+      "to": "PAN-4839",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4842",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4774",
+      "to": "PAN-4842",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4837",
+      "to": "PAN-4842",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4838",
+      "to": "PAN-4841",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4840",
+      "to": "PAN-4841",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }
