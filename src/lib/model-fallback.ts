@@ -100,6 +100,9 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'glm-4.7-flash': 'zai',
 
   // MiMo models
+  'mimo-v2.6-pro': 'mimo',
+  'mimo-v2.6-flash': 'mimo',
+  'mimo-v2.6-pro-ultraspeed': 'mimo',
   'mimo-v2.5-pro': 'mimo',
   'mimo-v2.5': 'mimo',
 
@@ -200,6 +203,9 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // MiMo → Anthropic
   'mimo-v2.5-pro': 'claude-sonnet-5-5', // Flagship reasoning → Sonnet
   'mimo-v2.5': 'claude-sonnet-5-5', // Multimodal → Sonnet
+  'mimo-v2.6-pro': 'claude-sonnet-5-5',
+  'mimo-v2.6-flash': 'claude-sonnet-5-5',
+  'mimo-v2.6-pro-ultraspeed': 'claude-sonnet-5-5',
 
   // Nous Portal → Anthropic
   'qwen/qwen3.6-plus': 'claude-sonnet-5-5',

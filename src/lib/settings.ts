@@ -41,7 +41,8 @@ export type KimiModel = 'k3.1-pro' | 'k3.1-pro-highspeed' | 'k3' | 'k3[1m]' | 'k
   | 'kimi-code/k3' | 'kimi-code/k3-256k' | 'kimi-code/kimi-for-coding' | 'kimi-code/kimi-for-coding-highspeed';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3';
 export type ZAIModel = 'glm-5.3' | 'glm-5.2' | 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
-export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
+// Retired 2026-10-21 (mimo-v2.5-pro, mimo-v2.5) — kept for MODEL_DEPRECATIONS and historical rows.
+export type MimoModel = 'mimo-v2.6-pro' | 'mimo-v2.6-flash' | 'mimo-v2.6-pro-ultraspeed' | 'mimo-v2.5-pro' | 'mimo-v2.5';
 export type NousModel = 'qwen/qwen3.6-plus';
 export type DashScopeModel = 'qwen3.7-plus' | 'qwen3.8-flash' | 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max' | 'qwen3.8-max';
 export type GrokModel = 'grok-build-0.1';
@@ -228,7 +229,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     : [];
 
   const mimoModels: MimoModel[] = settings.api_keys.mimo
-    ? ['mimo-v2.5-pro', 'mimo-v2.5']
+    ? ['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed']
     : [];
 
   const nousModels: NousModel[] = settings.api_keys.nous

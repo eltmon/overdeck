@@ -17,7 +17,7 @@ export interface ModelDef {
    * attachments); `true`/`undefined` = allow. Distinct from the `'vision'`
    * capability tag above, which is incomplete/unreliable today (e.g. multimodal
    * models missing the tag) — only `supportsImages` gates the attach guard.
-   * Scoped to the two MiMo models for now; full audit in PAN-1685.
+   * Set only for audited models (e.g. glm-5.3); full audit in PAN-1685.
    */
   supportsImages?: boolean;
 }
@@ -123,8 +123,9 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   mimo: {
     name: 'Xiaomi MiMo',
     models: [
-      { id: 'mimo-v2.5-pro' as ModelId, name: 'MiMo V2.5 Pro (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 2, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], supportsImages: false, description: 'Flagship reasoning model, 1M context, enhanced agent efficiency. Text-only on Token-Plan endpoints.' },
-      { id: 'mimo-v2.5' as ModelId, name: 'MiMo V2.5 (1M context)', icon: Zap, tier: 'balanced', costPer1MTokens: 1, capabilities: ['code', 'agentic', 'fast', 'vision'], supportsImages: true, description: 'Multimodal model, 1M context, strong agentic coding' },
+      { id: 'mimo-v2.6-pro' as ModelId, name: 'MiMo V2.6 Pro (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 0.6525, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Flagship reasoning model, 1M context, 128K output. $0.435/M in, $0.87/M out.' },
+      { id: 'mimo-v2.6-flash' as ModelId, name: 'MiMo V2.6 Flash (1M context)', icon: Zap, tier: 'balanced', costPer1MTokens: 0.21, capabilities: ['code', 'agentic', 'fast', 'large-context'], description: 'Fast multimodal model, 1M context, 128K output. $0.14/M in, $0.28/M out.' },
+      { id: 'mimo-v2.6-pro-ultraspeed' as ModelId, name: 'MiMo V2.6 Pro UltraSpeed (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 6.525, capabilities: ['reasoning', 'code', 'agentic', 'fast', 'large-context'], description: 'High-speed V2.6 Pro serving, 1M context. $4.35/M in, $8.70/M out.' },
     ],
   },
   nous: {
@@ -173,7 +174,7 @@ export function findModelDef(modelId: string): ModelDef | undefined {
 /**
  * Whether image attachments may be sent to a model. Permissive: returns `false`
  * ONLY for models flagged `supportsImages: false` (proven text-only, e.g.
- * mimo-v2.5-pro); every other model — including unflagged ones — is allowed, so
+ * glm-5.3); every other model — including unflagged ones — is allowed, so
  * the provider stays the final authority. Mirrors `modelSupportsImages` in
  * src/lib/model-capabilities.ts. PAN-1685.
  */

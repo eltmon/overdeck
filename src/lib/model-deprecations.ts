@@ -37,4 +37,7 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   // Z.AI deprecated
   'glm-4.7': 'glm-5.1',
   'glm-4.7-flash': 'glm-5.1',
+  // MiMo — retired by Xiaomi 2026-10-21 (mimo.mi.com/docs/en-US/price/pay-as-you-go)
+  'mimo-v2.5-pro': 'mimo-v2.6-pro',
+  'mimo-v2.5': 'mimo-v2.6-flash',
 };

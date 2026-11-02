@@ -47,8 +47,11 @@ const geminiArgon = {
 };
 // Kimi K3.1 Pro / K3.1 Pro Highspeed (2026-10-23) are additions after the fixture was captured.
 const kimiK31AdditionIds = new Set(['k3.1-pro', 'k3.1-pro-highspeed', 'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed']);
+// MiMo V2.5 Pro / V2.5 were retired 2026-10-21; the V2.6 series replaces them (PAN-4825).
+const mimoV26Ids = ['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed'];
+const expectedPreviousCatalog = { ...previousCatalog, mimo: [] };
 
-function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }>; kimi: Array<{ id: string }> }>(catalog: T): T {
+function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }>; kimi: Array<{ id: string }>; mimo: Array<{ id: string }> }>(catalog: T): T {
   return {
     ...catalog,
     anthropic: catalog.anthropic.filter((model) => ![opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
@@ -56,6 +59,7 @@ function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Arr
     google: catalog.google.filter((model) => model.id !== geminiArgon.id),
     meta: catalog.meta.filter((model) => model.id !== museWonderId),
     kimi: catalog.kimi.filter((model) => !kimiK31AdditionIds.has(model.id)),
+    mimo: catalog.mimo.filter((model) => !mimoV26Ids.includes(model.id)),
   };
 }
 
@@ -70,7 +74,7 @@ describe('model catalog no-loss audit', () => {
     expect(existing.openai.slice(0, 5).map((model) => model.id)).toEqual(['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-luna']);
     expect(existing.openai.filter((model) => gpt6AdditionIds.has(model.id))).toEqual(gpt6Additions);
     expect(existing.google[0]).toEqual(geminiArgon);
-    expect(withoutOpus55(existing)).toEqual(previousCatalog);
+    expect(withoutOpus55(existing)).toEqual(expectedPreviousCatalog);
     expect(opencode).toEqual([]);
     expect(go).toEqual([]);
     expect(compatibilityExport).toBe(getAvailableModelsApi);
@@ -89,6 +93,10 @@ describe('model catalog no-loss audit', () => {
     expect(k31ProHighspeedNative?.harness).toBe('kimi-code');
   });
 
+  it('lists exactly the MiMo V2.6 series and no retired V2.5 id', () => {
+    expect(getAvailableModelsApi().mimo.map((model) => model.id)).toEqual(mimoV26Ids);
+  });
+
   it('adds native Go and Zen rows without changing the previous catalog', () => {
     const zen = { id: 'opencode/kimi-k3' as const, name: 'Kimi K3', costPer1MTokens: 3, harness: 'opencode' as const };
     const go = { ...zen, id: 'opencode-go/kimi-k3' as const };
@@ -98,6 +106,6 @@ describe('model catalog no-loss audit', () => {
     expect(existing.anthropic.find((model) => model.id === opus55.id)).toEqual(opus55);
     expect(existing.anthropic.find((model) => model.id === sonnet55.id)).toEqual(sonnet55);
     expect(existing.anthropic.find((model) => model.id === haiku55.id)).toEqual(haiku55);
-    expect(withoutOpus55(existing)).toEqual(previousCatalog);
+    expect(withoutOpus55(existing)).toEqual(expectedPreviousCatalog);
   });
 });

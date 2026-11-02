@@ -148,8 +148,8 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   'glm-4.7': { apiModel: 'glm-4.7' },
   'glm-4.7-flash': { apiModel: 'glm-4.7-flash' },
   // MiMo models
-  'mimo-v2.5-pro': { apiModel: 'mimo-v2.5-pro' },
-  'mimo-v2.5': { apiModel: 'mimo-v2.5' },
+  'mimo-v2.6-pro': { apiModel: 'mimo-v2.6-pro' }, 'mimo-v2.6-flash': { apiModel: 'mimo-v2.6-flash' },
+  'mimo-v2.6-pro-ultraspeed': { apiModel: 'mimo-v2.6-pro-ultraspeed' },
   // Nous Portal models
   'qwen/qwen3.6-plus': { apiModel: 'qwen/qwen3.6-plus' },
   // Alibaba DashScope models
@@ -423,7 +423,7 @@ const postTestApiKeyRoute = HttpRouter.add(
         }
 
         case 'mimo': {
-          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'mimo-v2.5-pro') : 'mimo-v2.5-pro';
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'mimo-v2.6-pro') : 'mimo-v2.6-pro';
           try {
             const resp = await fetch('https://token-plan-sgp.xiaomimimo.com/anthropic/v1/messages', {
               method: 'POST',
@@ -672,11 +672,11 @@ const postValidateApiKeyRoute = HttpRouter.add(
             const resp = await fetch('https://token-plan-sgp.xiaomimimo.com/anthropic/v1/messages', {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-              body: JSON.stringify({ model: 'mimo-v2.5-pro', messages: [{ role: 'user', content: 'Hi' }], max_tokens: 1 }),
+              body: JSON.stringify({ model: 'mimo-v2.6-pro', messages: [{ role: 'user', content: 'Hi' }], max_tokens: 1 }),
             });
             if (resp.ok) {
               valid = true;
-              models = ['mimo-v2.5-pro', 'mimo-v2.5'];
+              models = ['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {

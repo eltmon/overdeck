@@ -531,7 +531,7 @@ export async function handleConversationMessage(
 
   if (droppedImageCount > 0 && !outboundMessage && effectiveAttachmentPaths.length === 0) {
     return jsonResponse(
-      { error: `${conv.model ?? 'This model'} can't read images. Switch to a vision-capable model (e.g. mimo-v2.5) to send images.` },
+      { error: `${conv.model ?? 'This model'} can't read images. Switch to a vision-capable model to send images.` },
       { status: 422 },
     );
   }

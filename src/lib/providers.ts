@@ -193,9 +193,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
     authType: 'static',
-    models: ['mimo-v2.5-pro', 'mimo-v2.5'],
-    haikuModel: 'mimo-v2.5',
-    tierModels: { opus: 'mimo-v2.5-pro', sonnet: 'mimo-v2.5-pro', haiku: 'mimo-v2.5' },
+    models: ['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed'],
+    haikuModel: 'mimo-v2.6-flash',
+    tierModels: { opus: 'mimo-v2.6-pro', sonnet: 'mimo-v2.6-pro', haiku: 'mimo-v2.6-flash' },
     tested: true,
     description: 'Route directly to Xiaomi MiMo Anthropic-compatible endpoint using MIMO_API_KEY.',
   },
@@ -505,7 +505,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check MiMo models
-  if (['mimo-v2.5-pro', 'mimo-v2.5'].includes(modelId)) {
+  if (['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed', 'mimo-v2.5-pro', 'mimo-v2.5'].includes(modelId)) {
     return PROVIDERS.mimo;
   }
 

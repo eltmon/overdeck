@@ -47,7 +47,7 @@ describe('September model catalog no-loss audit', () => {
     ['glm-5.3', 'zai', 1000000],
     ['qwen3.7-plus', 'dashscope', 1000000],
     ['qwen3.8-flash', 'dashscope', 1000000],
-    ['mimo-v2.5', 'mimo', 1048576],
+    ['mimo-v2.6-pro', 'mimo', 1048576],
   ] as const)('registers %s with the intended context and provider', (id, provider, contextWindow) => {
     expect(MODEL_CAPABILITIES[id].contextWindow).toBe(contextWindow);
     expect(getProviderForModel(id).name).toBe(provider);
