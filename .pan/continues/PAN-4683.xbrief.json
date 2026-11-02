@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4683",
   "created": "2026-11-02T03:42:24.487Z",
-  "updated": "2026-11-02T04:01:41.975Z",
+  "updated": "2026-11-02T04:20:18.388Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
       "claimedBy": "agent-pan-4683",
       "claimedAt": "2026-11-02T04:01:01.076Z",
       "doneAt": "2026-11-02T04:01:41.975Z"
+    },
+    "issue-plan-lookup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:20:18.388Z"
     }
   }
 }
