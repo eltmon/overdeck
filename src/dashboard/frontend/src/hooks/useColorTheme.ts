@@ -120,7 +120,10 @@ const terminalPaletteCache = new WeakMap<ColorTheme, TerminalPalette>();
 async function fileToBase64(file: File): Promise<string> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
+  // 32 KiB chunks keep the spread below the engine's argument-count limit.
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
   return btoa(binary);
 }
 

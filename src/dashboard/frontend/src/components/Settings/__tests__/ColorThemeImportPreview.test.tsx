@@ -141,4 +141,79 @@ describe('ColorThemeImportPreview (via ColorThemeSection)', () => {
     expect(screen.queryByTestId('color-theme-import-preview')).not.toBeInTheDocument();
     expect(fetchControl.fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'POST' && (init as RequestInit)?.body?.toString().includes('"theme"'))).toBe(false);
   });
+
+  describe('.vsix packages (PAN-4659)', () => {
+    const VSIX_LIGHT = { ...MAPPED_THEME, id: 'pack-light', name: 'Pack Light', type: 'light' as const };
+    const VSIX_DARK = { ...MAPPED_THEME, id: 'pack-dark', name: 'Pack Dark', type: 'dark' as const };
+
+    // 100 KiB of bytes 0..255 repeating — crosses the encoder's 32 KiB chunk boundary.
+    const vsixBytes = Uint8Array.from({ length: 100 * 1024 }, (_, i) => i % 256);
+
+    function expectedBase64(bytes: Uint8Array): string {
+      let binary = '';
+      for (const byte of bytes) binary += String.fromCharCode(byte);
+      return btoa(binary);
+    }
+
+    function installVsixFetch() {
+      fetchControl = installStrictFetchMock(({ method, url }) => {
+        if (method === 'POST' && url === '/api/color-themes/import/preview') {
+          return Response.json({ themes: [VSIX_LIGHT, VSIX_DARK], warnings: [] });
+        }
+        if (method === 'POST' && url === '/api/color-themes') {
+          return Response.json({ theme: VSIX_LIGHT });
+        }
+        if (method === 'GET' && url === '/api/color-themes') {
+          return Response.json({
+            themes: [BUILTIN_COLOR_THEMES['overdeck-dark'], BUILTIN_COLOR_THEMES['overdeck-light'], VSIX_LIGHT, VSIX_DARK],
+            selection: { light: 'overdeck-light', dark: 'overdeck-dark' },
+            warnings: [],
+          });
+        }
+        return undefined;
+      });
+    }
+
+    async function chooseVsix() {
+      const user = userEvent.setup();
+      render(<ColorThemeSection />);
+      expect(screen.getByTestId('color-theme-import-input')).toHaveAttribute('accept', '.json,.vsix');
+      await user.upload(screen.getByTestId('color-theme-import-input'), new File([vsixBytes], 'pack.vsix'));
+      await waitFor(() => {
+        expect(screen.getByTestId('color-theme-import-preview')).toBeInTheDocument();
+      });
+      return user;
+    }
+
+    function posts(url: string): RequestInit[] {
+      return fetchControl.fetchMock.mock.calls
+        .filter(([input, init]) => String(input) === url && (init as RequestInit | undefined)?.method === 'POST')
+        .map(([, init]) => init as RequestInit);
+    }
+
+    it('sends the .vsix to the preview route with its bytes intact and renders a card per theme', async () => {
+      installVsixFetch();
+
+      await chooseVsix();
+
+      const [previewCall] = posts('/api/color-themes/import/preview');
+      const body = JSON.parse(String(previewCall?.body));
+      expect(body.fileName).toBe('pack.vsix');
+      expect(body.contentBase64).toBe(expectedBase64(vsixBytes));
+      expect(screen.getByText('Pack Light')).toBeInTheDocument();
+      expect(screen.getByText('Pack Dark')).toBeInTheDocument();
+    });
+
+    it('Save on a two-theme preview sends two POST /api/color-themes calls', async () => {
+      installVsixFetch();
+
+      const user = await chooseVsix();
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => {
+        const saved = posts('/api/color-themes').map((init) => JSON.parse(String(init.body)).theme.name);
+        expect(saved).toEqual(['Pack Light', 'Pack Dark']);
+      });
+    });
+  });
 });
