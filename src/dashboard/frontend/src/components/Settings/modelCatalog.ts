@@ -152,6 +152,13 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'grok-build-0.1' as ModelId, name: 'Grok Build 0.1 (256K context)', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'vision'], description: 'xAI\'s agentic coding model (May 2026). 256K context, reasoning always active.' },
     ],
   },
+  groq: {
+    name: 'Groq',
+    models: [
+      { id: 'openai/gpt-oss-120b' as ModelId, name: 'GPT OSS 120B (131K context)', icon: Zap, tier: 'balanced', costPer1MTokens: 0.375, capabilities: ['reasoning', 'code', 'fast'], description: 'OpenAI open-weight model on Groq. 131K context, $0.15/M in, $0.60/M out.' },
+      { id: 'openai/gpt-oss-20b' as ModelId, name: 'GPT OSS 20B (131K context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.1875, capabilities: ['code', 'fast', 'cost-efficient'], description: 'Small OpenAI open-weight model on Groq. 131K context, $0.075/M in, $0.30/M out.' },
+    ],
+  },
   quantumllama: {
     name: 'QuantumLlama',
     models: [

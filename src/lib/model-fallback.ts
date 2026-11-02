@@ -121,6 +121,10 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // xAI models
   'grok-build-0.1': 'xai',
 
+  // Groq models
+  'openai/gpt-oss-120b': 'groq',
+  'openai/gpt-oss-20b': 'groq',
+
   // QuantumLlama models (synthetic benchmark provider, PAN-3252)
   'ql-reason-70b': 'quantumllama',
   'ql-swift-8b': 'quantumllama',
@@ -220,6 +224,10 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // xAI → Anthropic
   'grok-build-0.1': 'claude-sonnet-5-5', // Coding flagship → Sonnet
 
+  // Groq → Anthropic
+  'openai/gpt-oss-120b': 'claude-sonnet-5-5',
+  'openai/gpt-oss-20b': 'claude-haiku-4-5',
+
   // QuantumLlama → Anthropic (synthetic benchmark provider, PAN-3252)
   'ql-reason-70b': 'claude-sonnet-5-5', // Flagship reasoning → Sonnet
   'ql-swift-8b': 'claude-haiku-4-5', // Mid-tier → Haiku
@@ -269,8 +277,11 @@ const TIER_RANK: Record<SubscriptionPlan, number> = {
  * OpenRouter model IDs use the format "organization/model-name" (e.g., "qwen/qwen3.6-plus:free").
  * This is distinct from all other providers which use simple identifiers without slashes.
  */
+/** Groq-native ids that carry an `openai/` vendor prefix (console.groq.com/docs/models). */
+const GROQ_SLASH_MODEL_IDS = new Set(['openai/gpt-oss-120b', 'openai/gpt-oss-20b']);
+
 export function isOpenRouterModel(modelId: string): boolean {
-  return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus' && !modelId.startsWith('opencode/') && !modelId.startsWith('opencode-go/');
+  return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus' && !GROQ_SLASH_MODEL_IDS.has(modelId) && !modelId.startsWith('opencode/') && !modelId.startsWith('opencode-go/');
 }
 
 /**

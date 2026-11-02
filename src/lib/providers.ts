@@ -263,9 +263,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'direct',
     defaultHarness: 'ohmypi',
     authType: 'static',
-    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'qwen-qwq-32b', 'gemma2-9b-it'],
-    haikuModel: 'llama-3.1-8b-instant',
-    tierModels: { opus: 'llama-3.3-70b-versatile', sonnet: 'llama-3.3-70b-versatile', haiku: 'llama-3.1-8b-instant' },
+    models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'],
+    haikuModel: 'openai/gpt-oss-20b',
+    tierModels: { opus: 'openai/gpt-oss-120b', sonnet: 'openai/gpt-oss-120b', haiku: 'openai/gpt-oss-20b' },
     tested: false,
     description: 'Route via omp using GROQ_API_KEY. Ultra-low-latency inference on open-weight models.',
   },
@@ -451,6 +451,11 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   // except for explicitly supported slash-delimited providers such as Nous Portal.
   if (['qwen/qwen3.6-plus'].includes(modelId)) {
     return PROVIDERS.nous;
+  }
+  // Groq-native ids carry an `openai/` vendor prefix (console.groq.com/docs/models);
+  // carve them out before the slash-delimited OpenRouter catch-all.
+  if (['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(modelId)) {
+    return PROVIDERS.groq;
   }
   if (['qwen3.7-plus', 'qwen3.8-flash', 'qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'].includes(modelId)) {
     return PROVIDERS.dashscope;

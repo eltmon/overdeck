@@ -168,6 +168,9 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'custom', model: 'mimo-v2.6-pro', inputPer1k: 0.000435, outputPer1k: 0.00087, cacheReadPer1k: 0.0000036, currency: 'USD' },
   { provider: 'custom', model: 'mimo-v2.6-flash', inputPer1k: 0.00014, outputPer1k: 0.00028, cacheReadPer1k: 0.0000028, currency: 'USD' },
   { provider: 'custom', model: 'mimo-v2.6-pro-ultraspeed', inputPer1k: 0.00435, outputPer1k: 0.0087, cacheReadPer1k: 0.000036, currency: 'USD' },
+  // Groq gpt-oss (console.groq.com/docs/models). Keys keep the openai/ vendor prefix.
+  { provider: 'custom', model: 'openai/gpt-oss-120b', inputPer1k: 0.00015, outputPer1k: 0.0006, currency: 'USD' },
+  { provider: 'custom', model: 'openai/gpt-oss-20b', inputPer1k: 0.000075, outputPer1k: 0.0003, currency: 'USD' },
   // Z.AI (GLM) — PAN-1935: previously absent, so pi-harness GLM agents recorded $0 cost.
   // GLM-5.x: $1.4/M in, $4.4/M out (docs.z.ai/guides/overview/pricing). cacheRead set to
   // ~7% of input to approximate Z.AI's context-cache discount — verify upstream and refine.

@@ -3,6 +3,7 @@ import { getPricing } from '../cost.js';
 import { MODEL_CAPABILITY_CLASSES } from '../model-capability-class.js';
 import { hasModelCapability, resolveModelId } from '../model-capabilities.js';
 import { MODEL_DEPRECATIONS } from '../model-deprecations.js';
+import { getModelProvider, isOpenRouterModel } from '../model-fallback.js';
 import { getProviderForModel, PROVIDERS, type ProviderName } from '../providers.js';
 
 // PAN-4825: November 2026 catalog refresh. Sources: docs/MODEL-CONTEXT-AUDIT.md.
@@ -45,5 +46,31 @@ describe('MiMo V2.6 replaces the retired V2.5 ids', () => {
     expect(PROVIDERS.mimo.haikuModel).toBe('mimo-v2.6-flash');
     expect(PROVIDERS.mimo.tierModels).toEqual({ opus: 'mimo-v2.6-pro', sonnet: 'mimo-v2.6-pro', haiku: 'mimo-v2.6-flash' });
     expectNoRetiredSlots('mimo');
+  });
+});
+
+describe('Groq gpt-oss replaces the shut-down Llama, QwQ and Gemma ids', () => {
+  it.each(['openai/gpt-oss-120b', 'openai/gpt-oss-20b'])('registers %s under groq, not openrouter', (id) => {
+    expectRegistered(id, 'groq');
+    expect(getModelProvider(id)).toBe('groq');
+    expect(isOpenRouterModel(id)).toBe(false);
+  });
+
+  it('still routes other openai/ ids to OpenRouter', () => {
+    expect(getProviderForModel('openai/gpt-oss-safeguard-20b').name).toBe('openrouter');
+    expect(getModelProvider('openai/gpt-oss-safeguard-20b')).toBe('openrouter');
+  });
+
+  it('retires every dead Groq id to a live gpt-oss id', () => {
+    expectRetired('llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'groq');
+    expectRetired('qwen-qwq-32b', 'openai/gpt-oss-120b', 'groq');
+    expectRetired('llama-3.1-8b-instant', 'openai/gpt-oss-20b', 'groq');
+    expectRetired('gemma2-9b-it', 'openai/gpt-oss-20b', 'groq');
+  });
+
+  it('launches tiers and the haiku slot on gpt-oss', () => {
+    expect(PROVIDERS.groq.haikuModel).toBe('openai/gpt-oss-20b');
+    expect(PROVIDERS.groq.tierModels).toEqual({ opus: 'openai/gpt-oss-120b', sonnet: 'openai/gpt-oss-120b', haiku: 'openai/gpt-oss-20b' });
+    expectNoRetiredSlots('groq');
   });
 });
