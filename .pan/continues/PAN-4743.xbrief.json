@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T15:00:34.397Z",
+  "updated": "2026-11-02T15:03:30.297Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -220,5 +220,6 @@
     "live-uat-fly.ac2": {
       "status": "cancelled"
     }
-  }
+  },
+  "feedback": []
 }
