@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T23:22:42.664Z",
+  "updated": "2026-11-02T23:22:54.158Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,11 @@
       "claimedBy": "agent-pan-4774",
       "claimedAt": "2026-11-02T23:05:01.790Z",
       "doneAt": "2026-11-02T23:22:42.664Z"
+    },
+    "ac11-webhook-inbox": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T23:22:54.158Z"
     }
   }
 }
