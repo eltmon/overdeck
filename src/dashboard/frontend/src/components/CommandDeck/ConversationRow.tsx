@@ -19,6 +19,7 @@ import { fallbackBadgeTone } from './fallbackBadge';
 import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import { isOfflineLinked, LinkedMachineChip, LinkedOfflineMeta, LinkedRowMenuItems } from './LinkedConversationRow';
 import { PullRequestMenuItems } from './PullRequestMenuItems';
+import { ScheduleMenuItem } from '../chat/ConversationScheduleDialog';
 import { TriageMenuItems } from './TriageMenuItems';
 import { formatLocalWhen, formatSnoozeWake, isSnoozed } from './conversation-triage';
 import { PullRequestBadge } from '../primitives/PullRequestBadge';
@@ -822,6 +823,7 @@ export function ConversationRow({
           )}
           {!isNested && <TriageMenuItems conversation={conv} mutations={mutations} onClose={() => setMenuOpen(false)} />}
           <PullRequestMenuItems conversation={conv} mutations={mutations} onClose={() => setMenuOpen(false)} />
+          <ScheduleMenuItem conversation={conv} onClose={() => setMenuOpen(false)} />
           {conv.claudeSessionId && !conv.forkStatus && (
             <MenuItemButton
               onClick={() => { mutations.openForkModal(conv, { mode: 'handoff' }); setMenuOpen(false); }}
