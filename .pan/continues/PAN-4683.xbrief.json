@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4683",
   "created": "2026-11-02T03:42:24.487Z",
-  "updated": "2026-11-02T04:29:04.842Z",
+  "updated": "2026-11-02T04:29:23.045Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "remote-workspace-push.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T04:29:04.842Z"
+    },
+    "consent-workspace-location.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:29:23.045Z"
     }
   }
 }
