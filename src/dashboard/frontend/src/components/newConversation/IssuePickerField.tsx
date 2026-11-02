@@ -5,7 +5,7 @@
  * The chosen identifier becomes the create request's `issueId`.
  */
 import { useMemo, useState, type KeyboardEvent } from 'react';
-import { X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { selectIssues, useDashboardStore } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import type { Issue } from '../../types';
@@ -70,6 +70,7 @@ export function IssuePickerField({ value, onChange }: IssuePickerFieldProps) {
   const listId = 'issue-picker-listbox';
   return (
     <div className={styles.picker}>
+      <span className={styles.lead} aria-hidden="true"><Search size={14} /></span>
       <input
         type="text"
         role="combobox"
