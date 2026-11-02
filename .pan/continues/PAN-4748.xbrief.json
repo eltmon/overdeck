@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4748",
   "created": "2026-11-02T03:23:38.611Z",
-  "updated": "2026-11-02T05:16:10.055Z",
+  "updated": "2026-11-02T05:18:27.446Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
       "claimedBy": "agent-pan-4748",
       "claimedAt": "2026-11-02T05:03:54.307Z",
       "doneAt": "2026-11-02T05:16:10.055Z"
+    },
+    "fly-token-source.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:18:27.445Z"
     }
   }
 }
