@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4751",
   "created": "2026-11-02T00:16:08.781Z",
-  "updated": "2026-11-02T01:07:54.042Z",
+  "updated": "2026-11-02T01:12:55.035Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
       "claimedBy": "agent-pan-4751",
       "claimedAt": "2026-11-02T01:06:42.698Z",
       "doneAt": "2026-11-02T01:07:54.041Z"
+    },
+    "tick-message-id.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:12:55.035Z"
     }
   }
 }
