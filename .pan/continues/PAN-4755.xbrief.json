@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4755",
   "created": "2026-11-02T01:00:42.371Z",
-  "updated": "2026-11-02T02:32:38.489Z",
+  "updated": "2026-11-02T02:32:52.483Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -252,6 +252,10 @@
     "context-switches.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T02:32:38.488Z"
+    },
+    "skills-collapse.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:32:52.483Z"
     }
   }
 }
