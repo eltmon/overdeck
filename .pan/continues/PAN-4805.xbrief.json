@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4805",
   "created": "2026-11-02T06:47:26.972Z",
-  "updated": "2026-11-02T06:47:26.972Z",
+  "updated": "2026-11-02T06:49:08.409Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "pickport-os-assigned": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4805",
-      "claimedAt": "2026-11-02T06:47:26.972Z"
+      "claimedAt": "2026-11-02T06:47:26.972Z",
+      "doneAt": "2026-11-02T06:49:08.408Z"
     }
   }
 }
