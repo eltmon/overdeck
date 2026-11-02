@@ -165,6 +165,12 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'gpt-oss-120b' as ModelId, name: 'GPT OSS 120B (131K context)', icon: Zap, tier: 'balanced', costPer1MTokens: 0.55, capabilities: ['reasoning', 'code', 'fast'], description: 'OpenAI open-weight model on Cerebras. 131K context and 40K output on the paid tier, $0.35/M in, $0.75/M out.' },
     ],
   },
+  mistral: {
+    name: 'Mistral AI',
+    models: [
+      { id: 'mistral-large-4-0' as ModelId, name: 'Mistral Large 4 (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 1.4, capabilities: ['reasoning', 'code', 'large-context'], description: 'Public Preview (2026-10-06). 1M context, $0.70/M in, $0.07/M cached, $2.10/M out.' },
+    ],
+  },
   quantumllama: {
     name: 'QuantumLlama',
     models: [

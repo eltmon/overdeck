@@ -92,3 +92,11 @@ describe('Cerebras gpt-oss-120b replaces every deprecated Llama id', () => {
     expectNoRetiredSlots('cerebras');
   });
 });
+
+describe('Mistral Large 4', () => {
+  it('registers mistral-large-4-0 under mistral and leaves the -latest tier slots alone', () => {
+    expectRegistered('mistral-large-4-0', 'mistral');
+    expect(getModelProvider('mistral-large-4-0')).toBe('mistral');
+    expect(PROVIDERS.mistral.tierModels).toEqual({ opus: 'mistral-large-latest', sonnet: 'mistral-large-latest', haiku: 'mistral-small-latest' });
+  });
+});

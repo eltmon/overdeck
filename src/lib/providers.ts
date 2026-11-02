@@ -289,7 +289,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'direct',
     defaultHarness: 'ohmypi',
     authType: 'static',
-    models: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'],
+    models: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest', 'mistral-large-4-0'],
     haikuModel: 'mistral-small-latest',
     tierModels: { opus: 'mistral-large-latest', sonnet: 'mistral-large-latest', haiku: 'mistral-small-latest' },
     tested: false,
@@ -525,7 +525,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check Mistral models
-  if (['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'].includes(modelId)) {
+  if (['mistral-large-latest', 'mistral-small-latest', 'codestral-latest', 'mistral-large-4-0'].includes(modelId)) {
     return PROVIDERS.mistral;
   }
 

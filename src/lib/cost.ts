@@ -173,6 +173,8 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'custom', model: 'openai/gpt-oss-20b', inputPer1k: 0.000075, outputPer1k: 0.0003, currency: 'USD' },
   // Cerebras gpt-oss-120b (inference-docs.cerebras.ai/models/openai-oss)
   { provider: 'custom', model: 'gpt-oss-120b', inputPer1k: 0.00035, outputPer1k: 0.00075, currency: 'USD' },
+  // Mistral Large 4 (docs.mistral.ai/models/mistral-large-4-0, Public Preview)
+  { provider: 'custom', model: 'mistral-large-4-0', inputPer1k: 0.0007, outputPer1k: 0.0021, cacheReadPer1k: 0.00007, currency: 'USD' },
   // Z.AI (GLM) — PAN-1935: previously absent, so pi-harness GLM agents recorded $0 cost.
   // GLM-5.x: $1.4/M in, $4.4/M out (docs.z.ai/guides/overview/pricing). cacheRead set to
   // ~7% of input to approximate Z.AI's context-cache discount — verify upstream and refine.

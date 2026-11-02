@@ -48,10 +48,11 @@ export type DashScopeModel = 'qwen3.7-plus' | 'qwen3.8-flash' | 'qwen3-max' | 'q
 export type GrokModel = 'grok-build-0.1';
 export type GroqModel = 'openai/gpt-oss-120b' | 'openai/gpt-oss-20b';
 export type CerebrasModel = 'gpt-oss-120b';
+export type MistralModel = 'mistral-large-4-0';
 export type QuantumLlamaModel = 'ql-reason-70b' | 'ql-swift-8b' | 'ql-nano-1b';
 export type OpenCodeModelId = `opencode/${string}` | `opencode-go/${string}`;
 export type MuseModel = 'muse-wonder-1.0' | 'muse-spark-1.3' | 'muse-spark-1.3-contributor';
-export type ModelId = OpenCodeModelId | MuseModel | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | GroqModel | CerebrasModel | QuantumLlamaModel;
+export type ModelId = OpenCodeModelId | MuseModel | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | GroqModel | CerebrasModel | MistralModel | QuantumLlamaModel;
 
 // Specialist agent types
 export interface SpecialistModels {

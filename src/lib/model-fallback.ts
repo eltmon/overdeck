@@ -128,6 +128,9 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // Cerebras models
   'gpt-oss-120b': 'cerebras',
 
+  // Mistral models
+  'mistral-large-4-0': 'mistral',
+
   // QuantumLlama models (synthetic benchmark provider, PAN-3252)
   'ql-reason-70b': 'quantumllama',
   'ql-swift-8b': 'quantumllama',
@@ -233,6 +236,9 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // Cerebras → Anthropic
   'gpt-oss-120b': 'claude-sonnet-5-5',
+
+  // Mistral → Anthropic
+  'mistral-large-4-0': 'claude-sonnet-5-5',
 
   // QuantumLlama → Anthropic (synthetic benchmark provider, PAN-3252)
   'ql-reason-70b': 'claude-sonnet-5-5', // Flagship reasoning → Sonnet

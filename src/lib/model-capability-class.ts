@@ -48,6 +48,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'qwen/qwen3.6-plus': 'frontier',
   'ql-reason-70b': 'frontier',
   'mistral-large-latest': 'frontier',
+  'mistral-large-4-0': 'frontier',
   // workhorse
   'claude-sonnet-5-5': 'workhorse',
   'claude-sonnet-5': 'workhorse',
