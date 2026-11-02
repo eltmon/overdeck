@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T01:01:13.469691Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-02T02:06:07.805454Z · model: claude-opus-5-5 · open: 872_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 1 | PAN-4767 | S | critical | ok |  |  | Main is red: styleguide-conformance e2e spec times out since the Skills page redesign changed index.css; blocks every merge. |
 | 2 | PAN-4752 | S | high | ok |  |  | In-pipeline: Flywheel board shows strike workspaces as bogus PAN-<n>-STRIKE rows; map them to the base issue and strike PR. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4751 | S | medium | ok |  |  | In-pipeline: make the Flywheel NEEDS YOU banner reopen the pending AskUserQuestion dialog or jump to the conversation. |
@@ -610,6 +611,7 @@ _Last sequenced: 2026-11-02T01:01:13.469691Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
+| 603 | PAN-4762 | S | medium | ok |  |  | In-pipeline: file-link right-click menu gains Open in browser and per-installed-browser items for html/svg/pdf/image files. |
 | 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -670,7 +672,7 @@ _Last sequenced: 2026-11-02T01:01:13.469691Z · model: claude-opus-5-5 · open: 
 | 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 666 | PAN-4638 | L | medium | needs-refinement |  |  | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
+| 666 | PAN-4638 | L | medium | ok |  |  | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
@@ -881,6 +883,10 @@ _Last sequenced: 2026-11-02T01:01:13.469691Z · model: claude-opus-5-5 · open: 
 ### PAN-4702 (rank 1)
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
+
+### PAN-4767 (rank 1)
+
+New issue filed 2026-11-02 and already in the pipeline with a live workspace, so it is pinned at rank 1 beside PAN-4702 without moving any other node. Main CI fails unit shard 4 twice in a row on tests/e2e/styleguide-conformance.spec.ts after commit a443ff0619a changed the global stylesheet, and a red main empties the merge gate for every approved PR. The substrate-improvement label and the pipeline-blocking effect make it critical; the fix is scoped to one spec and one stylesheet change with a clear acceptance, so the condition is ok.
 
 ### PAN-4752 (rank 2)
 
@@ -1194,10 +1200,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
-### PAN-3118 (rank 79)
-
-Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1205,10 +1207,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T01:01:13.469691Z",
+  "generatedAt": "2026-11-02T02:06:07.805454Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 872,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -9380,7 +9382,7 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "size": "L",
       "importance": "medium",
       "score": 38,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
       "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
       "rationale": "Rank held: dependency PAN-4652 closed as completed on 2026-11-01; PAN-4651 still gates this issue, so order is unchanged.",
@@ -12050,6 +12052,32 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       ],
       "why": "Live 3-machine gauntlet check moved out of PAN-4638; needs its release, pan reload, a linked laptop rig and Fly setup by the operator.",
       "rationale": "New follow-up to PAN-4638 holding the live check that could not run before merge. It ranks just after PAN-4638 because it needs that PR released and reloaded plus operator setup of the rig and Fly, so it cannot be picked up autonomously yet.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4762",
+      "rank": 603,
+      "size": "S",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: file-link right-click menu gains Open in browser and per-installed-browser items for html/svg/pdf/image files.",
+      "rationale": "New in-pipeline issue with a fully specified body and ACs; pinned in the free rank 603 beside comparable dashboard UX features so no existing node moves.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4767",
+      "rank": 1,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Main is red: styleguide-conformance e2e spec times out since the Skills page redesign changed index.css; blocks every merge.",
+      "rationale": "New issue filed 2026-11-02 and already in the pipeline with a live workspace, so it is pinned at rank 1 beside PAN-4702 without moving any other node. Main CI fails unit shard 4 twice in a row on tests/e2e/styleguide-conformance.spec.ts after commit a443ff0619a changed the global stylesheet, and a red main empties the merge gate for every approved PR. The substrate-improvement label and the pipeline-blocking effect make it critical; the fix is scoped to one spec and one stylesheet change with a clear acceptance, so the condition is ok.",
       "gate": "auto",
       "planning": "auto"
     }

@@ -1175,6 +1175,32 @@ body::after {
   .dot-metadata {
     @apply inline-flex items-center gap-1.5 text-xs font-mono text-muted-foreground;
   }
+
+  /* Grouped list (Skills page, Broadsheet): collapsible groups of single-line rows.
+     The tints are color-mix() because Tailwind opacity modifiers on the
+     var()-based color tokens (bg-muted/40) compile to nothing here.
+     .list-group-bar tints a group header, .list-row gives a row its
+     hover, .list-meta tints a metadata strip under an open group. */
+  .list-group-bar {
+    background-color: color-mix(in srgb, var(--muted) 55%, transparent);
+  }
+  .list-row {
+    @apply transition-colors duration-150;
+  }
+  .list-row:hover {
+    background-color: color-mix(in srgb, var(--muted) 45%, transparent);
+  }
+  .list-meta {
+    background-color: color-mix(in srgb, var(--muted) 30%, transparent);
+  }
+
+  /* Switch tracks for role="switch" buttons: on, and on-but-locked. */
+  .switch-track-on {
+    background-color: color-mix(in srgb, var(--foreground) 62%, transparent);
+  }
+  .switch-track-locked {
+    background-color: color-mix(in srgb, var(--foreground) 28%, transparent);
+  }
 }
 
 @keyframes drawer-task-current-ping {

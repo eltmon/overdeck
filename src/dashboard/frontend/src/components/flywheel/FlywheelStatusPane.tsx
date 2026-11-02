@@ -52,9 +52,10 @@ interface FlywheelStatusPaneProps {
   unreachable: boolean;
   nowMs: number;
   onNavigateIssue?: (issueId: string) => void;
+  onNeedsYouClick?: () => void;
 }
 
-export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue }: FlywheelStatusPaneProps) {
+export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue, onNeedsYouClick }: FlywheelStatusPaneProps) {
   if (unreachable && !status) {
     return <EmptyState title="Can't reach the server — retrying" detail="The flywheel's state is unknown, not gone. This pane retries every few seconds." />;
   }
@@ -116,10 +117,16 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
             {status.freshness && status.run === 'running' && <FreshnessBadge freshness={status.freshness} at={tick.at} nowMs={nowMs} />}
           </div>
           {tick.needsYou && (
-            <div className="border-l-2 border-warning bg-warning/[0.08] px-3 py-2 text-sm text-foreground" role="note" data-testid="flywheel-needs-you">
+            <button
+              type="button"
+              className="block w-full border-l-2 border-warning bg-warning/[0.08] px-3 py-2 text-left text-sm text-foreground hover:bg-warning/[0.14]"
+              data-testid="flywheel-needs-you"
+              title="Open the question the flywheel is waiting on, or the message that raised this"
+              onClick={() => onNeedsYouClick?.()}
+            >
               <span className="mr-2 text-[11px] font-medium uppercase tracking-wider text-warning-foreground">Needs you</span>
               {tick.needsYou}
-            </div>
+            </button>
           )}
         </section>
       )}
@@ -168,6 +175,11 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
                     {row.trackerUnknown && (
                       <span className="mt-0.5 block">
                         <StatusBadge tone="neutral" testId={`flywheel-tracker-unknown-${row.issueId}`}>tracker unknown</StatusBadge>
+                      </span>
+                    )}
+                    {row.strike && (
+                      <span className="mt-0.5 block">
+                        <StatusBadge tone="neutral" testId={`flywheel-strike-${row.issueId}`}>strike</StatusBadge>
                       </span>
                     )}
                   </td>

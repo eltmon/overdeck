@@ -48,7 +48,7 @@ describe('laneContract', () => {
   });
 
   it('adds the answering line only when a builder answers a verdict', () => {
-    const answering = { criticId: 42, role: 'critic' as const, iteration: 1, verdict: 'NOT_YET', file: '/x/v.json' };
+    const answering = { criticId: 42 as number | null, criticName: '20261101-4242', role: 'critic' as const, iteration: 1, verdict: 'NOT_YET', file: '/x/v.json' };
     const answered = laneContract(input({ iteration: 2, answering }));
     expect(answered).toContain('This iteration answers critic c1 (conv #42): NOT_YET. Verdict file: /x/v.json.');
 
@@ -56,5 +56,10 @@ describe('laneContract', () => {
     expect(verifier).toContain('answers verifier v1 (conv #42): NOT_YET. Verdict file: none recorded.');
 
     expect(laneContract(input({ answering: null }))).not.toContain('answers');
+  });
+
+  it('names a critic on another machine by its conversation name (PAN-4638)', () => {
+    const answering = { criticId: null, criticName: '20261101-4242', role: 'critic' as const, iteration: 1, verdict: 'WOWED', file: null };
+    expect(laneContract(input({ iteration: 2, answering }))).toContain('This iteration answers critic c1 (conv 20261101-4242): WOWED.');
   });
 });

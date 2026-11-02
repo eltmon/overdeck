@@ -24,6 +24,7 @@ import { join } from 'node:path';
 import type {
   BackendPane,
   DerivedIssueState,
+  DerivedPrState,
   FlywheelAgentSummary,
   FlywheelConversationSummary,
   FlywheelDerivedStatus,
@@ -34,7 +35,7 @@ import type {
 } from '@overdeck/contracts';
 
 import type { LegacyConversation } from '../overdeck/conversations.js';
-import type { TrackerIssueFacts } from '../overdeck/derived-issue-state.js';
+import type { LoadedPr, TrackerIssueFacts } from '../overdeck/derived-issue-state.js';
 import type { PipelineJournalEntry } from '../cloister/pipeline-journal.js';
 import {
   FLYWHEEL_CONVERSATION_SESSION,
@@ -69,6 +70,8 @@ export interface DeriveFlywheelStatusDeps {
     opts: { issues: Readonly<Record<string, TrackerIssueFacts | null>>; panes: readonly BackendPane[] },
   ) => Promise<Map<string, DerivedIssueState>>;
   lastJournal?: (workspacePath: string) => PipelineJournalEntry | null | Promise<PipelineJournalEntry | null>;
+  /** The issue's open `strike/<id>` PR; null when none is open (PAN-4752). */
+  readStrikePr?: (projectPath: string, issueId: string) => DerivedPrState | null | Promise<DerivedPrState | null>;
   policies?: () => FlywheelPolicies | Promise<FlywheelPolicies>;
   runningBook?: (panDir: string) => FlywheelOrderBookSummary | null | Promise<FlywheelOrderBookSummary | null>;
   now?: () => number;
@@ -86,6 +89,12 @@ export function freshnessFor(atIso: string, nowMs: number): FlywheelFreshness {
   if (age <= FLYWHEEL_FRESHNESS_LIVE_MS) return 'live';
   if (age <= FLYWHEEL_FRESHNESS_BREATHING_MS) return 'breathing';
   return 'stalled';
+}
+
+/** `PAN-4669-STRIKE` → `PAN-4669`; null for any id that is not a strike id (PAN-4752). */
+export function strikeBaseId(issueId: string): string | null {
+  const match = /^(.+)-STRIKE$/i.exec(issueId);
+  return match?.[1] ? match[1].toUpperCase() : null;
 }
 
 // ─── lazy defaults ───────────────────────────────────────────────────────────
@@ -166,6 +175,25 @@ function paneIsLive(pane: BackendPane): boolean {
 async function defaultLastJournal(workspacePath: string): Promise<PipelineJournalEntry | null> {
   const { lastPipelineEntry } = await import('../cloister/pipeline-journal.js');
   return lastPipelineEntry(workspacePath);
+}
+
+/**
+ * The open PR among those on one strike head, highest number first (PAN-4752).
+ * `pan strike` reuses `strike/<id>` on every run, so a merged or closed PR on
+ * that head may belong to an earlier strike: it never counts.
+ */
+export function selectOpenStrikePr(prs: readonly (LoadedPr | null)[]): DerivedPrState | null {
+  const open = prs.filter((pr): pr is LoadedPr => pr !== null && !pr.merged).sort((a, b) => b.number - a.number)[0];
+  return open ? { url: open.url, number: open.number, reviewState: open.reviewState, checks: open.checks, mergeable: open.mergeable } : null;
+}
+
+async function defaultReadStrikePr(projectPath: string, issueId: string): Promise<DerivedPrState | null> {
+  const m = await import('../overdeck/derived-issue-state.js');
+  const branch = `strike/${issueId.toLowerCase()}`;
+  const prs = m.forgeForProject(projectPath) === 'gitlab'
+    ? (await m.listRepoMergeRequests(projectPath)).filter((row) => row.source_branch === branch).map(m.mrFromGlabRow)
+    : (await m.listRepoPullRequests(projectPath)).filter((row) => row.headRefName === branch).map(m.prFromGhRow);
+  return selectOpenStrikePr(prs);
 }
 
 async function defaultPolicies(): Promise<FlywheelPolicies> {
@@ -263,20 +291,34 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
   // The board is the union of the workspace census and the ids the loop named
   // in its own newest tick: an issue the loop is driving without a workspace
   // of its own is still in flight, and a workspace the loop has not picked up
-  // is still real. Census order first, then the tick-only ids.
-  const candidates: Array<{ issueId: string; workspacePath: string | null; inTick: boolean }> = [];
-  const seen = new Set<string>();
-  const tickIds = new Set((lastTick?.inFlight ?? []).map((id) => id.toUpperCase()));
+  // is still real. Census order first, then the tick-only ids. A `-STRIKE`
+  // workspace or tick id folds onto its base issue row (PAN-4752): the base
+  // workspace's path wins for the journal regardless of arrival order.
+  type Candidate = { issueId: string; workspacePath: string | null; inTick: boolean; strike: boolean };
+  const candidates: Candidate[] = [];
+  const byId = new Map<string, Candidate>();
+  const tickIds = new Set((lastTick?.inFlight ?? []).map((id) => strikeBaseId(id) ?? id.toUpperCase()));
+  const tickStrikeIds = new Set((lastTick?.inFlight ?? []).map(strikeBaseId).filter((id): id is string => id !== null));
   for (const ws of workspaces) {
-    const id = ws.issueId.toUpperCase();
-    if (seen.has(id)) continue;
-    seen.add(id);
-    candidates.push({ issueId: ws.issueId, workspacePath: ws.workspacePath, inTick: tickIds.has(id) });
+    const base = strikeBaseId(ws.issueId);
+    const id = base ?? ws.issueId.toUpperCase();
+    const existing = byId.get(id);
+    if (existing) {
+      // A strike workspace folds onto its base issue; the base workspace's journal wins.
+      if (base) existing.strike = true;
+      else existing.workspacePath = ws.workspacePath;
+      continue;
+    }
+    const candidate: Candidate = { issueId: base ?? ws.issueId, workspacePath: ws.workspacePath, inTick: tickIds.has(id), strike: base !== null };
+    byId.set(id, candidate);
+    candidates.push(candidate);
   }
   for (const id of tickIds) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    candidates.push({ issueId: id, workspacePath: null, inTick: true });
+    const existing = byId.get(id);
+    if (existing) { if (tickStrikeIds.has(id)) existing.strike = true; continue; }
+    const candidate: Candidate = { issueId: id, workspacePath: null, inTick: true, strike: tickStrikeIds.has(id) };
+    byId.set(id, candidate);
+    candidates.push(candidate);
   }
   const issueIds = candidates.map((c) => c.issueId);
   // The tracker read comes first: `loadIssueStatesForProject` treats a missing
@@ -306,13 +348,24 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
     const issue = issues[id] ?? null;
     // A tick-only id has no workspace, so it has no journal of its own.
     const entry = candidate.workspacePath ? await lastJournal(candidate.workspacePath) : null;
+    // A strike row with no feature-branch PR carries its open strike PR as
+    // `row.pr`; tracker state wins, so a closed issue stays closed even with
+    // an open strike PR (D7, PAN-4752).
+    const strikePr = candidate.strike && !derived?.pr
+      ? await (deps.readStrikePr ?? defaultReadStrikePr)(projectRoot, id)
+      : null;
+    const state = strikePr && derived?.state !== 'closed'
+      ? strikePr.reviewState === 'changes-requested' ? 'changes-requested' : 'in-review'
+      : derived?.state ?? 'backlog';
+    const attention = strikePr && derived?.attention === 'work-not-started' ? undefined : derived?.attention;
     return {
       issueId: candidate.issueId,
       title: issue?.title ?? null,
-      state: derived?.state ?? 'backlog',
-      ...(derived?.attention ? { attention: derived.attention } : {}),
-      ...(derived?.pr ? { pr: derived.pr } : {}),
+      state,
+      ...(attention ? { attention } : {}),
+      ...(derived?.pr ? { pr: derived.pr } : strikePr ? { pr: strikePr } : {}),
       ...(issue ? {} : { trackerUnknown: true as const }),
+      ...(candidate.strike ? { strike: true as const } : {}),
       liveAgents: livePanesByIssue.get(id)?.length ?? 0,
       inTick: candidate.inTick,
       lastJournal: entry ? { at: entry.at, type: entry.type, ...(entry.source ? { source: entry.source } : {}) } : null,

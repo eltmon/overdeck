@@ -1,0 +1,125 @@
+{
+  "version": "1",
+  "issueId": "PAN-4752",
+  "created": "2026-11-02T00:18:49.972Z",
+  "updated": "2026-11-02T01:12:49.592Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contract-strike-field": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4752",
+      "claimedAt": "2026-11-02T00:18:49.972Z",
+      "doneAt": "2026-11-02T00:20:43.315Z"
+    },
+    "fold-strike-workspaces": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4752",
+      "claimedAt": "2026-11-02T00:20:51.248Z",
+      "doneAt": "2026-11-02T00:29:39.849Z"
+    },
+    "strike-pr-overlay": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4752",
+      "claimedAt": "2026-11-02T00:29:47.050Z",
+      "doneAt": "2026-11-02T00:34:53.004Z"
+    },
+    "pane-strike-badge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4752",
+      "claimedAt": "2026-11-02T00:35:01.062Z",
+      "doneAt": "2026-11-02T00:36:35.933Z"
+    },
+    "cli-strike-marker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4752",
+      "claimedAt": "2026-11-02T00:36:40.537Z",
+      "doneAt": "2026-11-02T00:38:18.611Z"
+    },
+    "docs-flywheel-strike": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4752",
+      "claimedAt": "2026-11-02T00:38:24.857Z",
+      "doneAt": "2026-11-02T00:41:28.957Z"
+    },
+    "contract-strike-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:03:56.431Z"
+    },
+    "contract-strike-field.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:04:23.356Z"
+    },
+    "contract-strike-field.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:04:56.860Z"
+    },
+    "fold-strike-workspaces.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:05:38.525Z"
+    },
+    "fold-strike-workspaces.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:06:12.862Z"
+    },
+    "fold-strike-workspaces.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:06:46.481Z"
+    },
+    "fold-strike-workspaces.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:07:22.376Z"
+    },
+    "fold-strike-workspaces.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:07:54.568Z"
+    },
+    "strike-pr-overlay.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:08:34.672Z"
+    },
+    "strike-pr-overlay.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:09:11.874Z"
+    },
+    "strike-pr-overlay.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:09:47.027Z"
+    },
+    "strike-pr-overlay.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:10:12.118Z"
+    },
+    "strike-pr-overlay.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:10:44.104Z"
+    },
+    "pane-strike-badge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:11:14.466Z"
+    },
+    "pane-strike-badge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:11:33.646Z"
+    },
+    "cli-strike-marker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:11:53.300Z"
+    },
+    "cli-strike-marker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:12:13.253Z"
+    },
+    "docs-flywheel-strike.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:12:30.766Z"
+    },
+    "docs-flywheel-strike.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:12:49.591Z"
+    }
+  }
+}

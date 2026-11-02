@@ -207,6 +207,14 @@ a Fly machine started for Claude Code can also run a Codex conversation later.
   more slowly than on your own machine. `add-fly --json` reports `record.docker` as `true`
   or `false` for each machine.
 
+### Gauntlet lanes
+
+A linked Fly machine runs gauntlet lanes like any linked machine: name it with
+`pan lane start --machine fly-<machineId>`, or let `--machine auto --needs docker` choose
+it. It runs Claude Code and Codex lanes only. A run with long waits between reports can sit idle
+longer than `machine_idle_minutes`, so raise it for that run. See
+[Lanes on other machines](/reference/lanes#lanes-on-other-machines).
+
 ## Access levels
 
 | Level | What this machine may do on the other | Flag |
@@ -474,6 +482,13 @@ anywhere:
 `--needs docker,gpu` (and the dialog's **Needs** field when **Auto** is chosen) limits Auto to
 machines with every listed tag. The Machines list (`pan machines list`, Settings → Anywhere →
 Machines) shows each machine's load and tags.
+
+### Gauntlet lanes
+
+`pan lane start --machine auto [--needs <tags>]` places a gauntlet lane the same way, so a
+loop's heavy critics can run on an idle laptop or Fly machine instead of the orchestrator's
+machine. The orchestrator keeps the run's rules and lists, waits on, stops and reaps the
+lane from its own machine. See [Lanes on other machines](/reference/lanes#lanes-on-other-machines).
 
 ## Projects across machines
 

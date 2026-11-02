@@ -149,6 +149,7 @@ export interface Agent {
     askedAt: string;
     questions: ReadonlyArray<{
       question: string;
+      context?: string;
       header?: string;
       multiSelect?: boolean;
       options: ReadonlyArray<{ label: string; description?: string }>;

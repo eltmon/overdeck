@@ -65,6 +65,8 @@ export const FlywheelLastTick = Schema.Struct({
   needsYou: Schema.NullOr(Schema.String),
   /** The assistant message's `createdAt`. */
   at: Schema.String,
+  /** The assistant message's id, when the harness records one. */
+  messageId: Schema.optional(Schema.String),
 })
 export type FlywheelLastTick = typeof FlywheelLastTick.Type
 
@@ -102,6 +104,8 @@ export const FlywheelInFlightRow = Schema.Struct({
   pr: Schema.optional(DerivedPrState),
   /** Set when no configured tracker answered: the state is a guess, not a fact. */
   trackerUnknown: Schema.optional(Schema.Literal(true)),
+  /** The row folds a feature-<id>-strike workspace onto its base issue (PAN-4752). */
+  strike: Schema.optional(Schema.Literal(true)),
   /** Live agent panes on this issue. `working` with 0 means nobody is driving it. */
   liveAgents: Schema.Number,
   /** The loop named this id in its newest tick marker's in-flight list. */

@@ -14,20 +14,38 @@
  * Skill packs (PAN-4334) render above the skill list in SkillPacksSection
  * when the response carries `packs`.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, Lock } from 'lucide-react';
+import { Lock, Search, X } from 'lucide-react';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { cn } from '../../lib/utils';
+import { GroupHeader, LevelChoice, RowError, SkillSwitch } from './SkillControls';
 import { SkillPacksSection, type PackState } from './SkillPacksSection';
 
 export type SkillOverrideLevel = 'global' | 'project' | 'issue';
 type Source = 'core' | 'global' | 'project' | 'issue' | 'default';
+type SkillOrigin = 'overdeck' | 'personal' | 'project';
+type GroupKey = 'core' | SkillOrigin;
+
+/** Skills group by where they come from; core skills form their own group. */
+const GROUPS: Array<{ key: GroupKey; title: string; hint: string }> = [
+  { key: 'core', title: 'Core', hint: 'Always on; the pipeline depends on them' },
+  { key: 'overdeck', title: 'Overdeck', hint: '~/.overdeck/skills' },
+  { key: 'personal', title: 'Personal', hint: '~/.claude/skills, ~/.agents/skills' },
+  { key: 'project', title: 'Project', hint: '.pan/skills in this project' },
+];
+
+function groupOf(skill: SkillState): GroupKey {
+  if (skill.core) return 'core';
+  return skill.origin ?? (skill.projectSkill ? 'project' : 'personal');
+}
 
 export interface SkillState {
   name: string;
   description: string;
   core: boolean;
+  /** Where the skill lives: ~/.overdeck/skills, ~/.claude or ~/.agents skills, or the project's .pan/skills. */
+  origin?: SkillOrigin;
   projectSkill: boolean;
   global: boolean | null;
   project: boolean | null;
@@ -113,11 +131,12 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>(FILTERS[level][0][0]);
-  const [coreOpen, setCoreOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Partial<Record<GroupKey, boolean>>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, { message: string; enabled: boolean | null }>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [changed, setChanged] = useState(false);
+  const packsRef = useRef<HTMLElement>(null);
 
   const query = useQuery({
     queryKey: [...SKILL_OVERRIDES_QUERY_KEY, level, projectKey ?? null, issueId ?? null],
@@ -151,7 +170,6 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
   const data = query.data;
   const below = data?.overriddenBelow ?? {};
   const skills = useMemo(() => data?.skills ?? [], [data]);
-  const core = skills.filter(skill => skill.core);
   const counts = useMemo(() => ({
     all: skills.length,
     off: skills.filter(skill => !skill.enabled).length,
@@ -169,27 +187,62 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
   if (unavailable) return null;
 
   const needle = search.trim().toLowerCase();
+  // While a search or a narrowing filter is active, every group holding a match opens.
+  const narrowing = needle !== '' || filter !== 'all';
   const visible = skills.filter((skill) => {
-    if (level !== 'global' && skill.core) return false;
     if (needle && !skill.name.toLowerCase().includes(needle) && !skill.description.toLowerCase().includes(needle)) return false;
     switch (filter) {
       case 'off': return !skill.enabled;
       case 'core': return skill.core;
       case 'below': return !skill.core && belowNote(below[skill.name]) !== null;
-      case 'here': return levelValue(skill, level) !== null;
-      case 'relevant': return levelValue(skill, level) !== null || !skill.enabled;
+      case 'here': return !skill.core && levelValue(skill, level) !== null;
+      case 'relevant': return !skill.core && (levelValue(skill, level) !== null || !skill.enabled);
       default: return true;
     }
   });
+  const groups = GROUPS
+    .map(group => ({ ...group, all: skills.filter(skill => groupOf(skill) === group.key), rows: visible.filter(skill => groupOf(skill) === group.key) }))
+    // Below global, core skills are not choices: they stay one summary group whatever the filter.
+    .filter(group => (narrowing && !(group.key === 'core' && level !== 'global') ? group.rows.length > 0 : group.all.length > 0));
+  const isOpen = (key: GroupKey) => openGroups[key] ?? (narrowing || (key !== 'core' && key !== 'overdeck'));
+  const resetGroups = () => setOpenGroups({});
+  const packs = data?.packs;
+  const packsOn = packs?.filter(pack => pack.enabled).length ?? 0;
 
   return (
-    <div className="space-y-3" data-testid={`skill-overrides-${level}`}>
-      <p className="text-sm text-muted-foreground">
-        Changes apply to Claude Code and Codex agents at their next launch. Only Claude Code and Codex launches apply
-        skill choices; remote (Fly) launches get every skill, and running agents keep the skills they launched with.
-      </p>
+    <div className="space-y-4" data-testid={`skill-overrides-${level}`}>
+      <div className="space-y-1.5">
+        {data && (
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-muted-foreground" data-testid="skills-summary">
+            <span className="dot-metadata"><span className="text-foreground">{counts.all - counts.off}</span> on</span>
+            <span aria-hidden>·</span>
+            <span className="dot-metadata"><span className={cn(counts.off > 0 && 'text-foreground')}>{counts.off}</span> off</span>
+            <span aria-hidden>·</span>
+            <span className="dot-metadata">{counts.core} core</span>
+            {packs && packs.length > 0 && (
+              <>
+                <span aria-hidden>·</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    packsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    packsRef.current?.focus({ preventScroll: true });
+                  }}
+                  className="dot-metadata rounded underline decoration-border underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {packs.length} pack{packs.length === 1 ? '' : 's'}, {packsOn} on
+                </button>
+              </>
+            )}
+          </p>
+        )}
+        <p className="max-w-[72ch] text-[13px] leading-relaxed text-body-foreground">
+          Changes apply to Claude Code and Codex agents at their next launch. Only Claude Code and Codex launches apply
+          skill choices; remote (Fly) launches get every skill, and running agents keep the skills they launched with.
+        </p>
+      </div>
 
-      {query.isLoading && <p className="text-sm text-muted-foreground">Loading skills…</p>}
+      {query.isLoading && <SkillListSkeleton />}
       {query.error && !(query.error instanceof RequestError && query.error.code === 'unknown-issue') && (
         <p className="text-sm text-destructive">Could not load skills: {query.error.message}</p>
       )}
@@ -200,80 +253,118 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
         </p>
       )}
 
-      {data && Array.isArray(data.packs) && (
-        <SkillPacksSection
-          level={level}
-          projectKey={projectKey}
-          issueId={issueId}
-          packs={data.packs}
-          packOverriddenBelow={data.packOverriddenBelow}
-        />
-      )}
-
       {data && (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="search"
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Filter skills by name or description"
-              aria-label="Filter skills"
-              className="h-8 min-w-[220px] flex-1 rounded-md border border-border bg-background px-2.5 text-sm text-foreground placeholder:text-muted-foreground"
-            />
-            {FILTERS[level].map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={filter === key}
-                onClick={() => setFilter(key)}
-                className={cn('chip h-8 text-xs', filter === key && 'chip-selected')}
-              >
-                {label}
-                <span className="font-mono text-muted-foreground">{counts[key]}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="divide-y divide-border rounded-md border border-border">
-            {level !== 'global' && core.length > 0 && (
-              <div className="px-3 py-2">
+            <label className="relative min-w-[220px] flex-1">
+              <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => { setSearch(event.target.value); resetGroups(); }}
+                placeholder="Filter skills by name or description"
+                aria-label="Filter skills"
+                className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-8 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-search-cancel-button]:appearance-none"
+              />
+              {search && (
                 <button
                   type="button"
-                  aria-expanded={coreOpen}
-                  onClick={() => setCoreOpen(open => !open)}
-                  className="flex items-center gap-2 text-sm text-foreground"
+                  aria-label="Clear filter"
+                  onClick={() => { setSearch(''); resetGroups(); }}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <ChevronRight className={cn('h-3.5 w-3.5 transition-transform', coreOpen && 'rotate-90')} />
-                  <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                  {core.length} core skills, always on
+                  <X aria-hidden className="h-3.5 w-3.5" />
                 </button>
-                {coreOpen && (
-                  <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 pl-6 font-mono text-xs text-muted-foreground" aria-label="Core skills">
-                    {core.map(skill => <li key={skill.name}>{skill.name}</li>)}
-                  </ul>
-                )}
+              )}
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {FILTERS[level].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={filter === key}
+                  onClick={() => { setFilter(key); resetGroups(); }}
+                  className={cn('chip h-8 px-2.5 text-xs', filter === key && 'chip-selected')}
+                >
+                  {label}
+                  <span className="font-mono-ui tabular-nums text-muted-foreground">{counts[key]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
+            {groups.length === 0 && (
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                No skills match {needle ? <>“{search.trim()}”</> : 'this filter'}.
               </div>
             )}
-
-            {visible.length === 0 && (
-              <div className="px-3 py-4 text-sm text-muted-foreground">No skills match this filter.</div>
-            )}
-
-            {visible.map(skill => (
-              <SkillRow
-                key={skill.name}
-                skill={skill}
-                level={level}
-                below={level === 'global' ? belowNote(below[skill.name]) : null}
-                saving={saving[skill.name] === true}
-                error={rowErrors[skill.name]}
-                onSave={value => void save(skill.name, value)}
-              />
-            ))}
+            {groups.map((group, index) => {
+              const open = isOpen(group.key);
+              const on = group.all.filter(skill => skill.enabled).length;
+              return (
+                <section key={group.key} data-skill-group={group.key} className={cn(index > 0 && 'border-t border-border')}>
+                  <GroupHeader
+                    title={group.key === 'core' && level !== 'global' ? `${group.all.length} core skills, always on` : group.title}
+                    open={open}
+                    onToggle={() => setOpenGroups(prev => ({ ...prev, [group.key]: !open }))}
+                    hint={group.key === 'core' && level !== 'global' ? undefined : group.hint}
+                    count={narrowing && group.key !== 'core' && group.rows.length !== group.all.length
+                      ? `${group.rows.length} match${group.rows.length === 1 ? '' : 'es'}`
+                      : group.key === 'core' ? <Lock aria-label="Locked" className="h-3.5 w-3.5" /> : `${on} of ${group.all.length} on`}
+                  />
+                  {open && group.key === 'core' && level !== 'global' && (
+                    <ul className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border px-3 py-2 pl-9 font-mono text-xs text-muted-foreground" aria-label="Core skills">
+                      {group.all.map(skill => <li key={skill.name}>{skill.name}</li>)}
+                    </ul>
+                  )}
+                  {open && !(group.key === 'core' && level !== 'global') && (
+                    <div className="divide-y divide-border border-t border-border">
+                      {group.rows.map(skill => (
+                        <SkillRow
+                          key={skill.name}
+                          skill={skill}
+                          level={level}
+                          below={level === 'global' ? belowNote(below[skill.name]) : null}
+                          saving={saving[skill.name] === true}
+                          error={rowErrors[skill.name]}
+                          onSave={value => void save(skill.name, value)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
           </div>
+
+          {Array.isArray(packs) && (
+            <SkillPacksSection
+              level={level}
+              projectKey={projectKey}
+              issueId={issueId}
+              packs={packs}
+              packOverriddenBelow={data.packOverriddenBelow}
+              search={needle}
+              sectionRef={packsRef}
+            />
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+function SkillListSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-lg border border-border bg-card" aria-busy="true" aria-label="Loading skills">
+      {[0, 1, 2, 3, 4, 5].map(index => (
+        <div key={index} className={cn('flex items-center gap-4 px-3 py-2.5', index > 0 && 'border-t border-border')}>
+          <span className="h-3 w-32 animate-pulse rounded bg-muted" />
+          <span className="h-3 flex-1 animate-pulse rounded bg-muted" />
+          <span className="h-[18px] w-8 animate-pulse rounded-full bg-muted" />
+        </div>
+      ))}
     </div>
   );
 }
@@ -291,76 +382,52 @@ function SkillRow({ skill, level, below, saving, error, onSave }: SkillRowProps)
   const current = levelValue(skill, level);
   const inherit = inherited(skill, level);
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto_7rem] items-start gap-3 px-3 py-2" data-skill={skill.name}>
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-baseline gap-2">
-          <span className={cn('font-mono text-sm', skill.enabled ? 'text-foreground' : 'text-muted-foreground')}>{skill.name}</span>
-          {skill.projectSkill && <span className="eyebrow">project skill</span>}
-        </div>
-        {skill.description && <p className="truncate text-xs text-muted-foreground" title={skill.description}>{skill.description}</p>}
-        {below && <p className="text-xs text-muted-foreground">{below}</p>}
-        {error && (
-          <p className="mt-1 flex items-center gap-2 text-xs text-destructive" role="alert">
-            Save failed: {error.message}
-            <button type="button" className="underline" onClick={() => onSave(error.enabled)}>Retry</button>
-          </p>
-        )}
+    <div
+      className={cn(
+        'list-row grid items-start gap-x-4 gap-y-1 px-3 py-2',
+        level === 'global'
+          ? 'grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(11rem,15rem)_minmax(0,1fr)_auto]'
+          : 'grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(11rem,15rem)_minmax(0,1fr)_auto_4.5rem]',
+      )}
+      data-skill={skill.name}
+    >
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 pt-px">
+        <span className={cn('truncate font-mono-ui text-[13px]', skill.enabled ? 'text-foreground' : 'text-muted-foreground')}>{skill.name}</span>
+        {skill.projectSkill && <span className="text-[11px] text-muted-foreground">project skill</span>}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="col-start-1 row-start-2 min-w-0 md:col-start-2 md:row-start-1">
+        {skill.description && <p className="line-clamp-2 text-xs leading-5 text-muted-foreground md:line-clamp-1" title={skill.description}>{skill.description}</p>}
+        {below && <p className="text-xs leading-5 text-body-foreground">{below}</p>}
+        {error && <RowError message={error.message} onRetry={() => onSave(error.enabled)} />}
+      </div>
+
+      <div className="col-start-2 row-span-2 row-start-1 flex items-center justify-end gap-2 self-center md:col-start-3 md:row-span-1">
         {level === 'global' ? (
-          <>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={skill.core || skill.global !== false}
-              aria-label={`${skill.name} global default`}
-              disabled={skill.core || saving}
-              onClick={() => onSave(skill.global === false ? null : false)}
-              className={cn(
-                'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-border transition-colors disabled:cursor-not-allowed',
-                skill.core || skill.global !== false ? 'bg-foreground' : 'bg-muted',
-                skill.core && 'opacity-50',
-              )}
-            >
-              <span
-                className={cn(
-                  'inline-block h-3.5 w-3.5 rounded-full bg-background transition-transform',
-                  skill.core || skill.global !== false ? 'translate-x-4' : 'translate-x-0.5',
-                )}
-              />
-            </button>
-            {skill.core && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Lock className="h-3 w-3" />Core — always on
-              </span>
-            )}
-          </>
+          <SkillSwitch
+            checked={skill.core || skill.global !== false}
+            label={skill.core ? `${skill.name} is a core skill, always on` : `${skill.name} global default`}
+            locked={skill.core}
+            disabled={saving}
+            onToggle={() => onSave(skill.global === false ? null : false)}
+          />
         ) : (
-          <div role="group" aria-label={`${skill.name} at ${level} level`} className="inline-flex overflow-hidden rounded-md border border-border text-xs">
-            {([[null, `Inherit (${inherit.on ? 'on' : 'off'} via ${inherit.from})`], [true, 'On'], [false, 'Off']] as const).map(([value, label]) => (
-              <button
-                key={String(value)}
-                type="button"
-                aria-pressed={current === value}
-                disabled={saving}
-                onClick={() => onSave(value)}
-                className={cn(
-                  'px-2 py-1 text-muted-foreground transition-colors hover:bg-muted',
-                  current === value && 'bg-muted text-foreground',
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <LevelChoice
+            label={`${skill.name} at ${level} level`}
+            current={current}
+            inheritLabel={`Inherit (${inherit.on ? 'on' : 'off'} via ${inherit.from})`}
+            saving={saving}
+            onSet={onSave}
+          />
         )}
       </div>
 
-      <div className="text-right">
-        <div className="font-mono text-sm text-foreground">{skill.enabled ? 'on' : 'off'}</div>
-        <div className="font-mono text-xs text-muted-foreground">{skill.source}</div>
-      </div>
+      {level !== 'global' && (
+        <div className="hidden text-right font-mono-ui text-xs leading-5 md:block">
+          <span className={skill.enabled ? 'text-foreground' : 'text-muted-foreground'}>{skill.enabled ? 'on' : 'off'}</span>
+          <span className="block text-muted-foreground">{skill.source}</span>
+        </div>
+      )}
     </div>
   );
 }
