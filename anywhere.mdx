@@ -345,8 +345,10 @@ The full reasoning, section by section. Open any one that interests you.
     | --- | --- | --- |
     | &#36;5 a month | &#36;0.60 | 11.9% |
     | &#36;10 a month | &#36;0.79 | 7.9% |
+    | &#36;13 a month (Anywhere with the relay) | &#36;0.91 | 7.0% |
     | &#36;60 a year | &#36;2.74 | 4.6% |
     | &#36;96 a year | &#36;4.14 | 4.3% |
+    | &#36;126 a year (Anywhere with the relay) | &#36;5.31 | 4.2% |
 
     In countries with VAT or GST the fee is charged on the tax-inclusive amount, so its share
     of our revenue there is somewhat higher.
@@ -358,10 +360,13 @@ The full reasoning, section by section. Open any one that interests you.
     The rest of the price pays for building and maintaining Overdeck, supporting subscribers,
     and the parts of Anywhere that are not built yet.
 
-    The relay and push notifications will add cost that we have not modeled yet. We will
-    build that cost model before the relay leaves beta. Hosted agent compute is the one thing
-    whose cost scales directly with use, which is why it is billed by usage instead of being
-    included.
+    The relay costs us about &#36;0.05 per GB once all users together pass 1,000 GB a month.
+    A user who sends the full 50 GB every month costs about &#36;2.50, so the &#36;3 add-on
+    roughly breaks even in the worst case; most relay users send far less, because the relay
+    carries traffic only when no direct path works. The directory moves no conversation bytes
+    and costs a few cents per user a month. Push notifications cost us nothing, because your
+    machine sends them. Hosted agent compute is the one thing whose cost scales directly with
+    use, which is why it is billed by usage instead of being included.
   </Accordion>
 
   <Accordion title="5. Why annual billing" icon="calendar">
@@ -383,11 +388,12 @@ The full reasoning, section by section. Open any one that interests you.
     shared sessions. So the vault anchors one Anywhere subscription instead of being a
     separate product.
 
-    At launch only the vault exists, so we would be charging a bundle price for one feature.
-    The founding price addresses that: &#36;60 a year, locked for as long as you stay
-    subscribed, for the first 500 subscribers or 90 days after the Anywhere release, whichever
-    comes first. (It used to end "when the relay ships", which would have ended it on launch
-    day, because the relay ships in the same release.)
+    At the Anywhere release the directory, the webhook inbox and the relay add-on exist, but
+    the hosted vault does not yet. The founding price addresses that: &#36;60 a year, locked
+    for as long as you stay subscribed, for the first 500 subscribers or 90 days after the
+    Anywhere release, whichever comes first. Founders add the relay at the normal &#36;30 a
+    year. (It used to end "when the relay ships", which would have ended it on launch day,
+    because the relay ships in the same release.)
   </Accordion>
 
   <Accordion title="7. Why self-hosting stays ungated" icon="lock-open">
@@ -420,6 +426,27 @@ The full reasoning, section by section. Open any one that interests you.
     ([PAN-658](https://github.com/eltmon/overdeck/issues/658)). We will not publish a team
     price until that design exists.
   </Accordion>
+
+  <Accordion title="10. Why the directory is free for three machines" icon="network-wired">
+    T3 Connect, the closest comparable feature, is free for three devices, so a paid directory
+    would lose people who compare the two. Our directory introduces your machines to each other
+    and then steps aside. It moves no conversation bytes, so it costs a few cents per user a
+    month. The free account therefore includes three machines, and the paid tier sells what
+    costs money or does real work: more machines, the webhook inbox, the hosted vault and the
+    relay.
+  </Accordion>
+
+  <Accordion title="11. Why the relay is an add-on with a hard cap" icon="route">
+    - The relay is billed inside the Anywhere charge, never as a charge of its own. Creem's
+      &#36;0.40 fixed fee would take about 17% of a separate &#36;3 charge.
+    - The 50 GB monthly cap bounds what one user can cost us and means we need no usage
+      billing. At the cap the relay stops until the next month and the Anywhere card says
+      "Relay allowance used; install Tailscale or add 50 GB". An extra 50 GB is a one-time
+      &#36;3 purchase.
+    - We will check the allowance against the real monthly use of the first relay users. If
+      dev-server previews push typical use near the cap, we will lower the allowance or keep
+      previews off the relay.
+  </Accordion>
 </AccordionGroup>
 
 ## What we still need to learn
@@ -427,7 +454,7 @@ The full reasoning, section by section. Open any one that interests you.
 <Info>
 - How much a typical user actually stores. The vault collects no telemetry, so we plan a
   local `pan vault stats` command and will ask early users to share its output.
-- What the relay costs to run per user.
+- How much relay traffic real users send, compared with the 50 GB monthly allowance.
 - Whether people will pay &#36;96 a year, and &#36;60 at the founding price. We plan a waitlist
   before launch.
 
