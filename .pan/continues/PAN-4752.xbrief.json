@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4752",
   "created": "2026-11-02T00:18:49.972Z",
-  "updated": "2026-11-02T01:11:33.646Z",
+  "updated": "2026-11-02T01:11:53.300Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "pane-strike-badge.ac2": {
       "status": "completed",
       "doneAt": "2026-11-02T01:11:33.646Z"
+    },
+    "cli-strike-marker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:11:53.300Z"
     }
   }
 }
