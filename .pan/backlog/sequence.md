@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T03:08:40.285168Z · model: claude-opus-5-5 · open: 875_
+_Last sequenced: 2026-11-02T03:10:06.926420Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -237,7 +237,6 @@ _Last sequenced: 2026-11-02T03:08:40.285168Z · model: claude-opus-5-5 · open: 
 | 224 | PAN-4748 | M | high | ok |  |  | Fly API uses flyctl's stored token, which expires unrefreshed: loops, clone poll and rollback destroy 403; VMs leak and bill. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
-| 227 | PAN-4646 | S | medium | needs-refinement |  |  | Interactive mockup for machine-aware conversation UI (title bar, chips, offline banner); D-6 needs it approved first. Body pending. |
 | 228 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
 | 229 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 230 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -468,7 +467,6 @@ _Last sequenced: 2026-11-02T03:08:40.285168Z · model: claude-opus-5-5 · open: 
 | 455 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 456 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
 | 457 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 458 | PAN-4405 | M | medium | ok |  |  | Aggregated cross-environment overview, Needs-You and search; unblocked now that the PAN-4402 desktop switcher has closed |
 | 459 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 460 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 461 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
@@ -492,7 +490,6 @@ _Last sequenced: 2026-11-02T03:08:40.285168Z · model: claude-opus-5-5 · open: 
 | 479 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
 | 480 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
 | 481 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
-| 482 | PAN-4403 | M | medium | ok |  |  | Advertise direct HTTPS/Tailscale endpoints and add them to trusted origins; today such origins get 403 |
 | 483 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
 | 484 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
 | 485 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
@@ -533,7 +530,6 @@ _Last sequenced: 2026-11-02T03:08:40.285168Z · model: claude-opus-5-5 · open: 
 | 520 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
 | 521 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
 | 522 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 523 | PAN-3863 | L | medium | ok |  |  | Orca-style SSH Hosts onboarding; its SSH launch stack (PAN-4404) has now closed, so it is unblocked |
 | 524 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
 | 525 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
 | 526 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
@@ -1210,10 +1206,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T03:08:40.285168Z",
+  "generatedAt": "2026-11-02T03:10:06.926420Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 875,
+  "openCount": 871,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -4060,19 +4056,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "planning": "auto"
     },
     {
-      "issue": "PAN-4646",
-      "rank": 227,
-      "size": "S",
-      "importance": "medium",
-      "score": 52,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Interactive mockup for machine-aware conversation UI (title bar, chips, offline banner); D-6 needs it approved first. Body pending.",
-      "rationale": "New Anywhere child (W-CONV5 mockup). The plan says it can start on day one and decision D-6 requires an approved mockup before the UI is built, so it ranks right after the foundation. Body is still a placeholder.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3355",
       "rank": 229,
       "size": "XS",
@@ -6887,19 +6870,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "planning": "auto"
     },
     {
-      "issue": "PAN-4405",
-      "rank": 458,
-      "size": "M",
-      "importance": "medium",
-      "score": 46,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Aggregated cross-environment overview, Needs-You and search; unblocked now that the PAN-4402 desktop switcher has closed",
-      "rationale": "Lifted from 508 into the slot PAN-4402 vacated: PAN-4402 closed as completed on 2026-11-01, so this issue has no open dependency left.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3873",
       "rank": 459,
       "size": "M",
@@ -7177,18 +7147,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "dependsOn": [],
       "why": "Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver)",
       "rationale": "New this run: medium/50 — Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4403",
-      "rank": 482,
-      "size": "M",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Advertise direct HTTPS/Tailscale endpoints and add them to trusted origins; today such origins get 403",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7681,19 +7639,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "dependsOn": [],
       "why": "OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model",
       "rationale": "New this run: medium/45 — OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3863",
-      "rank": 523,
-      "size": "L",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Orca-style SSH Hosts onboarding; its SSH launch stack (PAN-4404) has now closed, so it is unblocked",
-      "rationale": "Rank held; PAN-4404 closed as completed, which removes this issue's last open dependency.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12562,13 +12507,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "confidence": 0.8
     },
     {
-      "from": "PAN-3862",
-      "to": "PAN-3863",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-3830",
       "to": "PAN-3831",
       "type": "informs",
@@ -12878,13 +12816,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
     },
     {
       "from": "PAN-2350",
-      "to": "PAN-3863",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
       "to": "PAN-3862",
       "type": "contains",
       "source": "github-ref",
@@ -12921,20 +12852,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
     {
       "from": "PAN-2350",
       "to": "PAN-4308",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4403",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4405",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -13243,13 +13160,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
     {
       "from": "PAN-2350",
       "to": "PAN-4638",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4646",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
