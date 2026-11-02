@@ -74,6 +74,28 @@ describe('advertised endpoints (PAN-4645 WI-19)', () => {
     }
   });
 
+  it('advertises nothing under OVERDECK_PUBLIC_LINK_ONLY=1 (PAN-4741 Fly machine)', async () => {
+    vi.stubEnv('OVERDECK_PUBLIC_LINK_ONLY', '1');
+    try {
+      const d = deps({ networkInterfaces: () => ({ eth0: [v4('172.19.4.10')] }) });
+      await expect(discoverEndpoints(d)).resolves.toEqual([]);
+      expect(d.execFile).not.toHaveBeenCalled();
+      expect(d.fetch).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('still advertises when OVERDECK_PUBLIC_LINK_ONLY is not exactly 1', async () => {
+    vi.stubEnv('OVERDECK_PUBLIC_LINK_ONLY', 'true');
+    try {
+      const d = deps({ networkInterfaces: () => ({ eth0: [v4('172.19.4.10')] }) });
+      await expect(discoverEndpoints(d)).resolves.toEqual([{ kind: 'lan', url: 'tcp://172.19.4.10:3011' }]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('ac2: Tailscale Serve is advertised only when the self-check answers with our environment id', async () => {
     const matching = deps({ execFile: vi.fn(async () => tailscaleStatus) });
     const found = await discoverEndpoints(matching);

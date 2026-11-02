@@ -226,6 +226,8 @@ this page) runs Claude Code in raw tmux and no Overdeck server. Start one with
 **Server environment (D-4).** The VM's `pan serve --port 3011 --no-open` runs with
 `OVERDECK_TERMINAL_BACKEND=tmux`, `IS_SANDBOX=1`, `OVERDECK_PUBLIC_LINK_ONLY=1` and
 `PORT=3011`, set on the command line so remote work agent VMs are unchanged.
+`OVERDECK_PUBLIC_LINK_ONLY=1` also makes the VM advertise no endpoints, so home never dials
+its private `172.19.x.y` addresses (PAN-4741).
 
 **Memory (D-12).** Fly machines get `max(remote.fly.vm_memory ?? 1024, 2048)` MB; the
 dashboard server and Claude Code do not fit in 1 GB.

@@ -11,6 +11,8 @@
  *    Tailscale Serve when `tailscale status --json` names this machine and
  *    `https://<name>/api/environment` answers with our environment id ⇒
  *    `wss://<name>/ws/link`.
+ *  - A server in public-link-only mode (`OVERDECK_PUBLIC_LINK_ONLY=1`) advertises
+ *    nothing (PAN-4741).
  *
  * Discovery is cached by `EndpointAdvertiser` (boot plus every 10 min) and the
  * `endpointsHash` (SHA-256 of the sorted URLs, first 16 hex) rides in every
@@ -108,10 +110,12 @@ export async function tailscaleServeEndpoint(deps: Pick<DiscoverEndpointsDeps, '
 /**
  * Everything this machine advertises, deduplicated and sorted by URL. `OVERDECK_ANYWHERE_NO_ADVERTISE=1`
  * advertises nothing (PAN-2356): the directory smoke uses it so two dashboards on one host can only
- * reach each other over the `direct` route.
+ * reach each other over the `direct` route. `OVERDECK_PUBLIC_LINK_ONLY=1` (a linked Fly machine) also
+ * advertises nothing (PAN-4741): only its public pairing route reaches it, and its private Fly
+ * addresses would otherwise rank before that route as unreachable `lan` routes.
  */
 export async function discoverEndpoints(deps: DiscoverEndpointsDeps): Promise<AdvertisedEndpoint[]> {
-  if (process.env['OVERDECK_ANYWHERE_NO_ADVERTISE'] === '1') return [];
+  if (process.env['OVERDECK_ANYWHERE_NO_ADVERTISE'] === '1' || process.env['OVERDECK_PUBLIC_LINK_ONLY'] === '1') return [];
   const found = interfaceEndpoints(deps.port, deps.networkInterfaces());
   const serve = await tailscaleServeEndpoint(deps);
   if (serve) found.push(serve);
