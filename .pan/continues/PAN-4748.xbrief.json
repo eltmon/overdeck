@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4748",
   "created": "2026-11-02T03:23:38.611Z",
-  "updated": "2026-11-02T05:22:22.062Z",
+  "updated": "2026-11-02T05:22:40.085Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "loop-lines-token-rejected.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T05:22:22.061Z"
+    },
+    "loop-lines-token-rejected.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:22:40.085Z"
     }
   }
 }
