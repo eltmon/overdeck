@@ -564,6 +564,11 @@ manual push.
 | Automatic reap (FR-1) | REMOTE_DONE at 2026-11-02T16:35:06Z; deacon-lite handed off at about 2026-11-02T16:35:56Z (about 50 s later) with no operator command: "Remote reap PAN-4832: handed-off (REMOTE_DONE sentinel present for PAN-4832; Review artifact: https://github.com/eltmon/overdeck/pull/4846; Destroyed machine pan-pan-4832-ws; …)". Machine `8911151a2e0d98` destroyed; `workspaces/feature-pan-4832/` materialized; PR [#4846](https://github.com/eltmon/overdeck/pull/4846) opened. Transcript copy-back: 1 JSONL in `remote-sessions/`. |
 | Journal source (FR-2) | **Failed.** `workspaces/feature-pan-4832/.overdeck/pipeline.jsonl` does not exist — no `review.requested` entry was ever written. The reap's own details line gives the reason: "Review not requested (Workspace has uncommitted changes. …)" — the materialized workspace had unrelated, uncommitted drift in `.overdeck/context/codebase/concerns.md` (not the smoke agent's work), which tripped the clean-tree guard in `getDirtyWorkspaceErrorForReviewRequest` before `requestReviewThroughRoute(..., { source: 'remote-reap' })` could run. Filed [#4847](https://github.com/eltmon/overdeck/issues/4847) with the root cause and evidence (D-3). |
 
+Cleanup: reviewers aborted (0 were running — no review had been requested),
+PR [#4846](https://github.com/eltmon/overdeck/pull/4846) closed unmerged with
+its branch deleted, PAN-4832 closed, `remote.enabled` restored to `false`, no
+smoke machine left (`fly machines list -a pan-workspaces --json` returns `[]`).
+
 ## Live verification (PAN-4652)
 
 Fly machines were tested live on 2026-11-01, before merge, against app
