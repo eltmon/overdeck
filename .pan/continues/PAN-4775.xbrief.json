@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4775",
   "created": "2026-11-02T03:25:35.744Z",
-  "updated": "2026-11-02T03:31:14.124Z",
+  "updated": "2026-11-02T03:31:22.778Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4775",
       "claimedAt": "2026-11-02T03:29:50.568Z",
       "doneAt": "2026-11-02T03:31:14.124Z"
+    },
+    "w5-supersede-header": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4775",
+      "claimedAt": "2026-11-02T03:31:22.778Z"
     }
   }
 }
