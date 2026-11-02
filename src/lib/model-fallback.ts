@@ -46,6 +46,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'gpt-6-luna': 'openai',
   'gpt-6.1-sol': 'openai',
   'gpt-6.1-terra': 'openai',
+  'gpt-6-rosalind': 'openai',
+  'gpt-6-astra-law': 'openai',
   'gpt-5.5': 'openai',
   'gpt-5.4': 'openai',
   'gpt-5.4-mini': 'openai',
@@ -145,6 +147,8 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'gpt-6-luna': 'claude-haiku-4-5', // GPT-6 fast/cheap tier → Haiku
   'gpt-6.1-sol': 'claude-sonnet-5-5', // GPT-6.1 mid tier → Sonnet
   'gpt-6.1-terra': 'claude-sonnet-5-5', // GPT-6.1 workhorse tier → Sonnet
+  'gpt-6-rosalind': 'claude-sonnet-5-5', // GPT-6 domain model → Sonnet
+  'gpt-6-astra-law': 'claude-sonnet-5-5', // GPT-6 Astra legal configuration → Sonnet
   'gpt-5.5': 'claude-sonnet-5-5', // Flagship model → Sonnet
   'gpt-5.5-pro': 'claude-sonnet-5-5', // Top-tier model → Sonnet
   'gpt-5.4': 'claude-sonnet-5-5', // Flagship model → Sonnet
@@ -234,6 +238,8 @@ const MODEL_TIER_RANK: Record<string, number> = {
   'gpt-6-luna': 1,
   'gpt-6.1-sol': 2,
   'gpt-6.1-terra': 2,
+  'gpt-6-rosalind': 3,
+  'gpt-6-astra-law': 3,
   'gpt-5.5': 2,
   'gpt-5.4': 2,
   'gpt-5.3-codex': 2,

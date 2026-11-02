@@ -34,6 +34,8 @@ describe('September model catalog no-loss audit', () => {
     ['gpt-6-luna', 'openai', 272000],
     ['gpt-6.1-sol', 'openai', 272000],
     ['gpt-6.1-terra', 'openai', 272000],
+    ['gpt-6-rosalind', 'openai', 272000],
+    ['gpt-6-astra-law', 'openai', 272000],
     ['gpt-5.6-sol', 'openai', 272000],
     ['gpt-5.6-terra', 'openai', 272000],
     ['gpt-5.6-luna', 'openai', 272000],

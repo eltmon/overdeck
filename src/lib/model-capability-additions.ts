@@ -326,6 +326,31 @@ export const AUDITED_MODEL_ADDITIONS = {
     notes: 'OpenAI GPT-6.1 workhorse tier (October 26, 2026), below gpt-6.1-sol in the slot gpt-5.6-terra fills for GPT-5.6. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] variant. 1.05M marketing context. Codex under ChatGPT sign-in needs CLI 0.159.0+. CLIProxy 7.3.16 does not serve it (PAN-4634).',
   },
 
+  // GPT-6 Rosalind (life sciences, released 2026-10-30) and GPT-6 Astra for Law: prices per
+  // developers.openai.com/api/docs/pricing (checked 2026-11-02). Their model pages 404, so no
+  // native window, max output or effort set is published; the 272K pin is the Codex harness pin
+  // (runtimes/codex.ts gpt-6- branch). Skills are unranked (domain models, not benchmarked).
+  'gpt-6-rosalind': {
+    model: 'gpt-6-rosalind',
+    provider: 'openai',
+    displayName: 'GPT-6 Rosalind',
+    costPer1MTokens: 45, // $15.00 in / $75.00 out ($1.50 cached)
+    contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 95 },
+    notes: 'OpenAI life-sciences model (2026-10-30). API access is limited to OpenAI\'s trusted-access program; absent from the Codex 0.159.0 ChatGPT-sign-in catalog, so no Codex floor is measured. Codex harness only (not served via CLIProxy). Pinned to the 272K billing tier; >272K input bills $30/$3/$112.50. Effort levels inherited from the GPT-6 family. Capability scores are unranked pending evaluation.',
+  },
+  'gpt-6-astra-law': {
+    model: 'gpt-6-astra-law',
+    provider: 'openai',
+    displayName: 'GPT-6 Astra for Law',
+    costPer1MTokens: 30, // $10.00 in / $50.00 out ($1.00 cached), promotional through at least 2026-12-31
+    contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 95 },
+    notes: 'OpenAI legal model configuration of GPT-6 Astra. Promotional pricing at least through 2026-12-31. Absent from the Codex 0.159.0 ChatGPT-sign-in catalog, so no Codex floor is measured. Codex harness only (not served via CLIProxy). The 272K window is the Codex harness pin; no long-context price is listed. Effort levels inherited from the GPT-6 family. Capability scores are unranked pending evaluation.',
+  },
+
   'gpt-6-luna': {
     model: 'gpt-6-luna',
     provider: 'openai',
