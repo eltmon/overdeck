@@ -10,6 +10,8 @@
  * `/api/lanes`), on `POST /api/machines/work/projects` (operator only), on
  * every other conversation write, on `POST /api/lanes/<name>/reap` (PAN-4638
  * FR-11: the owner's lane reap door checks provenance instead), on
+ * `POST /api/lanes/<name>/stop` unless its environment started that lane
+ * (a lane stop is a conversation write), on
  * `/ws/terminal` and on `/ws/forward`.
  * `POST /api/workers/:id/stop` passes here: the stop route itself checks the
  * worker's `worker.json` provenance, which is an async read. Operator actors
@@ -45,6 +47,16 @@ const CONVERSATION_PREFIX = '/api/conversations/';
 /** PAN-4638 FR-11: home's lane reap; an agent on a link reaps through the owner's provenance-checked door. */
 const LANE_REAP_PATH = /^\/api\/lanes\/[^/]+\/reap$/;
 
+/** PAN-4638: home's lane stop, a conversation write judged by the lane's provenance. */
+const LANE_STOP_PATH = /^\/api\/lanes\/([^/]+)\/stop$/;
+
+/** `'/api/lanes/<ref>/stop'` → the names the route may resolve `<ref>` to (it strips a `conv-` prefix); null otherwise. */
+function laneStopNamesOf(pathname: string): string[] | null {
+  const ref = LANE_STOP_PATH.exec(pathname)?.[1];
+  if (!ref) return null;
+  return ref.startsWith('conv-') ? [ref, ref.slice('conv-'.length)] : [ref];
+}
+
 /** `'/api/conversations/<name>[/…]'` → `<name>`; null for any other path. */
 function conversationNameOf(pathname: string): string | null {
   if (!pathname.startsWith(CONVERSATION_PREFIX)) return null;
@@ -73,6 +85,8 @@ export function linkActorFence(
   if (method === 'GET' || method === 'HEAD') return null;
   if (pathname === '/api/conversations') return AGENT_FENCED;
   if (method === 'POST' && LANE_REAP_PATH.test(pathname)) return AGENT_FENCED;
+  const laneStop = method === 'POST' ? laneStopNamesOf(pathname) : null;
+  if (laneStop) return laneStop.some((candidate) => startedByCaller(candidate, credential.environmentId, deps)) ? null : AGENT_FENCED;
   const name = conversationNameOf(pathname);
   if (name === null) return null;
   return startedByCaller(name, credential.environmentId, deps) ? null : AGENT_FENCED;

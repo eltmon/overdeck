@@ -91,7 +91,10 @@ function validateSpec(spec: OwnerLaneSpec): void {
   if (spec.role !== 'builder' && (spec.branch !== null || spec.base !== null)) {
     throw new LaneLaunchError(400, 'branch and base apply to builder lanes only');
   }
-  if (spec.role === 'critic' && !spec.at && !spec.reuseCwd) throw new LaneLaunchError(400, 'a critic lane needs the commit it judges');
+  // Home resolves `at` for both judges (resolveCriticLink); without it the owner would create no directory.
+  if ((spec.role === 'critic' || spec.role === 'verifier') && !spec.at && !spec.reuseCwd) {
+    throw new LaneLaunchError(400, `a ${spec.role} lane needs the commit it judges`);
+  }
   // Refs reach git as positional arguments; a leading dash would parse as an option.
   for (const [field, value] of [['at', spec.at], ['base', spec.base], ['branch', spec.branch]] as const) {
     if (value !== null && (value.startsWith('-') || value.trim() === '')) throw new LaneLaunchError(400, `${field} ${value} is not a git ref`);

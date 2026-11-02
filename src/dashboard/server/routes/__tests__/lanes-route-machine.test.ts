@@ -74,6 +74,8 @@ function deps(fetchPeer: LaneRouteDeps['fetchPeer']) {
     launch: (request, launchDeps) => launchLane(request, { ...LOCAL_DEPS, ...launchDeps }),
     flyEnvironmentIds: async () => [],
     follow: vi.fn(),
+    stopLocal: vi.fn(async () => undefined),
+    now: () => new Date(),
   };
   return value;
 }

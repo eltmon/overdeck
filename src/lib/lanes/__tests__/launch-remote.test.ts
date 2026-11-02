@@ -280,6 +280,25 @@ describe('launchLane on another machine (PAN-4638 WI-4)', () => {
     }
   });
 
+  it('a local launch refuses with 500 when every name candidate is taken, and removes its directory', async () => {
+    const { deps } = harness();
+    const parent = root();
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.25);
+    try {
+      await launchLane(request(parent, { run: 'full', key: 'r1', machine: 'desk' }), deps);
+      const local = harness();
+      const error = await rejection(launchLane(
+        request(parent, { run: 'full', key: 'l1', role: 'play', model: 'claude-opus-5-5' }),
+        { ...local.deps, remote: undefined, cpuPressure: vi.fn(async () => ({ ...CPU_SATURATED, saturated: false })) },
+      ));
+      expect(error.status).toBe(500);
+      expect(error.message).toContain('could not allocate a free conversation name');
+      expect(existsSync(join(LANES_ROOT, 'full-l1-play-i1'))).toBe(false);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
   it('a local critic of a remote builder links it through the sidecar', async () => {
     const { deps } = harness();
     const parent = root();

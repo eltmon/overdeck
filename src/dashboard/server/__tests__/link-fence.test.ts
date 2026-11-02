@@ -160,6 +160,14 @@ describe('provenance fence (PAN-4651 D-4651-2)', () => {
     expect(linkActorFence(machine('operator'), 'POST', '/api/lanes/x/reap', deps)).toBeNull();
   });
 
+  it('PAN-4638: an agent actor stops only lanes its own machine started', () => {
+    expect(linkActorFence(agentOf('env-laptop'), 'POST', '/api/lanes/conv-a/stop', deps)).toBeNull();
+    expect(linkActorFence(agentOf('env-laptop'), 'POST', '/api/lanes/a/stop', { conversationStartedBy: (name) => (name === 'a' ? 'env-laptop' : null) })).toBeNull();
+    expect(linkActorFence(agentOf('env-other'), 'POST', '/api/lanes/conv-a/stop', deps)).toBe('agent-fenced');
+    expect(linkActorFence(agentOf('env-laptop'), 'POST', '/api/lanes/unknown-lane/stop', deps)).toBe('agent-fenced');
+    expect(linkActorFence(machine('operator'), 'POST', '/api/lanes/unknown-lane/stop', deps)).toBeNull();
+  });
+
   it('ac3: an operator actor keeps every right, provenance or not', () => {
     const operator = machine('operator');
     expect(linkActorFence(operator, 'POST', '/api/conversations/conv-b/message', deps)).toBeNull();

@@ -150,6 +150,18 @@ describe('launchOwnedLane (PAN-4638 WI-2)', () => {
     expect(git.addBranchWorktree).not.toHaveBeenCalled();
   });
 
+  it('refuses a critic or verifier with no commit to judge before creating anything', async () => {
+    const { deps, git } = harness();
+    for (const role of ['critic', 'verifier'] as const) {
+      const lane = spec({ role, branch: null, at: null });
+      const error = await rejection(launchOwnedLane(lane, CONTEXT, deps));
+      expect(error.status).toBe(400);
+      expect(error.message).toBe(`a ${role} lane needs the commit it judges`);
+      expect(getConversationByName(lane.name)).toBeNull();
+    }
+    expect(git.fetchBase).not.toHaveBeenCalled();
+  });
+
   it('refuses an orchestrator lane with 400', async () => {
     const { deps } = harness();
     const error = await rejection(launchOwnedLane(spec({ role: 'orchestrator', branch: null }), CONTEXT, deps));

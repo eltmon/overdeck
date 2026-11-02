@@ -620,6 +620,7 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
         getConversationByName(candidate) !== null || (await remoteLaneNameTaken(candidate));
       let name = generateConversationName();
       for (let attempt = 0; attempt < NAME_ATTEMPTS && (await nameTaken(name)); attempt += 1) name = generateConversationName();
+      if (await nameTaken(name)) throw new LaneLaunchError(500, `could not allocate a free conversation name in ${NAME_ATTEMPTS} attempts`);
       const tmuxSession = `conv-${name}`;
       const briefPath = await writeBrief(name);
 
