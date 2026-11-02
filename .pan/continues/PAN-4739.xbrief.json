@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4739",
   "created": "2026-11-02T06:14:09.782Z",
-  "updated": "2026-11-02T06:43:51.888Z",
+  "updated": "2026-11-02T06:44:08.008Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "docs-liveness-confirm.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T06:43:51.887Z"
+    },
+    "docs-liveness-confirm.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:44:08.008Z"
     }
   }
 }
