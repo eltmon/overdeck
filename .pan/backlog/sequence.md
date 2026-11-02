@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T16:10:27.064756Z · model: claude-opus-5-5 · open: 855_
+_Last sequenced: 2026-11-02T16:13:13.759948Z · model: claude-opus-5-5 · open: 858_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 2 | PAN-4825 | M | high | ok |  |  | MiMo, Groq and Cerebras ship only dead ids (tierModels too), so every launch on them fails; also refreshes MiniMax/xAI/Mistral/Kimi |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
 | 6 | PAN-4821 | S | high | ok |  |  | Close-out says no PR found when the forge read fails transiently; dod-gate maps every lookup error to null and caches it. |
@@ -180,6 +181,7 @@ _Last sequenced: 2026-11-02T16:10:27.064756Z · model: claude-opus-5-5 · open: 
 | 172 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 173 | PAN-4634 | M | medium | needs-refinement |  |  | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
 | 174 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
+| 175 | PAN-4827 | M | high | ok |  | PAN-4825 | Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices |
 | 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
 | 180 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
@@ -226,6 +228,7 @@ _Last sequenced: 2026-11-02T16:10:27.064756Z · model: claude-opus-5-5 · open: 
 | 221 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 222 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 223 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
+| 224 | PAN-4826 | M | medium | ok |  |  | OpenAI/Anthropic catalog: fix 7 wrong prices, add gpt-6-rosalind, hide sonnet-4-5 before 11-30 retirement, raise 4-6 to 1M |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
 | 228 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
@@ -867,6 +870,10 @@ _Last sequenced: 2026-11-02T16:10:27.064756Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
+### PAN-4825 (rank 2)
+
+New in-pipeline issue from the 2026-11-02 model catalog audit. MiMo, Groq and Cerebras currently carry only provider-retired ids, including their tierModels, so every launch on those providers fails today; the issue retires them through MODEL_DEPRECATIONS with official-source decision rules and also refreshes MiniMax, xAI, Mistral, Meta and Kimi entries. As an in-pipeline issue it is pinned in the free rank 2 (no prior rank), so no other node moves. It also unblocks PAN-4827, whose all-provider tierModels test fails while these dead tier ids remain.
+
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1179,10 +1186,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
-### PAN-3106 (rank 80)
-
-New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1190,10 +1193,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T16:10:27.064756Z",
+  "generatedAt": "2026-11-02T16:13:13.759948Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 855,
+  "openCount": 858,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11846,6 +11849,47 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4825",
+      "rank": 2,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "MiMo, Groq and Cerebras ship only dead ids (tierModels too), so every launch on them fails; also refreshes MiniMax/xAI/Mistral/Kimi",
+      "rationale": "New in-pipeline issue from the 2026-11-02 model catalog audit. MiMo, Groq and Cerebras currently carry only provider-retired ids, including their tierModels, so every launch on those providers fails today; the issue retires them through MODEL_DEPRECATIONS with official-source decision rules and also refreshes MiniMax, xAI, Mistral, Meta and Kimi entries. As an in-pipeline issue it is pinned in the free rank 2 (no prior rank), so no other node moves. It also unblocks PAN-4827, whose all-provider tierModels test fails while these dead tier ids remain.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4827",
+      "rank": 175,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4825"
+      ],
+      "why": "Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices",
+      "rationale": "New issue from the 2026-11-02 catalog audit: Google's haiku tier and all three DashScope tiers point at shut-down or never-real ids, so Claude Code subagents on those providers fail, and several Qwen rows carry $0 placeholder prices. It is a well-specified provider bug fix, not substrate, so it takes the free rank 175 among high-importance fixes. Its AC1 test asserts no provider's tierModels is in MODEL_DEPRECATIONS, which cannot pass until PAN-4825 retires the MiMo/Groq/Cerebras tier ids, so it depends on PAN-4825.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4826",
+      "rank": 224,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "OpenAI/Anthropic catalog: fix 7 wrong prices, add gpt-6-rosalind, hide sonnet-4-5 before 11-30 retirement, raise 4-6 to 1M",
+      "rationale": "New issue from the 2026-11-02 catalog audit. Nothing is broken today: claude-sonnet-4-5 already migrates through MODEL_DEPRECATIONS, so the 2026-11-30 retirement only needs it hidden from new selections, and the rest is price accuracy, a new opt-in model and two context windows. It takes the free rank 224, after PAN-4364 (GPT-6 OpenAI catalog alignment, rank 208), which edits the same OpenAI rows and should land first to avoid conflicts.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13080,6 +13124,20 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4825",
+      "to": "PAN-4827",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4364",
+      "to": "PAN-4826",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
