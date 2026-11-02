@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T17:00:52.023Z",
+  "updated": "2026-11-02T17:01:09.149Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -253,6 +253,10 @@
     "wi12-tree-row-opens-linked.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T17:00:52.023Z"
+    },
+    "wi12-tree-row-opens-linked.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:01:09.149Z"
     }
   }
 }
