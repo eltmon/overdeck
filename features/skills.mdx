@@ -281,29 +281,6 @@ Overrides do not apply to other harnesses, to remote (Fly) launches, or to sessi
 
 ## Skill packs
 
-### Adding a pack
-
-```bash
-pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3
-```
-
-Overdeck fetches the repository, resolves the ref to a commit, reads the pack, and prints a preview before it writes anything:
-
-```
-Pack mattpocock
-  Source       https://github.com/eltmon/skills @ v1.2.3 (6acc160)
-  Adapter      claude-plugin
-  License      MIT
-  Skills       25 (1 opt-in: setup-matt-pocock-skills)
-  Executables  skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh, skills/engineering/wizard/template.sh
-  Not applied  executables (2), project-mutating skills (1)
-Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack mattpocock on
-```
-
-Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly|gstack-runtime` to choose. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
-
-For a known pack (`mattpocock`, `deft`, `sageox`, `pstack`) the url is optional; `pstack` also has a default ref, so `pan skills pack add pstack` is enough.
-
 ### Pinning and updates
 
 The registry stores the **ref** you asked for (a tag or a branch) and the **trusted commit** you approved. Every launch mounts exactly the trusted commit, even if the tag or branch moves.
@@ -380,12 +357,6 @@ A few pstack skills name Cursor model ids (`arena`, `architect`, `setup-pstack`)
 `agents/` is not applied, so `poteto-mode`'s delegations to `pstack:poteto-agent` and `pstack:comment-sicko` fall back to `general-purpose`. `poteto-mode`'s shipping and babysit playbooks open and merge PRs with `gh` and run `scripts/watch-pr/watch-pr`; Overdeck never runs these scripts, and inside an Overdeck issue the pipeline owns PRs and merges.
 
 Codex receives the same Claude Code build; the fork has no Codex-specific build.
-
-### What is not applied
-
-Overdeck mounts skill directories only. If a pack also carries hooks, MCP servers, commands, agents, context injection, git hooks, or scripts, the preview and the dashboard list them as **Not applied**, and none of them reach the agent. Scripts inside a skill directory are copied with the skill but never run by Overdeck.
-
-Runtime packs (gstack) are the exception: their scripts are mounted and run when you invoke a skill, after you trusted them at `add`.
 
 ### Where pack state is stored
 
