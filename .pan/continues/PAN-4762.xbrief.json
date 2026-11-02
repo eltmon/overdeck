@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4762",
   "created": "2026-11-02T01:21:42.220Z",
-  "updated": "2026-11-02T01:50:31.000Z",
+  "updated": "2026-11-02T01:50:45.831Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "frontend-markdown-menu-browsers.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T01:50:30.999Z"
+    },
+    "docs-browser-menu.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:50:45.831Z"
     }
   }
 }
