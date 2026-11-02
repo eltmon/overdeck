@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ColorThemeImportError, mapVsCodeTheme, mapVsCodeThemeObject, parseVsCodeThemeText } from '../vscode-import.js';
+import { ColorThemeImportError, mapVsCodeTheme } from '../vscode-import.js';
+import { mapVsCodeThemeObject, parseVsCodeThemeText } from '../vscode-import.js';
 
 function fixture(name: string): string {
   return readFileSync(join(__dirname, 'fixtures', name), 'utf8');
