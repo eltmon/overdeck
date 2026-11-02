@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4752",
   "created": "2026-11-02T00:18:49.972Z",
-  "updated": "2026-11-02T01:07:54.569Z",
+  "updated": "2026-11-02T01:08:34.673Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "fold-strike-workspaces.ac5": {
       "status": "completed",
       "doneAt": "2026-11-02T01:07:54.568Z"
+    },
+    "strike-pr-overlay.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:08:34.672Z"
     }
   }
 }
