@@ -585,9 +585,14 @@ Recorded, not fixed here:
 - The first message of a new conversation was lost to Claude Code's "Make auto mode your
   default permission mode?" startup dialog
   ([#4738](https://github.com/eltmon/overdeck/issues/4738)).
-- The VM's conversation-lifecycle patrol marks the live conversation ended on every tick,
-  which can make the idle sweep see a working machine as idle
-  ([#4739](https://github.com/eltmon/overdeck/issues/4739)).
+- The VM's conversation-lifecycle patrol and the conversation list disagreed about a live
+  conversation, so its row flapped between `ended` and `active` and the idle sweep could
+  see a working machine as idle
+  ([#4739](https://github.com/eltmon/overdeck/issues/4739)). Fixed by PAN-4739: the
+  census now reads tmux as a UTF-8 client (see "Reproduction (PAN-4739)" below), and the
+  patrol confirms through `conversationHarnessAlive` before it ends a conversation, so
+  the patrol and the list route can no longer flap the row. A census verdict the door
+  contradicts logs one `WARNING (PAN-4739)` line in `fly-serve.log`.
 - The first linked request after an idle spell failed with `socket hang up`; an
   immediate retry succeeded ([#4740](https://github.com/eltmon/overdeck/issues/4740)).
 - The VM advertises its private Fly addresses as `lan` routes, which home tries before

@@ -4,17 +4,17 @@
     "created": "2026-11-02T06:40:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4739: Fly machine: conversation-lifecycle marks a live conversation ended on every tick",
-    "updated": "2026-11-02T06:12:39.966Z"
+    "updated": "2026-11-02T06:13:54.208Z"
   },
   "plan": {
     "id": "pan-4739",
     "title": "Fly machine: conversation-lifecycle marks a live conversation ended on every tick",
-    "status": "proposed",
+    "status": "running",
     "uid": "f9912eac-9377-4f45-b963-1f7279b857d2",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T06:40:00.000Z",
-    "updated": "2026-11-02T06:12:39.966Z",
+    "updated": "2026-11-02T06:13:54.208Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4739",
@@ -330,5 +330,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

@@ -518,6 +518,18 @@ nothing. Readiness reads the pane through `readAgentPaneText` (Herdr `pane.read`
 `source: visible`, or tmux `capture-pane`): `recent` is empty while a full-screen TUI (omp, kimi,
 muse, the codex TUI) draws on the alternate screen, so the agent TUI waiters read `visible` too. The numbered-menu capture in `conversation-pane-choice.ts` stays tmux-only.
 
+The poller's census verdict ("session gone" or "keep-alive corpse") is a candidate, not the
+decision (PAN-4739). Before it ends a row it asks `conversationHarnessAlive`, the door the
+conversation list's repair uses. When the door reports the harness alive, the row stays
+`active` and the poller logs one `WARNING (PAN-4739)` line per episode, naming the session,
+the census verdict and the census health (`available`, `stale`, `error`, pane count, up to 20
+session names). The warning repeats only after the census and the door have agreed again. This
+check runs only for a row about to be ended, so a tick with nothing to end adds no subprocess.
+Without it, the poller (reading the census) and the list route (reading `list-sessions`) flapped
+a Fly machine's live conversation between `ended` and `active` on every tick. The census
+disagreed there because tmux, run without a UTF-8 locale, prints `-F` tabs as `_`; the pane
+readers that parse tab-separated records now pass `-u`.
+
 **On a tmux host the door still asks Herdr** when its socket answers, and only a Herdr `alive`
 counts there (an unreachable Herdr is the normal state of a tmux host). The poller does the same
 with `listHerdrAgents`. Stop, respawn, restart-all and `pan flywheel start --fresh` close a
