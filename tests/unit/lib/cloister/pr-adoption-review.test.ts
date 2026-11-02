@@ -4,6 +4,7 @@ vi.mock('../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipeline: vi.
 
 import {
   __resetPrAdoptionForTests,
+  adoptionRefusalComment,
   adoptPrAndStartReview,
   answerMissingWorkspace,
   findOpenPipelinePr,
@@ -20,6 +21,7 @@ function harness(adoption: AdoptionOutcome | (() => Promise<AdoptionOutcome>)) {
     startReview: vi.fn(async () => ({ started: true as const })),
     announce: vi.fn(async () => undefined),
     journal: vi.fn((_ws: string, entry: Record<string, unknown>) => ({ at: 'now', ...entry }) as never),
+    comment: vi.fn(async (_repo: string, _prNumber: number, _body: string) => undefined),
   };
 }
 
@@ -155,7 +157,7 @@ describe('answerMissingWorkspace', () => {
     const adoptAndReview = vi.fn(async () => ({ kind: 'started' as const, workspacePath: WS }));
 
     const answer = await answerMissingWorkspace('pan-1', 'pan-review-request', { derivedState: 'ready', workspaceExists: false }, {
-      findPr: async () => found, adoptAndReview,
+      findPr: async () => found, adoptAndReview, preflight: async () => ({ ok: true, headSha: PR.headSha!, project: { projectPath: '/repo', projectName: 'demo', polyrepo: false }, canonical: WS }),
     });
 
     expect(answer?.status).toBe(202);
@@ -183,5 +185,78 @@ describe('answerMissingWorkspace', () => {
 
     expect(answer?.status).toBe(503);
     expect(String(answer?.body['error'])).toContain('rate limited');
+  });
+});
+
+describe('adoption refusals reach the requester and the PR (PAN-4785)', () => {
+  const REFUSAL: AdoptionOutcome & { adopted: false } = {
+    adopted: false,
+    reason: 'checked-out-elsewhere',
+    detail: 'feature/pan-1 is checked out in /home/me/hoff',
+    fix: 'PR #7 (feature/pan-1) is checked out in /home/me/hoff ... run `git -C /home/me/hoff switch --detach` (the branch and the worktree stay), then `pan review request PAN-1`.',
+    worktreePath: '/home/me/hoff',
+  };
+
+  it('answers 409 with the worktree and the fix, and never starts adoption, when the preflight refuses', async () => {
+    const adoptAndReview = vi.fn();
+    const answer = await answerMissingWorkspace('PAN-1', 'pan-review-request', { derivedState: 'in-review', workspaceExists: false }, {
+      findPr: async () => ({ kind: 'found', pr: PR }),
+      adoptAndReview,
+      preflight: async () => ({ ok: false, refusal: REFUSAL }),
+    });
+
+    expect(answer).toEqual({
+      status: 409,
+      body: {
+        success: false,
+        error: 'PR #7 cannot be adopted into a pipeline workspace: feature/pan-1 is checked out in /home/me/hoff',
+        hint: REFUSAL.fix,
+        reason: 'checked-out-elsewhere',
+        worktreePath: '/home/me/hoff',
+      },
+    });
+    expect(adoptAndReview).not.toHaveBeenCalled();
+  });
+
+  it('answers 503 when the preflight itself fails', async () => {
+    const answer = await answerMissingWorkspace('PAN-1', 'pan-review-request', { derivedState: 'in-review', workspaceExists: false }, {
+      findPr: async () => ({ kind: 'found', pr: PR }),
+      preflight: async () => { throw new Error('git worktree list failed'); },
+    });
+    expect(answer?.status).toBe(503);
+    expect(String(answer?.body['error'])).toContain('git worktree list failed');
+  });
+
+  it('comments a late refusal on the PR once per reason and head', async () => {
+    const deps = harness(REFUSAL);
+
+    await adoptPrAndStartReview(PR, { source: 'webhook', ...deps });
+    await adoptPrAndStartReview(PR, { source: 'webhook', ...deps });
+    expect(deps.comment).toHaveBeenCalledTimes(1);
+    expect(deps.comment).toHaveBeenCalledWith('acme/demo', 7, adoptionRefusalComment(PR, REFUSAL));
+    const body = deps.comment.mock.calls[0]![2];
+    expect(body).toContain(`<!-- overdeck-adoption-refused reason=checked-out-elsewhere sha=${PR.headSha} -->`);
+    expect(body).toContain('git -C /home/me/hoff switch --detach');
+
+    // A new head is a new refusal.
+    await adoptPrAndStartReview({ ...PR, headSha: 'b'.repeat(40) }, { source: 'webhook', ...deps });
+    expect(deps.comment).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not comment when adoption succeeds, and survives a failing comment', async () => {
+    const ok = harness({ adopted: true, workspacePath: WS });
+    await adoptPrAndStartReview(PR, { source: 'webhook', ...ok });
+    expect(ok.comment).not.toHaveBeenCalled();
+
+    const failing = harness(REFUSAL);
+    failing.comment.mockRejectedValueOnce(new Error('gh: rate limited'));
+    await expect(adoptPrAndStartReview({ ...PR, issueId: 'PAN-2' }, { source: 'webhook', ...failing }))
+      .resolves.toEqual({ kind: 'refused', adoption: REFUSAL });
+  });
+
+  it('skips the comment when the PR repo is unknown', async () => {
+    const deps = harness(REFUSAL);
+    await adoptPrAndStartReview({ ...PR, repo: '' }, { source: 'webhook', ...deps });
+    expect(deps.comment).not.toHaveBeenCalled();
   });
 });

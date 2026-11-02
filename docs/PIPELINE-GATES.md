@@ -1630,19 +1630,31 @@ entry is `workspace.adoption-failed`. It carries
 `needs-you` and `api-error` still outrank it. Once a workspace exists, a
 later `review.requested` in its journal clears it. The fix has two forms. When another worktree holds the branch:
 "PR #<n> (<branch>) is checked out in <path>, so Overdeck cannot create the
-pipeline workspace … run `git -C <project> worktree remove <path>`, then
+pipeline workspace … Push any unpushed commits on <branch>, run
+`git -C <path> switch --detach` (the branch and the worktree stay), then
 `pan review request <ID>`." Otherwise: "PR #<n> (<branch>) was opened outside
 a pipeline workspace … Run `pan review request <ID>` to adopt the branch into
 a workspace and start verification." Each refusal is also announced once on
-the activity stream. The webhook calls `refreshIssuePullRequestStateNow` on
+the activity stream, and (PAN-4785) commented on the PR once per reason and
+head in a process, under the marker
+`<!-- overdeck-adoption-refused reason=<reason> sha=<head> -->`. A refusal
+that leaves no workspace is not journaled: the journal lives in the workspace
+and is never recreated for a refusal, so the PR comment is its durable record. The webhook calls `refreshIssuePullRequestStateNow` on
 `opened`, `reopened`, `ready_for_review` and `closed`, so the cached PR
 listing does not hide a just-opened PR for five minutes.
 
 `pan review request` adopts too. The `/api/review/:issueId/request` route
 asks `answerMissingWorkspace` right after it reads the derived state, before
 the approved-head force and nudge shortcuts and `requestReviewGuarded`. With
-no workspace and an open pipeline-branch PR it starts adoption in the
-background and answers 202. A forge failure answers 503, never "no PR". With
+no workspace and an open pipeline-branch PR it first runs the adoption
+preflight (PAN-4785, `preflightPrAdoption`): the checks that need no network
+(pipeline branch, known head, owning non-polyrepo project, and the branch not
+checked out in another worktree). When the preflight refuses, the route
+answers 409 with the reason as `error`, the fix as `hint`, and `reason` and
+`worktreePath`, so `pan review request` exits 1 naming the worktree instead of
+reporting "queued". Otherwise it starts adoption in the background and answers
+202. Adoption runs the same preflight first, so a branch held elsewhere is
+refused before any fetch. A forge failure answers 503, never "no PR". With
 no PR it answers 400 with a hint to run `pan start` or
 `pan workspace create`. A merged issue skips the check.
 
