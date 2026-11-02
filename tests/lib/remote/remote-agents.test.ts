@@ -309,6 +309,17 @@ describe('checkRemoteSpendCap', () => {
       .toThrow('unexpected shape');
   });
 
+  it('does not count a linked work agent on top of its Fly machine (PAN-4734 FR-10)', () => {
+    const active = [
+      { id: 'agent-pan-1', issueId: 'PAN-1', vmName: 'overdeck-machine-1a2b3c4d', model: 'claude-opus-5-5', status: 'running', startedAt: '2026-01-01T00:00:00Z', location: 'remote' as const, startedBy: 'operator', linked: true as const },
+    ];
+    const result = checkRemoteSpendCap(
+      { remote: { max_concurrent_agents: 2 } },
+      { listActiveRemoteAgentStates: () => active, countFlyMachines: () => 1 },
+    );
+    expect(result).toMatchObject({ allowed: true, current: 1, cap: 2 });
+  });
+
   it('allows any count of agents and Fly machines when the cap is zero', () => {
     const result = checkRemoteSpendCap(
       { remote: { max_concurrent_agents: 0 } },
@@ -405,6 +416,30 @@ describe('refreshHostHeartbeatForEphemeralVms', () => {
     expect(ssh).toHaveBeenCalledTimes(1);
     expect(sshCommands[0]).toContain('/workspace/.pan/host-heartbeat');
     expect(sshCommands[0]).toContain('2026-01-01T00:00:00.000Z');
+  });
+
+  it('skips a linked work agent, whose Fly machine record owns the heartbeat (PAN-4734 FR-10)', async () => {
+    const createFlyProvider = vi.fn();
+    const actions = await refreshHostHeartbeatForEphemeralVms({
+      listActiveRemoteAgentStates: () => [
+        {
+          id: 'agent-pan-1',
+          issueId: 'PAN-1',
+          vmName: 'overdeck-machine-1a2b3c4d',
+          model: 'claude-opus-5-5',
+          status: 'running',
+          startedAt: '2026-01-01T00:00:00Z',
+          location: 'remote',
+          startedBy: 'operator',
+          tier: 'ephemeral',
+          linked: true,
+        },
+      ],
+      createFlyProvider: createFlyProvider as any,
+      now: () => new Date('2026-01-01T00:00:00Z'),
+    });
+    expect(actions).toEqual([]);
+    expect(createFlyProvider).not.toHaveBeenCalled();
   });
 
   it('returns a failure message when SSH fails', async () => {

@@ -253,6 +253,20 @@ describe('remote Claude credential proactive refresh', () => {
       expect(createFlyProvider).not.toHaveBeenCalled();
     });
 
+    it('syncs a linked work agent\'s VM once, as its Fly machine (PAN-4734 FR-10)', async () => {
+      const syncClaudeCredentials = vi.fn().mockResolvedValue(true);
+      const actions = await refreshClaudeCredentialsForActiveRemoteAgents({
+        listActiveRemoteAgentStates: () => [{ ...activeRemoteState('PAN-4734', 'overdeck-machine-1a2b3c4d'), linked: true as const }],
+        listFlyMachineNames: async () => ['overdeck-machine-1a2b3c4d'],
+        credentialFingerprint: () => '100:12',
+        loadConfig: () => ({ remote: { provider: 'fly' } }) as any,
+        createFlyProvider: (() => ({ syncClaudeCredentials })) as any,
+      });
+      expect(syncClaudeCredentials).toHaveBeenCalledTimes(1);
+      expect(syncClaudeCredentials).toHaveBeenCalledWith('overdeck-machine-1a2b3c4d');
+      expect(actions).toEqual(['Remote credentials refreshed for Fly machine on overdeck-machine-1a2b3c4d']);
+    });
+
     it('still refreshes remote agents when the Fly machine store is unreadable', async () => {
       const syncClaudeCredentials = vi.fn().mockResolvedValue(true);
       const actions = await refreshClaudeCredentialsForActiveRemoteAgents({

@@ -370,10 +370,11 @@ export async function refreshHostHeartbeatForEphemeralVms(
 ): Promise<string[]> {
   const activeStates = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)();
   const ephemeralStates = activeStates.filter(
-    (state) => state.tier !== 'durable',
     // Missing tier defaults to ephemeral: older states pre-date tier tracking,
     // and writing a heartbeat is harmless for durable VMs while essential for
-    // ephemeral ones that may still have a watchdog installed.
+    // ephemeral ones that may still have a watchdog installed. A linked work
+    // agent's Fly machine record owns its heartbeat (PAN-4734 FR-10).
+    (state) => state.tier !== 'durable' && state.linked !== true,
   );
   if (ephemeralStates.length === 0) return [];
 
@@ -436,7 +437,10 @@ export function checkRemoteSpendCap(
   } catch (error) {
     if (cap > 0) throw error; // fail closed only when a cap applies
   }
-  const current = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)().length + flyMachines;
+  // A linked work agent runs on a Fly machine that is already counted (PAN-4734 FR-10).
+  const legacyAgents = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)()
+    .filter((state) => state.linked !== true).length;
+  const current = legacyAgents + flyMachines;
 
   if (!cap || cap <= 0) {
     return { allowed: true, current, cap: 0 };
