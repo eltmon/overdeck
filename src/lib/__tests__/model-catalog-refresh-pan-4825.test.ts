@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { getPricing } from '../cost.js';
 import { MODEL_CAPABILITY_CLASSES } from '../model-capability-class.js';
-import { getModelEffortLevels, hasModelCapability, resolveModelId } from '../model-capabilities.js';
+import { getModelCapability, getModelEffortLevels, hasModelCapability, resolveModelId } from '../model-capabilities.js';
+import { resolveKimiNativeEffort } from '../kimi-effort.js';
 import { MODEL_DEPRECATIONS } from '../model-deprecations.js';
 import { getModelProvider, isOpenRouterModel } from '../model-fallback.js';
 import { getProviderForModel, PROVIDERS, type ProviderName } from '../providers.js';
@@ -127,5 +128,13 @@ describe('Muse max effort', () => {
     expect(getModelEffortLevels('muse-wonder-1.0')).toContain('max');
     expect(getModelEffortLevels('muse-spark-1.3')).toContain('max');
     expect(getModelEffortLevels('muse-spark-1.3-contributor')).not.toContain('max');
+  });
+});
+
+describe('Kimi kimi-for-coding is K2.8 Preview', () => {
+  it('reports the 1M window and translates canonical effort to native levels', () => {
+    expect(getModelCapability('kimi-code/kimi-for-coding').contextWindow).toBe(1048576);
+    expect(resolveKimiNativeEffort('kimi-code/kimi-for-coding', 'medium')).toBe('high');
+    expect(getModelEffortLevels('kimi-code/kimi-for-coding-highspeed')).toEqual([]);
   });
 });

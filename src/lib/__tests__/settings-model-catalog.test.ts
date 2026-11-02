@@ -56,6 +56,16 @@ const expectedPreviousCatalog = {
   ...previousCatalog,
   mimo: [],
   meta: previousCatalog.meta.map((model: { id: string }) => (model.id === 'muse-spark-1.3' ? { ...model, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] } : model)),
+  // The Kimi CLI now serves kimi-for-coding as K2.8 Preview (1M, low/high/max) and names the highspeed alias K2.7 Code Highspeed (PAN-4825).
+  kimi: previousCatalog.kimi.map((model: { id: string }) => {
+    if (model.id === 'kimi-code/kimi-for-coding') {
+      return { ...model, name: 'Kimi K2.8 Preview (1M context) — Kimi Code CLI', baseName: 'Kimi K2.8 Preview (1M context)', contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] };
+    }
+    if (model.id === 'kimi-code/kimi-for-coding-highspeed') {
+      return { ...model, name: 'Kimi K2.7 Code Highspeed (256K context) — Kimi Code CLI', baseName: 'Kimi K2.7 Code Highspeed (256K context)' };
+    }
+    return model;
+  }),
 };
 
 function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }>; kimi: Array<{ id: string }>; mimo: Array<{ id: string }>; minimax: Array<{ id: string }> }>(catalog: T): T {
