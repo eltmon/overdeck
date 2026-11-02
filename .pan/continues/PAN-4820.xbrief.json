@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T18:00:02.600Z",
+  "updated": "2026-11-02T18:00:20.329Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
       "claimedBy": "agent-pan-4820",
       "claimedAt": "2026-11-02T17:55:40.717Z",
       "doneAt": "2026-11-02T18:00:02.600Z"
+    },
+    "merge-gate-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:00:20.328Z"
     }
   }
 }
