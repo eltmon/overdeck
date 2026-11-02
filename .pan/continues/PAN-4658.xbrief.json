@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4658",
   "created": "2026-11-02T04:25:38.183Z",
-  "updated": "2026-11-02T04:46:36.201Z",
+  "updated": "2026-11-02T04:46:45.615Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4658",
       "claimedAt": "2026-11-02T04:42:35.413Z",
       "doneAt": "2026-11-02T04:46:36.201Z"
+    },
+    "chip-passes-target": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4658",
+      "claimedAt": "2026-11-02T04:46:45.614Z"
     }
   }
 }
