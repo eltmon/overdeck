@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4722",
   "created": "2026-11-02T15:37:17.298Z",
-  "updated": "2026-11-02T16:02:09.521Z",
+  "updated": "2026-11-02T16:02:34.355Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "install-target.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T16:02:09.520Z"
+    },
+    "sync-via-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:02:34.355Z"
     }
   }
 }
