@@ -13,6 +13,7 @@ src/__tests__/overlay-tokens.test.ts
 src/components/Agents/directory/directory-tree.test.ts
 src/components/Agents/live/live-model.test.ts
 src/components/CommandDeck/CommandDeck.test.tsx
+src/components/CommandDeck/ProjectTree/FeatureItem.linkedConversation.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.pullRequest.test.tsx
 src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts
 src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx
