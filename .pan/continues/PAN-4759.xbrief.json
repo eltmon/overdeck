@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4759",
   "created": "2026-11-02T01:10:45.557Z",
-  "updated": "2026-11-02T02:01:13.102Z",
+  "updated": "2026-11-02T02:01:26.498Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -270,6 +270,10 @@
     "move-sageox.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T02:01:13.102Z"
+    },
+    "move-state-apply.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:01:26.497Z"
     }
   }
 }
