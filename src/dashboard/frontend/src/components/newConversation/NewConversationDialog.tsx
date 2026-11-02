@@ -186,12 +186,14 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
       onClose={onClose}
       dismissible={!submitting}
       onSubmit={submit}
-      pinned={error ? <p role="alert" className={styles.error}>{error}</p> : null}
+      pinned={error
+        ? <p role="alert" className={styles.error}>{error}</p>
+        : (submitting && machine.machine === 'fly' ? <p role="status" className={styles.summary}>Starting a Fly machine. This takes a few minutes.</p> : null)}
       footer={<>
         <p className={styles.summary} data-component="new-conversation-summary">{footerSummary}</p>
         <button type="button" className={styles.button} onClick={onClose} disabled={submitting}>Cancel</button>
         <button type="submit" className={styles.primaryButton} aria-label="Create conversation" disabled={submitting}>
-          {submitting ? 'Creating…' : 'Create'}
+          {submitting ? (machine.machine === 'fly' ? 'Starting…' : 'Creating…') : 'Create'}
         </button>
       </>}
     >
