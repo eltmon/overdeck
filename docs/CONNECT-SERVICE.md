@@ -71,9 +71,9 @@ Operator-only. **No agent deploys** and no agent runs any of the commands below.
 
 1. `npm run build:dry` in `services/connect` exits 0.
 2. Deploy `services/account` first (`docs/ACCOUNT-SERVICE.md`, "Deploy"); the `ACCOUNT` binding needs `overdeck-account` with its `AccountRpc` entrypoint returning `entitlement`, or every directory socket answers `account_service_outdated`.
-3. Reuse the share service's Realtime TURN key, or create one in the Cloudflare dashboard (Realtime section).
+3. Reuse the share service's Realtime TURN key, or create one in the Cloudflare dashboard (Realtime → TURN Server). An account without Realtime must first add the Realtime subscription, which needs a payment method (1,000 GB a month free, then billed per GB).
 4. `cd services/connect && npx wrangler secret put TURN_KEY_ID`, then `npx wrangler secret put TURN_KEY_API_TOKEN`.
 5. `npx wrangler deploy` (uploads the Worker, creates the `AccountDirectory` Durable Object from migration `v1`, binds `ACCOUNT` and both rate limiters, and registers `connect.overdeck.ai`).
-6. Smoke test: `curl -s https://connect.overdeck.ai/healthz` shows `"configured":true` and `"turn":true`.
+6. Smoke test: `node scripts/anywhere/smoke-hosted.mjs` exits 0 (both Workers' `/healthz`, plus one account device-code start), and on a signed-in machine `pan machines directory` lists it `online` within a minute.
 7. Run the two live checks of D-2356-21 on real machines: two machines on different networks without Tailscale link by approval and reach each other over `rtc://`; with UDP blocked on both, a relay-plan account links over `rtc+turn://` and the card shows **Using relay**.
 8. Rollback: `npx wrangler rollback` returns to the previous Worker version.

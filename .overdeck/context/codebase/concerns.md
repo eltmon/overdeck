@@ -141,6 +141,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly and f
   dialog's select cursor is the same `❯` the composer shows, and unnumbered selects
   escape `paneHasBlockingChoiceMenu`, so `waitForClaudeReady` matches known
   dialog titles instead.
+  With no `FLY_API_TOKEN` (or `remote.fly.api_token_env` variable), `createFlyApiClient()`
+  sends flyctl's stored `~/.fly/config.yml` token through a `FlyTokenSource`
+  (`src/lib/remote/fly-token.ts`, PAN-4748): `FlyApiClient.request()` re-reads the token
+  per call and, on a 401/403, runs `flyctl auth token` once (process-wide single-flight,
+  60s cooldown on failure) and retries. `pollUntil` rethrows a rejection that survives
+  the retry as `FlyMachineError('fly-token-rejected')` instead of counting it as "not
+  finished"; the heartbeat/sweep/Codex-sync loop lines, `pan machines unlink`/rollback,
+  and `pan doctor`'s `Fly token` row all report it as `Fly token rejected`.
 - **A workspace's `feature/<id>` branch tracks `origin/main`** (`branch.<b>.merge =
   refs/heads/main`), so a bare `git push` from a workspace fails ("upstream branch
   does not match") and `pushPlanArtifacts` (`overdeck/plan-artifact-commit.ts`)
