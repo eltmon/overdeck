@@ -490,3 +490,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Operator 2026-11-02: roles.flywheel.maxAgents 4 -> 8; auto_pickup_backlog stays
   OFF. "Nothing pickable" means no ready+released backlog items, which is
   different from an empty pipeline. Say so explicitly when reporting.
+- 2026-11-02 03:02 UTC: a push made after approval (for example, CodeRabbit fixes)
+  leaves GitHub `reviewDecision=APPROVED`, but the merge gate wants an approval of
+  the exact head, so the train skips the PR and logs nothing (PAN-4759 #4768,
+  approved 1d360ce2d, head 697a05f82). Check `overdeck=<state> <sha>` against the
+  head, not just reviewDecision. When routing CodeRabbit findings, always tell the
+  agent to finish with `pan review request <id>` after pushing.
