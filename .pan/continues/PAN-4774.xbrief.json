@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T21:49:15.106Z",
+  "updated": "2026-11-02T21:53:22.485Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,9 +70,10 @@
       "doneAt": "2026-11-02T21:49:14.179Z"
     },
     "ac15-open-in-editor": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4774",
-      "claimedAt": "2026-11-02T21:49:15.106Z"
+      "claimedAt": "2026-11-02T21:49:15.106Z",
+      "doneAt": "2026-11-02T21:53:22.485Z"
     }
   }
 }
