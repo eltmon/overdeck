@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T16:36:31.184581Z · model: claude-opus-5-5 · open: 875_
+_Last sequenced: 2026-11-02T16:37:25.401875Z · model: claude-opus-5-5 · open: 874_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -183,7 +183,6 @@ _Last sequenced: 2026-11-02T16:36:31.184581Z · model: claude-opus-5-5 · open: 
 | 174 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 175 | PAN-4827 | M | high | ok |  | PAN-4825 | Google and DashScope tierModels name dead ids, breaking Claude Code subagents there; adds Gemini/Qwen/GLM models and fixes prices |
 | 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
-| 177 | PAN-4819 | XS | low | ok |  |  | Throwaway in-pipeline issue for PAN-4734 live Fly checkpoint (WI-14); closed without merging once the check is recorded. |
 | 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
 | 179 | PAN-4844 | S | medium | ok |  |  | Claude Code parser prices glm-*/qwen3* as Sonnet 4, ohmypi prices DashScope at $0; route both to custom rows. |
 | 180 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
@@ -1210,10 +1209,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T16:36:31.184581Z",
+  "generatedAt": "2026-11-02T16:37:25.401875Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 875,
+  "openCount": 874,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -3518,19 +3517,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "Cost-bleed circuit breaker — progress-aware, always-on guard against runaway spend; the one real guard the epic authorizes. Updated since the prior run (comment/label activity); body substance unchanged, rank held. Note: its costBleedMonitor is described as a deacon patrol — deacon-lite is the new home. Blocker PAN-2466 closed since the prior run; dependsOn pruned.",
       "gate": "auto",
       "planning": "skip"
-    },
-    {
-      "issue": "PAN-4819",
-      "rank": 177,
-      "size": "XS",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Throwaway in-pipeline issue for PAN-4734 live Fly checkpoint (WI-14); closed without merging once the check is recorded.",
-      "rationale": "New in-pipeline throwaway: placed in the free rank 177 near its parent PAN-4734 (rank 147) so no pinned rank shifts.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-1042",
@@ -13417,13 +13403,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-4819",
-      "to": "PAN-4734",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4823",
