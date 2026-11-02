@@ -83,6 +83,11 @@ export function SimpleQuestionCard({ agent, onSend, sending }: SimpleQuestionCar
       <div className="mt-3 rounded-[10px] bg-accent px-3.5 py-3 text-[14px] leading-relaxed">
         {question.question}
       </div>
+      {question.context ? (
+        <div className="mt-2 whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground">
+          {question.context}
+        </div>
+      ) : null}
 
       {question.options.length > 0 && (
         <div className="mt-2.5 grid gap-2">

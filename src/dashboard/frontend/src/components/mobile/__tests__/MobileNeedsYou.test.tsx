@@ -52,6 +52,25 @@ describe('MobileNeedsYou', () => {
     vi.unstubAllGlobals();
   });
 
+  it('shows the decision context under the question', () => {
+    decisions = [auq('a1', 'agent', 'operator-decision:q1', ['Yes', 'No'], {
+      pendingAskUserQuestion: {
+        toolUseId: 'operator-decision:q1',
+        askedAt: '2026-11-01T00:00:00.000Z',
+        questions: [{ question: 'Pick a path.', context: '- tried A\n- tried B', options: [{ label: 'Yes' }, { label: 'No' }] }],
+      },
+    })];
+    render(<MobileNeedsYou subjectId={null} />);
+    expect(screen.getByText('Pick a path.')).toBeInTheDocument();
+    expect(screen.getByText(/tried A/)).toBeInTheDocument();
+  });
+
+  it('renders no context paragraph when the question has none', () => {
+    decisions = [auq('a1', 'agent', 't1', ['Yes', 'No'])];
+    render(<MobileNeedsYou subjectId={null} />);
+    expect(screen.queryByText(/tried A/)).toBeNull();
+  });
+
   it('sends an agent answer to answer-question and removes the card', async () => {
     decisions = [auq('a1', 'agent', 't1', ['Yes', 'No'])];
     const fetchMock = okFetch();
