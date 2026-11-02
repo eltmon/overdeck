@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T14:55:53.100Z",
+  "updated": "2026-11-02T14:56:09.532Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "fleet-conversation-fly.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T14:55:53.099Z"
+    },
+    "cli-fly-refusal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:56:09.532Z"
     }
   }
 }
